@@ -21,7 +21,54 @@ Ein Rudel — online wie offline.
 
 NIE einen registrierten Nutzer als „Mitglied" bezeichnen. Stattdessen „Community" oder „Spieler".
 
+## Phase A — Quick-Wins (04.05.2026 · 11/11 grün)
+
+- [x] **Galerie-Bug-Fix**: `/galerie` und `/gallery` Routes registriert (vorher Catch-all 404)
+- [x] **Sponsor-Tier-System v2**: 6 Tiers + Auto-Defaults für `show_on_home/footer`. Placement-Filter, PATCH-Recompute.
+- [x] **Image-Upload überall**: `<ImageUpload>`-Komponente, Bulk-Upload für Galerie, Auto-Migration externer URLs.
+- [x] **Profil Multi-Select**: `input_devices`, `main_platforms`, `gaming_subscriptions`.
+- [x] **News Datumsangabe**: `published_at` als `datetime-local`.
+- [x] **Twitch-Embed**: Toggle + Public-Profile-Embed.
+- [x] **SponsorTicker**: Placement-aware.
+- [x] **Tests**: 5/5 + 7/7 grün, Frontend 0 Issues.
+
 ## Phase 1+2 — IMPLEMENTIERT (04.05.2026 · Re-Plattform)
+
+
+## Roadmap (Re-Branding & Skalierung)
+
+### 🔴 Phase D — Vereins-Identität + Navigation-Refactor (NEXT)
+- Hauptnavigation: Home / Verein / Community / Mitglieder / Events / eSports / Teams / Spieler / News / Sponsoren / Mein Bereich / Admin
+- **Untertabs/Dropdowns** + Mobile Akkordeon
+- **Breadcrumbs** auf Detail-Seiten
+- „Arena" nur noch als Untermodul, Hauptbranding = „THE LION SQUAD eSPORTS"
+
+### 🟠 Phase B — Globales Achievement-System v3 (Punkt 30+31)
+- Datenmodell: `achievement_group_key`, `level`, `progress_target`, `random_trigger_*`, `cooldown_days`, `severity`, `points_value`, `condition_key`
+- **Achievement-Engine** mit Trigger-Hooks für alle Plattform-Events
+- Progressive Bronze→Silber→Gold→Platin
+- Negative Fun-Achievements (25 Player + 7 Team + 8 Fast-Lap), `hidden_until_unlocked`, Random-Trigger, Spam-Schutz
+- Profil-Page mit Progress-Anzeige + Locked/Hidden-Logik
+
+### 🟡 Phase C — Mitglieder-System dynamisch (Punkt 32)
+- Public/Internal/Admin Member Directory dynamisch
+- Profilvollständigkeit-Score
+- Auto-Badges in Mitgliederkarten
+- Membership-Application Form
+
+### 🟢 Phase F — Web-Admin-CMS (Punkt 34)
+- Pages-CMS, Medienverwaltung, Navigation-Editor, Email-Templates, Formular-Inbox
+
+### 🔵 Phase E — Live-Streamer-Integration (Punkt 9)
+- Twitch Helix API mit Client-ID/Secret im Admin-Panel
+- Auto-Slider auf Home (10s rotation)
+
+### ⚪️ Phase G — SEO + Discovery (Punkt 11)
+- JSON-LD strukturierte Daten, dynamische OG-Tags, robots.txt, IndexNow
+
+### ⚫️ Phase H — One-Line Installer (Punkt 10)
+- Docker / docker-compose interaktives `install.sh` + `update.sh`
+
 
 ### Backend
 - [x] User-Model erweitert: `user_type`, `is_club_member`, `roles[]`, plus 30+ Profilfelder (Vorname/Nachname/Nickname, Geburtsdatum, Stadt, Hauptplattform, Eingabegerät, Lieblingsspiele, Banner, Twitch/YouTube/TikTok/Instagram/X/Steam/Epic/PSN/Xbox/Nintendo/EA/Riot/Battle.net/Website, profile_visibility)
