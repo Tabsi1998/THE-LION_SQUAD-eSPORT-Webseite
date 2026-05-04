@@ -51,6 +51,7 @@ class TestDiscordSettings:
         data = r.json()
         # masked or empty
         assert "webhook_url" not in data or data.get("webhook_url_masked")
+        assert "configured" in data
 
     def test_discord_put_persists_and_audits(self, admin_client, base_url):
         # Save without webhook to avoid actually triggering anything
@@ -77,6 +78,20 @@ class TestDiscordSettings:
         assert a.status_code == 200
         actions = [x.get("action") for x in a.json()]
         assert any("settings.discord.update" in (x or "") for x in actions)
+
+    def test_discord_rejects_invalid_webhook(self, admin_client, base_url):
+        r = admin_client.put(
+            f"{base_url}/api/settings/discord",
+            json={"webhook_url": "https://example.com/not-discord", "enabled": True},
+        )
+        assert r.status_code == 400
+
+    def test_discord_can_clear_webhook(self, admin_client, base_url):
+        r = admin_client.put(f"{base_url}/api/settings/discord", json={"clear_webhook": True})
+        assert r.status_code == 200
+        g = admin_client.get(f"{base_url}/api/settings/discord")
+        assert g.status_code == 200
+        assert g.json().get("configured") is False
 
     def test_discord_test_disabled_when_no_webhook(self, admin_client, base_url):
         # Ensure webhook is empty (we did not save one above)

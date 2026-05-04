@@ -51,6 +51,7 @@ class TestEmailBody(BaseModel):
 
 class DiscordSettings(BaseModel):
     webhook_url: Optional[str] = None
+    clear_webhook: Optional[bool] = None
     username: Optional[str] = None
     avatar_url: Optional[str] = None
     enabled: bool = True
@@ -242,10 +243,21 @@ async def email_logs(me: dict = Depends(require_admin())):
 async def get_discord(me: dict = Depends(require_admin())):
     db = get_db()
     s = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
+    s["configured"] = bool(s.get("webhook_url"))
     if s.get("webhook_url"):
         u = s["webhook_url"]
         s["webhook_url_masked"] = u[:30] + "…" if len(u) > 30 else "***"
         s.pop("webhook_url", None)
+    last = await db.email_logs.find_one(
+        {"channel": "discord"},
+        {"_id": 0, "status": 1, "error": 1, "event_key": 1, "created_at": 1},
+        sort=[("created_at", -1)],
+    )
+    if last:
+        s["last_status"] = last.get("status")
+        s["last_error"] = last.get("error")
+        s["last_event_key"] = last.get("event_key")
+        s["last_checked_at"] = last.get("created_at")
     return s
 
 
@@ -253,11 +265,25 @@ async def get_discord(me: dict = Depends(require_admin())):
 async def update_discord(body: DiscordSettings, me: dict = Depends(require_admin())):
     db = get_db()
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    clear_webhook = bool(updates.pop("clear_webhook", False))
+    unset = {"webhook_url": ""} if clear_webhook else {}
+    if "webhook_url" in updates:
+        updates["webhook_url"] = updates["webhook_url"].strip()
     if "webhook_url" in updates and not updates["webhook_url"]:
         updates.pop("webhook_url")
+    if "webhook_url" in updates:
+        from discord_service import is_valid_discord_webhook_url
+        if not is_valid_discord_webhook_url(updates["webhook_url"]):
+            raise HTTPException(400, "Ungueltige Discord Webhook URL. Erlaubt sind https://discord.com/api/webhooks/... URLs.")
+    for key in ("username", "avatar_url"):
+        if key in updates and isinstance(updates[key], str):
+            updates[key] = updates[key].strip()
     updates["updated_at"] = now_utc().isoformat()
+    op = {"$set": updates, "$setOnInsert": {"id": "discord"}}
+    if unset:
+        op["$unset"] = unset
     await db.settings.update_one(
-        {"id": "discord"}, {"$set": updates, "$setOnInsert": {"id": "discord"}}, upsert=True,
+        {"id": "discord"}, op, upsert=True,
     )
     await db.audit_logs.insert_one({"id": new_id(), "action": "settings.discord.update",
                                      "actor_id": me["id"], "created_at": now_utc().isoformat()})

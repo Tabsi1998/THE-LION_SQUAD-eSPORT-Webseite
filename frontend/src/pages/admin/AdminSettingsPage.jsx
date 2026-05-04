@@ -12,8 +12,8 @@ export default function AdminSettingsPage() {
   const [smtpTestEmail, setSmtpTestEmail] = useState("");
   const [queue, setQueue] = useState([]);
   const [queueFilter, setQueueFilter] = useState("");
-  const [brand, setBrand] = useState({ club_name: "", tagline: "", primary_color: "#29B6E8", logo_url: "", mascot_url: "", domain: "", timezone: "Europe/Vienna", imprint: "", privacy_policy: "" });
-  const [discord, setDiscord] = useState({ webhook_url: "", username: "", avatar_url: "", enabled: true, webhook_url_masked: "" });
+  const [brand, setBrand] = useState({ club_name: "", tagline: "", primary_color: "#29B6E8", logo_url: "", mascot_url: "", domain: "", timezone: "Europe/Vienna", imprint: "", privacy_policy: "", discord_invite_url: "", twitch_channel: "" });
+  const [discord, setDiscord] = useState({ webhook_url: "", username: "", avatar_url: "", enabled: true, configured: false, webhook_url_masked: "", last_status: "", last_error: "", last_event_key: "", last_checked_at: "" });
   const [testEmail, setTestEmail] = useState("");
   const [logs, setLogs] = useState([]);
 
@@ -49,6 +49,12 @@ export default function AdminSettingsPage() {
   const saveDiscord = async () => {
     const payload = { ...discord };
     if (!payload.webhook_url) delete payload.webhook_url;
+    delete payload.configured;
+    delete payload.webhook_url_masked;
+    delete payload.last_status;
+    delete payload.last_error;
+    delete payload.last_event_key;
+    delete payload.last_checked_at;
     try { await api.put("/settings/discord", payload); toast.success("Discord gespeichert."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
@@ -64,8 +70,16 @@ export default function AdminSettingsPage() {
   const sendDiscordTest = async () => {
     try {
       const { data } = await api.post("/settings/discord/test");
-      if (data.ok) toast.success("Discord-Test gesendet.");
-      else toast.error(`Fehler: ${data.reason || "unbekannt"}`);
+      if (data.ok) toast.success(`Discord-Test gesendet${data.status_code ? ` (${data.status_code})` : ""}.`);
+      else toast.error(`Fehler: ${data.error || data.reason || "unbekannt"}`);
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+  const clearDiscordWebhook = async () => {
+    if (!window.confirm("Discord Webhook wirklich entfernen?")) return;
+    try {
+      await api.put("/settings/discord", { clear_webhook: true });
+      toast.success("Discord Webhook entfernt.");
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
@@ -99,7 +113,7 @@ export default function AdminSettingsPage() {
   };
 
   const emailNotConfigured = !email.resend_api_key_masked;
-  const discordNotConfigured = !discord.webhook_url_masked;
+  const discordNotConfigured = !discord.configured && !discord.webhook_url_masked;
 
   return (
     <AdminLayout>
@@ -380,8 +394,15 @@ export default function AdminSettingsPage() {
             <div>
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Webhook URL {discord.webhook_url_masked && <span className="text-white/40 normal-case">(aktuell: {discord.webhook_url_masked})</span>}</div>
               <input type="password" placeholder="https://discord.com/api/webhooks/…" value={discord.webhook_url} onChange={(e) => setDiscord({ ...discord, webhook_url: e.target.value })} data-testid="discord-webhook" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
-              <p className="text-xs text-white/40 mt-1">Leer lassen um den bestehenden Webhook beizubehalten.</p>
+              <p className="text-xs text-white/40 mt-1">Leer lassen um den bestehenden Webhook beizubehalten. Erlaubt sind https://discord.com/api/webhooks/... URLs.</p>
             </div>
+            {discord.last_status && (
+              <div className={`border rounded-sm p-3 text-xs ${discord.last_status === "sent" ? "border-[#00FF88]/25 bg-[#00FF88]/5 text-white/60" : "border-[#FF3B30]/25 bg-[#FF3B30]/5 text-white/60"}`}>
+                <div className="font-bold uppercase tracking-widest mb-1">Letzter Discord Status: {discord.last_status}</div>
+                <div>{discord.last_checked_at ? new Date(discord.last_checked_at).toLocaleString("de-DE") : ""}{discord.last_event_key ? ` - ${discord.last_event_key}` : ""}</div>
+                {discord.last_error && <div className="mt-1 text-[#FF3B30] break-words">{discord.last_error}</div>}
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Bot-Name</div>
@@ -395,6 +416,7 @@ export default function AdminSettingsPage() {
             <div className="flex flex-col sm:flex-row gap-2">
               <button onClick={saveDiscord} data-testid="discord-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
               <button onClick={sendDiscordTest} data-testid="discord-test" className="px-4 py-2 border border-[#5865F2] text-[#5865F2] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Test senden</button>
+              {discord.configured && <button onClick={clearDiscordWebhook} data-testid="discord-clear" className="px-4 py-2 border border-[#FF3B30]/60 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm">Webhook entfernen</button>}
             </div>
           </div>
         </div>
@@ -410,6 +432,10 @@ export default function AdminSettingsPage() {
               <BrandField label="Domain" value={brand.domain} onChange={(v) => setBrand({ ...brand, domain: v })} testId="brand-domain" />
             </div>
             <BrandField label="Zeitzone" value={brand.timezone} onChange={(v) => setBrand({ ...brand, timezone: v })} testId="brand-tz" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <BrandField label="Discord Einladung" value={brand.discord_invite_url} onChange={(v) => setBrand({ ...brand, discord_invite_url: v })} testId="brand-discord-invite" />
+              <BrandField label="Twitch Channel" value={brand.twitch_channel} onChange={(v) => setBrand({ ...brand, twitch_channel: v })} testId="brand-twitch-channel" />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ImageUpload value={brand.logo_url} onChange={(v) => setBrand({ ...brand, logo_url: v })} label="Vereinslogo" testId="brand-logo" variant="square" />
               <ImageUpload value={brand.mascot_url} onChange={(v) => setBrand({ ...brand, mascot_url: v })} label="Maskottchen" testId="brand-mascot" variant="square" />

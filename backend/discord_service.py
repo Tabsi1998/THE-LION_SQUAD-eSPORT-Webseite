@@ -3,18 +3,29 @@ Silent failure if not configured."""
 import asyncio
 import logging
 import httpx
+from urllib.parse import urlparse
 from database import get_db
 from models import now_utc, new_id
 
 logger = logging.getLogger("tls-arena.discord")
+VALID_WEBHOOK_HOSTS = {"discord.com", "discordapp.com", "canary.discord.com", "ptb.discord.com"}
+
+
+def is_valid_discord_webhook_url(url: str) -> bool:
+    parsed = urlparse((url or "").strip())
+    if parsed.scheme != "https" or parsed.netloc.lower() not in VALID_WEBHOOK_HOSTS:
+        return False
+    parts = [p for p in parsed.path.split("/") if p]
+    return len(parts) >= 4 and parts[0] == "api" and parts[1] == "webhooks"
 
 
 async def _get_discord_config() -> dict:
     db = get_db()
     s = await db.settings.find_one({"id": "discord"}) or {}
+    webhook_url = (s.get("webhook_url") or "").strip()
     return {
-        "webhook_url": s.get("webhook_url") or "",
-        "enabled": bool(s.get("enabled", True) and s.get("webhook_url")),
+        "webhook_url": webhook_url,
+        "enabled": bool(s.get("enabled", True) and webhook_url),
         "username": s.get("username") or "TLS ARENA",
         "avatar_url": s.get("avatar_url") or None,
     }
@@ -34,7 +45,12 @@ async def send_discord(title: str, description: str = "", *,
     if not cfg["enabled"]:
         log["error"] = "Discord webhook not configured"
         await db.email_logs.insert_one(log)
-        return {"ok": False, "reason": "disabled"}
+        return {"ok": False, "reason": "disabled", "error": log["error"]}
+    if not is_valid_discord_webhook_url(cfg["webhook_url"]):
+        log["status"] = "failed"
+        log["error"] = "Invalid Discord webhook URL"
+        await db.email_logs.insert_one(log)
+        return {"ok": False, "reason": "invalid_webhook_url", "error": log["error"]}
 
     embed = {"title": title[:256], "description": description[:4000], "color": color}
     if url: embed["url"] = url
@@ -51,7 +67,11 @@ async def send_discord(title: str, description: str = "", *,
         else:
             log["status"] = "sent"
         await db.email_logs.insert_one(log)
-        return {"ok": log["status"] == "sent"}
+        return {
+            "ok": log["status"] == "sent",
+            "status_code": r.status_code,
+            "error": log["error"],
+        }
     except Exception as e:
         logger.error(f"[discord] {e}")
         log["status"] = "failed"
