@@ -126,6 +126,41 @@ Self-hosted Tournament-Management-System ähnlich Toornament/Challonge, speziell
 - [x] 8/8 neue Backend-Tests grün (featured season, discord settings, sponsors seed)
 - [x] Frontend: Season Pass, Discord Tab, TV QR+Sponsors, Mobile Scroll alle grün (iteration_3.json)
 
+## Phase 4 — Content & Real Events (04.05.2026 · 3. Pass)
+
+### Backend
+- [x] Tournament Model: `prize_places` (List[dict]: place/label/value), `twitch_channel`, `twitch_enabled`
+- [x] F1Challenge Model: `prize_places`, `twitch_channel`, `twitch_enabled`
+- [x] `/api/exports/f1/{slug}/championship.pdf` — Championship Standings als PDF
+- [x] `/api/exports/f1/{slug}/leaderboard.pdf?track_id=X` — per-Strecke PDF
+- [x] `/api/settings/public` enthält nun `discord_invite_url` + `twitch_channel` (mit THE LION SQUAD Defaults)
+- [x] Discord-Trigger (silent-fail wenn nicht konfiguriert):
+  - Tournament Status-Wechsel → `registration_open`/`live`/`completed` → Embed mit Spiel + Format + Teilnehmern
+  - Match abgeschlossen → Sieger-Embed mit Score + Runde
+  - Neue F1-Bestzeit (neuer Leader pro Strecke) → Embed mit Fahrer + Zeit + vorherige Bestzeit
+- [x] Seed-Daten durch echte TLS Events ersetzt:
+  - Mario Kart · Gamers Heaven Cup (20. Juni, 16 Spieler, SE, 4 Preise)
+  - Super Smash Bros. Ultimate · Gamers Heaven (21. Juni, 16 Fighter, DE, 3 Preise)
+  - Mario Kart Masters · September Showdown (September, 128 Spieler, Groups+DE, 5 Preis-Tiers)
+  - F1 Fast Lap · Gamers Heaven · Samstag (Silverstone) + Sonntag (Spa)
+  - Season 2026 verbindet alle Events
+- [x] Backup: Import-Bug (`championship_standings` statt `championship`) von Testing-Agent gefixt
+
+### Frontend
+- [x] **CurrentEventHero** — Prominente Featured-Event Card auf Home (Priorität: live > check_in > registration_open), zeigt Titel, Beschreibung, Datum, freie Plätze (rot wenn ≤4), strukturierte Preis-Vorschau, CTA
+- [x] **SponsorTicker** — Endless-Marquee Band am Home-Ende mit Sponsor-Logos + Tier-Badges
+- [x] **SponsorGrid** — kompakte Nebeneinander-Anzeige für TV Footer (F1 + Bracket)
+- [x] **PrizeList** — strukturierte Preis-Karten (Gold/Silber/Bronze + Akzent-Platzierungen) mit Icons, Fallback auf Freitext
+- [x] **F1 TV Track-Selector** — Pfeil-Buttons + Dropdown + Arrow-Key-Navigation + `?track=` Deep-Link, Auto-Zyklus nur bei Championship ohne manuelle Sperre
+- [x] **F1 Detail PDF-Buttons** — "PDF (aktuelle Strecke)" + "Championship PDF" (bei Championship) + CSV als Sekundär-Option
+- [x] **Twitch Embed** — Live-Player auf Turnier- und F1-Seite wenn `twitch_enabled=true`
+- [x] **Footer Community** — Discord + Twitch Icons mit dynamischen URLs aus Public Settings, + Sponsoren-Link
+- [x] **Admin Tournament/F1 Create** — strukturierter Preis-Editor (Platz + Label + Wert + Hinzufügen/Entfernen), Twitch-Channel Eingabe + Einbetten-Checkbox, Location, Discord-Link
+
+### Tests
+- [x] 8/8 Backend-Tests für Phase 4 grün (iteration_4.json) — prize_places Roundtrip, twitch persistence, F1 Track-PDF, Championship-PDF, public settings defaults, Events vorhanden
+- [x] Frontend validiert: HomePage 3 Widgets, TournamentDetail PrizeList+Twitch, F1Detail PDF+CSV+Twitch, F1TV SponsorGrid, BracketTV SponsorGrid, PublicLayout Footer Community, AdminForms Editor
+
 | # | Kriterium | Status |
 |---|-----------|--------|
 | 1 | Spieler kann sich registrieren und einloggen | ✅ |
