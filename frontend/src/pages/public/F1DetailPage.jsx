@@ -102,7 +102,11 @@ export default function F1DetailPage() {
                       activeTrack === tr.id ? "border-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 hover:border-[#29B6E8]/40"
                     }`}
                   >
-                    {tr.image_url && <img src={tr.image_url} alt="" className="w-14 h-10 object-cover rounded-sm" />}
+                    {tr.image_url ? (
+                      <img src={tr.image_url} alt="" className="w-14 h-10 object-cover rounded-sm" />
+                    ) : (
+                      <div className="w-14 h-10 rounded-sm bg-[#0A0A0A] border border-white/5" />
+                    )}
                     <div className="min-w-0">
                       <div className="font-heading font-bold truncate">{tr.name}</div>
                       <div className="text-[10px] uppercase tracking-widest text-white/50">{tr.country}</div>
@@ -112,11 +116,11 @@ export default function F1DetailPage() {
               </div>
             </aside>
             <div className="lg:col-span-3">
-              {board?.track?.image_url && (
+              {board?.track?.image_url ? (
                 <div className="mb-4 rounded-sm overflow-hidden border border-white/10">
                   <img src={board.track.image_url} alt={board.track.name} className="w-full h-48 object-cover" />
                 </div>
-              )}
+              ) : null}
               <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
                 <div className="p-4 border-b border-white/10 flex items-center justify-between">
                   <h3 className="font-heading text-xl font-bold">{board?.track?.name || "—"}</h3>

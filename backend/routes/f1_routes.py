@@ -14,6 +14,16 @@ from models import (
 router = APIRouter(prefix="/api/f1", tags=["f1"])
 
 
+async def _resolve_cid(slug_or_id: str) -> str:
+    db = get_db()
+    c = await db.f1_challenges.find_one(
+        {"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"id": 1}
+    )
+    if not c:
+        raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
+    return c["id"]
+
+
 def _ms_to_time_str(ms: int) -> str:
     if ms is None:
         return "—"
@@ -83,6 +93,7 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
 @router.delete("/challenges/{cid}")
 async def delete_challenge(cid: str, me: dict = Depends(require_admin())):
     db = get_db()
+    cid = await _resolve_cid(cid)
     await db.f1_challenges.delete_one({"id": cid})
     await db.f1_tracks.delete_many({"challenge_id": cid})
     await db.f1_lap_times.delete_many({"challenge_id": cid})
@@ -93,6 +104,7 @@ async def delete_challenge(cid: str, me: dict = Depends(require_admin())):
 @router.post("/challenges/{cid}/tracks")
 async def add_track(cid: str, body: F1TrackCreate, me: dict = Depends(require_admin())):
     db = get_db()
+    cid = await _resolve_cid(cid)
     c = await db.f1_challenges.find_one({"id": cid})
     if not c:
         raise HTTPException(status_code=404)
@@ -127,6 +139,7 @@ async def delete_track(tid: str, me: dict = Depends(require_admin())):
 async def leaderboard(cid: str, track_id: str | None = None):
     """Per-track leaderboard. If no track_id, use first track."""
     db = get_db()
+    cid = await _resolve_cid(cid)
     c = await db.f1_challenges.find_one({"id": cid}, {"_id": 0})
     if not c:
         raise HTTPException(status_code=404)
@@ -181,6 +194,7 @@ async def leaderboard(cid: str, track_id: str | None = None):
 async def championship_standings(cid: str):
     """Championship standings across all tracks using points_per_position."""
     db = get_db()
+    cid = await _resolve_cid(cid)
     c = await db.f1_challenges.find_one({"id": cid}, {"_id": 0})
     if not c:
         raise HTTPException(status_code=404)
@@ -230,6 +244,7 @@ async def championship_standings(cid: str):
 @router.post("/challenges/{cid}/times")
 async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_admin())):
     db = get_db()
+    cid = await _resolve_cid(cid)
     # Verify
     c = await db.f1_challenges.find_one({"id": cid})
     if not c:
@@ -304,6 +319,7 @@ async def delete_time(time_id: str, me: dict = Depends(require_admin())):
 @router.get("/challenges/{cid}/export.csv")
 async def export_csv(cid: str, track_id: str | None = None):
     db = get_db()
+    cid = await _resolve_cid(cid)
     c = await db.f1_challenges.find_one({"id": cid})
     if not c:
         raise HTTPException(status_code=404)

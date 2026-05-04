@@ -33,6 +33,17 @@ async def _enrich_tournament(t: dict) -> dict:
     return t
 
 
+async def _resolve_tid(slug_or_id: str) -> str:
+    """Resolve slug to id if needed. Returns id or raises 404."""
+    db = get_db()
+    t = await db.tournaments.find_one(
+        {"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"id": 1}
+    )
+    if not t:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    return t["id"]
+
+
 @router.get("")
 async def list_tournaments(status: str | None = None, game_id: str | None = None,
                            event_id: str | None = None, limit: int = 100):
@@ -86,6 +97,7 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
 @router.patch("/{tid}")
 async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends(require_admin())):
     db = get_db()
+    tid = await _resolve_tid(tid)
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     for k in ["registration_open_from", "registration_open_until", "check_in_from",
               "check_in_until", "start_date", "end_date"]:
@@ -100,6 +112,7 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
 @router.delete("/{tid}")
 async def delete_tournament(tid: str, me: dict = Depends(require_admin())):
     db = get_db()
+    tid = await _resolve_tid(tid)
     await db.tournaments.delete_one({"id": tid})
     await db.tournament_registrations.delete_many({"tournament_id": tid})
     await db.matches.delete_many({"tournament_id": tid})
@@ -110,6 +123,7 @@ async def delete_tournament(tid: str, me: dict = Depends(require_admin())):
 @router.get("/{tid}/registrations")
 async def list_registrations(tid: str):
     db = get_db()
+    tid = await _resolve_tid(tid)
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
     # enrich user + team
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
@@ -134,6 +148,7 @@ async def list_registrations(tid: str):
 async def register_for_tournament(tid: str, body: RegistrationCreate,
                                    me: dict = Depends(get_current_user)):
     db = get_db()
+    tid = await _resolve_tid(tid)
     t = await db.tournaments.find_one({"id": tid})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
@@ -176,6 +191,7 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
 async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
                                me: dict = Depends(require_admin())):
     db = get_db()
+    tid = await _resolve_tid(tid)
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     updates["updated_at"] = now_utc().isoformat()
     await db.tournament_registrations.update_one({"id": reg_id}, {"$set": updates})
@@ -198,6 +214,7 @@ async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_curr
 @router.post("/{tid}/checkin")
 async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
     db = get_db()
+    tid = await _resolve_tid(tid)
     reg = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": me["id"]})
     if not reg:
         raise HTTPException(status_code=404, detail="Keine Anmeldung gefunden")
@@ -212,6 +229,7 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
 @router.post("/{tid}/generate-bracket")
 async def generate(tid: str, me: dict = Depends(require_admin())):
     db = get_db()
+    tid = await _resolve_tid(tid)
     t = await db.tournaments.find_one({"id": tid})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
@@ -233,6 +251,7 @@ async def generate(tid: str, me: dict = Depends(require_admin())):
 @router.post("/{tid}/reset-bracket")
 async def reset_bracket(tid: str, me: dict = Depends(require_admin())):
     db = get_db()
+    tid = await _resolve_tid(tid)
     await db.matches.delete_many({"tournament_id": tid})
     await db.tournaments.update_one({"id": tid}, {"$set": {"status": "draft", "updated_at": now_utc().isoformat()}})
     return {"ok": True}
@@ -241,6 +260,7 @@ async def reset_bracket(tid: str, me: dict = Depends(require_admin())):
 @router.post("/{tid}/status")
 async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
     db = get_db()
+    tid = await _resolve_tid(tid)
     status = body.get("status")
     allowed = {"draft", "registration_open", "check_in", "live", "paused", "completed", "archived"}
     if status not in allowed:
@@ -252,6 +272,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
 @router.get("/{tid}/bracket")
 async def get_bracket(tid: str):
     db = get_db()
+    tid = await _resolve_tid(tid)
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404)

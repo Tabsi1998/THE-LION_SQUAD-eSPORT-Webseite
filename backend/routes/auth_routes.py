@@ -31,6 +31,15 @@ async def _check_brute_force(db, identifier: str):
         )
 
 
+def _client_identifier(request: Request, email: str) -> str:
+    """Key brute-force counter by X-Forwarded-For (first hop) to survive behind proxies,
+    fall back to direct client host + email."""
+    xff = request.headers.get("x-forwarded-for", "")
+    first = xff.split(",")[0].strip() if xff else ""
+    ip = first or (request.client.host if request.client else "unknown")
+    return f"{ip}:{email}"
+
+
 async def _record_failed(db, identifier: str):
     await db.login_attempts.insert_one({
         "id": new_id(),
@@ -86,8 +95,7 @@ async def register(body: UserRegister, response: Response):
 async def login(body: UserLogin, request: Request, response: Response):
     db = get_db()
     email = body.email.lower().strip()
-    client_ip = request.client.host if request.client else "unknown"
-    identifier = f"{client_ip}:{email}"
+    identifier = _client_identifier(request, email)
     await _check_brute_force(db, identifier)
 
     user = await db.users.find_one({"email": email})
