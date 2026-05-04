@@ -8,7 +8,7 @@ import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquar
 export default function AdminSettingsPage() {
   const [tab, setTab] = useState("email");
   const [email, setEmail] = useState({ resend_api_key: "", sender_name: "", sender_email: "", reply_to_email: "", enabled: true, resend_api_key_masked: "" });
-  const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_auth: "auto", smtp_security: "starttls", smtp_tls_verify: true, smtp_envelope_from: "", sender_name: "", sender_email: "", reply_to_email: "", message_id_domain: "", enabled: true, smtp_pass_masked: "" });
+  const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_auth: "login", smtp_security: "starttls", smtp_tls_verify: true, smtp_envelope_from: "", sender_name: "", sender_email: "", reply_to_email: "", message_id_domain: "", enabled: true, smtp_pass_masked: "" });
   const [smtpTestEmail, setSmtpTestEmail] = useState("");
   const [smtpDiag, setSmtpDiag] = useState(null);
   const [queue, setQueue] = useState([]);
@@ -87,9 +87,25 @@ export default function AdminSettingsPage() {
 
   const saveSmtp = async () => {
     const payload = { ...smtp };
+    if (payload.provider === "smtp" && payload.smtp_auth === "login") {
+      if (!payload.smtp_user) return toast.error("SMTP User fehlt. Fuer einfachen Versand bitte office@... eintragen.");
+      if (!payload.smtp_pass && !payload.smtp_pass_masked) return toast.error("SMTP Passwort fehlt.");
+    }
     if (!payload.smtp_pass) delete payload.smtp_pass;
     try { await api.put("/settings/smtp", payload); toast.success("SMTP-Einstellungen gespeichert."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+  const applySubmissionPreset = () => {
+    setSmtp({
+      ...smtp,
+      provider: "smtp",
+      smtp_port: 587,
+      smtp_auth: "login",
+      smtp_security: "starttls",
+      smtp_tls_verify: true,
+      smtp_envelope_from: "",
+    });
+    toast.success("Standard SMTP-Login gesetzt: 587, STARTTLS, Benutzer/Passwort.");
   };
   const sendSmtpTest = async () => {
     if (!smtpTestEmail) return toast.error("E-Mail-Adresse eingeben");
@@ -201,6 +217,13 @@ export default function AdminSettingsPage() {
                 <span>Versand aktiv</span>
               </label>
             </div>
+            <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4 text-xs text-white/65">
+              <div className="font-bold uppercase tracking-widest text-[#29B6E8] mb-2">Einfacher Versand ohne Relay</div>
+              <p>Nutze den Submission-Port deines Mailservers: Port 587, STARTTLS, SMTP Anmeldung mit deiner Mailbox. Port 25 ohne Anmeldung ist lokaler Relay-Modus und hier nicht empfohlen.</p>
+              <button type="button" onClick={applySubmissionPreset} data-testid="smtp-preset-submission" className="mt-3 px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm">
+                Standard 587 Login setzen
+              </button>
+            </div>
             <div>
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Provider</div>
               <select value={smtp.provider} onChange={(e) => setSmtp({ ...smtp, provider: e.target.value })} data-testid="smtp-provider" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
@@ -221,12 +244,12 @@ export default function AdminSettingsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">SMTP Anmeldung</div>
-                <select value={smtp.smtp_auth || "auto"} onChange={(e) => setSmtp({ ...smtp, smtp_auth: e.target.value })} data-testid="smtp-auth" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-                  <option value="auto">Automatisch</option>
-                  <option value="login">Mit Benutzer/Passwort</option>
-                  <option value="none">Ohne Anmeldung</option>
+                <select value={smtp.smtp_auth || "login"} onChange={(e) => setSmtp({ ...smtp, smtp_auth: e.target.value })} data-testid="smtp-auth" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+                  <option value="login">Mit Benutzer/Passwort (empfohlen)</option>
+                  <option value="auto">Automatisch (Altbestand)</option>
+                  <option value="none">Ohne Anmeldung (lokaler Relay)</option>
                 </select>
-                <p className="mt-1 text-[11px] text-white/40">Bei lokalem Mailserver meist "Ohne Anmeldung".</p>
+                <p className="mt-1 text-[11px] text-white/40">Fuer normalen Versand: Benutzer/Passwort auf Port 587.</p>
               </div>
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">User</div>
@@ -345,8 +368,8 @@ export default function AdminSettingsPage() {
                 )}
               </div>
             )}
-            <p className="text-xs text-white/50">Testet die SMTP-Verbindung direkt. Im Docker-Setup fuer einen lokalen Host-Mailserver meist <code className="font-mono text-white/70">host.docker.internal</code> als SMTP Host nutzen. Bei self-signed Zertifikat "TLS Zertifikat pruefen" deaktivieren.</p>
-            <p className="text-xs text-white/50">Wenn der Server "SMTP AUTH extension is not supported" meldet, stelle "SMTP Anmeldung" auf "Ohne Anmeldung" und lasse User/Passwort leer.</p>
+            <p className="text-xs text-white/50">Testet die SMTP-Verbindung direkt. Fuer normalen Versand muss der Server nach STARTTLS AUTH anbieten. Falls "AUTH extension is not supported" kommt, ist das der falsche Port/Endpoint: nutze Submission 587 mit Login.</p>
+            <p className="text-xs text-white/50">Bei self-signed Zertifikat kann "TLS Zertifikat pruefen" deaktiviert werden; besser ist ein vertrauenswuerdiges Zertifikat am Mailserver.</p>
           </div>
         </div>
       )}

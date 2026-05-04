@@ -146,9 +146,11 @@ async def get_smtp_settings(me: dict = Depends(require_admin())):
     if s.get("smtp_pass"):
         p = s["smtp_pass"]
         s["smtp_pass_masked"] = "•" * min(8, max(4, len(p)))
-        s.pop("smtp_pass", None)
+    s.pop("smtp_pass", None)
     s.setdefault("provider", "smtp" if s.get("smtp_host") else "resend")
-    s.setdefault("smtp_auth", "auto")
+    s.setdefault("smtp_auth", "login")
+    if s.get("smtp_auth") == "auto":
+        s["smtp_auth"] = "login"
     s.setdefault("smtp_security", "starttls")
     s.setdefault("smtp_port", 587)
     s.setdefault("smtp_tls_verify", True)

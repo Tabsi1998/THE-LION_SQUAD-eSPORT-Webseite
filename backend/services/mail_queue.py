@@ -26,9 +26,8 @@ def explain_smtp_error(exc: Exception) -> str:
     if "AUTH extension is not supported" in raw:
         return (
             "Der SMTP-Server bietet auf diesem Host/Port keine Anmeldung an. "
-            "Nutze entweder den Submission-Port mit aktivem SMTP AUTH (meist 587 STARTTLS) "
-            "oder stelle SMTP Anmeldung auf 'Ohne Anmeldung' und erlaube dem Docker-Backend "
-            "serverseitig Relay."
+            "Fuer normalen E-Mail-Versand ohne Relay brauchst du den Submission-Port "
+            "mit SMTP AUTH, meistens 587 mit STARTTLS und Login."
         )
     if "Relay access denied" in raw:
         return (
@@ -58,7 +57,7 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
     host = cfg.get("smtp_host")
     port = int(cfg.get("smtp_port") or 587)
     security = cfg.get("smtp_security") or "starttls"
-    auth_mode = (cfg.get("smtp_auth") or "auto").lower()
+    auth_mode = (cfg.get("smtp_auth") or "login").lower()
     validate_certs = bool(cfg.get("smtp_tls_verify", True))
     username = cfg.get("smtp_user") or ""
     password = cfg.get("smtp_pass") or ""
@@ -109,7 +108,8 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
 
         should_login = auth_mode == "login" or (auth_mode == "auto" and username and password and auth_supported)
         if auth_mode == "login" and not auth_supported:
-            result["recommendations"].append("Dieser Host/Port bietet kein SMTP AUTH. Nutze einen Submission-Port mit AUTH oder stelle auf 'Ohne Anmeldung'.")
+            result["recommendations"].append("Dieser Host/Port bietet kein SMTP AUTH. Fuer Versand ohne Relay brauchst du Port 587 mit STARTTLS und SMTP Anmeldung.")
+            result["recommendations"].append("Port 25 ist fuer Server-zu-Server-Transport gedacht und ist ohne besondere Mailserver-Regel kein normaler Client-Versand.")
             return result
         if should_login:
             if not username or not password:
@@ -119,9 +119,11 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
             result["auth_ok"] = True
             result["steps"].append({"ok": True, "label": "SMTP Login erfolgreich."})
         elif auth_mode == "none":
-            result["steps"].append({"ok": True, "label": "SMTP Login bewusst uebersprungen."})
+            result["steps"].append({"ok": True, "label": "SMTP Login bewusst uebersprungen (lokaler Relay-Modus)."})
         else:
-            result["steps"].append({"ok": True, "label": "Auto-Modus: kein Login durchgefuehrt, weil AUTH nicht angeboten wird oder Zugangsdaten fehlen."})
+            result["steps"].append({"ok": False, "label": "Auto-Modus konnte keinen Login durchfuehren. Stelle auf 'Mit Benutzer/Passwort' und nutze Port 587 STARTTLS."})
+            result["recommendations"].append("Auto-Modus ist nur fuer Altbestand gedacht. Empfohlen ist 'Mit Benutzer/Passwort'.")
+            return result
 
         mail_code, mail_msg = smtp.mail(envelope_from)
         result["steps"].append({"ok": 200 <= mail_code < 400, "label": f"MAIL FROM <{envelope_from}>: {mail_code} {mail_msg.decode(errors='ignore') if isinstance(mail_msg, bytes) else mail_msg}"})
@@ -171,7 +173,7 @@ async def get_mail_settings() -> dict:
         "smtp_port": int(s.get("smtp_port") or 587),
         "smtp_user": s.get("smtp_user", ""),
         "smtp_pass": s.get("smtp_pass", ""),
-        "smtp_auth": s.get("smtp_auth", "auto"),
+        "smtp_auth": s.get("smtp_auth", "login"),
         "smtp_security": s.get("smtp_security", "starttls"),  # starttls | tls | none
         "smtp_tls_verify": s.get("smtp_tls_verify", True),
         "smtp_envelope_from": s.get("smtp_envelope_from", ""),
@@ -190,7 +192,9 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
     from email.mime.text import MIMEText
     from email.utils import formataddr, formatdate, make_msgid
 
-    smtp_auth = (cfg.get("smtp_auth") or "auto").lower()
+    smtp_auth = (cfg.get("smtp_auth") or "login").lower()
+    if smtp_auth == "auto":
+        smtp_auth = "login"
     auth_user_for_envelope = cfg.get("smtp_user") if smtp_auth != "none" else ""
     envelope_from = cfg.get("smtp_envelope_from") or auth_user_for_envelope or cfg["sender_email"]
     configured_msg_domain = (cfg.get("message_id_domain") or "").strip()
@@ -226,6 +230,8 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
     if smtp_auth == "none":
         username = None
         password = None
+    elif smtp_auth == "login" and (not username or not password):
+        raise RuntimeError("SMTP Login ist aktiv, aber Benutzer oder Passwort fehlt.")
 
     kwargs = {
         "hostname": cfg["smtp_host"],
@@ -244,15 +250,7 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
     if not (use_tls or start_tls):
         kwargs["use_tls"] = False
         kwargs["start_tls"] = False
-    try:
-        await aiosmtplib.send(msg, **kwargs)
-    except Exception as exc:
-        if smtp_auth == "auto" and username and "AUTH extension is not supported" in str(exc):
-            logger.warning("[mailqueue] SMTP AUTH not supported, retrying without login")
-            retry_kwargs = {**kwargs, "username": None, "password": None}
-            await aiosmtplib.send(msg, **retry_kwargs)
-        else:
-            raise
+    await aiosmtplib.send(msg, **kwargs)
     return msg["Message-ID"]
 
 
