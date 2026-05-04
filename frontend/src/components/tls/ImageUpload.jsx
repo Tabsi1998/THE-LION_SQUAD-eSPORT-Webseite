@@ -29,15 +29,18 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const { data } = await api.post(endpoint, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const { data } = await api.post(endpoint, fd);
       onChange(data.url);
       toast.success("Bild hochgeladen.");
     } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail) || "Upload fehlgeschlagen");
+      const detail = e.response?.data?.detail;
+      const status = e.response?.status;
+      const message = detail ? formatApiError(detail) : e.message || "Upload fehlgeschlagen";
+      toast.error(status ? `Upload fehlgeschlagen (${status}): ${message}` : `Upload fehlgeschlagen: ${message}`);
+    } finally {
+      if (fileRef.current) fileRef.current.value = "";
+      setUploading(false);
     }
-    setUploading(false);
   };
 
   const previewClass = variant === "wide"
@@ -66,7 +69,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept="image/png,image/jpeg,image/webp"
             className="hidden"
             onChange={(e) => handleFile(e.target.files?.[0])}
             data-testid={`${testId}-file`}
@@ -80,7 +83,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
           >
             <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : value ? "Anderes Bild" : "Bild hochladen"}
           </button>
-          <p className="text-[10px] text-white/40">PNG/JPG/WebP/SVG bis {maxSizeMb} MB.</p>
+          <p className="text-[10px] text-white/40">PNG/JPG/WebP bis {maxSizeMb} MB.</p>
         </div>
       </div>
     </div>

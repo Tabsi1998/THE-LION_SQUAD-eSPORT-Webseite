@@ -3,11 +3,13 @@ served via /uploads/... static mount."""
 import os
 import uuid
 import pathlib
+import logging
 from io import BytesIO
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from PIL import Image, UnidentifiedImageError
 from auth import require_admin, get_current_user
 
+logger = logging.getLogger("tls-arena.uploads")
 UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
@@ -15,6 +17,12 @@ PRIVATE_DOC_DIR = UPLOAD_DIR / "documents"
 PUBLIC_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 PRIVATE_DOC_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE = {"image/png", "image/jpeg", "image/webp"}
+IMAGE_MIME_BY_EXT = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+}
 ALLOWED_DOC = {
     "application/pdf",
     "application/zip",
@@ -41,11 +49,15 @@ router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_current_user)):
     """Upload an image. Returns public URL `/uploads/{filename}`.
     Accepts PNG/JPEG/WebP up to 5 MB and re-encodes before serving."""
-    if file.content_type not in ALLOWED_IMAGE:
-        raise HTTPException(status_code=400, detail="Nur PNG, JPG oder WebP")
+    content_type = file.content_type or ""
+    suffix = pathlib.Path(file.filename or "").suffix.lower()
+    if content_type not in ALLOWED_IMAGE and suffix in IMAGE_MIME_BY_EXT:
+        content_type = IMAGE_MIME_BY_EXT[suffix]
+    if content_type not in ALLOWED_IMAGE:
+        raise HTTPException(status_code=400, detail=f"Nur PNG, JPG oder WebP erlaubt. Erkannt: {file.content_type or 'unbekannt'}")
     ext = {
         "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp",
-    }.get(file.content_type, "")
+    }.get(content_type, "")
     # Read & size check
     data = await file.read()
     original_size = len(data)
@@ -57,24 +69,37 @@ async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_curr
         with Image.open(BytesIO(data)) as img:
             if img.width * img.height > MAX_IMAGE_PIXELS:
                 raise HTTPException(status_code=413, detail="Bild ist zu gross (max 16 Megapixel)")
-            expected = {"image/png": "PNG", "image/jpeg": "JPEG", "image/webp": "WEBP"}[file.content_type]
+            expected = {"image/png": "PNG", "image/jpeg": "JPEG", "image/webp": "WEBP"}[content_type]
             if img.format != expected:
                 raise HTTPException(status_code=400, detail="Dateiinhalt passt nicht zum angegebenen Bildtyp")
+            output_format = img.format
             out = BytesIO()
             save_kwargs = {}
-            if img.format == "JPEG":
+            if output_format == "JPEG":
                 img = img.convert("RGB")
                 save_kwargs = {"quality": 88, "optimize": True}
-            elif img.format == "PNG":
+            elif output_format == "PNG":
                 img = img.convert("RGBA" if img.mode in ("RGBA", "LA", "P") else "RGB")
                 save_kwargs = {"optimize": True}
-            img.save(out, format=img.format, **save_kwargs)
+            elif output_format == "WEBP" and img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGBA" if "A" in img.getbands() else "RGB")
+                save_kwargs = {"quality": 88, "method": 6}
+            img.save(out, format=output_format, **save_kwargs)
             data = out.getvalue()
     except UnidentifiedImageError:
         raise HTTPException(status_code=400, detail="Ungueltige Bilddatei")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("[uploads] image processing failed: %s", exc)
+        raise HTTPException(status_code=400, detail="Bild konnte nicht verarbeitet werden. Bitte PNG, JPG oder WebP erneut exportieren.")
     filename = f"{uuid.uuid4().hex}{ext}"
     path = PUBLIC_UPLOAD_DIR / filename
-    path.write_bytes(data)
+    try:
+        path.write_bytes(data)
+    except OSError as exc:
+        logger.error("[uploads] failed to write %s: %s", path, exc)
+        raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR pruefen.")
     return {"url": f"/api/static/uploads/{filename}", "filename": filename, "size": len(data), "original_size": original_size}
 
 

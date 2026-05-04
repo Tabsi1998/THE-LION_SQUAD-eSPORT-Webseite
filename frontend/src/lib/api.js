@@ -25,6 +25,15 @@ const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 api.interceptors.request.use((config) => {
   const method = (config.method || "get").toUpperCase();
+  if (config.data instanceof FormData) {
+    if (typeof config.headers?.delete === "function") {
+      config.headers.delete("Content-Type");
+      config.headers.delete("content-type");
+    } else if (config.headers) {
+      delete config.headers["Content-Type"];
+      delete config.headers["content-type"];
+    }
+  }
   if (UNSAFE_METHODS.has(method)) {
     const csrf = getCookie("csrf_token");
     if (csrf) config.headers["X-CSRF-Token"] = decodeURIComponent(csrf);
