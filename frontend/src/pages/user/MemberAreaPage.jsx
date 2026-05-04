@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { API, api } from "@/lib/api";
+import { API, api, formatMemberSince } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Crown, Gift, FileText, Bell, Calendar, Hash, Newspaper, Download, ArrowRight, User } from "lucide-react";
@@ -28,7 +28,9 @@ export default function MemberAreaPage() {
     });
   }, []);
 
-  const memberSince = my?.membership?.member_since ? new Date(my.membership.member_since).toLocaleDateString("de-DE") : null;
+  const memberSince = my?.membership?.member_since
+    ? formatMemberSince(my.membership.member_since, my.membership.member_since_precision)
+    : null;
 
   return (
     <PublicLayout>

@@ -70,6 +70,17 @@ export function formatMs(ms) {
   return `${m}:${String(s).padStart(2, "0")}.${String(mil).padStart(3, "0")}`;
 }
 
+export function formatMemberSince(value, precision = "day") {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  if (precision === "year") return String(date.getFullYear());
+  if (precision === "month") {
+    return date.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+  }
+  return date.toLocaleDateString("de-DE", { dateStyle: "long" });
+}
+
 export function parseTimeStr(str) {
   if (!str) return null;
   const trimmed = String(str).trim();

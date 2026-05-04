@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, formatMemberSince } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History } from "lucide-react";
@@ -57,7 +57,7 @@ export default function MyMembershipPage() {
 
         {/* Stats */}
         <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Stat icon={Calendar} label="Mitglied seit" value={memberSince ? memberSince.toLocaleDateString("de-DE", { dateStyle: "long" }) : "—"} />
+          <Stat icon={Calendar} label="Mitglied seit" value={formatMemberSince(m?.member_since, m?.member_since_precision)} />
           <Stat icon={History} label="Aktiv" value={yearsAsMember !== null ? `${yearsAsMember} Jahr${yearsAsMember === 1 ? "" : "e"}` : "—"} />
           <Stat icon={m?.show_member_number_publicly ? Eye : EyeOff} label="Nummer öffentlich" value={m?.show_member_number_publicly ? "Ja" : "Nein"} />
           <Stat icon={FileText} label="Mitgliedsart" value={m?.membership_type ? TYPE_LABELS[m.membership_type] : "—"} />

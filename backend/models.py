@@ -112,6 +112,7 @@ MemberStatus = Literal[
 MembershipType = Literal[
     "ordinary", "supporting", "honorary", "youth", "guest", "former"
 ]
+MemberSincePrecision = Literal["year", "month", "day"]
 
 
 class MembershipUpdate(BaseModel):
@@ -120,6 +121,7 @@ class MembershipUpdate(BaseModel):
     membership_type: Optional[MembershipType] = None
     member_number: Optional[str] = None
     member_since: Optional[str] = None  # ISO date
+    member_since_precision: Optional[MemberSincePrecision] = None
     internal_role: Optional[str] = None
     notes: Optional[str] = None
     show_member_number_publicly: Optional[bool] = None

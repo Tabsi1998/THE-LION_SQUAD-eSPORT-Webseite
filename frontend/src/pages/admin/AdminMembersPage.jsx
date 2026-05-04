@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, formatMemberSince } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { toast } from "sonner";
 import { Crown, Search, X, Save } from "lucide-react";
@@ -22,6 +22,33 @@ const TYPE_LABELS = {
   guest: "Gast",
   former: "Ehemalig",
 };
+
+const MONTHS = [
+  ["", "Monat offen lassen"],
+  ["01", "Januar"],
+  ["02", "Februar"],
+  ["03", "Maerz"],
+  ["04", "April"],
+  ["05", "Mai"],
+  ["06", "Juni"],
+  ["07", "Juli"],
+  ["08", "August"],
+  ["09", "September"],
+  ["10", "Oktober"],
+  ["11", "November"],
+  ["12", "Dezember"],
+];
+
+function memberSinceParts(m) {
+  if (!m?.member_since) return { year: "", month: "" };
+  const date = new Date(m.member_since);
+  if (Number.isNaN(date.getTime())) return { year: "", month: "" };
+  const precision = m.member_since_precision || "day";
+  return {
+    year: String(date.getFullYear()),
+    month: precision === "year" ? "" : String(date.getMonth() + 1).padStart(2, "0"),
+  };
+}
 
 export default function AdminMembersPage() {
   const [users, setUsers] = useState([]);
@@ -107,6 +134,7 @@ export default function AdminMembersPage() {
                 <th className="text-left px-4 py-3">Status</th>
                 <th className="text-left px-4 py-3">Nummer</th>
                 <th className="text-left px-4 py-3">Typ</th>
+                <th className="text-left px-4 py-3">Seit</th>
                 <th className="text-left px-4 py-3">Rolle</th>
                 <th className="text-center px-4 py-3">Aktion</th>
               </tr>
@@ -129,6 +157,7 @@ export default function AdminMembersPage() {
                     </td>
                     <td className="px-4 py-3 text-xs font-mono text-[#FFD700]">{m?.member_number || "—"}</td>
                     <td className="px-4 py-3 text-xs text-white/70">{m?.membership_type ? TYPE_LABELS[m.membership_type] || m.membership_type : "—"}</td>
+                    <td className="px-4 py-3 text-xs text-white/70">{formatMemberSince(m?.member_since, m?.member_since_precision)}</td>
                     <td className="px-4 py-3 text-xs text-white/70">{m?.internal_role || "—"}</td>
                     <td className="px-4 py-3 text-center">
                       <button onClick={() => setEditing({ user: u, membership: m })} data-testid={`member-edit-${u.username}`} className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 transition">
@@ -170,10 +199,13 @@ function StatusPill({ status }) {
 function EditModal({ entry, meta, onClose, onSave }) {
   const u = entry.user;
   const m = entry.membership || {};
+  const since = memberSinceParts(m);
   const [form, setForm] = useState({
     member_status: m.member_status || "none",
     membership_type: m.membership_type || "",
     member_number: m.member_number || "",
+    member_since_year: since.year,
+    member_since_month: since.month,
     internal_role: m.internal_role || "",
     notes: m.notes || "",
     show_member_number_publicly: !!m.show_member_number_publicly,
@@ -188,6 +220,14 @@ function EditModal({ entry, meta, onClose, onSave }) {
     const payload = { ...form };
     if (!payload.membership_type) delete payload.membership_type;
     if (!payload.member_number) delete payload.member_number;
+    if (payload.member_since_year) {
+      payload.member_since = payload.member_since_month
+        ? `${payload.member_since_year}-${payload.member_since_month}`
+        : payload.member_since_year;
+      payload.member_since_precision = payload.member_since_month ? "month" : "year";
+    }
+    delete payload.member_since_year;
+    delete payload.member_since_month;
     await onSave(u.id, payload);
     setSaving(false);
   };
@@ -217,6 +257,30 @@ function EditModal({ entry, meta, onClose, onSave }) {
           <Field label="Mitgliedsnummer (leer = automatisch)">
             <input value={form.member_number} onChange={(e) => set("member_number", e.target.value)} placeholder="z.B. TLS-2026-0007" data-testid="edit-number" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-mono" />
           </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Mitglied seit Jahr">
+              <input
+                type="number"
+                min="1900"
+                max={new Date().getFullYear()}
+                value={form.member_since_year}
+                onChange={(e) => set("member_since_year", e.target.value)}
+                placeholder="z.B. 2024"
+                data-testid="edit-member-since-year"
+                className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm"
+              />
+            </Field>
+            <Field label="Monat optional">
+              <select
+                value={form.member_since_month}
+                onChange={(e) => set("member_since_month", e.target.value)}
+                data-testid="edit-member-since-month"
+                className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm"
+              >
+                {MONTHS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </Field>
+          </div>
           <Field label="Interne Rolle">
             <input value={form.internal_role} onChange={(e) => set("internal_role", e.target.value)} placeholder="z.B. Vorstand, Captain, Helfer" data-testid="edit-role" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
           </Field>

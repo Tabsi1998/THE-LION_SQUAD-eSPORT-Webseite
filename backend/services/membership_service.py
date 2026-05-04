@@ -15,6 +15,7 @@ ACTIVE_STATUSES = {"active", "honorary"}
 VALID_TYPES = {
     "ordinary", "supporting", "honorary", "youth", "guest", "former",
 }
+VALID_MEMBER_SINCE_PRECISIONS = {"year", "month", "day"}
 
 
 def is_active_member(membership: dict | None) -> bool:
@@ -58,6 +59,43 @@ async def generate_member_number() -> str:
     return f"{prefix}{max_n + 1:04d}"
 
 
+def normalize_member_since(value: str, precision: str | None = None) -> tuple[str, str]:
+    """Normalize admin-entered membership start to ISO date + display precision."""
+    raw = (value or "").strip()
+    if not raw:
+        raise ValueError("member_since darf nicht leer sein.")
+
+    inferred = "day"
+    if len(raw) == 4 and raw.isdigit():
+        inferred = "year"
+    elif len(raw) == 7 and raw[4] == "-":
+        inferred = "month"
+
+    precision = precision or inferred
+    if precision not in VALID_MEMBER_SINCE_PRECISIONS:
+        raise ValueError(f"Invalid member_since_precision: {precision}")
+
+    try:
+        if precision == "year":
+            year = int(raw[:4])
+            dt = datetime(year, 1, 1, tzinfo=timezone.utc)
+        elif precision == "month":
+            year = int(raw[:4])
+            month = int(raw[5:7])
+            dt = datetime(year, month, 1, tzinfo=timezone.utc)
+        else:
+            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        raise ValueError("member_since muss als YYYY, YYYY-MM oder ISO-Datum angegeben werden.")
+
+    now = datetime.now(timezone.utc)
+    if dt.year < 1900 or dt > now:
+        raise ValueError("member_since muss zwischen 1900 und heute liegen.")
+    return dt.isoformat(), precision
+
+
 async def upsert_membership(
     user_id: str,
     actor_id: str,
@@ -66,6 +104,7 @@ async def upsert_membership(
     membership_type: str | None = None,
     member_number: str | None = None,
     member_since: str | None = None,
+    member_since_precision: str | None = None,
     internal_role: str | None = None,
     notes: str | None = None,
     show_member_number_publicly: bool | None = None,
@@ -89,6 +128,7 @@ async def upsert_membership(
         if member_status in ACTIVE_STATUSES:
             if not (existing or {}).get("member_since") and member_since is None:
                 update["member_since"] = now_utc().isoformat()
+                update["member_since_precision"] = "day"
             if not (existing or {}).get("member_number") and member_number is None:
                 update["member_number"] = await generate_member_number()
 
@@ -99,7 +139,13 @@ async def upsert_membership(
     if member_number is not None:
         update["member_number"] = member_number
     if member_since is not None:
-        update["member_since"] = member_since
+        normalized_since, normalized_precision = normalize_member_since(member_since, member_since_precision)
+        update["member_since"] = normalized_since
+        update["member_since_precision"] = normalized_precision
+    elif member_since_precision is not None:
+        if member_since_precision not in VALID_MEMBER_SINCE_PRECISIONS:
+            raise ValueError(f"Invalid member_since_precision: {member_since_precision}")
+        update["member_since_precision"] = member_since_precision
     if internal_role is not None:
         update["internal_role"] = internal_role
     if notes is not None:
@@ -135,6 +181,7 @@ async def upsert_membership(
             "membership_type": None,
             "member_number": None,
             "member_since": None,
+            "member_since_precision": None,
             "internal_role": None,
             "notes": None,
             "show_member_number_publicly": False,
