@@ -1,0 +1,38 @@
+{
+  "summary": "Phase 8 (SMTP & Mail Queue), Phase 9 (Preise & Gewinnabholung) and Phase 10 (Setup Wizard, Error Pages, SEO/Sitemap) — frontend + backend smoke verified. Backend pytest: 7/7 PASSED in /app/backend/tests/test_phase_8_9_10.py (smtp roundtrip, mail-queue endpoints, setup status/complete idempotent, sitemap.xml, prizes CRUD, prizes auth-protection). Direct API smoke: GET /api/setup/status=200, GET /api/sitemap.xml=200 (3012b XML), GET/PUT /api/settings/smtp=200 (password masked correctly), GET /api/settings/mail-queue=200, POST /api/settings/mail-queue/process=200 {processed:0,sent:0}, GET /api/prizes(/me|/me/open-count)=200, POST /api/settings/smtp/test=200 with graceful {ok:false,reason:'Provider ist nicht auf SMTP gesetzt.'} (kein Crash). Frontend Playwright durchgelaufen: Login admin@thelionsquad.at OK → /admin lädt, admin-nav-prizes IM Sidebar vorhanden; dashboard-setup-cta NICHT sichtbar (korrekt, da setup_status.completed=true) → /admin/settings: ALLE 6 Tabs (email/smtp/queue/discord/brand/logs) als data-testid='settings-tab-{k}' vorhanden → SMTP-Tab: alle 8 Felder (smtp-host, smtp-port, smtp-user, smtp-pass, smtp-security, smtp-sender-name, smtp-sender-email, smtp-save) gefunden und befüllbar; Speichern OK (PUT /settings/smtp 200) → Queue-Tab: queue-process-now + queue-filter vorhanden, Process-Button klickbar ohne Fehler → /admin/prizes: Page lädt, enthält 'Gewinne', keine Error-Overlays → /setup: wizard-welcome + alle 5 wizard-step-N (0..4) Indikatoren; wizard-next funktioniert über 3 Klicks bis Step 3, ab Step 3 (=STEPS.length-2) erscheint korrekt wizard-finish (statt -next), wizard-back ebenfalls vorhanden → /my/prizes: lädt, enthält 'Gewinne' → /this-route-does-not-exist-xyz: 404-Page mit '404' + 'Seite nicht gefunden' rendert sauber. SMTP-Settings nach Test wieder auf provider=resend zurückgesetzt (PUT /settings/smtp 200).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/settings/smtp/test", "issue": "Liefert HTTP 200 mit {ok:false, reason:...} statt 4xx wenn Provider!=smtp oder Connection refused. Funktional korrekt (kein Crash, klare Fehlermeldung), aber semantisch ist 200 für 'send fehlgeschlagen' streng genommen ein false-positive Status. Frontend müsste anhand body.ok unterscheiden statt response.status — bitte UI verifizieren ob Toast bei {ok:false} korrekt als Fehler dargestellt wird."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_8_9_10.py",
+    "/app/test_reports/pytest/phase_8_9_10_results.xml"
+  ],
+  "action_items": [
+    "(Optional) /api/settings/smtp/test bei Misconfig (provider!=smtp) konsistent: entweder 400 mit detail oder Frontend prüft body.ok und zeigt rote Toast — bitte E1 den UI-Path im SMTP-Test-Button validieren.",
+    "(Optional) Vorschlag: GET /api/setup/status returnt aktuell completed=true (initial seed). Wenn der Wizard-Flow für ein frisches Setup re-getestet werden soll, Setup-Doc-State per DB-Reset (TLS_RESET=true) bzw. setup_state.completed=false vorbereiten — sonst ist dashboard-setup-cta nie sichtbar in dieser Umgebung.",
+    "(Nice-to-have) Pro queue-row data-testid (queue-row-{id}, queue-retry-{id}, queue-delete-{id}) existieren, aber Queue ist leer — bei Bedarf Test-Job via enqueue_mail seeden, um retry/delete zu testen."
+  ],
+  "critical_code_review_comments": [
+    "AdminSettingsPage.jsx Zeile 109: Tab-Liste ist als Inline-Array hardcoded — 6 Tabs okay, aber bei Erweiterung wäre extracted const lesbarer.",
+    "SetupWizardPage.jsx STEPS.length-2 Logik (Zeile 218/223) ist subtil: wizard-finish erscheint auf step==3 (welcomeStep0 + branding1 + admin2 + mail3 + done4 → Finish auf step 3), Step 4 ist nur Auto-Redirect. Klarere Variablen wären robuster (isLastStep / isDoneStep).",
+    "extras_routes.py SMTP /test Endpoint sollte konsequent 4xx bei Misconfig liefern statt 200{ok:false} — frontend integration becomes brittle when toast logic depends on body.ok parsing.",
+    "SMTP /settings/smtp Pflichtfeld-Validation: Speichern eines Profils mit leerem host/user/pass akzeptiert die Werte (geprüft via Test-Form mit Dummy-Werten). Pydantic-Constraints (min_length=1) für aktivierte SMTP wäre sauberer.",
+    "AdminPrizesPage und MyPrizesPage rendern bei leerer Liste keine geprüften data-testids für Empty-State — Empfehlung: data-testid='prizes-empty' für stabile Tests."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (7/7 pytest + 9/9 smoke endpoints)", "frontend": "100% kritischer Testids vorhanden + Flows klickbar"},
+  "test_credentials": "Admin: admin@thelionsquad.at / TLSAdmin2026! verifiziert (Login → /dashboard erfolgreich).",
+  "seed_data_creation": "Während des UI-Tests wurde das SMTP-Profil temporär auf {host:smtp.example.com, port:587, user:TEST_smtp_user, pass:TEST_dummy_pw_abc123, sender:test@example.com} gesetzt. Nach Tests via PUT /api/settings/smtp {provider:'resend'} zurückgesetzt — verifiziert (200 ok:true).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 8/9/10 Backend-Suite /app/backend/tests/test_phase_8_9_10.py (7 pass) + Smoke-Endpoints stabil. Frontend testids alle vorhanden: settings-tab-{email,smtp,queue,discord,brand,logs}; smtp-{host,port,user,pass,security,sender-name,sender-email,save}; queue-{process-now,filter,row-ID,retry-ID,delete-ID}; wizard-{welcome,step-0..4,next,back,finish,skip,done,branding,admin,mail}; admin-nav-prizes; dashboard-setup-cta (nur bei !completed); dashboard-prizes-cta (nur bei open_count>0). 404 NotFoundPage rendert. Setup-Status ist completed=true (kann via TLS_RESET=true zurückgesetzt werden falls Wizard-from-scratch getestet werden soll). SMTP-Test-Endpoint liefert immer 200 mit body.ok=bool — Toast-Logik im UI muss body.ok parsen.",
+  "rca of the issue": "Keine Bugs. Einzige Auffälligkeit: POST /api/settings/smtp/test gibt HTTP 200 zurück, auch wenn der Send fehlschlägt (Connection refused / provider!=smtp). Im Body steht dann {ok:false, reason:'...'}. Das ist kein Bug per se — kein Crash, klare Fehlermeldung — aber API-semantisch wäre 4xx sauberer und entkoppelt Frontend von Body-Parsing. E1 sollte verifizieren, dass die UI bei {ok:false} eine rote Error-Toast zeigt (nicht Erfolg)."
+}

@@ -191,6 +191,73 @@ def tpl_test(branding: str = "TLS ARENA") -> tuple[str, str]:
     )
 
 
+# ---------- Phase 8: Match-Reminder (mit Lead-Time) ----------
+def tpl_match_lead_24h(tournament_title: str, opponent: str, when: str, url: str) -> tuple[str, str]:
+    return f"In 24h: {tournament_title}", _wrap(
+        "Match in 24 Stunden",
+        f"<p>Morgen um <strong>{when}</strong> startet dein nächstes Match im Turnier <strong>{tournament_title}</strong> gegen <strong>{opponent}</strong>.</p>"
+        "<p>Plane deinen Tag, lade dein Setup und sei rechtzeitig bereit.</p>",
+        "Zum Match Hub", url,
+    )
+
+
+def tpl_match_lead_2h(tournament_title: str, opponent: str, when: str, url: str) -> tuple[str, str]:
+    return f"In 2h: {tournament_title}", _wrap(
+        "Match in 2 Stunden",
+        f"<p>In <strong>2 Stunden</strong> ist dein Match im Turnier <strong>{tournament_title}</strong> gegen <strong>{opponent}</strong>. Startzeit: <strong>{when}</strong>.</p>",
+        "Zum Match Hub", url,
+    )
+
+
+def tpl_match_lead_30m(tournament_title: str, opponent: str, when: str, url: str) -> tuple[str, str]:
+    return f"In 30 Minuten: {tournament_title}", _wrap(
+        "Match in 30 Minuten",
+        f"<p>Achtung Löwe — dein Match gegen <strong>{opponent}</strong> startet in <strong>30 Minuten</strong> ({when}).</p>"
+        "<p>Letzter Check: Setup, Verbindung, Voice-Chat.</p>",
+        "Match öffnen", url,
+    )
+
+
+def tpl_match_lead_10m(tournament_title: str, opponent: str, when: str, url: str) -> tuple[str, str]:
+    return f"Jetzt gleich: {tournament_title}", _wrap(
+        "Match startet in 10 Minuten",
+        f"<p>Dein Match gegen <strong>{opponent}</strong> ({tournament_title}) startet in <strong>10 Minuten</strong>. Sei bereit!</p>",
+        "Match öffnen", url,
+    )
+
+
+# ---------- Phase 9: Prize Pickup ----------
+def tpl_prize_ready(display_name: str, tournament_title: str, place: str, prize_label: str, deadline: str = "") -> tuple[str, str]:
+    body = (
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        f"<p>Glückwunsch nochmal zu Platz <strong>{place}</strong> beim Turnier <strong>{tournament_title}</strong>!</p>"
+        f"<p>Dein Gewinn <strong>{prize_label}</strong> ist jetzt <strong>zur Abholung bereit</strong>.</p>"
+    )
+    if deadline:
+        body += f"<p>Bitte hole deinen Preis bis spätestens <strong>{deadline}</strong> ab. Danach verfällt der Anspruch.</p>"
+    body += "<p>Komm einfach zum nächsten Vereinsabend oder vereinbare einen Termin mit dem Vorstand.</p>"
+    return f"Dein Gewinn wartet: {tournament_title}", _wrap(
+        "Gewinn bereit zur Abholung", body,
+    )
+
+
+def tpl_prize_picked_up(display_name: str, tournament_title: str, prize_label: str) -> tuple[str, str]:
+    return f"Gewinn übergeben: {tournament_title}", _wrap(
+        "Gewinn erfolgreich übergeben",
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        f"<p>dein Gewinn <strong>{prize_label}</strong> aus dem Turnier <strong>{tournament_title}</strong> wurde übergeben. Danke fürs Mitmachen — wir sehen uns beim nächsten Wettkampf!</p>",
+    )
+
+
+def tpl_prize_expired(display_name: str, tournament_title: str, prize_label: str) -> tuple[str, str]:
+    return f"Gewinn verfallen: {tournament_title}", _wrap(
+        "Abholfrist abgelaufen",
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        f"<p>leider wurde dein Gewinn <strong>{prize_label}</strong> aus dem Turnier <strong>{tournament_title}</strong> nicht innerhalb der Frist abgeholt. Der Anspruch ist verfallen.</p>"
+        "<p>Bei Rückfragen wende dich bitte an den Vorstand.</p>",
+    )
+
+
 # ---------- Membership templates ----------
 def tpl_membership_activated(display_name: str, member_number: str = "") -> tuple[str, str]:
     body = (
@@ -222,8 +289,10 @@ def tpl_membership_blocked(display_name: str) -> tuple[str, str]:
     )
 
 
-async def send_template(template_key: str, to: str, **kwargs) -> dict:
-    """Shortcut for named templates."""
+async def send_template(template_key: str, to: str, queue: bool = True, scheduled_at=None, dedupe_key: Optional[str] = None, **kwargs) -> dict:
+    """Shortcut for named templates. By default the mail is queued via the new mail-queue.
+    Set queue=False to use the old immediate-Resend path (e.g. test buttons).
+    """
     templates = {
         "registration": tpl_registration,
         "password_reset": tpl_password_reset,
@@ -237,6 +306,13 @@ async def send_template(template_key: str, to: str, **kwargs) -> dict:
         "dispute_resolved": tpl_dispute_resolved,
         "tournament_finished": tpl_tournament_finished,
         "test": tpl_test,
+        "match_lead_24h": tpl_match_lead_24h,
+        "match_lead_2h": tpl_match_lead_2h,
+        "match_lead_30m": tpl_match_lead_30m,
+        "match_lead_10m": tpl_match_lead_10m,
+        "prize_ready": tpl_prize_ready,
+        "prize_picked_up": tpl_prize_picked_up,
+        "prize_expired": tpl_prize_expired,
         "membership_activated": tpl_membership_activated,
         "membership_deactivated": tpl_membership_deactivated,
         "membership_blocked": tpl_membership_blocked,
@@ -248,4 +324,11 @@ async def send_template(template_key: str, to: str, **kwargs) -> dict:
         subject, html = fn(**kwargs)
     except TypeError as e:
         return {"ok": False, "reason": f"template args error: {e}"}
+    if queue:
+        from services.mail_queue import enqueue_mail
+        return await enqueue_mail(
+            to=to, subject=subject, html=html,
+            template_key=template_key, scheduled_at=scheduled_at,
+            dedupe_key=dedupe_key,
+        )
     return await send_mail(to, subject, html, template_key=template_key)

@@ -100,8 +100,102 @@ async def update_email_settings(body: EmailSettings, me: dict = Depends(require_
 
 @settings_router.post("/email/test")
 async def send_test(body: TestEmailBody, me: dict = Depends(require_admin())):
-    res = await send_template("test", body.to, branding="TLS ARENA")
+    res = await send_template("test", body.to, branding="TLS ARENA", queue=False)
     return res
+
+
+# ---------- Phase 8: SMTP & Mail Queue ----------
+class SmtpSettings(BaseModel):
+    provider: Optional[Literal["smtp", "resend"]] = None
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_user: Optional[str] = None
+    smtp_pass: Optional[str] = None
+    smtp_security: Optional[Literal["starttls", "tls", "none"]] = None
+    sender_name: Optional[str] = None
+    sender_email: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+@settings_router.get("/smtp")
+async def get_smtp_settings(me: dict = Depends(require_admin())):
+    db = get_db()
+    s = await db.settings.find_one({"id": "mail"}, {"_id": 0}) or {}
+    if s.get("smtp_pass"):
+        p = s["smtp_pass"]
+        s["smtp_pass_masked"] = "•" * min(8, max(4, len(p)))
+        s.pop("smtp_pass", None)
+    s.setdefault("provider", "smtp" if s.get("smtp_host") else "resend")
+    s.setdefault("smtp_security", "starttls")
+    s.setdefault("smtp_port", 587)
+    s.setdefault("enabled", True)
+    return s
+
+
+@settings_router.put("/smtp")
+async def update_smtp_settings(body: SmtpSettings, me: dict = Depends(require_admin())):
+    db = get_db()
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    # Only overwrite password if a non-empty value given
+    if "smtp_pass" in updates and not updates["smtp_pass"]:
+        updates.pop("smtp_pass")
+    updates["updated_at"] = now_utc().isoformat()
+    await db.settings.update_one(
+        {"id": "mail"}, {"$set": updates, "$setOnInsert": {"id": "mail"}}, upsert=True,
+    )
+    await db.audit_logs.insert_one({"id": new_id(), "action": "settings.smtp.update",
+                                     "actor_id": me["id"], "created_at": now_utc().isoformat()})
+    return {"ok": True}
+
+
+@settings_router.post("/smtp/test")
+async def smtp_send_test(body: TestEmailBody, me: dict = Depends(require_admin())):
+    from services.mail_queue import smtp_test
+    return await smtp_test(body.to)
+
+
+@settings_router.get("/mail-queue")
+async def list_mail_queue(status: Optional[str] = None, limit: int = 100,
+                          me: dict = Depends(require_admin())):
+    db = get_db()
+    q = {}
+    if status:
+        q["status"] = status
+    jobs = await db.mail_jobs.find(q, {"_id": 0, "html": 0}).sort("created_at", -1).to_list(limit)
+    return jobs
+
+
+@settings_router.post("/mail-queue/process")
+async def process_queue_now(me: dict = Depends(require_admin())):
+    from services.mail_queue import process_mail_queue
+    return await process_mail_queue(batch=20)
+
+
+@settings_router.post("/mail-queue/{job_id}/retry")
+async def retry_mail_job(job_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    res = await db.mail_jobs.update_one(
+        {"id": job_id},
+        {"$set": {
+            "status": "pending",
+            "attempts": 0,
+            "next_attempt_at": now_utc().isoformat(),
+            "last_error": None,
+            "updated_at": now_utc().isoformat(),
+        }},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Job nicht gefunden")
+    return {"ok": True}
+
+
+@settings_router.delete("/mail-queue/{job_id}")
+async def delete_mail_job(job_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    res = await db.mail_jobs.delete_one({"id": job_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Job nicht gefunden")
+    return {"ok": True}
 
 
 @settings_router.get("/branding")

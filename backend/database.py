@@ -111,6 +111,17 @@ async def init_indexes():
     await db.badges.create_index("code", unique=True)
     await db.badges.create_index("audience")
     await db.user_badges.create_index([("user_id", 1), ("badge_code", 1)], unique=True)
+    # Phase 8: Mail queue
+    await db.mail_jobs.create_index("id", unique=True)
+    await db.mail_jobs.create_index([("status", 1), ("next_attempt_at", 1)])
+    await db.mail_jobs.create_index("dedupe_key")
+    await db.mail_jobs.create_index("created_at")
+    # Phase 9: Prize pickups
+    await db.prize_pickups.create_index("id", unique=True)
+    await db.prize_pickups.create_index("tournament_id")
+    await db.prize_pickups.create_index("user_id")
+    await db.prize_pickups.create_index("status")
+    await db.prize_pickups.create_index([("tournament_id", 1), ("place", 1), ("user_id", 1)])
 
 
 async def close_client():

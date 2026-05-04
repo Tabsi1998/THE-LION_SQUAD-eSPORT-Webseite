@@ -4,21 +4,24 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
-import { Trophy, Flag, Bell, Crown, Gift } from "lucide-react";
+import { Trophy, Flag, Bell, Crown, Gift, Award } from "lucide-react";
 
 export default function DashboardPage() {
   const { user, isClubMember } = useAuth();
   const [matches, setMatches] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [openPrizes, setOpenPrizes] = useState(0);
 
   useEffect(() => {
     (async () => {
-      const [m, n] = await Promise.allSettled([
+      const [m, n, p] = await Promise.allSettled([
         api.get("/matches/upcoming"),
         api.get("/admin/notifications"),
+        api.get("/prizes/me/open-count"),
       ]);
       if (m.status === "fulfilled") setMatches(m.value.data);
       if (n.status === "fulfilled") setNotifications(n.value.data);
+      if (p.status === "fulfilled") setOpenPrizes(p.value.data?.count || 0);
     })();
   }, []);
 
@@ -74,6 +77,13 @@ export default function DashboardPage() {
         </div>
 
         <div className="mt-8 grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {openPrizes > 0 && (
+            <Link to="/my/prizes" data-testid="dashboard-prizes-cta" className="border border-[#FFD700]/60 hover:border-[#FFD700] rounded-sm p-5 bg-gradient-to-br from-[#FFD700]/15 to-transparent transition relative">
+              <span className="absolute top-3 right-3 bg-[#FFD700] text-black text-[10px] font-black px-2 py-0.5 rounded-sm uppercase">{openPrizes} offen</span>
+              <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Du hast gewonnen!</div>
+              <div className="mt-2 font-heading text-lg font-bold flex items-center gap-2"><Award className="w-4 h-4 text-[#FFD700]" /> Meine Gewinne</div>
+            </Link>
+          )}
           {isClubMember && (
             <Link to="/members/area" data-testid="dashboard-member-area" className="border border-[#FFD700]/40 hover:border-[#FFD700]/80 rounded-sm p-5 bg-gradient-to-br from-[#FFD700]/10 to-transparent transition">
               <div className="flex items-center justify-between">

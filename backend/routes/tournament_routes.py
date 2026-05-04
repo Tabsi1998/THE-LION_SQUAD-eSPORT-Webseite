@@ -345,6 +345,13 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
                         num_participants=num_participants, weight=weight,
                     )
             await on_tournament_completed(tid, placements)
+            # Phase 9: Auto-create prize pickups
+            try:
+                from services.prize_service import auto_create_for_tournament
+                await auto_create_for_tournament(tid)
+            except Exception as exc2:
+                import logging
+                logging.getLogger("tls.prizes").warning(f"auto-create prizes: {exc2}")
         except Exception as exc:
             import logging
             logging.getLogger("tls.tournament").warning(f"results_published hook: {exc}")

@@ -67,6 +67,10 @@ import MyMembershipPage from "@/pages/user/MyMembershipPage";
 
 import F1TVPage from "@/pages/display/F1TVPage";
 import BracketTVPage from "@/pages/display/BracketTVPage";
+import MyPrizesPage from "@/pages/user/MyPrizesPage";
+import AdminPrizesPage from "@/pages/admin/AdminPrizesPage";
+import SetupWizardPage from "@/pages/SetupWizardPage";
+import { NotFoundPage, ForbiddenPage } from "@/pages/ErrorPages";
 
 function App() {
   return (
@@ -144,10 +148,21 @@ function App() {
 
           {/* Admin */}
           <Route path="/admin/sponsors" element={<ProtectedRoute requireAdmin><AdminSponsorsPage /></ProtectedRoute>} />
+          <Route path="/admin/prizes" element={<ProtectedRoute requireAdmin><AdminPrizesPage /></ProtectedRoute>} />
+
+          {/* Setup wizard */}
+          <Route path="/setup" element={<ProtectedRoute requireAdmin><SetupWizardPage /></ProtectedRoute>} />
+
+          {/* User: Meine Gewinne */}
+          <Route path="/my/prizes" element={<ProtectedRoute><MyPrizesPage /></ProtectedRoute>} />
 
           {/* Display / TV */}
           <Route path="/display/f1/:id" element={<F1TVPage />} />
           <Route path="/display/bracket/:id" element={<BracketTVPage />} />
+
+          {/* Error pages */}
+          <Route path="/403" element={<ForbiddenPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

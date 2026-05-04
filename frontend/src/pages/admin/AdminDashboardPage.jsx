@@ -2,11 +2,15 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
-import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon } from "lucide-react";
+import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles } from "lucide-react";
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
-  useEffect(() => { api.get("/admin/dashboard").then(({ data }) => setData(data)); }, []);
+  const [setupStatus, setSetupStatus] = useState(null);
+  useEffect(() => {
+    api.get("/admin/dashboard").then(({ data }) => setData(data));
+    api.get("/setup/status").then(({ data }) => setSetupStatus(data)).catch(() => {});
+  }, []);
 
   const kpis = [
     { label: "Spieler", value: data?.player_count, icon: UsersIcon, color: "#29B6E8" },
@@ -25,6 +29,21 @@ export default function AdminDashboardPage() {
         <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Control Room</span>
         <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Dashboard</h1>
       </div>
+
+      {setupStatus && !setupStatus.completed && (
+        <Link to="/setup" data-testid="dashboard-setup-cta" className="block mb-6 border border-[#29B6E8]/40 bg-gradient-to-r from-[#29B6E8]/10 to-transparent rounded-sm p-4 hover:border-[#29B6E8] transition group">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-5 h-5 text-[#29B6E8] shrink-0" />
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Erst-Einrichtung empfohlen</div>
+                <div className="font-heading text-base mt-0.5">Setup-Wizard ausführen — Branding, SMTP & Admin-Passwort in 4 Schritten</div>
+              </div>
+            </div>
+            <div className="text-[#29B6E8] text-2xl group-hover:translate-x-1 transition-transform">→</div>
+          </div>
+        </Link>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {kpis.map((k) => (
           <div key={k.label} data-testid={`kpi-${k.label}`} className="border border-white/10 rounded-sm bg-[#121212] p-4 hover:border-[#29B6E8]/40 transition">

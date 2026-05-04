@@ -29,6 +29,8 @@ from routes.badge_routes import router as badge_router
 from routes.membership_routes import router as membership_router
 from routes.document_routes import router as document_router
 from routes.home_routes import router as home_router
+from routes.prize_routes import router as prize_router
+from routes.setup_routes import router as setup_router, sitemap_router
 from routes.extras_routes import (
     settings_router, season_router, widget_router, dsgvo_router, pdf_router, audit_router,
 )
@@ -55,7 +57,7 @@ async def lifespan(app: FastAPI):
             "tournament_groups", "memberships", "member_benefits", "user_socials",
             "gallery_albums", "gallery_photos", "documents", "season_points",
             "audit_logs", "email_logs", "notifications", "password_reset_tokens",
-            "login_attempts", "user_badges",
+            "login_attempts", "user_badges", "mail_jobs", "prize_pickups",
         ]:
             try:
                 await db[coll].delete_many({})
@@ -69,8 +71,20 @@ async def lifespan(app: FastAPI):
     if os.environ.get("SEED_DEMO", "false").lower() == "true":
         logger.info("[TLS ARENA] Seeding demo data...")
         await seed_demo_data()
+    # Phase 8: start background scheduler (mail queue + reminders + prize expiry)
+    if os.environ.get("DISABLE_SCHEDULER", "").lower() != "true":
+        try:
+            from services.scheduler import start_scheduler
+            start_scheduler()
+        except Exception as exc:
+            logger.warning(f"[scheduler] failed to start: {exc}")
     logger.info("[TLS ARENA] Startup complete.")
     yield
+    try:
+        from services.scheduler import stop_scheduler
+        stop_scheduler()
+    except Exception:
+        pass
     await close_client()
 
 
@@ -126,6 +140,9 @@ app.include_router(badge_router)
 app.include_router(membership_router)
 app.include_router(document_router)
 app.include_router(home_router)
+app.include_router(prize_router)
+app.include_router(setup_router)
+app.include_router(sitemap_router)
 
 # Static uploads (serve user-uploaded images through /api prefix to survive ingress)
 from fastapi.staticfiles import StaticFiles
