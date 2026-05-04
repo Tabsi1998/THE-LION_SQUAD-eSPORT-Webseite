@@ -47,7 +47,8 @@ from typing import Literal
 from database import get_db
 from models import new_id, now_utc
 
-SourceType = Literal["tournament", "challenge", "fastlap", "fun", "event", "custom"]
+SourceType = Literal["tournament", "challenge", "fastlap", "fun", "event", "custom",
+                     "major", "mini"]
 
 
 # ---------- Configuration ----------

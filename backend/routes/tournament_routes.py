@@ -95,7 +95,9 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
               "check_in_until", "start_date", "end_date"]:
         doc[k] = _iso(doc.get(k))
     doc["id"] = new_id()
-    doc["status"] = "draft"
+    # Allow scheduling directly (Warten auf Öffnung) — fall back to draft.
+    if not doc.get("status"):
+        doc["status"] = "draft"
     doc["created_at"] = now_utc().isoformat()
     doc["updated_at"] = now_utc().isoformat()
     doc["created_by"] = me["id"]

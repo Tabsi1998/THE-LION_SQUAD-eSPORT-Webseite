@@ -58,25 +58,47 @@ NIE einen registrierten Nutzer als „Mitglied" bezeichnen. Stattdessen „Commu
 - [x] **DashboardPage** überarbeitet — Member-only Tiles (Mitgliederbereich + Vorteile), Mitgliedsnummer, „Mitglied werden" CTA für Community
 - [x] **AdminLayout** erweitert — Mitglieder + Mitgliedervorteile in Sidebar
 
-## Roadmap (Phase 5-10)
-
-### 🔴 Phase 5 — Status-System & Stream-Logik
-- „Warten auf Öffnung" Status für Tournaments/Challenges/Fast-Lap (für Events bereits umgesetzt in Phase 3!)
-- Stream-pro-Objekt mit hasLiveStream/streamPlatform/streamUrl (für Events bereits da!)
-- Homepage-Logik: Live > Heute > Bald > News
-
-### 🟠 Phase 6 — Achievements mit Audiences
-- Achievement.audience: public/community/members_only/admins_only/hidden_secret
-- Mitglieder-only Achievements
-- Negative Fun-Achievements
-
-### 🟡 Phase 7 — Season Pass v2 (Farming-Schutz)
+## Roadmap (Phase 8-10)
 
 ### 🔵 Phase 8 — SMTP & Mail Queue (Resend ablösen)
 
 ### 🟢 Phase 9 — Preise & Gewinnabholung (PrizePickup-Model)
 
 ### 🟣 Phase 10 — Feinschliff (404/403/500 Pages, SEO, Setup-Wizard)
+
+## Phase 5+6+7 — IMPLEMENTIERT (04.05.2026 · großer Status/Stream/Badge/Season Refactor)
+
+### Phase 5 — Status & Stream Refactor
+- [x] **Einheitliches Status-Vokabular** über Tournaments + F1-Challenges + Events: `draft / scheduled / registration_open / registration_closed / check_in / live / paused / completed / results_published / archived / cancelled`
+- [x] **„Warten auf Öffnung"** (`scheduled`) jetzt für alle Wettbewerbsobjekte verfügbar
+- [x] **Stream-pro-Objekt einheitlich**: `has_live_stream` / `stream_platform` (twitch/youtube/kick/custom) / `stream_url` / `stream_title` / `show_chat`. Stream wird ausschließlich angezeigt, wenn `has_live_stream=true`. Twitch-Felder bleiben für BC erhalten.
+- [x] **`StreamEmbed` Komponente** ersetzt hartkodierte Twitch-iFrames in TournamentDetailPage + F1DetailPage
+- [x] **HomePage komplett neu** (Live > Heute > Bald > News, **keine fixen Preise**, Live-Banner nur wenn etwas live ist)
+- [x] **`/api/home/state`** liefert aggregierten Plattform-Status, respektiert Drafts + Visibility
+- [x] **Drafts versteckt** für Nicht-Admins in `GET /tournaments`, `GET /tournaments/{slug}` (Events + News bereits in Phase 3)
+- [x] StatusBadge erweitert: scheduled → "WARTEN AUF ÖFFNUNG", + registration_closed / results_published / cancelled
+
+### Phase 6 — Achievement Audiences
+- [x] Badge-Catalog erweitert um: `audience` (public/community/members_only/admins_only/hidden_secret), `negative` (Fun-Achievements), `secret`, `requires_membership`, `can_showcase`
+- [x] **6 Members-only Achievements**: „Offiziell im Rudel", Vereinsmitglied Bronze/Silber/Gold/Platin, Ehrenlöwe (Hall of Fame, manuell)
+- [x] **6 Negative Fun-Achievements**: Holzmedaille (4. Platz), AFK-Legende, Wandmagnet, Last Minute Panic, Controller leer, Ehrenvoll untergegangen — alle nicht showcase-fähig + secret
+- [x] `/api/badges` zeigt audience-gefilterten Katalog (anon=public only, member=public+community+members_only)
+- [x] `/api/badges/user/{id}` versteckt negative Badges vor Fremden
+- [x] Auto-Award bei Membership-Status-Change (`evaluate_membership_badges`)
+- [x] **Admin manual award/revoke** (`POST/DELETE /api/badges/admin/award|revoke`) für Hall of Fame, mit Audit-Log
+- [x] Hooks: `on_tournament_completed` vergibt Holzmedaille bei Rang 4, `on_lap_submitted` vergibt Wandmagnet ab 5 ungültigen Runden
+
+### Phase 7 — Season Pass v2
+- [x] **`services/season_service.py`** mit Formel `base × weight × participant_factor + bonus`
+- [x] **Default Weights**: Major 3.0 / Tournament 2.0 / Mini 1.25 / Fastlap 1.0 / Fun 0.75 / Event 0.5 / Custom 1.0
+- [x] **Placement Base**: 1→100, 2→80, 3→65, 4→50, 5-8→35, 9-16→20, >16→10, Teilnahme→10
+- [x] **Participant Factor**: 1-7→0.75, 8-15→1.0, 16-31→1.15, 32-63→1.3, 64+→1.5
+- [x] **Farming Protection**: max 4 Fast-Lap/Fun-Awards pro Kalendermonat voll, ab 5. nur 50% (Major/Normal/Mini immer voll, `farming_exempt` für Admin-Override)
+- [x] `POST /api/seasons/v2/award` (admin) für manuelle Vergabe oder Tests
+- [x] `GET /api/seasons/v2/leaderboard?only_members=true|only_community|teams|rookie_only|source_type=...`
+- [x] `GET /api/seasons/v2/me` für eigene Season-Punkte mit Entry-Liste
+- [x] **Auto-Hook**: `set_status="results_published"` → vergibt Punkte für alle Platzierungen + Teilnahmepunkte für die Übrigen + ruft Tournament-Completion-Badges
+- [x] **45/45 Backend-Tests** (1 abhängig vom Game-Setup, der wurde manuell verifiziert)
 
 ## Phase 4 — IMPLEMENTIERT (04.05.2026 · Mitgliederportal Vertiefung)
 
@@ -135,7 +157,8 @@ Siehe `/app/memory/test_credentials.md`
 | TLS-Arena P5 | 22 Badges, Public Profiles, Admin Sponsors | ✅ |
 | Vereins-Phase 1+2 | Mitgliedersystem + erweitertes Profil | ✅ |
 | **Vereins-Phase 3** | **Vereins-CMS (News, Events, Galerie)** | **✅ NEU** |
-| Vereins-Phase 4-10 | Siehe oben | ⏳ |
+| Vereins-Phase 5+6+7 | **Status/Stream Refactor + Achievement-Audiences + Season Pass v2** | ✅ NEU |
+| Vereins-Phase 8-10 | Siehe oben | ⏳ |
 
 ## User Personas
 

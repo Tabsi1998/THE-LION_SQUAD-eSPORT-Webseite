@@ -1,8 +1,9 @@
 """Badge / Achievement routes — audience-aware (Phase 6)."""
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
-from auth import get_optional_user, get_current_user
-from badges import _user_can_see_badge
+from auth import get_optional_user, get_current_user, require_admin
+from badges import _user_can_see_badge, award_badge, BADGE_BY_CODE
+from models import now_utc, new_id
 
 router = APIRouter(prefix="/api/badges", tags=["badges"])
 
@@ -101,3 +102,56 @@ async def get_badge(code: str, user: dict | None = Depends(get_optional_user)):
     b["holders"] = holders
     b["awarded_count"] = len(holders_raw)
     return b
+
+
+# ---------- Admin: manual award & revoke (Phase 6) ----------
+@router.post("/admin/award")
+async def admin_award(body: dict, me: dict = Depends(require_admin())):
+    """Manually award a badge (e.g. 'ehrenloewe' / Hall of Fame)."""
+    user_id = body.get("user_id")
+    code = body.get("code")
+    if not user_id or not code:
+        raise HTTPException(400, "user_id und code erforderlich.")
+    if code not in BADGE_BY_CODE:
+        raise HTTPException(404, "Unbekannter Badge-Code.")
+    db = get_db()
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1})
+    if not user:
+        raise HTTPException(404, "Nutzer nicht gefunden.")
+    awarded = await award_badge(user_id, code, {"manual": True, "by": me["id"], "note": body.get("note")})
+    if not awarded:
+        # Either already held or membership requirement missing
+        existing = await db.user_badges.find_one({"user_id": user_id, "badge_code": code})
+        if existing:
+            return {"ok": True, "already_awarded": True}
+        raise HTTPException(400, "Vergabe nicht möglich (z. B. Mitgliedschaft erforderlich).")
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "badge.manual_award",
+        "actor_id": me["id"],
+        "target_id": user_id,
+        "data": {"code": code, "note": body.get("note")},
+        "created_at": now_utc().isoformat(),
+    })
+    return {"ok": True, "newly_awarded": True}
+
+
+@router.delete("/admin/revoke")
+async def admin_revoke(body: dict, me: dict = Depends(require_admin())):
+    user_id = body.get("user_id")
+    code = body.get("code")
+    if not user_id or not code:
+        raise HTTPException(400, "user_id und code erforderlich.")
+    db = get_db()
+    res = await db.user_badges.delete_one({"user_id": user_id, "badge_code": code})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Badge nicht vergeben.")
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "badge.manual_revoke",
+        "actor_id": me["id"],
+        "target_id": user_id,
+        "data": {"code": code},
+        "created_at": now_utc().isoformat(),
+    })
+    return {"ok": True}

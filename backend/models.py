@@ -346,6 +346,17 @@ class TournamentCreate(BaseModel):
     location: Optional[str] = None
     banner_url: Optional[str] = None
     seeding_mode: Literal["manual", "random", "ranking"] = "random"
+    # Phase 5: unified stream-per-object
+    has_live_stream: bool = False
+    stream_platform: Optional[StreamPlatform] = None
+    stream_url: Optional[str] = None
+    stream_title: Optional[str] = None
+    show_chat: bool = False
+    # Phase 7
+    season_weight: float = 2.0
+    visibility: Literal["public", "community", "members", "internal"] = "public"
+    # Optional initial status — admin can publish straight to 'scheduled' (Warten auf Öffnung)
+    status: Optional[TournamentStatus] = None
 
 
 class TournamentUpdate(BaseModel):
@@ -382,6 +393,7 @@ class TournamentUpdate(BaseModel):
     stream_title: Optional[str] = None
     show_chat: Optional[bool] = None
     season_weight: Optional[float] = None
+    visibility: Optional[Literal["public", "community", "members", "internal"]] = None
 
 
 class RegistrationCreate(BaseModel):
