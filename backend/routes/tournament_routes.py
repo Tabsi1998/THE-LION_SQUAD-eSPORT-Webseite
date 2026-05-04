@@ -268,7 +268,30 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
     allowed = {"draft", "registration_open", "check_in", "live", "paused", "completed", "archived"}
     if status not in allowed:
         raise HTTPException(status_code=400, detail="Ungültiger Status")
+    t = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
+    prev = t.get("status")
     await db.tournaments.update_one({"id": tid}, {"$set": {"status": status, "updated_at": now_utc().isoformat()}})
+    # Discord trigger
+    if prev != status and status in ("registration_open", "live", "completed"):
+        try:
+            from discord_service import send_discord
+            colors = {"registration_open": 0x00FF88, "live": 0x29B6E8, "completed": 0xFFD700}
+            labels = {"registration_open": "Anmeldung offen", "live": "Jetzt live", "completed": "Beendet"}
+            game_id = t.get("game_id")
+            game = await db.games.find_one({"id": game_id}, {"name": 1}) if game_id else None
+            url = f"/tournaments/{t.get('slug') or tid}"
+            fields = []
+            if game and game.get("name"): fields.append({"name": "Spiel", "value": game["name"], "inline": True})
+            if t.get("format"): fields.append({"name": "Format", "value": t["format"].replace("_", " ").title(), "inline": True})
+            if t.get("max_participants"): fields.append({"name": "Teilnehmer", "value": f"max. {t['max_participants']}", "inline": True})
+            await send_discord(
+                f"🏆 {t.get('title') or 'Turnier'} · {labels[status]}",
+                t.get("description") or "",
+                color=colors[status], url=url, fields=fields,
+                event_key=f"tournament.{status}",
+            )
+        except Exception:
+            pass
     return {"ok": True}
 
 

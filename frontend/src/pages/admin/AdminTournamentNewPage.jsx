@@ -28,6 +28,13 @@ export default function AdminTournamentNewPage() {
     max_participants: 16, min_participants: 2,
     best_of: 1, bronze_match: false, seeding_mode: "random",
     is_public: true, rules: "", prize_pool: "",
+    prize_places: [
+      { place: 1, label: "1. Platz", value: "" },
+      { place: 2, label: "2. Platz", value: "" },
+      { place: 3, label: "3. Platz", value: "" },
+    ],
+    twitch_channel: "", twitch_enabled: false,
+    location: "", stream_link: "", discord_link: "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -44,6 +51,11 @@ export default function AdminTournamentNewPage() {
     try {
       const payload = { ...form };
       if (!payload.event_id) delete payload.event_id;
+      // Filter empty prize places
+      payload.prize_places = (payload.prize_places || [])
+        .filter((p) => p.value && p.value.trim())
+        .map((p) => ({ place: Number(p.place) || 0, label: p.label || `Platz ${p.place}`, value: p.value }));
+      if (payload.prize_places.length === 0) payload.prize_places = null;
       const { data } = await api.post("/tournaments", payload);
       toast.success("Turnier erstellt.");
       nav(`/admin/tournaments/${data.id}`);
@@ -91,7 +103,49 @@ export default function AdminTournamentNewPage() {
           <span>Bronze Match (Platz 3 ermitteln)</span>
         </label>
         <Textarea label="Regeln" value={form.rules} onChange={(v) => set("rules", v)} testId="new-tr-rules" />
-        <Textarea label="Preise" value={form.prize_pool} onChange={(v) => set("prize_pool", v)} testId="new-tr-prizes" />
+
+        {/* Structured Prize Places */}
+        <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Preise (strukturiert)</div>
+              <div className="text-xs text-white/50 mt-0.5">Jede Zeile erscheint als eigene Preis-Karte auf der Turnierseite.</div>
+            </div>
+            <button type="button" onClick={() => set("prize_places", [...form.prize_places, { place: form.prize_places.length + 1, label: `Platz ${form.prize_places.length + 1}`, value: "" }])} data-testid="new-tr-prize-add" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
+          </div>
+          {form.prize_places.map((p, i) => (
+            <div key={i} className="grid grid-cols-12 gap-2 items-start">
+              <input type="number" min="1" value={p.place} onChange={(e) => {
+                const np = [...form.prize_places]; np[i] = { ...p, place: Number(e.target.value) || 1 }; set("prize_places", np);
+              }} data-testid={`new-tr-prize-place-${i}`} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm tabular-nums" placeholder="#" />
+              <input value={p.label || ""} onChange={(e) => {
+                const np = [...form.prize_places]; np[i] = { ...p, label: e.target.value }; set("prize_places", np);
+              }} data-testid={`new-tr-prize-label-${i}`} className="col-span-4 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Label (z.B. Champion)" />
+              <input value={p.value || ""} onChange={(e) => {
+                const np = [...form.prize_places]; np[i] = { ...p, value: e.target.value }; set("prize_places", np);
+              }} data-testid={`new-tr-prize-value-${i}`} className="col-span-5 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Preis (z.B. 100 €)" />
+              <button type="button" onClick={() => set("prize_places", form.prize_places.filter((_, j) => j !== i))} data-testid={`new-tr-prize-remove-${i}`} className="col-span-1 text-white/40 hover:text-[#FF3B30] text-center py-2">✕</button>
+            </div>
+          ))}
+          <Textarea label="Fallback Text (freier Preis-Text, falls nicht strukturiert)" value={form.prize_pool} onChange={(v) => set("prize_pool", v)} testId="new-tr-prizes" />
+        </div>
+
+        {/* Streaming + Links */}
+        <div className="border border-[#9146FF]/20 bg-[#9146FF]/5 rounded-sm p-4 space-y-3">
+          <div className="text-[11px] font-bold uppercase tracking-widest text-[#9146FF]">Streaming &amp; Links</div>
+          <Row>
+            <Field label="Twitch Channel" value={form.twitch_channel} onChange={(v) => set("twitch_channel", v)} testId="new-tr-twitch" placeholder="the_lion_squad_esports" />
+            <Field label="Location" value={form.location} onChange={(v) => set("location", v)} testId="new-tr-location" placeholder="z.B. Gamers Heaven · Bregenz" />
+          </Row>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.twitch_enabled} onChange={(e) => set("twitch_enabled", e.target.checked)} data-testid="new-tr-twitch-enabled" className="accent-[#9146FF]" />
+            <span>Twitch-Player auf Turnierseite einbetten</span>
+          </label>
+          <Row>
+            <Field label="Externer Stream-Link" value={form.stream_link} onChange={(v) => set("stream_link", v)} testId="new-tr-stream" placeholder="https://…" />
+            <Field label="Discord Invite" value={form.discord_link} onChange={(v) => set("discord_link", v)} testId="new-tr-discord" placeholder="https://discord.com/invite/…" />
+          </Row>
+        </div>
         <button disabled={saving} data-testid="new-tr-submit" className="px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50">
           {saving ? "Erstelle …" : "Turnier erstellen"}
         </button>

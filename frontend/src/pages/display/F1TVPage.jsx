@@ -1,29 +1,33 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { MascotBadge } from "@/components/tls/Logo";
+import { SponsorGrid } from "@/components/tls/SponsorTicker";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const medalColors = ["#FFD700", "#C0C0C0", "#CD7F32"];
 
 export default function F1TVPage() {
   const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [challenge, setChallenge] = useState(null);
   const [activeTrackIdx, setActiveTrackIdx] = useState(0);
   const [board, setBoard] = useState(null);
-  const [sponsors, setSponsors] = useState([]);
-  const [sponsorIdx, setSponsorIdx] = useState(0);
 
   useEffect(() => {
     (async () => {
       const { data } = await api.get(`/f1/challenges/${id}`);
       setChallenge(data);
-      try {
-        const { data: sp } = await api.get("/sponsors");
-        setSponsors(sp || []);
-      } catch { setSponsors([]); }
+      // Apply ?track= query param if present
+      const qs = searchParams.get("track");
+      if (qs && data.tracks) {
+        const idx = data.tracks.findIndex((t) => t.id === qs || t.slug === qs);
+        if (idx >= 0) setActiveTrackIdx(idx);
+      }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
@@ -38,19 +42,24 @@ export default function F1TVPage() {
     return () => clearInterval(iv);
   }, [challenge, activeTrackIdx, id]);
 
-  // Cycle tracks every 45s if championship
+  // Cycle tracks every 45s if championship AND no manual override via ?track=
   useEffect(() => {
     if (!challenge?.is_championship || !challenge.tracks?.length) return;
+    if (searchParams.get("track")) return; // manual lock
     const iv = setInterval(() => setActiveTrackIdx((i) => (i + 1) % challenge.tracks.length), 45000);
     return () => clearInterval(iv);
-  }, [challenge]);
+  }, [challenge, searchParams]);
 
-  // Rotate sponsors every 8s
+  // Arrow key navigation
   useEffect(() => {
-    if (sponsors.length < 2) return;
-    const iv = setInterval(() => setSponsorIdx((i) => (i + 1) % sponsors.length), 8000);
-    return () => clearInterval(iv);
-  }, [sponsors]);
+    if (!challenge?.tracks?.length) return;
+    const onKey = (e) => {
+      if (e.key === "ArrowRight") setActiveTrackIdx((i) => (i + 1) % challenge.tracks.length);
+      else if (e.key === "ArrowLeft") setActiveTrackIdx((i) => (i - 1 + challenge.tracks.length) % challenge.tracks.length);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [challenge]);
 
   if (!challenge) return <div className="min-h-screen bg-black flex items-center justify-center font-display tracking-widest text-white/40">LADE …</div>;
 
@@ -59,7 +68,8 @@ export default function F1TVPage() {
   const top3 = entries.slice(0, 3);
   const rest = entries.slice(3, 13);
   const publicUrl = `${window.location.origin}/f1/${challenge.slug || challenge.id}`;
-  const currentSponsor = sponsors[sponsorIdx];
+  const prevTrack = () => challenge.tracks?.length && setActiveTrackIdx((i) => (i - 1 + challenge.tracks.length) % challenge.tracks.length);
+  const nextTrack = () => challenge.tracks?.length && setActiveTrackIdx((i) => (i + 1) % challenge.tracks.length);
 
   return (
     <div className="min-h-screen tv-bg text-white overflow-hidden relative">
@@ -76,6 +86,24 @@ export default function F1TVPage() {
           <div className="text-[11px] uppercase tracking-[0.3em] text-white/50">Strecke {activeTrackIdx + 1} / {challenge.tracks?.length || 1}</div>
           <div className="font-heading text-3xl md:text-5xl font-black uppercase text-[#29B6E8]">{track?.name || "—"}</div>
           {track?.country && <div className="text-white/50 text-sm mt-1">{track.country}</div>}
+          {(challenge.tracks?.length || 0) > 1 && (
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <button onClick={prevTrack} data-testid="f1-tv-prev-track" className="p-2 border border-white/10 rounded-sm hover:border-[#29B6E8] hover:text-[#29B6E8] transition" title="Vorherige Strecke (←)">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <select
+                value={activeTrackIdx}
+                onChange={(e) => setActiveTrackIdx(Number(e.target.value))}
+                data-testid="f1-tv-track-select"
+                className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm min-w-[180px]"
+              >
+                {challenge.tracks.map((tr, i) => <option key={tr.id} value={i}>{tr.name}</option>)}
+              </select>
+              <button onClick={nextTrack} data-testid="f1-tv-next-track" className="p-2 border border-white/10 rounded-sm hover:border-[#29B6E8] hover:text-[#29B6E8] transition" title="Nächste Strecke (→)">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -134,30 +162,7 @@ export default function F1TVPage() {
             <div className="text-sm text-white/80 truncate font-mono">{publicUrl.replace(/^https?:\/\//, "")}</div>
           </div>
         </div>
-        <AnimatePresence mode="wait">
-          {currentSponsor ? (
-            <motion.div
-              key={currentSponsor.id}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.6 }}
-              className="flex items-center gap-4 min-w-0"
-            >
-              <div className="text-right min-w-0">
-                <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 font-bold">Presented by</div>
-                <div className="font-heading text-lg md:text-xl font-bold text-white truncate uppercase">{currentSponsor.name}</div>
-              </div>
-              {currentSponsor.logo_url && (
-                <div className="bg-white/5 border border-white/10 rounded-sm px-3 py-2 shrink-0">
-                  <img src={currentSponsor.logo_url} alt={currentSponsor.name} className="h-10 w-auto object-contain" />
-                </div>
-              )}
-            </motion.div>
-          ) : (
-            <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8]">AUTO-REFRESH · 7s</div>
-          )}
-        </AnimatePresence>
+        <SponsorGrid max={3} />
       </footer>
     </div>
   );

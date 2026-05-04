@@ -3,7 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import { api, formatMs } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
-import { Tv, Trophy, Flag, Download } from "lucide-react";
+import { PrizeList } from "@/components/tls/PrizeList";
+import { Tv, Trophy, Flag, Download, Twitch, FileDown } from "lucide-react";
 
 export default function F1DetailPage() {
   const { slug } = useParams();
@@ -54,21 +55,58 @@ export default function F1DetailPage() {
           <h1 data-testid="f1-challenge-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{challenge.title}</h1>
           {challenge.description && <p className="mt-3 text-white/70 max-w-2xl">{challenge.description}</p>}
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link to={`/display/f1/${challenge.id}`} target="_blank" data-testid="f1-tv-link" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
+            <Link to={`/display/f1/${challenge.id}${activeTrack ? `?track=${activeTrack}` : ""}`} target="_blank" data-testid="f1-tv-link" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
               <Tv className="w-4 h-4" /> TV / Beamer Modus
             </Link>
             <a
-              href={`${process.env.REACT_APP_BACKEND_URL}/api/f1/challenges/${challenge.id}/export.csv`}
-              data-testid="f1-export-csv"
+              href={`${process.env.REACT_APP_BACKEND_URL}/api/exports/f1/${challenge.slug || challenge.id}/leaderboard.pdf${activeTrack ? `?track_id=${activeTrack}` : ""}`}
+              target="_blank" rel="noreferrer"
+              data-testid="f1-export-pdf-track"
               className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition"
             >
-              <Download className="w-4 h-4" /> Export CSV
+              <FileDown className="w-4 h-4" /> PDF (aktuelle Strecke)
+            </a>
+            {challenge.is_championship && (
+              <a
+                href={`${process.env.REACT_APP_BACKEND_URL}/api/exports/f1/${challenge.slug || challenge.id}/championship.pdf`}
+                target="_blank" rel="noreferrer"
+                data-testid="f1-export-pdf-championship"
+                className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition"
+              >
+                <Trophy className="w-4 h-4" /> Championship PDF
+              </a>
+            )}
+            <a
+              href={`${process.env.REACT_APP_BACKEND_URL}/api/f1/challenges/${challenge.id}/export.csv`}
+              data-testid="f1-export-csv"
+              className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/10 text-white/60 font-bold uppercase tracking-wider rounded-sm hover:border-white/20 hover:text-white transition text-sm"
+            >
+              <Download className="w-3.5 h-3.5" /> CSV
             </a>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+        {challenge.twitch_enabled && challenge.twitch_channel && (
+          <section data-testid="f1-twitch-embed">
+            <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2"><Twitch className="w-4 h-4 text-[#9146FF]" /> Live Stream</h2>
+            <div className="rounded-sm overflow-hidden border border-[#9146FF]/30 bg-black aspect-video max-w-4xl">
+              <iframe
+                src={`https://player.twitch.tv/?channel=${encodeURIComponent(challenge.twitch_channel)}&parent=${window.location.hostname}&muted=true`}
+                title="Twitch Stream"
+                allowFullScreen
+                className="w-full h-full"
+              />
+            </div>
+          </section>
+        )}
+        {(challenge.prize_places?.length > 0) && (
+          <section>
+            <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Preise</h2>
+            <PrizeList prizePlaces={challenge.prize_places} />
+          </section>
+        )}
         {challenge.is_championship && (
           <div className="flex gap-2 mb-6">
             <button

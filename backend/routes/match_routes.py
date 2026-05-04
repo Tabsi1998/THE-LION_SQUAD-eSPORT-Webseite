@@ -64,6 +64,28 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(requ
         updated_matches = advance_match_winner(m, all_matches)
         for um in updated_matches:
             await db.matches.update_one({"id": um["id"]}, {"$set": um})
+        # Discord trigger: match completed
+        try:
+            from discord_service import send_discord
+            regs = {r["id"]: r for r in await db.tournament_registrations.find(
+                {"tournament_id": m["tournament_id"]}, {"_id": 0}).to_list(500)}
+            t = await db.tournaments.find_one({"id": m["tournament_id"]}, {"_id": 0}) or {}
+            a = regs.get(m.get("participant_a_id"), {})
+            b = regs.get(m.get("participant_b_id"), {})
+            w = regs.get(m.get("winner_id"), {})
+            await send_discord(
+                f"🎮 Match beendet · {t.get('title') or 'Turnier'}",
+                f"**{a.get('display_name') or '?'}** vs **{b.get('display_name') or '?'}**\n"
+                f"Gewinner: **{w.get('display_name') or '?'}** ({m.get('score_a',0)}:{m.get('score_b',0)})",
+                color=0x29B6E8,
+                url=f"/tournaments/{t.get('slug') or t.get('id')}/bracket",
+                fields=[
+                    {"name": "Runde", "value": m.get("round_name") or f"Runde {m.get('round','?')}", "inline": True},
+                ],
+                event_key="match.completed",
+            )
+        except Exception:
+            pass
     m.pop("_id", None)
     return m
 

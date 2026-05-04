@@ -6,6 +6,8 @@ import { TournamentCard } from "@/components/tls/TournamentCard";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { MascotBadge } from "@/components/tls/Logo";
 import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
+import { CurrentEventHero } from "@/components/tls/CurrentEventHero";
+import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { motion } from "framer-motion";
 import { ArrowRight, Flag, Trophy, Zap, Users as UsersIcon } from "lucide-react";
 
@@ -101,6 +103,8 @@ export default function HomePage() {
       </section>
 
       {/* Live + Tournaments */}
+      <CurrentEventHero />
+
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <SectionHeader title="Aktuelle Turniere" subtitle="Anmeldung offen, Live und beendet" actionLabel="Alle Turniere" actionTo="/tournaments" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
@@ -204,6 +208,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Sponsor Ticker */}
+      <SponsorTicker />
     </PublicLayout>
   );
 }

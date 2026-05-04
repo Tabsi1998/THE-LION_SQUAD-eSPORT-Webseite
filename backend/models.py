@@ -192,9 +192,12 @@ class TournamentCreate(BaseModel):
     is_invite_only: bool = False
     rules: Optional[str] = None
     prize_pool: Optional[str] = None
+    prize_places: Optional[List[dict]] = None  # [{"place":1,"label":"1. Platz","value":"…"}]
     best_of: int = 1
     bronze_match: bool = False
     stream_link: Optional[str] = None
+    twitch_channel: Optional[str] = None
+    twitch_enabled: bool = False
     discord_link: Optional[str] = None
     location: Optional[str] = None
     banner_url: Optional[str] = None
@@ -219,9 +222,12 @@ class TournamentUpdate(BaseModel):
     is_public: Optional[bool] = None
     rules: Optional[str] = None
     prize_pool: Optional[str] = None
+    prize_places: Optional[List[dict]] = None
     best_of: Optional[int] = None
     bronze_match: Optional[bool] = None
     stream_link: Optional[str] = None
+    twitch_channel: Optional[str] = None
+    twitch_enabled: Optional[bool] = None
     discord_link: Optional[str] = None
     location: Optional[str] = None
     banner_url: Optional[str] = None
@@ -306,7 +312,10 @@ class F1ChallengeCreate(BaseModel):
     end_date: Optional[datetime] = None
     is_championship: bool = False
     points_per_position: List[int] = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
+    prize_places: Optional[List[dict]] = None
     banner_url: Optional[str] = None
+    twitch_channel: Optional[str] = None
+    twitch_enabled: bool = False
 
 
 class F1ChallengeUpdate(BaseModel):
@@ -324,7 +333,10 @@ class F1ChallengeUpdate(BaseModel):
     end_date: Optional[datetime] = None
     is_championship: Optional[bool] = None
     points_per_position: Optional[List[int]] = None
+    prize_places: Optional[List[dict]] = None
     banner_url: Optional[str] = None
+    twitch_channel: Optional[str] = None
+    twitch_enabled: Optional[bool] = None
 
 
 class F1LapTimeCreate(BaseModel):

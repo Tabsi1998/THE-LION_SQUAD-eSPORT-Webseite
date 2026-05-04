@@ -36,6 +36,8 @@ class BrandingSettings(BaseModel):
     timezone: Optional[str] = None
     imprint: Optional[str] = None
     privacy_policy: Optional[str] = None
+    discord_invite_url: Optional[str] = None
+    twitch_channel: Optional[str] = None
 
 
 class TestEmailBody(BaseModel):
@@ -63,6 +65,8 @@ async def public_settings():
         "mascot_url": b.get("mascot_url"),
         "imprint": b.get("imprint"),
         "privacy_policy": b.get("privacy_policy"),
+        "discord_invite_url": b.get("discord_invite_url") or "https://discord.com/invite/thelionsquadesports",
+        "twitch_channel": b.get("twitch_channel") or "the_lion_squad_esports",
     }
 
 
@@ -542,6 +546,23 @@ async def pdf_f1_lb(slug_or_id: str, track_id: Optional[str] = None):
     lb = await f1_lb(c["id"], track_id)
     return _pdf_response(pdf_f1_leaderboard(c, lb.get("track"), lb.get("entries", [])),
                           f"f1_{c['slug']}.pdf")
+
+
+@pdf_router.get("/f1/{slug_or_id}/championship.pdf")
+async def pdf_f1_championship(slug_or_id: str):
+    db = get_db()
+    c = await db.f1_challenges.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    if not c:
+        raise HTTPException(status_code=404)
+    from routes.f1_routes import championship_standings as f1_champ
+    cs = await f1_champ(c["id"])
+    # Reuse standings PDF shape
+    rows = [{"rank": r["rank"], "display_name": r["display_name"],
+             "won": r.get("wins", 0), "lost": (r.get("races", 0) - r.get("wins", 0)),
+             "points": r.get("points", 0)} for r in (cs.get("standings") or [])]
+    fake_tournament = {"title": (c.get("title") or "F1") + " · Championship", "slug": c.get("slug")}
+    return _pdf_response(pdf_standings(fake_tournament, rows),
+                          f"f1_championship_{c.get('slug') or slug_or_id}.pdf")
 
 
 # ---------- Audit ----------

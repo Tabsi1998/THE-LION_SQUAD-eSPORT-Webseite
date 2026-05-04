@@ -5,7 +5,8 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { toast } from "sonner";
-import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap } from "lucide-react";
+import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, Twitch } from "lucide-react";
+import { PrizeList } from "@/components/tls/PrizeList";
 
 export default function TournamentDetailPage() {
   const { slug } = useParams();
@@ -119,10 +120,23 @@ export default function TournamentDetailPage() {
               <div className="text-white/80 whitespace-pre-line border border-white/10 rounded-sm p-5 bg-[#121212]">{t.rules}</div>
             </section>
           )}
-          {t.prize_pool && (
+          {(t.prize_places?.length || t.prize_pool) && (
             <section>
               <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Preise</h2>
-              <div className="text-white/80 whitespace-pre-line border border-[#FFD700]/20 rounded-sm p-5 bg-[#FFD700]/5">{t.prize_pool}</div>
+              <PrizeList prizePlaces={t.prize_places} prizePool={t.prize_pool} />
+            </section>
+          )}
+          {t.twitch_enabled && t.twitch_channel && (
+            <section data-testid="twitch-embed">
+              <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Twitch className="w-4 h-4 text-[#9146FF]" /> Live Stream</h2>
+              <div className="rounded-sm overflow-hidden border border-[#9146FF]/30 bg-black aspect-video">
+                <iframe
+                  src={`https://player.twitch.tv/?channel=${encodeURIComponent(t.twitch_channel)}&parent=${window.location.hostname}&muted=true`}
+                  title="Twitch Stream"
+                  allowFullScreen
+                  className="w-full h-full"
+                />
+              </div>
             </section>
           )}
           <section>

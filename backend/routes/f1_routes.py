@@ -276,6 +276,40 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_a
     await db.f1_lap_times.insert_one(doc)
     doc.pop("_id", None)
     doc["time_str"] = _ms_to_time_str(body.time_ms)
+    # Discord trigger: if this submission is the new P1 on this track
+    if not body.is_invalid:
+        try:
+            from discord_service import send_discord
+            effective = body.time_ms + int((body.penalty_seconds or 0) * 1000)
+            # Find current P1
+            others = await db.f1_lap_times.find(
+                {"challenge_id": cid, "track_id": body.track_id,
+                 "is_invalid": {"$ne": True}, "id": {"$ne": doc["id"]}},
+                {"_id": 0}).to_list(5000)
+            # Compute per-user best (effective)
+            best = {}
+            for t in others:
+                eff = t["time_ms"] + int(t.get("penalty_seconds", 0) * 1000)
+                if t["user_id"] not in best or eff < best[t["user_id"]]:
+                    best[t["user_id"]] = eff
+            best_per_user_sorted = sorted(best.values()) if best else []
+            prev_best = best_per_user_sorted[0] if best_per_user_sorted else None
+            if prev_best is None or effective < prev_best:
+                u = await db.users.find_one({"id": body.user_id}, {"display_name": 1, "username": 1}) or {}
+                tr = await db.f1_tracks.find_one({"id": body.track_id}, {"name": 1}) or {}
+                await send_discord(
+                    f"🏁 Neue Bestzeit · {c.get('title') or 'F1 Challenge'}",
+                    f"**{u.get('display_name') or u.get('username') or 'Fahrer'}** führt jetzt auf **{tr.get('name') or '–'}**!",
+                    color=0xFFD700,
+                    url=f"/f1/{c.get('slug') or cid}",
+                    fields=[
+                        {"name": "Zeit", "value": _ms_to_time_str(effective), "inline": True},
+                        *([{"name": "Vorher", "value": _ms_to_time_str(prev_best), "inline": True}] if prev_best else []),
+                    ],
+                    event_key="f1.new_leader",
+                )
+        except Exception:
+            pass
     return doc
 
 

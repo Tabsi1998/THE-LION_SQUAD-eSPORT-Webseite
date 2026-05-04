@@ -1,0 +1,46 @@
+{
+  "summary": "Phase 4 (TLS Arena Feature-Batch) tested: 8/8 backend tests passing in test_phase4_features.py after fixing 1 backend import bug. Frontend: HomePage CurrentEventHero + SponsorTicker + SeasonPassWidget all rendered, PublicLayout Footer Discord+Twitch testids present. TournamentDetailPage /tournaments/mario-kart-masters-september shows PrizeList. F1DetailPage /f1/f1-fast-lap-gamers-heaven-samstag shows 'PDF (aktuelle Strecke)' + CSV buttons, Twitch live stream embed, structured PrizeList (Tagessieger 100€+TLS Jersey, P2 50€, P3 25€). F1TVPage SponsorGrid present, BracketTVPage SponsorGrid present. AdminTournamentNewPage and AdminF1NewPage have prize_places editor (add/place-0) + Twitch fields. F1 TV track-selector arrows/select were NOT detected because the seeded Samstag Challenge has only 1 track (Silverstone) – per spec the controls only render when >1 track, so this is correct behaviour.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/exports/f1/{id}/championship.pdf", "issue": "Initially crashed with 500 ImportError: 'cannot import name championship from routes.f1_routes' – function is named championship_standings. Fixed in extras_routes.py line 557 (import alias). Now returns 200 application/pdf for both championship and non-championship challenges."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/f1/f1-fast-lap-gamers-heaven-samstag", "issues": ["Twitch-Embed lädt von Twitch (offline-Hinweis 'the_lion_squad_esports is offline'), nicht buggy, aber offline. AmazonIVS Player liefert 429 / 404 in Console – externer Twitch-Player, kein TLS-Bug."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase4_features.py",
+    "/app/test_reports/pytest/phase4_results.xml"
+  ],
+  "action_items": [
+    "(Erledigt) Bug fix: extras_routes.py importiert jetzt championship_standings statt championship – F1 Championship-PDF Export funktioniert.",
+    "(Optional) F1TVPage Track-Selector visuell mit nur 1 Track absichern (z.B. show single track name statt Auto-hide) – aktuell korrekt versteckt, aber kein Hinweis auf 'Mehr Strecken folgen'.",
+    "(Optional) data-testid='f1tv-track-select' / 'f1tv-prev-track' / 'f1tv-next-track' / 'f1tv-qr' an die F1TVPage-Komponenten ergänzen, damit E2E-Tests die Controls ohne fragile generische Selektoren prüfen können (analog auf BracketTV: 'bracket-tv-qr').",
+    "(Optional) Bei Sponsor-Grid die data-testid='sponsor-grid' Wrapper sind vorhanden – gut. Sponsor-Items mit data-testid='sponsor-grid-item' wären zusätzlich hilfreich.",
+    "(Optional) prize_places Editor in AdminTournamentNew: Test bestätigt new-tr-prize-add + new-tr-prize-place-0 – Tip: nach add auch new-tr-prize-label-0 / new-tr-prize-value-0 mit einheitlichen testids ausstatten."
+  ],
+  "critical_code_review_comments": [
+    "extras_routes.py /api/exports/f1/{id}/championship.pdf: Korrigiert auf championship_standings. Gut: Funktion shape-mapped {rank, display_name, won, lost, points} für pdf_standings – auch für nicht-championship Challenges crash-frei (leere standings -> leeres PDF).",
+    "tournament_routes.py set_status: Discord-Trigger korrekt nur bei status-change (prev != status) und nur für relevante Status (registration_open/live/completed). try/except Exception:pass schluckt Webhook-Fehler – discord_service liefert ohnehin {ok:false,reason:disabled}, d.h. kein Crash bei fehlendem Webhook (verifiziert).",
+    "models.py: prize_places: Optional[List[dict]] – tolerant; sollte langfristig zu einem Pydantic-Submodel PrizePlace(place:int,label:str,value:str) gehärtet werden, um Frontend/Backend-Schema zu synchronisieren.",
+    "Backend Routen-Naming Inkonsistenz: tournament_routes hat POST /api/tournaments/{tid}/status (nicht /set-status wie im Review beschrieben) – Tests laufen gegen /status. F1 Discord-Trigger existieren in f1_routes.add_time (new leader) und match_routes.completed laut Spec – nicht im Detail im Test berührt, aber set_status no-crash verifiziert.",
+    "extras_routes.py /api/settings/public: enthält discord_invite_url + twitch_channel mit Default-Werten ('https://discord.com/invite/thelionsquadesports' bzw. 'the_lion_squad_esports') – sauber.",
+    "Frontend F1DetailPage: PrizeList rendert 3 Karten (Tagessieger, P2, P3), Sortierung nach place stimmt; Twitch-Embed nutzt offizielles parent-Domain Param – verifiziert. PDF/CSV Buttons mit korrekten data-testids."
+  ],
+  "updated_files": [
+    "/app/backend/routes/extras_routes.py",
+    "/app/backend/tests/test_phase4_features.py"
+  ],
+  "success_rate": {"backend": "100% (8/8 phase4 tests)", "frontend": "Alle gefragten data-testids vorhanden außer F1TV Track-Selector Arrows/Select (nur bei >1 Track sichtbar – Samstag-Challenge hat 1 Track)"},
+  "test_credentials": "admin@thelionsquad.at / TLSAdmin2026! verifiziert (login -> /dashboard).",
+  "seed_data_creation": "Test hat ein temporäres TEST Tournament + TEST F1 Challenge erstellt und nach Verify wieder via DELETE entfernt. Außerdem wurde der Status eines seeded Tournaments kurzzeitig auf 'registration_open' gesetzt und auf den ursprünglichen Status zurückgesetzt – Discord-Webhook ist nicht konfiguriert, daher kein realer Webhook-Aufruf.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 4 Test-Suite in /app/backend/tests/test_phase4_features.py: TestSeededEvents (mario-kart-gamers-heaven-juni, smash-gamers-heaven-juni, mario-kart-masters-september, f1-fast-lap-gamers-heaven-samstag/sonntag), TestPublicSettings (discord_invite_url+twitch_channel default), TestTournamentCreateNewFields (prize_places List[dict] + twitch_channel/twitch_enabled persistiert), TestF1CreateNewFields, TestPDFExports (F1 leaderboard + championship PDF, both 200/application/pdf, %PDF magic bytes), TestDiscordTriggers (set-status no-crash). Frontend Playwright: Home/TournamentDetail/F1Detail/AdminTRNew/AdminF1New testids alle gefunden. Track-Selector auf F1TV nur bei >1 Track (Samstag = 1 Track). Sponsor-Grid + QR Wrapper auf F1TV/BracketTV vorhanden (QR via qrcode.react SVG). Backend-Bug gefixt: extras_routes.py importierte 'championship' statt 'championship_standings'.",
+  "rca of the issue": "RCA F1 Championship PDF 500: pdf_router /f1/{slug_or_id}/championship.pdf nutzt 'from routes.f1_routes import championship as f1_champ' – die tatsächliche Funktion in f1_routes.py heißt jedoch 'championship_standings'. Lokal in den anderen Routen ist die Funktion an /api/f1/challenges/{cid}/championship gemounted (Path-Decorator), aber der Python-Funktionsname blieb 'championship_standings'. Behoben durch Umstellung auf 'from routes.f1_routes import championship_standings as f1_champ'. Kein zusätzlicher Restart nötig dank Hot-Reload – Test direkt grün."
+}

@@ -12,6 +12,8 @@ export default function AdminF1NewPage() {
     controller_type: "", platform: "", banner_url: "",
     unlimited_attempts: true, max_attempts: 0,
     is_championship: false,
+    twitch_channel: "", twitch_enabled: false,
+    prize_places: [],
   });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -22,6 +24,10 @@ export default function AdminF1NewPage() {
     try {
       const payload = { ...form };
       if (payload.unlimited_attempts) payload.max_attempts = null;
+      payload.prize_places = (payload.prize_places || [])
+        .filter((p) => p.value && p.value.trim())
+        .map((p) => ({ place: Number(p.place) || 0, label: p.label || `Platz ${p.place}`, value: p.value }));
+      if (payload.prize_places.length === 0) payload.prize_places = null;
       const { data } = await api.post("/f1/challenges", payload);
       toast.success("Challenge erstellt.");
       nav(`/admin/f1/${data.id}`);
@@ -56,6 +62,34 @@ export default function AdminF1NewPage() {
           <span>Unbegrenzte Versuche</span>
         </label>
         {!form.unlimited_attempts && <Field label="Max Versuche" type="number" value={form.max_attempts} onChange={(v) => set("max_attempts", Number(v))} testId="f1-new-max-attempts" />}
+
+        <div className="border border-[#9146FF]/20 bg-[#9146FF]/5 rounded-sm p-4 space-y-3">
+          <div className="text-[11px] font-bold uppercase tracking-widest text-[#9146FF]">Streaming</div>
+          <Field label="Twitch Channel" value={form.twitch_channel} onChange={(v) => set("twitch_channel", v)} testId="f1-new-twitch" />
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.twitch_enabled} onChange={(e) => set("twitch_enabled", e.target.checked)} data-testid="f1-new-twitch-enabled" className="accent-[#9146FF]" />
+            <span>Twitch-Player auf F1-Seite einbetten</span>
+          </label>
+        </div>
+
+        <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Preise (strukturiert)</div>
+              <div className="text-xs text-white/50 mt-0.5">z.B. Tagessieger Samstag / Sonntag</div>
+            </div>
+            <button type="button" onClick={() => set("prize_places", [...(form.prize_places || []), { place: (form.prize_places?.length || 0) + 1, label: "", value: "" }])} data-testid="f1-new-prize-add" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
+          </div>
+          {(form.prize_places || []).map((p, i) => (
+            <div key={i} className="grid grid-cols-12 gap-2">
+              <input type="number" min="1" value={p.place} onChange={(e) => { const np=[...form.prize_places]; np[i]={...p,place:Number(e.target.value)||1}; set("prize_places",np); }} data-testid={`f1-new-prize-place-${i}`} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm tabular-nums" placeholder="#" />
+              <input value={p.label || ""} onChange={(e) => { const np=[...form.prize_places]; np[i]={...p,label:e.target.value}; set("prize_places",np); }} data-testid={`f1-new-prize-label-${i}`} className="col-span-4 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Label" />
+              <input value={p.value || ""} onChange={(e) => { const np=[...form.prize_places]; np[i]={...p,value:e.target.value}; set("prize_places",np); }} data-testid={`f1-new-prize-value-${i}`} className="col-span-5 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Preis" />
+              <button type="button" onClick={() => set("prize_places", form.prize_places.filter((_, j) => j !== i))} data-testid={`f1-new-prize-remove-${i}`} className="col-span-1 text-white/40 hover:text-[#FF3B30] text-center py-2">✕</button>
+            </div>
+          ))}
+        </div>
+
         <button disabled={saving} data-testid="f1-new-submit" className="px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50">
           {saving ? "Erstelle…" : "Challenge erstellen"}
         </button>
