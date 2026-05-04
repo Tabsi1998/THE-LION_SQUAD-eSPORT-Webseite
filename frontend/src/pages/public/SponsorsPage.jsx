@@ -3,19 +3,19 @@ import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Star, ExternalLink } from "lucide-react";
 
-const tierLabel = { gold: "Gold Sponsor", silver: "Silber", bronze: "Bronze", standard: "Partner" };
-const tierColor = { gold: "#FFD700", silver: "#C0C0C0", bronze: "#CD7F32", standard: "#29B6E8" };
+const tierLabel = { main: "Hauptsponsor", gold: "Gold", silver: "Silber", bronze: "Bronze", supporter: "Supporter", partner: "Partner" };
+const tierColor = { main: "#29B6E8", gold: "#FFD700", silver: "#C0C0C0", bronze: "#CD7F32", supporter: "#9CA3AF", partner: "#A855F7" };
 
 export default function SponsorsPage() {
   const [list, setList] = useState([]);
   useEffect(() => { api.get("/sponsors").then(({ data }) => setList(data)).catch(() => {}); }, []);
 
   const grouped = list.reduce((acc, s) => {
-    const t = s.tier || "standard";
+    const t = s.tier || "supporter";
     (acc[t] = acc[t] || []).push(s);
     return acc;
   }, {});
-  const order = ["gold", "silver", "bronze", "standard"];
+  const order = ["main", "gold", "silver", "bronze", "supporter", "partner"];
 
   return (
     <PublicLayout>
@@ -42,7 +42,7 @@ export default function SponsorsPage() {
                 <h2 className="font-heading text-xl font-black uppercase tracking-wider">{tierLabel[t] || t}</h2>
                 <div className="flex-1 border-t border-white/10" />
               </div>
-              <div className={`grid gap-5 ${t === "gold" ? "md:grid-cols-2" : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
+              <div className={`grid gap-5 ${(t === "main" || t === "gold") ? "md:grid-cols-2" : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
                 {grouped[t].map((s) => (
                   <a
                     key={s.id}

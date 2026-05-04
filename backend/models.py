@@ -54,9 +54,14 @@ class UserUpdate(BaseModel):
     # Gaming meta
     favorite_games: Optional[List[str]] = None
     main_platform: Optional[str] = None  # PC / PS5 / Xbox / Switch / Mobile
+    main_platforms: Optional[List[str]] = None  # multi-select
     preferred_role: Optional[str] = None
-    input_device: Optional[str] = None  # controller / wheel / keyboard_mouse
+    input_device: Optional[str] = None  # legacy single value
+    input_devices: Optional[List[str]] = None  # multi-select: keyboard_mouse / controller / wheel / mobile_touch / arcade
+    gaming_subscriptions: Optional[List[str]] = None  # nintendo_online, ea_play, ps_plus, xbox_game_pass, ubisoft_plus, ea_pro, gog_galaxy
     website: Optional[str] = None
+    # Public profile features
+    show_twitch_embed: Optional[bool] = None  # show live twitch on public profile
     # Socials (legacy fields for compatibility)
     discord_name: Optional[str] = None
     discord_id: Optional[str] = None
@@ -591,12 +596,31 @@ class NewsUpdate(BaseModel):
     linked_team_ids: Optional[List[str]] = None
 
 
+SponsorTier = Literal["main", "gold", "silver", "bronze", "supporter", "partner"]
+
+
 class SponsorCreate(BaseModel):
     name: str
     logo_url: Optional[str] = None
     link: Optional[str] = None
     description: Optional[str] = None
-    tier: Optional[str] = "standard"
+    tier: SponsorTier = "supporter"
+    is_active: bool = True
+    show_on_home: Optional[bool] = None  # auto-derived when None: gold/main yes, others no
+    show_on_footer: Optional[bool] = None
+    order_index: int = 0
+
+
+class SponsorUpdate(BaseModel):
+    name: Optional[str] = None
+    logo_url: Optional[str] = None
+    link: Optional[str] = None
+    description: Optional[str] = None
+    tier: Optional[SponsorTier] = None
+    is_active: Optional[bool] = None
+    show_on_home: Optional[bool] = None
+    show_on_footer: Optional[bool] = None
+    order_index: Optional[int] = None
 
 
 # ---------- Gallery ----------

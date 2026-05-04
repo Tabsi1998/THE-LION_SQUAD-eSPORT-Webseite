@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
 import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2 } from "lucide-react";
 
@@ -341,8 +342,10 @@ export default function AdminSettingsPage() {
               <BrandField label="Domain" value={brand.domain} onChange={(v) => setBrand({ ...brand, domain: v })} testId="brand-domain" />
             </div>
             <BrandField label="Zeitzone" value={brand.timezone} onChange={(v) => setBrand({ ...brand, timezone: v })} testId="brand-tz" />
-            <BrandField label="Logo URL" value={brand.logo_url} onChange={(v) => setBrand({ ...brand, logo_url: v })} testId="brand-logo" />
-            <BrandField label="Mascot URL" value={brand.mascot_url} onChange={(v) => setBrand({ ...brand, mascot_url: v })} testId="brand-mascot" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ImageUpload value={brand.logo_url} onChange={(v) => setBrand({ ...brand, logo_url: v })} label="Vereinslogo" testId="brand-logo" variant="square" />
+              <ImageUpload value={brand.mascot_url} onChange={(v) => setBrand({ ...brand, mascot_url: v })} label="Maskottchen" testId="brand-mascot" variant="square" />
+            </div>
             <div>
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Impressum</div>
               <textarea value={brand.imprint || ""} onChange={(e) => setBrand({ ...brand, imprint: e.target.value })} rows={4} data-testid="brand-imprint" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />

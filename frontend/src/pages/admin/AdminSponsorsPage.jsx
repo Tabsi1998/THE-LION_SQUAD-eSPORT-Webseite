@@ -1,39 +1,62 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
 import { Plus, Trash2, Upload, Pencil, X as XIcon } from "lucide-react";
 
-const TIERS = ["gold", "silver", "bronze", "standard"];
+const TIERS = ["main", "gold", "silver", "bronze", "supporter", "partner"];
+const TIER_LABELS = { main: "Hauptsponsor", gold: "Gold", silver: "Silber", bronze: "Bronze", supporter: "Supporter", partner: "Partner" };
+const TIER_COLORS = { main: "text-[#29B6E8]", gold: "text-[#FFD700]", silver: "text-white/80", bronze: "text-[#CD7F32]", supporter: "text-white/60", partner: "text-purple-400" };
 
 export default function AdminSponsorsPage() {
   const [list, setList] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [migrating, setMigrating] = useState(false);
 
   const load = async () => {
-    const { data } = await api.get("/sponsors");
+    const { data } = await api.get("/sponsors/admin");
     setList(data);
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
   const del = async (id) => {
-    if (!confirm("Sponsor wirklich löschen?")) return;
+    if (!window.confirm("Sponsor wirklich löschen?")) return;
     await api.delete(`/sponsors/${id}`);
     toast.success("Sponsor gelöscht.");
     load();
   };
 
+  const migrate = async () => {
+    if (!window.confirm("Externe Bilder JETZT lokal speichern? (Sponsoren, News, Events, Galerie, Avatare)")) return;
+    setMigrating(true);
+    try {
+      const { data } = await api.post("/uploads/migrate-external-images");
+      const total = Object.values(data.summary || {}).reduce((s, v) => s + (v.updated || 0), 0);
+      toast.success(`${total} Bilder lokal gespeichert.`);
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
+    setMigrating(false);
+  };
+
   return (
     <AdminLayout>
-      <div className="flex items-start justify-between gap-4 mb-6">
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Partner</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Sponsoren</h1>
-          <p className="mt-2 text-white/60 text-sm max-w-xl">Logos und Links verwalten. Sponsoren erscheinen als Slider auf der Startseite, im TV-Modus und im Footer.</p>
+          <p className="mt-2 text-white/60 text-sm max-w-xl">
+            <strong className="text-[#FFD700]">Main/Gold</strong> erscheinen auf der Startseite + Footer, <strong>Silber</strong> nur im Footer, <strong>Bronze/Supporter/Partner</strong> nur auf der Sponsorenseite.
+          </p>
         </div>
-        <button onClick={() => setCreating(true)} data-testid="sponsor-new-btn" className="px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><Plus className="w-4 h-4" /> Neuer Sponsor</button>
+        <div className="flex gap-2">
+          <button onClick={migrate} disabled={migrating} data-testid="sponsor-migrate-btn" className="px-4 py-2.5 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:border-[#29B6E8] hover:text-[#29B6E8] disabled:opacity-50 text-xs">
+            <Upload className="w-4 h-4" /> {migrating ? "Migriere…" : "Bilder migrieren"}
+          </button>
+          <button onClick={() => setCreating(true)} data-testid="sponsor-new-btn" className="px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><Plus className="w-4 h-4" /> Neuer Sponsor</button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -49,8 +72,13 @@ export default function AdminSponsorsPage() {
                   </div>
                 )}
                 <div className="min-w-0">
-                  <div className={`text-[10px] uppercase tracking-widest font-bold ${s.tier === "gold" ? "text-[#FFD700]" : s.tier === "silver" ? "text-white/70" : s.tier === "bronze" ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}>{s.tier || "—"}</div>
+                  <div className={`text-[10px] uppercase tracking-widest font-bold ${TIER_COLORS[s.tier] || "text-white/60"}`}>{TIER_LABELS[s.tier] || s.tier || "—"}</div>
                   <div className="font-heading text-lg font-bold truncate">{s.name}</div>
+                  <div className="flex gap-1 mt-1 flex-wrap">
+                    {s.show_on_home && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest">Home</span>}
+                    {s.show_on_footer && <span className="text-[9px] px-1.5 py-0.5 bg-white/10 text-white/70 rounded-sm font-bold uppercase tracking-widest">Footer</span>}
+                    {s.is_active === false && <span className="text-[9px] px-1.5 py-0.5 bg-[#FF3B30]/15 text-[#FF3B30] rounded-sm font-bold uppercase tracking-widest">Inaktiv</span>}
+                  </div>
                 </div>
               </div>
               <div className="flex gap-1 shrink-0">
@@ -80,26 +108,13 @@ function SponsorForm({ sponsor, onClose, onSaved }) {
   const [form, setForm] = useState({
     name: sponsor?.name || "", logo_url: sponsor?.logo_url || "",
     link: sponsor?.link || "", description: sponsor?.description || "",
-    tier: sponsor?.tier || "standard",
+    tier: sponsor?.tier || "supporter",
+    is_active: sponsor?.is_active !== false,
+    show_on_home: sponsor?.show_on_home,
+    show_on_footer: sponsor?.show_on_footer,
+    order_index: sponsor?.order_index ?? 0,
   });
-  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const fileRef = useRef(null);
-
-  const uploadLogo = async (file) => {
-    if (!file) return;
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const { data } = await api.post("/uploads/sponsor-logo", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setForm((f) => ({ ...f, logo_url: data.url }));
-      toast.success("Logo hochgeladen.");
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Upload fehlgeschlagen"); }
-    setUploading(false);
-  };
 
   const save = async (e) => {
     e.preventDefault();
@@ -121,31 +136,34 @@ function SponsorForm({ sponsor, onClose, onSaved }) {
           <button type="button" onClick={onClose} className="text-white/40 hover:text-white"><XIcon className="w-4 h-4" /></button>
         </div>
         <Field label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required testId="sponsor-name" />
-        <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Logo</div>
-          <div className="flex items-start gap-3">
-            {form.logo_url ? (
-              <img src={form.logo_url} alt="" className="w-16 h-16 object-contain bg-white/5 border border-white/10 rounded-sm p-1 shrink-0" />
-            ) : (
-              <div className="w-16 h-16 bg-[#0A0A0A] border border-dashed border-white/20 rounded-sm shrink-0" />
-            )}
-            <div className="flex-1 space-y-2">
-              <input value={form.logo_url} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} placeholder="URL oder hochladen" data-testid="sponsor-logo-url" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadLogo(e.target.files?.[0])} data-testid="sponsor-logo-file" />
-              <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} data-testid="sponsor-logo-upload-btn" className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 disabled:opacity-50">
-                <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Bild hochladen"}
-              </button>
-            </div>
-          </div>
-          <p className="text-xs text-white/40 mt-1">PNG/JPG/WebP/SVG bis 5 MB.</p>
-        </div>
+        <ImageUpload value={form.logo_url} onChange={(v) => setForm({ ...form, logo_url: v })} label="Logo" testId="sponsor-logo" variant="square" endpoint="/uploads/sponsor-logo" />
         <Field label="Link (URL)" value={form.link} onChange={(v) => setForm({ ...form, link: v })} testId="sponsor-link" placeholder="https://…" />
-        <label className="block">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Tier</div>
-          <select value={form.tier} onChange={(e) => setForm({ ...form, tier: e.target.value })} data-testid="sponsor-tier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-            {TIERS.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Tier</div>
+            <select value={form.tier} onChange={(e) => setForm({ ...form, tier: e.target.value, show_on_home: undefined, show_on_footer: undefined })} data-testid="sponsor-tier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+              {TIERS.map((t) => <option key={t} value={t}>{TIER_LABELS[t]}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Reihenfolge</div>
+            <input type="number" value={form.order_index ?? 0} onChange={(e) => setForm({ ...form, order_index: parseInt(e.target.value, 10) || 0 })} data-testid="sponsor-order" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+          </label>
+        </div>
+        <div className="grid grid-cols-3 gap-3 text-sm">
+          <label className="inline-flex items-center gap-2">
+            <input type="checkbox" checked={form.is_active !== false} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} data-testid="sponsor-active" className="accent-[#29B6E8]" />
+            Aktiv
+          </label>
+          <label className="inline-flex items-center gap-2">
+            <input type="checkbox" checked={form.show_on_home === true || (form.show_on_home === undefined && ["main", "gold"].includes(form.tier))} onChange={(e) => setForm({ ...form, show_on_home: e.target.checked })} data-testid="sponsor-show-home" className="accent-[#29B6E8]" />
+            Auf Home
+          </label>
+          <label className="inline-flex items-center gap-2">
+            <input type="checkbox" checked={form.show_on_footer === true || (form.show_on_footer === undefined && ["main", "gold", "silver"].includes(form.tier))} onChange={(e) => setForm({ ...form, show_on_footer: e.target.checked })} data-testid="sponsor-show-footer" className="accent-[#29B6E8]" />
+            Im Footer
+          </label>
+        </div>
         <label className="block">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Beschreibung</div>
           <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} data-testid="sponsor-description" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />

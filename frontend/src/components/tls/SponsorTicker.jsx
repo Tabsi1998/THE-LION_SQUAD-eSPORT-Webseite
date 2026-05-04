@@ -5,14 +5,14 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
-export function SponsorTicker({ className = "", compact = false }) {
+export function SponsorTicker({ className = "", compact = false, placement = "home" }) {
   const [sponsors, setSponsors] = useState([]);
   useEffect(() => {
     (async () => {
-      try { const { data } = await api.get("/sponsors"); setSponsors(data || []); }
+      try { const { data } = await api.get(`/sponsors?placement=${placement}`); setSponsors(data || []); }
       catch { setSponsors([]); }
     })();
-  }, []);
+  }, [placement]);
   if (!sponsors.length) return null;
   const items = [...sponsors, ...sponsors]; // duplicate for seamless loop
   const speed = compact ? 28 : 36;
@@ -60,7 +60,7 @@ export function SponsorGrid({ max = 4 }) {
   const [sponsors, setSponsors] = useState([]);
   useEffect(() => {
     (async () => {
-      try { const { data } = await api.get("/sponsors"); setSponsors(data || []); }
+      try { const { data } = await api.get("/sponsors?placement=footer"); setSponsors(data || []); }
       catch { setSponsors([]); }
     })();
   }, []);

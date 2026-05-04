@@ -1,0 +1,117 @@
+"""Phase A: Bulk-migrate external image URLs in DB to local uploads.
+
+Scans sponsors, news posts, events, gallery_albums, gallery_photos, users,
+teams, tournaments, f1_challenges and downloads any external (http/https) image
+URL, stores it under /app/backend/uploads/ and rewrites the field to the local
+/api/static/uploads/{filename} URL.
+
+Idempotent: skips URLs that already point at /api/static/uploads/.
+Safe: errors per row are logged and don't abort the whole run.
+"""
+import logging
+import uuid
+import pathlib
+import asyncio
+import mimetypes
+from typing import Optional
+
+import httpx
+
+from database import get_db
+
+logger = logging.getLogger("tls.image_migrate")
+
+UPLOAD_DIR = pathlib.Path("/app/backend/uploads")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# (collection, list of fields, optional pointer to nested list of {url_field}, optional sub-doc field-name)
+TARGETS: list[tuple[str, list[str]]] = [
+    ("sponsors", ["logo_url"]),
+    ("news_posts", ["banner_url", "cover_url"]),
+    ("events", ["banner_url", "cover_url"]),
+    ("gallery_albums", ["cover_url"]),
+    ("gallery_photos", ["image_url", "thumbnail_url"]),
+    ("users", ["avatar_url", "banner_url"]),
+    ("teams", ["logo_url", "banner_url"]),
+    ("tournaments", ["banner_url", "cover_url"]),
+    ("f1_challenges", ["banner_url", "cover_url"]),
+]
+
+LOCAL_PREFIX = "/api/static/uploads/"
+
+
+def _is_external(url: Optional[str]) -> bool:
+    if not url:
+        return False
+    if url.startswith("/"):
+        return False
+    if url.startswith(LOCAL_PREFIX):
+        return False
+    return url.startswith("http://") or url.startswith("https://")
+
+
+async def _download_to_local(url: str, client: httpx.AsyncClient) -> Optional[str]:
+    try:
+        resp = await client.get(url, follow_redirects=True, timeout=15)
+        if resp.status_code != 200:
+            logger.warning(f"[image-migrate] {url} → HTTP {resp.status_code}")
+            return None
+        ct = resp.headers.get("content-type", "").split(";")[0].strip().lower()
+        ext = mimetypes.guess_extension(ct) or pathlib.Path(url).suffix or ".bin"
+        # Normalise weird extensions
+        if ext == ".jpe":
+            ext = ".jpg"
+        # Reject non-images
+        if not ct.startswith("image/"):
+            logger.warning(f"[image-migrate] skip (not an image): {url} ct={ct}")
+            return None
+        # Size cap 8 MB
+        if len(resp.content) > 8 * 1024 * 1024:
+            logger.warning(f"[image-migrate] skip (too large): {url}")
+            return None
+        filename = f"{uuid.uuid4().hex}{ext}"
+        (UPLOAD_DIR / filename).write_bytes(resp.content)
+        return f"{LOCAL_PREFIX}{filename}"
+    except Exception as exc:
+        logger.warning(f"[image-migrate] failed {url}: {exc}")
+        return None
+
+
+async def migrate_all() -> dict:
+    """Run the migration. Returns counts per collection."""
+    db = get_db()
+    summary: dict[str, dict[str, int]] = {}
+    async with httpx.AsyncClient(headers={"User-Agent": "TLS-ImageMigrate/1.0"}) as client:
+        for coll_name, fields in TARGETS:
+            scanned = 0
+            updated = 0
+            failed = 0
+            cursor = db[coll_name].find({})
+            async for doc in cursor:
+                scanned += 1
+                updates: dict[str, str] = {}
+                for f in fields:
+                    val = doc.get(f)
+                    if not _is_external(val):
+                        continue
+                    new_url = await _download_to_local(val, client)
+                    if new_url:
+                        updates[f] = new_url
+                    else:
+                        failed += 1
+                if updates:
+                    await db[coll_name].update_one({"id": doc["id"]} if doc.get("id") else {"_id": doc["_id"]}, {"$set": updates})
+                    updated += 1
+            summary[coll_name] = {"scanned": scanned, "updated": updated, "failed": failed}
+    logger.info(f"[image-migrate] done: {summary}")
+    return summary
+
+
+# CLI entrypoint
+if __name__ == "__main__":
+    import sys
+    from dotenv import load_dotenv
+    load_dotenv("/app/backend/.env")
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    print(asyncio.run(migrate_all()))

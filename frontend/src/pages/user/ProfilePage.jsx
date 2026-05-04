@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { ImageUpload } from "@/components/tls/ImageUpload";
+import { MultiSelect } from "@/components/tls/MultiSelect";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye } from "lucide-react";
@@ -14,12 +16,39 @@ const TABS = [
 ];
 
 const PLATFORMS = [
-  { k: "PC", l: "PC" },
-  { k: "PS5", l: "PlayStation 5" },
-  { k: "Xbox", l: "Xbox Series" },
-  { k: "Switch", l: "Nintendo Switch" },
-  { k: "Switch2", l: "Nintendo Switch 2" },
-  { k: "Mobile", l: "Mobile" },
+  { value: "PC", label: "PC" },
+  { value: "PS5", label: "PlayStation 5" },
+  { value: "PS4", label: "PlayStation 4" },
+  { value: "Xbox", label: "Xbox Series" },
+  { value: "Xbox_One", label: "Xbox One" },
+  { value: "Switch2", label: "Switch 2" },
+  { value: "Switch", label: "Switch" },
+  { value: "Mobile", label: "Mobile" },
+  { value: "Steam_Deck", label: "Steam Deck" },
+  { value: "VR", label: "VR" },
+];
+
+const INPUT_DEVICES = [
+  { value: "keyboard_mouse", label: "Tastatur + Maus" },
+  { value: "controller", label: "Controller" },
+  { value: "wheel", label: "Lenkrad" },
+  { value: "fightstick", label: "Fightstick" },
+  { value: "mobile_touch", label: "Touch / Mobile" },
+  { value: "arcade", label: "Arcade Stick" },
+];
+
+const SUBSCRIPTIONS = [
+  { value: "nintendo_online", label: "Nintendo Online" },
+  { value: "nintendo_online_expansion", label: "Nintendo Online + Expansion" },
+  { value: "ps_plus_essential", label: "PS Plus Essential" },
+  { value: "ps_plus_extra", label: "PS Plus Extra" },
+  { value: "ps_plus_premium", label: "PS Plus Premium" },
+  { value: "xbox_game_pass", label: "Xbox Game Pass" },
+  { value: "xbox_game_pass_ultimate", label: "Xbox Game Pass Ultimate" },
+  { value: "ea_play", label: "EA Play" },
+  { value: "ea_play_pro", label: "EA Play Pro" },
+  { value: "ubisoft_plus", label: "Ubisoft+" },
+  { value: "geforce_now", label: "GeForce NOW" },
 ];
 
 const VISIBILITY = [
@@ -53,11 +82,15 @@ export default function ProfilePage() {
         // gaming
         favorite_games: (user.favorite_games || []).join(", "),
         main_platform: user.main_platform || "",
+        main_platforms: user.main_platforms || (user.main_platform ? [user.main_platform] : []),
         preferred_role: user.preferred_role || "",
         input_device: user.input_device || "",
+        input_devices: user.input_devices || (user.input_device ? [user.input_device] : []),
+        gaming_subscriptions: user.gaming_subscriptions || [],
         // socials
         discord_name: user.discord_name || "",
         twitch_handle: user.twitch_handle || "",
+        show_twitch_embed: user.show_twitch_embed ?? false,
         youtube_handle: user.youtube_handle || "",
         tiktok_handle: user.tiktok_handle || "",
         instagram_handle: user.instagram_handle || "",
@@ -168,8 +201,8 @@ export default function ProfilePage() {
                 <Field label="Stadt"><Input value={form.city} onChange={(v) => set("city", v)} /></Field>
               </Row>
               <Row>
-                <Field label="Avatar URL"><Input value={form.avatar_url} onChange={(v) => set("avatar_url", v)} placeholder="https://…" /></Field>
-                <Field label="Banner URL"><Input value={form.banner_url} onChange={(v) => set("banner_url", v)} placeholder="https://…" /></Field>
+                <Field label="Avatar"><ImageUpload value={form.avatar_url} onChange={(v) => set("avatar_url", v)} testId="profile-avatar" variant="square" /></Field>
+                <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="profile-banner" variant="wide" /></Field>
               </Row>
             </Section>
           )}
@@ -179,22 +212,15 @@ export default function ProfilePage() {
               <Field label="Lieblingsspiele (Komma-getrennt)">
                 <Input value={form.favorite_games} onChange={(v) => set("favorite_games", v)} placeholder="Mario Kart, F1, Rocket League" testId="profile-fav-games" />
               </Field>
-              <Row>
-                <Field label="Hauptplattform">
-                  <select value={form.main_platform} onChange={(e) => set("main_platform", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-                    <option value="">— wählen —</option>
-                    {PLATFORMS.map((p) => <option key={p.k} value={p.k}>{p.l}</option>)}
-                  </select>
-                </Field>
-                <Field label="Eingabegerät">
-                  <select value={form.input_device} onChange={(e) => set("input_device", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-                    <option value="">— wählen —</option>
-                    <option value="controller">Controller</option>
-                    <option value="wheel">Lenkrad</option>
-                    <option value="keyboard_mouse">Tastatur + Maus</option>
-                  </select>
-                </Field>
-              </Row>
+              <Field label="Plattformen (mehrere möglich)">
+                <MultiSelect options={PLATFORMS} value={form.main_platforms} onChange={(v) => set("main_platforms", v)} testId="profile-platforms" />
+              </Field>
+              <Field label="Eingabegeräte (mehrere möglich)">
+                <MultiSelect options={INPUT_DEVICES} value={form.input_devices} onChange={(v) => set("input_devices", v)} testId="profile-input-devices" />
+              </Field>
+              <Field label="Gaming-Abos (Game Pass, PS Plus, EA Play, …)">
+                <MultiSelect options={SUBSCRIPTIONS} value={form.gaming_subscriptions} onChange={(v) => set("gaming_subscriptions", v)} testId="profile-subs" />
+              </Field>
               <Field label="Bevorzugte Rolle"><Input value={form.preferred_role} onChange={(v) => set("preferred_role", v)} placeholder="z.B. IGL, Support, Driver" /></Field>
             </Section>
           )}
@@ -203,8 +229,17 @@ export default function ProfilePage() {
             <Section>
               <Row>
                 <Field label="Discord Name"><Input value={form.discord_name} onChange={(v) => set("discord_name", v)} testId="profile-discord" /></Field>
-                <Field label="Twitch"><Input value={form.twitch_handle} onChange={(v) => set("twitch_handle", v)} /></Field>
+                <Field label="Twitch"><Input value={form.twitch_handle} onChange={(v) => set("twitch_handle", v)} testId="profile-twitch" placeholder="thelionsquad_esports" /></Field>
               </Row>
+              {form.twitch_handle && (
+                <label className="flex items-start gap-3 p-3 border border-[#9146FF]/30 bg-[#9146FF]/5 rounded-sm">
+                  <input type="checkbox" checked={form.show_twitch_embed || false} onChange={(e) => set("show_twitch_embed", e.target.checked)} data-testid="profile-twitch-embed" className="accent-[#9146FF] mt-1" />
+                  <div className="text-sm">
+                    <div className="font-bold text-white">Twitch-Live-Embed im öffentlichen Profil zeigen</div>
+                    <div className="text-white/60 text-xs mt-1">Wenn du live bist, erscheint dein Stream als eingebetteter Player auf deinem öffentlichen Profil.</div>
+                  </div>
+                </label>
+              )}
               <Row>
                 <Field label="YouTube"><Input value={form.youtube_handle} onChange={(v) => set("youtube_handle", v)} /></Field>
                 <Field label="Instagram"><Input value={form.instagram_handle} onChange={(v) => set("instagram_handle", v)} /></Field>

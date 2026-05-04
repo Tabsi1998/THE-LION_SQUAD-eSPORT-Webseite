@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
 import { Plus, Pin, Trash2, Save, X, Newspaper } from "lucide-react";
 
@@ -101,6 +102,7 @@ function NewsModal({ post, meta, onClose, onSaved }) {
     visibility: post.visibility || "public",
     published: post.published ?? true,
     pinned: post.pinned ?? false,
+    published_at: post.published_at ? post.published_at.slice(0, 16) : "",
   });
   const [tournaments, setTournaments] = useState([]);
   const [events, setEvents] = useState([]);
@@ -126,6 +128,13 @@ function NewsModal({ post, meta, onClose, onSaved }) {
     setSaving(true);
     try {
       const payload = { ...form, linked_tournament_ids: linkedT, linked_event_ids: linkedE };
+      // Convert datetime-local back to ISO with seconds + UTC marker
+      if (payload.published_at) {
+        const d = new Date(payload.published_at);
+        if (!isNaN(d.getTime())) payload.published_at = d.toISOString();
+      } else {
+        delete payload.published_at;
+      }
       if (isNew) await api.post("/news", payload);
       else await api.patch(`/news/${post.id}`, payload);
       toast.success("Gespeichert.");
@@ -151,7 +160,17 @@ function NewsModal({ post, meta, onClose, onSaved }) {
           <Field label="Inhalt (Markdown / Plaintext)">
             <textarea value={form.content} onChange={(e) => set("content", e.target.value)} rows={10} required data-testid="news-content" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-mono text-sm" />
           </Field>
-          <Field label="Banner URL"><Input value={form.banner_url} onChange={(v) => set("banner_url", v)} placeholder="https://…" /></Field>
+          <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="news-banner" variant="wide" /></Field>
+
+          <Field label="Veröffentlichungsdatum (optional, sonst jetzt)">
+            <input
+              type="datetime-local"
+              value={form.published_at || ""}
+              onChange={(e) => set("published_at", e.target.value)}
+              data-testid="news-published-at"
+              className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"
+            />
+          </Field>
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Kategorie">

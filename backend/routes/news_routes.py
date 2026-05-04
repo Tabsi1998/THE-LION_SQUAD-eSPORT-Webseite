@@ -5,7 +5,7 @@ from database import get_db
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see, filter_visible
 from models import (
-    NewsCreate, NewsUpdate, SponsorCreate,
+    NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
     GalleryAlbumCreate, GalleryAlbumUpdate,
     GalleryPhotoCreate, GalleryPhotoUpdate,
     now_utc, new_id,
@@ -139,10 +139,45 @@ async def news_meta():
 
 
 # ---------- Sponsors ----------
+
+# Tier hierarchy used for default placement & auto-flags
+_TIER_ORDER = {"main": 0, "gold": 1, "silver": 2, "bronze": 3, "supporter": 4, "partner": 5}
+
+
+def _sponsor_defaults(doc: dict) -> dict:
+    """Resolve auto-derived placement flags based on tier when not explicitly set."""
+    tier = doc.get("tier") or "supporter"
+    if doc.get("show_on_home") is None:
+        doc["show_on_home"] = tier in ("main", "gold")
+    if doc.get("show_on_footer") is None:
+        doc["show_on_footer"] = tier in ("main", "gold", "silver")
+    if doc.get("is_active") is None:
+        doc["is_active"] = True
+    return doc
+
+
 @router.get("/sponsors")
-async def list_sponsors():
+async def list_sponsors(placement: Optional[str] = None):
+    """Public list. ?placement=home → only sponsors with show_on_home,
+    ?placement=footer → only show_on_footer, ?placement=all → everything."""
     db = get_db()
-    sp = await db.sponsors.find({}, {"_id": 0}).to_list(100)
+    q = {"is_active": {"$ne": False}}
+    sp = await db.sponsors.find(q, {"_id": 0}).to_list(500)
+    # Apply placement filter
+    if placement == "home":
+        sp = [s for s in sp if s.get("show_on_home", s.get("tier") in ("main", "gold"))]
+    elif placement == "footer":
+        sp = [s for s in sp if s.get("show_on_footer", s.get("tier") in ("main", "gold", "silver"))]
+    # Sort by tier then order_index
+    sp.sort(key=lambda s: (_TIER_ORDER.get(s.get("tier", "supporter"), 99), s.get("order_index") or 0, s.get("name") or ""))
+    return sp
+
+
+@router.get("/sponsors/admin")
+async def admin_list_sponsors(me: dict = Depends(require_admin())):
+    db = get_db()
+    sp = await db.sponsors.find({}, {"_id": 0}).to_list(500)
+    sp.sort(key=lambda s: (_TIER_ORDER.get(s.get("tier", "supporter"), 99), s.get("order_index") or 0, s.get("name") or ""))
     return sp
 
 
@@ -150,6 +185,7 @@ async def list_sponsors():
 async def create_sponsor(body: SponsorCreate, me: dict = Depends(require_admin())):
     db = get_db()
     doc = body.model_dump()
+    doc = _sponsor_defaults(doc)
     doc["id"] = new_id()
     doc["created_at"] = now_utc().isoformat()
     await db.sponsors.insert_one(doc)
@@ -158,13 +194,23 @@ async def create_sponsor(body: SponsorCreate, me: dict = Depends(require_admin()
 
 
 @router.patch("/sponsors/{sid}")
-async def update_sponsor(sid: str, body: dict, me: dict = Depends(require_admin())):
+async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(require_admin())):
     db = get_db()
-    updates = {k: v for k, v in body.items() if k in {"name", "logo_url", "link", "description", "tier"}}
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     if not updates:
         return {"ok": True}
-    await db.sponsors.update_one({"id": sid}, {"$set": updates})
-    return {"ok": True}
+    # When tier changes and home/footer flags not set, recompute defaults
+    if "tier" in updates and "show_on_home" not in updates and "show_on_footer" not in updates:
+        cur = await db.sponsors.find_one({"id": sid}, {"_id": 0}) or {}
+        merged = {**cur, **updates, "show_on_home": None, "show_on_footer": None}
+        merged = _sponsor_defaults(merged)
+        updates["show_on_home"] = merged["show_on_home"]
+        updates["show_on_footer"] = merged["show_on_footer"]
+    updates["updated_at"] = now_utc().isoformat()
+    res = await db.sponsors.update_one({"id": sid}, {"$set": updates})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Sponsor nicht gefunden.")
+    return await db.sponsors.find_one({"id": sid}, {"_id": 0})
 
 
 @router.delete("/sponsors/{sid}")

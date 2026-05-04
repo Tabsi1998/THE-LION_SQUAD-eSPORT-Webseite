@@ -145,6 +145,10 @@ function App() {
           <Route path="/badges" element={<BadgesPage />} />
           <Route path="/fastlap" element={<F1ListPage />} />
           <Route path="/fastlap/:slug" element={<F1DetailPage />} />
+          <Route path="/galerie" element={<GalleryPage />} />
+          <Route path="/galerie/:slug" element={<GalleryAlbumPage />} />
+          <Route path="/gallery" element={<GalleryPage />} />
+          <Route path="/gallery/:slug" element={<GalleryAlbumPage />} />
 
           {/* Admin */}
           <Route path="/admin/sponsors" element={<ProtectedRoute requireAdmin><AdminSponsorsPage /></ProtectedRoute>} />

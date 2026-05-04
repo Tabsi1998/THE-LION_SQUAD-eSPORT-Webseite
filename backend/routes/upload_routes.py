@@ -56,6 +56,15 @@ async def upload_sponsor_logo(file: UploadFile = File(...), me: dict = Depends(r
     return await upload_image(file, me)
 
 
+@router.post("/migrate-external-images")
+async def migrate_external_images(me: dict = Depends(require_admin())):
+    """Scan all collections and download external image URLs into local uploads.
+    Idempotent. Returns a per-collection summary of {scanned, updated, failed}."""
+    from services.image_migrate import migrate_all
+    summary = await migrate_all()
+    return {"ok": True, "summary": summary}
+
+
 _EXT_BY_MIME = {
     "application/pdf": ".pdf",
     "application/zip": ".zip", "application/x-zip-compressed": ".zip",

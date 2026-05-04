@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
 import { Plus, Save, X, Trash2, Image as ImageIcon, ArrowLeft } from "lucide-react";
 
@@ -120,7 +121,7 @@ function AlbumModal({ album, events, onClose, onSaved }) {
           <Field label="Titel"><Input value={form.title} onChange={(v) => { set("title", v); if (isNew && !form.slug) set("slug", slugFrom(v)); }} testId="album-title" required /></Field>
           <Field label="Slug"><Input value={form.slug} onChange={(v) => set("slug", v)} testId="album-slug" required /></Field>
           <Field label="Beschreibung"><textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={2} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-          <Field label="Cover-Bild URL"><Input value={form.cover_url} onChange={(v) => set("cover_url", v)} placeholder="https://…" /></Field>
+          <Field label="Cover-Bild"><ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} testId="album-cover" variant="wide" /></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Verknüpftes Event">
               <select value={form.event_id || ""} onChange={(e) => set("event_id", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
@@ -155,8 +156,7 @@ function AlbumModal({ album, events, onClose, onSaved }) {
 
 function AlbumPhotos({ album, events, onBack }) {
   const [photos, setPhotos] = useState([]);
-  const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ image_url: "", thumbnail_url: "", caption: "", order_index: 0 });
+  const [uploading, setUploading] = useState(false);
 
   const load = async () => {
     const { data } = await api.get(`/gallery/${album.slug}`);
@@ -164,16 +164,27 @@ function AlbumPhotos({ album, events, onBack }) {
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [album.id]);
 
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!form.image_url) return;
-    try {
-      await api.post(`/gallery/${album.id}/photos`, { ...form, order_index: parseInt(form.order_index) || photos.length });
-      setForm({ image_url: "", thumbnail_url: "", caption: "", order_index: photos.length + 1 });
-      setAdding(false);
-      toast.success("Foto hinzugefügt.");
-      load();
-    } catch { toast.error("Fehler."); }
+  const onPick = async (files) => {
+    if (!files || !files.length) return;
+    setUploading(true);
+    let ok = 0, fail = 0;
+    for (const file of Array.from(files)) {
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const { data } = await api.post("/uploads/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+        await api.post(`/gallery/${album.id}/photos`, {
+          image_url: data.url,
+          thumbnail_url: data.url,
+          caption: file.name.replace(/\.[^/.]+$/, ""),
+          order_index: photos.length + ok + 1,
+        });
+        ok++;
+      } catch { fail++; }
+    }
+    setUploading(false);
+    toast.success(`${ok} Foto(s) hinzugefügt${fail ? `, ${fail} fehlgeschlagen` : ""}.`);
+    load();
   };
   const remove = async (id) => {
     if (!window.confirm("Foto löschen?")) return;
@@ -190,25 +201,14 @@ function AlbumPhotos({ album, events, onBack }) {
           <h1 className="font-heading text-3xl font-black uppercase">{album.title}</h1>
           <div className="text-xs text-white/50">{photos.length} Fotos · /{album.slug}</div>
         </div>
-        <button onClick={() => setAdding(true)} data-testid="photo-add" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm">
-          <Plus className="w-3.5 h-3.5" /> Foto hinzufügen
-        </button>
+        <label className={`inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm cursor-pointer ${uploading ? "opacity-50" : ""}`} data-testid="photo-bulk-upload">
+          <Plus className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Fotos hochladen"}
+          <input type="file" accept="image/*" multiple disabled={uploading} className="hidden" onChange={(e) => onPick(e.target.files)} />
+        </label>
       </div>
 
-      {adding && (
-        <form onSubmit={submit} className="border border-white/10 rounded-sm bg-[#121212] p-4 mb-6 grid sm:grid-cols-3 gap-3">
-          <input required placeholder="Bild URL *" value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} data-testid="photo-url" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-          <input placeholder="Thumbnail URL (optional)" value={form.thumbnail_url} onChange={(e) => setForm({ ...form, thumbnail_url: e.target.value })} className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-          <input placeholder="Caption" value={form.caption} onChange={(e) => setForm({ ...form, caption: e.target.value })} className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-          <div className="sm:col-span-3 flex gap-2 justify-end">
-            <button type="button" onClick={() => setAdding(false)} className="px-3 py-1.5 text-xs border border-white/10 text-white/60 rounded-sm">Abbrechen</button>
-            <button type="submit" data-testid="photo-save" className="px-4 py-1.5 text-xs bg-[#29B6E8] text-black font-bold uppercase rounded-sm">Hinzufügen</button>
-          </div>
-        </form>
-      )}
-
       {photos.length === 0 ? (
-        <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Noch keine Fotos.</div>
+        <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Noch keine Fotos. Lade welche hoch — du kannst auch mehrere auf einmal auswählen.</div>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
           {photos.map((p) => (

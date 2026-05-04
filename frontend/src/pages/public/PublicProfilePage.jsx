@@ -74,6 +74,20 @@ export default function PublicProfilePage() {
                 )}
               </div>
               {profile.bio && <p className="mt-4 text-white/80 text-base max-w-2xl leading-relaxed">{profile.bio}</p>}
+              {/* Setup chips */}
+              {((profile.main_platforms?.length || 0) + (profile.input_devices?.length || 0) + (profile.gaming_subscriptions?.length || 0) > 0) && (
+                <div className="mt-4 flex flex-wrap gap-2" data-testid="profile-setup-chips">
+                  {profile.main_platforms?.map((p) => (
+                    <span key={p} className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 bg-[#29B6E8]/10 text-[#29B6E8] border border-[#29B6E8]/20 rounded-sm">{p}</span>
+                  ))}
+                  {profile.input_devices?.map((d) => (
+                    <span key={d} className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 bg-white/5 text-white/70 border border-white/10 rounded-sm">{d.replace(/_/g, " ")}</span>
+                  ))}
+                  {profile.gaming_subscriptions?.length > 0 && (
+                    <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 bg-[#FFD700]/10 text-[#FFD700] border border-[#FFD700]/20 rounded-sm">{profile.gaming_subscriptions.length} Abos</span>
+                  )}
+                </div>
+              )}
               {profile.discord_name && (
                 <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-[#5865F2]/10 border border-[#5865F2]/30 rounded-sm text-sm">
                   <span className="text-[#5865F2] text-[10px] uppercase tracking-widest font-bold">Discord</span>
@@ -137,6 +151,28 @@ export default function PublicProfilePage() {
               )}
             </div>
             {/* Top tournaments */}
+            {profile.show_twitch_embed && profile.twitch_handle && (
+              <div className="mb-8" data-testid="public-profile-twitch-embed">
+                <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-[#9146FF]" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
+                  Live auf Twitch
+                </h2>
+                <div className="border border-[#9146FF]/30 bg-black rounded-sm overflow-hidden aspect-video">
+                  <iframe
+                    title={`Twitch Stream ${profile.twitch_handle}`}
+                    src={`https://player.twitch.tv/?channel=${profile.twitch_handle}&parent=${window.location.hostname}&muted=true`}
+                    width="100%"
+                    height="100%"
+                    allowFullScreen
+                    frameBorder="0"
+                  />
+                </div>
+                <a href={`https://twitch.tv/${profile.twitch_handle}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-[#9146FF] hover:text-[#a86bff]">
+                  <ExternalLink className="w-3 h-3" /> twitch.tv/{profile.twitch_handle}
+                </a>
+              </div>
+            )}
+
             <div>
               <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Recent Turniere</h2>
               {profile.tournaments?.length ? (
