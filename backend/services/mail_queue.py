@@ -34,7 +34,9 @@ def explain_smtp_error(exc: Exception) -> str:
         return (
             "Relay access denied: Der Mailserver erlaubt dem Backend nicht, an externe "
             "Empfaenger zu senden. Loesung: SMTP AUTH auf dem Submission-Port verwenden "
-            "oder die Docker-/Server-IP im Mailserver als vertrauenswuerdiges Relay eintragen."
+            "oder die exakte Docker-/Server-IP im Mailserver als vertrauenswuerdiges Relay "
+            "eintragen. Port 25 ohne AUTH funktioniert nur fuer vertrauenswuerdige interne "
+            "Hosts und darf nie als offenes Relay konfiguriert werden."
         )
     if "CERTIFICATE_VERIFY_FAILED" in raw or "self-signed certificate" in raw:
         return (
@@ -135,7 +137,10 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
             result["ok"] = True
             result["recommendations"].append("SMTP Diagnose erfolgreich. Der Server akzeptiert den Empfaenger vor DATA.")
         elif "Relay access denied" in rcpt_text:
-            result["recommendations"].append("Relay fehlt: Mailserver muss SMTP AUTH erlauben oder die Docker-/Server-IP in permit_mynetworks/mynetworks aufnehmen.")
+            result["recommendations"].append("Relay fehlt: Der Mailserver akzeptiert den Absender, erlaubt diesem Backend aber keine externen Empfaenger.")
+            result["recommendations"].append("Empfohlen: Submission-Port 587 mit STARTTLS und SMTP Anmeldung fuer office@lionsquad.at aktivieren.")
+            result["recommendations"].append("Alternative fuer lokalen Relay-Betrieb: Port 25 ohne Anmeldung lassen, aber nur die exakte Webserver-/Docker-IP in mynetworks/permit_mynetworks erlauben. Nicht 0.0.0.0/0 freigeben.")
+            result["recommendations"].append("Pruefe im Mailserver-Log, welche Quell-IP beim RCPT-Versuch ankommt; genau diese IP muss erlaubt werden.")
         else:
             result["recommendations"].append("Empfaenger wurde vor DATA abgelehnt. Pruefe Mailserver-Logs fuer die genaue Regel.")
         return result
