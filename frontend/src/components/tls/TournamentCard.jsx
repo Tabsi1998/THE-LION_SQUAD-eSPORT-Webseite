@@ -1,0 +1,66 @@
+import { Link } from "react-router-dom";
+import { StatusBadge } from "./StatusBadge";
+import { Calendar, Users, Trophy } from "lucide-react";
+
+export function TournamentCard({ tournament, index = 0 }) {
+  const t = tournament;
+  const start = t.start_date ? new Date(t.start_date) : null;
+  const bg = t.banner_url || t.game?.cover_url ||
+    "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200";
+
+  return (
+    <Link
+      to={`/tournaments/${t.slug || t.id}`}
+      data-testid={`tournament-card-${t.slug}`}
+      className="group relative block overflow-hidden rounded-sm border border-white/10 hover:border-[#29B6E8]/60 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(41,182,232,0.25)] bg-[#18181B]"
+    >
+      <div className="aspect-[16/9] relative overflow-hidden">
+        <img
+          src={bg}
+          alt={t.title}
+          className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-60 group-hover:scale-105 transition-all duration-500"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/70 to-transparent" />
+        <div className="absolute top-3 left-3 flex gap-2">
+          <StatusBadge status={t.status} />
+        </div>
+        <div className="absolute top-3 right-3">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#29B6E8] bg-[#29B6E8]/10 border border-[#29B6E8]/30 px-2 py-1 rounded-sm">
+            {t.format?.replace("_", " ")}
+          </span>
+        </div>
+      </div>
+      <div className="p-4 md:p-5">
+        <div className="flex items-center gap-2 mb-2">
+          {t.game?.short_name && (
+            <span className="text-[11px] font-bold text-[#29B6E8] uppercase tracking-wider">
+              {t.game.short_name}
+            </span>
+          )}
+          {t.platform && <span className="text-white/40 text-xs">· {t.platform}</span>}
+        </div>
+        <h3 className="font-heading font-bold text-xl text-white group-hover:text-[#29B6E8] transition-colors line-clamp-2">
+          {t.title}
+        </h3>
+        <div className="mt-3 flex items-center gap-4 text-xs text-white/60">
+          {start && (
+            <span className="inline-flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5" />
+              {start.toLocaleDateString("de-DE", { day: "2-digit", month: "short", year: "numeric" })}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1">
+            <Users className="w-3.5 h-3.5" />
+            {t.participant_count || 0}/{t.max_participants}
+          </span>
+          {t.prize_pool && (
+            <span className="inline-flex items-center gap-1 text-[#FFD700]">
+              <Trophy className="w-3.5 h-3.5" />
+              Preise
+            </span>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}

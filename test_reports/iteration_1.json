@@ -1,0 +1,58 @@
+{
+  "summary": "Comprehensive testing of TLS ARENA tournament management system. 23/23 backend pytest tests passing. All key frontend flows (home, login, admin dashboard, F1 leaderboard, TV display, tournament detail) load correctly with no console errors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "/api/f1/challenges/{slug}/leaderboard|championship|export.csv|times",
+        "issue": "Endpoints only accept UUID, not slug. The review request expects 'GET /api/f1/challenges/f1-winter-championship/leaderboard' to work with slug. Currently returns 404. The detail endpoint /api/f1/challenges/{slug_or_id} supports slug, but downstream endpoints don't. Recommend resolving slug to id at the start of leaderboard/championship/times/export.csv handlers."
+      },
+      {
+        "endpoint": "/api/tournaments/{slug}/generate-bracket|register|checkin|bracket|standings|reset-bracket|status|registrations",
+        "issue": "Tournament action endpoints accept only UUID. Only GET /api/tournaments/{slug_or_id} supports slug. Inconsistency: list view links by slug but actions need UUID. Frontend currently works because it has the UUID after fetching detail, but this is fragile and inconsistent."
+      },
+      {
+        "endpoint": "/api/auth/login (brute force)",
+        "issue": "Brute-force counter is keyed by request.client.host:email. Behind k8s ingress, multiple proxy IPs (e.g. 10.64.130.10 and 10.64.128.135) round-robin requests, so per-identifier count rarely reaches threshold of 7. Required ~14-16 attempts in testing instead of 7 to trigger 429. Fix: use X-Forwarded-For (first hop) or just email as identifier."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "F1 detail page (/f1/f1-winter-championship)",
+        "issues": ["Track thumbnails show broken-image placeholder (img alt 'Silverstone' renders without src). Backend f1_tracks records have no image_url so this is data, but frontend should hide <img> when no src or use a fallback."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_tls_arena_api.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Add slug-or-id resolution at top of F1 leaderboard/championship/times/export.csv handlers to match the public URL contract (slug expected per spec).",
+    "Add slug-or-id resolution to tournament action endpoints (generate-bracket, register, checkin, bracket, standings, registrations).",
+    "Fix brute-force identifier to use X-Forwarded-For (first IP) instead of request.client.host so the threshold of 7 actually triggers behind the k8s ingress.",
+    "Hide F1 track <img> when track.image_url is empty (currently shows broken image placeholder)."
+  ],
+  "critical_code_review_comments": [
+    "tournament_routes and f1_routes are inconsistent: detail GET accepts slug_or_id but all action endpoints require UUID. This is a UX/API hazard - a developer integrating against /api/f1/challenges/{slug}/leaderboard (per docs) gets 404.",
+    "Brute-force protection is effectively bypassable due to ingress IP rotation. Should also consider a global per-email rate limit independent of source IP.",
+    "/api/auth/register and /api/auth/login do NOT return access_token in the response body (they only set httpOnly cookies). Tests had to use cookies. Frontend works because it relies on cookies + /me, but mobile/non-cookie clients would have no way to obtain a bearer token. Consider returning access_token in body for completeness.",
+    "Email is stored & matched lowercased on login but original casing is preserved nowhere - that's fine. Just ensure docs note emails are case-insensitive."
+  ],
+  "updated_files": [
+    "/app/backend/tests/conftest.py",
+    "/app/backend/tests/test_tls_arena_api.py"
+  ],
+  "success_rate": {"backend": "100% (23/23 pytest)", "frontend": "100% on tested flows (home, login->dashboard, /admin, /f1/{slug}, /display/f1/{id}, /tournaments/{slug})"},
+  "test_credentials": "Superadmin admin@thelionsquad.at / TLSAdmin2026! and demo player leon_king@demo.thelionsquad.at / demo123 both verified working.",
+  "seed_data_creation": "Tests created several TEST_ users via /api/auth/register and a few test games (cleaned up). Player count grew from 21 to ~26 due to test users - non-blocking, all asserts use >=21.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend test suite is at /app/backend/tests/test_tls_arena_api.py with 23 passing tests covering auth, games, tournaments+bracket gen, F1 leaderboard/championship/csv/add-time, admin dashboard, role enforcement, brute force, registration+checkin, user PATCH. All green. Frontend manually verified: home page, login flow, admin dashboard KPIs (26 players, 5 teams, 1 active tournament), F1 detail with track switcher and Silverstone leaderboard sorted ASC, TV/beamer mode with podium top-3 + ranked list, Mario Kart tournament page with 16 participants. No console errors observed. Open issues are non-blocking but should be addressed: (a) slug support for F1 + tournament action endpoints, (b) brute force ingress-IP issue, (c) broken track image placeholder.",
+  "rca of the issue": "Slug 404 RCA: /api/f1/challenges/{cid}/leaderboard does `db.f1_challenges.find_one({\"id\": cid})` directly without slug fallback. Same pattern in tournament_routes.py for action endpoints. Fix: at the top of each handler, do `c = await db.x.find_one({\"$or\": [{\"id\": cid}, {\"slug\": cid}]})`. Brute-force RCA: client.host = ingress proxy pod IP which varies; mongo doc shows two IPs interleaved. Fix in auth_routes.py _check_brute_force/_record_failed to derive client_ip from `request.headers.get('x-forwarded-for', request.client.host).split(',')[0].strip()`."
+}

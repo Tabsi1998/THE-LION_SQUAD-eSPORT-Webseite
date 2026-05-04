@@ -1,0 +1,172 @@
+import { useEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import { api, formatApiError, formatMs, parseTimeStr } from "@/lib/api";
+import { AdminLayout } from "@/components/tls/AdminLayout";
+import { StatusBadge } from "@/components/tls/StatusBadge";
+import { toast } from "sonner";
+import { Plus, Trash2, Tv } from "lucide-react";
+
+export default function AdminF1EditPage() {
+  const { id } = useParams();
+  const [challenge, setChallenge] = useState(null);
+  const [tracks, setTracks] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [times, setTimes] = useState([]);
+  const [activeTrack, setActiveTrack] = useState(null);
+  const [newTrack, setNewTrack] = useState({ name: "", image_url: "", country: "" });
+  const [newTime, setNewTime] = useState({ user_id: "", time_str: "", penalty_seconds: 0 });
+
+  const load = async () => {
+    const { data: c } = await api.get(`/f1/challenges/${id}`);
+    setChallenge(c);
+    setTracks(c.tracks || []);
+    if (!activeTrack && c.tracks?.length) setActiveTrack(c.tracks[0].id);
+    const { data: u } = await api.get("/users");
+    setUsers(u);
+  };
+
+  const loadTimes = async () => {
+    if (!activeTrack) return;
+    const { data } = await api.get(`/f1/challenges/${id}/times?track_id=${activeTrack}`);
+    setTimes(data);
+  };
+
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+  useEffect(() => { loadTimes(); /* eslint-disable-next-line */ }, [activeTrack]);
+
+  const addTrack = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post(`/f1/challenges/${id}/tracks`, { ...newTrack, order_index: tracks.length });
+      setNewTrack({ name: "", image_url: "", country: "" });
+      toast.success("Strecke hinzugefügt.");
+      load();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+  };
+
+  const delTrack = async (tid) => {
+    if (!confirm("Strecke und Zeiten löschen?")) return;
+    await api.delete(`/f1/tracks/${tid}`);
+    load();
+  };
+
+  const addTime = async (e) => {
+    e.preventDefault();
+    const ms = parseTimeStr(newTime.time_str);
+    if (!ms) { toast.error("Ungültiges Zeitformat (m:ss.SSS)"); return; }
+    try {
+      await api.post(`/f1/challenges/${id}/times`, {
+        user_id: newTime.user_id, track_id: activeTrack,
+        time_ms: ms, penalty_seconds: Number(newTime.penalty_seconds) || 0,
+      });
+      setNewTime({ ...newTime, time_str: "" });
+      toast.success("Zeit eingetragen.");
+      loadTimes();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+  };
+
+  const delTime = async (tid) => {
+    await api.delete(`/f1/times/${tid}`);
+    loadTimes();
+  };
+
+  const setStatus = async (status) => {
+    await api.patch(`/f1/challenges/${id}`, { status });
+    toast.success(`Status: ${status}`);
+    load();
+  };
+
+  if (!challenge) return <AdminLayout><div className="p-10 text-white/40">Lade…</div></AdminLayout>;
+
+  return (
+    <AdminLayout>
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+        <div>
+          <Link to="/admin/f1" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← F1 Challenges</Link>
+          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">{challenge.title}</h1>
+          <div className="mt-2 flex items-center gap-3"><StatusBadge status={challenge.status} /></div>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <select value={challenge.status} onChange={(e) => setStatus(e.target.value)} data-testid="f1-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
+            {["draft", "registration_open", "live", "paused", "completed"].map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <Link target="_blank" to={`/display/f1/${challenge.id}`} data-testid="f1-tv-admin-link" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8] text-[#29B6E8] rounded-sm uppercase tracking-wider text-sm font-bold hover:bg-[#29B6E8]/10">
+            <Tv className="w-4 h-4" /> TV Modus
+          </Link>
+          <Link target="_blank" to={`/f1/${challenge.slug || challenge.id}`} className="px-4 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-sm font-bold hover:border-[#29B6E8]/60">Public</Link>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Tracks */}
+        <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
+          <h2 className="font-heading font-bold uppercase mb-3 text-lg">Strecken</h2>
+          <div className="space-y-2">
+            {tracks.map((tr) => (
+              <div key={tr.id} className={`flex items-center justify-between gap-2 border rounded-sm p-2 ${activeTrack === tr.id ? "border-[#29B6E8] bg-[#29B6E8]/5" : "border-white/10"}`}>
+                <button onClick={() => setActiveTrack(tr.id)} data-testid={`f1-track-${tr.id}`} className="flex items-center gap-2 flex-1 text-left">
+                  {tr.image_url && <img src={tr.image_url} className="w-10 h-7 object-cover rounded-sm" alt="" />}
+                  <div className="min-w-0"><div className="text-sm font-bold truncate">{tr.name}</div><div className="text-[10px] text-white/50">{tr.country}</div></div>
+                </button>
+                <button onClick={() => delTrack(tr.id)} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+            ))}
+          </div>
+          <form onSubmit={addTrack} className="mt-4 space-y-2 border-t border-white/5 pt-4">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Neue Strecke</div>
+            <input placeholder="Name" value={newTrack.name} onChange={(e) => setNewTrack({ ...newTrack, name: e.target.value })} required data-testid="f1-new-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            <input placeholder="Bild URL" value={newTrack.image_url} onChange={(e) => setNewTrack({ ...newTrack, image_url: e.target.value })} data-testid="f1-new-track-image" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            <input placeholder="Land" value={newTrack.country} onChange={(e) => setNewTrack({ ...newTrack, country: e.target.value })} data-testid="f1-new-track-country" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            <button data-testid="f1-add-track-btn" className="w-full px-3 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#1E95C2] inline-flex items-center justify-center gap-2">
+              <Plus className="w-3.5 h-3.5" /> Hinzufügen
+            </button>
+          </form>
+        </div>
+
+        {/* Time input + list */}
+        <div className="lg:col-span-2 border border-white/10 rounded-sm bg-[#121212] p-5">
+          <h2 className="font-heading font-bold uppercase mb-3 text-lg">Zeiten eintragen</h2>
+          {activeTrack ? (
+            <>
+              <form onSubmit={addTime} className="flex flex-wrap gap-2 items-end border-b border-white/5 pb-4 mb-4">
+                <div className="flex-1 min-w-[200px]">
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Spieler</div>
+                  <select value={newTime.user_id} onChange={(e) => setNewTime({ ...newTime, user_id: e.target.value })} required data-testid="f1-add-time-user" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+                    <option value="">— auswählen —</option>
+                    {users.map((u) => <option key={u.id} value={u.id}>{u.display_name || u.username}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Zeit (m:ss.SSS)</div>
+                  <input value={newTime.time_str} onChange={(e) => setNewTime({ ...newTime, time_str: e.target.value })} placeholder="1:24.587" required data-testid="f1-add-time-value" className="w-36 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display text-lg tabular-nums" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Strafe (s)</div>
+                  <input type="number" value={newTime.penalty_seconds} onChange={(e) => setNewTime({ ...newTime, penalty_seconds: e.target.value })} data-testid="f1-add-time-penalty" className="w-24 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
+                </div>
+                <button data-testid="f1-add-time-submit" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2]">Eintragen</button>
+              </form>
+              <div className="space-y-1">
+                {times.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between px-3 py-2 border border-white/5 rounded-sm hover:border-[#29B6E8]/40">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-white/50 text-xs w-6">#{t.attempt_number}</span>
+                      <span className="text-white text-sm truncate">{t.user?.display_name || t.user?.username}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-display font-bold text-lg text-white tabular-nums">{t.time_str}</span>
+                      {t.penalty_seconds > 0 && <span className="text-[#FF3B30] text-xs">+{t.penalty_seconds}s</span>}
+                      {t.is_invalid && <span className="text-[#FF3B30] text-xs">INVALID</span>}
+                      <button onClick={() => delTime(t.id)} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </div>
+                ))}
+                {times.length === 0 && <div className="text-center py-6 text-white/40 text-sm">Noch keine Zeiten</div>}
+              </div>
+            </>
+          ) : <div className="text-white/40 text-sm">Bitte erst eine Strecke anlegen.</div>}
+        </div>
+      </div>
+    </AdminLayout>
+  );
+}

@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: tls-mongodb
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - tls-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: tls-backend
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      MONGO_URL: "mongodb://mongodb:27017"
+      DB_NAME: "${DB_NAME:-tls_arena}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-*}"
+      FRONTEND_URL: "${FRONTEND_URL:-http://localhost:3000}"
+      JWT_SECRET: "${JWT_SECRET}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@thelionsquad.at}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD}"
+      SEED_DEMO: "${SEED_DEMO:-false}"
+    ports:
+      - "${BACKEND_PORT:-8001}:8001"
+    networks:
+      - tls-net
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_BACKEND_URL: "${PUBLIC_BACKEND_URL:-http://localhost:8001}"
+    container_name: tls-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    networks:
+      - tls-net
+
+volumes:
+  mongo_data:
+
+networks:
+  tls-net:
+    driver: bridge

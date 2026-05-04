@@ -1,53 +1,92 @@
-import { useEffect } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import { Toaster } from "sonner";
+import { AuthProvider } from "@/context/AuthContext";
+import { ProtectedRoute } from "@/components/tls/ProtectedRoute";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import HomePage from "@/pages/public/HomePage";
+import TournamentsPage from "@/pages/public/TournamentsPage";
+import TournamentDetailPage from "@/pages/public/TournamentDetailPage";
+import TournamentBracketPage from "@/pages/public/TournamentBracketPage";
+import TournamentStandingsPage from "@/pages/public/TournamentStandingsPage";
+import F1ListPage from "@/pages/public/F1ListPage";
+import F1DetailPage from "@/pages/public/F1DetailPage";
+import EventsPage from "@/pages/public/EventsPage";
+import EventDetailPage from "@/pages/public/EventDetailPage";
+import TeamsPage from "@/pages/public/TeamsPage";
+import NewsPage from "@/pages/public/NewsPage";
+import LoginPage from "@/pages/public/LoginPage";
+import RegisterPage from "@/pages/public/RegisterPage";
+import { PrivacyPage, ImprintPage } from "@/pages/public/LegalPages";
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
+import DashboardPage from "@/pages/user/DashboardPage";
+import ProfilePage from "@/pages/user/ProfilePage";
+import MatchHubPage from "@/pages/user/MatchHubPage";
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
+import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
+import AdminTournamentsPage from "@/pages/admin/AdminTournamentsPage";
+import AdminTournamentNewPage from "@/pages/admin/AdminTournamentNewPage";
+import AdminTournamentEditPage from "@/pages/admin/AdminTournamentEditPage";
+import AdminF1Page from "@/pages/admin/AdminF1Page";
+import AdminF1NewPage from "@/pages/admin/AdminF1NewPage";
+import AdminF1EditPage from "@/pages/admin/AdminF1EditPage";
+import AdminGamesPage from "@/pages/admin/AdminGamesPage";
+import AdminUsersPage from "@/pages/admin/AdminUsersPage";
+import AdminStationsPage from "@/pages/admin/AdminStationsPage";
+import AdminEventsPage from "@/pages/admin/AdminEventsPage";
+import AdminNewsPage from "@/pages/admin/AdminNewsPage";
 
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+import F1TVPage from "@/pages/display/F1TVPage";
+import BracketTVPage from "@/pages/display/BracketTVPage";
 
 function App() {
   return (
-    <div className="App">
+    <AuthProvider>
       <BrowserRouter>
+        <Toaster theme="dark" position="top-right" richColors />
         <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
+          {/* Public */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/tournaments" element={<TournamentsPage />} />
+          <Route path="/tournaments/:slug" element={<TournamentDetailPage />} />
+          <Route path="/tournaments/:slug/bracket" element={<TournamentBracketPage />} />
+          <Route path="/tournaments/:slug/standings" element={<TournamentStandingsPage />} />
+          <Route path="/f1" element={<F1ListPage />} />
+          <Route path="/f1/:slug" element={<F1DetailPage />} />
+          <Route path="/events" element={<EventsPage />} />
+          <Route path="/events/:slug" element={<EventDetailPage />} />
+          <Route path="/teams" element={<TeamsPage />} />
+          <Route path="/news" element={<NewsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/imprint" element={<ImprintPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+
+          {/* User */}
+          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/matches/:id" element={<ProtectedRoute><MatchHubPage /></ProtectedRoute>} />
+
+          {/* Admin */}
+          <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboardPage /></ProtectedRoute>} />
+          <Route path="/admin/tournaments" element={<ProtectedRoute requireAdmin><AdminTournamentsPage /></ProtectedRoute>} />
+          <Route path="/admin/tournaments/new" element={<ProtectedRoute requireAdmin><AdminTournamentNewPage /></ProtectedRoute>} />
+          <Route path="/admin/tournaments/:id" element={<ProtectedRoute requireAdmin><AdminTournamentEditPage /></ProtectedRoute>} />
+          <Route path="/admin/f1" element={<ProtectedRoute requireAdmin><AdminF1Page /></ProtectedRoute>} />
+          <Route path="/admin/f1/new" element={<ProtectedRoute requireAdmin><AdminF1NewPage /></ProtectedRoute>} />
+          <Route path="/admin/f1/:id" element={<ProtectedRoute requireAdmin><AdminF1EditPage /></ProtectedRoute>} />
+          <Route path="/admin/games" element={<ProtectedRoute requireAdmin><AdminGamesPage /></ProtectedRoute>} />
+          <Route path="/admin/users" element={<ProtectedRoute requireAdmin><AdminUsersPage /></ProtectedRoute>} />
+          <Route path="/admin/stations" element={<ProtectedRoute requireAdmin><AdminStationsPage /></ProtectedRoute>} />
+          <Route path="/admin/events" element={<ProtectedRoute requireAdmin><AdminEventsPage /></ProtectedRoute>} />
+          <Route path="/admin/news" element={<ProtectedRoute requireAdmin><AdminNewsPage /></ProtectedRoute>} />
+
+          {/* Display / TV */}
+          <Route path="/display/f1/:id" element={<F1TVPage />} />
+          <Route path="/display/bracket/:id" element={<BracketTVPage />} />
         </Routes>
       </BrowserRouter>
-    </div>
+    </AuthProvider>
   );
 }
 

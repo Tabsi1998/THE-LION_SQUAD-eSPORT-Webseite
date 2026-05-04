@@ -1,0 +1,55 @@
+import { useEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import { api } from "@/lib/api";
+import { PublicLayout } from "@/components/tls/PublicLayout";
+
+export default function TournamentStandingsPage() {
+  const { slug } = useParams();
+  const [t, setT] = useState(null);
+  const [rows, setRows] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      const { data: tr } = await api.get(`/tournaments/${slug}`);
+      setT(tr);
+      const { data } = await api.get(`/tournaments/${tr.id}/standings`);
+      setRows(data);
+    })();
+  }, [slug]);
+
+  if (!t) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
+
+  return (
+    <PublicLayout>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <Link to={`/tournaments/${t.slug}`} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← {t.title}</Link>
+        <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Standings</h1>
+        <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+              <tr>
+                <th className="text-left px-4 py-3 w-14">#</th>
+                <th className="text-left px-4 py-3">Spieler</th>
+                <th className="text-right px-4 py-3">W</th>
+                <th className="text-right px-4 py-3">L</th>
+                <th className="text-right px-4 py-3">Punkte</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {rows.map((r) => (
+                <tr key={r.registration_id} className={r.rank <= 3 ? "bg-[#29B6E8]/5" : ""}>
+                  <td className="px-4 py-3 font-display font-bold text-[#29B6E8]">{r.rank}</td>
+                  <td className="px-4 py-3 text-white">{r.display_name}</td>
+                  <td className="px-4 py-3 text-right text-white/80">{r.won ?? r.wins ?? 0}</td>
+                  <td className="px-4 py-3 text-right text-white/80">{r.lost ?? r.losses ?? 0}</td>
+                  <td className="px-4 py-3 text-right font-display font-bold text-white">{r.points ?? r.furthest_round ?? 0}</td>
+                </tr>
+              ))}
+              {rows.length === 0 && <tr><td colSpan="5" className="text-center py-8 text-white/40">Noch keine Ergebnisse</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </PublicLayout>
+  );
+}
