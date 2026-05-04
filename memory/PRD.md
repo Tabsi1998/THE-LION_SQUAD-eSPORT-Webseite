@@ -21,7 +21,52 @@ Ein Rudel — online wie offline.
 
 NIE einen registrierten Nutzer als „Mitglied" bezeichnen. Stattdessen „Community" oder „Spieler".
 
-## Phase D — Final-Schliff (04.05.2026 · Nav/Footer/Contact/Board)
+## Phase B Final v4 — Achievement-System Komplett-Rewrite (04.05.2026)
+
+**User-Wunsch:** Achievement-System weg vom öffentlichen Katalog, nur noch im Profil. Tiered Bronze/Silber/Gold/Platin/Special-Rot mit aufklappbaren Stufen. Negative-Achievements **niemals** öffentlich, nur intern für Admin sichtbar.
+
+### Backend Engine (`/app/backend/badges.py` + neuer `achievement_catalog.py`)
+- **Neue Collections**: `achievement_groups` (39), `achievements` (100 Tiers), `user_achievements`
+- **Migration Option B**: einmaliges Auto-Wipe der Legacy `badges` + `user_badges` (settings-Marker `achievements_v4_migrated`)
+- **Groups**: 8 match · 8 tournament · 5 fastlap · 7 club · 6 special · 5 negative (intern)
+- **Tier-Levels**: 1=Bronze, 2=Silber, 3=Gold, 4=Platin, 5=Special-Rot — pro Group beliebig kombinierbar (manchmal nur Platin, manchmal alle 4)
+- **`compute_user_progress`**: condition_keys aus echten DB-Daten (matches_played, matches_won, match_streak_max, tournaments_won, podium_finishes, fastlap_valid_count, distinct_tracks, pole_count, membership_days, distinct_games_registered, distinct_formats, distinct_platforms, achievements_unlocked, teams_founded, etc.)
+- **`evaluate_user_progress`**: scannt alle progress-basierten Tiers + auto-vergibt bei `current >= target`
+- **Hooks** `on_tournament_registered/checked_in/match_completed/tournament_completed/lap_submitted/team_*`/`evaluate_membership_badges` rufen alle `evaluate_user_progress` auf
+- **Negative-Auto-Award**: Holzmedaille bei rank=4, Wandmagnet bei 5+ ungültigen Laps in einer Challenge
+- **Discord-Hook** nur für nicht-negative Awards mit Tier-Farbe + Punkten
+
+### Privacy (kritisch nach iteration_14 Privacy-Bug)
+- **`list_groups_for_user`** filtert `is_negative=true` direkt in der DB-Query → niemals in `/api/achievements/me` oder `/user/{id}` zurückgegeben — auch nicht für Admin
+- **`list_user_awards`** filtert `is_negative=true` hart unabhängig vom Viewer
+- **`/api/users/public/{username}` badges** filtert ebenfalls is_negative
+- **Negative-Inventar** ausschließlich über `/api/admin/achievements/negative/awards`
+
+### Routes
+- **Public/User** (`/api/achievements`):
+  - `GET /groups` — Catalog ohne Negative
+  - `GET /me` — `{groups, awards}` mit Progress (eigene)
+  - `GET /user/{user_id}` — Public Profile-View
+  - `POST /evaluate` — Re-Evaluation für eigenen Account (auto-award)
+- **Admin** (`/api/admin/achievements`):
+  - `GET/POST/PATCH/DELETE /groups` — System-Groups nicht löschbar (nur is_admin_created)
+  - `GET/POST/PATCH/DELETE /tiers`
+  - `POST/DELETE /award` — manuelle Vergabe / Revoke (Audit-Log)
+  - `GET /negative/awards` — Inbox mit User-Info
+  - `GET /users/search?q=` — Spielersuche für Manual-Award-Picker
+
+### Frontend
+- **`/badges` Public-Page entfernt** (Component + Route + Footer-Link + eSports-Dropdown-Eintrag) — Achievements gibt's nur noch im Profil
+- **`AchievementGroupsView` Component**: aufklappbare Group-Cards, höchste erreichte Tier sichtbar (mit 🥉🥈🥇💎❤ + Level-Color-Border), Klick = inline expand, Tier-Rows mit Progress-Bar/Lock-Icon, manual_only-Hinweis. Kein Routing-404 mehr.
+- **PublicProfilePage** überarbeitet: lädt `/api/achievements/user/{id}` parallel zum Profile, neuer Achievements-Tab mit `AchievementGroupsView`, „Letzte Achievements" auf Übersicht zeigt Top-4 mit Level-Color-Sidebar
+- **`AdminAchievementsPage`** neu: 4 Tabs (Groups · Tiers · Manuell vergeben · Negative Vorfälle), volle CRUD inkl. Color-Picker + Icon-Field + manual-only-Toggle, Spielersuche mit Live-Filter (debounced), Negative-Inbox als getrennter Bereich
+- **AdminLayout-Sidebar** Eintrag „Achievements" mit Medal-Icon zwischen Sponsoren und Vorstand
+
+### Tests
+- iteration_14: 17/18 (1 Privacy-Bug) → iteration_15: **19/19 grün** nach Privacy-Fix
+- Frontend: alle Smoke-Checks grün, Group-Cards rendern Locked + Earned korrekt mit Progress-Bars
+
+
 
 - [x] **MainNav umgebaut**: 7 Top-Level (Home / Verein / News / Events / eSports / Community / Kontakt). „Spieler" + „Mitglieder" zu **„Community"**-Dropdown gemerged (Vereinsmitglieder, Community-Spieler, Mitglied werden, Divider, Member-only Items: Mitgliederbereich / -vorteile / -dokumente)
 - [x] **Footer 2-Reihen-Layout** (Desktop): 5 Link-Spalten (Brand+Social, Verein, eSports, Community, Kontakt), Bottom-Bar mit Impressum/Datenschutz/Versions-Tag. Sponsoren-Link in Kontakt-Spalte verschoben.
