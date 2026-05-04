@@ -62,6 +62,77 @@ def _is_ip_literal(value: str | None) -> bool:
         return False
 
 
+def _probe_smtp_port(host: str, port: int, security: str, validate_certs: bool, helo_name: str | None) -> dict:
+    result = {
+        "port": port,
+        "security": security,
+        "connect_ok": False,
+        "starttls_ok": False,
+        "auth_supported": False,
+        "error": None,
+    }
+    smtp = None
+    try:
+        context = _smtp_tls_context(validate_certs)
+        if security == "tls":
+            smtp = smtplib.SMTP_SSL(host=host, port=port, timeout=5, context=context, local_hostname=helo_name)
+        else:
+            smtp = smtplib.SMTP(host=host, port=port, timeout=5, local_hostname=helo_name)
+        result["connect_ok"] = True
+        smtp.ehlo()
+        if security == "starttls":
+            if not smtp.has_extn("starttls"):
+                result["error"] = "STARTTLS nicht angeboten"
+                return result
+            smtp.starttls(context=context)
+            result["starttls_ok"] = True
+            smtp.ehlo()
+        result["auth_supported"] = smtp.has_extn("auth")
+        return result
+    except Exception as exc:
+        result["error"] = str(exc)[:180]
+        return result
+    finally:
+        if smtp is not None:
+            try:
+                smtp.quit()
+            except Exception:
+                pass
+
+
+def _probe_common_smtp_ports(host: str, validate_certs: bool, helo_name: str | None) -> list[dict]:
+    checks = [
+        (587, "starttls"),
+        (465, "tls"),
+        (25, "starttls"),
+        (25, "none"),
+    ]
+    seen = set()
+    results = []
+    for port, security in checks:
+        key = (port, security)
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append(_probe_smtp_port(host, port, security, validate_certs, helo_name))
+    return results
+
+
+def _append_port_probe_recommendations(result: dict):
+    checks = result.get("port_checks") or []
+    auth_ports = [c for c in checks if c.get("auth_supported")]
+    if auth_ports:
+        labels = ", ".join(f"{c['port']} {c['security'].upper()}" for c in auth_ports)
+        result["recommendations"].append(f"Gefundene Ports mit SMTP AUTH auf diesem Host: {labels}. Nutze einen davon mit Benutzer/Passwort.")
+    else:
+        reachable = [c for c in checks if c.get("connect_ok")]
+        if reachable:
+            labels = ", ".join(f"{c['port']} {c['security'].upper()}" for c in reachable)
+            result["recommendations"].append(f"Erreichbar, aber ohne SMTP AUTH: {labels}. Am Mailserver Submission/Auth aktivieren.")
+        else:
+            result["recommendations"].append("Keiner der typischen SMTP-Ports 587/465/25 war von diesem Backend aus sinnvoll erreichbar.")
+
+
 def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
     host = cfg.get("smtp_host")
     port = int(cfg.get("smtp_port") or 587)
@@ -83,6 +154,7 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
         "auth_ok": False,
         "relay_ok": False,
         "helo_name": helo_name or "",
+        "port_checks": [],
         "steps": [],
         "recommendations": [],
     }
@@ -123,6 +195,8 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
         if auth_mode == "login" and not auth_supported:
             result["recommendations"].append("Dieser Host/Port bietet kein SMTP AUTH. Die IP ist okay, aber du brauchst auf dieser IP einen Submission-Port mit AUTH, meistens 587 STARTTLS oder 465 SSL/TLS.")
             result["recommendations"].append("Port 25 ist fuer Server-zu-Server-Transport gedacht und ist ohne Relay-Regel kein normaler Client-Versand.")
+            result["port_checks"] = _probe_common_smtp_ports(host, validate_certs, helo_name)
+            _append_port_probe_recommendations(result)
             return result
         if should_login:
             if not username or not password:
@@ -156,6 +230,8 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
             result["recommendations"].append("Wenn du per lokaler IP verbinden musst, ist das okay: auf dieser IP muss aber Port 587 oder 465 mit SMTP AUTH aktiv sein.")
             result["recommendations"].append("Alternative fuer lokalen Relay-Betrieb: Port 25 ohne Anmeldung lassen, aber nur die exakte Webserver-/Docker-IP in mynetworks/permit_mynetworks erlauben. Nicht 0.0.0.0/0 freigeben.")
             result["recommendations"].append("Pruefe im Mailserver-Log, welche Quell-IP beim RCPT-Versuch ankommt; genau diese IP muss erlaubt werden.")
+            result["port_checks"] = _probe_common_smtp_ports(host, validate_certs, helo_name)
+            _append_port_probe_recommendations(result)
         else:
             result["recommendations"].append("Empfaenger wurde vor DATA abgelehnt. Pruefe Mailserver-Logs fuer die genaue Regel.")
         return result

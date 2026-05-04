@@ -1,60 +1,359 @@
-# TLS ARENA — THE LION SQUAD eSports Tournament System
+# THE LION SQUAD eSPORT Webseite
 
-Production-ready, self-hosted Tournament Management System for esports clubs.
-Built around the needs of **THE LION SQUAD eSports** (Toornament/Challonge-style, with a fully integrated F1 Fast Lap Challenge module).
+Offizielle Vereins- und eSports-Plattform fuer **THE LION SQUAD**.
 
-## Features
+Die Anwendung ist eine selbst gehostete Full-Stack-Webseite mit oeffentlicher Vereinsseite,
+Mitgliederbereich, Adminbereich, Turnieren, Fast-Lap-Challenges, News, Events, Galerie,
+Dokumenten, Achievements, Kontaktformular, Mailversand und Discord-Integrationen.
 
-- **Auth**: JWT (access + refresh as httpOnly cookies), role-based access (player / team_leader / moderator / tournament_admin / club_admin / superadmin), brute-force protection, password reset tokens.
-- **Teams**: Create, join-code, leader / co-leader / members, team profiles.
-- **Games & Events**: Multi-discipline with platforms, event pages aggregating tournaments + F1 challenges + stations.
-- **Tournaments**: Wizard creation, registration, check-in, auto-bracket generation (Single Elim, Double Elim, Round Robin, League, plus structure for Swiss / Groups / FFA / BR / Time Trial / Grand Prix), score reporting with consensus auto-confirmation, dispute flow, forfeit, bronze match.
-- **F1 Fast Lap Challenge (full integration)**: Per-track leaderboards, championship points across tracks, unlimited attempts, penalty seconds, invalid lap flag, CSV export, **TV/Beamer live mode** with auto-refresh.
-- **Stations**: Switch / Switch 2 / PC / Racing Rig / Beamer / Stream / Admin Desk, status + assign to match.
-- **Admin**: KPI dashboard, user/role management, ban/unban, audit log.
-- **Display / TV views**: `/display/f1/:id`, `/display/bracket/:id` — optimized for projectors.
-- **Public pages**: Landing, tournaments, brackets, standings, events, teams, news, login/register, privacy / imprint.
-- **Exports**: CSV for F1 leaderboards.
-- **Self-hostable**: Docker Compose (MongoDB + FastAPI + React/Nginx), plain Ubuntu 24.04 compatible, works behind Nginx Proxy Manager.
+## Aktueller Stand
 
-## Quickstart (development via Supervisor, pre-installed)
+- Frontend: React, Tailwind, Nginx
+- Backend: FastAPI, MongoDB
+- Betrieb: Docker Compose
+- Domain: `https://lionsquad.at`
+- API: `/api`
+- Uploads: persistentes Docker-Volume
+- Auth: JWT ueber httpOnly Cookies mit CSRF-Schutz
+- Admin-Setup: per `.env` und Admin-Oberflaeche
 
-```bash
-sudo supervisorctl restart backend
-# frontend hot-reloads automatically
+## Hauptfunktionen
+
+- Oeffentliche Webseite mit Home, Verein, Vorstand, Werte, News, Events, Galerie, Sponsoren, Kontakt, Impressum und Datenschutz.
+- Mitgliederbereich mit Dashboard, Mitgliedsdaten, Vorteilen, Dokumenten, News und geschuetzten Inhalten.
+- Profile mit Avatar, Banner, Bio, Social/Gaming-Daten, Sichtbarkeit und Achievements.
+- Adminbereich fuer Benutzer, Mitglieder, Mitgliedsantraege, Turniere, Fast Lap, Events, News, Sponsoren, Galerie, Dokumente, Board, Navigation, CMS und Systemeinstellungen.
+- Turnier- und Matchverwaltung mit Registrierungen, Check-in, Brackets, Ergebnissen und TV-Anzeigen.
+- F1/Fast-Lap-Challenges mit Strecken, Zeiten, Strafen, Ranglisten und Display-Modus.
+- Mail-Queue mit SMTP oder Resend, Testmail, Diagnose und Versandlogs.
+- Discord Webhook fuer automatische Benachrichtigungen.
+- Branding-Hauptsettings fuer Vereinsname, Logo, Maskottchen, Favicon, Farben, Domain, Kontaktmail, Impressum und Datenschutz.
+
+## Repository-Struktur
+
+```text
+backend/      FastAPI API, Datenmodelle, Routen, Services
+frontend/     React App, Admin UI, Public UI, Nginx Build
+tests/        vorhandene Test- und Pruefdateien
+memory/       lokale Projekt-/Agentennotizen
+docker-compose.yml
+.env.example
+INSTALL.md
+UPDATE.md
+BACKUP_RESTORE.md
 ```
 
-For local development, set `APP_ENV=development` and provide an `ADMIN_PASSWORD`
-in `.env`. Demo users are created only when `SEED_DEMO=true`.
+## Schnellstart Produktion
 
-Change the admin password immediately in **/profile → change password** (or `/api/auth/change-password`).
+```bash
+cd /root/THE-LION_SQUAD-eSPORT-Webseite
+cp .env.example .env
+nano .env
+docker compose up -d --build
+```
 
-## Production (Docker Compose)
+Danach:
 
-1. `cp .env.example .env`
-2. Set a strong `JWT_SECRET`, `ADMIN_PASSWORD`, `PUBLIC_BACKEND_URL`, `FRONTEND_URL`, `CORS_ORIGINS`.
-3. `docker compose up -d --build`
-4. Open `https://lionsquad.at/` and login with the admin credentials from your `.env`.
-5. Change the admin password immediately.
+```bash
+docker compose ps
+docker compose logs -f backend
+docker compose logs -f frontend
+```
 
-Behind Nginx Proxy Manager, point `lionsquad.at` to `frontend:80` and `lionsquad.at/api/*` to `backend:8001/api/*` (or front the entire backend as a separate subdomain).
+Die Webseite ist standardmaessig am Host-Port `3000`, die API am Host-Port `8001`.
+Hinter einem Reverse Proxy sollte die Webseite ueber `https://lionsquad.at` laufen.
 
-### Production checklist
+## Wichtige `.env` Werte
 
-- Use one canonical domain everywhere, preferably `https://lionsquad.at`.
-- Set `CORS_ORIGINS` and `FRONTEND_URL` to the same public origin unless you intentionally split frontend/backend domains.
-- Keep `SEED_DEMO=false` in production.
-- Configure SMTP in the admin UI. For a local mailserver, use `host.docker.internal` or the host IP and set SMTP auth to "Ohne Anmeldung" when the server does not offer SMTP AUTH.
-- For reliable mail delivery, configure SPF, DKIM, DMARC and PTR/rDNS for `lionsquad.at`.
-- Run `docker compose logs -f backend frontend` after every update and check `/api/health`.
+```env
+APP_ENV=production
+FRONTEND_URL=https://lionsquad.at
+PUBLIC_BACKEND_URL=https://lionsquad.at
+CORS_ORIGINS=https://lionsquad.at
 
-## Docs
+DB_NAME=tls_arena
+JWT_SECRET=sehr-langer-zufaelliger-secret
+ADMIN_EMAIL=admin@lionsquad.at
+ADMIN_PASSWORD=sehr-langes-admin-passwort
 
-- [INSTALL.md](INSTALL.md) — Full Ubuntu 24.04 install guide
-- [UPDATE.md](UPDATE.md) — How to update safely
-- [BACKUP_RESTORE.md](BACKUP_RESTORE.md) — MongoDB backup & restore
-- `/app/memory/test_credentials.md` — Seeded credentials for development
+SEED_DEMO=false
+DISABLE_SCHEDULER=false
+UPLOAD_DIR=/app/backend/uploads
+```
 
-## License
+`JWT_SECRET` und `ADMIN_PASSWORD` muessen in Produktion gesetzt sein. Docker Compose bricht
+sonst bewusst ab.
 
-Proprietary — THE LION SQUAD eSports club.
+## Deployment und Updates
+
+```bash
+cd /root/THE-LION_SQUAD-eSPORT-Webseite
+git pull
+docker compose up -d --build
+docker compose logs -f backend
+```
+
+Nach jedem Update pruefen:
+
+```bash
+curl -I https://lionsquad.at
+curl https://lionsquad.at/api/health
+docker compose ps
+```
+
+## Reverse Proxy
+
+Empfohlene Variante:
+
+- `https://lionsquad.at` zeigt auf den Frontend-Container.
+- `/api/*` wird an den Backend-Container weitergeleitet.
+- Websocket-Sonderregeln sind aktuell nicht erforderlich.
+- HTTPS per Let's Encrypt aktivieren.
+- HTTP auf HTTPS weiterleiten.
+
+Wenn Nginx Proxy Manager auf dem Docker-Host laeuft:
+
+```text
+Frontend Ziel: 127.0.0.1:3000
+Backend/API:   127.0.0.1:8001
+```
+
+## Admin Erststart
+
+1. Webseite oeffnen.
+2. Login mit `ADMIN_EMAIL` und `ADMIN_PASSWORD` aus `.env`.
+3. Admin-Passwort direkt aendern.
+4. Unter `Admin -> Einstellungen` Branding, SMTP, Discord, Impressum und Datenschutz pruefen.
+5. Unter `Admin -> Navigation` nicht benoetigte Menuepunkte deaktivieren.
+
+## Branding, Favicon und Hauptsettings
+
+Im Adminbereich unter `Einstellungen -> Branding` pflegen:
+
+- Vereinsname
+- Tagline
+- SEO-Beschreibung
+- Akzentfarbe
+- Domain
+- Zeitzone
+- Kontakt-E-Mail
+- Discord Einladung
+- Twitch Channel
+- Vereinslogo
+- Maskottchen
+- Favicon / Browser Icon
+- Impressum
+- Datenschutz
+
+Diese Werte werden oeffentlich genutzt, unter anderem fuer Header/Footer, Kontaktseite,
+Impressum, Datenschutz, Browser-Favicon, Apple Icon, Manifest, Theme-Color und SEO-Meta.
+
+## SMTP richtig konfigurieren
+
+Die App kann E-Mails ueber Resend oder ueber einen eigenen SMTP-Server senden.
+Fuer deinen lokalen Mailserver ist die IP als Host erlaubt.
+
+Empfohlene Einstellung fuer lokalen Mailserver per IP:
+
+```text
+Provider: SMTP
+Host: 192.168.2.106
+Port: 587
+Sicherheit: STARTTLS
+TLS Zertifikat pruefen: aus, wenn self-signed oder Zertifikat passt nicht zur IP
+SMTP Anmeldung: Mit Benutzer/Passwort
+User: office@lionsquad.at
+Passwort: Mailbox-Passwort
+Absendername: THE LION SQUAD
+Absender E-Mail: office@lionsquad.at
+Antworten an: office@lionsquad.at
+Message-ID Domain: lionsquad.at
+HELO/EHLO Name: lionsquad.at
+```
+
+Wichtig:
+
+- `192.168.2.106:25` ist klassischer Server-zu-Server-SMTP.
+- Wenn Port 25 kein AUTH anbietet, ist das kein normaler Client-Versand.
+- Ohne AUTH auf Port 25 waere externer Versand ein Relay-Betrieb.
+- Wenn kein Relay gewuenscht ist, muss am Mailserver auf derselben IP ein Submission-Port laufen: meistens `587 STARTTLS` oder `465 SSL/TLS`.
+- Bei lokaler IP und Zertifikatsfehler: `TLS Zertifikat pruefen` deaktivieren oder ein Zertifikat verwenden, dessen Name zum SMTP Host passt.
+
+Im Admin gibt es:
+
+- `Standard 587 Login`
+- `Lokale IP vorbereiten`
+- `Diagnose`
+- `Testmail`
+
+Die Diagnose prueft Verbindung, STARTTLS, AUTH, Login, MAIL FROM und RCPT TO.
+Wenn der eingestellte Port kein AUTH anbietet oder Relay verweigert, prueft die Diagnose
+zusaetzlich typische Ports auf demselben Host: `587 STARTTLS`, `465 SSL/TLS`, `25 STARTTLS`
+und `25 ohne TLS`.
+
+## Mail-Zustellbarkeit
+
+Damit Mails nicht im Spam landen:
+
+- SPF fuer die sendende IP erlauben.
+- DKIM fuer `lionsquad.at` signieren.
+- DMARC setzen.
+- PTR/rDNS der sendenden IP passend konfigurieren.
+- HELO/EHLO Name passend setzen.
+- Absender, Envelope-Sender und Message-ID Domain konsistent halten.
+- Keine fremde From-Adresse verwenden, die der SMTP-User nicht senden darf.
+
+## Uploads und Medien
+
+Uploads werden im Docker-Volume `uploads_data` gespeichert und ueber
+`/api/static/uploads/...` ausgeliefert.
+
+Unterstuetzt fuer Bilder:
+
+- PNG
+- JPG/JPEG
+- WebP
+
+Typische Bereiche:
+
+- Branding Logo
+- Maskottchen
+- Favicon
+- Sponsorenlogos
+- Galerie
+- Profilbilder und Banner
+
+## Discord
+
+Discord wird ueber Webhooks angebunden.
+
+Im Adminbereich:
+
+- Webhook URL eintragen
+- Bot-Name setzen
+- Avatar URL optional setzen
+- Testnachricht senden
+
+Erlaubt sind Discord Webhook URLs im Format:
+
+```text
+https://discord.com/api/webhooks/...
+```
+
+## Rechtliches
+
+`/imprint` und `/privacy` sind vorhanden und nutzen die Branding-Hauptsettings.
+Die rechtlichen Inhalte muessen im Adminbereich mit den echten Vereinsdaten gepflegt werden:
+
+- vollstaendiger Vereinsname
+- Rechtsform
+- Zustelladresse
+- ZVR-Zahl
+- vertretungsbefugte Personen
+- Kontaktadresse
+- Datenschutzkontakt
+- verwendete Dienstleister
+
+## Backup und Restore
+
+Siehe:
+
+- [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
+
+Kurzform Backup:
+
+```bash
+docker exec tls-mongodb mongodump --archive=/tmp/tls.archive --gzip --db tls_arena
+docker cp tls-mongodb:/tmp/tls.archive ./tls.archive
+```
+
+Uploads separat sichern:
+
+```bash
+docker run --rm -v the-lion_squad-esport-webseite_uploads_data:/data -v "$PWD":/backup alpine tar czf /backup/uploads.tar.gz -C /data .
+```
+
+## Troubleshooting
+
+### Docker Compose warnt wegen fehlender Variablen
+
+`.env` fehlt oder Werte sind leer. `.env.example` kopieren und Werte setzen.
+
+### Backend startet in Produktion nicht
+
+Pruefen:
+
+```bash
+docker compose logs backend
+```
+
+Haeufige Ursachen:
+
+- `JWT_SECRET` zu kurz oder leer
+- `ADMIN_PASSWORD` leer
+- `FRONTEND_URL` fehlt
+- MongoDB nicht gesund
+
+### SMTP: AUTH extension is not supported
+
+Der Port bietet keinen Login an. Fuer normalen Versand:
+
+```text
+Port 587 + STARTTLS + SMTP Anmeldung
+```
+
+Wenn nur Port 25 offen ist, muss am Mailserver Submission aktiviert werden.
+
+### SMTP: Relay access denied
+
+Der Mailserver akzeptiert die Verbindung, erlaubt aber externe Empfaenger nicht.
+Ohne Relay muss stattdessen SMTP AUTH auf Port 587 oder 465 genutzt werden.
+
+### SMTP: CERTIFICATE_VERIFY_FAILED
+
+Bei lokaler IP passt das Zertifikat oft nicht zum Hostnamen.
+Entweder `TLS Zertifikat pruefen` deaktivieren oder den Zertifikatsnamen als SMTP Host nutzen.
+
+### Upload: Ein Fehler ist aufgetreten
+
+Pruefen:
+
+```bash
+docker compose logs backend
+docker volume ls
+```
+
+Nur PNG/JPG/WebP verwenden und Dateigroesse beachten.
+
+## Entwicklung lokal
+
+Frontend:
+
+```bash
+cd frontend
+corepack yarn install
+corepack yarn start
+```
+
+Backend benoetigt Python 3.11 und MongoDB. Fuer die Produktion ist Docker Compose der
+empfohlene Weg.
+
+Build pruefen:
+
+```bash
+cd frontend
+corepack yarn build
+```
+
+## Offene sinnvolle Verbesserungen
+
+- Impressum und Datenschutz mit echten finalen Vereinsdaten befuellen.
+- Admin-Dashboard fuer Systemstatus erweitern: SMTP, Discord, Uploads, Scheduler, Health.
+- E-Mail-Templates weiter vereinheitlichen und rechtlich pruefen.
+- Achievements/Profilbereich weiter visuell polieren.
+- Backups automatisieren und Restore-Test dokumentieren.
+- Monitoring und Logrotation fuer den Server einrichten.
+
+## Lizenz
+
+Proprietaer. Nutzung und Weitergabe nur fuer THE LION SQUAD bzw. nach Freigabe.

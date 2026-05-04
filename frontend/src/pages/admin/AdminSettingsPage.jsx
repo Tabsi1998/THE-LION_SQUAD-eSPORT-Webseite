@@ -391,6 +391,21 @@ export default function AdminSettingsPage() {
                     </div>
                   ))}
                 </div>
+                {(smtpDiag.port_checks || []).length > 0 && (
+                  <div className="border-t border-white/10 pt-3">
+                    <div className="font-bold uppercase tracking-widest text-white/55 mb-2">Port-Check</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {(smtpDiag.port_checks || []).map((c, i) => (
+                        <div key={`${c.port}-${c.security}-${i}`} className="border border-white/10 bg-black/20 rounded-sm p-2 text-white/65">
+                          <div className="font-mono text-white/80">{c.port} / {String(c.security || "").toUpperCase()}</div>
+                          <div>Verbindung: {c.connect_ok ? "OK" : "NO"}</div>
+                          <div>AUTH: {c.auth_supported ? "ja" : "nein"}</div>
+                          {c.error && <div className="text-[#FF3B30] break-words">{c.error}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {(smtpDiag.recommendations || []).length > 0 && (
                   <div className="border-t border-white/10 pt-3 space-y-1 text-white/70">
                     {(smtpDiag.recommendations || []).map((r, i) => <div key={i}>{r}</div>)}
