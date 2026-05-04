@@ -21,7 +21,31 @@ Ein Rudel — online wie offline.
 
 NIE einen registrierten Nutzer als „Mitglied" bezeichnen. Stattdessen „Community" oder „Spieler".
 
-## Phase B Final v4 — Achievement-System Komplett-Rewrite (04.05.2026)
+## Phase B v4.1 + Phase C — Catalog 150+ & Mitglieder-System (04.05.2026)
+
+### Achievement-Erweiterung (Track 1)
+- **Catalog von 100 auf 138 Tiers erweitert** in 39 Groups: 5 neue Groups (`community_helper`, `event_host`, `season_consistency`, `profile_completeness`, `tutorial`), Legend-Stufen (Level 5) für `match_master`, `victory_count`, `win_streak`, `fairplay`, `fastlap_volume`, `pole_position_collector`, `tournament_veteran`, `podium_collector`, `tournament_champion`, `event_attendance`, `team_loyalty`, `achievement_collector`. Platinum für `discord_active`/`track_master`/`marathoner`/`format_master`/`platform_diversity`/`registration_speed`/`checkin_streak`. Gold für `early_bird_match`/`night_owl_match`.
+- **Negative-Incident-Trigger** (`POST /api/admin/achievements/trigger-incident`): 8 Vorfall-Typen mit fixem Tier-Mapping (`afk → neg_afk`, `no_show → neg_no_show`, `ghost → neg_ghost`, `rage_quit → neg_rage_quit`, `controller_throw → neg_controller_throw`, `chat_warning → neg_chat_warning`, `dispute_open → neg_dispute`, `team_no_show → neg_team_no_show`). Zusätzliche Helper `on_dispute_opened`/`on_match_disconnect` für künftige Auto-Hooks.
+- **Season-Completion-Hook** `on_season_completed(season_id)` + Admin-Endpoint `POST /api/admin/achievements/season/{id}/award`: vergibt `season_climber` + `championship_top` Tiers (Bronze/Silber/Gold/Platin) basierend auf `season_standings.rank`.
+
+### Phase C — Mitglieder-System dynamisch (Track 2)
+- **Profilvollständigkeit-Score**: `compute_profile_completeness()` mit gewichteten 12 Feldern (avatar/bio/country/city/birthdate/main_platforms/input_devices/favorite_games/discord_name/twitch_channel/banner_url/privacy). Endpoints `/api/users/me/profile-completeness` und `/api/users/{id}/profile-completeness` liefern `score` + `missing[]`. Auto-Award für `profile_completeness_b/s/g` Tiers bei 50%/75%/100%.
+- **Membership-Application-Form**:
+  - `POST /api/membership/apply` mit Motivation (≥20 Zeichen) + Beitragsart (full/supporter/youth/honorary) + Statuten/Privacy-Akzept
+  - `GET /api/membership/apply/me` für eigene aktuelle Bewerbung
+  - `GET /api/membership/applications` (admin) mit Status-Filter
+  - `PATCH /api/membership/applications/{id}` (admin) `{decision: approve|reject, note}` → bei approve wird `db.memberships` aktiviert + Audit-Log + Mail an User + `evaluate_user_progress` (membership_join Auto-Award)
+  - Admin-Mail bei jeder neuen Bewerbung über `mail_queue.enqueue_mail`
+  - Doppelte/aktive-Member-Schutz mit 409
+- **Auto-Badges in Member-Cards** (`/players` + `/api/users/public-list`): Backend enriched mit `profile_completeness` (number), `achievements_count`, `top_achievement` (name/level/level_color/level_name/code/icon). Frontend rendert: Profile-Score-Pill rechts unten am Avatar, Top-Achievement-Chip in Level-Color, Achievements-Counter.
+- **Profile-Completeness-Banner** auf `/dashboard`: lila SVG-Donut-Ring mit Score, fehlende Felder als Hinweis, „Vervollständigen"-CTA → `/profile`.
+- **Admin-Sidebar** Eintrag „Bewerbungen" (Inbox-Icon) mit 3-Tab-Inbox (Offen/Akzeptiert/Abgelehnt), Detail-Modal, Approve/Reject-Workflow inkl. Notiz-Prompt.
+- **Frontend-Routes**: `/membership/apply` (auth-required) + `/admin/membership-applications` (admin-only).
+
+### Tests
+- iteration_16: Backend 12/12 grün, Frontend 4/5 grün (1 LOW = Admin viewt eigenes /membership/apply → korrekte „bereits Mitglied"-Status-Card statt Form). retest_needed: False.
+
+
 
 **User-Wunsch:** Achievement-System weg vom öffentlichen Katalog, nur noch im Profil. Tiered Bronze/Silber/Gold/Platin/Special-Rot mit aufklappbaren Stufen. Negative-Achievements **niemals** öffentlich, nur intern für Admin sichtbar.
 
