@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { MascotBadge } from "@/components/tls/Logo";
 import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
+import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
 import { motion } from "framer-motion";
 import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Crown, Pin, Radio, Users as UsersIcon } from "lucide-react";
 
@@ -21,6 +22,9 @@ export default function HomePage() {
     <PublicLayout>
       {/* Live Banner — only when something is actually live */}
       {state?.has_live && <LiveBanner state={state} />}
+
+      {/* Phase E — Live Twitch Streams */}
+      <LiveStreamSlider />
 
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-white/10 bg-grid-dense">

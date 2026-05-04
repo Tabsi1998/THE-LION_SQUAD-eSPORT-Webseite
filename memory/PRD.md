@@ -21,7 +21,45 @@ Ein Rudel — online wie offline.
 
 NIE einen registrierten Nutzer als „Mitglied" bezeichnen. Stattdessen „Community" oder „Spieler".
 
-## Phase B v4.1 + Phase C — Catalog 150+ & Mitglieder-System (04.05.2026)
+## Phase Auto-Hooks + Phase E + Phase F + Discord-Counter (04.05.2026)
+
+### Auto-Hooks für Negative-Achievements
+- **`POST /api/matches/{id}/dispute`** ruft `on_dispute_opened(user_id)` → vergibt `neg_dispute`
+- **`POST /api/matches/{id}/forfeit`** löst `trigger_negative_incident(loser_user_id, "no_show", ...)` aus
+- **`POST /api/tournaments/{id}/checkin`** prüft `check_in_until` Cutoff → bei Überschreitung `neg_afk` (mit Minuten-Verspätung im Context)
+- Alle Hooks fail-silent (try/except), brechen niemals die Match-/Turnier-Workflows
+
+### Phase E — Twitch Live-Streamer-Detector
+- **`services/twitch_service.py`**: OAuth-Client-Credentials-Token mit DB-Cache (`twitch_app_token`), `/helix/streams` Polling für alle User mit `twitch_handle`/`twitch_channel`, Batch-Size 100, fail-silent ohne Credentials
+- **APScheduler-Job** `twitch_poll` läuft alle 90 s, max_instances=1, coalesce
+- **`live_streams`** Collection wird upserted mit Stream-ID/Title/Game/Viewers/Thumbnail/Started_at/Stream_URL — offline Streams werden gelöscht
+- **`GET /api/streams/live`** (public) sortiert nach viewer_count DESC
+- **`POST /api/admin/streams/refresh`** für sofortige Force-Polls
+- **Branding-Settings** erweitert: `twitch_client_id`, `twitch_client_secret`, `twitch_live_detection` (alle optional)
+- **Frontend-Slider** `LiveStreamSlider.jsx` auf HomePage: pulsierende rote LIVE-Pille, horizontaler Snap-Scroller mit Stream-Cards (Thumbnail · LIVE-Badge · Viewer-Counter · Display-Name · Title · Game-Name in Twitch-Lila), klick öffnet `twitch.tv/{login}` in neuem Tab. Nicht gerendert wenn keine Streams live.
+
+### Phase F — Web-CMS (Pages + Email-Templates)
+- **`cms_pages`** Collection mit 4 Default-Seiten (`about`/`values`/`imprint`/`privacy`) — beim Startup geseedet (idempotent)
+- **`GET /api/pages/{slug}`** (public, nur `is_published != false`)
+- **Admin CRUD** `/api/admin/pages` — Default-Seiten können nur deaktiviert (is_published=false), nicht gelöscht werden
+- **`email_templates`** Collection mit 4 Default-Templates (`membership_approve`, `membership_reject`, `contact_auto_reply`, `membership_application_admin`) inkl. `vars`-Liste für Placeholder
+- **Admin** `/api/admin/email-templates` GET/PATCH (Subject + HTML)
+- **Helper** `render_template(key, vars_)` substituiert `{{var}}` Placeholders — bereit für Wiring in mail_queue
+- **Frontend `CmsPage.jsx`**: generischer Markdown-Light-Renderer (h1/h2/h3, **bold**, *italic*, [Links](url), Listen, ---). Routes `/about`, `/values`, `/imprint`, `/privacy` ziehen jetzt aus DB
+- **Frontend `AdminCmsPage.jsx`**: 2-Tab-Editor (Seiten · E-Mail-Templates). Pages-Editor mit Markdown-Quelle + Live-Vorschau Side-by-Side, Templates-Editor mit Subject + HTML + Vars-Hint. „Live"/„Versteckt"-Toggle direkt in der Tabelle.
+- **AdminLayout-Sidebar** Eintrag „CMS / Mails" (FileEdit-Icon) zwischen Bewerbungen und unten
+
+### Discord-Counter (Mod-Bump statt Bot)
+- **`POST /api/admin/discord/counter/{user_id}`** `{delta: int}` inkrementiert `users.discord_messages_count`, ruft sofort `evaluate_user_progress` auf → Auto-Award der `discord_active_*` Tiers (Bronze 1 / Silber 100 / Gold 500 / Platin 2000)
+- **`GET /api/admin/discord/counters`** für Admin-Übersicht
+- **Audit-Log** für jeden Bump (`action: discord.counter_bump`, mit delta + new_total)
+- `discord_active`-Tiers nicht mehr `manual_only` — werden automatisch vergeben sobald counter ≥ Threshold
+- `compute_user_progress.discord_messages` zieht jetzt aus `user.discord_messages_count`
+
+### Tests
+- **iteration_17**: pytest `test_phase_ef_iter17.py` → **22/22 grün** (Streams · Branding-Twitch-Felder · Pages CMS CRUD · Email-Templates · Discord-Counter inkl. Auto-Award · Auto-Hooks für dispute/forfeit/late-checkin · Privacy-Re-Check)
+
+
 
 ### Achievement-Erweiterung (Track 1)
 - **Catalog von 100 auf 138 Tiers erweitert** in 39 Groups: 5 neue Groups (`community_helper`, `event_host`, `season_consistency`, `profile_completeness`, `tutorial`), Legend-Stufen (Level 5) für `match_master`, `victory_count`, `win_streak`, `fairplay`, `fastlap_volume`, `pole_position_collector`, `tournament_veteran`, `podium_collector`, `tournament_champion`, `event_attendance`, `team_loyalty`, `achievement_collector`. Platinum für `discord_active`/`track_master`/`marathoner`/`format_master`/`platform_diversity`/`registration_speed`/`checkin_streak`. Gold für `early_bird_match`/`night_owl_match`.

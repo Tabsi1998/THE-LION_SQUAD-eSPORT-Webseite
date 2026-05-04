@@ -38,6 +38,10 @@ class BrandingSettings(BaseModel):
     privacy_policy: Optional[str] = None
     discord_invite_url: Optional[str] = None
     twitch_channel: Optional[str] = None
+    # Phase E — Twitch Helix credentials
+    twitch_client_id: Optional[str] = None
+    twitch_client_secret: Optional[str] = None
+    twitch_live_detection: Optional[bool] = None
 
 
 class TestEmailBody(BaseModel):

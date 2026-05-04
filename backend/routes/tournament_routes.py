@@ -240,6 +240,24 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Nicht check-in-fähig")
     await db.tournament_registrations.update_one(
         {"id": reg["id"]}, {"$set": {"status": "checked_in", "updated_at": now_utc().isoformat()}})
+    # Phase B v4.1: late check-in detection (check-in after start_date) → neg_late_checkin
+    try:
+        t = await db.tournaments.find_one({"id": tid}, {"_id": 0, "start_date": 1, "check_in_until": 1})
+        if t:
+            now = now_utc()
+            cutoff = t.get("check_in_until") or t.get("start_date")
+            if cutoff:
+                from datetime import datetime, timezone
+                cutoff_dt = datetime.fromisoformat(cutoff.replace("Z", "+00:00"))
+                if cutoff_dt.tzinfo is None:
+                    cutoff_dt = cutoff_dt.replace(tzinfo=timezone.utc)
+                if now > cutoff_dt:
+                    from badges import trigger_negative_incident
+                    await trigger_negative_incident(me["id"], "afk",
+                        {"tournament_id": tid, "reason": "late_checkin",
+                         "minutes_late": int((now - cutoff_dt).total_seconds() / 60)})
+    except Exception:
+        pass
     try:
         from badges import on_checked_in
         await on_checked_in(me["id"], tid)

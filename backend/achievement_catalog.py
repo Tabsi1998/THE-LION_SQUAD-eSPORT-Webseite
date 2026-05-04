@@ -359,11 +359,11 @@ ACHIEVEMENT_TIERS = [
 
     # --- discord_active: messages_sent (manual or via integration) ---
     _t("discord_active_b", "discord_active", 1, "Hallo Welt", "Erste Discord-Aktivität.",
-       condition_key="discord_messages", progress_target=1, points=5, icon="message-circle", manual_only=True),
+       condition_key="discord_messages", progress_target=1, points=5, icon="message-circle"),
     _t("discord_active_s", "discord_active", 2, "Talker", "100 Discord-Nachrichten.",
-       condition_key="discord_messages", progress_target=100, points=20, icon="message-circle", manual_only=True),
+       condition_key="discord_messages", progress_target=100, points=20, icon="message-circle"),
     _t("discord_active_g", "discord_active", 3, "Quasselstrippe", "500 Discord-Nachrichten.",
-       condition_key="discord_messages", progress_target=500, points=80, icon="message-circle", manual_only=True),
+       condition_key="discord_messages", progress_target=500, points=80, icon="message-circle"),
 
     # --- team_founder: single ---
     _t("team_founder_p", "team_founder", 4, "Team-Gründer", "Gründe ein eigenes Team.",
@@ -470,7 +470,7 @@ ACHIEVEMENT_TIERS = [
 # ---------- Phase B v4.1 — Catalog Expansion (extra tiers) ----------
 ACHIEVEMENT_TIERS_EXTRA = [
     _t("discord_active_p", "discord_active", 4, "Quasselkönig", "2000 Discord-Nachrichten.",
-       condition_key="discord_messages", progress_target=2000, points=200, icon="message-circle", manual_only=True),
+       condition_key="discord_messages", progress_target=2000, points=200, icon="message-circle"),
     _t("track_master_p", "track_master", 4, "Welten-Konqueror", "Fahre auf 25 Strecken.",
        condition_key="distinct_tracks", progress_target=25, points=350, icon="map"),
     _t("marathoner_p", "marathoner", 4, "Eisenmensch", "10 Matches >120 min.",

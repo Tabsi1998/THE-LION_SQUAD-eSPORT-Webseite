@@ -18,6 +18,7 @@ import NewsPage from "@/pages/public/NewsPage";
 import LoginPage from "@/pages/public/LoginPage";
 import RegisterPage from "@/pages/public/RegisterPage";
 import { PrivacyPage, ImprintPage } from "@/pages/public/LegalPages";
+import CmsPage from "@/pages/public/CmsPage";
 
 import DashboardPage from "@/pages/user/DashboardPage";
 import ProfilePage from "@/pages/user/ProfilePage";
@@ -48,6 +49,7 @@ import SeasonPage from "@/pages/public/SeasonPage";
 import PublicProfilePage from "@/pages/public/PublicProfilePage";
 import AdminAchievementsPage from "@/pages/admin/AdminAchievementsPage";
 import AdminMembershipApplicationsPage from "@/pages/admin/AdminMembershipApplicationsPage";
+import AdminCmsPage from "@/pages/admin/AdminCmsPage";
 import MembershipApplyPage from "@/pages/public/MembershipApplyPage";
 import AdminSponsorsPage from "@/pages/admin/AdminSponsorsPage";
 
@@ -86,9 +88,9 @@ function App() {
         <Routes>
           {/* Public — Verein */}
           <Route path="/" element={<HomePage />} />
-          <Route path="/about" element={<AboutPage />} />
+          <Route path="/about" element={<CmsPage slug="about" />} />
           <Route path="/board" element={<BoardPage />} />
-          <Route path="/values" element={<ValuesPage />} />
+          <Route path="/values" element={<CmsPage slug="values" />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/sponsors" element={<SponsorsPage />} />
           <Route path="/partners" element={<PartnersPage />} />
@@ -109,8 +111,8 @@ function App() {
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/news" element={<NewsPage />} />
           <Route path="/news/:slug" element={<NewsDetailPage />} />
-          <Route path="/privacy" element={<PrivacyPage />} />
-          <Route path="/imprint" element={<ImprintPage />} />
+          <Route path="/privacy" element={<CmsPage slug="privacy" />} />
+          <Route path="/imprint" element={<CmsPage slug="imprint" />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
@@ -164,6 +166,7 @@ function App() {
           <Route path="/admin/sponsors" element={<ProtectedRoute requireAdmin><AdminSponsorsPage /></ProtectedRoute>} />
           <Route path="/admin/achievements" element={<ProtectedRoute requireAdmin><AdminAchievementsPage /></ProtectedRoute>} />
           <Route path="/admin/membership-applications" element={<ProtectedRoute requireAdmin><AdminMembershipApplicationsPage /></ProtectedRoute>} />
+          <Route path="/admin/cms" element={<ProtectedRoute requireAdmin><AdminCmsPage /></ProtectedRoute>} />
           <Route path="/admin/prizes" element={<ProtectedRoute requireAdmin><AdminPrizesPage /></ProtectedRoute>} />
           <Route path="/admin/contact" element={<ProtectedRoute requireAdmin><AdminContactPage /></ProtectedRoute>} />
           <Route path="/admin/board" element={<ProtectedRoute requireAdmin><AdminBoardPage /></ProtectedRoute>} />

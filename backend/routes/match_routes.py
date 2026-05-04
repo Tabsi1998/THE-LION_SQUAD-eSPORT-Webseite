@@ -162,6 +162,12 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
         "$set": {"status": "disputed", "updated_at": now_utc().isoformat()},
     })
     m = await db.matches.find_one({"id": match_id}, {"_id": 0})
+    # Phase B v4.1: trigger negative achievement for the user who disputed
+    try:
+        from badges import on_dispute_opened
+        await on_dispute_opened(me["id"], match_id=match_id)
+    except Exception:
+        pass
     return m
 
 
@@ -183,4 +189,15 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(require_admin())
     for um in advance_match_winner(m, all_matches):
         await db.matches.update_one({"id": um["id"]}, {"$set": um})
     m.pop("_id", None)
+    # Phase B v4.1: forfeit ⇒ no_show for the loser
+    try:
+        from badges import trigger_negative_incident
+        # Resolve loser registration → user_id
+        if loser_id:
+            reg = await db.tournament_registrations.find_one({"id": loser_id}, {"_id": 0, "user_id": 1})
+            if reg and reg.get("user_id"):
+                await trigger_negative_incident(reg["user_id"], "no_show",
+                    {"match_id": match_id, "reason": "forfeit"}, awarded_by=me["id"])
+    except Exception:
+        pass
     return m

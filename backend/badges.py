@@ -264,10 +264,13 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     p["best_season_rank_inv"] = 0
     p["best_championship_rank_inv"] = 0
 
+    # Phase E + Discord-Counter: discord_messages comes from manually maintained counter
+    p["discord_messages"] = (user or {}).get("discord_messages_count", 0)
+
     for k in [
         "checkins_in_a_row", "fast_registrations", "clutch_count",
         "dispute_free_matches", "long_matches_60", "long_matches_120",
-        "matches_early", "matches_late", "sub_target_count", "discord_messages",
+        "matches_early", "matches_late", "sub_target_count",
         "afk_count", "no_show_count", "late_checkins", "ghost_count",
         "disputes_opened", "disputes_opened_season", "chat_warnings", "rage_quits",
         "hardware_incidents", "invalid_laps_session", "dnfs_season",

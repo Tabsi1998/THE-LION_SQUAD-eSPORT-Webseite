@@ -49,6 +49,14 @@ async def _safe_prize_expiry():
         logger.exception(f"[scheduler] prize_expiry crash: {exc}")
 
 
+async def _safe_twitch_poll():
+    try:
+        from services.twitch_service import twitch_poll_loop
+        await twitch_poll_loop()
+    except Exception as exc:
+        logger.exception(f"[scheduler] twitch_poll crash: {exc}")
+
+
 def start_scheduler() -> AsyncIOScheduler:
     global _scheduler
     if _scheduler:
@@ -60,9 +68,11 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_prize_expiry, IntervalTrigger(minutes=60), id="prize_expiry",
                   max_instances=1, coalesce=True)
+    sched.add_job(_safe_twitch_poll, IntervalTrigger(seconds=90), id="twitch_poll",
+                  max_instances=1, coalesce=True)
     sched.start()
     _scheduler = sched
-    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · prize_expiry 60m)")
+    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · prize_expiry 60m · twitch 90s)")
     return sched
 
 
