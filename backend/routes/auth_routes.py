@@ -57,6 +57,8 @@ async def _clear_failed(db, identifier: str):
 @router.post("/register")
 async def register(body: UserRegister, response: Response):
     db = get_db()
+    if not body.accept_privacy or not body.accept_terms:
+        raise HTTPException(status_code=400, detail="Datenschutz und Nutzungsbedingungen müssen akzeptiert werden.")
     email = body.email.lower().strip()
     username = body.username.strip()
     if await db.users.find_one({"email": email}):

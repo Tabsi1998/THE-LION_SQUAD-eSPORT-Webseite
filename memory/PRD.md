@@ -1,15 +1,110 @@
-# TLS ARENA — Product Requirements Document
+# THE LION SQUAD — eSPORTS · Vereinsplattform PRD
 
-**Projekt:** TLS ARENA / THE LION SQUAD ARENA
-**Verein:** THE LION SQUAD eSports
+**Projekt:** THE LION SQUAD — eSPORTS Vereinsplattform (Re-Brand von TLS ARENA)
+**Verein:** THE LION SQUAD eSports (offiziell eingetragener österreichischer eSports-Verein)
 **Stack:** FastAPI + MongoDB + React 19 + Tailwind + Shadcn/UI + Framer Motion
-**Erstellt:** 2026-05-04
+**Erstellt:** 2026-05-04 (Re-Plattform Phase 1+2)
 
 ---
 
-## Vision
+## Vision (NEU)
 
-Self-hosted Tournament-Management-System ähnlich Toornament/Challonge, speziell auf den Vereinsbetrieb (Offline-Events, F1 Fast Lap Championships, Multi-Game-Turniere) zugeschnitten. Dient dem Verein THE LION SQUAD für Online-Turniere, Offline-Events und Vereinsmeisterschaften.
+Zentrale Vereinsplattform für THE LION SQUAD — eSPORTS.
+**Hauptebene:** Vereinswebseite (Verein, Mitglieder, News, Events, Sponsoren, Vorteile).
+**Integriertes Modul:** Arena (Turniere, Fast Lap, Brackets, Achievements, Season Pass).
+Ein Rudel — online wie offline.
+
+## User Trennung (zentraler Begriff)
+- **Gast** — nicht eingeloggt
+- **Community-Spieler** — registriert, kein offizielles Vereinsmitglied
+- **Vereinsmitglied** — vom Admin freigeschaltet (Mitgliedsnummer TLS-YYYY-NNNN)
+
+NIE einen registrierten Nutzer als „Mitglied" bezeichnen. Stattdessen „Community" oder „Spieler".
+
+## Phase 1+2 — IMPLEMENTIERT (04.05.2026 · Re-Plattform)
+
+### Backend
+- [x] User-Model erweitert: `user_type`, `is_club_member`, `roles[]`, plus 30+ Profilfelder (Vorname/Nachname/Nickname, Geburtsdatum, Stadt, Hauptplattform, Eingabegerät, Lieblingsspiele, Banner, Twitch/YouTube/TikTok/Instagram/X/Steam/Epic/PSN/Xbox/Nintendo/EA/Riot/Battle.net/Website, profile_visibility)
+- [x] **Membership-Service** (`services/membership_service.py`): `upsert_membership`, `generate_member_number` (TLS-YYYY-NNNN sequentiell), `derived_user_type`, History-Tracking
+- [x] **Membership-Routes** (`routes/membership_routes.py`): meta, me, list, get/put user-membership, public directory, benefits CRUD
+- [x] **MemberBenefit-Model** + CRUD mit Sichtbarkeit pro Mitgliedsart
+- [x] **UserSocial-Model** + CRUD mit pro-Eintrag-Visibility
+- [x] Auth erweitert: `register` mit accept_privacy/terms Pflicht (HTTP 400 bei Verstoß) + newsletter_consent separat opt-in + birth_date + discord_name; `login` und `/auth/me` liefern `membership` + `is_club_member`
+- [x] Email-Templates: `membership_activated`, `membership_deactivated`, `membership_blocked` — werden bei Statuswechsel automatisch gefeuert
+- [x] `require_club_member()` Dependency
+- [x] DB-Wipe-Mechanismus via `TLS_RESET=true` env
+- [x] Demo-Seed standardmäßig deaktiviert (`SEED_DEMO=false`)
+- [x] Auto-Seed Admin als Vereinsmitglied (TLS-2026-0001, Vorstand)
+- [x] Public Routes: `/api/users/public-list`, `/api/users/public/{username}` mit Membership-Block und Socials
+- [x] 28 Backend-Tests in `tests/test_phase_membership.py` — 27 pass, 1 skip (96.4%)
+
+### Frontend
+- [x] **AuthContext** erweitert: `isClubMember`, `userType`, `isModerator`
+- [x] **PublicLayout** rollenabhängig: Verein/News/Events/Turniere/Fast Lap/Teams/Spieler/Mitglieder Nav; goldener „Mitgliederbereich"-Button für Members; Admin-Button cyan
+- [x] **ProtectedRoute** mit `requireMember` und `requireModerator`
+- [x] **AboutPage** (`/about`) — Vereinsgeschichte, Werte, Off-Game-Aktivitäten (Inhalte aus lionsquad.at integriert)
+- [x] **MembersDirectoryPage** (`/members`) — Öffentliches Mitgliederverzeichnis
+- [x] **JoinMembershipPage** (`/membership/join`) — „Mitglied werden" Landing
+- [x] **MemberAreaPage** (`/members/area`) — Mitgliederbereich (Member-only)
+- [x] **MemberBenefitsPage** (`/members/benefits`) — Vorteile (Member-only)
+- [x] **PlayersPage** (`/players`) — Spielerliste mit Member/Community-Tabs
+- [x] **SponsorsPage** (`/sponsors`) — gruppiert nach Tier
+- [x] **PartnersPage** (`/partners`)
+- [x] **ContactPage** (`/contact`) — Discord, E-Mail, Vereinsinfo
+- [x] **AdminMembersPage** (`/admin/members`) — Mitgliederverwaltung mit Filtern (Alle/Mitglieder/Community/Offen) + Edit-Modal
+- [x] **AdminBenefitsPage** (`/admin/benefits`) — Mitgliedervorteil-CRUD mit Mitgliedsart-Filter
+- [x] **ProfilePage** überarbeitet — 4 Tabs: Grunddaten / Gaming / Socials / Privatsphäre + Per-Feld-Visibility-Selector
+- [x] **RegisterPage** überarbeitet — accept_privacy + accept_terms (Pflicht), newsletter_consent (separat opt-in), birth_date + discord_name, klare „Du wirst Community-Spieler"-Hinweis
+- [x] **DashboardPage** überarbeitet — Member-only Tiles (Mitgliederbereich + Vorteile), Mitgliedsnummer, „Mitglied werden" CTA für Community
+- [x] **AdminLayout** erweitert — Mitglieder + Mitgliedervorteile in Sidebar
+
+## Roadmap (Phase 3-10)
+
+### 🟢 Phase 3 — Vereins-CMS (öffentliche Webseite)
+- News-System erweitern (Kategorien, Slug, Pinning, Sichtbarkeit, Verknüpfungen)
+- Event-System erweitern (Event-Typen, Adressen, separat von Turnier)
+- Galerie, Vereinsgeschichte als CMS-Seiten
+
+### 🟣 Phase 4 — Mitgliederportal Vertiefung
+- Interne News, Events, Vereinsdokumente, Downloads
+- „Meine Mitgliedschaft"-Seite
+
+### 🔴 Phase 5 — Status-System & Stream-Logik
+- „Warten auf Öffnung" Status für Tournaments/Events/Challenges/Fast-Lap
+- Stream-pro-Objekt mit hasLiveStream/streamPlatform/streamUrl
+- Homepage-Logik: Live > Heute > Bald > News
+
+### 🟠 Phase 6 — Achievements mit Audiences
+- Achievement.audience: public/community/members_only/admins_only/hidden_secret
+- Mitglieder-only Achievements (Offiziell im Rudel, Vereinsmitglied Bronze/Silber/Gold/Platin)
+- Negative Fun-Achievements
+
+### 🟡 Phase 7 — Season Pass v2 (Farming-Schutz, Wertungen)
+
+### 🔵 Phase 8 — SMTP & Mail Queue (Resend ablösen)
+
+### 🟢 Phase 9 — Preise & Gewinnabholung (PrizePickup-Model)
+
+### 🟣 Phase 10 — Feinschliff (404/403/500 Pages, SEO, Setup-Wizard)
+
+## Test Credentials
+
+Siehe `/app/memory/test_credentials.md`
+
+## Vorherige Implementations-Historie
+
+(Phase 1-5 als TLS ARENA, abgeschlossen am 04.05.2026; siehe Git-Historie)
+
+| Phase | Fokus | Status |
+|-------|-------|--------|
+| TLS-Arena P1 | MVP Tournaments + F1 Fast Lap | ✅ |
+| TLS-Arena P2 | E-Mails (Resend), Swiss/Groups, PDF, DSGVO, Audit | ✅ |
+| TLS-Arena P3 | Discord, Season Pass Widget, TV QR + Sponsors | ✅ |
+| TLS-Arena P4 | Dynamic Prizes, Twitch, Sponsor Ticker | ✅ |
+| TLS-Arena P5 | 22 Badges, Public Profiles, Admin Sponsors | ✅ |
+| **Vereins-Phase 1+2** | **Mitgliedersystem + erweitertes Profil** | **✅ NEU** |
+| Vereins-Phase 3 | Vereins-CMS (Über uns, News, Events) | ⏳ |
+| Vereins-Phase 4-10 | Siehe oben | ⏳ |
 
 ## User Personas
 

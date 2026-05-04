@@ -27,8 +27,8 @@ class UserRegister(BaseModel):
     display_name: Optional[str] = None
     birth_date: Optional[str] = None  # ISO date string
     discord_name: Optional[str] = None
-    accept_privacy: bool = True
-    accept_terms: bool = True
+    accept_privacy: bool = Field(..., description="Must be explicitly true")
+    accept_terms: bool = Field(..., description="Must be explicitly true")
     newsletter_consent: bool = False  # explicitly opt-in, not auto-checked
 
 
