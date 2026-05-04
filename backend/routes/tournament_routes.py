@@ -8,6 +8,9 @@ from models import (
     now_utc, new_id,
 )
 from bracket_engine import generate_bracket, compute_round_robin_standings
+from bracket_extensions import (
+    generate_swiss_round, compute_swiss_standings, generate_groups, compute_group_standings,
+)
 
 router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 
@@ -292,6 +295,7 @@ async def get_bracket(tid: str):
 @router.get("/{tid}/standings")
 async def standings(tid: str):
     db = get_db()
+    tid = await _resolve_tid(tid)
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404)
@@ -303,29 +307,90 @@ async def standings(tid: str):
     for r in regs:
         u = users.get(r.get("user_id") or "", {})
         r["display_name"] = r.get("display_name") or u.get("display_name") or u.get("username")
-    if t.get("format") in ("round_robin", "league"):
+    fmt = t.get("format")
+    if fmt in ("round_robin", "league"):
         return compute_round_robin_standings(matches, regs)
-    # Elimination: rank by furthest round reached (simple heuristic)
-    rank_map = {}
-    for r in regs:
-        rank_map[r["id"]] = {"registration_id": r["id"], "display_name": r["display_name"],
-                              "furthest_round": 0, "wins": 0, "losses": 0}
+    if fmt == "swiss":
+        return compute_swiss_standings(regs, matches)
+    if fmt == "groups":
+        groups = await db.tournament_groups.find({"tournament_id": tid}, {"_id": 0}).to_list(50)
+        reg_map = {r["id"]: r for r in regs}
+        return compute_group_standings(groups, matches, reg_map)
+    # Elimination fallback
+    rank_map = {r["id"]: {"registration_id": r["id"], "display_name": r["display_name"],
+                           "furthest_round": 0, "wins": 0, "losses": 0} for r in regs}
     for m in matches:
-        a = m.get("participant_a_id")
-        b = m.get("participant_b_id")
-        w = m.get("winner_id")
+        a, b, w = m.get("participant_a_id"), m.get("participant_b_id"), m.get("winner_id")
         if a in rank_map and m.get("round"):
             rank_map[a]["furthest_round"] = max(rank_map[a]["furthest_round"], m["round"])
         if b in rank_map and m.get("round"):
             rank_map[b]["furthest_round"] = max(rank_map[b]["furthest_round"], m["round"])
         if m.get("status") == "completed" and w:
             loser = a if w == b else b
-            if w in rank_map:
-                rank_map[w]["wins"] += 1
-            if loser in rank_map:
-                rank_map[loser]["losses"] += 1
+            if w in rank_map: rank_map[w]["wins"] += 1
+            if loser in rank_map: rank_map[loser]["losses"] += 1
     arr = list(rank_map.values())
     arr.sort(key=lambda s: (s["furthest_round"], s["wins"]), reverse=True)
     for i, s in enumerate(arr):
         s["rank"] = i + 1
     return arr
+
+
+# ---------- Swiss / Groups specific ----------
+@router.post("/{tid}/swiss/next-round")
+async def swiss_next_round(tid: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    t = await db.tournaments.find_one({"id": tid})
+    if not t or t.get("format") != "swiss":
+        raise HTTPException(status_code=400, detail="Nur für Swiss-Turniere")
+    prev = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(2000)
+    # Check open matches
+    open_count = sum(1 for m in prev if m.get("status") not in ("completed", "forfeit", "cancelled"))
+    if open_count > 0:
+        raise HTTPException(status_code=400, detail=f"{open_count} Matches sind noch offen")
+    regs = await db.tournament_registrations.find(
+        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+        {"_id": 0},
+    ).to_list(500)
+    next_round_num = (max((m.get("round") or 0) for m in prev) + 1) if prev else 1
+    matches = generate_swiss_round(tid, regs, prev, next_round_num, t.get("best_of", 1))
+    if matches:
+        await db.matches.insert_many(matches)
+    if t.get("status") == "draft":
+        await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live"}})
+    return {"ok": True, "round": next_round_num, "match_count": len(matches)}
+
+
+@router.post("/{tid}/groups/generate")
+async def groups_generate(tid: str, body: dict, me: dict = Depends(require_admin())):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    t = await db.tournaments.find_one({"id": tid})
+    if not t or t.get("format") != "groups":
+        raise HTTPException(status_code=400, detail="Nur für Group-Stage")
+    group_count = int(body.get("group_count", 4))
+    regs = await db.tournament_registrations.find(
+        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+        {"_id": 0},
+    ).to_list(500)
+    # Reset
+    await db.matches.delete_many({"tournament_id": tid})
+    await db.tournament_groups.delete_many({"tournament_id": tid})
+    res = generate_groups(tid, regs, group_count, t.get("best_of", 1))
+    if res["groups"]:
+        for g in res["groups"]:
+            g["tournament_id"] = tid
+            g["created_at"] = now_utc().isoformat()
+        await db.tournament_groups.insert_many(res["groups"])
+    if res["matches"]:
+        await db.matches.insert_many(res["matches"])
+    await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live"}})
+    return {"ok": True, "group_count": len(res["groups"]), "match_count": len(res["matches"])}
+
+
+@router.get("/{tid}/groups")
+async def list_groups(tid: str):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    return await db.tournament_groups.find({"tournament_id": tid}, {"_id": 0}).to_list(50)

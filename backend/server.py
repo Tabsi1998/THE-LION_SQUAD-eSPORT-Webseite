@@ -23,6 +23,9 @@ from routes.f1_routes import router as f1_router
 from routes.station_routes import router as station_router
 from routes.news_routes import router as news_router
 from routes.admin_routes import router as admin_router
+from routes.extras_routes import (
+    settings_router, season_router, widget_router, dsgvo_router, pdf_router, audit_router,
+)
 
 
 logging.basicConfig(level=logging.INFO,
@@ -85,6 +88,23 @@ app.include_router(f1_router)
 app.include_router(station_router)
 app.include_router(news_router)
 app.include_router(admin_router)
+app.include_router(settings_router)
+app.include_router(season_router)
+app.include_router(widget_router)
+app.include_router(dsgvo_router)
+app.include_router(pdf_router)
+app.include_router(audit_router)
+
+
+# Security headers middleware
+@app.middleware("http")
+async def security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
 
 
 @app.get("/api/")

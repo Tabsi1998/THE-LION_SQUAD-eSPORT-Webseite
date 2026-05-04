@@ -18,10 +18,14 @@ export function AdminLayout({ children }) {
     { to: "/admin/tournaments", label: "Turniere", icon: Trophy },
     { to: "/admin/f1", label: "F1 Fast Lap", icon: Flag },
     { to: "/admin/events", label: "Events", icon: CalendarDays },
+    { to: "/admin/seasons", label: "Saisons / Circuit", icon: Trophy },
     { to: "/admin/games", label: "Spiele", icon: Gamepad2 },
     { to: "/admin/stations", label: "Stationen", icon: Building2 },
     { to: "/admin/users", label: "Spieler", icon: UsersIcon },
     { to: "/admin/news", label: "News", icon: Newspaper },
+    { to: "/admin/widgets", label: "Widgets", icon: ExternalLink },
+    { to: "/admin/audit", label: "Audit Logs", icon: LogOut },
+    { to: "/admin/settings", label: "Einstellungen", icon: Building2 },
   ];
 
   return (

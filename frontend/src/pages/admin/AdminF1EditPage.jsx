@@ -94,6 +94,8 @@ export default function AdminF1EditPage() {
             <Tv className="w-4 h-4" /> TV Modus
           </Link>
           <Link target="_blank" to={`/f1/${challenge.slug || challenge.id}`} className="px-4 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-sm font-bold hover:border-[#29B6E8]/60">Public</Link>
+          <a href={`${process.env.REACT_APP_BACKEND_URL}/api/f1/challenges/${challenge.id}/export.csv`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">CSV</a>
+          <a href={`${process.env.REACT_APP_BACKEND_URL}/api/exports/f1/${challenge.id}/leaderboard.pdf${activeTrack ? `?track_id=${activeTrack}` : ""}`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF</a>
         </div>
       </div>
 

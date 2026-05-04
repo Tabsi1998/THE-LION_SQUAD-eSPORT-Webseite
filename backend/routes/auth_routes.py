@@ -1,4 +1,5 @@
 """Authentication routes."""
+import os
 import secrets
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Response, Request, HTTPException, Depends
@@ -7,6 +8,7 @@ from auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
     set_auth_cookies, clear_auth_cookies, get_current_user, _decode,
 )
+from email_service import send_template
 from models import (
     UserRegister, UserLogin, ForgotPasswordBody, ResetPasswordBody, ChangePasswordBody,
     now_utc, new_id,
@@ -86,6 +88,8 @@ async def register(body: UserRegister, response: Response):
     access = create_access_token(user_id, email, "player")
     refresh = create_refresh_token(user_id)
     set_auth_cookies(response, access, refresh)
+    # Send welcome email (silent fail if not configured)
+    await send_template("registration", email, display_name=user_doc["display_name"])
     user_doc.pop("_id", None)
     user_doc.pop("password_hash", None)
     return {**user_doc, "access_token": access, "refresh_token": refresh}
@@ -159,8 +163,11 @@ async def forgot_password(body: ForgotPasswordBody):
             "created_at": now_utc().isoformat(),
             "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
         })
-        # SMTP is disabled for MVP -- log the reset link for admin
-        print(f"[Password Reset] For {email}: /reset-password?token={token}")
+        # SMTP / Resend integration — try to send actual email
+        frontend = os.environ.get("FRONTEND_URL", "").rstrip("/")
+        reset_url = f"{frontend}/reset-password?token={token}" if frontend else f"/reset-password?token={token}"
+        await send_template("password_reset", email, reset_url=reset_url)
+        print(f"[Password Reset] For {email}: {reset_url}")
     return {"ok": True, "message": "Falls diese E-Mail registriert ist, wurde ein Link gesendet."}
 
 

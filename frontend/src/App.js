@@ -35,6 +35,11 @@ import AdminUsersPage from "@/pages/admin/AdminUsersPage";
 import AdminStationsPage from "@/pages/admin/AdminStationsPage";
 import AdminEventsPage from "@/pages/admin/AdminEventsPage";
 import AdminNewsPage from "@/pages/admin/AdminNewsPage";
+import AdminSettingsPage from "@/pages/admin/AdminSettingsPage";
+import AdminSeasonsPage from "@/pages/admin/AdminSeasonsPage";
+import AdminAuditPage from "@/pages/admin/AdminAuditPage";
+import AdminWidgetsPage from "@/pages/admin/AdminWidgetsPage";
+import SeasonPage from "@/pages/public/SeasonPage";
 
 import F1TVPage from "@/pages/display/F1TVPage";
 import BracketTVPage from "@/pages/display/BracketTVPage";
@@ -80,6 +85,12 @@ function App() {
           <Route path="/admin/stations" element={<ProtectedRoute requireAdmin><AdminStationsPage /></ProtectedRoute>} />
           <Route path="/admin/events" element={<ProtectedRoute requireAdmin><AdminEventsPage /></ProtectedRoute>} />
           <Route path="/admin/news" element={<ProtectedRoute requireAdmin><AdminNewsPage /></ProtectedRoute>} />
+          <Route path="/admin/settings" element={<ProtectedRoute requireAdmin><AdminSettingsPage /></ProtectedRoute>} />
+          <Route path="/admin/seasons" element={<ProtectedRoute requireAdmin><AdminSeasonsPage /></ProtectedRoute>} />
+          <Route path="/admin/audit" element={<ProtectedRoute requireAdmin><AdminAuditPage /></ProtectedRoute>} />
+          <Route path="/admin/widgets" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
+
+          <Route path="/seasons/:slug" element={<SeasonPage />} />
 
           {/* Display / TV */}
           <Route path="/display/f1/:id" element={<F1TVPage />} />
