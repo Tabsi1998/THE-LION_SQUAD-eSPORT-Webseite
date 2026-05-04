@@ -184,12 +184,18 @@ Im Admin gibt es:
 - `Standard 587 Login`
 - `Lokale IP vorbereiten`
 - `Diagnose`
+- `Zustellbarkeit`
 - `Testmail`
 
 Die Diagnose prueft Verbindung, STARTTLS, AUTH, Login, MAIL FROM und RCPT TO.
 Wenn der eingestellte Port kein AUTH anbietet oder Relay verweigert, prueft die Diagnose
 zusaetzlich typische Ports auf demselben Host: `587 STARTTLS`, `465 SSL/TLS`, `25 STARTTLS`
 und `25 ohne TLS`.
+
+`Zustellbarkeit` prueft DNS- und Header-Grundlagen fuer Gmail: SPF, DMARC, MX,
+Domain-Alignment, HELO/EHLO und Hinweise zu DKIM. Wichtig: Eine erfolgreiche SMTP-Testmail
+bedeutet nur, dass dein lokaler Mailserver die Mail angenommen hat. Ob Gmail sie annimmt,
+steht im Mailserver-Log bzw. in der Mailserver-Queue.
 
 ## Mail-Zustellbarkeit
 

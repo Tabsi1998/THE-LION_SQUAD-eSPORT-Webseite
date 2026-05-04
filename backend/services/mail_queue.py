@@ -7,9 +7,12 @@ import smtplib
 import ipaddress
 from datetime import datetime, timezone, timedelta
 from typing import Optional
+from email.utils import parseaddr
 
 import aiosmtplib
 import resend
+import dns.resolver
+import dns.reversename
 
 from database import get_db
 from models import new_id, now_utc
@@ -60,6 +63,114 @@ def _is_ip_literal(value: str | None) -> bool:
         return True
     except ValueError:
         return False
+
+
+def _is_private_ip(value: str | None) -> bool:
+    try:
+        return ipaddress.ip_address((value or "").strip()).is_private
+    except ValueError:
+        return False
+
+
+def _domain_from_address(address: str, fallback: str = "") -> str:
+    _, parsed = parseaddr(address or "")
+    if "@" not in parsed:
+        return fallback
+    return parsed.rsplit("@", 1)[1].strip().lower()
+
+
+def _dns_txt(name: str) -> list[str]:
+    try:
+        answers = dns.resolver.resolve(name, "TXT", lifetime=5)
+        return ["".join(part.decode() if isinstance(part, bytes) else str(part) for part in r.strings) for r in answers]
+    except Exception:
+        return []
+
+
+def _dns_mx(name: str) -> list[str]:
+    try:
+        answers = dns.resolver.resolve(name, "MX", lifetime=5)
+        return [str(r.exchange).rstrip(".") for r in answers]
+    except Exception:
+        return []
+
+
+def _dns_ptr(ip: str) -> list[str]:
+    try:
+        rev = dns.reversename.from_address(ip)
+        answers = dns.resolver.resolve(rev, "PTR", lifetime=5)
+        return [str(r).rstrip(".") for r in answers]
+    except Exception:
+        return []
+
+
+def _deliverability_sync(cfg: dict) -> dict:
+    sender_email = cfg.get("sender_email") or ""
+    smtp_user = cfg.get("smtp_user") or ""
+    smtp_auth = (cfg.get("smtp_auth") or "login").lower()
+    envelope_from = cfg.get("smtp_envelope_from") or (smtp_user if smtp_auth != "none" else "") or sender_email
+    from_domain = _domain_from_address(sender_email, mailbox_domain(sender_email))
+    envelope_domain = _domain_from_address(envelope_from, from_domain)
+    message_id_domain = (cfg.get("message_id_domain") or from_domain).strip().lower()
+    smtp_host = (cfg.get("smtp_host") or "").strip()
+
+    result = {
+        "ok": False,
+        "from_domain": from_domain,
+        "envelope_domain": envelope_domain,
+        "message_id_domain": message_id_domain,
+        "smtp_host": smtp_host,
+        "checks": [],
+        "recommendations": [],
+    }
+
+    def add(ok: bool, label: str, detail: str = "", severity: str = "error"):
+        result["checks"].append({"ok": ok, "label": label, "detail": detail, "severity": severity})
+
+    spf_records = [r for r in _dns_txt(from_domain) if r.lower().startswith("v=spf1")]
+    add(bool(spf_records), "SPF fuer From-Domain", spf_records[0] if spf_records else f"Kein SPF TXT fuer {from_domain} gefunden.")
+
+    if envelope_domain != from_domain:
+        env_spf = [r for r in _dns_txt(envelope_domain) if r.lower().startswith("v=spf1")]
+        add(bool(env_spf), "SPF fuer Envelope-Domain", env_spf[0] if env_spf else f"Kein SPF TXT fuer {envelope_domain} gefunden.")
+    else:
+        env_spf = spf_records
+
+    dmarc_records = [r for r in _dns_txt(f"_dmarc.{from_domain}") if r.lower().startswith("v=dmarc1")]
+    add(bool(dmarc_records), "DMARC fuer From-Domain", dmarc_records[0] if dmarc_records else f"Kein DMARC TXT fuer _dmarc.{from_domain} gefunden.")
+
+    mx_records = _dns_mx(from_domain)
+    add(bool(mx_records), "MX fuer From-Domain", ", ".join(mx_records[:5]) if mx_records else f"Keine MX Records fuer {from_domain} gefunden.", "warning")
+
+    aligned = envelope_domain == from_domain or message_id_domain == from_domain
+    add(aligned, "Domain Alignment", f"From={from_domain}, Envelope={envelope_domain}, Message-ID={message_id_domain}", "warning")
+
+    if _is_ip_literal(smtp_host):
+        if _is_private_ip(smtp_host):
+            add(True, "Lokaler SMTP Host", f"{smtp_host} ist eine private IP. Fuer Gmail zaehlt die oeffentliche Ausgangs-IP deines Mailservers, nicht die Backend-IP.", "info")
+        else:
+            ptr_records = _dns_ptr(smtp_host)
+            add(bool(ptr_records), "PTR/rDNS fuer SMTP Host", ", ".join(ptr_records) if ptr_records else f"Kein PTR fuer {smtp_host} gefunden.", "warning")
+    elif smtp_host:
+        add(True, "SMTP Host", smtp_host, "info")
+
+    if not cfg.get("smtp_helo_name"):
+        add(False, "HELO/EHLO Name", "Kein HELO/EHLO Name gesetzt. Setze z.B. lionsquad.at oder den Mailhost-Namen.", "warning")
+    else:
+        add(True, "HELO/EHLO Name", cfg.get("smtp_helo_name"), "info")
+
+    add(False, "DKIM", "Kann ohne DKIM-Selector nicht automatisch per DNS geprueft werden. Der Mailserver muss ausgehende Mails fuer die From-Domain DKIM-signieren.", "warning")
+
+    if not spf_records:
+        result["recommendations"].append(f"SPF fuer {from_domain} setzen und die oeffentliche sendende Mailserver-IP erlauben.")
+    if not dmarc_records:
+        result["recommendations"].append(f"DMARC fuer {from_domain} setzen, z.B. _dmarc.{from_domain} TXT mit p=none zum Start.")
+    result["recommendations"].append("Pruefe am Mailserver die Queue und Logs: App 'sent' bedeutet nur, dass dein SMTP-Server die Mail angenommen hat.")
+    result["recommendations"].append("Wenn eine Mail bei Gmail ankommt, dort 'Original anzeigen' oeffnen und SPF/DKIM/DMARC Ergebnisse pruefen.")
+
+    blocking = [c for c in result["checks"] if not c["ok"] and c.get("severity") == "error"]
+    result["ok"] = not blocking
+    return result
 
 
 def _probe_smtp_port(host: str, port: int, security: str, validate_certs: bool, helo_name: str | None) -> dict:
@@ -528,3 +639,10 @@ async def smtp_diagnose(to: str) -> dict:
     if cfg["provider"] != "smtp":
         return {"ok": False, "recommendations": ["Provider ist nicht auf SMTP gesetzt."], "steps": []}
     return await asyncio.to_thread(_smtp_diagnose_sync, cfg, to)
+
+
+async def smtp_deliverability() -> dict:
+    cfg = await get_mail_settings()
+    if cfg["provider"] != "smtp":
+        return {"ok": False, "recommendations": ["Provider ist nicht auf SMTP gesetzt."], "checks": []}
+    return await asyncio.to_thread(_deliverability_sync, cfg)

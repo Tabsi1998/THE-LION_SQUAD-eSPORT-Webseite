@@ -190,6 +190,12 @@ async def smtp_diagnose(body: TestEmailBody, me: dict = Depends(require_admin())
     return await run_smtp_diagnose(body.to)
 
 
+@settings_router.get("/smtp/deliverability")
+async def smtp_deliverability(me: dict = Depends(require_admin())):
+    from services.mail_queue import smtp_deliverability as run_smtp_deliverability
+    return await run_smtp_deliverability()
+
+
 @settings_router.get("/mail-queue")
 async def list_mail_queue(status: Optional[str] = None, limit: int = 100,
                           me: dict = Depends(require_admin())):

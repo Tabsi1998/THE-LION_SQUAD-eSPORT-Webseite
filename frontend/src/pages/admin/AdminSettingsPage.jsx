@@ -11,6 +11,7 @@ export default function AdminSettingsPage() {
   const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_auth: "login", smtp_security: "starttls", smtp_tls_verify: true, smtp_envelope_from: "", smtp_helo_name: "", sender_name: "", sender_email: "", reply_to_email: "", message_id_domain: "", enabled: true, smtp_pass_masked: "" });
   const [smtpTestEmail, setSmtpTestEmail] = useState("");
   const [smtpDiag, setSmtpDiag] = useState(null);
+  const [smtpDeliverability, setSmtpDeliverability] = useState(null);
   const [queue, setQueue] = useState([]);
   const [queueFilter, setQueueFilter] = useState("");
   const [brand, setBrand] = useState({ club_name: "", tagline: "", site_description: "", primary_color: "#29B6E8", logo_url: "", mascot_url: "", favicon_url: "", contact_email: "", domain: "", timezone: "Europe/Vienna", imprint: "", privacy_policy: "", discord_invite_url: "", twitch_channel: "" });
@@ -136,6 +137,14 @@ export default function AdminSettingsPage() {
       setSmtpDiag(data);
       if (data.ok) toast.success("SMTP Diagnose erfolgreich.");
       else toast.error("SMTP Diagnose zeigt ein Problem.");
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+  const checkDeliverability = async () => {
+    try {
+      const { data } = await api.get("/settings/smtp/deliverability");
+      setSmtpDeliverability(data);
+      if (data.ok) toast.success("Zustellbarkeit sieht grundsaetzlich okay aus.");
+      else toast.error("Zustellbarkeit hat offene Punkte.");
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const processQueueNow = async () => {
@@ -369,6 +378,7 @@ export default function AdminSettingsPage() {
             <div className="flex flex-col sm:flex-row gap-2">
               <input type="email" placeholder="test@example.com" value={smtpTestEmail} onChange={(e) => setSmtpTestEmail(e.target.value)} data-testid="smtp-test-to" className="flex-1 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               <button onClick={diagnoseSmtp} data-testid="smtp-diagnose" className="px-4 py-2 border border-[#FFD700] text-[#FFD700] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Diagnose</button>
+              <button onClick={checkDeliverability} data-testid="smtp-deliverability" className="px-4 py-2 border border-[#00FF88] text-[#00FF88] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><CheckCircle2 className="w-3.5 h-3.5" /> Zustellbarkeit</button>
               <button onClick={sendSmtpTest} data-testid="smtp-test-send" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Senden</button>
             </div>
             {smtpDiag && (
@@ -409,6 +419,32 @@ export default function AdminSettingsPage() {
                 {(smtpDiag.recommendations || []).length > 0 && (
                   <div className="border-t border-white/10 pt-3 space-y-1 text-white/70">
                     {(smtpDiag.recommendations || []).map((r, i) => <div key={i}>{r}</div>)}
+                  </div>
+                )}
+              </div>
+            )}
+            {smtpDeliverability && (
+              <div data-testid="smtp-deliverability-result" className={`border rounded-sm p-4 text-xs space-y-3 ${smtpDeliverability.ok ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FFD700]/25 bg-[#FFD700]/5"}`}>
+                <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
+                  {smtpDeliverability.ok ? <CheckCircle2 className="w-4 h-4 text-[#00FF88]" /> : <AlertTriangle className="w-4 h-4 text-[#FFD700]" />}
+                  Gmail Zustellbarkeit: {smtpDeliverability.ok ? "Basis OK" : "Pruefen"}
+                </div>
+                <div className="grid sm:grid-cols-3 gap-2 text-white/55">
+                  <div>From: <span className="font-mono text-white/75">{smtpDeliverability.from_domain || "-"}</span></div>
+                  <div>Envelope: <span className="font-mono text-white/75">{smtpDeliverability.envelope_domain || "-"}</span></div>
+                  <div>Message-ID: <span className="font-mono text-white/75">{smtpDeliverability.message_id_domain || "-"}</span></div>
+                </div>
+                <div className="space-y-1">
+                  {(smtpDeliverability.checks || []).map((c, i) => (
+                    <div key={i} className="flex gap-2 text-white/70">
+                      <span className={c.ok ? "text-[#00FF88]" : c.severity === "error" ? "text-[#FF3B30]" : "text-[#FFD700]"}>{c.ok ? "OK" : c.severity === "error" ? "NO" : "INFO"}</span>
+                      <span className="break-words"><strong>{c.label}:</strong> {c.detail}</span>
+                    </div>
+                  ))}
+                </div>
+                {(smtpDeliverability.recommendations || []).length > 0 && (
+                  <div className="border-t border-white/10 pt-3 space-y-1 text-white/70">
+                    {(smtpDeliverability.recommendations || []).map((r, i) => <div key={i}>{r}</div>)}
                   </div>
                 )}
               </div>
