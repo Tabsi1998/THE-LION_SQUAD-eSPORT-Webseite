@@ -22,7 +22,7 @@ export default function SetupWizardPage() {
   const [data, setData] = useState({
     club_name: "THE LION SQUAD",
     tagline: "eSports Verein",
-    domain: "arena.thelionsquad.at",
+    domain: "lionsquad.at",
     primary_color: "#29B6E8",
     discord_invite_url: "",
     twitch_channel: "",
@@ -38,7 +38,7 @@ export default function SetupWizardPage() {
     smtp_tls_verify: true,
     smtp_envelope_from: "",
     sender_name: "THE LION SQUAD",
-    sender_email: "noreply@thelionsquad.at",
+    sender_email: "noreply@lionsquad.at",
     reply_to_email: "office@lionsquad.at",
     message_id_domain: "lionsquad.at",
     resend_api_key: "",

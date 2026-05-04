@@ -17,7 +17,7 @@ if not _BU:
         pass
 BASE_URL = (_BU or "").rstrip("/")
 assert BASE_URL, "REACT_APP_BACKEND_URL not configured"
-ADMIN_EMAIL = "admin@thelionsquad.at"
+ADMIN_EMAIL = "admin@lionsquad.at"
 ADMIN_PASSWORD = "TLSAdmin2026!"
 
 

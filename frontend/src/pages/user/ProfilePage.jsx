@@ -66,7 +66,8 @@ export default function ProfilePage() {
   const [params, setParams] = useSearchParams();
   const [tab, setTab] = useState(params.get("tab") || "basic");
   // Sync tab → URL
-  useEffect(() => { setParams({ tab }, { replace: true }); /* eslint-disable-next-line */ }, [tab]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setParams({ tab }, { replace: true }); }, [tab]);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [achData, setAchData] = useState(null);

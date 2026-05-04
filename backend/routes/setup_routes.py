@@ -97,8 +97,8 @@ async def complete_setup(body: SetupWizardBody, me: dict = Depends(require_super
             {"$set": {
                 "resend_api_key": body.resend_api_key,
                 "sender_name": body.sender_name or "TLS ARENA",
-                "sender_email": body.sender_email or "noreply@thelionsquad.at",
-                "reply_to_email": body.reply_to_email or body.sender_email or "noreply@thelionsquad.at",
+                "sender_email": body.sender_email or "noreply@lionsquad.at",
+                "reply_to_email": body.reply_to_email or body.sender_email or "noreply@lionsquad.at",
                 "enabled": True,
                 "updated_at": now_iso,
             }, "$setOnInsert": {"id": "email"}},
@@ -147,7 +147,7 @@ sitemap_router = APIRouter(tags=["seo"])
 async def sitemap():
     db = get_db()
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
-    base = (branding.get("domain") or "https://arena.thelionsquad.at").rstrip("/")
+    base = (branding.get("domain") or "https://lionsquad.at").rstrip("/")
     if not base.startswith("http"):
         base = "https://" + base
 

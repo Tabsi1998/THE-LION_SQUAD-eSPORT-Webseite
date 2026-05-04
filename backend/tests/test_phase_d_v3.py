@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 load_dotenv("/app/frontend/.env")
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
-ADMIN_EMAIL = "admin@thelionsquad.at"
+ADMIN_EMAIL = "admin@lionsquad.at"
 ADMIN_PW = "TLSAdmin2026!"
 
 

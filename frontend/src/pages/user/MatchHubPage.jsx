@@ -21,7 +21,8 @@ export default function MatchHubPage() {
     setScoreB(data.score_b || 0);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [id]);
 
   if (!m) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
   const a = m.participant_a, b = m.participant_b;

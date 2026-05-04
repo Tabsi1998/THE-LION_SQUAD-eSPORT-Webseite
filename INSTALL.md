@@ -2,7 +2,7 @@
 
 ## Prerequisites
 - Ubuntu Server 24.04 (fresh)
-- A domain (e.g., `arena.thelionsquad.at`) pointed at the server
+- A domain (e.g., `lionsquad.at`) pointed at the server
 - Root / sudo access
 
 ## 1. Install Docker + Compose
@@ -51,15 +51,15 @@ The frontend is now at http://your-server:3000 and backend at http://your-server
 ## 4. Reverse Proxy (Nginx Proxy Manager)
 
 Create two proxy hosts:
-1. `arena.example.com` → `tls-frontend:80`
-2. `arena.example.com/api/*` → `tls-backend:8001` (or run under a separate `api.` subdomain)
+1. `lionsquad.at` → `tls-frontend:80`
+2. `lionsquad.at/api/*` → `tls-backend:8001` (or run under a separate `api.` subdomain)
 
 Enable HTTPS (Let's Encrypt) inside NPM.
 
 ## 5. First Login
 
-- Open `https://arena.example.com/`
-- Login: `admin@thelionsquad.at` / the password you set
+- Open `https://lionsquad.at/`
+- Login: `admin@lionsquad.at` / the password you set
 - Navigate to **/profile** → change password
 - Start creating games, tournaments, and F1 challenges.
 

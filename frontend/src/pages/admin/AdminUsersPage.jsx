@@ -10,7 +10,8 @@ export default function AdminUsersPage() {
     const { data } = await api.get(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     setList(data);
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [q]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [q]);
 
   const setRole = async (id, role) => {
     try { await api.post(`/users/${id}/role`, { role }); toast.success("Rolle aktualisiert."); load(); }

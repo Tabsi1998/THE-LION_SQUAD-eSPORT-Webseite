@@ -3,10 +3,10 @@ import os
 import requests
 import pytest
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://fast-lap-mgmt.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "admin@thelionsquad.at"
+ADMIN_EMAIL = "admin@lionsquad.at"
 ADMIN_PW = "TLSAdmin2026!"
 
 

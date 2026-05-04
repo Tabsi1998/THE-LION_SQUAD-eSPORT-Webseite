@@ -21,7 +21,7 @@ export default function PartnersPage() {
         </div>
 
         <div className="mt-10 border border-dashed border-white/15 rounded-sm p-10 text-center text-white/50">
-          Du willst Partner werden? <a href="mailto:info@thelionsquad.at" className="text-[#29B6E8] hover:underline">Schreib uns</a>.
+          Du willst Partner werden? <a href="mailto:info@lionsquad.at" className="text-[#29B6E8] hover:underline">Schreib uns</a>.
         </div>
       </section>
     </PublicLayout>

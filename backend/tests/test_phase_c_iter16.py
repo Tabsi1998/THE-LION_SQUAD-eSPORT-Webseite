@@ -19,7 +19,7 @@ import pytest
 
 BASE = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE}/api"
-ADMIN_EMAIL = "admin@thelionsquad.at"
+ADMIN_EMAIL = "admin@lionsquad.at"
 ADMIN_PW = "TLSAdmin2026!"
 
 

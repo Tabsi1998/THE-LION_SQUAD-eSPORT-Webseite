@@ -69,7 +69,7 @@ export function ImprintPage() {
             ["Rechtsform", "eingetragener Verein nach österreichischem Vereinsrecht"],
             ["Sitz", "Österreich"],
             ["Website", <a href={domain} className="text-[#29B6E8] hover:underline">{domain}</a>],
-            ["E-Mail", <a href="mailto:info@thelionsquad.at" className="text-[#29B6E8] hover:underline">info@thelionsquad.at</a>],
+            ["E-Mail", <a href="mailto:info@lionsquad.at" className="text-[#29B6E8] hover:underline">info@lionsquad.at</a>],
           ]}
         />
         {imprint && (
@@ -141,8 +141,8 @@ export function PrivacyPage() {
             ["Verantwortlicher", clubName],
             ["Sitz", "Österreich"],
             ["Website", <a href={domain} className="text-[#29B6E8] hover:underline">{domain}</a>],
-            ["Kontakt", <a href="mailto:info@thelionsquad.at" className="text-[#29B6E8] hover:underline">info@thelionsquad.at</a>],
-            ["Datenschutz", <a href="mailto:datenschutz@thelionsquad.at" className="text-[#29B6E8] hover:underline">datenschutz@thelionsquad.at</a>],
+            ["Kontakt", <a href="mailto:info@lionsquad.at" className="text-[#29B6E8] hover:underline">info@lionsquad.at</a>],
+            ["Datenschutz", <a href="mailto:datenschutz@lionsquad.at" className="text-[#29B6E8] hover:underline">datenschutz@lionsquad.at</a>],
           ]}
         />
       </Section>
@@ -252,7 +252,7 @@ export function PrivacyPage() {
           Betroffene Personen haben nach Maßgabe der DSGVO Rechte auf Auskunft, Berichtigung,
           Löschung, Einschränkung, Datenübertragbarkeit, Widerspruch sowie Widerruf erteilter
           Einwilligungen. Zur Ausübung genügt eine Nachricht an{" "}
-          <a href="mailto:datenschutz@thelionsquad.at" className="text-[#29B6E8] hover:underline">datenschutz@thelionsquad.at</a>.
+          <a href="mailto:datenschutz@lionsquad.at" className="text-[#29B6E8] hover:underline">datenschutz@lionsquad.at</a>.
         </p>
         <p>
           Außerdem besteht das Recht auf Beschwerde bei der Österreichischen Datenschutzbehörde,

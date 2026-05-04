@@ -17,7 +17,7 @@ def test_smtp_settings_roundtrip(admin_client, base_url):
         "provider": "smtp", "smtp_host": "mail.example.com", "smtp_port": 587,
         "smtp_user": "u", "smtp_pass": "secretpass", "smtp_auth": "none",
         "smtp_security": "starttls",
-        "sender_name": "TLS Test", "sender_email": "test@thelionsquad.at",
+        "sender_name": "TLS Test", "sender_email": "test@lionsquad.at",
         "enabled": True,
     }
     r = admin_client.put(f"{base_url}/api/settings/smtp", json=payload)

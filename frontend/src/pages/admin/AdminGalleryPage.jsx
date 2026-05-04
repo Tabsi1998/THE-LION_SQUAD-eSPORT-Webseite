@@ -162,7 +162,8 @@ function AlbumPhotos({ album, events, onBack }) {
     const { data } = await api.get(`/gallery/${album.slug}`);
     setPhotos(data.photos || []);
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [album.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [album.id]);
 
   const onPick = async (files) => {
     if (!files || !files.length) return;

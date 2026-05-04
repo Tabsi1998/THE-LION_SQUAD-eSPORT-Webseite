@@ -62,7 +62,8 @@ export default function AdminMembersPage() {
     setUsers(data);
   };
   useEffect(() => { api.get("/membership/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, []);
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [q]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [q]);
 
   const filtered = users.filter((u) => {
     if (filter === "members") return u.is_club_member;

@@ -27,7 +27,8 @@ export default function TournamentDetailPage() {
     if (user) setMyReg(r.find((x) => x.user_id === user.id) || null);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [slug, user?.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [slug, user?.id]);
 
   const handleRegister = async () => {
     if (!user) { nav(`/login?next=/tournaments/${slug}`); return; }

@@ -21,6 +21,7 @@ export default function AdminMembershipApplicationsPage() {
   const [selected, setSelected] = useState(null);
 
   const load = () => api.get(`/membership/applications?status=${tab}`).then(({ data }) => setList(data));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [tab]);
 
   const decide = async (a, decision) => {

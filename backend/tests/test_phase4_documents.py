@@ -6,8 +6,8 @@ import uuid
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://fast-lap-mgmt.preview.emergentagent.com").rstrip("/")
-ADMIN_EMAIL = "admin@thelionsquad.at"
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
+ADMIN_EMAIL = "admin@lionsquad.at"
 ADMIN_PASSWORD = "TLSAdmin2026!"
 
 

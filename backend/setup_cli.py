@@ -88,12 +88,12 @@ async def main():
     print(f"\n{BOLD}[1/6]{RESET} Vereins-Branding")
     club_name = ask("Vereinsname", "THE LION SQUAD")
     tagline = ask("Tagline / Untertitel", "eSports Arena")
-    domain = ask("Öffentliche Domain", "arena.thelionsquad.at")
+    domain = ask("Öffentliche Domain", "lionsquad.at")
     timezone_str = ask("Zeitzone", "Europe/Vienna")
     primary_color = ask("Akzentfarbe (HEX)", "#29B6E8")
 
     print(f"\n{BOLD}[2/6]{RESET} Superadmin Account")
-    admin_email = ask("Admin E-Mail", os.environ.get("ADMIN_EMAIL", "admin@thelionsquad.at"))
+    admin_email = ask("Admin E-Mail", os.environ.get("ADMIN_EMAIL", "admin@lionsquad.at"))
     while True:
         admin_pw = ask("Admin Passwort (min. 8 Zeichen)", secret=True,
                         validator=lambda v: len(v) >= 8)
@@ -106,7 +106,7 @@ async def main():
     if ask_yes_no("Resend jetzt konfigurieren?", False):
         resend_key = ask("Resend API Key (re_...)", secret=True)
         sender_name = ask("Absendername", club_name)
-        sender_email = ask("Absender-E-Mail", "noreply@thelionsquad.at")
+        sender_email = ask("Absender-E-Mail", "noreply@lionsquad.at")
     else:
         resend_key = None
         sender_name = club_name
@@ -115,7 +115,7 @@ async def main():
 
     print(f"\n{BOLD}[4/6]{RESET} Rechtliches")
     imprint = ask("Impressum (kurz, 1 Zeile — voller Text im Admin)", f"{club_name}, Wien, Österreich")
-    privacy_short = ask("Datenschutz Kontakt", "datenschutz@thelionsquad.at")
+    privacy_short = ask("Datenschutz Kontakt", "datenschutz@lionsquad.at")
 
     print(f"\n{BOLD}[5/6]{RESET} Demo-Daten")
     seed_demo = ask_yes_no("Demo-Daten (20 Testspieler + Beispielturniere) anlegen?", False)

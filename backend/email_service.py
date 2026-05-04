@@ -19,7 +19,7 @@ async def _get_email_config() -> dict:
     s = await db.settings.find_one({"id": "email"}) or {}
     mail = await db.settings.find_one({"id": "mail"}) or {}
     api_key = s.get("resend_api_key") or os.environ.get("RESEND_API_KEY", "")
-    sender_email = s.get("sender_email") or mail.get("sender_email") or os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
+    sender_email = s.get("sender_email") or mail.get("sender_email") or os.environ.get("SENDER_EMAIL", "noreply@lionsquad.at")
     sender_name = s.get("sender_name") or mail.get("sender_name") or "TLS ARENA"
     reply_to_email = s.get("reply_to_email") or mail.get("reply_to_email") or sender_email
     enabled = s.get("enabled", True) and bool(api_key)

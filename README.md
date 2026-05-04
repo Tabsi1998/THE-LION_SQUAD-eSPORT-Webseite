@@ -34,10 +34,19 @@ Change the admin password immediately in **/profile → change password** (or `/
 1. `cp .env.example .env`
 2. Set a strong `JWT_SECRET`, `ADMIN_PASSWORD`, `PUBLIC_BACKEND_URL`, `FRONTEND_URL`, `CORS_ORIGINS`.
 3. `docker compose up -d --build`
-4. Open `https://arena.<your-domain>/` and login with the admin credentials from your `.env`.
+4. Open `https://lionsquad.at/` and login with the admin credentials from your `.env`.
 5. Change the admin password immediately.
 
-Behind Nginx Proxy Manager, point `arena.<your-domain>` to `frontend:80` and `arena.<your-domain>/api/*` to `backend:8001/api/*` (or front the entire backend as a separate subdomain).
+Behind Nginx Proxy Manager, point `lionsquad.at` to `frontend:80` and `lionsquad.at/api/*` to `backend:8001/api/*` (or front the entire backend as a separate subdomain).
+
+### Production checklist
+
+- Use one canonical domain everywhere, preferably `https://lionsquad.at`.
+- Set `CORS_ORIGINS` and `FRONTEND_URL` to the same public origin unless you intentionally split frontend/backend domains.
+- Keep `SEED_DEMO=false` in production.
+- Configure SMTP in the admin UI. For a local mailserver, use `host.docker.internal` or the host IP and set SMTP auth to "Ohne Anmeldung" when the server does not offer SMTP AUTH.
+- For reliable mail delivery, configure SPF, DKIM, DMARC and PTR/rDNS for `lionsquad.at`.
+- Run `docker compose logs -f backend frontend` after every update and check `/api/health`.
 
 ## Docs
 

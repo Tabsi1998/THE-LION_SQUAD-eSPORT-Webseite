@@ -32,8 +32,10 @@ export default function AdminF1EditPage() {
     setTimes(data);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
-  useEffect(() => { loadTimes(); /* eslint-disable-next-line */ }, [activeTrack]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadTimes(); }, [activeTrack]);
 
   const addTrack = async (e) => {
     e.preventDefault();

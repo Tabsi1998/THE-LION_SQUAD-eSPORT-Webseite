@@ -60,7 +60,7 @@ export default function ContactPage() {
           <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
             <Mail className="w-6 h-6 text-[#29B6E8] mb-3" />
             <h3 className="font-heading font-black uppercase text-base">E-Mail direkt</h3>
-            <p className="mt-1 text-sm text-white/60">{branding?.contact_email || "info@thelionsquad.at"}</p>
+            <p className="mt-1 text-sm text-white/60">{branding?.contact_email || "info@lionsquad.at"}</p>
           </div>
         </div>
 

@@ -11,7 +11,7 @@ from models import new_id, now_utc
 
 async def seed_admin():
     db = get_db()
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@thelionsquad.at").lower()
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@lionsquad.at").lower()
     admin_password = os.environ.get("ADMIN_PASSWORD")
     is_production = os.environ.get("APP_ENV", os.environ.get("ENVIRONMENT", "development")).lower() in {
         "prod", "production"
@@ -180,7 +180,7 @@ async def seed_demo_data():
         uid = new_id()
         user_docs.append({
             "id": uid,
-            "email": f"{username}@demo.thelionsquad.at",
+            "email": f"{username}@demo.lionsquad.at",
             "username": username,
             "password_hash": hash_password("demo123"),
             "display_name": display,
@@ -231,7 +231,7 @@ async def seed_demo_data():
         "location": "The Lion Squad HQ, Wien",
         "is_online": False, "is_hybrid": True,
         "banner_url": "https://images.pexels.com/photos/7915213/pexels-photo-7915213.jpeg",
-        "contact": "events@thelionsquad.at",
+        "contact": "events@lionsquad.at",
         "status": "upcoming",
         "created_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(),
     })

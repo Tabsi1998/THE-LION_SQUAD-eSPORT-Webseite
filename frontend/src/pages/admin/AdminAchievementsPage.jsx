@@ -205,6 +205,7 @@ function TiersTab() {
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { api.get("/admin/achievements/groups").then(({ data }) => { setGroups(data); if (!groupCode && data[0]) setGroupCode(data[0].code); }); }, []);
   useEffect(() => {
     if (!groupCode) return;

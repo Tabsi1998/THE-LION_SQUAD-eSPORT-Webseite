@@ -28,6 +28,7 @@ export default function AdminStationsPage() {
     setTournaments(t);
     if (!activeTid && t.length) setActiveTid(t[0].id);
   };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
   const loadMatches = async () => {
@@ -36,7 +37,8 @@ export default function AdminStationsPage() {
     setMatches(data.matches || []);
     setRegs(data.registrations || []);
   };
-  useEffect(() => { loadMatches(); /* eslint-disable-next-line */ }, [activeTid]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadMatches(); }, [activeTid]);
 
   const create = async (e) => {
     e.preventDefault();

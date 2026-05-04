@@ -62,6 +62,7 @@ memory/test_credentials.md
 *.dylib
 
 # Deployment/editor tooling
+.emergent/
 .vercel/
 .chainlit/
 chainlit.md

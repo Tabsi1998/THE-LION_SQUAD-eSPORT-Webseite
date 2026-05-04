@@ -7,7 +7,7 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
-ADMIN_EMAIL = "admin@thelionsquad.at"
+ADMIN_EMAIL = "admin@lionsquad.at"
 ADMIN_PASS = "TLSAdmin2026!"
 
 

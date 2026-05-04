@@ -27,10 +27,14 @@ services:
       CORS_ORIGINS: "${CORS_ORIGINS:?Set CORS_ORIGINS in .env before deploying}"
       FRONTEND_URL: "${FRONTEND_URL:?Set FRONTEND_URL in .env before deploying}"
       JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env before deploying}"
-      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@thelionsquad.at}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@lionsquad.at}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env before deploying}"
+      SENDER_EMAIL: "${SENDER_EMAIL:-noreply@lionsquad.at}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
       SEED_DEMO: "${SEED_DEMO:-false}"
+      DISABLE_SCHEDULER: "${DISABLE_SCHEDULER:-false}"
       UPLOAD_DIR: "${UPLOAD_DIR:-/app/backend/uploads}"
+      ALLOW_INSECURE_CORS: "${ALLOW_INSECURE_CORS:-false}"
     ports:
       - "${BACKEND_PORT:-8001}:8001"
     volumes:

@@ -30,7 +30,8 @@ export default function AdminPenaltiesPage() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [filter]);
 
   const counts = (() => {
     const c = { all: data.items.length, lap_penalty: 0, lap_invalid: 0, match_forfeit: 0, incident: 0 };
