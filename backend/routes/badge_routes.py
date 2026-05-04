@@ -26,7 +26,8 @@ from database import get_db
 from auth import get_optional_user, get_current_user, require_admin
 from badges import (
     award_achievement, list_groups_for_user, list_user_awards,
-    evaluate_user_progress,
+    evaluate_user_progress, trigger_negative_incident, on_season_completed,
+    NEGATIVE_INCIDENTS,
 )
 from models import now_utc, new_id
 
@@ -288,3 +289,55 @@ async def admin_search_users(q: str = "", me: dict = Depends(require_admin())):
         query = {"$or": [{"username": rx}, {"display_name": rx}, {"email": rx}]}
     users = await db.users.find(query, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "email": 1}).limit(20).to_list(20)
     return users
+
+
+# ---- Phase B v4.1 — Negative incident trigger ----
+class IncidentBody(BaseModel):
+    user_id: str
+    incident_type: str  # one of NEGATIVE_INCIDENTS keys
+    note: Optional[str] = None
+    match_id: Optional[str] = None
+
+
+@admin_router.get("/incident-types")
+async def admin_incident_types(me: dict = Depends(require_admin())):
+    return [{"key": k, "tier_code": v} for k, v in NEGATIVE_INCIDENTS.items()]
+
+
+@admin_router.post("/trigger-incident")
+async def admin_trigger_incident(body: IncidentBody, me: dict = Depends(require_admin())):
+    db = get_db()
+    if body.incident_type not in NEGATIVE_INCIDENTS:
+        raise HTTPException(400, f"Unbekannter Vorfall-Typ. Erlaubt: {sorted(NEGATIVE_INCIDENTS.keys())}")
+    if not await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(404, "Nutzer nicht gefunden.")
+    code = await trigger_negative_incident(
+        body.user_id, body.incident_type,
+        context={"manual": True, "by": me["id"], "note": body.note, "match_id": body.match_id},
+        awarded_by=me["id"],
+    )
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "achievement.negative_trigger",
+        "actor_id": me["id"], "target_id": body.user_id,
+        "data": {"incident_type": body.incident_type, "tier_code": code, "note": body.note},
+        "created_at": now_utc().isoformat(),
+    })
+    return {"ok": True, "tier_code": code, "newly_awarded": bool(code)}
+
+
+# ---- Phase B v4.1 — Season completion ----
+@admin_router.post("/season/{season_id}/award")
+async def admin_season_award(season_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    if not await db.seasons.find_one({"id": season_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(404, "Saison nicht gefunden.")
+    result = await on_season_completed(season_id)
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "achievement.season_award",
+        "actor_id": me["id"], "target_id": season_id,
+        "data": result,
+        "created_at": now_utc().isoformat(),
+    })
+    return result

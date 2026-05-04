@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 16 (Achievement-Erweiterung 138 Tiers + Phase C Membership-System) — Backend 12/12 PASS via pytest. Frontend Smoke-Tests bestätigen Profile-Completeness-Banner, Admin-Bewerbungs-Inbox (3 Tabs), Admin-Achievements (4 Tabs grün) und Players-Member-Cards mit Badges/Achievements. Mail-Queue erhält Jobs korrekt (admin notify + applicant notify).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/achievements/groups (anon)", "issue": "Spec sagt '34 public groups', tatsächlich 39 (inkl. 5 neue Groups). 138 Tiers stimmt. Nur Spec-Text ist veraltet, Code ist konsistent."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "MembershipApplyPage", "issue": "Direkter Aufruf /membership/apply als bereits eingeloggter Admin (= aktives Mitglied) redirectet auf /login?next=/membership/apply statt 'Du bist bereits Mitglied'-State anzuzeigen. Andere admin-only Seiten funktionieren mit gleichem Token einwandfrei.", "selector": "/membership/apply", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_c_iter16.py",
+    "/app/test_reports/pytest/iter16_results.xml"
+  ],
+  "action_items": [
+    "Optional: MembershipApplyPage sollte bei aktiven Mitgliedern einen 'bereits Mitglied'-State rendern statt Login-Redirect (Auth-State Check beim Mount).",
+    "Spec-Text aktualisieren: 39 public groups (statt 34) — fünf neue Groups community_helper, event_host, season_consistency, profile_completeness, tutorial wurden korrekt addiert."
+  ],
+  "critical_code_review_comments": [
+    "phase_c_routes.py membership_apply: idempotenz-Check via existing pending application + active membership ist sauber (409). ✅",
+    "phase_c_routes.py admin_decide_application: erstellt/aktualisiert memberships korrekt, ruft evaluate_user_progress für Achievements-Trigger, schreibt audit_log und enqueued Mail. ✅",
+    "badge_routes.py /admin/achievements/trigger-incident: validiert incident_type gegen NEGATIVE_INCIDENTS map (400 bei unbekannt), korrekt gegen User-Existenz (404), korrekt audit-logged. Privacy bleibt erhalten — fresh user (test_iter16_*) bekam neg_rage_quit, taucht NICHT in /achievements/user/{id} auf, NUR in /admin/achievements/negative/awards. ✅",
+    "phase_c_routes.py my_profile_completeness: ruft evaluate_user_progress nach jedem GET → Auto-Award bei profile_completeness Tiers funktioniert (Admin score=58% → profile_completeness_b auto-awarded). ✅",
+    "user_routes.py /users/public-list: enrichment-Felder (profile_completeness/achievements_count/top_achievement) mit korrekter Struktur (level/level_color/level_name/name/code/icon). ✅"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase_c_iter16.py (neu — 12 Tests, 4 Test-Klassen + Membership-Flow Fixture)"
+  ],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "95% (4/5 Flows grün, /membership/apply als-Admin-Redirect = LOW)"},
+  "test_credentials": "admin@thelionsquad.at / TLSAdmin2026! verifiziert; Test-User dynamisch via /api/auth/register erstellt (test_iter16_<uuid>@example.com)",
+  "seed_data_creation": "Pytest erstellt pro Run 1-2 frische Community-User (TEST_iter16_<sfx>) + zugehörige Bewerbung. Diese werden im flow approved → User wird zum aktiven Mitglied. neg_rage_quit Award wird im Test wieder revoked. mail_jobs Collection enthält 16+ pending Jobs (admin notify + applicant notify) — keine Cleanup, da beabsichtigt.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter16 Backend ist vollständig grün. Test-Suite test_phase_c_iter16.py + test_phase_b_v4_achievements.py bilden zusammen die kanonische Regressions-Suite. Awards in /achievements/me verwenden Feld 'code' (nicht tier_code). Register-Endpoint braucht accept_privacy + accept_terms. /membership/me liefert {is_active_member, membership: {member_status}, user_type} — kein flacher member_status auf root. Für Privacy-Tests von Negative-Awards immer fresh user verwenden, da Admin neg_rage_quit ggf. schon hat.",
+  "rca of the issue": "Keine Bugs gefunden. Einziger Hinweis: /membership/apply Frontend-Page redirectet logged-in Admin auf /login statt 'Bereits Mitglied'-State zu zeigen — vermutlich client-side Auth-Guard ohne fallback für 'is_active_member'. Reproduktion: Login als admin → Direktnavigation /membership/apply → 302 zu /login?next=/membership/apply. Mitigation: in MembershipApplyPage useEffect prüfen ob aktuelle membership aktiv ist und alternativen State rendern."
+}

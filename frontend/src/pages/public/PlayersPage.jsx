@@ -72,11 +72,18 @@ export default function PlayersPage() {
                     className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] p-4 transition group"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-sm border ${isMember ? "border-[#FFD700]/50" : "border-white/15"} bg-[#0A0A0A] flex items-center justify-center overflow-hidden`}>
-                        {p.avatar_url ? (
-                          <img src={p.avatar_url} alt={p.display_name} className="w-full h-full object-cover" />
-                        ) : (
-                          <span className={`font-heading font-black ${isMember ? "text-[#FFD700]" : "text-white/40"}`}>{(p.display_name || p.username)[0]}</span>
+                      <div className="relative">
+                        <div className={`w-12 h-12 rounded-sm border ${isMember ? "border-[#FFD700]/50" : "border-white/15"} bg-[#0A0A0A] flex items-center justify-center overflow-hidden`}>
+                          {p.avatar_url ? (
+                            <img src={p.avatar_url} alt={p.display_name} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className={`font-heading font-black ${isMember ? "text-[#FFD700]" : "text-white/40"}`}>{(p.display_name || p.username)[0]}</span>
+                          )}
+                        </div>
+                        {p.profile_completeness != null && (
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#0A0A0A] border border-white/20 flex items-center justify-center" title={`Profil ${p.profile_completeness}% komplett`}>
+                            <span className="text-[8px] font-bold tabular-nums text-white/70">{p.profile_completeness}</span>
+                          </div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -87,6 +94,17 @@ export default function PlayersPage() {
                         <div className="text-[11px] text-white/45 truncate">@{p.username}</div>
                       </div>
                     </div>
+                    {/* Phase C: Top Achievement chip + count */}
+                    {p.top_achievement && (
+                      <div className="mt-3 flex items-center gap-2 text-[10px] uppercase tracking-widest" data-testid={`player-top-${p.username}`}>
+                        <span className="px-1.5 py-0.5 rounded-sm border" style={{ color: p.top_achievement.level_color, borderColor: p.top_achievement.level_color + "55" }}>
+                          {p.top_achievement.level_name} · {p.top_achievement.name}
+                        </span>
+                      </div>
+                    )}
+                    {p.achievements_count > 0 && (
+                      <div className="mt-2 text-[10px] uppercase tracking-widest text-white/35">{p.achievements_count} Achievements</div>
+                    )}
                   </Link>
                 );
               })}

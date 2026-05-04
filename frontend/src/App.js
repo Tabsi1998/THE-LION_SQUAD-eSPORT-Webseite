@@ -47,6 +47,8 @@ import AdminDocumentsPage from "@/pages/admin/AdminDocumentsPage";
 import SeasonPage from "@/pages/public/SeasonPage";
 import PublicProfilePage from "@/pages/public/PublicProfilePage";
 import AdminAchievementsPage from "@/pages/admin/AdminAchievementsPage";
+import AdminMembershipApplicationsPage from "@/pages/admin/AdminMembershipApplicationsPage";
+import MembershipApplyPage from "@/pages/public/MembershipApplyPage";
 import AdminSponsorsPage from "@/pages/admin/AdminSponsorsPage";
 
 import AboutPage from "@/pages/public/AboutPage";
@@ -93,6 +95,7 @@ function App() {
           <Route path="/players" element={<PlayersPage />} />
           <Route path="/members" element={<MembersDirectoryPage />} />
           <Route path="/membership/join" element={<JoinMembershipPage />} />
+          <Route path="/membership/apply" element={<MembershipApplyPage />} />
 
           {/* Public — Arena */}
           <Route path="/tournaments" element={<TournamentsPage />} />
@@ -160,6 +163,7 @@ function App() {
           {/* Admin */}
           <Route path="/admin/sponsors" element={<ProtectedRoute requireAdmin><AdminSponsorsPage /></ProtectedRoute>} />
           <Route path="/admin/achievements" element={<ProtectedRoute requireAdmin><AdminAchievementsPage /></ProtectedRoute>} />
+          <Route path="/admin/membership-applications" element={<ProtectedRoute requireAdmin><AdminMembershipApplicationsPage /></ProtectedRoute>} />
           <Route path="/admin/prizes" element={<ProtectedRoute requireAdmin><AdminPrizesPage /></ProtectedRoute>} />
           <Route path="/admin/contact" element={<ProtectedRoute requireAdmin><AdminContactPage /></ProtectedRoute>} />
           <Route path="/admin/board" element={<ProtectedRoute requireAdmin><AdminBoardPage /></ProtectedRoute>} />

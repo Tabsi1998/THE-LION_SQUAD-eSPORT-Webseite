@@ -31,6 +31,7 @@ export function AdminLayout({ children }) {
     { to: "/admin/sponsors", label: "Sponsoren", icon: Star },
     { to: "/admin/achievements", label: "Achievements", icon: Medal },
     { to: "/admin/board", label: "Vorstand", icon: UserCheck },
+    { to: "/admin/membership-applications", label: "Bewerbungen", icon: Inbox },
     { to: "/admin/contact", label: "Inbox", icon: Inbox },
     { to: "/admin/prizes", label: "Gewinne", icon: Award },
     { to: "/admin/widgets", label: "Widgets", icon: Code2 },

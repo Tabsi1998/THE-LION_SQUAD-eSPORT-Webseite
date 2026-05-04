@@ -4,24 +4,27 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
-import { Trophy, Flag, Bell, Crown, Gift, Award } from "lucide-react";
+import { Trophy, Flag, Bell, Crown, Gift, Award, UserCheck } from "lucide-react";
 
 export default function DashboardPage() {
   const { user, isClubMember } = useAuth();
   const [matches, setMatches] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [openPrizes, setOpenPrizes] = useState(0);
+  const [completeness, setCompleteness] = useState(null);
 
   useEffect(() => {
     (async () => {
-      const [m, n, p] = await Promise.allSettled([
+      const [m, n, p, c] = await Promise.allSettled([
         api.get("/matches/upcoming"),
         api.get("/admin/notifications"),
         api.get("/prizes/me/open-count"),
+        api.get("/users/me/profile-completeness"),
       ]);
       if (m.status === "fulfilled") setMatches(m.value.data);
       if (n.status === "fulfilled") setNotifications(n.value.data);
       if (p.status === "fulfilled") setOpenPrizes(p.value.data?.count || 0);
+      if (c.status === "fulfilled") setCompleteness(c.value.data);
     })();
   }, []);
 
@@ -40,6 +43,30 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+
+        {completeness && completeness.score < 100 && (
+          <div className="mb-8 border border-[#A855F7]/30 bg-gradient-to-r from-[#A855F7]/10 via-transparent to-transparent rounded-sm p-5 flex items-center gap-4" data-testid="profile-completeness-banner">
+            <div className="relative w-14 h-14 shrink-0">
+              <svg viewBox="0 0 36 36" className="w-14 h-14 -rotate-90">
+                <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+                <circle cx="18" cy="18" r="16" fill="none" stroke="#A855F7" strokeWidth="3" strokeDasharray={`${completeness.score} 100`} pathLength="100" strokeLinecap="round" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="font-heading font-black text-sm">{completeness.score}%</span>
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#A855F7]">
+                <UserCheck className="w-3.5 h-3.5" /> Profil-Pflege
+              </div>
+              <h3 className="font-heading text-lg md:text-xl font-bold uppercase mt-0.5">Profil zu {completeness.score}% komplett</h3>
+              {completeness.missing?.length > 0 && (
+                <p className="text-xs text-white/55 mt-1">Fehlt: <span className="text-white/75">{completeness.missing.slice(0, 4).join(", ")}{completeness.missing.length > 4 ? "…" : ""}</span></p>
+              )}
+            </div>
+            <Link to="/profile" data-testid="profile-completeness-cta" className="px-4 py-2 border border-[#A855F7]/40 text-[#A855F7] hover:bg-[#A855F7]/10 rounded-sm text-xs font-bold uppercase tracking-wider whitespace-nowrap">Vervollständigen</Link>
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 border border-white/10 rounded-sm bg-[#121212] p-5">

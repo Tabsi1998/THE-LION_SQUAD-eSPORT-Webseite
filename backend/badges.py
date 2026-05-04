@@ -121,6 +121,43 @@ def _user_can_see_badge(group: dict, user: dict | None) -> bool:
     return True
 
 
+# ---------- Profile-Completeness (Phase C) ----------
+PROFILE_FIELDS = [
+    ("avatar_url", 1.0),
+    ("banner_url", 0.6),
+    ("bio", 1.0),
+    ("country", 0.8),
+    ("city", 0.6),
+    ("birthdate", 0.6),
+    ("main_platforms", 1.0),     # list, non-empty
+    ("input_devices", 0.8),      # list
+    ("favorite_games", 0.8),     # list
+    ("discord_name", 0.8),
+    ("twitch_channel", 0.6),
+    ("privacy_public_profile", 0.4),  # explicit choice
+]
+
+
+def compute_profile_completeness(user: dict | None) -> int:
+    """Return percent (0–100) of profile completeness using PROFILE_FIELDS weights."""
+    if not user:
+        return 0
+    total = sum(w for _, w in PROFILE_FIELDS)
+    score = 0.0
+    for key, weight in PROFILE_FIELDS:
+        v = user.get(key)
+        if isinstance(v, list):
+            if len(v) > 0:
+                score += weight
+        elif isinstance(v, bool):
+            # privacy_public_profile counts when set (either true or false explicitly)
+            if v is True or v is False:
+                score += weight
+        elif v not in (None, "", 0):
+            score += weight
+    return round(100 * score / total) if total else 0
+
+
 # ---------------- Progress Counters ----------------
 async def compute_user_progress(user_id: str) -> dict[str, int]:
     db = get_db()
@@ -198,7 +235,7 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     else:
         p["events_attended"] = 0
 
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "main_platforms": 1, "main_platform": 1})
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
     plats = set()
     if user:
         for x in (user.get("main_platforms") or []):
@@ -207,6 +244,16 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
         if user.get("main_platform"):
             plats.add(user["main_platform"])
     p["distinct_platforms"] = len(plats)
+
+    # seasons_active — distinct seasons where user has any registration
+    seasons_active = 0
+    if tids:
+        season_ids = await db.tournaments.distinct("season_id", {"id": {"$in": tids}, "season_id": {"$ne": None}})
+        seasons_active = len([s for s in season_ids if s])
+    p["seasons_active"] = seasons_active
+
+    # profile_completeness — same scoring used by /api/users/me/profile-completeness
+    p["profile_completeness"] = compute_profile_completeness(user) if user else 0
 
     p["achievements_unlocked"] = await db.user_achievements.count_documents({"user_id": user_id})
 
@@ -393,3 +440,68 @@ async def on_team_created(user_id: str, team_id: str):
 
 async def on_team_joined(user_id: str, team_id: str):
     await evaluate_user_progress(user_id)
+
+
+# ---------- Phase B v4.1 — Negative incident trigger ----------
+NEGATIVE_INCIDENTS = {
+    "afk":              "neg_afk",
+    "no_show":          "neg_no_show",
+    "ghost":            "neg_ghost",
+    "rage_quit":        "neg_rage_quit",
+    "controller_throw": "neg_controller_throw",
+    "chat_warning":     "neg_chat_warning",
+    "dispute_open":     "neg_dispute",
+    "team_no_show":     "neg_team_no_show",
+}
+
+
+async def trigger_negative_incident(user_id: str, incident_type: str,
+                                     context: dict | None = None,
+                                     awarded_by: str | None = None) -> str | None:
+    """Public helper for hooks/admin endpoints to award a negative tier.
+
+    Returns the awarded tier_code or None if the incident type is unknown.
+    """
+    code = NEGATIVE_INCIDENTS.get(incident_type)
+    if not code:
+        return None
+    awarded = await award_achievement(user_id, code, context=context, awarded_by=awarded_by)
+    return code if awarded else None
+
+
+async def on_dispute_opened(user_id: str, match_id: str | None = None):
+    await trigger_negative_incident(user_id, "dispute_open", {"match_id": match_id})
+
+
+async def on_match_disconnect(user_id: str, match_id: str | None = None):
+    await trigger_negative_incident(user_id, "rage_quit", {"match_id": match_id})
+
+
+# ---------- Phase B v4.1 — Season completion hook ----------
+async def on_season_completed(season_id: str) -> dict:
+    """Award season_climber + championship_top tiers based on final standings.
+
+    Pulls from `season_standings` if present, else from tournaments aggregation.
+    Returns a summary {awarded: int, ranked: int}.
+    """
+    db = get_db()
+    standings = await db.season_standings.find({"season_id": season_id}, {"_id": 0}).sort("rank", 1).to_list(500)
+    if not standings:
+        # Fallback: aggregate by tournament_registrations + matches
+        return {"awarded": 0, "ranked": 0, "skipped": "no standings"}
+    awarded_total = 0
+    targets = [
+        ("season_climber_p", 1), ("season_climber_g", 3),
+        ("season_climber_s", 10), ("season_climber_b", 25),
+    ]
+    for s in standings:
+        uid = s.get("user_id")
+        rank = s.get("rank")
+        if not uid or not rank:
+            continue
+        for code, max_rank in targets:
+            if rank <= max_rank:
+                if await award_achievement(uid, code,
+                                            {"season_id": season_id, "rank": rank}):
+                    awarded_total += 1
+    return {"awarded": awarded_total, "ranked": len(standings)}

@@ -59,15 +59,68 @@ async def list_users(q: str | None = None, role: str | None = None,
 
 @router.get("/public-list")
 async def list_public_users():
-    """Public listing of all users with public profile (community + members)."""
+    """Public listing of all users with public profile (community + members).
+
+    Phase C: enriches each user with `profile_completeness`, `achievements_count`
+    and `top_achievement` (highest tier earned, ignoring negatives).
+    """
     db = get_db()
     users = await db.users.find(
         {"privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1,
-         "country": 1, "favorite_games": 1, "is_club_member": 1, "user_type": 1,
-         "created_at": 1},
+        {"_id": 0},
     ).sort("created_at", -1).to_list(2000)
-    return users
+    if not users:
+        return []
+    user_ids = [u["id"] for u in users]
+    # Memberships for is_club_member flag
+    memberships = {m["user_id"]: m for m in await db.memberships.find(
+        {"user_id": {"$in": user_ids}}, {"_id": 0}).to_list(2000)}
+    # Achievements (excl. negative groups)
+    neg_codes = [g["code"] async for g in db.achievement_groups.find(
+        {"is_negative": True}, {"_id": 0, "code": 1})]
+    awards = await db.user_achievements.find(
+        {"user_id": {"$in": user_ids}, "group_code": {"$nin": neg_codes}},
+        {"_id": 0}).to_list(20000)
+    by_user: dict[str, list] = {}
+    for a in awards:
+        by_user.setdefault(a["user_id"], []).append(a)
+    # Resolve tier metadata once
+    tier_codes = list({a["tier_code"] for a in awards})
+    tiers = {t["code"]: t for t in await db.achievements.find(
+        {"code": {"$in": tier_codes}}, {"_id": 0}).to_list(2000)} if tier_codes else {}
+
+    from badges import compute_profile_completeness, _level_name, _color_for_level
+
+    out = []
+    for u in users:
+        score = compute_profile_completeness(u)
+        ua = by_user.get(u["id"], [])
+        top = None
+        if ua:
+            ua_sorted = sorted(ua, key=lambda a: (a.get("level", 0), tiers.get(a["tier_code"], {}).get("points", 0)), reverse=True)
+            t = tiers.get(ua_sorted[0]["tier_code"])
+            if t:
+                top = {
+                    "code": t["code"],
+                    "name": t["name"],
+                    "level": t["level"],
+                    "level_name": _level_name(t["level"]),
+                    "level_color": _color_for_level(t["level"]),
+                    "points": t.get("points", 0),
+                    "icon": t.get("icon"),
+                }
+        out.append({
+            "id": u["id"], "username": u["username"], "display_name": u.get("display_name"),
+            "avatar_url": u.get("avatar_url"), "country": u.get("country"),
+            "favorite_games": u.get("favorite_games"),
+            "is_club_member": is_active_member(memberships.get(u["id"])),
+            "user_type": derived_user_type(u, memberships.get(u["id"])),
+            "created_at": u.get("created_at"),
+            "profile_completeness": score,
+            "achievements_count": len(ua),
+            "top_achievement": top,
+        })
+    return out
 
 
 @router.get("/public/{username}")
