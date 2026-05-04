@@ -43,6 +43,7 @@ import AdminWidgetsPage from "@/pages/admin/AdminWidgetsPage";
 import AdminMembersPage from "@/pages/admin/AdminMembersPage";
 import AdminBenefitsPage from "@/pages/admin/AdminBenefitsPage";
 import AdminGalleryPage from "@/pages/admin/AdminGalleryPage";
+import AdminDocumentsPage from "@/pages/admin/AdminDocumentsPage";
 import SeasonPage from "@/pages/public/SeasonPage";
 import PublicProfilePage from "@/pages/public/PublicProfilePage";
 import BadgesPage from "@/pages/public/BadgesPage";
@@ -60,6 +61,9 @@ import GalleryPage from "@/pages/public/GalleryPage";
 import GalleryAlbumPage from "@/pages/public/GalleryAlbumPage";
 import MemberAreaPage from "@/pages/user/MemberAreaPage";
 import MemberBenefitsPage from "@/pages/user/MemberBenefitsPage";
+import MemberDocumentsPage from "@/pages/user/MemberDocumentsPage";
+import MemberNewsPage from "@/pages/user/MemberNewsPage";
+import MyMembershipPage from "@/pages/user/MyMembershipPage";
 
 import F1TVPage from "@/pages/display/F1TVPage";
 import BracketTVPage from "@/pages/display/BracketTVPage";
@@ -105,6 +109,9 @@ function App() {
           {/* Member-only */}
           <Route path="/members/area" element={<ProtectedRoute requireMember><MemberAreaPage /></ProtectedRoute>} />
           <Route path="/members/benefits" element={<ProtectedRoute requireMember><MemberBenefitsPage /></ProtectedRoute>} />
+          <Route path="/members/documents" element={<ProtectedRoute requireMember><MemberDocumentsPage /></ProtectedRoute>} />
+          <Route path="/members/news" element={<ProtectedRoute requireMember><MemberNewsPage /></ProtectedRoute>} />
+          <Route path="/members/membership" element={<ProtectedRoute requireMember><MyMembershipPage /></ProtectedRoute>} />
 
           {/* Admin */}
           <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboardPage /></ProtectedRoute>} />
@@ -122,6 +129,7 @@ function App() {
           <Route path="/admin/events" element={<ProtectedRoute requireAdmin><AdminEventsPage /></ProtectedRoute>} />
           <Route path="/admin/news" element={<ProtectedRoute requireAdmin><AdminNewsPage /></ProtectedRoute>} />
           <Route path="/admin/gallery" element={<ProtectedRoute requireAdmin><AdminGalleryPage /></ProtectedRoute>} />
+          <Route path="/admin/documents" element={<ProtectedRoute requireAdmin><AdminDocumentsPage /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requireAdmin><AdminSettingsPage /></ProtectedRoute>} />
           <Route path="/admin/seasons" element={<ProtectedRoute requireAdmin><AdminSeasonsPage /></ProtectedRoute>} />
           <Route path="/admin/audit" element={<ProtectedRoute requireAdmin><AdminAuditPage /></ProtectedRoute>} />

@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon,
   CalendarDays, Flag, Building2, Newspaper, LogOut,
   ExternalLink, Menu, X, Settings as SettingsIcon,
-  ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon,
+  ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon, FileText,
 } from "lucide-react";
 import { useState } from "react";
 

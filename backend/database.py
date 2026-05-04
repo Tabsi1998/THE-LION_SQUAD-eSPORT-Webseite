@@ -97,6 +97,10 @@ async def init_indexes():
     # Events
     await db.events.create_index("event_type")
     await db.events.create_index("status")
+    # Documents
+    await db.documents.create_index("id", unique=True)
+    await db.documents.create_index("category")
+    await db.documents.create_index([("pinned", -1), ("order_index", 1)])
 
 
 async def close_client():

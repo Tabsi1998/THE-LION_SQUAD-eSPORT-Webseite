@@ -564,6 +564,42 @@ class SponsorCreate(BaseModel):
 GalleryVisibility = Literal["public", "community", "members"]
 
 
+# ---------- Documents (members area) ----------
+DocumentVisibility = Literal["public", "community", "members", "internal"]
+DocumentCategory = Literal[
+    "statutes", "minutes", "form", "regulations", "guideline",
+    "download", "media_kit", "presentation", "template", "other",
+]
+
+
+class DocumentCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    category: DocumentCategory = "other"
+    visibility: DocumentVisibility = "members"
+    file_url: str
+    original_filename: Optional[str] = None
+    file_size: Optional[int] = None
+    mime: Optional[str] = None
+    tags: List[str] = []
+    order_index: int = 0
+    pinned: bool = False
+
+
+class DocumentUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[DocumentCategory] = None
+    visibility: Optional[DocumentVisibility] = None
+    file_url: Optional[str] = None
+    original_filename: Optional[str] = None
+    file_size: Optional[int] = None
+    mime: Optional[str] = None
+    tags: Optional[List[str]] = None
+    order_index: Optional[int] = None
+    pinned: Optional[bool] = None
+
+
 class GalleryAlbumCreate(BaseModel):
     title: str
     slug: str

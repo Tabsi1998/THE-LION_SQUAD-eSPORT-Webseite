@@ -1,0 +1,42 @@
+{
+  "summary": "Phase 4 Re-Plattform (Vereinsdokumente + Downloads + members news + Mitgliedschafts-Historie) backend-only getestet. 29 Tests in /app/backend/tests/test_phase4_documents.py — ALLE 29 PASSED. Abgedeckt: documents/meta (10 Kategorien + 4 Visibilities), POST /api/uploads/document (txt + pdf success, .exe + .sh -> 400, community user -> 403), Document CRUD (create/list/admin-list/patch/delete) inkl. download_count=0 Initialwert, Sichtbarkeitsregeln (anon + CU sehen members-doc nicht; aktives Mitglied sieht members-doc; aktives Mitglied sieht internal NICHT; admin override sieht alles), Kategorie-Filter, pinned-Sortierung in admin-list, PATCH 404 + DELETE 404, track-download (member 200 +counter increment, anon members-only -> 403, missing-id -> 404), CU Authorisierung -> 403 auf POST/PATCH/DELETE/admin-list, members-only News (anon hidden, member visible), GET /api/membership/me liefert history Array mit actor_id/at/from_status/to_status für aktives Mitglied, Member Area Aggregate (benefits + documents + news laden konsistent für active member). Keine Backend-Bugs gefunden.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/uploads/document", "issue": "Validation per content-type-Header — Browser/Curl könnten falsche/spoofed mime header senden. Ein zusätzlicher Magic-Bytes-Check (z. B. python-magic) wäre hardening-würdig, aber MVP-mäßig OK."},
+      {"endpoint": "GET /api/documents", "issue": "List endpoint zeigt auch unpublished/draft-mäßige docs, weil Document model kein 'published'-Flag hat. Phase 4 spec hat das so vorgesehen — kein Bug, aber Pinning/Reihenfolge geht ohne Draft-Konzept."},
+      {"endpoint": "POST /api/documents/{id}/track-download", "issue": "Counter += 1 ist nicht idempotent gegen mehrfaches Klicken/Reload des Users. Wäre für stat-genauigkeit relevant; Phase 4 erlaubt das aber als Use-Case."},
+      {"endpoint": "GET /api/documents", "issue": "Pagination fehlt (.to_list(500) hard limit). Bei großem Vereinsarchiv kein Skip/Limit-Param, aber für Phase 4 ausreichend."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_phase4_documents.py",
+    "/app/test_reports/pytest/phase4_documents_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Magic-Bytes-Check beim Upload zusätzlich zum Content-Type — Schutz gegen mime-spoofing.",
+    "(Optional) Pagination-Parameter (skip/limit) für GET /api/documents falls Vereinsarchiv stark wächst.",
+    "(Optional) DocumentCreate ein optionales 'published'-Flag geben analog NewsCreate, damit Drafts möglich sind."
+  ],
+  "critical_code_review_comments": [
+    "document_routes._user_can_see ist eine *vierte* Kopie der Visibility-Logik (news_routes, event_routes, gallery_routes, document_routes haben jeweils ihre eigene). DRY: bitte in services/visibility.py auslagern. Bereits in iteration_7 gemeldet, nicht behoben.",
+    "upload_routes.upload_document: filename-Whitelist nutzt UUID, aber falls _EXT_BY_MIME mime nicht kennt UND file.filename keine extension hat, wird filename ohne extension geschrieben (kein Risk, aber ungewohnt für Browser-Download).",
+    "document_routes.create_document gibt direkt body.model_dump() + id + meta zurück — ABER kein Schema-Validation gegen file_url-Format/Existenz. Ein admin könnte file_url='javascript:alert(1)' schicken und es würde gespeichert. Empfehlung: prüfen, dass file_url mit '/api/static/uploads/' oder 'http(s)://' beginnt.",
+    "document_routes.list_documents: in-memory-Filter via async _user_can_see — okay für 500 docs, aber inefficient, da pro doc ggf. ein DB-call get_membership(user_id) erfolgt. Memoisieren pro request.",
+    "document_routes.track_download: gibt {url} zurück; client kann die URL aber auch direkt aus der List-Response holen, wodurch der counter umgangen wird (Tracking ist optional). Phase4-fachlich okay, aber dokumentieren.",
+    "models.DocumentCreate: file_size/mime/original_filename sind alle Optional — falls Frontend sie nicht mitschickt, fehlen sie für die anschließende UI. Empfehlung: required machen, da der Upload-Endpoint sie ohnehin liefert.",
+    "membership_service.upsert_membership: history-Eintrag wird AUCH dann erzeugt, wenn member_status nicht geändert wurde (z. B. nur internal_role gesetzt). from_status==to_status spammt die history. Empfehlung: history-Push nur wenn status sich tatsächlich ändert.",
+    "membership_service.upsert_membership: history-Entry hat keine user-readable description — nur from/to/notes. UI muss Datum + Status mappen. Optional: action-Feld ('promote', 'demote', 'role_change') hinzufügen für klareres UI-Rendering."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase4_documents.py"
+  ],
+  "success_rate": {"backend": "100% (29/29)", "frontend": "n/a (out of scope)"},
+  "test_credentials": "Admin: admin@thelionsquad.at / TLSAdmin2026! verifiziert. CU + Member werden pro Modul-Run via /auth/register (mit accept_privacy + accept_terms = true) angelegt; Member wird via PUT /api/membership/user/{id} {member_status:active, membership_type:ordinary} promoted.",
+  "seed_data_creation": "Pro Run: 1 Upload (.txt, geteilt), ~5 TEST_-prefixed documents (statutes/internal/public + 2 dispoable für track-download/delete), 1 TEST_-news (members-only). DELETE im Teardown der Fixtures. Kein Cleanup für hochgeladene Dateien auf disk (uploads/ wächst).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Suite /app/backend/tests/test_phase4_documents.py (29 pass) deckt Phase 4 vollständig ab. Auth-Pattern: registriere via /auth/register MIT accept_privacy + accept_terms (sonst 422). Promotion zum aktiven Mitglied via admin PUT /api/membership/user/{uid} {member_status: 'active', membership_type: 'ordinary'}. NewsCreate erwartet 'content' (nicht 'body'). Documents brauchen kein published-Flag (alle live). _user_can_see für members nutzt is_active_member ODER user.role in (moderator/tournament_admin/club_admin/superadmin). Internal-Visibility ist HARTER admin-only check (nur club_admin/superadmin). Track-download erhöht counter via $inc, aber gibt url einfach zurück — kein 302-redirect.",
+  "rca of the issue": "Keine Bugs zu reportieren — Phase 4 funktioniert spezifikationsgemäß. Identifizierte Code-Quality-Hinweise (DRY-Verletzung _user_can_see in 4 routes-Dateien, history-Spam wenn status nicht geändert, file_url-Validation fehlt, mime-spoof-Schutz fehlt) sind keine Funktionsfehler."
+}
