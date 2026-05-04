@@ -79,6 +79,12 @@ async def init_indexes():
     await db.seasons.create_index("slug", unique=True)
     await db.tournament_groups.create_index("id", unique=True)
     await db.tournament_groups.create_index("tournament_id")
+    # Membership / club system
+    await db.memberships.create_index("user_id", unique=True)
+    await db.memberships.create_index("member_number", unique=True, sparse=True)
+    await db.memberships.create_index("member_status")
+    await db.member_benefits.create_index("id", unique=True)
+    await db.user_socials.create_index([("user_id", 1), ("platform", 1)], unique=True)
 
 
 async def close_client():

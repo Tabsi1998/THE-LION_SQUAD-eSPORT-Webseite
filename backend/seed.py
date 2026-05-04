@@ -1,4 +1,6 @@
-"""Seed admin user + demo data (games, players, tournament, F1 challenge)."""
+"""Seed admin user — Vereinsplattform.
+Demo data is OFF by default; set SEED_DEMO=true in env to enable for dev/testing.
+"""
 import os
 import random
 from datetime import datetime, timezone, timedelta
@@ -13,27 +15,62 @@ async def seed_admin():
     admin_password = os.environ.get("ADMIN_PASSWORD", "TLSAdmin2026!")
     existing = await db.users.find_one({"email": admin_email})
     if existing is None:
+        admin_id = new_id()
         doc = {
-            "id": new_id(),
+            "id": admin_id,
             "email": admin_email,
             "username": "admin",
             "password_hash": hash_password(admin_password),
             "display_name": "TLS Admin",
-            "avatar_url": None,
+            "avatar_url": None, "banner_url": None,
             "role": "superadmin",
+            "roles": ["superadmin", "club_admin", "tournament_admin"],
+            "user_type": "club_member",
+            "is_club_member": True,
             "discord_name": None, "discord_id": None,
             "switch_code": None, "steam_id": None, "epic_id": None,
             "psn_id": None, "xbox_id": None, "riot_id": None,
-            "country": "AT", "state": None,
+            "twitch_handle": None, "youtube_handle": None, "tiktok_handle": None,
+            "instagram_handle": None, "x_handle": None, "nintendo_fc": None,
+            "ea_id": None, "battlenet_id": None, "website": None,
+            "country": "AT", "state": None, "city": None,
+            "first_name": None, "last_name": None, "nickname": None,
+            "birth_date": None,
             "favorite_games": [],
+            "main_platform": None, "preferred_role": None, "input_device": None,
             "privacy_public_profile": False,
-            "bio": "The Lion Squad eSports Club Admin",
-            "is_active": True, "is_banned": False,
-            "accepted_privacy": True,
+            "profile_visibility": {},
+            "bio": "THE LION SQUAD eSports — Vereinsadministrator.",
+            "is_active": True, "is_banned": False, "email_verified": True,
+            "accepted_privacy": True, "accepted_terms": True,
+            "newsletter_consent": False,
             "created_at": now_utc().isoformat(),
             "updated_at": now_utc().isoformat(),
         }
         await db.users.insert_one(doc)
+        # Auto-create membership for admin
+        await db.memberships.insert_one({
+            "id": new_id(),
+            "user_id": admin_id,
+            "member_status": "active",
+            "membership_type": "ordinary",
+            "member_number": "TLS-2026-0001",
+            "member_since": now_utc().isoformat(),
+            "internal_role": "Vorstand",
+            "notes": "Auto-Seed Vereinsadministrator.",
+            "show_member_number_publicly": False,
+            "history": [{
+                "actor_id": admin_id,
+                "at": now_utc().isoformat(),
+                "from_status": None,
+                "to_status": "active",
+                "notes": "Initial seed",
+            }],
+            "created_at": now_utc().isoformat(),
+            "created_by": admin_id,
+            "updated_at": now_utc().isoformat(),
+            "updated_by": admin_id,
+        })
         print(f"[seed] Admin created: {admin_email} / {admin_password}")
     else:
         # Ensure admin role

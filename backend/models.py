@@ -1,7 +1,7 @@
 """Pydantic v2 models for TLS Arena."""
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
-from typing import Optional, List, Literal, Any
-from datetime import datetime, timezone
+from typing import Optional, List, Literal, Any, Dict
+from datetime import datetime, timezone, date
 import uuid
 
 
@@ -14,7 +14,10 @@ def new_id():
 
 
 # ---------- Users ----------
+# Backward compatible Role - keeps old roles as primary key, additional roles via roles[] array
 Role = Literal["player", "team_leader", "moderator", "tournament_admin", "club_admin", "superadmin"]
+UserType = Literal["guest", "community_user", "club_member"]
+VisibilityLevel = Literal["public", "community", "members", "admins", "private"]
 
 
 class UserRegister(BaseModel):
@@ -22,7 +25,11 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
     display_name: Optional[str] = None
+    birth_date: Optional[str] = None  # ISO date string
+    discord_name: Optional[str] = None
     accept_privacy: bool = True
+    accept_terms: bool = True
+    newsletter_consent: bool = False  # explicitly opt-in, not auto-checked
 
 
 class UserLogin(BaseModel):
@@ -31,8 +38,26 @@ class UserLogin(BaseModel):
 
 
 class UserUpdate(BaseModel):
+    """Profile update - all optional, both basic and extended fields."""
+    # Basic
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
+    banner_url: Optional[str] = None
+    bio: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    nickname: Optional[str] = None
+    birth_date: Optional[str] = None
+    country: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    # Gaming meta
+    favorite_games: Optional[List[str]] = None
+    main_platform: Optional[str] = None  # PC / PS5 / Xbox / Switch / Mobile
+    preferred_role: Optional[str] = None
+    input_device: Optional[str] = None  # controller / wheel / keyboard_mouse
+    website: Optional[str] = None
+    # Socials (legacy fields for compatibility)
     discord_name: Optional[str] = None
     discord_id: Optional[str] = None
     switch_code: Optional[str] = None
@@ -41,11 +66,19 @@ class UserUpdate(BaseModel):
     psn_id: Optional[str] = None
     xbox_id: Optional[str] = None
     riot_id: Optional[str] = None
-    country: Optional[str] = None
-    state: Optional[str] = None
-    favorite_games: Optional[List[str]] = None
+    # New socials
+    twitch_handle: Optional[str] = None
+    youtube_handle: Optional[str] = None
+    tiktok_handle: Optional[str] = None
+    instagram_handle: Optional[str] = None
+    x_handle: Optional[str] = None
+    nintendo_fc: Optional[str] = None
+    ea_id: Optional[str] = None
+    battlenet_id: Optional[str] = None
+    # Privacy
     privacy_public_profile: Optional[bool] = None
-    bio: Optional[str] = None
+    profile_visibility: Optional[Dict[str, VisibilityLevel]] = None  # field_name -> level
+    newsletter_consent: Optional[bool] = None
 
 
 class UserPublic(BaseModel):
@@ -56,6 +89,8 @@ class UserPublic(BaseModel):
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     role: Role = "player"
+    roles: List[str] = []
+    user_type: UserType = "community_user"
     discord_name: Optional[str] = None
     country: Optional[str] = None
     favorite_games: List[str] = []
@@ -63,6 +98,72 @@ class UserPublic(BaseModel):
     is_active: bool = True
     is_banned: bool = False
     created_at: Optional[datetime] = None
+
+
+# ---------- Membership ----------
+MemberStatus = Literal[
+    "none", "pending", "active", "inactive", "honorary", "former", "blocked"
+]
+MembershipType = Literal[
+    "ordinary", "supporting", "honorary", "youth", "guest", "former"
+]
+
+
+class MembershipUpdate(BaseModel):
+    """Admin sets / updates a user's membership."""
+    member_status: Optional[MemberStatus] = None
+    membership_type: Optional[MembershipType] = None
+    member_number: Optional[str] = None
+    member_since: Optional[str] = None  # ISO date
+    internal_role: Optional[str] = None
+    notes: Optional[str] = None
+    show_member_number_publicly: Optional[bool] = None
+
+
+class MemberBenefitCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+    image_url: Optional[str] = None
+    link_url: Optional[str] = None
+    valid_from: Optional[str] = None
+    valid_until: Optional[str] = None
+    visible_for_membership_types: List[str] = []  # empty = all members
+    is_active: bool = True
+    order_index: int = 0
+
+
+class MemberBenefitUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    image_url: Optional[str] = None
+    link_url: Optional[str] = None
+    valid_from: Optional[str] = None
+    valid_until: Optional[str] = None
+    visible_for_membership_types: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+    order_index: Optional[int] = None
+
+
+# ---------- User Socials (separate table for fine-grained visibility) ----------
+SocialPlatform = Literal[
+    "discord", "twitch", "youtube", "tiktok", "instagram", "x", "steam",
+    "epic", "psn", "xbox", "nintendo", "ea", "riot", "battlenet", "website"
+]
+
+
+class UserSocialCreate(BaseModel):
+    platform: SocialPlatform
+    value: str
+    url: Optional[str] = None
+    visibility: VisibilityLevel = "public"
+
+
+class UserSocialUpdate(BaseModel):
+    value: Optional[str] = None
+    url: Optional[str] = None
+    visibility: Optional[VisibilityLevel] = None
 
 
 class ForgotPasswordBody(BaseModel):

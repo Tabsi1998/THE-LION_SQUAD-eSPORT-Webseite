@@ -1,0 +1,43 @@
+{
+  "summary": "Phase 1+2 Re-Plattform (Vereins-Mitgliedschaft + erweitertes Profil) backend-only tested. 28 Tests in /app/backend/tests/test_phase_membership.py: 27 passed, 1 skipped (kein /admin/email-logs Endpoint vorhanden — Mail-Templates wurden stattdessen via Mongo-Direkt im Test verifiziert). 1 echter Backend-Bug gefunden und gefixt: PUT /api/membership/user/{user_id} returned ein veraltetes is_club_member-Flag (User-Doc wurde VOR upsert gefetcht und Feld wurde nicht überschrieben). Auswirkung: Frontend zeigte beim Promote/Demote den alten Status. Fix: is_club_member im Response explizit aus is_active_member(m) ableiten.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/membership/user/{user_id}", "issue": "is_club_member im Response war stale (basierte auf user-doc vor upsert). Behoben in routes/membership_routes.py durch explizites Setzen aus is_active_member(m)."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_phase_membership.py",
+    "/app/test_reports/pytest/phase_membership_results.xml"
+  ],
+  "action_items": [
+    "(Erledigt) Bug fix membership_routes.update_user_membership: is_club_member explizit aus is_active_member(m) abgeleitet — derived_user_type wurde korrekt überschrieben, is_club_member aber nicht.",
+    "(Optional) Admin-Endpoint /api/admin/email-logs für Mail-Audit/Debugging einführen; aktuell nur DB-Direktzugriff möglich.",
+    "(Optional) email_service.send_template: NUR template_key wird geloggt, kein 'template'-Alias — Doku/UI sollte template_key verwenden.",
+    "(Optional) GET /api/membership/public sortiert by member_since asc, dadurch erscheinen NEU promovierte Mitglieder mit aktuellem timestamp ZULETZT — fachlich evtl. by member_since asc als 'Stammmitglieder zuerst' gewollt, aber Doku/UI sollte das festhalten.",
+    "(Optional) /api/membership PATCH /benefits akzeptiert nur dict via Pydantic-Modell — die Validierung dafür ist OK, aber visible_for_membership_types ist plain List[str] ohne Literal-Validierung gegen VALID_TYPES. Ungültige Strings werden silent akzeptiert (z. B. 'foobar')."
+  ],
+  "critical_code_review_comments": [
+    "membership_routes.update_user_membership (Zeile 110-145): user-Doc wurde VOR upsert gefetcht; is_club_member-Feld auf user-Dict war stale (Membership wurde im DB user-doc von upsert_membership aktualisiert, aber lokale Variable nicht). Fix durch explizite Ableitung. Empfehlung: anstelle einer stale-Kopie nach upsert die Funktion get_user_with_membership(user_id) wiederverwenden — eliminiert die ganze Klasse von Bugs.",
+    "membership_service.upsert_membership: history-Eintrag 'to_status' wird auch dann angelegt, wenn member_status NICHT übergeben wurde (zB nur internal_role-Update). Aktuell bleibt to_status == from_status — fachlich OK, aber das produziert sinnlose History-Einträge bei jedem benign Update. Erwägen, history-Push nur bei tatsächlichem Status-Wechsel oder mit explizitem 'change_kind' Feld.",
+    "membership_service.upsert_membership: bei Re-Promotion (active → blocked → active) wird member_since NICHT neu gesetzt (nur wenn !existing.member_since). Fachlich OK ('Mitglied seit' bleibt das ursprüngliche Datum), sollte aber dokumentiert sein.",
+    "membership_routes.list_benefits: User mit aktiver Mitgliedschaft aber KEIN membership_type bekommt KEINE benefits zurück (da im Loop 'if not allowed or (user_type and user_type in allowed)' — der erste Branch greift nur bei leerem allowed-Array). Korrekt aber subtil; sollte über Test/Beispiel dokumentiert werden.",
+    "user_routes.get_public_profile (~120 Zeilen) bleibt monolithisch — vorheriger Review-Vorschlag (Refactor in helpers) noch offen.",
+    "user_routes.update_me: filtert 'v is not None' → falsy Felder wie newsletter_consent=False, privacy_public_profile=False, accept_terms=False werden korrekt mitgeschickt (False ist not None) — VERIFIZIERT in test_patch_extended_fields. Aber: leere Strings ('') werden ebenfalls als gültig akzeptiert; ggf. 'Empty-String → null' Normalisierung sinnvoll.",
+    "auth_routes.register: Setzt is_club_member=False & user_type='community_user' hardcoded. OK für Phase 1+2. Verify dass register NIE einen pending-Membership-Datensatz erstellt — aktuell tut es das nicht (kein automatischer Antrag); Antragsflow erfolgt manuell via Admin. Beabsichtigt? Falls ja, dokumentieren — falls Self-Service-Mitgliedsantrag geplant, Endpoint POST /api/membership/me/apply einführen.",
+    "auth_routes.register: accept_terms / accept_privacy haben Default True im Pydantic-Modell — sollte für rechtssichere Compliance Pflichtfelder sein (Field(...)) und Backend muss 422 werfen, wenn nicht explizit gesetzt. Aktuell kann ein Client ohne accept_terms registrieren und das Feld wird als True abgespeichert.",
+    "models.UserSocialCreate: visibility-Default 'public' OK; aber kein unique-key-Constraint (user_id, platform) auf DB-Level — Race-Condition möglich (Frontend doppelklick). 409 wird nur durch Pre-Check abgefangen. Index hinzufügen: db.user_socials.create_index([('user_id',1),('platform',1)], unique=True)."
+  ],
+  "updated_files": [
+    "/app/backend/routes/membership_routes.py",
+    "/app/backend/tests/test_phase_membership.py"
+  ],
+  "success_rate": {"backend": "96.4% (27/28; 1 skip — kein Admin-Email-Endpoint)", "frontend": "n/a (out of scope)"},
+  "test_credentials": "Admin: admin@thelionsquad.at / TLSAdmin2026! verifiziert. Test-Community-User wird pro Run frisch erzeugt (test_cu_<hex>@example.com / Pass1234!).",
+  "seed_data_creation": "Pro Run wird 1 frischer test_cu_*-User erzeugt + 1 TEST_Benefit_*. Benefit wird im Teardown gelöscht. test_cu_*-User bleiben in der DB (kein expliziter Cleanup, da DB isoliert genug — kann jederzeit via TLS_RESET=true geleert werden).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Suite /app/backend/tests/test_phase_membership.py (27 pass, 1 skip). Deckt: Auth Register/Login, /auth/me, /membership/meta, /membership/me, /membership (admin list), /membership/user/{id} PUT (promote+demote+history+block), /membership/benefits CRUD + visibility, /membership/public, /users/public-list, /users/public/{username}, /users/me PATCH (extended fields + favorite_games), /users/me/socials CRUD. Bekanntes Verhalten: Email-Versand silent skipped (RESEND_API_KEY fehlt), aber email_logs.template_key wird korrekt geschrieben — getestet via Mongo-Direkt-Query in TestMembershipUpsert.test_email_log_activated und test_block_user_renders_template. Field-Name: 'template_key' (nicht 'template'). Public-Members-Directory sortiert by member_since asc — frisch-promovierte stehen zuletzt. ACTIVE_STATUSES = {active, honorary}. Member-Nummer-Format: TLS-YYYY-NNNN, Re-Promotion erhält bestehende Nummer.",
+  "rca of the issue": "RCA stale is_club_member: routes/membership_routes.py update_user_membership liest user-Doc VOR upsert_membership-Call. upsert_membership UPDATEt zwar das DB-User-Doc (is_club_member + user_type), aber die lokale Python-Variable bleibt unverändert. Anschließend werden nur user['membership'] und user['user_type'] mit derived_user_type(user, m) überschrieben — is_club_member-Feld bleibt der Pre-Update-Wert. Reproduktion: PUT /membership/user/{id} mit member_status=active auf community_user → response.is_club_member=False statt True. Fix: explicit user['is_club_member'] = is_active_member(m). Saubere Lösung: nach upsert get_user_with_membership(user_id) erneut fetchen und zurückgeben (ein Round-trip mehr, aber konsistente Single-Source-of-Truth)."
+}

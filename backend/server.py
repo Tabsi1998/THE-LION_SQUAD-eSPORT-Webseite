@@ -26,6 +26,7 @@ from routes.news_routes import router as news_router
 from routes.admin_routes import router as admin_router
 from routes.upload_routes import router as upload_router
 from routes.badge_routes import router as badge_router
+from routes.membership_routes import router as membership_router
 from routes.extras_routes import (
     settings_router, season_router, widget_router, dsgvo_router, pdf_router, audit_router,
 )
@@ -40,11 +41,29 @@ logger = logging.getLogger("tls-arena")
 async def lifespan(app: FastAPI):
     logger.info("[TLS ARENA] Initializing indexes...")
     await init_indexes()
+    # One-time wipe for the new club platform launch (set TLS_RESET=true once, then unset)
+    if os.environ.get("TLS_RESET", "").lower() == "true":
+        from database import get_db
+        db = get_db()
+        # Preserve nothing — clean slate. Admin will be re-seeded right after.
+        for coll in [
+            "users", "teams", "team_members", "games", "events", "tournaments",
+            "tournament_registrations", "matches", "f1_challenges", "f1_tracks",
+            "f1_lap_times", "stations", "news_posts", "sponsors", "seasons",
+            "tournament_groups", "memberships", "member_benefits", "user_socials",
+            "audit_logs", "email_logs", "notifications", "password_reset_tokens",
+            "login_attempts", "user_badges",
+        ]:
+            try:
+                await db[coll].delete_many({})
+                logger.info(f"[TLS RESET] Cleared collection: {coll}")
+            except Exception as e:
+                logger.warning(f"[TLS RESET] {coll}: {e}")
     logger.info("[TLS ARENA] Seeding admin...")
     await seed_admin()
     logger.info("[TLS ARENA] Seeding badge catalog...")
     await seed_badges()
-    if os.environ.get("SEED_DEMO", "true").lower() == "true":
+    if os.environ.get("SEED_DEMO", "false").lower() == "true":
         logger.info("[TLS ARENA] Seeding demo data...")
         await seed_demo_data()
     logger.info("[TLS ARENA] Startup complete.")
@@ -101,6 +120,7 @@ app.include_router(pdf_router)
 app.include_router(audit_router)
 app.include_router(upload_router)
 app.include_router(badge_router)
+app.include_router(membership_router)
 
 # Static uploads (serve user-uploaded images through /api prefix to survive ingress)
 from fastapi.staticfiles import StaticFiles

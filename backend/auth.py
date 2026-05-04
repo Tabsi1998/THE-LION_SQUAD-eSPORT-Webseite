@@ -114,6 +114,14 @@ async def get_current_user(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="User not found")
     if user.get("is_banned"):
         raise HTTPException(status_code=403, detail="Account is banned")
+    # Attach membership for downstream guards / UI
+    membership = await db.memberships.find_one({"user_id": user["id"]}, {"_id": 0})
+    user["membership"] = membership
+    user["is_club_member"] = bool(membership and membership.get("member_status") in ("active", "honorary"))
+    if user["is_club_member"]:
+        user["user_type"] = "club_member"
+    elif not user.get("user_type"):
+        user["user_type"] = "community_user"
     return user
 
 
@@ -135,6 +143,19 @@ def require_role(*allowed_roles: str):
             if user_level >= ROLE_LEVELS.get(r, 99):
                 return user
         raise HTTPException(status_code=403, detail="Insufficient permissions")
+    return dep
+
+
+def require_club_member():
+    """Active club member only — admins are also allowed."""
+    async def dep(user: dict = Depends(get_current_user)) -> dict:
+        # Admins always pass
+        admin_roles = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+        if user.get("role") in admin_roles:
+            return user
+        if user.get("is_club_member"):
+            return user
+        raise HTTPException(status_code=403, detail="Nur Vereinsmitglieder.")
     return dep
 
 

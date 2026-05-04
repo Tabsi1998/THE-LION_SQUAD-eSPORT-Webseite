@@ -187,7 +187,38 @@ def tpl_tournament_finished(tournament_title: str, url: str) -> tuple[str, str]:
 def tpl_test(branding: str = "TLS ARENA") -> tuple[str, str]:
     return f"[Test] {branding} E-Mail-Versand funktioniert", _wrap(
         "Testmail erfolgreich",
-        "<p>Diese E-Mail bestätigt, dass dein Resend-Setup korrekt funktioniert. Die TLS ARENA kann jetzt Nachrichten an deine Spieler senden.</p>",
+        "<p>Diese E-Mail bestätigt, dass dein E-Mail-Setup korrekt funktioniert. THE LION SQUAD kann jetzt Nachrichten an deine Spieler und Mitglieder senden.</p>",
+    )
+
+
+# ---------- Membership templates ----------
+def tpl_membership_activated(display_name: str, member_number: str = "") -> tuple[str, str]:
+    body = (
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        "<p>du bist jetzt offizielles <strong>Vereinsmitglied</strong> bei THE LION SQUAD eSports — willkommen im Rudel!</p>"
+    )
+    if member_number:
+        body += f"<p>Deine Mitgliedsnummer: <strong>{member_number}</strong></p>"
+    body += "<p>Der Mitgliederbereich, alle Vereinsvorteile, internen News und Mitglieder-Achievements sind jetzt für dich freigeschaltet.</p>"
+    return "Willkommen als offizielles Vereinsmitglied", _wrap(
+        "Vereinsmitglied freigeschaltet", body, "Mitgliederbereich öffnen", None,
+    )
+
+
+def tpl_membership_deactivated(display_name: str) -> tuple[str, str]:
+    return "Deine Mitgliedschaft wurde deaktiviert", _wrap(
+        "Mitgliedschaft deaktiviert",
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        "<p>deine offizielle Vereinsmitgliedschaft wurde deaktiviert. Dein Account bleibt als Community-Account aktiv und du kannst weiterhin an öffentlichen Turnieren teilnehmen.</p>"
+        "<p>Bei Fragen melde dich jederzeit beim Vorstand.</p>",
+    )
+
+
+def tpl_membership_blocked(display_name: str) -> tuple[str, str]:
+    return "Mitgliedschaftsstatus geändert", _wrap(
+        "Mitgliedschaft gesperrt",
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        "<p>deine Vereinsmitgliedschaft wurde gesperrt. Bitte kontaktiere den Vorstand für weitere Informationen.</p>",
     )
 
 
@@ -206,6 +237,9 @@ async def send_template(template_key: str, to: str, **kwargs) -> dict:
         "dispute_resolved": tpl_dispute_resolved,
         "tournament_finished": tpl_tournament_finished,
         "test": tpl_test,
+        "membership_activated": tpl_membership_activated,
+        "membership_deactivated": tpl_membership_deactivated,
+        "membership_blocked": tpl_membership_blocked,
     }
     fn = templates.get(template_key)
     if not fn:

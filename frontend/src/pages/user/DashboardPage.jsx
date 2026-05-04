@@ -4,10 +4,10 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
-import { Trophy, Flag, Bell } from "lucide-react";
+import { Trophy, Flag, Bell, Crown, Gift } from "lucide-react";
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, isClubMember } = useAuth();
   const [matches, setMatches] = useState([]);
   const [notifications, setNotifications] = useState([]);
 
@@ -26,12 +26,15 @@ export default function DashboardPage() {
     <PublicLayout>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex items-center gap-4 mb-10">
-          <div className="w-16 h-16 border border-[#29B6E8]/50 rounded-sm bg-[#0A0A0A] flex items-center justify-center font-heading font-black text-2xl text-[#29B6E8]">
+          <div className={`w-16 h-16 border ${isClubMember ? "border-[#FFD700]/60" : "border-[#29B6E8]/50"} rounded-sm bg-[#0A0A0A] flex items-center justify-center font-heading font-black text-2xl ${isClubMember ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>
             {user?.display_name?.[0] || user?.username?.[0] || "L"}
           </div>
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Dashboard</span>
+            <span className={`text-[11px] font-bold uppercase tracking-[0.3em] ${isClubMember ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{isClubMember ? "VEREINSMITGLIED" : "COMMUNITY"}</span>
             <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">{user?.display_name || user?.username}</h1>
+            {isClubMember && user?.membership?.member_number && (
+              <div className="text-xs text-white/50 mt-0.5 font-mono">{user.membership.member_number}</div>
+            )}
           </div>
         </div>
 
@@ -70,7 +73,25 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="mt-8 grid md:grid-cols-3 gap-4">
+        <div className="mt-8 grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {isClubMember && (
+            <Link to="/members/area" data-testid="dashboard-member-area" className="border border-[#FFD700]/40 hover:border-[#FFD700]/80 rounded-sm p-5 bg-gradient-to-br from-[#FFD700]/10 to-transparent transition">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Vereinsmitglieder</div>
+                <Crown className="w-4 h-4 text-[#FFD700]" />
+              </div>
+              <div className="mt-2 font-heading text-lg font-bold">Mitgliederbereich</div>
+            </Link>
+          )}
+          {isClubMember && (
+            <Link to="/members/benefits" data-testid="dashboard-benefits" className="border border-[#FFD700]/30 hover:border-[#FFD700]/60 rounded-sm p-5 bg-[#121212] transition">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Exklusiv</div>
+                <Gift className="w-4 h-4 text-[#FFD700]" />
+              </div>
+              <div className="mt-2 font-heading text-lg font-bold">Mitgliedervorteile</div>
+            </Link>
+          )}
           <Link to="/profile" data-testid="dashboard-profile-link" className="border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-5 bg-[#121212] transition">
             <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Profil</div>
             <div className="mt-2 font-heading text-lg font-bold">Einstellungen</div>
@@ -83,6 +104,15 @@ export default function DashboardPage() {
             <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Fast Lap</div>
             <div className="mt-2 font-heading text-lg font-bold">Ranglisten</div>
           </Link>
+          {!isClubMember && (
+            <Link to="/membership/join" data-testid="dashboard-join-cta" className="border border-[#FFD700]/30 hover:border-[#FFD700]/60 rounded-sm p-5 bg-[#121212] transition">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Verein</div>
+                <Crown className="w-4 h-4 text-[#FFD700]" />
+              </div>
+              <div className="mt-2 font-heading text-lg font-bold">Mitglied werden</div>
+            </Link>
+          )}
           <Link to="/privacy-account" data-testid="dashboard-privacy-link" className="border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-5 bg-[#121212] transition">
             <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">DSGVO</div>
             <div className="mt-2 font-heading text-lg font-bold">Meine Daten</div>

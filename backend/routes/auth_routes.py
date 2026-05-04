@@ -70,17 +70,29 @@ async def register(body: UserRegister, response: Response):
         "username": username,
         "password_hash": hash_password(body.password),
         "display_name": body.display_name or username,
-        "avatar_url": None,
+        "avatar_url": None, "banner_url": None,
         "role": "player",
-        "discord_name": None, "discord_id": None,
+        "roles": ["player"],
+        "user_type": "community_user",
+        "is_club_member": False,
+        "discord_name": body.discord_name, "discord_id": None,
         "switch_code": None, "steam_id": None, "epic_id": None,
         "psn_id": None, "xbox_id": None, "riot_id": None,
-        "country": None, "state": None,
+        "twitch_handle": None, "youtube_handle": None, "tiktok_handle": None,
+        "instagram_handle": None, "x_handle": None, "nintendo_fc": None,
+        "ea_id": None, "battlenet_id": None, "website": None,
+        "country": None, "state": None, "city": None,
+        "first_name": None, "last_name": None, "nickname": None,
+        "birth_date": body.birth_date,
         "favorite_games": [],
+        "main_platform": None, "preferred_role": None, "input_device": None,
         "privacy_public_profile": True,
+        "profile_visibility": {},
         "bio": None,
-        "is_active": True, "is_banned": False,
+        "is_active": True, "is_banned": False, "email_verified": False,
         "accepted_privacy": body.accept_privacy,
+        "accepted_terms": body.accept_terms,
+        "newsletter_consent": body.newsletter_consent,
         "created_at": now_utc().isoformat(),
         "updated_at": now_utc().isoformat(),
     }
@@ -115,6 +127,14 @@ async def login(body: UserLogin, request: Request, response: Response):
     set_auth_cookies(response, access, refresh)
     user.pop("_id", None)
     user.pop("password_hash", None)
+    # Attach membership for instant UI gating
+    membership = await db.memberships.find_one({"user_id": user["id"]}, {"_id": 0})
+    user["membership"] = membership
+    user["is_club_member"] = bool(membership and membership.get("member_status") in ("active", "honorary"))
+    if user["is_club_member"]:
+        user["user_type"] = "club_member"
+    elif not user.get("user_type"):
+        user["user_type"] = "community_user"
     return {**user, "access_token": access, "refresh_token": refresh}
 
 

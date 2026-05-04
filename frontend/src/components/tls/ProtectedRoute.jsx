@@ -1,7 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
-export function ProtectedRoute({ children, requireAdmin = false }) {
+export function ProtectedRoute({ children, requireAdmin = false, requireMember = false, requireModerator = false }) {
   const { user } = useAuth();
   const loc = useLocation();
   if (user === undefined) {
@@ -14,6 +14,12 @@ export function ProtectedRoute({ children, requireAdmin = false }) {
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname)}`} replace />;
   if (requireAdmin && !["tournament_admin", "club_admin", "superadmin"].includes(user.role)) {
     return <Navigate to="/dashboard" replace />;
+  }
+  if (requireModerator && !["moderator", "tournament_admin", "club_admin", "superadmin"].includes(user.role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  if (requireMember && !user.is_club_member && !["tournament_admin", "club_admin", "superadmin"].includes(user.role)) {
+    return <Navigate to="/membership/join" replace />;
   }
   return children;
 }

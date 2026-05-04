@@ -2,7 +2,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import get_current_user, require_admin, require_super
-from models import UserUpdate, RoleUpdate, now_utc
+from services.membership_service import get_membership, derived_user_type, is_active_member
+from models import UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -13,8 +14,20 @@ def _clean(u: dict) -> dict:
     return u
 
 
+async def _attach_membership(user: dict) -> dict:
+    """Annotate user dict with current membership info."""
+    if not user:
+        return user
+    m = await get_membership(user["id"])
+    user["membership"] = m
+    user["is_club_member"] = is_active_member(m)
+    user["user_type"] = derived_user_type(user, m)
+    return user
+
+
 @router.get("")
 async def list_users(q: str | None = None, role: str | None = None,
+                     user_type: str | None = None,
                      user: dict = Depends(require_admin())):
     db = get_db()
     query = {}
@@ -26,7 +39,34 @@ async def list_users(q: str | None = None, role: str | None = None,
         ]
     if role:
         query["role"] = role
+    if user_type:
+        query["user_type"] = user_type
     users = await db.users.find(query, {"password_hash": 0, "_id": 0}).to_list(500)
+    # Bulk fetch memberships
+    user_ids = [u["id"] for u in users]
+    members = {
+        m["user_id"]: m for m in await db.memberships.find(
+            {"user_id": {"$in": user_ids}}, {"_id": 0}
+        ).to_list(2000)
+    }
+    for u in users:
+        m = members.get(u["id"])
+        u["membership"] = m
+        u["is_club_member"] = is_active_member(m)
+        u["user_type"] = derived_user_type(u, m)
+    return users
+
+
+@router.get("/public-list")
+async def list_public_users():
+    """Public listing of all users with public profile (community + members)."""
+    db = get_db()
+    users = await db.users.find(
+        {"privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1,
+         "country": 1, "favorite_games": 1, "is_club_member": 1, "user_type": 1,
+         "created_at": 1},
+    ).sort("created_at", -1).to_list(2000)
     return users
 
 
@@ -37,15 +77,43 @@ async def get_public_profile(username: str):
     if not u:
         raise HTTPException(status_code=404, detail="Spieler nicht gefunden")
     public = bool(u.get("privacy_public_profile"))
+    # Membership data
+    membership = await db.memberships.find_one({"user_id": u["id"]}, {"_id": 0})
+    is_member = bool(membership and membership.get("member_status") in ("active", "honorary"))
+    public_member = None
+    if is_member:
+        public_member = {
+            "membership_type": membership.get("membership_type"),
+            "member_since": membership.get("member_since"),
+            "internal_role": membership.get("internal_role"),
+            "member_number": membership.get("member_number") if membership.get("show_member_number_publicly") else None,
+        }
     # Base profile (always visible)
     base = {
         "username": u["username"], "display_name": u.get("display_name"),
-        "avatar_url": u.get("avatar_url"), "bio": u.get("bio") if public else None,
+        "avatar_url": u.get("avatar_url"), "banner_url": u.get("banner_url"),
+        "bio": u.get("bio") if public else None,
         "role": u.get("role"), "created_at": u.get("created_at"),
         "country": u.get("country") if public else None,
+        "city": u.get("city") if public else None,
         "discord_name": u.get("discord_name") if public else None,
+        "twitch_handle": u.get("twitch_handle") if public else None,
+        "youtube_handle": u.get("youtube_handle") if public else None,
+        "instagram_handle": u.get("instagram_handle") if public else None,
+        "x_handle": u.get("x_handle") if public else None,
+        "main_platform": u.get("main_platform") if public else None,
+        "favorite_games": u.get("favorite_games") or [],
+        "website": u.get("website") if public else None,
         "privacy_public_profile": public,
+        "is_club_member": is_member,
+        "user_type": "club_member" if is_member else "community_user",
+        "membership": public_member,
     }
+    # Public socials (separately stored UserSocial entries with visibility=public)
+    socials = await db.user_socials.find(
+        {"user_id": u["id"], "visibility": "public"},
+        {"_id": 0, "platform": 1, "value": 1, "url": 1},
+    ).to_list(50)
     # Badges (always visible – they're achievements)
     user_id = u["id"]
     ub = await db.user_badges.find({"user_id": user_id}, {"_id": 0})\
@@ -159,6 +227,7 @@ async def get_public_profile(username: str):
         "tournaments": tournaments,
         "f1_bests": f1_bests,
         "teams": teams,
+        "socials": socials,
     }
 
 
@@ -171,6 +240,7 @@ async def get_user(user_id: str, me: dict = Depends(get_current_user)):
     # Hide email for non-admins if not own
     if me["id"] != user_id and me["role"] not in ("moderator", "tournament_admin", "club_admin", "superadmin"):
         u.pop("email", None)
+    await _attach_membership(u)
     return u
 
 
@@ -179,11 +249,58 @@ async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
     db = get_db()
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     if not updates:
+        await _attach_membership(me)
         return me
     updates["updated_at"] = now_utc().isoformat()
     await db.users.update_one({"id": me["id"]}, {"$set": updates})
     u = await db.users.find_one({"id": me["id"]}, {"_id": 0, "password_hash": 0})
+    await _attach_membership(u)
     return u
+
+
+# ---------- User socials ----------
+@router.get("/me/socials")
+async def list_my_socials(me: dict = Depends(get_current_user)):
+    db = get_db()
+    rows = await db.user_socials.find({"user_id": me["id"]}, {"_id": 0}).to_list(50)
+    return rows
+
+
+@router.post("/me/socials")
+async def add_my_social(body: UserSocialCreate, me: dict = Depends(get_current_user)):
+    db = get_db()
+    existing = await db.user_socials.find_one({"user_id": me["id"], "platform": body.platform})
+    if existing:
+        raise HTTPException(409, "Plattform bereits verknüpft.")
+    doc = {
+        "id": new_id(), "user_id": me["id"],
+        **body.model_dump(),
+        "created_at": now_utc().isoformat(),
+        "updated_at": now_utc().isoformat(),
+    }
+    await db.user_socials.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@router.patch("/me/socials/{social_id}")
+async def update_my_social(social_id: str, body: UserSocialUpdate, me: dict = Depends(get_current_user)):
+    db = get_db()
+    update = body.model_dump(exclude_unset=True)
+    update["updated_at"] = now_utc().isoformat()
+    res = await db.user_socials.update_one({"id": social_id, "user_id": me["id"]}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Eintrag nicht gefunden.")
+    return await db.user_socials.find_one({"id": social_id}, {"_id": 0})
+
+
+@router.delete("/me/socials/{social_id}")
+async def delete_my_social(social_id: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    res = await db.user_socials.delete_one({"id": social_id, "user_id": me["id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Eintrag nicht gefunden.")
+    return {"ok": True}
 
 
 @router.patch("/{user_id}")

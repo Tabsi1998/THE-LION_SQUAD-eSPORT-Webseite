@@ -40,10 +40,22 @@ import AdminSettingsPage from "@/pages/admin/AdminSettingsPage";
 import AdminSeasonsPage from "@/pages/admin/AdminSeasonsPage";
 import AdminAuditPage from "@/pages/admin/AdminAuditPage";
 import AdminWidgetsPage from "@/pages/admin/AdminWidgetsPage";
+import AdminMembersPage from "@/pages/admin/AdminMembersPage";
+import AdminBenefitsPage from "@/pages/admin/AdminBenefitsPage";
 import SeasonPage from "@/pages/public/SeasonPage";
 import PublicProfilePage from "@/pages/public/PublicProfilePage";
 import BadgesPage from "@/pages/public/BadgesPage";
 import AdminSponsorsPage from "@/pages/admin/AdminSponsorsPage";
+
+import AboutPage from "@/pages/public/AboutPage";
+import ContactPage from "@/pages/public/ContactPage";
+import SponsorsPage from "@/pages/public/SponsorsPage";
+import PartnersPage from "@/pages/public/PartnersPage";
+import PlayersPage from "@/pages/public/PlayersPage";
+import MembersDirectoryPage from "@/pages/public/MembersDirectoryPage";
+import JoinMembershipPage from "@/pages/public/JoinMembershipPage";
+import MemberAreaPage from "@/pages/user/MemberAreaPage";
+import MemberBenefitsPage from "@/pages/user/MemberBenefitsPage";
 
 import F1TVPage from "@/pages/display/F1TVPage";
 import BracketTVPage from "@/pages/display/BracketTVPage";
@@ -54,8 +66,17 @@ function App() {
       <BrowserRouter>
         <Toaster theme="dark" position="top-right" richColors />
         <Routes>
-          {/* Public */}
+          {/* Public — Verein */}
           <Route path="/" element={<HomePage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/sponsors" element={<SponsorsPage />} />
+          <Route path="/partners" element={<PartnersPage />} />
+          <Route path="/players" element={<PlayersPage />} />
+          <Route path="/members" element={<MembersDirectoryPage />} />
+          <Route path="/membership/join" element={<JoinMembershipPage />} />
+
+          {/* Public — Arena */}
           <Route path="/tournaments" element={<TournamentsPage />} />
           <Route path="/tournaments/:slug" element={<TournamentDetailPage />} />
           <Route path="/tournaments/:slug/bracket" element={<TournamentBracketPage />} />
@@ -77,8 +98,14 @@ function App() {
           <Route path="/matches/:id" element={<ProtectedRoute><MatchHubPage /></ProtectedRoute>} />
           <Route path="/privacy-account" element={<ProtectedRoute><PrivacyAccountPage /></ProtectedRoute>} />
 
+          {/* Member-only */}
+          <Route path="/members/area" element={<ProtectedRoute requireMember><MemberAreaPage /></ProtectedRoute>} />
+          <Route path="/members/benefits" element={<ProtectedRoute requireMember><MemberBenefitsPage /></ProtectedRoute>} />
+
           {/* Admin */}
           <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboardPage /></ProtectedRoute>} />
+          <Route path="/admin/members" element={<ProtectedRoute requireAdmin><AdminMembersPage /></ProtectedRoute>} />
+          <Route path="/admin/benefits" element={<ProtectedRoute requireAdmin><AdminBenefitsPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments" element={<ProtectedRoute requireAdmin><AdminTournamentsPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments/new" element={<ProtectedRoute requireAdmin><AdminTournamentNewPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments/:id" element={<ProtectedRoute requireAdmin><AdminTournamentEditPage /></ProtectedRoute>} />
