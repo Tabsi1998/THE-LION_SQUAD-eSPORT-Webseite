@@ -7,6 +7,7 @@ from database import get_db
 from auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
     set_auth_cookies, clear_auth_cookies, get_current_user, _decode,
+    hash_token, refresh_expires_at,
 )
 from email_service import send_template
 from models import (
@@ -24,7 +25,7 @@ async def _check_brute_force(db, identifier: str):
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=BRUTE_FORCE_WINDOW_MIN)
     count = await db.login_attempts.count_documents({
         "identifier": identifier,
-        "created_at": {"$gte": cutoff.isoformat()},
+        "created_at": {"$gte": cutoff},
     })
     if count >= BRUTE_FORCE_MAX:
         raise HTTPException(
@@ -46,7 +47,7 @@ async def _record_failed(db, identifier: str):
     await db.login_attempts.insert_one({
         "id": new_id(),
         "identifier": identifier,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(timezone.utc),
     })
 
 
@@ -54,8 +55,41 @@ async def _clear_failed(db, identifier: str):
     await db.login_attempts.delete_many({"identifier": identifier})
 
 
+async def _issue_session(db, response: Response, user: dict, request: Request):
+    access = create_access_token(user["id"], user["email"], user.get("role", "player"))
+    token_id = secrets.token_urlsafe(24)
+    refresh = create_refresh_token(user["id"], token_id)
+    await db.refresh_tokens.insert_one({
+        "id": new_id(),
+        "jti": token_id,
+        "user_id": user["id"],
+        "token_hash": hash_token(refresh),
+        "revoked": False,
+        "created_at": now_utc(),
+        "expires_at": refresh_expires_at(),
+        "user_agent": request.headers.get("user-agent"),
+        "ip": request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+              or (request.client.host if request.client else None),
+    })
+    set_auth_cookies(response, access, refresh)
+
+
+async def _revoke_refresh(db, token: str):
+    try:
+        payload = _decode(token)
+    except HTTPException:
+        return
+    token_id = payload.get("jti")
+    if not token_id:
+        return
+    await db.refresh_tokens.update_one(
+        {"jti": token_id, "token_hash": hash_token(token)},
+        {"$set": {"revoked": True, "revoked_at": now_utc()}},
+    )
+
+
 @router.post("/register")
-async def register(body: UserRegister, response: Response):
+async def register(body: UserRegister, request: Request, response: Response):
     db = get_db()
     if not body.accept_privacy or not body.accept_terms:
         raise HTTPException(status_code=400, detail="Datenschutz und Nutzungsbedingungen müssen akzeptiert werden.")
@@ -99,14 +133,12 @@ async def register(body: UserRegister, response: Response):
         "updated_at": now_utc().isoformat(),
     }
     await db.users.insert_one(user_doc)
-    access = create_access_token(user_id, email, "player")
-    refresh = create_refresh_token(user_id)
-    set_auth_cookies(response, access, refresh)
+    await _issue_session(db, response, user_doc, request)
     # Send welcome email (silent fail if not configured)
     await send_template("registration", email, display_name=user_doc["display_name"])
     user_doc.pop("_id", None)
     user_doc.pop("password_hash", None)
-    return {**user_doc, "access_token": access, "refresh_token": refresh}
+    return user_doc
 
 
 @router.post("/login")
@@ -124,9 +156,7 @@ async def login(body: UserLogin, request: Request, response: Response):
         raise HTTPException(status_code=403, detail="Account gesperrt")
 
     await _clear_failed(db, identifier)
-    access = create_access_token(user["id"], user["email"], user.get("role", "player"))
-    refresh = create_refresh_token(user["id"])
-    set_auth_cookies(response, access, refresh)
+    await _issue_session(db, response, user, request)
     user.pop("_id", None)
     user.pop("password_hash", None)
     # Attach membership for instant UI gating
@@ -137,11 +167,15 @@ async def login(body: UserLogin, request: Request, response: Response):
         user["user_type"] = "club_member"
     elif not user.get("user_type"):
         user["user_type"] = "community_user"
-    return {**user, "access_token": access, "refresh_token": refresh}
+    return user
 
 
 @router.post("/logout")
-async def logout(response: Response):
+async def logout(request: Request, response: Response):
+    db = get_db()
+    token = request.cookies.get("refresh_token")
+    if token:
+        await _revoke_refresh(db, token)
     clear_auth_cookies(response)
     return {"ok": True}
 
@@ -159,13 +193,29 @@ async def refresh(request: Request, response: Response):
     payload = _decode(token)
     if payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+    token_id = payload.get("jti")
+    if not token_id:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
     db = get_db()
+    stored = await db.refresh_tokens.find_one({
+        "jti": token_id,
+        "token_hash": hash_token(token),
+        "revoked": {"$ne": True},
+    })
+    if not stored:
+        await db.refresh_tokens.update_many(
+            {"user_id": payload["sub"]},
+            {"$set": {"revoked": True, "revoked_at": now_utc(), "revocation_reason": "refresh_reuse"}},
+        )
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
     user = await db.users.find_one({"id": payload["sub"]})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
-    access = create_access_token(user["id"], user["email"], user.get("role", "player"))
-    new_refresh = create_refresh_token(user["id"])
-    set_auth_cookies(response, access, new_refresh)
+    await db.refresh_tokens.update_one(
+        {"id": stored["id"]},
+        {"$set": {"revoked": True, "rotated_at": now_utc()}},
+    )
+    await _issue_session(db, response, user, request)
     return {"ok": True}
 
 
@@ -179,7 +229,7 @@ async def forgot_password(body: ForgotPasswordBody):
         token = secrets.token_urlsafe(32)
         await db.password_reset_tokens.insert_one({
             "id": new_id(),
-            "token": token,
+            "token_hash": hash_token(token),
             "user_id": user["id"],
             "used": False,
             "created_at": now_utc().isoformat(),
@@ -189,14 +239,13 @@ async def forgot_password(body: ForgotPasswordBody):
         frontend = os.environ.get("FRONTEND_URL", "").rstrip("/")
         reset_url = f"{frontend}/reset-password?token={token}" if frontend else f"/reset-password?token={token}"
         await send_template("password_reset", email, reset_url=reset_url)
-        print(f"[Password Reset] For {email}: {reset_url}")
     return {"ok": True, "message": "Falls diese E-Mail registriert ist, wurde ein Link gesendet."}
 
 
 @router.post("/reset-password")
 async def reset_password(body: ResetPasswordBody):
     db = get_db()
-    doc = await db.password_reset_tokens.find_one({"token": body.token, "used": False})
+    doc = await db.password_reset_tokens.find_one({"token_hash": hash_token(body.token), "used": False})
     if not doc:
         raise HTTPException(status_code=400, detail="Ungültiger oder abgelaufener Token")
     # Expiry check (defense-in-depth; Mongo TTL also handles it)

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { API, api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Crown, Gift, FileText, Bell, Calendar, Hash, Newspaper, Download, ArrowRight, User } from "lucide-react";
@@ -100,7 +100,7 @@ export default function MemberAreaPage() {
                         <div className="font-bold text-sm text-white truncate">{d.title}</div>
                         <div className="text-[10px] text-white/40 uppercase tracking-wider">{d.original_filename}</div>
                       </div>
-                      <a href={d.file_url} target="_blank" rel="noreferrer" download className="text-xs text-[#FFD700] font-bold uppercase tracking-wider hover:underline">↓</a>
+                      <a href={`${API}/documents/${d.id}/download`} target="_blank" rel="noreferrer" download className="text-xs text-[#FFD700] font-bold uppercase tracking-wider hover:underline">↓</a>
                     </div>
                   ))}
                 </div>

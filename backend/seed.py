@@ -12,7 +12,14 @@ from models import new_id, now_utc
 async def seed_admin():
     db = get_db()
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@thelionsquad.at").lower()
-    admin_password = os.environ.get("ADMIN_PASSWORD", "TLSAdmin2026!")
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    is_production = os.environ.get("APP_ENV", os.environ.get("ENVIRONMENT", "development")).lower() in {
+        "prod", "production"
+    }
+    if not admin_password:
+        if is_production:
+            raise RuntimeError("ADMIN_PASSWORD must be set in production.")
+        admin_password = "TLSAdmin2026!"
     existing = await db.users.find_one({"email": admin_email})
     if existing is None:
         admin_id = new_id()
@@ -71,7 +78,7 @@ async def seed_admin():
             "updated_at": now_utc().isoformat(),
             "updated_by": admin_id,
         })
-        print(f"[seed] Admin created: {admin_email} / {admin_password}")
+        print(f"[seed] Admin created: {admin_email}")
     else:
         # Ensure admin role
         await db.users.update_one(

@@ -1,10 +1,15 @@
 import axios from "axios";
 
 export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-const TOKEN_KEY = "tls_access_token";
 
-export const getToken = () => localStorage.getItem(TOKEN_KEY);
-export const setToken = (t) => t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY);
+function getCookie(name) {
+  const prefix = `${name}=`;
+  return document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix))
+    ?.slice(prefix.length);
+}
 
 export const api = axios.create({
   baseURL: API,
@@ -12,12 +17,34 @@ export const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Attach bearer token if we have one (fallback when cookies are blocked by proxies).
+const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
 api.interceptors.request.use((config) => {
-  const t = getToken();
-  if (t) config.headers.Authorization = `Bearer ${t}`;
+  const method = (config.method || "get").toUpperCase();
+  if (UNSAFE_METHODS.has(method)) {
+    const csrf = getCookie("csrf_token");
+    if (csrf) config.headers["X-CSRF-Token"] = decodeURIComponent(csrf);
+  }
   return config;
 });
+
+let refreshPromise = null;
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const original = error.config;
+    const url = original?.url || "";
+    const authRequest = url.includes("/auth/login") || url.includes("/auth/register") || url.includes("/auth/refresh");
+    if (error.response?.status === 401 && original && !original._retry && !authRequest) {
+      original._retry = true;
+      refreshPromise = refreshPromise || api.post("/auth/refresh").finally(() => { refreshPromise = null; });
+      await refreshPromise;
+      return api(original);
+    }
+    return Promise.reject(error);
+  }
+);
 
 export function formatApiError(detail) {
   if (detail == null) return "Ein Fehler ist aufgetreten.";

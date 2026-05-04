@@ -2,6 +2,8 @@
 import os
 import bcrypt
 import jwt
+import hashlib
+import secrets
 from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException, Request, Depends, Response
 from database import get_db
@@ -9,6 +11,7 @@ from database import get_db
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_MINUTES = 60 * 12  # 12h
 REFRESH_TOKEN_DAYS = 14
+CSRF_TOKEN_BYTES = 32
 
 # Hierarchy for role checks (higher number = more permissions)
 ROLE_LEVELS = {
@@ -47,13 +50,26 @@ def create_access_token(user_id: str, email: str, role: str) -> str:
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
-def create_refresh_token(user_id: str) -> str:
+def create_refresh_token(user_id: str, token_id: str) -> str:
     payload = {
         "sub": user_id,
+        "jti": token_id,
         "exp": datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_DAYS),
         "type": "refresh",
     }
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+
+
+def refresh_expires_at() -> datetime:
+    return datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_DAYS)
+
+
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def new_csrf_token() -> str:
+    return secrets.token_urlsafe(CSRF_TOKEN_BYTES)
 
 
 def _secure_cookies() -> bool:
@@ -62,11 +78,12 @@ def _secure_cookies() -> bool:
     return fu.startswith("https://")
 
 
-def set_auth_cookies(response: Response, access: str, refresh: str):
+def set_auth_cookies(response: Response, access: str, refresh: str, csrf_token: str | None = None):
     secure = _secure_cookies()
     # When on HTTPS (cross-site scenarios behind CDN), use SameSite=None + Secure.
     # When purely local HTTP, use SameSite=Lax.
     samesite = "none" if secure else "lax"
+    csrf_token = csrf_token or new_csrf_token()
     response.set_cookie(
         "access_token", access, httponly=True, secure=secure, samesite=samesite,
         max_age=ACCESS_TOKEN_MINUTES * 60, path="/",
@@ -75,11 +92,16 @@ def set_auth_cookies(response: Response, access: str, refresh: str):
         "refresh_token", refresh, httponly=True, secure=secure, samesite=samesite,
         max_age=REFRESH_TOKEN_DAYS * 24 * 3600, path="/",
     )
+    response.set_cookie(
+        "csrf_token", csrf_token, httponly=False, secure=secure, samesite=samesite,
+        max_age=REFRESH_TOKEN_DAYS * 24 * 3600, path="/",
+    )
 
 
 def clear_auth_cookies(response: Response):
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/")
+    response.delete_cookie("csrf_token", path="/")
 
 
 def _decode(token: str) -> dict:

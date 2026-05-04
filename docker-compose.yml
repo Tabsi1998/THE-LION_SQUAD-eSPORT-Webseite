@@ -25,14 +25,18 @@ services:
     environment:
       MONGO_URL: "mongodb://mongodb:27017"
       DB_NAME: "${DB_NAME:-tls_arena}"
-      CORS_ORIGINS: "${CORS_ORIGINS:-*}"
+      APP_ENV: "${APP_ENV:-production}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:3000}"
       FRONTEND_URL: "${FRONTEND_URL:-http://localhost:3000}"
       JWT_SECRET: "${JWT_SECRET}"
       ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@thelionsquad.at}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD}"
       SEED_DEMO: "${SEED_DEMO:-false}"
+      UPLOAD_DIR: "${UPLOAD_DIR:-/app/backend/uploads}"
     ports:
       - "${BACKEND_PORT:-8001}:8001"
+    volumes:
+      - uploads_data:${UPLOAD_DIR:-/app/backend/uploads}
     networks:
       - tls-net
 
@@ -52,6 +56,7 @@ services:
 
 volumes:
   mongo_data:
+  uploads_data:
 
 networks:
   tls-net:

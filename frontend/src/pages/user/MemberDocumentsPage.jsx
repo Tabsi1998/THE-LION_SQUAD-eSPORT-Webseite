@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { API, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { FileText, Download, Pin, ArrowLeft, Search } from "lucide-react";
 
@@ -37,12 +37,6 @@ export default function MemberDocumentsPage() {
     const url = activeCat ? `/documents?category=${activeCat}` : "/documents";
     api.get(url).then(({ data }) => setList(data)).catch(() => {}).finally(() => setLoading(false));
   }, [activeCat]);
-
-  const trackDownload = async (doc) => {
-    try {
-      await api.post(`/documents/${doc.id}/track-download`);
-    } catch { /* swallow */ }
-  };
 
   const filtered = list.filter((d) => {
     if (!q) return true;
@@ -96,10 +90,10 @@ export default function MemberDocumentsPage() {
         ) : (
           <div className="mt-10 space-y-8">
             {pinned.length > 0 && (
-              <Group label="Angepinnt" docs={pinned} onTrack={trackDownload} />
+              <Group label="Angepinnt" docs={pinned} />
             )}
             {rest.length > 0 && (
-              <Group label={pinned.length ? "Weitere" : null} docs={rest} onTrack={trackDownload} />
+              <Group label={pinned.length ? "Weitere" : null} docs={rest} />
             )}
           </div>
         )}
@@ -108,18 +102,18 @@ export default function MemberDocumentsPage() {
   );
 }
 
-function Group({ label, docs, onTrack }) {
+function Group({ label, docs }) {
   return (
     <div>
       {label && <div className="text-[11px] uppercase tracking-widest text-white/40 font-bold mb-3">{label}</div>}
       <div className="space-y-2">
-        {docs.map((d) => <DocRow key={d.id} d={d} onTrack={onTrack} />)}
+        {docs.map((d) => <DocRow key={d.id} d={d} />)}
       </div>
     </div>
   );
 }
 
-function DocRow({ d, onTrack }) {
+function DocRow({ d }) {
   const c = CATEGORY_COLORS[d.category] || "#29B6E8";
   return (
     <div data-testid={`doc-row-${d.id}`} className="border border-white/10 hover:border-white/25 rounded-sm bg-[#121212] p-4 flex items-center gap-4 transition">
@@ -140,11 +134,10 @@ function DocRow({ d, onTrack }) {
         </div>
       </div>
       <a
-        href={d.file_url}
+        href={`${API}/documents/${d.id}/download`}
         target="_blank"
         rel="noreferrer"
         download={d.original_filename || true}
-        onClick={() => onTrack(d)}
         data-testid={`doc-download-${d.id}`}
         className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] border border-[#FFD700]/40 font-bold uppercase tracking-wider text-xs rounded-sm transition"
       >

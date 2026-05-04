@@ -72,6 +72,10 @@ async def init_indexes():
     await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
     await db.login_attempts.create_index("identifier")
     await db.login_attempts.create_index("created_at", expireAfterSeconds=3600)
+    await db.refresh_tokens.create_index("id", unique=True)
+    await db.refresh_tokens.create_index("jti", unique=True)
+    await db.refresh_tokens.create_index("user_id")
+    await db.refresh_tokens.create_index("expires_at", expireAfterSeconds=0)
     # Phase 2/3 collections
     await db.settings.create_index("id", unique=True)
     await db.email_logs.create_index("created_at")

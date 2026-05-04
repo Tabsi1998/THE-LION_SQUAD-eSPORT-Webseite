@@ -24,19 +24,17 @@ sudo supervisorctl restart backend
 # frontend hot-reloads automatically
 ```
 
-The backend seeds on first start:
-- Superadmin: `admin@thelionsquad.at` / `TLSAdmin2026!`
-- 20 demo players: `<username>@demo.thelionsquad.at` / `demo123`
-- Demo games, tournaments, a 4-track F1 Championship, 10 stations.
+For local development, set `APP_ENV=development` and provide an `ADMIN_PASSWORD`
+in `.env`. Demo users are created only when `SEED_DEMO=true`.
 
 Change the admin password immediately in **/profile → change password** (or `/api/auth/change-password`).
 
 ## Production (Docker Compose)
 
 1. `cp .env.example .env`
-2. Set `JWT_SECRET`, `ADMIN_PASSWORD`, `PUBLIC_BACKEND_URL`, `FRONTEND_URL`, `CORS_ORIGINS`.
+2. Set a strong `JWT_SECRET`, `ADMIN_PASSWORD`, `PUBLIC_BACKEND_URL`, `FRONTEND_URL`, `CORS_ORIGINS`.
 3. `docker compose up -d --build`
-4. Open `https://arena.<your-domain>/` — login with the admin credentials.
+4. Open `https://arena.<your-domain>/` and login with the admin credentials from your `.env`.
 5. Change the admin password immediately.
 
 Behind Nginx Proxy Manager, point `arena.<your-domain>` to `frontend:80` and `arena.<your-domain>/api/*` to `backend:8001/api/*` (or front the entire backend as a separate subdomain).

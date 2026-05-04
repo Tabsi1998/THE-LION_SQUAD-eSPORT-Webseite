@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { api } from "@/lib/api";
+import { API, api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { toast } from "sonner";
 import { Plus, Save, X, Trash2, FileText, Pin, UploadCloud } from "lucide-react";
@@ -80,7 +80,7 @@ export default function AdminDocumentsPage() {
                     <td className="px-4 py-3 text-xs text-white/65">{fmtSize(d.file_size)}</td>
                     <td className="px-4 py-3 text-xs text-white/55">{d.download_count || 0}</td>
                     <td className="px-4 py-3 text-center space-x-1 whitespace-nowrap">
-                      <a href={d.file_url} target="_blank" rel="noreferrer" className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white">Vorschau</a>
+                      <a href={`${API}/documents/${d.id}/download`} target="_blank" rel="noreferrer" className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white">Vorschau</a>
                       <button onClick={() => setEditing(d)} data-testid={`doc-edit-${d.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10">Bearbeiten</button>
                       <button onClick={() => remove(d.id)} data-testid={`doc-delete-${d.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
                     </td>
@@ -106,6 +106,7 @@ function DocModal({ doc, meta, onClose, onSaved }) {
     category: doc.category || "other",
     visibility: doc.visibility || "members",
     file_url: doc.file_url || "",
+    storage_key: doc.storage_key || "",
     original_filename: doc.original_filename || "",
     file_size: doc.file_size || 0,
     mime: doc.mime || "",
@@ -128,6 +129,7 @@ function DocModal({ doc, meta, onClose, onSaved }) {
       setForm((f) => ({
         ...f,
         file_url: data.url,
+        storage_key: data.storage_key || data.filename,
         original_filename: data.original_filename,
         file_size: data.size,
         mime: data.mime,
@@ -142,7 +144,7 @@ function DocModal({ doc, meta, onClose, onSaved }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.file_url) { toast.error("Bitte zuerst eine Datei hochladen."); return; }
+    if (!form.storage_key && !form.file_url) { toast.error("Bitte zuerst eine Datei hochladen."); return; }
     setSaving(true);
     try {
       const payload = {
@@ -173,7 +175,7 @@ function DocModal({ doc, meta, onClose, onSaved }) {
           {/* File upload */}
           <div className="border border-dashed border-[#FFD700]/40 rounded-sm p-5 bg-[#0A0A0A] text-center">
             <input ref={fileRef} type="file" onChange={upload} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt,.csv,.md,.png,.jpg,.jpeg" data-testid="doc-file" />
-            {form.file_url ? (
+            {(form.storage_key || form.file_url) ? (
               <div className="text-sm">
                 <div className="font-mono text-xs text-white/60 break-all">{form.original_filename || form.file_url}</div>
                 <div className="text-[10px] uppercase tracking-widest text-[#FFD700] mt-1">{fmtSize(form.file_size)} · {form.mime || "Datei"}</div>

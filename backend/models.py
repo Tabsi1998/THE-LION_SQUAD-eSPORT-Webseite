@@ -641,6 +641,7 @@ class DocumentCreate(BaseModel):
     category: DocumentCategory = "other"
     visibility: DocumentVisibility = "members"
     file_url: str
+    storage_key: Optional[str] = None
     original_filename: Optional[str] = None
     file_size: Optional[int] = None
     mime: Optional[str] = None
@@ -655,6 +656,7 @@ class DocumentUpdate(BaseModel):
     category: Optional[DocumentCategory] = None
     visibility: Optional[DocumentVisibility] = None
     file_url: Optional[str] = None
+    storage_key: Optional[str] = None
     original_filename: Optional[str] = None
     file_size: Optional[int] = None
     mime: Optional[str] = None

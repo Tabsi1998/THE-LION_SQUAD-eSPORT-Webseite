@@ -6,7 +6,8 @@ load_dotenv(ROOT / ".env")
 
 import os
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse, FileResponse
 from starlette.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
@@ -53,8 +54,21 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger("tls-arena")
 
 
+def validate_runtime_env():
+    if not is_production:
+        return
+    jwt_secret = os.environ.get("JWT_SECRET", "")
+    if len(jwt_secret) < 32:
+        raise RuntimeError("JWT_SECRET must be set to at least 32 characters in production.")
+    if not os.environ.get("ADMIN_PASSWORD"):
+        raise RuntimeError("ADMIN_PASSWORD must be set in production.")
+    if not os.environ.get("FRONTEND_URL"):
+        raise RuntimeError("FRONTEND_URL must be set in production.")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    validate_runtime_env()
     logger.info("[TLS ARENA] Initializing indexes...")
     await init_indexes()
     # One-time wipe for the new club platform launch (set TLS_RESET=true once, then unset)
@@ -107,13 +121,23 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="TLS ARENA - THE LION SQUAD eSports", version="1.0.0", lifespan=lifespan)
 
-# CORS - use regex to allow any origin WITH credentials (browsers reject '*' + credentials).
-# Still honour an explicit FRONTEND_URL / CORS_ORIGINS list if provided (comma-separated).
-cors_origins_env = os.environ.get("CORS_ORIGINS", "*").strip()
+# CORS: credentials require explicit trusted origins. Open wildcard CORS can be
+# enabled only for short-lived local debugging via ALLOW_INSECURE_CORS=true.
+app_env = os.environ.get("APP_ENV", os.environ.get("ENVIRONMENT", "development")).lower()
+is_production = app_env in {"prod", "production"}
+cors_origins_env = os.environ.get("CORS_ORIGINS", "").strip()
+allow_insecure_cors = os.environ.get("ALLOW_INSECURE_CORS", "").lower() == "true"
+if cors_origins_env == "*" and not allow_insecure_cors:
+    if is_production:
+        raise RuntimeError("CORS_ORIGINS='*' is not allowed in production.")
+    logger.warning("[security] Ignoring wildcard CORS_ORIGINS. Set ALLOW_INSECURE_CORS=true for local debugging.")
+    cors_origins_env = ""
 explicit_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip() and o.strip() != "*"]
 frontend_url = os.environ.get("FRONTEND_URL", "").strip()
 if frontend_url and frontend_url not in explicit_origins:
     explicit_origins.append(frontend_url)
+if not explicit_origins and not allow_insecure_cors:
+    explicit_origins.extend(["http://localhost:3000", "http://127.0.0.1:3000"])
 
 if explicit_origins:
     app.add_middleware(
@@ -124,7 +148,9 @@ if explicit_origins:
         allow_headers=["*"],
     )
 else:
-    # No explicit origins - open to any but still support credentials via regex
+    if is_production:
+        raise RuntimeError("CORS_ORIGINS must be explicit in production.")
+    logger.warning("[security] ALLOW_INSECURE_CORS=true - accepting any origin with credentials.")
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=".*",
@@ -178,12 +204,57 @@ app.include_router(board_router)
 app.include_router(penalty_router)
 app.include_router(penalty_admin_router)
 
-# Static uploads (serve user-uploaded images through /api prefix to survive ingress)
-from fastapi.staticfiles import StaticFiles
+# Static uploads: only public image files are served directly. Documents are
+# streamed through visibility-aware /api/documents/{id}/download.
 import pathlib
-upload_dir = pathlib.Path("/app/backend/uploads")
+upload_dir = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 upload_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/api/static/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
+public_upload_dir = upload_dir / "public"
+public_upload_dir.mkdir(parents=True, exist_ok=True)
+PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+
+
+@app.get("/api/static/uploads/{filename}")
+async def public_upload(filename: str):
+    if "/" in filename or "\\" in filename or ".." in filename or filename.startswith("."):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    if pathlib.Path(filename).suffix.lower() not in PUBLIC_IMAGE_EXTS:
+        raise HTTPException(status_code=404, detail="File not found")
+    for base in (public_upload_dir, upload_dir):
+        path = base / filename
+        if path.exists() and path.is_file():
+            return FileResponse(path)
+    raise HTTPException(status_code=404, detail="File not found")
+
+
+UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+CSRF_EXEMPT_PATHS = {
+    "/api/auth/login",
+    "/api/auth/register",
+    "/api/auth/refresh",
+    "/api/auth/forgot-password",
+    "/api/auth/reset-password",
+}
+
+
+@app.middleware("http")
+async def csrf_protection(request, call_next):
+    path = request.url.path
+    has_auth_cookie = bool(request.cookies.get("access_token") or request.cookies.get("refresh_token"))
+    if (
+        request.method.upper() in UNSAFE_METHODS
+        and path.startswith("/api/")
+        and path not in CSRF_EXEMPT_PATHS
+        and has_auth_cookie
+    ):
+        cookie_token = request.cookies.get("csrf_token")
+        header_token = request.headers.get("x-csrf-token")
+        if not cookie_token or not header_token or cookie_token != header_token:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "CSRF token missing or invalid"},
+            )
+    return await call_next(request)
 
 
 # Security headers middleware

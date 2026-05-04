@@ -25,6 +25,8 @@ from auth import require_admin
 from models import now_utc
 
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
+PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
+PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
 
 # ============= Media Browser =============
@@ -37,8 +39,12 @@ async def admin_list_media(me: dict = Depends(require_admin())):
     if not UPLOAD_DIR.exists():
         return []
     items: list[dict] = []
-    for p in sorted(UPLOAD_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
-        if p.is_file() and not p.name.startswith("."):
+    candidates = []
+    for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
+        if base.exists():
+            candidates.extend([p for p in base.iterdir() if p.is_file()])
+    for p in sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True):
+        if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in PUBLIC_IMAGE_EXTS:
             stat = p.stat()
             items.append({
                 "filename": p.name,
@@ -55,7 +61,11 @@ async def admin_delete_media(filename: str, me: dict = Depends(require_admin()))
     """Delete a file from upload dir. Path-traversal protected."""
     if "/" in filename or ".." in filename or filename.startswith("."):
         raise HTTPException(400, "Ungültiger Dateiname.")
-    p = UPLOAD_DIR / filename
+    p = PUBLIC_UPLOAD_DIR / filename
+    if not p.exists():
+        p = UPLOAD_DIR / filename
+    if p.suffix.lower() not in PUBLIC_IMAGE_EXTS:
+        raise HTTPException(404, "Datei nicht gefunden.")
     if not p.exists() or not p.is_file():
         raise HTTPException(404, "Datei nicht gefunden.")
     try:
