@@ -1,8 +1,14 @@
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/tls/ProtectedRoute";
+
+function MeRedirect() {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login?next=/profile" replace />;
+  return <Navigate to={`/u/${user.username}`} replace />;
+}
 
 import HomePage from "@/pages/public/HomePage";
 import TournamentsPage from "@/pages/public/TournamentsPage";
@@ -153,6 +159,7 @@ function App() {
 
           <Route path="/seasons/current" element={<CurrentSeasonRedirect />} />
           <Route path="/seasons/:slug" element={<SeasonPage />} />
+          <Route path="/u/me" element={<MeRedirect />} />
           <Route path="/u/:username" element={<PublicProfilePage />} />
           <Route path="/players/:username" element={<PublicProfilePage />} />
           <Route path="/fastlap" element={<F1ListPage />} />

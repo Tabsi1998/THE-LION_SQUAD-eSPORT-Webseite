@@ -67,22 +67,30 @@ async def submit_contact(body: ContactSubmit, me=Depends(get_current_user_option
         "internal_note": "",
     }
     await db.contact_messages.insert_one(doc)
-    # Auto-reply via mail queue
+    # Auto-reply via mail queue (uses render_template if admin customised it)
     from email_service import _wrap
     from services.mail_queue import enqueue_mail
+    from routes.phase_ef_routes import render_template
     topic_label = TOPIC_LABELS.get(body.topic, body.topic)
-    user_html = _wrap(
+    first_name = body.name.strip().split()[0] if body.name.strip() else "dort"
+    fallback_user_html = _wrap(
         "Wir haben deine Nachricht erhalten",
-        f"<p>Hallo {body.name.strip().split()[0]},</p>"
+        f"<p>Hallo {first_name},</p>"
         f"<p>danke für deine Nachricht zum Thema <strong>{topic_label}</strong>. Wir melden uns so bald wie möglich.</p>"
         "<p>Falls dein Anliegen dringend ist, findest du uns auch auf Discord.</p>"
         "<hr style='border:0;border-top:1px solid #1F2937;margin:20px 0;'/>"
         "<p style='color:#6B7280;font-size:12px'>Deine Nachricht (Kopie):</p>"
         f"<blockquote style='margin:8px 0;padding:8px 12px;border-left:3px solid #29B6E8;color:#9CA3AF;font-size:13px'>{body.message[:1000]}</blockquote>",
     )
+    user_subj, user_html = await render_template(
+        "contact_auto_reply",
+        {"name": first_name, "topic": topic_label},
+        fallback_subject=f"Bestätigung: Wir haben deine Nachricht erhalten — {body.subject[:80]}",
+        fallback_html=fallback_user_html,
+    )
     await enqueue_mail(
         to=body.email,
-        subject=f"Bestätigung: Wir haben deine Nachricht erhalten — {body.subject[:80]}",
+        subject=user_subj,
         html=user_html,
         template_key="contact_autoreply",
         meta={"contact_id": doc["id"]},

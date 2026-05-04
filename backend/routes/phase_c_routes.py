@@ -85,15 +85,19 @@ async def membership_apply(body: ApplyBody, me: dict = Depends(get_current_user)
     # Notify admin via SMTP queue (best-effort)
     try:
         from services.mail_queue import enqueue_mail
+        from routes.phase_ef_routes import render_template
         admins = await db.users.find({"role": {"$in": ["club_admin", "superadmin"]}},
                                       {"_id": 0, "email": 1}).to_list(20)
+        applicant_name = me.get("display_name") or me.get("username") or "Spieler"
+        subj, html = await render_template(
+            "membership_application_admin",
+            {"applicant": applicant_name},
+            fallback_subject="Neue Mitgliedsbewerbung",
+            fallback_html=f"<p>{applicant_name} hat eine Mitgliedsbewerbung eingereicht.</p>",
+        )
         for a in admins:
             if a.get("email"):
-                await enqueue_mail(
-                    to=a["email"],
-                    subject="Neue Mitgliedsbewerbung",
-                    html=f"<p>{me.get('display_name') or me.get('username')} hat eine Mitgliedsbewerbung eingereicht.</p><p>Bitte im Admin-Bereich prüfen.</p>",
-                )
+                await enqueue_mail(to=a["email"], subject=subj, html=html)
     except Exception:
         pass
     doc.pop("_id", None)
@@ -176,13 +180,20 @@ async def admin_decide_application(app_id: str, body: DecisionBody,
     # Notify applicant via mail queue
     try:
         from services.mail_queue import enqueue_mail
-        u = await db.users.find_one({"id": app["user_id"]}, {"_id": 0, "email": 1, "display_name": 1})
+        from routes.phase_ef_routes import render_template
+        u = await db.users.find_one({"id": app["user_id"]}, {"_id": 0, "email": 1, "display_name": 1, "username": 1})
         if u and u.get("email"):
-            subject = "Mitgliedsbewerbung angenommen 🦁" if body.decision == "approve" else "Mitgliedsbewerbung abgelehnt"
-            html = (f"<p>Hallo {u.get('display_name') or 'Spieler'},</p>"
-                    f"<p>Deine Bewerbung wurde {'angenommen' if body.decision == 'approve' else 'abgelehnt'}.</p>"
-                    f"<p>{body.note or ''}</p>")
-            await enqueue_mail(to=u["email"], subject=subject, html=html)
+            tpl_key = "membership_approve" if body.decision == "approve" else "membership_reject"
+            display = u.get("display_name") or u.get("username") or "Spieler"
+            subj, html = await render_template(
+                tpl_key,
+                {"display_name": display, "note": body.note or ""},
+                fallback_subject=("Mitgliedsbewerbung angenommen 🦁" if body.decision == "approve" else "Mitgliedsbewerbung abgelehnt"),
+                fallback_html=(f"<p>Hallo {display},</p><p>Deine Bewerbung wurde "
+                               f"{'angenommen' if body.decision == 'approve' else 'abgelehnt'}.</p>"
+                               f"<p>{body.note or ''}</p>"),
+            )
+            await enqueue_mail(to=u["email"], subject=subj, html=html)
     except Exception:
         pass
 

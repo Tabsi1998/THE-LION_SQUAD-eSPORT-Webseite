@@ -42,15 +42,15 @@ export function AdminLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex">
-      {/* Sidebar */}
-      <aside className={`fixed md:sticky top-0 left-0 h-screen w-64 bg-[#0A0A0A] border-r border-white/10 z-40 transform transition-transform ${openMobile ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
-        <div className="p-5 border-b border-white/10 flex items-center justify-between">
+      {/* Sidebar — Flex column with scrollable nav */}
+      <aside className={`fixed md:sticky top-0 left-0 h-screen w-64 bg-[#0A0A0A] border-r border-white/10 z-40 transform transition-transform flex flex-col ${openMobile ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
+        <div className="p-5 border-b border-white/10 flex items-center justify-between shrink-0">
           <Logo size="sm" />
           <button className="md:hidden p-1" onClick={() => setOpenMobile(false)}>
             <X className="w-4 h-4" />
           </button>
         </div>
-        <nav className="p-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1 admin-scroll">
           {items.map((it) => (
             <NavLink
               key={it.to}
@@ -71,7 +71,7 @@ export function AdminLayout({ children }) {
             </NavLink>
           ))}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-white/10 space-y-2">
+        <div className="shrink-0 p-3 border-t border-white/10 space-y-2 bg-[#0A0A0A]">
           <Link
             to="/"
             data-testid="admin-exit-link"
@@ -94,6 +94,7 @@ export function AdminLayout({ children }) {
             </button>
           </div>
         </div>
+        <style>{`.admin-scroll::-webkit-scrollbar{width:6px}.admin-scroll::-webkit-scrollbar-track{background:transparent}.admin-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:3px}.admin-scroll::-webkit-scrollbar-thumb:hover{background:rgba(41,182,232,0.4)}`}</style>
       </aside>
       {/* Main */}
       <div className="flex-1 min-w-0">

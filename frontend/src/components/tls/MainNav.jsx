@@ -53,9 +53,14 @@ export const NAV_USER = [
     label: "Mein Bereich",
     children: [
       { to: "/dashboard", label: "Übersicht" },
-      { to: "/profile", label: "Profil" },
+      { to: "/profile", label: "Profil & Einstellungen" },
+      { to: "/profile?tab=achievements", label: "Meine Achievements" },
+      { to: "/u/me", label: "Mein öffentliches Profil" },
+      { to: "/teams", label: "Meine Teams", divider: true },
       { to: "/my/prizes", label: "Meine Gewinne" },
-      { to: "/teams", label: "Meine Teams" },
+      { to: "/membership/apply", label: "Mitgliedschaft beantragen" },
+      { to: "/members/area", label: "Mitgliederbereich", memberOnly: true, divider: true },
+      { to: "/privacy-account", label: "Datenschutz / Daten", divider: true },
     ],
   },
 ];

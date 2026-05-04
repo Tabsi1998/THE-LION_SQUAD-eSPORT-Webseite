@@ -32,6 +32,10 @@ from routes.phase_ef_routes import (
     pages_router, admin_pages_router, admin_emailt_router, admin_discord_router,
     seed_default_pages, seed_email_templates,
 )
+from routes.phase_fg_routes import (
+    admin_media_router, nav_router, admin_nav_router, seo_router, seo_meta_router,
+    seed_default_nav,
+)
 from routes.membership_routes import router as membership_router
 from routes.document_routes import router as document_router
 from routes.home_routes import router as home_router
@@ -79,6 +83,7 @@ async def lifespan(app: FastAPI):
     logger.info("[TLS ARENA] Seeding CMS pages + email templates...")
     await seed_default_pages()
     await seed_email_templates()
+    await seed_default_nav()
     if os.environ.get("SEED_DEMO", "false").lower() == "true":
         logger.info("[TLS ARENA] Seeding demo data...")
         await seed_demo_data()
@@ -156,6 +161,11 @@ app.include_router(pages_router)
 app.include_router(admin_pages_router)
 app.include_router(admin_emailt_router)
 app.include_router(admin_discord_router)
+app.include_router(admin_media_router)
+app.include_router(nav_router)
+app.include_router(admin_nav_router)
+app.include_router(seo_router)
+app.include_router(seo_meta_router)
 app.include_router(membership_router)
 app.include_router(document_router)
 app.include_router(home_router)

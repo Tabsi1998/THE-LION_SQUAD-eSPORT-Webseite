@@ -5,7 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MultiSelect } from "@/components/tls/MultiSelect";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal } from "lucide-react";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 
@@ -63,7 +63,10 @@ const VISIBILITY = [
 
 export default function ProfilePage() {
   const { user, refresh, isClubMember } = useAuth();
-  const [tab, setTab] = useState("basic");
+  const [params, setParams] = useSearchParams();
+  const [tab, setTab] = useState(params.get("tab") || "basic");
+  // Sync tab → URL
+  useEffect(() => { setParams({ tab }, { replace: true }); /* eslint-disable-next-line */ }, [tab]);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [achData, setAchData] = useState(null);
