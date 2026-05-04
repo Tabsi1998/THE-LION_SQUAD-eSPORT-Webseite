@@ -58,13 +58,37 @@ NIE einen registrierten Nutzer als „Mitglied" bezeichnen. Stattdessen „Commu
 - [x] **DashboardPage** überarbeitet — Member-only Tiles (Mitgliederbereich + Vorteile), Mitgliedsnummer, „Mitglied werden" CTA für Community
 - [x] **AdminLayout** erweitert — Mitglieder + Mitgliedervorteile in Sidebar
 
-## Roadmap (Phase 8-10)
+## Roadmap (Phase 8-10) — IMPLEMENTIERT (04.05.2026)
 
-### 🔵 Phase 8 — SMTP & Mail Queue (Resend ablösen)
+### 🔵 Phase 8 — SMTP & Mail Queue (Resend abgelöst)
+- [x] **`services/mail_queue.py`** — `enqueue_mail()` (Queue + Dedupe via dedupe_key), `process_mail_queue()` Worker mit exponentiellem Retry-Backoff (1m/5m/30m/2h/12h, max 6 Versuche), `smtp_test()` für direkten SMTP-Test
+- [x] **aiosmtplib** echt-async SMTP-Versand (STARTTLS / SSL/TLS / plain), `from_header` mit Display Name, MIME-multipart HTML
+- [x] **Resend bleibt als Fallback-Provider** — admin wählt provider=smtp|resend
+- [x] **`services/scheduler.py`** mit APScheduler: mail_queue alle 30s, match_reminders alle 5min, prize_expiry alle 60min, max_instances=1+coalesce gegen Überlappung, in lifespan gestartet/gestoppt
+- [x] **`services/match_reminder.py`** — schedule_match_reminders: 24h/2h/30m/10m Lead-Time-Mails, dedupe via match_reminder:{mid}:{uid}:{label}
+- [x] **email_service.py** — `send_template(queue=True)` per default; neue Templates: `match_lead_24h/2h/30m/10m`, `prize_ready/picked_up/expired`
+- [x] **Admin UI**: `/admin/settings` Tabs neu **SMTP** (Provider-Switch, Host/Port/User/Pass/Sicherheit/Sender) + **Mail-Queue** (Auflistung mit Status-Filter, Process-Now-Button, Retry/Delete pro Job)
+- [x] **API**: GET/PUT `/api/settings/smtp` (Pass maskiert), POST `/api/settings/smtp/test`, GET `/api/settings/mail-queue`, POST `/api/settings/mail-queue/process`, POST `/{id}/retry`, DELETE `/{id}`
 
-### 🟢 Phase 9 — Preise & Gewinnabholung (PrizePickup-Model)
+### 🟢 Phase 9 — Preise & Gewinnabholung
+- [x] **`services/prize_service.py`** — `auto_create_for_tournament()` idempotent, `mark_ready()` + `mark_picked_up()` + `expire_overdue()` (90-Tage-Default-Frist)
+- [x] **Auto-Trigger** in `tournament_routes.py` `set_status="results_published"` legt Pickups basierend auf `prize_places` + matches.final_position an
+- [x] **Email-Trigger** via Mail Queue: prize_ready bei mark_ready, prize_picked_up bei mark_picked_up, prize_expired bei expire_overdue (mit dedupe_key)
+- [x] **API**: `/api/prizes` admin (CRUD + Status-Patch), `/api/prizes/me` user, `/api/prizes/me/open-count` Dashboard-Hint, `/api/prizes/auto-create/{tid}` manueller Trigger
+- [x] **Admin UI**: `/admin/prizes` Status-Stat-Cards (Offen/Bereit/Abgeholt/Verfallen), Filter, Aktionen (Bereit-markieren / Abgeholt / Zurück / Löschen)
+- [x] **User UI**: `/my/prizes` mit getrennten Sektionen Offene + Archiv, Hinweis-Karte, Frist sichtbar
+- [x] **Dashboard-Hint**: Goldene CTA-Kachel auf Dashboard wenn open_count > 0
 
-### 🟣 Phase 10 — Feinschliff (404/403/500 Pages, SEO, Setup-Wizard)
+### 🟣 Phase 10 — Feinschliff
+- [x] **Setup-Wizard UI** (`/setup`, admin-only) — 5 Schritte (Willkommen / Vereinsdaten / Admin-PW / E-Mail / Done), Provider-Switch SMTP↔Resend, Skip-Option
+- [x] **API**: GET `/api/setup/status` (public), POST `/api/setup/complete` (super-only), POST `/api/setup/skip`
+- [x] **AdminDashboard CTA-Banner** wenn setup nicht completed → Wizard
+- [x] **Error Pages**: 404 + 403 + 500 mit TLS-Branding (`pages/ErrorPages.jsx`), Catch-All-Route in App.js
+- [x] **SEO**: index.html Meta-Tags (description, og:type, og:title, og:description, og:site_name, twitter:card), Title aktualisiert, `useDocumentTitle`-Hook erstellt
+- [x] **Sitemap**: GET `/api/sitemap.xml` mit static + tournaments + f1 + events + news + public profiles, lastmod von updated_at
+- [x] **Backend Tests**: `tests/test_phase_8_9_10.py` 7/7 grün
+- [x] **DB-Indexes**: mail_jobs (id/status+next_attempt_at/dedupe_key/created_at), prize_pickups (id/tournament_id/user_id/status/composite)
+
 
 ## Phase 5+6+7 — IMPLEMENTIERT (04.05.2026 · großer Status/Stream/Badge/Season Refactor)
 
