@@ -3,14 +3,14 @@
  * Lists all uploaded files in /api/static/uploads, preview, copy URL, delete.
  */
 import { useEffect, useMemo, useState } from "react";
-import { api, formatApiError } from "@/lib/api";
+import { API_BASE, api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { toast } from "sonner";
 import {
   Image as ImageIcon, FileText, Trash2, Copy, ExternalLink, Search, RefreshCw,
 } from "lucide-react";
 
-const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
+const BACKEND = API_BASE;
 const IMG_EXT = new Set(["png", "jpg", "jpeg", "webp", "gif", "svg", "avif"]);
 
 const fmtBytes = (n) => {

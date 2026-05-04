@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { API_BASE, api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { toast } from "sonner";
 import { Copy, Eye } from "lucide-react";
@@ -17,10 +17,9 @@ export default function AdminWidgetsPage() {
     api.get("/f1/challenges").then(({ data }) => setChallenges(data));
   }, []);
 
-  const base = process.env.REACT_APP_BACKEND_URL;
   const path = selType === "bracket" ? `/display/bracket/${selId}`
     : selType === "f1" ? `/display/f1/${selId}` : "";
-  const url = selId ? `${base}${path}?theme=${theme}` : "";
+  const url = selId ? `${API_BASE}${path}?theme=${theme}` : "";
   const iframe = url ? `<iframe src="${url}" width="100%" height="${height}" frameborder="0" style="border:none"></iframe>` : "";
 
   const copy = () => {

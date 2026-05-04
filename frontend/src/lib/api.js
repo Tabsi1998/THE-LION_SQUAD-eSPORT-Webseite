@@ -1,6 +1,10 @@
 import axios from "axios";
 
-export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const configuredBackendUrl = (process.env.REACT_APP_BACKEND_URL || "").trim().replace(/\/+$/, "");
+
+export const API_BASE =
+  configuredBackendUrl || (typeof window !== "undefined" ? window.location.origin : "");
+export const API = `${API_BASE}/api`;
 
 function getCookie(name) {
   const prefix = `${name}=`;
@@ -59,7 +63,7 @@ export function formatApiError(detail) {
 }
 
 export function formatMs(ms) {
-  if (ms == null) return "—";
+  if (ms == null) return "-";
   const m = Math.floor(ms / 60000);
   const s = Math.floor((ms % 60000) / 1000);
   const mil = ms % 1000;

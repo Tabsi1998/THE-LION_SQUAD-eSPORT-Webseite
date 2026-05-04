@@ -84,8 +84,8 @@
   },
   "media_assets": {
     "logos": {
-      "primary_mascot": "https://customer-assets.emergentagent.com/job_esports-hub-134/artifacts/2rsp6zmh_Lo%CC%88we_aufSchwarz_Web.png",
-      "primary_wordmark": "https://customer-assets.emergentagent.com/job_esports-hub-134/artifacts/e3zukpsb_TheLionSquad_Logo_%20aufSchwarz_Quer_Web.png"
+      "primary_mascot": "/assets/brand/tls-mascot.png",
+      "primary_wordmark": "/assets/brand/tls-wordmark.png"
     },
     "images": {
       "hero_esports_arena": "https://images.pexels.com/photos/7915213/pexels-photo-7915213.jpeg",

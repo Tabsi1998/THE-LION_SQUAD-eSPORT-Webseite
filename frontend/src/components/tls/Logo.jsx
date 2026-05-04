@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
-export const TLS_MASCOT = "https://customer-assets.emergentagent.com/job_esports-hub-134/artifacts/2rsp6zmh_Lo%CC%88we_aufSchwarz_Web.png";
-export const TLS_WORDMARK = "https://customer-assets.emergentagent.com/job_esports-hub-134/artifacts/e3zukpsb_TheLionSquad_Logo_%20aufSchwarz_Quer_Web.png";
+export const TLS_MASCOT = "/assets/brand/tls-mascot.png";
+export const TLS_WORDMARK = "/assets/brand/tls-wordmark.png";
 
 export function Logo({ variant = "wordmark", size = "md", asLink = true, className = "" }) {
   const sizes = {

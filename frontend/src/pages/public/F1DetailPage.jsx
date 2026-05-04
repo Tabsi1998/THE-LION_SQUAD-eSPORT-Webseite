@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, formatMs } from "@/lib/api";
+import { API, api, formatMs } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StatusBadge } from "@/components/tls/StatusBadge";
@@ -62,7 +62,7 @@ export default function F1DetailPage() {
               <Tv className="w-4 h-4" /> TV / Beamer Modus
             </Link>
             <a
-              href={`${process.env.REACT_APP_BACKEND_URL}/api/exports/f1/${challenge.slug || challenge.id}/leaderboard.pdf${activeTrack ? `?track_id=${activeTrack}` : ""}`}
+              href={`${API}/exports/f1/${challenge.slug || challenge.id}/leaderboard.pdf${activeTrack ? `?track_id=${activeTrack}` : ""}`}
               target="_blank" rel="noreferrer"
               data-testid="f1-export-pdf-track"
               className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition"
@@ -71,7 +71,7 @@ export default function F1DetailPage() {
             </a>
             {challenge.is_championship && (
               <a
-                href={`${process.env.REACT_APP_BACKEND_URL}/api/exports/f1/${challenge.slug || challenge.id}/championship.pdf`}
+                href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship.pdf`}
                 target="_blank" rel="noreferrer"
                 data-testid="f1-export-pdf-championship"
                 className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition"
@@ -80,7 +80,7 @@ export default function F1DetailPage() {
               </a>
             )}
             <a
-              href={`${process.env.REACT_APP_BACKEND_URL}/api/f1/challenges/${challenge.id}/export.csv`}
+              href={`${API}/f1/challenges/${challenge.id}/export.csv`}
               data-testid="f1-export-csv"
               className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/10 text-white/60 font-bold uppercase tracking-wider rounded-sm hover:border-white/20 hover:text-white transition text-sm"
             >
