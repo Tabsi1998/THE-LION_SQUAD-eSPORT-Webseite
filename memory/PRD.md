@@ -58,11 +58,7 @@ NIE einen registrierten Nutzer als „Mitglied" bezeichnen. Stattdessen „Commu
 - [x] **DashboardPage** überarbeitet — Member-only Tiles (Mitgliederbereich + Vorteile), Mitgliedsnummer, „Mitglied werden" CTA für Community
 - [x] **AdminLayout** erweitert — Mitglieder + Mitgliedervorteile in Sidebar
 
-## Roadmap (Phase 4-10)
-
-### 🟣 Phase 4 — Mitgliederportal Vertiefung
-- Interne News, Events, Vereinsdokumente, Downloads
-- „Meine Mitgliedschaft"-Seite
+## Roadmap (Phase 5-10)
 
 ### 🔴 Phase 5 — Status-System & Stream-Logik
 - „Warten auf Öffnung" Status für Tournaments/Challenges/Fast-Lap (für Events bereits umgesetzt in Phase 3!)
@@ -81,6 +77,24 @@ NIE einen registrierten Nutzer als „Mitglied" bezeichnen. Stattdessen „Commu
 ### 🟢 Phase 9 — Preise & Gewinnabholung (PrizePickup-Model)
 
 ### 🟣 Phase 10 — Feinschliff (404/403/500 Pages, SEO, Setup-Wizard)
+
+## Phase 4 — IMPLEMENTIERT (04.05.2026 · Mitgliederportal Vertiefung)
+
+### Backend
+- [x] **Document-Model** + CRUD: 10 Kategorien (statutes/minutes/form/regulations/guideline/download/media_kit/presentation/template/other), 4 Visibilities (public/community/members/internal), pinned, tags, order_index, download_count, uploader_name
+- [x] **Datei-Upload für Dokumente** (`POST /api/uploads/document`): PDF/DOCX/XLSX/PPTX/ZIP/TXT/CSV/MD/Images, max 25 MB. Returnt URL + original_filename + size + mime
+- [x] **Track-Download-Endpoint** (`POST /api/documents/{id}/track-download`) — Counter pro Download
+- [x] **DRY: `services/visibility.py`** zentralisiert die Visibility-Logik (vorher 4× kopiert in news/events/gallery/document)
+- [x] **History-Spam-Fix** in `upsert_membership`: History wächst nur, wenn `member_status` sich tatsächlich ändert (nicht bei reinen role/notes-Updates)
+- [x] **29/29 Backend-Tests grün** (test_phase4_documents.py)
+
+### Frontend
+- [x] **MemberAreaPage** überarbeitet — 4 Quick-Tiles (Mitgliedschaft / Vorteile / Dokumente / Interne News), Vorschau auf 3-4 letzte Einträge je Bereich
+- [x] **MemberDocumentsPage** (`/members/documents`) — Kategoriefilter, Suche, Pinned/Rest-Sektionen, File-Size-Format, Download-Counter, Track-Download-Hook
+- [x] **MemberNewsPage** (`/members/news`) — nur visibility=members + internal
+- [x] **MyMembershipPage** (`/members/membership`) — Hero mit Mitgliedsnummer, Stats (Aktiv-Jahre, Mitglied seit, Sichtbarkeit, Mitgliedsart), Verlauf/History-Liste mit allen Statusübergängen, Vorstand-Notiz-Box
+- [x] **AdminDocumentsPage** (`/admin/documents`) — CRUD-Tabelle + Modal mit eingebautem File-Upload (Drag-Auswahl, Datei-Wechsel, Auto-Title aus Filename)
+- [x] Member-Tiles im Mitgliederbereich verlinken alles und zeigen Counter
 
 ## Phase 3 — IMPLEMENTIERT (04.05.2026 · Vereins-CMS)
 

@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from database import get_db
 from auth import require_admin, get_optional_user
-from services.membership_service import is_active_member, get_membership
+from services.visibility import user_can_see, filter_visible
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate,
     GalleryAlbumCreate, GalleryAlbumUpdate,
@@ -14,33 +14,13 @@ from models import (
 router = APIRouter(prefix="/api", tags=["news"])
 
 
-# ---------- Visibility helper ----------
+# ---------- Visibility helper (delegates to shared module) ----------
 async def _user_can_see(user: dict | None, visibility: str) -> bool:
-    if visibility == "public":
-        return True
-    if not user:
-        return False
-    if visibility == "internal":
-        return user.get("role") in ("club_admin", "superadmin")
-    if visibility == "community":
-        return True  # any logged-in user
-    if visibility == "members":
-        if user.get("is_club_member"):
-            return True
-        m = await get_membership(user["id"])
-        return is_active_member(m) or user.get("role") in (
-            "moderator", "tournament_admin", "club_admin", "superadmin"
-        )
-    return True
+    return await user_can_see(user, visibility)
 
 
 async def _filter_visible(items: list, user: dict | None) -> list:
-    out = []
-    for it in items:
-        v = it.get("visibility") or "public"
-        if await _user_can_see(user, v):
-            out.append(it)
-    return out
+    return await filter_visible(items, user)
 
 
 # ---------- News ----------

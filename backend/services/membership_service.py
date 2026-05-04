@@ -74,14 +74,12 @@ async def upsert_membership(
     promoting to active for the first time."""
     db = get_db()
     existing = await get_membership(user_id)
-    history_entry = {
-        "actor_id": actor_id,
-        "at": now_utc().isoformat(),
-        "from_status": existing.get("member_status") if existing else None,
-        "to_status": member_status if member_status is not None else (existing.get("member_status") if existing else None),
-        "notes": notes,
-    }
     update = {"updated_at": now_utc().isoformat(), "updated_by": actor_id}
+    status_changed = (
+        member_status is not None
+        and existing
+        and existing.get("member_status") != member_status
+    ) or (member_status is not None and not existing)
 
     if member_status is not None:
         if member_status not in VALID_STATUSES:
@@ -110,11 +108,26 @@ async def upsert_membership(
         update["show_member_number_publicly"] = show_member_number_publicly
 
     if existing:
-        await db.memberships.update_one(
-            {"user_id": user_id},
-            {"$set": update, "$push": {"history": history_entry}},
-        )
+        ops: dict = {"$set": update}
+        if status_changed:
+            ops["$push"] = {"history": {
+                "actor_id": actor_id,
+                "at": now_utc().isoformat(),
+                "from_status": existing.get("member_status"),
+                "to_status": member_status,
+                "notes": notes,
+            }}
+        await db.memberships.update_one({"user_id": user_id}, ops)
     else:
+        history = []
+        if member_status is not None:
+            history.append({
+                "actor_id": actor_id,
+                "at": now_utc().isoformat(),
+                "from_status": None,
+                "to_status": member_status,
+                "notes": notes,
+            })
         doc = {
             "id": new_id(),
             "user_id": user_id,
@@ -125,7 +138,7 @@ async def upsert_membership(
             "internal_role": None,
             "notes": None,
             "show_member_number_publicly": False,
-            "history": [history_entry],
+            "history": history,
             "created_at": now_utc().isoformat(),
             "created_by": actor_id,
             **update,
