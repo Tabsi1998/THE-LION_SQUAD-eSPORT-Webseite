@@ -35,6 +35,12 @@ services:
       - "${BACKEND_PORT:-8001}:8001"
     volumes:
       - uploads_data:${UPLOAD_DIR:-/app/backend/uploads}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health', timeout=3).read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       - tls-net
 
@@ -46,9 +52,16 @@ services:
     container_name: tls-frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "${FRONTEND_PORT:-3000}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - tls-net
 
