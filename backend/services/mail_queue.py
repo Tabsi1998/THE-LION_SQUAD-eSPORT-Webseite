@@ -34,6 +34,7 @@ async def get_mail_settings() -> dict:
         "smtp_port": int(s.get("smtp_port") or 587),
         "smtp_user": s.get("smtp_user", ""),
         "smtp_pass": s.get("smtp_pass", ""),
+        "smtp_auth": s.get("smtp_auth", "auto"),
         "smtp_security": s.get("smtp_security", "starttls"),  # starttls | tls | none
         "smtp_tls_verify": s.get("smtp_tls_verify", True),
         "smtp_envelope_from": s.get("smtp_envelope_from", ""),
@@ -52,7 +53,9 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
     from email.mime.text import MIMEText
     from email.utils import formataddr, formatdate, make_msgid
 
-    envelope_from = cfg.get("smtp_envelope_from") or cfg.get("smtp_user") or cfg["sender_email"]
+    smtp_auth = (cfg.get("smtp_auth") or "auto").lower()
+    auth_user_for_envelope = cfg.get("smtp_user") if smtp_auth != "none" else ""
+    envelope_from = cfg.get("smtp_envelope_from") or auth_user_for_envelope or cfg["sender_email"]
     configured_msg_domain = (cfg.get("message_id_domain") or "").strip()
     message_id_domain = configured_msg_domain or mailbox_domain(cfg["sender_email"])
     reply_to = (cfg.get("reply_to_email") or cfg["sender_email"]).strip()
@@ -81,11 +84,17 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
         tls_context.check_hostname = False
         tls_context.verify_mode = ssl.CERT_NONE
 
+    username = cfg["smtp_user"] or None
+    password = cfg["smtp_pass"] or None
+    if smtp_auth == "none":
+        username = None
+        password = None
+
     kwargs = {
         "hostname": cfg["smtp_host"],
         "port": cfg["smtp_port"],
-        "username": cfg["smtp_user"] or None,
-        "password": cfg["smtp_pass"] or None,
+        "username": username,
+        "password": password,
         "sender": envelope_from,
         "recipients": [to],
         "use_tls": use_tls,
@@ -98,7 +107,15 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
     if not (use_tls or start_tls):
         kwargs["use_tls"] = False
         kwargs["start_tls"] = False
-    await aiosmtplib.send(msg, **kwargs)
+    try:
+        await aiosmtplib.send(msg, **kwargs)
+    except Exception as exc:
+        if smtp_auth == "auto" and username and "AUTH extension is not supported" in str(exc):
+            logger.warning("[mailqueue] SMTP AUTH not supported, retrying without login")
+            retry_kwargs = {**kwargs, "username": None, "password": None}
+            await aiosmtplib.send(msg, **retry_kwargs)
+        else:
+            raise
     return msg["Message-ID"]
 
 

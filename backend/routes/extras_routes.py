@@ -116,6 +116,7 @@ class SmtpSettings(BaseModel):
     smtp_port: Optional[int] = None
     smtp_user: Optional[str] = None
     smtp_pass: Optional[str] = None
+    smtp_auth: Optional[Literal["auto", "login", "none"]] = None
     smtp_security: Optional[Literal["starttls", "tls", "none"]] = None
     smtp_tls_verify: Optional[bool] = None
     smtp_envelope_from: Optional[str] = None
@@ -135,6 +136,7 @@ async def get_smtp_settings(me: dict = Depends(require_admin())):
         s["smtp_pass_masked"] = "•" * min(8, max(4, len(p)))
         s.pop("smtp_pass", None)
     s.setdefault("provider", "smtp" if s.get("smtp_host") else "resend")
+    s.setdefault("smtp_auth", "auto")
     s.setdefault("smtp_security", "starttls")
     s.setdefault("smtp_port", 587)
     s.setdefault("smtp_tls_verify", True)

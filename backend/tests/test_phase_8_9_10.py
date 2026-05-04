@@ -15,7 +15,8 @@ def test_smtp_settings_roundtrip(admin_client, base_url):
 
     payload = {
         "provider": "smtp", "smtp_host": "mail.example.com", "smtp_port": 587,
-        "smtp_user": "u", "smtp_pass": "secretpass", "smtp_security": "starttls",
+        "smtp_user": "u", "smtp_pass": "secretpass", "smtp_auth": "none",
+        "smtp_security": "starttls",
         "sender_name": "TLS Test", "sender_email": "test@thelionsquad.at",
         "enabled": True,
     }
@@ -25,6 +26,7 @@ def test_smtp_settings_roundtrip(admin_client, base_url):
     r = admin_client.get(f"{base_url}/api/settings/smtp")
     body = r.json()
     assert body["smtp_host"] == "mail.example.com"
+    assert body["smtp_auth"] == "none"
     assert "smtp_pass" not in body
     assert "smtp_pass_masked" in body
 

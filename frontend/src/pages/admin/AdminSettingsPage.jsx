@@ -8,7 +8,7 @@ import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquar
 export default function AdminSettingsPage() {
   const [tab, setTab] = useState("email");
   const [email, setEmail] = useState({ resend_api_key: "", sender_name: "", sender_email: "", reply_to_email: "", enabled: true, resend_api_key_masked: "" });
-  const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_security: "starttls", smtp_tls_verify: true, smtp_envelope_from: "", sender_name: "", sender_email: "", reply_to_email: "", message_id_domain: "", enabled: true, smtp_pass_masked: "" });
+  const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_auth: "auto", smtp_security: "starttls", smtp_tls_verify: true, smtp_envelope_from: "", sender_name: "", sender_email: "", reply_to_email: "", message_id_domain: "", enabled: true, smtp_pass_masked: "" });
   const [smtpTestEmail, setSmtpTestEmail] = useState("");
   const [queue, setQueue] = useState([]);
   const [queueFilter, setQueueFilter] = useState("");
@@ -196,6 +196,15 @@ export default function AdminSettingsPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">SMTP Anmeldung</div>
+                <select value={smtp.smtp_auth || "auto"} onChange={(e) => setSmtp({ ...smtp, smtp_auth: e.target.value })} data-testid="smtp-auth" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+                  <option value="auto">Automatisch</option>
+                  <option value="login">Mit Benutzer/Passwort</option>
+                  <option value="none">Ohne Anmeldung</option>
+                </select>
+                <p className="mt-1 text-[11px] text-white/40">Bei lokalem Mailserver meist "Ohne Anmeldung".</p>
+              </div>
+              <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">User</div>
                 <input value={smtp.smtp_user || ""} onChange={(e) => setSmtp({ ...smtp, smtp_user: e.target.value })} data-testid="smtp-user" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
               </div>
@@ -285,6 +294,7 @@ export default function AdminSettingsPage() {
               <button onClick={sendSmtpTest} data-testid="smtp-test-send" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Senden</button>
             </div>
             <p className="text-xs text-white/50">Testet die SMTP-Verbindung direkt. Im Docker-Setup fuer einen lokalen Host-Mailserver meist <code className="font-mono text-white/70">host.docker.internal</code> als SMTP Host nutzen. Bei self-signed Zertifikat "TLS Zertifikat pruefen" deaktivieren.</p>
+            <p className="text-xs text-white/50">Wenn der Server "SMTP AUTH extension is not supported" meldet, stelle "SMTP Anmeldung" auf "Ohne Anmeldung" und lasse User/Passwort leer.</p>
           </div>
         </div>
       )}

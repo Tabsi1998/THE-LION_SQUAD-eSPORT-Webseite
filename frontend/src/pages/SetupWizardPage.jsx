@@ -33,6 +33,7 @@ export default function SetupWizardPage() {
     smtp_port: 587,
     smtp_user: "",
     smtp_pass: "",
+    smtp_auth: "auto",
     smtp_security: "starttls",
     smtp_tls_verify: true,
     smtp_envelope_from: "",
@@ -76,7 +77,7 @@ export default function SetupWizardPage() {
       if (!payload.new_admin_password) delete payload.new_admin_password;
       if (payload.mail_provider === "resend") {
         delete payload.smtp_host; delete payload.smtp_port; delete payload.smtp_user;
-        delete payload.smtp_pass; delete payload.smtp_security; delete payload.smtp_tls_verify; delete payload.smtp_envelope_from;
+        delete payload.smtp_pass; delete payload.smtp_auth; delete payload.smtp_security; delete payload.smtp_tls_verify; delete payload.smtp_envelope_from;
         delete payload.message_id_domain;
       } else {
         delete payload.resend_api_key;
@@ -189,6 +190,14 @@ export default function SetupWizardPage() {
                     <input type="checkbox" checked={data.smtp_tls_verify !== false} onChange={(e) => upd("smtp_tls_verify", e.target.checked)} data-testid="wizard-smtp-tls-verify" className="accent-[#29B6E8]" />
                     <span>TLS Zertifikat pruefen</span>
                   </label>
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">SMTP Anmeldung</div>
+                    <select value={data.smtp_auth} onChange={(e) => upd("smtp_auth", e.target.value)} data-testid="wizard-smtp-auth" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+                      <option value="auto">Automatisch</option>
+                      <option value="login">Mit Benutzer/Passwort</option>
+                      <option value="none">Ohne Anmeldung</option>
+                    </select>
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="User" testId="wizard-smtp-user" value={data.smtp_user} onChange={(v) => upd("smtp_user", v)} />
                     <Field label="Passwort" type="password" testId="wizard-smtp-pass" value={data.smtp_pass} onChange={(v) => upd("smtp_pass", v)} />
