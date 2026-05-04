@@ -16,12 +16,15 @@ logger = logging.getLogger("tls.badges")
 # Helper to keep the catalog readable
 def _b(code, name, description, *, tier="bronze", category="tournament", icon="flag",
        points=5, audience="public", secret=False, negative=False,
-       requires_membership=False, can_showcase=True):
+       requires_membership=False, can_showcase=True,
+       progress_target=None, condition_key=None, severity=None):
     return {
         "code": code, "name": name, "description": description,
         "tier": tier, "category": category, "icon": icon, "points": points,
         "audience": audience, "secret": secret, "negative": negative,
         "requires_membership": requires_membership, "can_showcase": can_showcase,
+        "progress_target": progress_target, "condition_key": condition_key,
+        "severity": severity,
     }
 
 
@@ -40,9 +43,11 @@ BADGE_CATALOG = [
     _b("grand_champion", "Grand Champion", "Gewinne 3 Turniere.",
        tier="platinum", category="tournament", icon="crown", points=150, audience="public"),
     _b("veteran_10", "Veteran I", "Nimm an 10 Turnieren teil.",
-       tier="silver", category="tournament", icon="shield", points=20, audience="community"),
+       tier="silver", category="tournament", icon="shield", points=20, audience="community",
+       progress_target=10, condition_key="tournaments_registered"),
     _b("veteran_25", "Veteran II", "Nimm an 25 Turnieren teil.",
-       tier="gold", category="tournament", icon="shield-check", points=75, audience="community"),
+       tier="gold", category="tournament", icon="shield-check", points=75, audience="community",
+       progress_target=25, condition_key="tournaments_registered"),
 
     # Matches
     _b("win_streak_3", "Drei in Folge", "Gewinne 3 Matches am Stück.",
@@ -56,9 +61,11 @@ BADGE_CATALOG = [
     _b("first_lap", "Erster Versuch", "Trage deine erste Fast-Lap-Zeit ein.",
        tier="bronze", category="fastlap", icon="flag", points=5, audience="community"),
     _b("laps_10", "10 Runden", "Fahre 10 Fast-Lap Versuche.",
-       tier="silver", category="fastlap", icon="flag", points=15, audience="community"),
+       tier="silver", category="fastlap", icon="flag", points=15, audience="community",
+       progress_target=10, condition_key="fastlap_valid_count"),
     _b("laps_50", "50 Runden", "Fahre 50 Fast-Lap Versuche.",
-       tier="gold", category="fastlap", icon="flag-triangle-right", points=60, audience="community"),
+       tier="gold", category="fastlap", icon="flag-triangle-right", points=60, audience="community",
+       progress_target=50, condition_key="fastlap_valid_count"),
     _b("lap_pole_position", "Pole Position", "Fahre die schnellste Zeit auf einer Strecke.",
        tier="gold", category="fastlap", icon="trophy", points=40, audience="public"),
     _b("lap_sub_target", "Sub-Grenze", "Knacke die Sekunden-Zielzeit eines Admins.",
@@ -119,6 +126,138 @@ BADGE_CATALOG = [
     _b("ehrenvoll_untergegangen", "Ehrenvoll untergegangen", "Klare Niederlage im Finale.",
        tier="bronze", category="fun", icon="skull", points=0,
        audience="public", negative=True, can_showcase=False, secret=True),
+
+    # ---------- Phase B v3 — Positive Fun (public, showcaseable) ----------
+    _b("first_dispute_resolved", "Friedenstifter", "Dein erster Dispute wurde gütlich gelöst.",
+       tier="bronze", category="community", icon="handshake", points=10, audience="public"),
+    _b("nightowl", "Nachteule", "Spiele ein Match zwischen 02:00 und 05:00 Uhr.",
+       tier="bronze", category="fun", icon="moon", points=5, audience="public"),
+    _b("early_bird", "Frühaufsteher", "Spiele ein Match zwischen 05:00 und 08:00 Uhr.",
+       tier="bronze", category="fun", icon="sun", points=5, audience="public"),
+    _b("perfect_attendance", "100 % Anwesenheit", "Check-in ohne Verspätung bei 5 Turnieren in Folge.",
+       tier="silver", category="community", icon="check-check", points=25, audience="public",
+       progress_target=5, condition_key="checkins_in_a_row"),
+    _b("comeback_king", "Comeback-King", "Verliere ein Match, gewinne das nächste.",
+       tier="silver", category="match", icon="rotate-cw", points=15, audience="public"),
+    _b("multi_game", "Multitalent", "Nimm an Turnieren in 3 verschiedenen Spielen teil.",
+       tier="silver", category="tournament", icon="layers", points=25, audience="public",
+       progress_target=3, condition_key="distinct_games_registered"),
+    _b("multi_platform", "Plattform-Held", "Spiele auf 2+ Plattformen.",
+       tier="silver", category="community", icon="cpu", points=20, audience="public",
+       progress_target=2, condition_key="distinct_platforms"),
+    _b("season_silver", "Season Silber", "Erreiche Top 25 in einer Saison.",
+       tier="silver", category="season", icon="trending-up", points=40, audience="public"),
+    _b("invite_friend", "Bring a Friend", "Lade einen Freund ein, der sich registriert.",
+       tier="silver", category="community", icon="user-plus", points=20, audience="public"),
+    _b("streamer_spotted", "Streamer Spotted", "Verlinke einen Twitch-Stream in deinem Profil.",
+       tier="bronze", category="community", icon="tv", points=10, audience="public"),
+    _b("photo_op", "Photo Op", "Werde im Album eines Vereinsevents getaggt.",
+       tier="bronze", category="community", icon="camera", points=10, audience="community"),
+    _b("event_attendance_5", "Stammgast", "Nimm an 5 Vereinsevents teil.",
+       tier="silver", category="community", icon="calendar-check", points=30, audience="community",
+       progress_target=5, condition_key="events_attended"),
+    _b("badge_collector_10", "Sammler", "Schalte 10 Badges frei.",
+       tier="silver", category="community", icon="layers", points=30, audience="public",
+       progress_target=10, condition_key="badges_unlocked"),
+    _b("badge_collector_25", "Trophäenjäger", "Schalte 25 Badges frei.",
+       tier="gold", category="community", icon="trophy", points=80, audience="public",
+       progress_target=25, condition_key="badges_unlocked"),
+
+    # ---------- Phase B v3 — Negative Fun: Player (mehr Würze) ----------
+    _b("ghost_player", "Geist", "Anmeldung ohne jemals zu erscheinen.",
+       tier="bronze", category="fun", icon="ghost", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
+    _b("rage_quitter", "Rage Quitter", "Match abgebrochen mit weniger als 30 % Spielzeit.",
+       tier="bronze", category="fun", icon="x-circle", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
+    _b("nullachter", "Null-Achter", "Verloren mit 0:8 oder schlechter.",
+       tier="bronze", category="fun", icon="frown", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+    _b("tilt_master", "Tilt Master", "3 Niederlagen in Folge.",
+       tier="bronze", category="fun", icon="alert-triangle", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+    _b("captain_obvious", "Captain Obvious", "Score gemeldet, der nie bestätigt wurde.",
+       tier="bronze", category="fun", icon="circle-help", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+    _b("disconnect_diva", "DC-Diva", "3 Disconnects in einer Session.",
+       tier="bronze", category="fun", icon="wifi-off", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
+    _b("snack_break", "Snack-Break-Pro", "Match-Pause länger als der eigene Match.",
+       tier="bronze", category="fun", icon="cookie", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+    _b("forgot_to_register", "Anmeldung? Welche Anmeldung?", "Turnier verpasst trotz angekündigter Teilnahme.",
+       tier="bronze", category="fun", icon="bell-off", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
+    _b("backseat_pro", "Backseat-Profi", "5 Kommentare ohne selbst zu spielen.",
+       tier="bronze", category="fun", icon="armchair", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+    _b("toxic_chat_warning", "Verbalakrobat", "Chat-Verwarnung erhalten.",
+       tier="bronze", category="fun", icon="message-square-warning", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="savage"),
+    _b("no_show_admin", "Admin-Schreck", "Admin musste 3-mal nachhaken.",
+       tier="bronze", category="fun", icon="megaphone-off", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
+    _b("controller_throw", "Controller-Wurf", "Hardware-Schaden gemeldet.",
+       tier="bronze", category="fun", icon="alert-octagon", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="savage"),
+    _b("lucky_loser", "Lucky Loser", "Erstes Match verloren — trotzdem ins Finale.",
+       tier="bronze", category="fun", icon="dice-3", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+    _b("flagged_screenshot", "Beweisfoto vergessen", "Score ohne Proof eingereicht (3-mal).",
+       tier="bronze", category="fun", icon="image-off", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+    _b("warmup_master", "Aufwärm-Spezialist", "Warmup länger als das eigentliche Match.",
+       tier="bronze", category="fun", icon="thermometer-snowflake", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+
+    # ---------- Phase B v3 — Negative Fun: Team (7) ----------
+    _b("team_one_man", "Einzelkämpfer", "Team-Match mit nur einem aktiven Spieler.",
+       tier="bronze", category="fun", icon="user-minus", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
+    _b("team_no_show", "Geisterclan", "Team komplett im No-Show-Modus.",
+       tier="bronze", category="fun", icon="ghost", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="savage"),
+    _b("team_friendly_fire", "Friendly Fire Champ", "Eigentor / Teamkill > 3 in einem Match.",
+       tier="bronze", category="fun", icon="crosshair", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+    _b("team_late_arrival", "Verspäteter Clan", "Komplettes Team verpasst Check-in.",
+       tier="bronze", category="fun", icon="clock-alert", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
+    _b("team_dispute_loop", "Streit-Verein", "5+ offene Disputes als Team.",
+       tier="bronze", category="fun", icon="messages-square", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="savage"),
+    _b("team_drama_queen", "Drama-Queen-Team", "Team mit den meisten Forum-Beschwerden.",
+       tier="bronze", category="fun", icon="theater", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+    _b("team_revolving_door", "Drehtür", "Mehr als 50 % Mitgliederwechsel pro Saison.",
+       tier="bronze", category="fun", icon="door-open", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+
+    # ---------- Phase B v3 — Negative Fun: Fast Lap (8) ----------
+    _b("offroad_artist", "Offroad-Künstler", "Mehr als 10 Mal von der Strecke abgekommen.",
+       tier="bronze", category="fun", icon="map-off", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+    _b("reverse_gear", "Rückwärtsgang", "Eine ganze Runde rückwärts gefahren.",
+       tier="bronze", category="fun", icon="rotate-ccw", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+    _b("slowest_lap", "Schneckenrennen", "Langsamste Rundenzeit auf einer Strecke.",
+       tier="bronze", category="fun", icon="snail", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+    _b("crash_test_dummy", "Crash-Test", "5+ Crashes in einer einzigen Session.",
+       tier="bronze", category="fun", icon="car-front", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
+    _b("invalid_streak", "Ungültig-Marathon", "10+ ungültige Runden in einer Challenge.",
+       tier="bronze", category="fun", icon="ban", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
+    _b("pit_lane_pro", "Boxengassen-Profi", "Mehr als 3 Pit-Stops pro Runde.",
+       tier="bronze", category="fun", icon="construction", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
+    _b("dnf_legend", "DNF-Legende", "5 Did-Not-Finish Einträge in einer Saison.",
+       tier="bronze", category="fun", icon="x-octagon", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
+    _b("ghost_lap", "Phantom-Runde", "Zeit gemeldet, aber kein Beweis.",
+       tier="bronze", category="fun", icon="cloud-off", points=0,
+       audience="public", negative=True, can_showcase=False, secret=True, severity="savage"),
 ]
 
 BADGE_BY_CODE = {b["code"]: b for b in BADGE_CATALOG}
@@ -333,3 +472,43 @@ async def on_team_created(user_id: str, team_id: str):
 
 async def on_team_joined(user_id: str, team_id: str):
     await award_badge(user_id, "clan_member", {"team_id": team_id})
+
+
+# ---------- Phase B v3 — Progress Aggregator ----------
+async def compute_user_progress(user_id: str) -> dict[str, int]:
+    """Aggregate counters used by progress_target / condition_key fields.
+
+    Returns dict {condition_key: current_count} to be merged into badge listings.
+    """
+    db = get_db()
+    progress: dict[str, int] = {}
+
+    progress["tournaments_registered"] = await db.tournament_registrations.count_documents({"user_id": user_id})
+    progress["fastlap_valid_count"] = await db.f1_lap_times.count_documents({"user_id": user_id, "is_invalid": {"$ne": True}})
+    progress["badges_unlocked"] = await db.user_badges.count_documents({"user_id": user_id})
+    progress["events_attended"] = await db.event_registrations.count_documents({"user_id": user_id, "checked_in": True}) if "event_registrations" in await db.list_collection_names() else 0
+
+    # Distinct games via tournament -> game_id
+    regs = await db.tournament_registrations.find({"user_id": user_id}, {"_id": 0, "tournament_id": 1}).to_list(500)
+    tids = list({r["tournament_id"] for r in regs if r.get("tournament_id")})
+    distinct_games = 0
+    if tids:
+        games = await db.tournaments.distinct("game_id", {"id": {"$in": tids}})
+        distinct_games = len([g for g in games if g])
+    progress["distinct_games_registered"] = distinct_games
+
+    # Distinct platforms from user profile
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "main_platforms": 1, "main_platform": 1})
+    platforms = set()
+    if user:
+        for p in (user.get("main_platforms") or []):
+            if p:
+                platforms.add(p)
+        if user.get("main_platform"):
+            platforms.add(user.get("main_platform"))
+    progress["distinct_platforms"] = len(platforms)
+
+    # Streak counters — best-effort (placeholders, computed conservatively)
+    progress["checkins_in_a_row"] = 0  # filled by tournament hook on success
+
+    return progress

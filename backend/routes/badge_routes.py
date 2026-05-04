@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import get_optional_user, get_current_user, require_admin
-from badges import _user_can_see_badge, award_badge, BADGE_BY_CODE
+from badges import _user_can_see_badge, award_badge, BADGE_BY_CODE, compute_user_progress
 from models import now_utc, new_id
 
 router = APIRouter(prefix="/api/badges", tags=["badges"])
@@ -43,6 +43,48 @@ async def list_my_badges(user: dict = Depends(get_current_user)):
         b = badges.get(e["badge_code"])
         if b:
             out.append({**b, "earned_at": e["earned_at"], "context": e.get("context", {})})
+    return out
+
+
+@router.get("/progress/me")
+async def my_progress(user: dict = Depends(get_current_user)):
+    """Phase B v3 — return locked badges with progress toward unlock.
+
+    Output: list of {badge, current, target, percent}. Only progressable badges
+    visible to the user (and not yet earned) are returned.
+    """
+    db = get_db()
+    counters = await compute_user_progress(user["id"])
+    earned_codes = {b["badge_code"] async for b in db.user_badges.find({"user_id": user["id"]})}
+    catalog = await db.badges.find({}, {"_id": 0}).to_list(500)
+    out = []
+    for b in catalog:
+        if b["code"] in earned_codes:
+            continue
+        target = b.get("progress_target")
+        ck = b.get("condition_key")
+        if not target or not ck or ck not in counters:
+            continue
+        if not _user_can_see_badge(b, user):
+            continue
+        cur = min(counters[ck], target)
+        # Auto-award when user reaches 100% via progress evaluation
+        if counters[ck] >= target:
+            awarded = await award_badge(user["id"], b["code"], {"auto_progress": True, "current": counters[ck], "target": target})
+            if awarded:
+                continue  # show as earned, not as progress
+        out.append({
+            "code": b["code"],
+            "name": b["name"],
+            "tier": b["tier"],
+            "category": b["category"],
+            "icon": b.get("icon"),
+            "points": b.get("points", 0),
+            "current": cur,
+            "target": target,
+            "percent": round(100 * cur / target) if target else 0,
+        })
+    out.sort(key=lambda x: (-x["percent"], x["target"]))
     return out
 
 

@@ -36,12 +36,12 @@ export const NAV_STRUCTURE = [
     ],
   },
   {
-    label: "Spieler",
+    label: "Community",
     children: [
-      { to: "/players", label: "Alle Spieler" },
       { to: "/members", label: "Vereinsmitglieder" },
+      { to: "/players", label: "Community-Spieler" },
       { to: "/membership/join", label: "Mitglied werden" },
-      { to: "/members/area", label: "Mitgliederbereich", memberOnly: true },
+      { to: "/members/area", label: "Mitgliederbereich", memberOnly: true, divider: true },
       { to: "/members/benefits", label: "Mitgliedervorteile", memberOnly: true },
       { to: "/members/documents", label: "Vereinsdokumente", memberOnly: true },
     ],
@@ -91,20 +91,22 @@ function NavDropdown({ item, isClubMember }) {
           data-testid={`nav-${item.label.toLowerCase()}-dropdown`}
         >
           <div className="border border-white/10 bg-[#0F0F10]/95 backdrop-blur-xl rounded-sm shadow-xl shadow-black/50 py-2">
-            {visibleChildren.map((c) => (
-              <NavLink
-                key={c.to}
-                to={c.to}
-                onClick={() => setOpen(false)}
-                data-testid={`nav-sub-${c.label.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}`}
-                className={({ isActive }) =>
-                  `block px-4 py-2 text-sm transition ${
-                    isActive ? "text-[#29B6E8] bg-[#29B6E8]/5" : "text-white/80 hover:text-[#29B6E8] hover:bg-white/5"
-                  }`
-                }
-              >
-                {c.label}
-              </NavLink>
+            {visibleChildren.map((c, idx) => (
+              <div key={c.to}>
+                {c.divider && idx > 0 && <div className="my-1 mx-3 border-t border-white/10" />}
+                <NavLink
+                  to={c.to}
+                  onClick={() => setOpen(false)}
+                  data-testid={`nav-sub-${c.label.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}`}
+                  className={({ isActive }) =>
+                    `block px-4 py-2 text-sm transition ${
+                      isActive ? "text-[#29B6E8] bg-[#29B6E8]/5" : "text-white/80 hover:text-[#29B6E8] hover:bg-white/5"
+                    }`
+                  }
+                >
+                  {c.label}
+                </NavLink>
+              </div>
             ))}
           </div>
         </div>
