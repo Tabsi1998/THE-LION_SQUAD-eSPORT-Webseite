@@ -1,4 +1,32 @@
 # THE LION SQUAD — eSPORTS · Vereinsplattform PRD
+## Phase P0 — Penalty-Transparenz (04.05.2026 · iteration_18 grün · 42/42)
+
+**User-Wunsch**: Bei jeder Strafe (Turnier oder Fast Lap) muss zwingend ein Kommentar/Begründung gemacht werden, und der Spieler MUSS sehen warum.
+
+### Backend
+- **`f1_routes._validate_penalty_note`**: Helper validiert dass `admin_note ≥5 Zeichen` wenn `penalty_seconds > 0` ODER `is_invalid = true` (HTTP 422 mit deutscher Hinweis-Message)
+- **POST/PATCH `/api/f1/.../times`**: Validation enforced; Update-Path berechnet finalen State aus existing+updates
+- **F1 Leaderboard `entries[].penalty_note`** wird gefüllt für Strafzeit-Einträge → öffentlich sichtbar
+- **POST `/api/matches/{id}/forfeit`**: Body `note` ist Pflichtfeld (≥5 Zeichen, sonst 422); Match speichert `admin_decision_note`, `admin_decision_by`, `admin_decision_at`
+- **NEU `routes/penalty_routes.py`**: 
+  - `GET /api/penalties/me` (auth) — eigene Strafen-History (Fast Lap Strafen + Lap Invalid + Match Forfeit + Negative Achievements)
+  - `GET /api/admin/penalties` (admin) — aggregierte Inbox mit `kind`-Filter (lap_penalty/lap_invalid/match_forfeit/incident) + User-Enrichment
+
+### Frontend
+- **`AdminF1EditPage`**: 
+  - addTime-Form zeigt Pflicht-Reason-Textarea (rote Border) sobald Strafe > 0
+  - editTime-Modal zeigt Note-Feld mit roter Border + Pflicht-Label sobald penalty>0 oder is_invalid; Toast-Error bei < 5 Zeichen
+- **F1 Leaderboard (`F1DetailPage`)**: Eintrag mit Strafzeit zeigt orange `+Xs ⓘ` Badge mit `title` Tooltip + italic Begründung in Rot unter der Zeit
+- **NEU `/my/penalties`** (`MyPenaltiesPage.jsx`): Liste aller eigenen Strafen mit Icon, Label, Kontext-Link, Begründungs-Quote (left border accent), Issuer + Datum + Roh-Zeit; Empty-State „Saubere Weste"
+- **NEU `/admin/penalties`** (`AdminPenaltiesPage.jsx`): Filter-Tabs (Alle/Strafzeit/Lap Invalid/Forfeit/Vorfall) mit Counts, Rows mit User-Avatar-Link, Reason-Quote, Kontext-Link, Issuer + Datum
+- **DashboardPage**: neue Kachel „Meine Strafen (n)" mit roter Akzent-Border wenn n > 0
+- **AdminLayout-Sidebar**: neuer Eintrag „Strafen" (AlertTriangle Icon) zwischen Gewinne und Widgets
+
+### Tests (`test_phase_penalty_iter19.py`)
+- 10/10 grün: 422-Validation für penalty/invalid ohne Note, 200 mit Note, Leaderboard-Exposure, /me Auth-Block, Admin-Filter, Forfeit-Validation
+- Regression: 32/32 (Phase EF + FG) grün → **42/42 gesamt**
+
+
 ## Phase F.2 + Phase G + Phase H — IMPLEMENTIERT (04.05.2026 · iteration_17 grün)
 
 ### Phase F.2 — Medien-Browser & Navigations-Editor
