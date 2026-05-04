@@ -300,6 +300,46 @@ def tpl_membership_blocked(display_name: str) -> tuple[str, str]:
     )
 
 
+def _wrap(title: str, body_html: str, cta_label: Optional[str] = None, cta_url: Optional[str] = None) -> str:
+    """Neutral transactional email layout tuned for inbox placement."""
+    cta = ""
+    if cta_label and cta_url:
+        cta = (
+            f'<p style="margin:24px 0 0"><a href="{cta_url}" '
+            f'style="display:inline-block;padding:12px 18px;background:{BRAND_CYAN};'
+            'color:#001018;font-weight:700;text-decoration:none;font-family:Arial,sans-serif;'
+            'font-size:14px;border-radius:4px">'
+            f"{cta_label}</a></p>"
+        )
+    return f"""<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#17202a">
+<div style="display:none;max-height:0;overflow:hidden;color:transparent">Automatische Nachricht von THE LION SQUAD.</div>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:32px 0">
+<tr><td align="center">
+  <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #d8dee6;border-radius:6px">
+    <tr><td style="padding:28px 32px 16px;border-bottom:1px solid #edf0f3">
+      <div style="font-size:13px;font-weight:700;color:#167da3">THE LION SQUAD eSports</div>
+      <div style="margin-top:10px;font-size:24px;font-weight:700;color:#111827;line-height:1.25">{title}</div>
+    </td></tr>
+    <tr><td style="padding:26px 32px 30px;color:#273447;font-size:15px;line-height:1.65">
+      {body_html}
+      {cta}
+    </td></tr>
+    <tr><td style="padding:16px 32px;border-top:1px solid #edf0f3;color:#6b7280;font-size:12px;line-height:1.5">
+      Diese automatische Nachricht wurde von THE LION SQUAD eSports versendet.
+    </td></tr>
+  </table>
+</td></tr></table></body></html>"""
+
+
+def tpl_test(branding: str = "TLS ARENA") -> tuple[str, str]:
+    return "Testmail von THE LION SQUAD", _wrap(
+        "E-Mail-Test",
+        "<p>Diese Nachricht wurde ueber die Website von THE LION SQUAD eSports versendet.</p>"
+        "<p>Sie dient nur zur Pruefung der SMTP-Konfiguration.</p>",
+    )
+
+
 async def send_template(template_key: str, to: str, queue: bool = True, scheduled_at=None, dedupe_key: Optional[str] = None, **kwargs) -> dict:
     """Shortcut for named templates. By default the mail is queued via the new mail-queue.
     Set queue=False to use the old immediate-Resend path (e.g. test buttons).

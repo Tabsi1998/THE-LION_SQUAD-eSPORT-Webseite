@@ -115,6 +115,17 @@ def _dns_ptr(ip: str) -> list[str]:
         return []
 
 
+def _find_dkim_records(domain: str) -> list[dict]:
+    selectors = ["default", "mail", "smtp", "dkim", "selector1", "selector2", "google", "s1", "s2"]
+    found = []
+    for selector in selectors:
+        name = f"{selector}._domainkey.{domain}"
+        records = [r for r in _dns_txt(name) if "V=DKIM1" in r.upper()]
+        if records:
+            found.append({"selector": selector, "name": name, "record": records[0][:220]})
+    return found
+
+
 def _deliverability_sync(cfg: dict) -> dict:
     sender_email = cfg.get("sender_email") or ""
     smtp_user = cfg.get("smtp_user") or ""
@@ -170,12 +181,19 @@ def _deliverability_sync(cfg: dict) -> dict:
     else:
         add(True, "HELO/EHLO Name", cfg.get("smtp_helo_name"), "info")
 
-    add(False, "DKIM", "Kann ohne DKIM-Selector nicht automatisch per DNS geprueft werden. Der Mailserver muss ausgehende Mails fuer die From-Domain DKIM-signieren.", "warning")
+    dkim_records = _find_dkim_records(from_domain)
+    if dkim_records:
+        selectors = ", ".join(r["selector"] for r in dkim_records)
+        add(True, "DKIM DNS", f"DKIM Record gefunden fuer Selector: {selectors}", "info")
+    else:
+        add(False, "DKIM DNS", "Kein DKIM Record mit typischen Selectors gefunden. Wenn dein Selector anders heisst, pruefe ihn manuell. Der Mailserver sollte ausgehende Mails fuer die From-Domain DKIM-signieren.", "warning")
 
     if not spf_records:
         result["recommendations"].append(f"SPF fuer {from_domain} setzen und die oeffentliche sendende Mailserver-IP erlauben.")
     if not dmarc_records:
         result["recommendations"].append(f"DMARC fuer {from_domain} setzen, z.B. _dmarc.{from_domain} TXT mit p=none zum Start.")
+    if not dkim_records:
+        result["recommendations"].append(f"DKIM fuer {from_domain} aktivieren. Gmail empfiehlt SPF, DKIM und DMARC; ohne DKIM landen neue oder kleine Domains schneller im Spam.")
     result["recommendations"].append("Pruefe am Mailserver die Queue und Logs: App 'sent' bedeutet nur, dass dein SMTP-Server die Mail angenommen hat.")
     result["recommendations"].append("Wenn eine Mail bei Gmail ankommt, dort 'Original anzeigen' oeffnen und SPF/DKIM/DMARC Ergebnisse pruefen.")
 
