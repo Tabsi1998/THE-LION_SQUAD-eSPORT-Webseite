@@ -21,7 +21,32 @@ Ein Rudel — online wie offline.
 
 NIE einen registrierten Nutzer als „Mitglied" bezeichnen. Stattdessen „Community" oder „Spieler".
 
-## Phase D — Navigation & Vereins-Identität (04.05.2026 · 35/36 grün)
+## Phase D — Final-Schliff (04.05.2026 · Nav/Footer/Contact/Board)
+
+- [x] **MainNav umgebaut**: 7 Top-Level (Home / Verein / News / Events / eSports / Community / Kontakt). „Spieler" + „Mitglieder" zu **„Community"**-Dropdown gemerged (Vereinsmitglieder, Community-Spieler, Mitglied werden, Divider, Member-only Items: Mitgliederbereich / -vorteile / -dokumente)
+- [x] **Footer 2-Reihen-Layout** (Desktop): 5 Link-Spalten (Brand+Social, Verein, eSports, Community, Kontakt), Bottom-Bar mit Impressum/Datenschutz/Versions-Tag. Sponsoren-Link in Kontakt-Spalte verschoben.
+- [x] **Dynamisches Vorstand-Modul**: `/api/board` CRUD mit Default-Seeds (Obmann/Schriftführer/Kassier), Geschlechter-spezifische Titel (Obmann/Obfrau), Stellvertreter-Support, Standard-Positionen können nicht gelöscht werden (deaktivieren stattdessen)
+- [x] **Public BoardPage** dynamisch aus `/api/board?active_only=true`, Avatare + Verlinkung zu PublicProfilePage
+- [x] **Admin /admin/board**: Tabelle mit Aktiv-Toggle, Zuweisungs-Selects (User + Stv.), Eigene-Position-Modal
+- [x] **Kontaktformular** (`/api/contact/submit` + `/contact/topics`): 9 Topics (general/membership/tournament/fastlap/sponsorship/press/report_bug/abuse/other), Auto-Reply via Mail-Queue, Admin-Notification an `branding.contact_email` oder Superadmin
+- [x] **Admin /admin/contact**: Inbox mit Status-Filter (new/in_progress/answered/closed/spam), Detail-View mit Status-Buttons + interner Notiz, Mailto-Reply
+- [x] **Tests**: 9/9 Backend + 14/14 Frontend grün (iteration_13.json)
+
+## Phase B v3 — Globales Achievement-System (04.05.2026)
+
+- [x] **Catalog erweitert** auf 64 Badges (vorher ~28): 14 neue positive (`first_dispute_resolved`, `nightowl`, `early_bird`, `perfect_attendance`, `comeback_king`, `multi_game`, `multi_platform`, `season_silver`, `invite_friend`, `streamer_spotted`, `photo_op`, `event_attendance_5`, `badge_collector_10`, `badge_collector_25`)
+- [x] **25 Player-Negative-Fun-Badges** (zusätzlich zu den 6 existierenden): `ghost_player`, `rage_quitter`, `nullachter`, `tilt_master`, `captain_obvious`, `disconnect_diva`, `snack_break`, `forgot_to_register`, `backseat_pro`, `toxic_chat_warning`, `no_show_admin`, `controller_throw`, `lucky_loser`, `flagged_screenshot`, `warmup_master`
+- [x] **7 Team-Negative-Fun-Badges**: `team_one_man`, `team_no_show`, `team_friendly_fire`, `team_late_arrival`, `team_dispute_loop`, `team_drama_queen`, `team_revolving_door`
+- [x] **8 Fast-Lap-Negative-Fun-Badges**: `offroad_artist`, `reverse_gear`, `slowest_lap`, `crash_test_dummy`, `invalid_streak`, `pit_lane_pro`, `dnf_legend`, `ghost_lap`
+- [x] **Neue Badge-Felder**: `progress_target`, `condition_key`, `severity` (mild/medium/savage)
+- [x] **Progress-Aggregator** (`badges.compute_user_progress`): liefert tournaments_registered / fastlap_valid_count / badges_unlocked / events_attended / distinct_games_registered / distinct_platforms / checkins_in_a_row
+- [x] **`GET /api/badges/progress/me`**: Liste fortschrittlicher Badges mit current/target/percent
+- [x] **Auto-Award bei 100 % Progress**: Aufruf von `/progress/me` evaluiert und vergibt Badges automatisch (z. B. multi_platform sobald 2+ platforms im Profil hinterlegt)
+- [x] **BadgeCard** zeigt Progress-Bar bei locked+progress, separater Negative-Style (FF3B30) mit Severity-Label
+- [x] **BadgesPage** zeigt „Beinahe geschafft"-Sektion für eingeloggte Nutzer + neue Kategorien Verein und Fun & Negative
+- [x] **Tests**: alle Phase-B-spezifischen Backend-Checks grün (badges anon/admin Filter, progress/me, auto-award) — iteration_13.json
+
+
 
 - [x] **Neue Hauptnavigation** mit Hover-Dropdowns: Home / Verein / Community / Mitglieder / Events / eSports / News (`MainNav.jsx`, `NAV_STRUCTURE`)
 - [x] **memberOnly-Filter** im Mitglieder-Dropdown (Mitgliederbereich/Vorteile/Dokumente nur für Vereinsmitglieder)
