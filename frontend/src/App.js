@@ -71,6 +71,8 @@ import MyPrizesPage from "@/pages/user/MyPrizesPage";
 import AdminPrizesPage from "@/pages/admin/AdminPrizesPage";
 import SetupWizardPage from "@/pages/SetupWizardPage";
 import { NotFoundPage, ForbiddenPage } from "@/pages/ErrorPages";
+import { BoardPage, ValuesPage } from "@/pages/public/ClubPages";
+import CurrentSeasonRedirect from "@/pages/public/CurrentSeasonRedirect";
 
 function App() {
   return (
@@ -81,6 +83,8 @@ function App() {
           {/* Public — Verein */}
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
+          <Route path="/board" element={<BoardPage />} />
+          <Route path="/values" element={<ValuesPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/sponsors" element={<SponsorsPage />} />
           <Route path="/partners" element={<PartnersPage />} />
@@ -99,6 +103,7 @@ function App() {
           <Route path="/events/:slug" element={<EventDetailPage />} />
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/news" element={<NewsPage />} />
+          <Route path="/news/:slug" element={<NewsDetailPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/imprint" element={<ImprintPage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -139,6 +144,7 @@ function App() {
           <Route path="/admin/audit" element={<ProtectedRoute requireAdmin><AdminAuditPage /></ProtectedRoute>} />
           <Route path="/admin/widgets" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
 
+          <Route path="/seasons/current" element={<CurrentSeasonRedirect />} />
           <Route path="/seasons/:slug" element={<SeasonPage />} />
           <Route path="/u/:username" element={<PublicProfilePage />} />
           <Route path="/players/:username" element={<PublicProfilePage />} />

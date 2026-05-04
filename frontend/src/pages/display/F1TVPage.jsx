@@ -78,7 +78,7 @@ export default function F1TVPage() {
         <div className="flex items-center gap-5">
           <MascotBadge className="w-16 h-16" />
           <div>
-            <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">THE LION SQUAD · TLS ARENA</div>
+            <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">THE LION SQUAD · FAST LAP</div>
             <h1 className="font-heading text-3xl md:text-5xl font-black uppercase leading-none mt-1">{challenge.title}</h1>
           </div>
         </div>

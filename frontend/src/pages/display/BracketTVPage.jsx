@@ -31,7 +31,7 @@ export default function BracketTVPage() {
         <div className="flex items-center gap-4">
           <MascotBadge className="w-12 h-12" />
           <div>
-            <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">TLS ARENA · LIVE</div>
+            <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">THE LION SQUAD · LIVE</div>
             <h1 className="font-heading text-2xl md:text-4xl font-black uppercase">{t.title}</h1>
           </div>
         </div>

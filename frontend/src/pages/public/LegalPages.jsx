@@ -6,7 +6,7 @@ export function PrivacyPage() {
       <div className="max-w-3xl mx-auto px-4 py-12">
         <h1 className="font-heading text-4xl font-black uppercase">Datenschutzerklärung</h1>
         <div className="mt-6 text-white/80 space-y-4 text-sm leading-relaxed">
-          <p>Diese TLS ARENA Instanz wird vom THE LION SQUAD eSports Verein gehostet. Wir erfassen nur die Daten, die für die Turnierverwaltung notwendig sind.</p>
+          <p>Diese TLS-Plattform wird vom Verein THE LION SQUAD eSports gehostet. Wir erfassen nur die Daten, die für Vereinsverwaltung, Community und Turniere notwendig sind.</p>
           <p>Personenbezogene Daten (E-Mail, Benutzername, Discord-Name, Spielernamen) werden ausschließlich für die Verwaltung von Turnieranmeldungen, Check-in und Ergebnisdarstellung verwendet.</p>
           <p>Passwörter werden ausschließlich als bcrypt-Hashes gespeichert. Spielerprofile sind standardmäßig öffentlich sichtbar — dies kann im Profil deaktiviert werden.</p>
           <p>Rechte: Auskunft, Löschung, Berichtigung, Einschränkung der Verarbeitung. Kontakt: <strong>datenschutz@thelionsquad.at</strong>.</p>

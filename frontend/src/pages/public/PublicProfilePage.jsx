@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, formatMs } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { BadgeGrid, BadgeCard } from "@/components/tls/BadgeGrid";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import {
@@ -45,6 +46,7 @@ export default function PublicProfilePage() {
           <div className="absolute -bottom-20 -right-10 w-[400px] h-[400px] rounded-full bg-[#FFD700] blur-[160px] opacity-5" />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+          <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Spieler", to: "/players" }, { label: profile.display_name || profile.username }]} className="mb-6" />
           <div className="flex flex-col md:flex-row gap-8 items-start">
             <div className="shrink-0">
               {profile.avatar_url ? (
@@ -57,7 +59,7 @@ export default function PublicProfilePage() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">
-                <span>TLS ARENA · Spieler</span>
+                <span>THE LION SQUAD · Spieler</span>
                 {isPrivate && <span className="inline-flex items-center gap-1 text-white/40"><Lock className="w-3 h-3" /> Privat</span>}
               </div>
               <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase leading-[0.95] tracking-tight truncate">

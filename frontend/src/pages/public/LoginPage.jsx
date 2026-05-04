@@ -28,7 +28,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md border border-white/10 rounded-sm bg-[#121212] p-8 md:p-10">
         <div className="flex justify-center mb-8"><Logo size="md" /></div>
         <h1 className="font-heading text-2xl font-black uppercase text-center">Login</h1>
-        <p className="text-sm text-white/60 text-center mt-1">Willkommen in der TLS Arena.</p>
+        <p className="text-sm text-white/60 text-center mt-1">Willkommen bei THE LION SQUAD.</p>
 
         <form onSubmit={submit} className="mt-8 space-y-4">
           <Field label="E-Mail" type="email" value={email} onChange={setEmail} required testId="login-email" />
