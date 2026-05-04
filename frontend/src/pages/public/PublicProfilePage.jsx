@@ -82,12 +82,12 @@ export default function PublicProfilePage() {
               )}
               {/* Quick stats */}
               <div className="mt-6 grid grid-cols-3 md:grid-cols-6 gap-3">
-                <QuickStat icon={Medal} label="Badges" value={s.badges || 0} data-testid="profile-stat-badges" />
-                <QuickStat icon={Zap} label="Punkte" value={s.points || 0} color="#29B6E8" />
-                <QuickStat icon={Trophy} label="Siege" value={s.wins || 0} color="#FFD700" />
-                <QuickStat icon={Medal} label="Podium" value={s.top3 || 0} color="#C0C0C0" />
-                <QuickStat icon={TrendingUp} label="Fast Laps" value={s.fast_laps || 0} />
-                <QuickStat icon={Flag} label="Pole Pos." value={s.pole_positions || 0} color="#FFD700" />
+                <QuickStat icon={Medal} label="Badges" value={s.badges || 0} testId="profile-stat-badges" />
+                <QuickStat icon={Zap} label="Punkte" value={s.points || 0} color="#29B6E8" testId="profile-stat-points" />
+                <QuickStat icon={Trophy} label="Siege" value={s.wins || 0} color="#FFD700" testId="profile-stat-wins" />
+                <QuickStat icon={Medal} label="Podium" value={s.top3 || 0} color="#C0C0C0" testId="profile-stat-top3" />
+                <QuickStat icon={TrendingUp} label="Fast Laps" value={s.fast_laps || 0} testId="profile-stat-fastlaps" />
+                <QuickStat icon={Flag} label="Pole Pos." value={s.pole_positions || 0} color="#FFD700" testId="profile-stat-poles" />
               </div>
             </div>
           </div>
@@ -205,9 +205,9 @@ export default function PublicProfilePage() {
   );
 }
 
-function QuickStat({ icon: Icon, label, value, color = "#FFFFFF" }) {
+function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", testId }) {
   return (
-    <div className="border border-white/10 rounded-sm bg-[#121212] px-3 py-3">
+    <div data-testid={testId} className="border border-white/10 rounded-sm bg-[#121212] px-3 py-3">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-white/40"><Icon className="w-3 h-3" /> {label}</div>
       <div className="mt-1 font-display font-bold text-2xl tabular-nums" style={{ color }}>{value}</div>
     </div>

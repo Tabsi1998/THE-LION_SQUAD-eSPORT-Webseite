@@ -189,13 +189,34 @@ Self-hosted Tournament-Management-System ähnlich Toornament/Challonge, speziell
 | 24 | UI mobile + Desktop sauber | ✅ |
 | 25 | THE LION SQUAD Branding | ✅ (Logos, Farben, Wortmarke) |
 
+## Phase 5 — Achievement System & Pro Profiles (04.05.2026 · 4. Pass)
+
+### Backend
+- [x] **22 Badges** in 6 Kategorien (tournament/match/fastlap/community/season), Tiers bronze/silver/gold/platinum, 5-200 Saison-Punkte je Badge
+- [x] `badges.py` Engine: `seed_badges()`, idempotente `award_badge()`, Trigger-Funktionen für alle Events
+- [x] **Discord-Badge-Trigger** mit Tier-Farbe + Punkten
+- [x] Hooks verdrahtet in: Tournament register/checkin, Match complete, F1 add_time (new-leader flag), Team create/join
+- [x] `/api/badges` + `/api/badges/{code}` (mit Holders)
+- [x] `/api/users/public/{username}` — Vollprofil mit Badges, Stats, Tournament-History, F1-Bests, Teams
+- [x] `/api/uploads/image` + `/api/uploads/sponsor-logo` — 5MB, served via `/api/static/uploads/`
+- [x] Sponsor-CRUD komplett (POST/GET/PATCH/DELETE)
+
+### Frontend
+- [x] **PublicProfilePage** (`/u/:username`, `/players/:username`) — Pro Hero, 6 QuickStats, 5 Tabs, Tournament-Rows mit Placement-Badges
+- [x] **BadgesPage** (`/badges`) — Katalog mit Kategorie-Gruppierung + Holders-Count
+- [x] **BadgeGrid/BadgeCard** — wiederverwendbar mit Tier-Styling, motion-entry, locked-State
+- [x] **AdminSponsorsPage** (`/admin/sponsors`) — CRUD mit Logo-URL oder File-Upload
+- [x] **Fast Lap Rename** global (URL `/f1` bleibt, neuer Alias `/fastlap`)
+- [x] Profile: „Öffentliches Profil" Link; Nav: neue Badges + Sponsoren Einträge
+
 ## Noch offen (Backlog)
 
-- Resend API Key durch Nutzer in `/admin/settings` hinterlegen → live E-Mail-Versand
-- Discord Webhook Events automatisch bei Turnier-Start / Match-Ende / F1-Neuer-Leader triggern (Infrastruktur vorhanden, Trigger fehlen)
+- **User-Aktion nötig**: Resend API-Key + Discord Webhook-URL im Admin-Panel hinterlegen
 - 2FA, Stripe-Zahlungen (P2)
 - Ladder / King of the Hill Formate (P2)
 - Bulk CSV Teilnehmer-Import (P2)
+- Season-Abschluss → automatisches Vergeben von `season_top10` und `season_champion` Badges (P2)
+- Bio-Anonymisierung nach DSGVO sollte Badge-Historie behalten (P2)
 
 ## Test Credentials
 Siehe `/app/memory/test_credentials.md`

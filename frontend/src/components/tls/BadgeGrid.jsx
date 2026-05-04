@@ -14,7 +14,7 @@ export function BadgeCard({ badge, locked = false, compact = false }) {
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      data-testid={`badge-${badge.code}`}
+      data-testid={`badge-card-${badge.code}`}
       className={`group relative overflow-hidden rounded-sm border p-4 transition-all ${locked ? "opacity-40 border-white/5 bg-[#0A0A0A]" : style.card} hover:-translate-y-0.5`}
     >
       <div className={`absolute -top-6 -right-6 opacity-10 ${style.bg}`}>
