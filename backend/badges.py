@@ -243,11 +243,14 @@ def _level_name(level: int) -> str:
 
 
 async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list[dict]:
+    """Public/profile catalog. Negative groups are NEVER returned via this path —
+    not even to admins viewing their own profile. Admin negative inventory lives
+    at /api/admin/achievements/negative/awards.
+    """
     db = get_db()
     is_admin = bool(viewer and viewer.get("role") in ("club_admin", "superadmin"))
-    show_negative = is_admin
 
-    groups = await db.achievement_groups.find({}, {"_id": 0}).sort("sort_order", 1).to_list(500)
+    groups = await db.achievement_groups.find({"is_negative": {"$ne": True}}, {"_id": 0}).sort("sort_order", 1).to_list(500)
     tiers = await db.achievements.find({}, {"_id": 0}).sort("level", 1).to_list(2000)
     awards: list = []
     progress: dict = {}
@@ -258,8 +261,6 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
 
     out = []
     for g in groups:
-        if g.get("is_negative") and not show_negative:
-            continue
         if not g.get("public") and not is_admin:
             continue
         gtiers = [t for t in tiers if t.get("group_code") == g["code"]]
@@ -293,8 +294,10 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
 
 
 async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
+    """Profile/public award list. NEVER includes negatives — even for admins.
+    Admin negative inventory has its own dedicated endpoint.
+    """
     db = get_db()
-    is_admin = bool(viewer and viewer.get("role") in ("club_admin", "superadmin"))
     awards = await db.user_achievements.find({"user_id": user_id}, {"_id": 0}).sort("earned_at", -1).to_list(500)
     out = []
     for a in awards:
@@ -304,8 +307,8 @@ async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
         g = await db.achievement_groups.find_one({"code": t["group_code"]}, {"_id": 0})
         if not g:
             continue
-        if g.get("is_negative") and not is_admin:
-            continue
+        if g.get("is_negative"):
+            continue  # Hard-filter — no exposure on user-facing endpoints.
         out.append({
             **t,
             "group_name": g["name"],

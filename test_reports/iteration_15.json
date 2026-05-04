@@ -1,0 +1,32 @@
+{
+  "summary": "Re-Test nach Privacy-Fix für Phase B v4 Achievement-System: 19/19 pytest PASS. Negative-Award (neg_holzmedaille) ist nirgendwo in user-facing Endpoints sichtbar — weder in /api/achievements/me (admin), /api/achievements/user/{admin_id} (anon UND admin auth), noch im 'badges' Feld von /api/users/public/{username}. Ausschließlich /api/admin/achievements/negative/awards listet das Award korrekt. Cleanup via DELETE /api/admin/achievements/award entfernt das Award sauber aus der Inbox. Alle iteration_14 Smoke-Tests (Groups CRUD, Tiers CRUD, manuelles Award/Revoke, User-Search, alte /api/badges Route 404) bleiben grün. Frontend wurde laut Anforderung NICHT erneut getestet.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_b_v4_achievements.py",
+    "/app/test_reports/pytest/phase_b_v4_iter15.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "badges.py list_user_awards (Z.296+) und list_groups_for_user (Z.245+): Filter is_negative=true HART unabhängig vom Viewer — Privacy-Spec eingehalten. Kommentare verweisen explizit auf /admin/achievements/negative/awards als alleinigen Pfad. ✅",
+    "user_routes.py get_public_profile (Z.135-136): Skip-Check 'if g and g.get(\"is_negative\")' filtert Negative-Tiers aus 'badges'-Feld. ✅",
+    "Optional/kosmetisch: AdminAchievementsPage.jsx Hydration-Warning (<span> in <option>) aus iteration_14 ist nicht teil des Re-Tests, aber bleibt unbehoben. LOW Prio."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase_b_v4_achievements.py (TestNegHolzmedailleRetestPrivacy hinzugefügt — explizit für neg_holzmedaille mit allen 4 Endpoint-Checks + cleanup verify)"
+  ],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "n/a (nicht getestet, nicht angefordert)"},
+  "test_credentials": "admin@thelionsquad.at / TLSAdmin2026! (verifiziert)",
+  "seed_data_creation": "Während Pytest temporär: TEST_custom_grp Group, TEST_tier_xyz Tier, gamers_heaven_p Award an admin, neg_afk Award an admin, neg_holzmedaille Award an admin — alle wieder in try/finally bzw. expliziten Cleanup-Schritten gelöscht. Keine Reststände in DB.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase B v4 Achievement-System ist backend-seitig vollständig grün (19/19). Privacy-Fix in /app/backend/badges.py (list_user_awards + list_groups_for_user) und /app/backend/routes/user_routes.py (get_public_profile badges) ist korrekt. Test-Suite test_phase_b_v4_achievements.py ist die kanonische Regressions-Suite — ALTE Tests test_phase5_badges.py, test_phase567.py, test_phase_d_v3.py sind obsolet (legacy /api/badges Schema). Login-Response liefert JWT als 'access_token'. Admin-ID = 005a5e67-a39a-481f-9417-75a14d768cd5, username='admin'.",
+  "rca of the issue": "Privacy-Bug aus iteration_14 (negative Awards an Admin in /achievements/user/{id} sichtbar) ist GEFIXT: list_user_awards/list_groups_for_user filtern is_negative=true HART unabhängig vom Viewer-Role. Verifiziert über drei distinkte Code-Pfade: (1) badges.py list_groups_for_user → DB-Query {'is_negative': {'$ne': True}}, (2) badges.py list_user_awards → Group-Lookup mit early-skip wenn is_negative, (3) user_routes.py get_public_profile → identische Skip-Logik. neg_holzmedaille Award wurde in allen 4 user-facing Endpoints korrekt unterdrückt und tauchte exklusiv in /admin/achievements/negative/awards auf."
+}

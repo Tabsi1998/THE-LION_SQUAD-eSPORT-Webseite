@@ -259,6 +259,114 @@ class TestNegativePrivacy:
                             json={"user_id": admin_id, "tier_code": negative_tier_code}, timeout=15)
 
 
+# ---------------- Privacy re-test (iteration_15): neg_holzmedaille ----------------
+class TestNegHolzmedailleRetestPrivacy:
+    """Re-test after privacy fix: a negative award (neg_holzmedaille) must NEVER
+    appear in user-facing endpoints — even for admin self-view. Only the
+    admin negative inbox endpoint is allowed to expose them.
+    """
+    NEG_TIER = "neg_holzmedaille"
+
+    def test_setup_award_then_full_privacy_then_cleanup(self, admin_headers, admin_id, admin_login):
+        username = admin_login.get("username") or "admin"
+        # Pre-cleanup remnant
+        requests.delete(f"{BASE_URL}/api/admin/achievements/award", headers=admin_headers,
+                        json={"user_id": admin_id, "tier_code": self.NEG_TIER}, timeout=15)
+
+        # ---- SETUP: admin awards neg_holzmedaille to himself ----
+        r = requests.post(f"{BASE_URL}/api/admin/achievements/award", headers=admin_headers,
+                          json={"user_id": admin_id, "tier_code": self.NEG_TIER, "note": "TEST_priv"},
+                          timeout=15)
+        assert r.status_code == 200, f"award failed: {r.status_code} {r.text}"
+        assert r.json().get("ok") is True
+
+        try:
+            # ---- /api/achievements/me (admin) MUST NOT contain negative ----
+            r1 = requests.get(f"{BASE_URL}/api/achievements/me", headers=admin_headers, timeout=15)
+            assert r1.status_code == 200
+            me = r1.json()
+            me_codes = [a["code"] for a in me.get("awards", [])]
+            assert self.NEG_TIER not in me_codes, \
+                f"/me leaked negative award: {me_codes}"
+            for a in me.get("awards", []):
+                assert a.get("group_category") != "negative", \
+                    f"/me award has negative category: {a}"
+                assert not a.get("code", "").startswith("neg_"), \
+                    f"/me award has neg_ prefix: {a}"
+            for g in me.get("groups", []):
+                assert g.get("is_negative") is not True, \
+                    f"/me groups list contains negative group: {g.get('code')}"
+
+            # ---- /api/achievements/user/{admin_id} (anon) MUST NOT contain negative ----
+            r2 = requests.get(f"{BASE_URL}/api/achievements/user/{admin_id}", timeout=15)
+            assert r2.status_code == 200
+            anon_data = r2.json()
+            anon_codes = [a["code"] for a in anon_data.get("awards", [])]
+            assert self.NEG_TIER not in anon_codes, \
+                f"/user/{{id}} (anon) leaked negative: {anon_codes}"
+            for a in anon_data.get("awards", []):
+                assert a.get("group_category") != "negative"
+                assert not a.get("code", "").startswith("neg_")
+            for g in anon_data.get("groups", []):
+                assert g.get("is_negative") is not True
+
+            # ---- /api/achievements/user/{admin_id} (admin auth) MUST NOT contain negative ----
+            r3 = requests.get(f"{BASE_URL}/api/achievements/user/{admin_id}",
+                              headers=admin_headers, timeout=15)
+            assert r3.status_code == 200
+            adm_data = r3.json()
+            adm_codes = [a["code"] for a in adm_data.get("awards", [])]
+            assert self.NEG_TIER not in adm_codes, \
+                f"/user/{{id}} (admin viewer) leaked negative: {adm_codes}"
+            for a in adm_data.get("awards", []):
+                assert a.get("group_category") != "negative"
+                assert not a.get("code", "").startswith("neg_")
+            for g in adm_data.get("groups", []):
+                assert g.get("is_negative") is not True
+
+            # ---- /api/admin/achievements/negative/awards (admin) MUST contain it ----
+            r4 = requests.get(f"{BASE_URL}/api/admin/achievements/negative/awards",
+                              headers=admin_headers, timeout=15)
+            assert r4.status_code == 200
+            inbox = r4.json()
+            assert isinstance(inbox, list)
+            inbox_tiers = [a.get("tier_code") for a in inbox]
+            assert self.NEG_TIER in inbox_tiers, \
+                f"negative inbox missing {self.NEG_TIER}: {inbox_tiers}"
+            # And it should be tagged for admin_id
+            mine_in_inbox = [a for a in inbox if a.get("user_id") == admin_id and a.get("tier_code") == self.NEG_TIER]
+            assert mine_in_inbox, "admin's neg_holzmedaille not present in inbox for admin_id"
+
+            # ---- /api/users/public/{username} 'badges' field MUST NOT contain negative tier ----
+            r5 = requests.get(f"{BASE_URL}/api/users/public/{username}", timeout=15)
+            assert r5.status_code == 200, f"public profile fetch failed: {r5.status_code} {r5.text}"
+            public_profile = r5.json()
+            assert "badges" in public_profile, "public profile missing 'badges' field"
+            badges = public_profile["badges"]
+            badge_codes = [b.get("code") for b in badges]
+            assert self.NEG_TIER not in badge_codes, \
+                f"public profile badges leaked negative tier: {badge_codes}"
+            for b in badges:
+                assert not (b.get("code") or "").startswith("neg_"), \
+                    f"public profile badge has neg_ prefix: {b}"
+
+        finally:
+            # ---- CLEANUP: revoke neg_holzmedaille ----
+            r_del = requests.delete(f"{BASE_URL}/api/admin/achievements/award",
+                                    headers=admin_headers,
+                                    json={"user_id": admin_id, "tier_code": self.NEG_TIER},
+                                    timeout=15)
+            assert r_del.status_code == 200, \
+                f"cleanup delete failed: {r_del.status_code} {r_del.text}"
+            # verify gone from negative inbox
+            r_check = requests.get(f"{BASE_URL}/api/admin/achievements/negative/awards",
+                                   headers=admin_headers, timeout=15)
+            assert r_check.status_code == 200
+            still = [a for a in r_check.json()
+                     if a.get("user_id") == admin_id and a.get("tier_code") == self.NEG_TIER]
+            assert not still, f"award still present after delete: {still}"
+
+
 # ---------------- User search ----------------
 class TestUserSearch:
     def test_search_admin(self, admin_headers):
