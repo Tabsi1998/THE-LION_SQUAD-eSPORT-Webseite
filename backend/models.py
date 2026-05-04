@@ -252,6 +252,7 @@ class EventCreate(BaseModel):
     description: Optional[str] = None
     event_type: EventType = "general"
     visibility: EventVisibility = "public"
+    status: EventStatus = "draft"
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     door_time: Optional[datetime] = None

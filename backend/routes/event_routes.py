@@ -130,7 +130,8 @@ async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
         raise HTTPException(status_code=409, detail="Slug bereits vergeben")
     doc = body.model_dump()
     doc["id"] = new_id()
-    doc["status"] = "draft"
+    if not doc.get("status"):
+        doc["status"] = "draft"
     for k in ("start_date", "end_date", "door_time", "registration_opens_at", "registration_closes_at"):
         if doc.get(k):
             doc[k] = doc[k].isoformat()

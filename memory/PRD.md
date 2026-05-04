@@ -58,34 +58,51 @@ NIE einen registrierten Nutzer als „Mitglied" bezeichnen. Stattdessen „Commu
 - [x] **DashboardPage** überarbeitet — Member-only Tiles (Mitgliederbereich + Vorteile), Mitgliedsnummer, „Mitglied werden" CTA für Community
 - [x] **AdminLayout** erweitert — Mitglieder + Mitgliedervorteile in Sidebar
 
-## Roadmap (Phase 3-10)
-
-### 🟢 Phase 3 — Vereins-CMS (öffentliche Webseite)
-- News-System erweitern (Kategorien, Slug, Pinning, Sichtbarkeit, Verknüpfungen)
-- Event-System erweitern (Event-Typen, Adressen, separat von Turnier)
-- Galerie, Vereinsgeschichte als CMS-Seiten
+## Roadmap (Phase 4-10)
 
 ### 🟣 Phase 4 — Mitgliederportal Vertiefung
 - Interne News, Events, Vereinsdokumente, Downloads
 - „Meine Mitgliedschaft"-Seite
 
 ### 🔴 Phase 5 — Status-System & Stream-Logik
-- „Warten auf Öffnung" Status für Tournaments/Events/Challenges/Fast-Lap
-- Stream-pro-Objekt mit hasLiveStream/streamPlatform/streamUrl
+- „Warten auf Öffnung" Status für Tournaments/Challenges/Fast-Lap (für Events bereits umgesetzt in Phase 3!)
+- Stream-pro-Objekt mit hasLiveStream/streamPlatform/streamUrl (für Events bereits da!)
 - Homepage-Logik: Live > Heute > Bald > News
 
 ### 🟠 Phase 6 — Achievements mit Audiences
 - Achievement.audience: public/community/members_only/admins_only/hidden_secret
-- Mitglieder-only Achievements (Offiziell im Rudel, Vereinsmitglied Bronze/Silber/Gold/Platin)
+- Mitglieder-only Achievements
 - Negative Fun-Achievements
 
-### 🟡 Phase 7 — Season Pass v2 (Farming-Schutz, Wertungen)
+### 🟡 Phase 7 — Season Pass v2 (Farming-Schutz)
 
 ### 🔵 Phase 8 — SMTP & Mail Queue (Resend ablösen)
 
 ### 🟢 Phase 9 — Preise & Gewinnabholung (PrizePickup-Model)
 
 ### 🟣 Phase 10 — Feinschliff (404/403/500 Pages, SEO, Setup-Wizard)
+
+## Phase 3 — IMPLEMENTIERT (04.05.2026 · Vereins-CMS)
+
+### Backend
+- [x] **News-System erweitert**: `category` (10 Kategorien), `visibility` (public/community/members/internal), `pinned`, `published`, `linked_event_ids`/`linked_tournament_ids`/`linked_team_ids`, `author_id/_name`. `/api/news-meta` für UI. Pinned-Sortierung.
+- [x] **Event-System erweitert**: `event_type` (13 Typen: club_evening, lan_party, public_event, community_evening, grill_evening, mario_kart_event, f1_event, expo, online_event, internal, sponsor_action, tournament_finals, general), `status` (11 inkl. **`scheduled` = "Warten auf Öffnung"**), `visibility`, `door_time`, `registration_opens_at/closes_at`, `program`, `address`, `is_online`, `is_hybrid`, `max_participants`, `show_participants`, **Stream-pro-Event** (`has_live_stream`, `stream_platform`, `stream_url`). Event-Detail liefert Tournaments + F1-Challenges + Albums + verknüpfte News.
+- [x] **Galerie-System**: `GalleryAlbum` (slug, cover, event_id verknüpft, visibility, taken_at, published, order_index) + `GalleryPhoto` (image_url, thumbnail_url, caption, order_index). Cascade-Delete (Album löscht alle Photos). 404-Validation auf PATCH.
+- [x] **Sichtbarkeitsregeln** durchgängig: `_user_can_see` für public/community/members/internal mit Admin-Override.
+- [x] **Drafts versteckt** für Nicht-Admins (Events: `status=draft`; News: `published=false`).
+- [x] **36/36 Backend-Tests grün** (test_phase3_news_events_gallery.py)
+
+### Frontend
+- [x] **NewsPage** überarbeitet — Kategoriefilter, Pinned-Sektion, Cards mit Visibility-Icons (Crown/Lock)
+- [x] **NewsDetailPage** — Verknüpfte Events/Tournaments/Teams werden inline angezeigt
+- [x] **EventsPage** überarbeitet — Tabs (Kommend/Vergangen), Typ-Filter, Status-Pills, Stream-Indikator
+- [x] **EventDetailPage** überarbeitet — Hero mit Banner, Programm, verknüpfte Turniere, F1-Challenges, Galerie-Alben, News
+- [x] **GalleryPage** — Album-Übersicht mit Member-Badge
+- [x] **GalleryAlbumPage** — Lightbox mit Prev/Next Navigation
+- [x] **AdminNewsPage** — CRUD mit Tabelle, Modal mit Kategorie/Sichtbarkeit/Pinning + MultiSelect für Verknüpfungen
+- [x] **AdminEventsPage** — CRUD mit Modal (alle Felder inkl. Stream-Sektion)
+- [x] **AdminGalleryPage** — Album-Grid + Sub-View „Fotos verwalten" mit URL-Foto-Add
+- [x] Galerie-Link in Hauptnavigation
 
 ## Test Credentials
 
@@ -102,8 +119,8 @@ Siehe `/app/memory/test_credentials.md`
 | TLS-Arena P3 | Discord, Season Pass Widget, TV QR + Sponsors | ✅ |
 | TLS-Arena P4 | Dynamic Prizes, Twitch, Sponsor Ticker | ✅ |
 | TLS-Arena P5 | 22 Badges, Public Profiles, Admin Sponsors | ✅ |
-| **Vereins-Phase 1+2** | **Mitgliedersystem + erweitertes Profil** | **✅ NEU** |
-| Vereins-Phase 3 | Vereins-CMS (Über uns, News, Events) | ⏳ |
+| Vereins-Phase 1+2 | Mitgliedersystem + erweitertes Profil | ✅ |
+| **Vereins-Phase 3** | **Vereins-CMS (News, Events, Galerie)** | **✅ NEU** |
 | Vereins-Phase 4-10 | Siehe oben | ⏳ |
 
 ## User Personas

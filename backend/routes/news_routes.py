@@ -261,7 +261,9 @@ async def update_album(aid: str, body: GalleryAlbumUpdate, me: dict = Depends(re
     if update.get("taken_at"):
         update["taken_at"] = update["taken_at"].isoformat()
     update["updated_at"] = now_utc().isoformat()
-    await db.gallery_albums.update_one({"id": aid}, {"$set": update})
+    res = await db.gallery_albums.update_one({"id": aid}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Album nicht gefunden.")
     return await db.gallery_albums.find_one({"id": aid}, {"_id": 0})
 
 
@@ -293,7 +295,9 @@ async def add_photo(aid: str, body: GalleryPhotoCreate, me: dict = Depends(requi
 async def update_photo(pid: str, body: GalleryPhotoUpdate, me: dict = Depends(require_admin())):
     db = get_db()
     update = body.model_dump(exclude_unset=True)
-    await db.gallery_photos.update_one({"id": pid}, {"$set": update})
+    res = await db.gallery_photos.update_one({"id": pid}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Foto nicht gefunden.")
     return await db.gallery_photos.find_one({"id": pid}, {"_id": 0})
 
 
