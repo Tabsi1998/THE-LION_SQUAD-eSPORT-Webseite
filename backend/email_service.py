@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import resend
 from database import get_db
 from models import new_id
+from services.email_delivery import html_to_text
 
 logger = logging.getLogger("tls-arena.email")
 
@@ -16,14 +17,17 @@ logger = logging.getLogger("tls-arena.email")
 async def _get_email_config() -> dict:
     db = get_db()
     s = await db.settings.find_one({"id": "email"}) or {}
+    mail = await db.settings.find_one({"id": "mail"}) or {}
     api_key = s.get("resend_api_key") or os.environ.get("RESEND_API_KEY", "")
-    sender_email = s.get("sender_email") or os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
-    sender_name = s.get("sender_name") or "TLS ARENA"
+    sender_email = s.get("sender_email") or mail.get("sender_email") or os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
+    sender_name = s.get("sender_name") or mail.get("sender_name") or "TLS ARENA"
+    reply_to_email = s.get("reply_to_email") or mail.get("reply_to_email") or sender_email
     enabled = s.get("enabled", True) and bool(api_key)
     return {
         "api_key": api_key,
         "sender_email": sender_email,
         "sender_name": sender_name,
+        "reply_to_email": reply_to_email,
         "enabled": enabled,
         "from_header": f"{sender_name} <{sender_email}>",
     }
@@ -54,7 +58,14 @@ async def send_mail(to: str, subject: str, html: str, template_key: str = "custo
             "to": [to],
             "subject": subject,
             "html": html,
+            "text": html_to_text(html),
+            "headers": {
+                "Auto-Submitted": "auto-generated",
+                "X-Auto-Response-Suppress": "All",
+            },
         }
+        if cfg.get("reply_to_email"):
+            params["reply_to"] = cfg["reply_to_email"]
         resp = await asyncio.to_thread(resend.Emails.send, params)
         log["status"] = "sent"
         log["message_id"] = resp.get("id") if isinstance(resp, dict) else None

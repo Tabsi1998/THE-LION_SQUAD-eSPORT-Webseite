@@ -38,6 +38,8 @@ export default function SetupWizardPage() {
     smtp_envelope_from: "",
     sender_name: "THE LION SQUAD",
     sender_email: "noreply@thelionsquad.at",
+    reply_to_email: "office@lionsquad.at",
+    message_id_domain: "lionsquad.at",
     resend_api_key: "",
   });
 
@@ -75,6 +77,7 @@ export default function SetupWizardPage() {
       if (payload.mail_provider === "resend") {
         delete payload.smtp_host; delete payload.smtp_port; delete payload.smtp_user;
         delete payload.smtp_pass; delete payload.smtp_security; delete payload.smtp_tls_verify; delete payload.smtp_envelope_from;
+        delete payload.message_id_domain;
       } else {
         delete payload.resend_api_key;
       }
@@ -191,6 +194,7 @@ export default function SetupWizardPage() {
                     <Field label="Passwort" type="password" testId="wizard-smtp-pass" value={data.smtp_pass} onChange={(v) => upd("smtp_pass", v)} />
                   </div>
                   <Field label="Technischer SMTP-Absender" testId="wizard-smtp-envelope-from" value={data.smtp_envelope_from} onChange={(v) => upd("smtp_envelope_from", v)} placeholder="office@lionsquad.at" />
+                  <Field label="Message-ID Domain" testId="wizard-message-id-domain" value={data.message_id_domain} onChange={(v) => upd("message_id_domain", v)} placeholder="lionsquad.at" />
                 </>
               ) : (
                 <Field label="Resend API Key" type="password" testId="wizard-resend-key" value={data.resend_api_key} onChange={(v) => upd("resend_api_key", v)} placeholder="re_..." />
@@ -199,6 +203,7 @@ export default function SetupWizardPage() {
                 <Field label="Absender Name" testId="wizard-sender-name" value={data.sender_name} onChange={(v) => upd("sender_name", v)} />
                 <Field label="Absender E-Mail" testId="wizard-sender-email" type="email" value={data.sender_email} onChange={(v) => upd("sender_email", v)} />
               </div>
+              <Field label="Antworten an" testId="wizard-reply-to" type="email" value={data.reply_to_email} onChange={(v) => upd("reply_to_email", v)} placeholder="office@lionsquad.at" />
               <p className="text-xs text-white/40">Du kannst das später unter <em>Einstellungen → SMTP</em> ändern oder leer lassen.</p>
             </div>
           )}

@@ -23,6 +23,7 @@ class EmailSettings(BaseModel):
     resend_api_key: Optional[str] = None
     sender_name: Optional[str] = None
     sender_email: Optional[str] = None
+    reply_to_email: Optional[str] = None
     enabled: bool = True
 
 
@@ -120,6 +121,8 @@ class SmtpSettings(BaseModel):
     smtp_envelope_from: Optional[str] = None
     sender_name: Optional[str] = None
     sender_email: Optional[str] = None
+    reply_to_email: Optional[str] = None
+    message_id_domain: Optional[str] = None
     enabled: Optional[bool] = None
 
 
@@ -136,6 +139,8 @@ async def get_smtp_settings(me: dict = Depends(require_admin())):
     s.setdefault("smtp_port", 587)
     s.setdefault("smtp_tls_verify", True)
     s.setdefault("enabled", True)
+    s.setdefault("reply_to_email", s.get("sender_email") or "")
+    s.setdefault("message_id_domain", "")
     return s
 
 

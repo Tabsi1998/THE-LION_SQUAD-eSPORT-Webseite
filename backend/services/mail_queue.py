@@ -11,6 +11,7 @@ import resend
 
 from database import get_db
 from models import new_id, now_utc
+from services.email_delivery import html_to_text, mailbox_domain
 
 logger = logging.getLogger("tls.mailqueue")
 
@@ -38,6 +39,8 @@ async def get_mail_settings() -> dict:
         "smtp_envelope_from": s.get("smtp_envelope_from", ""),
         "sender_name": s.get("sender_name") or legacy.get("sender_name") or "TLS ARENA",
         "sender_email": s.get("sender_email") or legacy.get("sender_email") or os.environ.get("SENDER_EMAIL", "noreply@thelionsquad.at"),
+        "reply_to_email": s.get("reply_to_email") or legacy.get("reply_to_email") or s.get("sender_email") or legacy.get("sender_email") or os.environ.get("SENDER_EMAIL", "noreply@thelionsquad.at"),
+        "message_id_domain": s.get("message_id_domain") or legacy.get("message_id_domain") or "",
         "resend_api_key": legacy.get("resend_api_key") or s.get("resend_api_key") or os.environ.get("RESEND_API_KEY", ""),
         "enabled": s.get("enabled", True) if "enabled" in s else legacy.get("enabled", True),
     }
@@ -47,16 +50,27 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
     """Send via aiosmtplib. Returns message-id-like marker."""
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
-    from email.utils import formataddr, make_msgid
+    from email.utils import formataddr, formatdate, make_msgid
+
+    envelope_from = cfg.get("smtp_envelope_from") or cfg.get("smtp_user") or cfg["sender_email"]
+    configured_msg_domain = (cfg.get("message_id_domain") or "").strip()
+    message_id_domain = configured_msg_domain or mailbox_domain(cfg["sender_email"])
+    reply_to = (cfg.get("reply_to_email") or cfg["sender_email"]).strip()
 
     msg = MIMEMultipart("alternative")
     msg["From"] = formataddr((cfg["sender_name"], cfg["sender_email"]))
     msg["To"] = to
     msg["Subject"] = subject
-    msg["Message-ID"] = make_msgid(domain="tls-arena")
+    msg["Date"] = formatdate(localtime=False)
+    msg["Message-ID"] = make_msgid(domain=message_id_domain)
+    msg["Auto-Submitted"] = "auto-generated"
+    msg["X-Auto-Response-Suppress"] = "All"
+    if reply_to:
+        msg["Reply-To"] = reply_to
+    if envelope_from and envelope_from.lower() != cfg["sender_email"].lower():
+        msg["Sender"] = envelope_from
+    msg.attach(MIMEText(html_to_text(html), "plain", "utf-8"))
     msg.attach(MIMEText(html, "html", "utf-8"))
-
-    envelope_from = cfg.get("smtp_envelope_from") or cfg.get("smtp_user") or cfg["sender_email"]
 
     use_tls = cfg["smtp_security"] == "tls"
     start_tls = cfg["smtp_security"] == "starttls"
@@ -97,7 +111,14 @@ async def _resend_send(cfg: dict, to: str, subject: str, html: str) -> str:
         "to": [to],
         "subject": subject,
         "html": html,
+        "text": html_to_text(html),
+        "headers": {
+            "Auto-Submitted": "auto-generated",
+            "X-Auto-Response-Suppress": "All",
+        },
     }
+    if cfg.get("reply_to_email"):
+        params["reply_to"] = cfg["reply_to_email"]
     resp = await asyncio.to_thread(resend.Emails.send, params)
     return resp.get("id") if isinstance(resp, dict) else "ok"
 

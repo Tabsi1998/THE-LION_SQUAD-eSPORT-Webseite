@@ -7,8 +7,8 @@ import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquar
 
 export default function AdminSettingsPage() {
   const [tab, setTab] = useState("email");
-  const [email, setEmail] = useState({ resend_api_key: "", sender_name: "", sender_email: "", enabled: true, resend_api_key_masked: "" });
-  const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_security: "starttls", smtp_tls_verify: true, smtp_envelope_from: "", sender_name: "", sender_email: "", enabled: true, smtp_pass_masked: "" });
+  const [email, setEmail] = useState({ resend_api_key: "", sender_name: "", sender_email: "", reply_to_email: "", enabled: true, resend_api_key_masked: "" });
+  const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_security: "starttls", smtp_tls_verify: true, smtp_envelope_from: "", sender_name: "", sender_email: "", reply_to_email: "", message_id_domain: "", enabled: true, smtp_pass_masked: "" });
   const [smtpTestEmail, setSmtpTestEmail] = useState("");
   const [queue, setQueue] = useState([]);
   const [queueFilter, setQueueFilter] = useState("");
@@ -149,6 +149,11 @@ export default function AdminSettingsPage() {
                 <input value={email.sender_email || ""} onChange={(e) => setEmail({ ...email, sender_email: e.target.value })} data-testid="email-sender-email" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="noreply@thelionsquad.at" />
               </div>
             </div>
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Antworten an</div>
+              <input type="email" value={email.reply_to_email || ""} onChange={(e) => setEmail({ ...email, reply_to_email: e.target.value })} data-testid="email-reply-to" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder="office@lionsquad.at" />
+              <p className="text-xs text-white/40 mt-1">Reply-To fuer Rueckfragen. Leer = sichtbare Absender-E-Mail.</p>
+            </div>
             <button onClick={saveEmail} data-testid="email-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
           </div>
 
@@ -237,9 +242,38 @@ export default function AdminSettingsPage() {
                 />
                 <p className="mt-1 text-[11px] text-white/40">MAIL FROM / Return-Path. Leer = SMTP User.</p>
               </div>
-              <div className="text-xs text-white/45 flex items-end pb-1">
-                Sichtbarer Absender kann weiter noreply sein. Viele Mailserver verlangen aber als technischen Envelope-Sender den eingeloggten User.
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Antworten an</div>
+                <input
+                  type="email"
+                  value={smtp.reply_to_email || ""}
+                  onChange={(e) => setSmtp({ ...smtp, reply_to_email: e.target.value })}
+                  data-testid="smtp-reply-to"
+                  className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
+                  placeholder="office@lionsquad.at"
+                />
+                <p className="mt-1 text-[11px] text-white/40">Reply-To fuer Rueckfragen.</p>
               </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Message-ID Domain</div>
+                <input
+                  value={smtp.message_id_domain || ""}
+                  onChange={(e) => setSmtp({ ...smtp, message_id_domain: e.target.value })}
+                  data-testid="smtp-message-id-domain"
+                  className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
+                  placeholder="lionsquad.at"
+                />
+                <p className="mt-1 text-[11px] text-white/40">Leer = Domain der Absender-E-Mail.</p>
+              </div>
+              <div className="text-xs text-white/45 flex items-end pb-1">
+                Fuer beste Zustellbarkeit sollten Absender, Envelope-Sender, Message-ID Domain und DNS zur selben Domain passen.
+              </div>
+            </div>
+            <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 text-xs text-white/60">
+              <div className="font-bold uppercase tracking-widest text-[#FFD700] mb-2">DNS Checkliste gegen Spam</div>
+              <p>SPF erlaubt den sendenden Server, DKIM signiert fuer lionsquad.at, DMARC ist gesetzt, PTR/rDNS zeigt auf den Mailhost, HELO/EHLO passt zum Mailhost und der Server nutzt ein oeffentlich vertrauenswuerdiges TLS-Zertifikat.</p>
             </div>
             <button onClick={saveSmtp} data-testid="smtp-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
           </div>

@@ -51,6 +51,8 @@ class SetupWizardBody(BaseModel):
     smtp_envelope_from: Optional[str] = None
     sender_name: Optional[str] = None
     sender_email: Optional[str] = None
+    reply_to_email: Optional[str] = None
+    message_id_domain: Optional[str] = None
     resend_api_key: Optional[str] = None
 
 
@@ -75,7 +77,7 @@ async def complete_setup(body: SetupWizardBody, me: dict = Depends(require_super
     # Mail/SMTP
     mail_keys = ["smtp_host", "smtp_port", "smtp_user", "smtp_pass",
                  "smtp_security", "smtp_tls_verify", "smtp_envelope_from",
-                 "sender_name", "sender_email"]
+                 "sender_name", "sender_email", "reply_to_email", "message_id_domain"]
     mail_updates = {k: getattr(body, k) for k in mail_keys if getattr(body, k) not in (None, "")}
     if body.mail_provider:
         mail_updates["provider"] = body.mail_provider
@@ -95,6 +97,7 @@ async def complete_setup(body: SetupWizardBody, me: dict = Depends(require_super
                 "resend_api_key": body.resend_api_key,
                 "sender_name": body.sender_name or "TLS ARENA",
                 "sender_email": body.sender_email or "noreply@thelionsquad.at",
+                "reply_to_email": body.reply_to_email or body.sender_email or "noreply@thelionsquad.at",
                 "enabled": True,
                 "updated_at": now_iso,
             }, "$setOnInsert": {"id": "email"}},
