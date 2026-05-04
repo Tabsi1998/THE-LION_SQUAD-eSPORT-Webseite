@@ -30,11 +30,14 @@ class EmailSettings(BaseModel):
 class BrandingSettings(BaseModel):
     club_name: Optional[str] = None
     tagline: Optional[str] = None
+    site_description: Optional[str] = None
     primary_color: Optional[str] = None
     logo_url: Optional[str] = None
     mascot_url: Optional[str] = None
+    favicon_url: Optional[str] = None
     domain: Optional[str] = None
     timezone: Optional[str] = None
+    contact_email: Optional[str] = None
     imprint: Optional[str] = None
     privacy_policy: Optional[str] = None
     discord_invite_url: Optional[str] = None
@@ -63,12 +66,20 @@ async def public_settings():
     db = get_db()
     b = await db.settings.find_one({"id": "branding"}) or {}
     b.pop("_id", None)
+    domain = (b.get("domain") or "https://lionsquad.at").strip()
+    if domain and not domain.startswith(("http://", "https://")):
+        domain = "https://" + domain
     return {
         "club_name": b.get("club_name", "THE LION SQUAD"),
         "tagline": b.get("tagline", "eSports Arena"),
+        "site_description": b.get("site_description") or "THE LION SQUAD eSports - Vereinsplattform fuer Turniere, Fast Lap Challenges, News und Mitgliederbereich.",
         "primary_color": b.get("primary_color", "#29B6E8"),
         "logo_url": b.get("logo_url"),
         "mascot_url": b.get("mascot_url"),
+        "favicon_url": b.get("favicon_url"),
+        "domain": domain,
+        "timezone": b.get("timezone") or "Europe/Vienna",
+        "contact_email": b.get("contact_email") or "office@lionsquad.at",
         "imprint": b.get("imprint"),
         "privacy_policy": b.get("privacy_policy"),
         "discord_invite_url": b.get("discord_invite_url") or "https://discord.com/invite/thelionsquadesports",

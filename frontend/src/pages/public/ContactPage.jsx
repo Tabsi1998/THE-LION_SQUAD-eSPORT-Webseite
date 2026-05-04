@@ -112,7 +112,7 @@ export default function ContactPage() {
           <div className="flex items-start gap-4">
             <MapPin className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />
             <div>
-              <h3 className="font-heading font-black uppercase">THE LION SQUAD — eSports</h3>
+              <h3 className="font-heading font-black uppercase">{branding?.club_name || "THE LION SQUAD"} — {branding?.tagline || "eSports"}</h3>
               <p className="mt-2 text-sm text-white/65">Offiziell eingetragener Verein, Österreich.</p>
               <p className="mt-1 text-sm text-white/50">Vereinsdaten und ZVR-Nummer findest du im <Link to="/imprint" className="text-[#29B6E8] hover:underline">Impressum</Link>.</p>
             </div>

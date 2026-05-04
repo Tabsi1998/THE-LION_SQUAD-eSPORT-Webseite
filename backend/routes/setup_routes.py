@@ -1,6 +1,7 @@
 """Phase 10: Setup status + sitemap + simple setup-wizard helpers."""
+import json
 from fastapi import APIRouter, Depends, HTTPException, Response
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timezone
 import bcrypt
@@ -33,8 +34,11 @@ async def setup_status():
 class SetupWizardBody(BaseModel):
     club_name: Optional[str] = None
     tagline: Optional[str] = None
+    site_description: Optional[str] = None
     primary_color: Optional[str] = None
+    contact_email: Optional[str] = None
     domain: Optional[str] = None
+    favicon_url: Optional[str] = None
     imprint: Optional[str] = None
     privacy_policy: Optional[str] = None
     discord_invite_url: Optional[str] = None
@@ -64,7 +68,8 @@ async def complete_setup(body: SetupWizardBody, me: dict = Depends(require_super
     now_iso = now_utc().isoformat()
 
     # Branding
-    brand_keys = ["club_name", "tagline", "primary_color", "domain", "imprint",
+    brand_keys = ["club_name", "tagline", "site_description", "primary_color", "contact_email",
+                  "domain", "favicon_url", "imprint",
                   "privacy_policy", "discord_invite_url", "twitch_channel"]
     brand_updates = {k: getattr(body, k) for k in brand_keys if getattr(body, k) is not None}
     if brand_updates:
@@ -192,3 +197,27 @@ async def sitemap():
         xml_lines.append("</url>")
     xml_lines.append("</urlset>")
     return Response(content="\n".join(xml_lines), media_type="application/xml")
+
+
+@sitemap_router.get("/api/manifest.webmanifest")
+async def web_manifest():
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
+    name = branding.get("club_name") or "THE LION SQUAD"
+    description = branding.get("site_description") or "THE LION SQUAD eSports Vereinsplattform"
+    icon = branding.get("favicon_url") or branding.get("mascot_url") or branding.get("logo_url") or "/assets/brand/tls-mascot.png"
+    manifest = {
+        "name": name,
+        "short_name": "TLS",
+        "description": description,
+        "start_url": "/",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#0A0A0A",
+        "theme_color": branding.get("primary_color") or "#29B6E8",
+        "icons": [
+            {"src": icon, "sizes": "192x192", "purpose": "any"},
+            {"src": icon, "sizes": "512x512", "purpose": "any maskable"},
+        ],
+    }
+    return Response(content=json.dumps(manifest), media_type="application/manifest+json")

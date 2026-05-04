@@ -13,7 +13,7 @@ export default function AdminSettingsPage() {
   const [smtpDiag, setSmtpDiag] = useState(null);
   const [queue, setQueue] = useState([]);
   const [queueFilter, setQueueFilter] = useState("");
-  const [brand, setBrand] = useState({ club_name: "", tagline: "", primary_color: "#29B6E8", logo_url: "", mascot_url: "", domain: "", timezone: "Europe/Vienna", imprint: "", privacy_policy: "", discord_invite_url: "", twitch_channel: "" });
+  const [brand, setBrand] = useState({ club_name: "", tagline: "", site_description: "", primary_color: "#29B6E8", logo_url: "", mascot_url: "", favicon_url: "", contact_email: "", domain: "", timezone: "Europe/Vienna", imprint: "", privacy_policy: "", discord_invite_url: "", twitch_channel: "" });
   const [discord, setDiscord] = useState({ webhook_url: "", username: "", avatar_url: "", enabled: true, configured: false, webhook_url_masked: "", last_status: "", last_error: "", last_event_key: "", last_checked_at: "" });
   const [testEmail, setTestEmail] = useState("");
   const [logs, setLogs] = useState([]);
@@ -465,11 +465,15 @@ export default function AdminSettingsPage() {
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
             <BrandField label="Vereinsname" value={brand.club_name} onChange={(v) => setBrand({ ...brand, club_name: v })} testId="brand-club-name" />
             <BrandField label="Tagline" value={brand.tagline} onChange={(v) => setBrand({ ...brand, tagline: v })} testId="brand-tagline" />
+            <BrandField label="SEO Beschreibung" value={brand.site_description} onChange={(v) => setBrand({ ...brand, site_description: v })} testId="brand-site-description" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <BrandField label="Akzentfarbe (HEX)" value={brand.primary_color} onChange={(v) => setBrand({ ...brand, primary_color: v })} testId="brand-color" />
               <BrandField label="Domain" value={brand.domain} onChange={(v) => setBrand({ ...brand, domain: v })} testId="brand-domain" />
             </div>
-            <BrandField label="Zeitzone" value={brand.timezone} onChange={(v) => setBrand({ ...brand, timezone: v })} testId="brand-tz" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <BrandField label="Zeitzone" value={brand.timezone} onChange={(v) => setBrand({ ...brand, timezone: v })} testId="brand-tz" />
+              <BrandField label="Kontakt E-Mail" value={brand.contact_email} onChange={(v) => setBrand({ ...brand, contact_email: v })} testId="brand-contact-email" />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <BrandField label="Discord Einladung" value={brand.discord_invite_url} onChange={(v) => setBrand({ ...brand, discord_invite_url: v })} testId="brand-discord-invite" />
               <BrandField label="Twitch Channel" value={brand.twitch_channel} onChange={(v) => setBrand({ ...brand, twitch_channel: v })} testId="brand-twitch-channel" />
@@ -477,6 +481,7 @@ export default function AdminSettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ImageUpload value={brand.logo_url} onChange={(v) => setBrand({ ...brand, logo_url: v })} label="Vereinslogo" testId="brand-logo" variant="square" />
               <ImageUpload value={brand.mascot_url} onChange={(v) => setBrand({ ...brand, mascot_url: v })} label="Maskottchen" testId="brand-mascot" variant="square" />
+              <ImageUpload value={brand.favicon_url} onChange={(v) => setBrand({ ...brand, favicon_url: v })} label="Favicon / Browser Icon" testId="brand-favicon" variant="square" />
             </div>
             <div>
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Impressum</div>

@@ -9,7 +9,7 @@ const UPDATED_AT = "04.05.2026";
 function useBranding() {
   const [branding, setBranding] = useState({});
   useEffect(() => {
-    api.get("/settings/branding").then(({ data }) => setBranding(data || {})).catch(() => {});
+    api.get("/settings/public").then(({ data }) => setBranding(data || {})).catch(() => {});
   }, []);
   return branding;
 }
@@ -55,6 +55,7 @@ export function ImprintPage() {
   const branding = useBranding();
   const clubName = branding.club_name || "THE LION SQUAD eSports";
   const domain = branding.domain || "https://lionsquad.at";
+  const contactEmail = branding.contact_email || "office@lionsquad.at";
   const imprint = branding.imprint;
 
   return (
@@ -69,7 +70,7 @@ export function ImprintPage() {
             ["Rechtsform", "eingetragener Verein nach österreichischem Vereinsrecht"],
             ["Sitz", "Österreich"],
             ["Website", <a href={domain} className="text-[#29B6E8] hover:underline">{domain}</a>],
-            ["E-Mail", <a href="mailto:info@lionsquad.at" className="text-[#29B6E8] hover:underline">info@lionsquad.at</a>],
+            ["E-Mail", <a href={`mailto:${contactEmail}`} className="text-[#29B6E8] hover:underline">{contactEmail}</a>],
           ]}
         />
         {imprint && (
@@ -129,6 +130,7 @@ export function PrivacyPage() {
   const branding = useBranding();
   const clubName = branding.club_name || "THE LION SQUAD eSports";
   const domain = branding.domain || "https://lionsquad.at";
+  const contactEmail = branding.contact_email || "office@lionsquad.at";
 
   return (
     <LegalArticle
@@ -141,8 +143,8 @@ export function PrivacyPage() {
             ["Verantwortlicher", clubName],
             ["Sitz", "Österreich"],
             ["Website", <a href={domain} className="text-[#29B6E8] hover:underline">{domain}</a>],
-            ["Kontakt", <a href="mailto:info@lionsquad.at" className="text-[#29B6E8] hover:underline">info@lionsquad.at</a>],
-            ["Datenschutz", <a href="mailto:datenschutz@lionsquad.at" className="text-[#29B6E8] hover:underline">datenschutz@lionsquad.at</a>],
+            ["Kontakt", <a href={`mailto:${contactEmail}`} className="text-[#29B6E8] hover:underline">{contactEmail}</a>],
+            ["Datenschutz", <a href={`mailto:${contactEmail}`} className="text-[#29B6E8] hover:underline">{contactEmail}</a>],
           ]}
         />
       </Section>
@@ -252,7 +254,7 @@ export function PrivacyPage() {
           Betroffene Personen haben nach Maßgabe der DSGVO Rechte auf Auskunft, Berichtigung,
           Löschung, Einschränkung, Datenübertragbarkeit, Widerspruch sowie Widerruf erteilter
           Einwilligungen. Zur Ausübung genügt eine Nachricht an{" "}
-          <a href="mailto:datenschutz@lionsquad.at" className="text-[#29B6E8] hover:underline">datenschutz@lionsquad.at</a>.
+          <a href={`mailto:${contactEmail}`} className="text-[#29B6E8] hover:underline">{contactEmail}</a>.
         </p>
         <p>
           Außerdem besteht das Recht auf Beschwerde bei der Österreichischen Datenschutzbehörde,

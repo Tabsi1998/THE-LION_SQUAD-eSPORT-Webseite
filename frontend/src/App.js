@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/tls/ProtectedRoute";
+import { BrandingHead } from "@/components/tls/BrandingHead";
 
 function MeRedirect() {
   const { user } = useAuth();
@@ -93,6 +94,7 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <BrandingHead />
         <Toaster theme="dark" position="top-right" richColors />
         <Routes>
           {/* Public — Verein */}

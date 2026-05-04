@@ -16,6 +16,8 @@ export function PublicLayout({ children }) {
   }, []);
   const nav = useNavigate();
   const closeMobile = () => setMobileOpen(false);
+  const clubName = branding?.club_name || "THE LION SQUAD";
+  const tagline = branding?.tagline || "eSports";
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col">
@@ -124,7 +126,7 @@ export function PublicLayout({ children }) {
             <div className="col-span-2 md:col-span-3 lg:col-span-4">
               <Logo size="lg" asLink={false} />
               <p className="mt-4 text-white/60 text-sm max-w-md">
-                <strong className="text-white">THE LION SQUAD — eSports.</strong> Die offizielle Vereinsplattform für Community, Mitglieder, Events, Turniere und Fast-Lap-Challenges. Online &amp; offline. Ein Rudel.
+                <strong className="text-white">{clubName} — {tagline}.</strong> Die offizielle Vereinsplattform für Community, Mitglieder, Events, Turniere und Fast-Lap-Challenges. Online &amp; offline. Ein Rudel.
               </p>
               <div className="mt-4 flex gap-2">
                 <a href={branding?.discord_invite_url || "https://discord.com/invite/thelionsquadesports"} target="_blank" rel="noreferrer" data-testid="footer-discord" aria-label="Discord" className="w-9 h-9 inline-flex items-center justify-center border border-white/10 rounded-sm hover:border-[#5865F2] hover:text-[#5865F2] text-white/70 transition">
@@ -176,7 +178,7 @@ export function PublicLayout({ children }) {
         {/* Reihe 2 — Bottom Bar */}
         <div className="border-t border-white/5">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-white/40">
-            <span>© {new Date().getFullYear()} THE LION SQUAD — eSports. Alle Rechte vorbehalten.</span>
+            <span>© {new Date().getFullYear()} {clubName} — {tagline}. Alle Rechte vorbehalten.</span>
             <div className="flex items-center gap-4">
               <Link to="/imprint" className="hover:text-[#29B6E8] transition" data-testid="footer-imprint">Impressum</Link>
               <Link to="/privacy" className="hover:text-[#29B6E8] transition" data-testid="footer-privacy">Datenschutz</Link>
