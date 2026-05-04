@@ -4,7 +4,7 @@ import { api, formatApiError, formatMs, parseTimeStr } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { toast } from "sonner";
-import { Plus, Trash2, Tv } from "lucide-react";
+import { Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
 
 export default function AdminF1EditPage() {
   const { id } = useParams();
@@ -14,7 +14,8 @@ export default function AdminF1EditPage() {
   const [times, setTimes] = useState([]);
   const [activeTrack, setActiveTrack] = useState(null);
   const [newTrack, setNewTrack] = useState({ name: "", image_url: "", country: "" });
-  const [newTime, setNewTime] = useState({ user_id: "", time_str: "", penalty_seconds: 0 });
+  const [newTime, setNewTime] = useState({ user_id: "", time_str: "", penalty_seconds: 0, proof_url: "" });
+  const [editTime, setEditTime] = useState(null);
 
   const load = async () => {
     const { data: c } = await api.get(`/f1/challenges/${id}`);
@@ -58,8 +59,9 @@ export default function AdminF1EditPage() {
       await api.post(`/f1/challenges/${id}/times`, {
         user_id: newTime.user_id, track_id: activeTrack,
         time_ms: ms, penalty_seconds: Number(newTime.penalty_seconds) || 0,
+        proof_url: newTime.proof_url || null,
       });
-      setNewTime({ ...newTime, time_str: "" });
+      setNewTime({ ...newTime, time_str: "", proof_url: "" });
       toast.success("Zeit eingetragen.");
       loadTimes();
     } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
@@ -68,6 +70,24 @@ export default function AdminF1EditPage() {
   const delTime = async (tid) => {
     await api.delete(`/f1/times/${tid}`);
     loadTimes();
+  };
+
+  const saveEdit = async () => {
+    if (!editTime) return;
+    try {
+      const ms = editTime.time_str ? parseTimeStr(editTime.time_str) : editTime.time_ms;
+      if (editTime.time_str && !ms) { toast.error("Ungültiges Zeitformat"); return; }
+      await api.patch(`/f1/times/${editTime.id}`, {
+        time_ms: ms,
+        penalty_seconds: Number(editTime.penalty_seconds) || 0,
+        is_invalid: !!editTime.is_invalid,
+        proof_url: editTime.proof_url || null,
+        admin_note: editTime.admin_note || null,
+      });
+      toast.success("Zeit aktualisiert.");
+      setEditTime(null);
+      loadTimes();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
 
   const setStatus = async (status) => {
@@ -144,21 +164,27 @@ export default function AdminF1EditPage() {
                 </div>
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Strafe (s)</div>
-                  <input type="number" value={newTime.penalty_seconds} onChange={(e) => setNewTime({ ...newTime, penalty_seconds: e.target.value })} data-testid="f1-add-time-penalty" className="w-24 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
+                  <input type="number" step="0.1" value={newTime.penalty_seconds} onChange={(e) => setNewTime({ ...newTime, penalty_seconds: e.target.value })} data-testid="f1-add-time-penalty" className="w-24 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
+                </div>
+                <div className="flex-1 min-w-[160px]">
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Proof URL</div>
+                  <input value={newTime.proof_url} onChange={(e) => setNewTime({ ...newTime, proof_url: e.target.value })} placeholder="Screenshot/Video Link" data-testid="f1-add-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
                 </div>
                 <button data-testid="f1-add-time-submit" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2]">Eintragen</button>
               </form>
               <div className="space-y-1">
                 {times.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between px-3 py-2 border border-white/5 rounded-sm hover:border-[#29B6E8]/40">
+                  <div key={t.id} className={`flex items-center justify-between px-3 py-2 border rounded-sm hover:border-[#29B6E8]/40 ${t.is_invalid ? "border-[#FF3B30]/30 bg-[#FF3B30]/5" : "border-white/5"}`}>
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="text-white/50 text-xs w-6">#{t.attempt_number}</span>
                       <span className="text-white text-sm truncate">{t.user?.display_name || t.user?.username}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="font-display font-bold text-lg text-white tabular-nums">{t.time_str}</span>
+                      <span className={`font-display font-bold text-lg tabular-nums ${t.is_invalid ? "line-through text-white/40" : "text-white"}`}>{t.time_str}</span>
                       {t.penalty_seconds > 0 && <span className="text-[#FF3B30] text-xs">+{t.penalty_seconds}s</span>}
-                      {t.is_invalid && <span className="text-[#FF3B30] text-xs">INVALID</span>}
+                      {t.is_invalid && <span className="text-[#FF3B30] text-[10px] font-bold uppercase tracking-widest">INVALID</span>}
+                      {t.proof_url && <a href={t.proof_url} target="_blank" rel="noreferrer" className="text-[10px] text-[#29B6E8] uppercase tracking-widest hover:underline">Proof</a>}
+                      <button onClick={() => setEditTime({ ...t, time_str: t.time_str })} data-testid={`f1-edit-time-${t.id}`} className="p-1 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-3.5 h-3.5" /></button>
                       <button onClick={() => delTime(t.id)} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
@@ -169,6 +195,43 @@ export default function AdminF1EditPage() {
           ) : <div className="text-white/40 text-sm">Bitte erst eine Strecke anlegen.</div>}
         </div>
       </div>
+
+      {/* Edit Time Modal */}
+      {editTime && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setEditTime(null)}>
+          <div className="bg-[#121212] border border-white/10 rounded-sm max-w-md w-full p-6 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-heading text-lg font-bold uppercase">Zeit bearbeiten</h3>
+              <button onClick={() => setEditTime(null)} className="text-white/40 hover:text-white"><XIcon className="w-4 h-4" /></button>
+            </div>
+            <div className="text-xs text-white/60">Spieler: <span className="text-white">{editTime.user?.display_name || editTime.user?.username}</span></div>
+            <label className="block">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Zeit (m:ss.SSS)</div>
+              <input value={editTime.time_str} onChange={(e) => setEditTime({ ...editTime, time_str: e.target.value })} data-testid="f1-edit-time-value" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display text-lg tabular-nums" />
+            </label>
+            <label className="block">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Strafsekunden</div>
+              <input type="number" step="0.1" value={editTime.penalty_seconds ?? 0} onChange={(e) => setEditTime({ ...editTime, penalty_seconds: e.target.value })} data-testid="f1-edit-time-penalty" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
+            </label>
+            <label className="block">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Proof URL</div>
+              <input value={editTime.proof_url || ""} onChange={(e) => setEditTime({ ...editTime, proof_url: e.target.value })} placeholder="Screenshot / Video" data-testid="f1-edit-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            </label>
+            <label className="block">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Admin-Notiz</div>
+              <textarea rows={2} value={editTime.admin_note || ""} onChange={(e) => setEditTime({ ...editTime, admin_note: e.target.value })} data-testid="f1-edit-time-note" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={!!editTime.is_invalid} onChange={(e) => setEditTime({ ...editTime, is_invalid: e.target.checked })} data-testid="f1-edit-time-invalid" className="accent-[#29B6E8]" />
+              <span>Als ungültig markieren (zählt nicht für Leaderboard)</span>
+            </label>
+            <div className="flex gap-2 pt-2">
+              <button onClick={saveEdit} data-testid="f1-edit-time-save" className="flex-1 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
+              <button onClick={() => setEditTime(null)} className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm">Abbrechen</button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

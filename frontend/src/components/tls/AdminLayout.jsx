@@ -4,7 +4,8 @@ import { Logo } from "@/components/tls/Logo";
 import {
   LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon,
   CalendarDays, Flag, Building2, Newspaper, LogOut,
-  ExternalLink, Menu, X,
+  ExternalLink, Menu, X, Settings as SettingsIcon,
+  ShieldCheck, Code2,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -23,9 +24,9 @@ export function AdminLayout({ children }) {
     { to: "/admin/stations", label: "Stationen", icon: Building2 },
     { to: "/admin/users", label: "Spieler", icon: UsersIcon },
     { to: "/admin/news", label: "News", icon: Newspaper },
-    { to: "/admin/widgets", label: "Widgets", icon: ExternalLink },
-    { to: "/admin/audit", label: "Audit Logs", icon: LogOut },
-    { to: "/admin/settings", label: "Einstellungen", icon: Building2 },
+    { to: "/admin/widgets", label: "Widgets", icon: Code2 },
+    { to: "/admin/audit", label: "Audit Logs", icon: ShieldCheck },
+    { to: "/admin/settings", label: "Einstellungen", icon: SettingsIcon },
   ];
 
   return (

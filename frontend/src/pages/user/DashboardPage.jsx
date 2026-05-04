@@ -83,6 +83,10 @@ export default function DashboardPage() {
             <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">F1 Fast Lap</div>
             <div className="mt-2 font-heading text-lg font-bold">Ranglisten</div>
           </Link>
+          <Link to="/privacy-account" data-testid="dashboard-privacy-link" className="border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-5 bg-[#121212] transition">
+            <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">DSGVO</div>
+            <div className="mt-2 font-heading text-lg font-bold">Meine Daten</div>
+          </Link>
         </div>
       </div>
     </PublicLayout>

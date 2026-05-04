@@ -22,6 +22,7 @@ import { PrivacyPage, ImprintPage } from "@/pages/public/LegalPages";
 import DashboardPage from "@/pages/user/DashboardPage";
 import ProfilePage from "@/pages/user/ProfilePage";
 import MatchHubPage from "@/pages/user/MatchHubPage";
+import PrivacyAccountPage from "@/pages/user/PrivacyAccountPage";
 
 import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
 import AdminTournamentsPage from "@/pages/admin/AdminTournamentsPage";
@@ -71,6 +72,7 @@ function App() {
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/matches/:id" element={<ProtectedRoute><MatchHubPage /></ProtectedRoute>} />
+          <Route path="/privacy-account" element={<ProtectedRoute><PrivacyAccountPage /></ProtectedRoute>} />
 
           {/* Admin */}
           <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboardPage /></ProtectedRoute>} />

@@ -13,6 +13,7 @@ export default function AdminTournamentEditPage() {
   const [regs, setRegs] = useState([]);
   const [bracket, setBracket] = useState(null);
   const [tab, setTab] = useState("participants");
+  const [groups, setGroups] = useState([]);
 
   const load = async () => {
     const { data } = await api.get(`/tournaments/${id}`);
@@ -21,6 +22,10 @@ export default function AdminTournamentEditPage() {
     setRegs(r);
     const { data: b } = await api.get(`/tournaments/${id}/bracket`);
     setBracket(b);
+    if (data.format === "groups") {
+      try { const { data: g } = await api.get(`/tournaments/${id}/groups`); setGroups(g || []); }
+      catch { setGroups([]); }
+    }
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
@@ -88,15 +93,15 @@ export default function AdminTournamentEditPage() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-5 border-b border-white/10">
-        {["participants", "bracket", "matches", "edit"].map((s) => (
+      <div className="flex gap-2 mb-5 border-b border-white/10 overflow-x-auto">
+        {["participants", "bracket", "matches", ...(t.format === "groups" ? ["groups"] : []), "edit"].map((s) => (
           <button
             key={s}
             data-testid={`admin-tr-tab-${s}`}
             onClick={() => setTab(s)}
-            className={`px-4 py-3 text-xs font-bold uppercase tracking-wider ${tab === s ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}
+            className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${tab === s ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}
           >
-            {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Bracket" : s === "matches" ? "Matches" : "Bearbeiten"}
+            {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Bracket" : s === "matches" ? "Matches" : s === "groups" ? "Gruppen" : "Bearbeiten"}
           </button>
         ))}
       </div>
@@ -179,6 +184,23 @@ export default function AdminTournamentEditPage() {
       )}
       {tab === "edit" && (
         <TournamentEditForm tournament={t} onSaved={load} />
+      )}
+      {tab === "groups" && (
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {groups.map((g) => (
+            <div key={g.id} className="border border-white/10 rounded-sm bg-[#121212] p-4">
+              <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">Gruppe</div>
+              <h3 className="font-heading text-lg font-bold">{g.name}</h3>
+              <div className="mt-3 space-y-1.5">
+                {(g.participant_ids || []).map((pid) => {
+                  const r = bracket?.registrations.find((x) => x.id === pid);
+                  return <div key={pid} className="text-sm text-white/80 truncate">{r?.display_name || "—"}</div>;
+                })}
+              </div>
+            </div>
+          ))}
+          {groups.length === 0 && <div className="col-span-full text-center py-10 text-white/40">Noch keine Gruppen. Oben "Gruppen generieren" klicken.</div>}
+        </div>
       )}
     </AdminLayout>
   );

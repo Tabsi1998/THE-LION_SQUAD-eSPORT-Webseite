@@ -1,0 +1,43 @@
+{
+  "summary": "Phase 2/3 backend + frontend testing complete. 60 total backend tests (41/42 legacy + 19/19 new Phase23) passing. Frontend admin pages for Stations, Widgets, Seasons, Audit, Settings and user /privacy-account all load without console errors, render correct German UI with data-testid attributes, and are integrated with the backend (verified audit log picks up branding.update written via settings PUT).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/f1/challenges/{id}/times (admin add)", "issue": "test_admin_add_lap_time_resorts intermittently fails because prior test runs leave multiple users with identical 30000ms fastest times; the newly inserted record may not tie-break to the target user. Pre-existing behavior, not Phase 2/3 regression. Consider tie-break by created_at DESC so newest fastest wins."},
+      {"endpoint": "Phase 1 carryover (not retested)", "issue": "Slug support still missing on /api/tournaments/{id}/(generate-bracket|register|checkin|bracket|standings|registrations) and /api/f1/challenges/{id}/(leaderboard|championship|times|export.csv) - reported in iteration_1. PDF/Widget endpoints correctly accept slug_or_id."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase2_3.py",
+    "/app/backend/tests/test_tls_arena_api.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/phase23_results.xml",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Tie-break admin-added lap times by created_at so new fastest time always wins when equal, to stabilize regression test."
+  ],
+  "critical_code_review_comments": [
+    "extras_routes.py: widget endpoints correctly strip sensitive fields (notes/discord/platform_id/admin_note/reports/proof_url/email/password_hash) - good.",
+    "PDF endpoints consistently support slug_or_id - good; recommend tournament/F1 action endpoints adopt the same pattern for API consistency.",
+    "DSGVO /export-my-data returns all 5 required collections (user, tournament_registrations, f1_lap_times, teams, email_logs) plus exported_at timestamp - spec compliant.",
+    "Audit log is written on settings.branding.update and settings.email.update - verified by GET /api/audit after PUT.",
+    "F1 PATCH /api/f1/times/{id} accepts proof_url/is_invalid/admin_note and persists correctly - verified via GET /api/f1/challenges/{cid}/times roundtrip.",
+    "Swiss/next-round and groups/generate correctly reject non-matching tournament formats (single_elim) with 4xx."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase2_3.py"
+  ],
+  "success_rate": {"backend": "98% (60/61 pytest, single pre-existing flaky)", "frontend": "100% on tested admin + DSGVO pages (no console errors)"},
+  "test_credentials": "admin@thelionsquad.at / TLSAdmin2026! and leon_king@demo.thelionsquad.at / demo123 verified.",
+  "seed_data_creation": "Tests create TEST_ users via /api/auth/register, TEST-Station via POST /api/stations (deleted), TEST Season (deleted), and temporarily flag one F1 lap time as invalid (reverted).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 2/3 test file at /app/backend/tests/test_phase2_3.py covers: Settings (public/email/branding+audit), Seasons CRUD, Widgets (bracket+F1 without sensitive fields), DSGVO export, Audit admin-only, PDF exports (participants/checkin/matches/standings + f1 leaderboard with %PDF header verification), Stations CRUD, F1 time PATCH with proof_url/is_invalid, Swiss/Groups rejection on wrong format. All 19 green. Frontend verified admin pages /admin/{stations,widgets,seasons,audit,settings} and /privacy-account: each renders proper German headings, forms with data-testid attributes (widget-type, season-submit, email-api-key, dsgvo-export-btn, dsgvo-anonymize-btn, station-assign-*, etc). Station page shows 9 seeded stations with free/busy/broken/reserved selector and Match zuweisen button. Anonymize button intentionally NOT triggered per instructions.",
+  "rca of the issue": "test_admin_add_lap_time_resorts flake: inserting new lap time with time_ms=30000 produces duplicate when rerun; leaderboard sorts by effective_ms only, and there is no tie-break by created_at. First matching user wins, which may be a stale test user. Fix: add .sort([('time_ms', 1), ('created_at', -1)]) when picking best_per_user in f1_routes.leaderboard, or use time_ms < (not <=) so new insert cannot overwrite existing best for same user — but more robustly, de-duplicate by taking latest of equal times."
+}
