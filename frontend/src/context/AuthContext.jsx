@@ -1,17 +1,19 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatApiError, setToken, getToken } from "@/lib/api";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(undefined); // undefined=loading, null=guest, obj=user
+  const [user, setUser] = useState(undefined);
   const [error, setError] = useState(null);
 
   const fetchMe = useCallback(async () => {
+    if (!getToken()) { setUser(null); return; }
     try {
       const { data } = await api.get("/auth/me");
       setUser(data);
     } catch {
+      setToken(null);
       setUser(null);
     }
   }, []);
@@ -22,6 +24,7 @@ export function AuthProvider({ children }) {
     setError(null);
     try {
       const { data } = await api.post("/auth/login", { email, password });
+      if (data?.access_token) setToken(data.access_token);
       setUser(data);
       return { ok: true };
     } catch (e) {
@@ -35,6 +38,7 @@ export function AuthProvider({ children }) {
     setError(null);
     try {
       const { data } = await api.post("/auth/register", payload);
+      if (data?.access_token) setToken(data.access_token);
       setUser(data);
       return { ok: true };
     } catch (e) {
@@ -46,6 +50,7 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try { await api.post("/auth/logout"); } catch {}
+    setToken(null);
     setUser(null);
   };
 

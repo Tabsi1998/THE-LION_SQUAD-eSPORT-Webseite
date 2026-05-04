@@ -46,26 +46,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="TLS ARENA - THE LION SQUAD eSports", version="1.0.0", lifespan=lifespan)
 
-# CORS - allow the configured frontend URL + wildcard fallback
-cors_origins = os.environ.get("CORS_ORIGINS", "*")
-frontend_url = os.environ.get("FRONTEND_URL", "")
-origins = [o.strip() for o in cors_origins.split(",")] if cors_origins != "*" else ["*"]
-if frontend_url and frontend_url not in origins and "*" not in origins:
-    origins.append(frontend_url)
+# CORS - use regex to allow any origin WITH credentials (browsers reject '*' + credentials).
+# Still honour an explicit FRONTEND_URL / CORS_ORIGINS list if provided (comma-separated).
+cors_origins_env = os.environ.get("CORS_ORIGINS", "*").strip()
+explicit_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip() and o.strip() != "*"]
+frontend_url = os.environ.get("FRONTEND_URL", "").strip()
+if frontend_url and frontend_url not in explicit_origins:
+    explicit_origins.append(frontend_url)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins if origins != ["*"] else ["*"],
-    allow_credentials=True if origins != ["*"] else False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# --- IMPORTANT: allow cookies even when origins contains "*" by using regex ---
-# Browsers reject allow_origins=['*'] with allow_credentials=True. To make auth
-# cookies work across deployments, we additionally allow any origin via regex.
-if origins == ["*"]:
-    app.user_middleware.clear()
+if explicit_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=explicit_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    # No explicit origins - open to any but still support credentials via regex
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=".*",

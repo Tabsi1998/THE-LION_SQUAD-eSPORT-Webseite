@@ -56,13 +56,23 @@ def create_refresh_token(user_id: str) -> str:
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
+def _secure_cookies() -> bool:
+    """Use Secure cookies when served behind HTTPS (preview / production)."""
+    fu = os.environ.get("FRONTEND_URL", "")
+    return fu.startswith("https://")
+
+
 def set_auth_cookies(response: Response, access: str, refresh: str):
+    secure = _secure_cookies()
+    # When on HTTPS (cross-site scenarios behind CDN), use SameSite=None + Secure.
+    # When purely local HTTP, use SameSite=Lax.
+    samesite = "none" if secure else "lax"
     response.set_cookie(
-        "access_token", access, httponly=True, secure=False, samesite="lax",
+        "access_token", access, httponly=True, secure=secure, samesite=samesite,
         max_age=ACCESS_TOKEN_MINUTES * 60, path="/",
     )
     response.set_cookie(
-        "refresh_token", refresh, httponly=True, secure=False, samesite="lax",
+        "refresh_token", refresh, httponly=True, secure=secure, samesite=samesite,
         max_age=REFRESH_TOKEN_DAYS * 24 * 3600, path="/",
     )
 

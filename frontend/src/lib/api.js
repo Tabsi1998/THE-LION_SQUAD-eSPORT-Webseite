@@ -1,11 +1,22 @@
 import axios from "axios";
 
 export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const TOKEN_KEY = "tls_access_token";
+
+export const getToken = () => localStorage.getItem(TOKEN_KEY);
+export const setToken = (t) => t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY);
 
 export const api = axios.create({
   baseURL: API,
   withCredentials: true,
   headers: { "Content-Type": "application/json" },
+});
+
+// Attach bearer token if we have one (fallback when cookies are blocked by proxies).
+api.interceptors.request.use((config) => {
+  const t = getToken();
+  if (t) config.headers.Authorization = `Bearer ${t}`;
+  return config;
 });
 
 export function formatApiError(detail) {
@@ -29,7 +40,6 @@ export function formatMs(ms) {
 }
 
 export function parseTimeStr(str) {
-  // Parse "m:ss.SSS" or "ss.SSS" -> ms
   if (!str) return null;
   const trimmed = String(str).trim();
   const m = trimmed.match(/^(?:(\d+):)?(\d{1,2})\.(\d{1,3})$/);

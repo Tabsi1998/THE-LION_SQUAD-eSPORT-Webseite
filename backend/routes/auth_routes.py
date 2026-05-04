@@ -88,7 +88,7 @@ async def register(body: UserRegister, response: Response):
     set_auth_cookies(response, access, refresh)
     user_doc.pop("_id", None)
     user_doc.pop("password_hash", None)
-    return user_doc
+    return {**user_doc, "access_token": access, "refresh_token": refresh}
 
 
 @router.post("/login")
@@ -111,7 +111,7 @@ async def login(body: UserLogin, request: Request, response: Response):
     set_auth_cookies(response, access, refresh)
     user.pop("_id", None)
     user.pop("password_hash", None)
-    return user
+    return {**user, "access_token": access, "refresh_token": refresh}
 
 
 @router.post("/logout")
