@@ -19,38 +19,12 @@ export const NAV_STRUCTURE = [
       { to: "/about", label: "Über uns" },
       { to: "/board", label: "Vorstand" },
       { to: "/values", label: "Werte & Ziele" },
-      { to: "/contact", label: "Kontakt" },
-      { to: "/imprint", label: "Impressum" },
-      { to: "/privacy", label: "Datenschutz" },
-    ],
-  },
-  {
-    label: "Community",
-    children: [
-      { to: "/players", label: "Spieler" },
-      { to: "/galerie", label: "Galerie" },
-      { to: "/badges", label: "Achievements" },
       { to: "/sponsors", label: "Sponsoren" },
+      { to: "/galerie", label: "Galerie" },
     ],
   },
-  {
-    label: "Mitglieder",
-    children: [
-      { to: "/members", label: "Mitgliederliste" },
-      { to: "/membership/join", label: "Mitglied werden" },
-      { to: "/members/area", label: "Mitgliederbereich", memberOnly: true },
-      { to: "/members/benefits", label: "Mitgliedervorteile", memberOnly: true },
-      { to: "/members/documents", label: "Vereinsdokumente", memberOnly: true },
-    ],
-  },
-  {
-    label: "Events",
-    children: [
-      { to: "/events", label: "Eventübersicht" },
-      { to: "/events?filter=upcoming", label: "Kommende" },
-      { to: "/events?filter=past", label: "Vergangene" },
-    ],
-  },
+  { to: "/news", label: "News" },
+  { to: "/events", label: "Events" },
   {
     label: "eSports",
     children: [
@@ -61,7 +35,18 @@ export const NAV_STRUCTURE = [
       { to: "/badges", label: "Achievements" },
     ],
   },
-  { to: "/news", label: "News" },
+  {
+    label: "Spieler",
+    children: [
+      { to: "/players", label: "Alle Spieler" },
+      { to: "/members", label: "Vereinsmitglieder" },
+      { to: "/membership/join", label: "Mitglied werden" },
+      { to: "/members/area", label: "Mitgliederbereich", memberOnly: true },
+      { to: "/members/benefits", label: "Mitgliedervorteile", memberOnly: true },
+      { to: "/members/documents", label: "Vereinsdokumente", memberOnly: true },
+    ],
+  },
+  { to: "/contact", label: "Kontakt" },
 ];
 
 export const NAV_USER = [

@@ -1,14 +1,28 @@
 /**
- * Phase D — Statische Vereins-Sub-Pages (Vorstand, Werte/Ziele).
- * Werden später (Phase F: Web-CMS) editierbar gemacht.
+ * Phase D — Statische Vereins-Sub-Pages.
+ *
+ * BoardPage ist jetzt dynamisch: liest /api/board und rendert nur is_active=true.
  */
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { Crown, Heart, Target, Sparkles } from "lucide-react";
+import { Crown, Heart, Target, Sparkles, User as UserIcon, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export function BoardPage() {
   useDocumentTitle("Vorstand", "Der Vorstand von THE LION SQUAD eSports.");
+  const [positions, setPositions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get("/board?active_only=true")
+      .then(({ data }) => setPositions(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <PublicLayout>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -19,23 +33,19 @@ export function BoardPage() {
           Das Team hinter THE LION SQUAD — eSports. Ehrenamtlich, leidenschaftlich, mit klarem Fokus auf Community und Fairplay.
         </p>
 
-        <div className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {[
-            { role: "Obmann / Präsident", desc: "Vereinsleitung, Strategie, externe Vertretung." },
-            { role: "Schriftführer", desc: "Protokolle, Kommunikation, Vereinsregister." },
-            { role: "Kassier", desc: "Finanzen, Mitgliedsbeiträge, Sponsoren-Abrechnung." },
-            { role: "Event-Koordinator", desc: "Planung & Durchführung von Vereinsevents." },
-            { role: "eSports-Lead", desc: "Turniere, Brackets, Rangliste, Fairplay." },
-            { role: "Community Manager", desc: "Discord, Social Media, Mitgliederbetreuung." },
-          ].map((m) => (
-            <div key={m.role} className="border border-white/10 rounded-sm p-5 bg-[#121212] hover:border-[#FFD700]/40 transition">
-              <Crown className="w-5 h-5 text-[#FFD700] mb-3" />
-              <div className="font-heading font-bold uppercase">{m.role}</div>
-              <p className="mt-2 text-sm text-white/60">{m.desc}</p>
-              <div className="mt-3 text-[10px] uppercase tracking-widest text-white/40">Position offen — wird befüllt</div>
-            </div>
-          ))}
-        </div>
+        {loading ? (
+          <div className="mt-10 text-white/40">Lade …</div>
+        ) : positions.length === 0 ? (
+          <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
+            Es sind noch keine Vorstandspositionen aktiv.
+          </div>
+        ) : (
+          <div className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" data-testid="board-grid">
+            {positions.map((p) => (
+              <BoardCard key={p.id} p={p} />
+            ))}
+          </div>
+        )}
 
         <div className="mt-10 border border-white/10 bg-[#121212] rounded-sm p-6">
           <h2 className="font-heading text-xl font-bold uppercase mb-2">Statuten & Vereinsregister</h2>
@@ -45,6 +55,43 @@ export function BoardPage() {
         </div>
       </div>
     </PublicLayout>
+  );
+}
+
+function BoardCard({ p }) {
+  const u = p.user;
+  const d = p.deputy_user;
+  return (
+    <div className="border border-white/10 rounded-sm p-5 bg-[#121212] hover:border-[#FFD700]/40 transition" data-testid={`board-position-${p.slug}`}>
+      <Crown className="w-5 h-5 text-[#FFD700] mb-3" />
+      <div className="font-heading font-bold uppercase">{p.display_title}</div>
+      {p.description && <p className="mt-2 text-sm text-white/55">{p.description}</p>}
+
+      {u ? (
+        <Link to={`/u/${u.username}`} className="mt-4 flex items-center gap-3 group">
+          {u.avatar_url ? (
+            <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover border border-white/10" />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-[#0A0A0A] border border-white/10 flex items-center justify-center">
+              <UserIcon className="w-5 h-5 text-white/40" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-white text-sm group-hover:text-[#FFD700] transition truncate">{u.display_name || u.username}</div>
+            <div className="text-[10px] text-white/40 uppercase tracking-widest">@{u.username}</div>
+          </div>
+          <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-[#FFD700] transition" />
+        </Link>
+      ) : (
+        <div className="mt-3 text-[10px] uppercase tracking-widest text-white/40">Position offen</div>
+      )}
+      {d && (
+        <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-widest text-white/40">Stv.:</span>
+          <Link to={`/u/${d.username}`} className="text-sm text-white/80 hover:text-[#FFD700] transition">{d.display_name || d.username}</Link>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -78,9 +125,9 @@ export function ValuesPage() {
           <h2 className="font-heading text-2xl font-bold uppercase mb-4">Unsere Ziele</h2>
           <ul className="space-y-3 text-white/80 max-w-2xl">
             <li>🦁 <strong>Eine Heimat schaffen</strong> für eSports-Begeisterte aller Plattformen, Spiele und Skill-Level.</li>
-            <li>🏁 <strong>Reguläre Vereinsevents</strong> (online & offline) mit Pokal, Preisen und gutem Essen.</li>
+            <li>🏁 <strong>Reguläre Vereinsevents</strong> (online &amp; offline) mit Pokal, Preisen und gutem Essen.</li>
             <li>🏆 <strong>Eigene Turnierserie</strong> mit Season Pass, Achievements und Hall of Fame.</li>
-            <li>🎮 <strong>Förderung des Nachwuchses</strong> — auch für Kinder & Jugendliche, mit klaren Regeln und sicheren Strukturen.</li>
+            <li>🎮 <strong>Förderung des Nachwuchses</strong> — auch für Kinder &amp; Jugendliche, mit klaren Regeln und sicheren Strukturen.</li>
             <li>🤝 <strong>Kooperationen mit anderen Vereinen</strong>, Streamern, Spielentwicklern und Sponsoren.</li>
           </ul>
         </div>

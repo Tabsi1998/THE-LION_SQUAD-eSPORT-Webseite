@@ -69,6 +69,8 @@ import F1TVPage from "@/pages/display/F1TVPage";
 import BracketTVPage from "@/pages/display/BracketTVPage";
 import MyPrizesPage from "@/pages/user/MyPrizesPage";
 import AdminPrizesPage from "@/pages/admin/AdminPrizesPage";
+import AdminContactPage from "@/pages/admin/AdminContactPage";
+import AdminBoardPage from "@/pages/admin/AdminBoardPage";
 import SetupWizardPage from "@/pages/SetupWizardPage";
 import { NotFoundPage, ForbiddenPage } from "@/pages/ErrorPages";
 import { BoardPage, ValuesPage } from "@/pages/public/ClubPages";
@@ -159,6 +161,8 @@ function App() {
           {/* Admin */}
           <Route path="/admin/sponsors" element={<ProtectedRoute requireAdmin><AdminSponsorsPage /></ProtectedRoute>} />
           <Route path="/admin/prizes" element={<ProtectedRoute requireAdmin><AdminPrizesPage /></ProtectedRoute>} />
+          <Route path="/admin/contact" element={<ProtectedRoute requireAdmin><AdminContactPage /></ProtectedRoute>} />
+          <Route path="/admin/board" element={<ProtectedRoute requireAdmin><AdminBoardPage /></ProtectedRoute>} />
 
           {/* Setup wizard */}
           <Route path="/setup" element={<ProtectedRoute requireAdmin><SetupWizardPage /></ProtectedRoute>} />

@@ -433,6 +433,49 @@ async def delete_season_entry(entry_id: str, me: dict = Depends(require_admin())
 
 
 @season_router.get("/{slug_or_id}/standings")
+async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
+    """Resolve which tournaments + f1 challenges feed into this season.
+
+    Strategy:
+      - If `tournament_ids`/`f1_challenge_ids` are explicitly listed → use those.
+      - Otherwise auto-include every tournament/f1 challenge whose status is in
+        a relevant set AND whose start/created date falls inside the season
+        date range (start_date / end_date). Falls back to all if season has no
+        date range yet.
+    """
+    db = get_db()
+    explicit_t = list(s.get("tournament_ids") or [])
+    explicit_f = list(s.get("f1_challenge_ids") or [])
+    if explicit_t and explicit_f:
+        return explicit_t, explicit_f
+
+    # Build date filter (lenient: matches scheduled_at OR created_at fallback)
+    start = s.get("start_date")
+    end = s.get("end_date")
+    relevant_status = {"live", "completed", "results_published", "check_in", "scheduled"}
+
+    auto_t: list[str] = []
+    if not explicit_t:
+        async for t in db.tournaments.find({}, {"id": 1, "status": 1, "start_at": 1, "created_at": 1, "_id": 0}):
+            if t.get("status") not in relevant_status:
+                continue
+            ts = t.get("start_at") or t.get("created_at")
+            if start and end and ts and not (start <= ts <= end):
+                continue
+            auto_t.append(t["id"])
+    auto_f: list[str] = []
+    if not explicit_f:
+        async for f in db.f1_challenges.find({}, {"id": 1, "status": 1, "start_at": 1, "created_at": 1, "_id": 0}):
+            if f.get("status") not in relevant_status:
+                continue
+            ts = f.get("start_at") or f.get("created_at")
+            if start and end and ts and not (start <= ts <= end):
+                continue
+            auto_f.append(f["id"])
+
+    return (explicit_t or auto_t), (explicit_f or auto_f)
+
+
 async def season_standings(slug_or_id: str):
     """Aggregate standings over all tournaments + F1 challenges in the season."""
     db = get_db()
@@ -448,8 +491,10 @@ async def season_standings(slug_or_id: str):
         if won:
             per_user_points[user_id]["wins"] += 1
 
+    tournament_ids, f1_ids = await _resolve_season_sources(s)
+
     # Tournaments: use standings endpoint results (rank -> points)
-    for tid in s.get("tournament_ids", []):
+    for tid in tournament_ids:
         matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(2000)
         regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
         reg_user_map = {r["id"]: r.get("user_id") for r in regs}
@@ -474,7 +519,7 @@ async def season_standings(slug_or_id: str):
             add_points(uid, pts, pos == 0)
 
     # F1 Challenges: aggregate per-track then championship-style
-    for cid in s.get("f1_challenge_ids", []):
+    for cid in f1_ids:
         tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).to_list(100)
         for tr in tracks:
             times = await db.f1_lap_times.find(
