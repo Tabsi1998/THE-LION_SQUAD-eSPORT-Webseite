@@ -7,7 +7,7 @@ import {
   ExternalLink, Menu, X, Settings as SettingsIcon,
   ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon, FileText,
   Award, Inbox, UserCheck, Medal, FileEdit, Tv,
-  FolderOpen, ListOrdered,
+  FolderOpen, ListOrdered, AlertTriangle,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -38,6 +38,7 @@ export function AdminLayout({ children }) {
     { to: "/admin/nav", label: "Navigation", icon: ListOrdered },
     { to: "/admin/contact", label: "Inbox", icon: Inbox },
     { to: "/admin/prizes", label: "Gewinne", icon: Award },
+    { to: "/admin/penalties", label: "Strafen", icon: AlertTriangle },
     { to: "/admin/widgets", label: "Widgets", icon: Code2 },
     { to: "/admin/audit", label: "Audit Logs", icon: ShieldCheck },
     { to: "/admin/settings", label: "Einstellungen", icon: SettingsIcon },

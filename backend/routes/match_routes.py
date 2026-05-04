@@ -173,16 +173,30 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
 
 @router.post("/{match_id}/forfeit")
 async def forfeit(match_id: str, body: dict, me: dict = Depends(require_admin())):
-    """Admin forfeit - winner_id is the surviving participant."""
+    """Admin forfeit - winner_id is the surviving participant.
+
+    P0 — Penalty Transparency: a justification note (≥5 chars) is mandatory and
+    will be visible to the affected player in /api/penalties/me.
+    """
     db = get_db()
     m = await db.matches.find_one({"id": match_id})
     if not m:
         raise HTTPException(status_code=404)
+    note = (body.get("note") or body.get("reason") or "").strip()
+    if len(note) < 5:
+        raise HTTPException(
+            status_code=422,
+            detail="Bei einem Forfeit ist eine Begründung (mind. 5 Zeichen) Pflicht.",
+        )
     winner_id = body.get("winner_id")
     loser_id = m.get("participant_a_id") if winner_id == m.get("participant_b_id") else m.get("participant_b_id")
     await db.matches.update_one({"id": match_id}, {"$set": {
         "winner_id": winner_id, "loser_id": loser_id,
-        "status": "forfeit", "updated_at": now_utc().isoformat(),
+        "status": "forfeit",
+        "admin_decision_note": note,
+        "admin_decision_by": me["id"],
+        "admin_decision_at": now_utc().isoformat(),
+        "updated_at": now_utc().isoformat(),
     }})
     m = await db.matches.find_one({"id": match_id})
     all_matches = await db.matches.find({"tournament_id": m["tournament_id"]}).to_list(2000)

@@ -36,6 +36,7 @@ from routes.phase_fg_routes import (
     admin_media_router, nav_router, admin_nav_router, seo_router, seo_meta_router,
     seed_default_nav,
 )
+from routes.penalty_routes import router as penalty_router, admin_router as penalty_admin_router
 from routes.membership_routes import router as membership_router
 from routes.document_routes import router as document_router
 from routes.home_routes import router as home_router
@@ -174,6 +175,8 @@ app.include_router(setup_router)
 app.include_router(sitemap_router)
 app.include_router(contact_router)
 app.include_router(board_router)
+app.include_router(penalty_router)
+app.include_router(penalty_admin_router)
 
 # Static uploads (serve user-uploaded images through /api prefix to survive ingress)
 from fastapi.staticfiles import StaticFiles

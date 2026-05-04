@@ -172,7 +172,25 @@ export default function F1DetailPage() {
                       <tr key={e.user_id} data-testid={`f1-row-${e.rank}`} className={e.rank <= 3 ? "bg-[#29B6E8]/5" : ""}>
                         <td className={`px-4 py-3 font-display font-bold ${e.rank === 1 ? "text-[#FFD700]" : e.rank === 2 ? "text-white/80" : e.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}>{e.rank}</td>
                         <td className="px-4 py-3">{e.display_name}</td>
-                        <td className="px-4 py-3 text-right font-display font-bold text-white tabular-nums">{e.time_str}</td>
+                        <td className="px-4 py-3 text-right font-display font-bold text-white tabular-nums">
+                          <span className="inline-flex items-center gap-1.5">
+                            {e.time_str}
+                            {e.penalty_seconds > 0 && (
+                              <span
+                                title={`+${e.penalty_seconds}s Strafzeit · ${e.penalty_note || "ohne Begründung"}`}
+                                data-testid={`f1-penalty-${e.user_id}`}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-[#FF3B30] bg-[#FF3B30]/10 px-1.5 py-0.5 rounded-sm normal-case"
+                              >
+                                +{e.penalty_seconds}s ⓘ
+                              </span>
+                            )}
+                          </span>
+                          {e.penalty_note && (
+                            <div className="text-[10px] font-normal text-[#FF3B30]/80 italic mt-0.5 text-right max-w-[260px] ml-auto">
+                              „{e.penalty_note}"
+                            </div>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-right text-white/60 tabular-nums">{e.gap_str || "—"}</td>
                         <td className="px-4 py-3 text-right text-white/50">{e.attempts}</td>
                       </tr>

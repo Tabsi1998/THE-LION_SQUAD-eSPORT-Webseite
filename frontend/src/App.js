@@ -80,7 +80,9 @@ import MyMembershipPage from "@/pages/user/MyMembershipPage";
 import F1TVPage from "@/pages/display/F1TVPage";
 import BracketTVPage from "@/pages/display/BracketTVPage";
 import MyPrizesPage from "@/pages/user/MyPrizesPage";
+import MyPenaltiesPage from "@/pages/user/MyPenaltiesPage";
 import AdminPrizesPage from "@/pages/admin/AdminPrizesPage";
+import AdminPenaltiesPage from "@/pages/admin/AdminPenaltiesPage";
 import AdminContactPage from "@/pages/admin/AdminContactPage";
 import AdminBoardPage from "@/pages/admin/AdminBoardPage";
 import SetupWizardPage from "@/pages/SetupWizardPage";
@@ -179,6 +181,7 @@ function App() {
           <Route path="/admin/media" element={<ProtectedRoute requireAdmin><AdminMediaPage /></ProtectedRoute>} />
           <Route path="/admin/nav" element={<ProtectedRoute requireAdmin><AdminNavPage /></ProtectedRoute>} />
           <Route path="/admin/prizes" element={<ProtectedRoute requireAdmin><AdminPrizesPage /></ProtectedRoute>} />
+          <Route path="/admin/penalties" element={<ProtectedRoute requireAdmin><AdminPenaltiesPage /></ProtectedRoute>} />
           <Route path="/admin/contact" element={<ProtectedRoute requireAdmin><AdminContactPage /></ProtectedRoute>} />
           <Route path="/admin/board" element={<ProtectedRoute requireAdmin><AdminBoardPage /></ProtectedRoute>} />
 
@@ -187,6 +190,7 @@ function App() {
 
           {/* User: Meine Gewinne */}
           <Route path="/my/prizes" element={<ProtectedRoute><MyPrizesPage /></ProtectedRoute>} />
+          <Route path="/my/penalties" element={<ProtectedRoute><MyPenaltiesPage /></ProtectedRoute>} />
 
           {/* Display / TV */}
           <Route path="/display/f1/:id" element={<F1TVPage />} />

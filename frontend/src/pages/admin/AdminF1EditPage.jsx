@@ -14,7 +14,7 @@ export default function AdminF1EditPage() {
   const [times, setTimes] = useState([]);
   const [activeTrack, setActiveTrack] = useState(null);
   const [newTrack, setNewTrack] = useState({ name: "", image_url: "", country: "" });
-  const [newTime, setNewTime] = useState({ user_id: "", time_str: "", penalty_seconds: 0, proof_url: "" });
+  const [newTime, setNewTime] = useState({ user_id: "", time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "" });
   const [editTime, setEditTime] = useState(null);
 
   const load = async () => {
@@ -55,13 +55,19 @@ export default function AdminF1EditPage() {
     e.preventDefault();
     const ms = parseTimeStr(newTime.time_str);
     if (!ms) { toast.error("Ungültiges Zeitformat (m:ss.SSS)"); return; }
+    const pen = Number(newTime.penalty_seconds) || 0;
+    if (pen > 0 && (newTime.admin_note || "").trim().length < 5) {
+      toast.error("Bei Strafzeit ist eine Begründung (mind. 5 Zeichen) Pflicht.");
+      return;
+    }
     try {
       await api.post(`/f1/challenges/${id}/times`, {
         user_id: newTime.user_id, track_id: activeTrack,
-        time_ms: ms, penalty_seconds: Number(newTime.penalty_seconds) || 0,
+        time_ms: ms, penalty_seconds: pen,
         proof_url: newTime.proof_url || null,
+        admin_note: newTime.admin_note?.trim() || null,
       });
-      setNewTime({ ...newTime, time_str: "", proof_url: "" });
+      setNewTime({ ...newTime, time_str: "", proof_url: "", admin_note: "", penalty_seconds: 0 });
       toast.success("Zeit eingetragen.");
       loadTimes();
     } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
@@ -77,12 +83,19 @@ export default function AdminF1EditPage() {
     try {
       const ms = editTime.time_str ? parseTimeStr(editTime.time_str) : editTime.time_ms;
       if (editTime.time_str && !ms) { toast.error("Ungültiges Zeitformat"); return; }
+      const pen = Number(editTime.penalty_seconds) || 0;
+      const inv = !!editTime.is_invalid;
+      const note = (editTime.admin_note || "").trim();
+      if ((pen > 0 || inv) && note.length < 5) {
+        toast.error("Bei Strafzeit oder Invalid-Markierung ist eine Begründung (mind. 5 Zeichen) Pflicht.");
+        return;
+      }
       await api.patch(`/f1/times/${editTime.id}`, {
         time_ms: ms,
-        penalty_seconds: Number(editTime.penalty_seconds) || 0,
-        is_invalid: !!editTime.is_invalid,
+        penalty_seconds: pen,
+        is_invalid: inv,
         proof_url: editTime.proof_url || null,
-        admin_note: editTime.admin_note || null,
+        admin_note: note || null,
       });
       toast.success("Zeit aktualisiert.");
       setEditTime(null);
@@ -170,6 +183,20 @@ export default function AdminF1EditPage() {
                   <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Proof URL</div>
                   <input value={newTime.proof_url} onChange={(e) => setNewTime({ ...newTime, proof_url: e.target.value })} placeholder="Screenshot/Video Link" data-testid="f1-add-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
                 </div>
+                {Number(newTime.penalty_seconds) > 0 && (
+                  <div className="w-full">
+                    <div className="text-[11px] font-bold uppercase tracking-widest text-[#FF3B30] mb-1">Begründung für Strafe (Pflicht, ≥5 Zeichen)</div>
+                    <textarea
+                      rows={2}
+                      required
+                      value={newTime.admin_note}
+                      onChange={(e) => setNewTime({ ...newTime, admin_note: e.target.value })}
+                      placeholder="z. B. Cut Curb in Kurve 7, Lap 3 — Replay 0:42"
+                      data-testid="f1-add-time-note"
+                      className="w-full bg-[#0A0A0A] border border-[#FF3B30]/40 px-3 py-2 rounded-sm text-sm"
+                    />
+                  </div>
+                )}
                 <button data-testid="f1-add-time-submit" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2]">Eintragen</button>
               </form>
               <div className="space-y-1">
@@ -218,8 +245,23 @@ export default function AdminF1EditPage() {
               <input value={editTime.proof_url || ""} onChange={(e) => setEditTime({ ...editTime, proof_url: e.target.value })} placeholder="Screenshot / Video" data-testid="f1-edit-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </label>
             <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Admin-Notiz</div>
-              <textarea rows={2} value={editTime.admin_note || ""} onChange={(e) => setEditTime({ ...editTime, admin_note: e.target.value })} data-testid="f1-edit-time-note" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <div className={`text-[11px] font-bold uppercase tracking-widest mb-1 ${(Number(editTime.penalty_seconds) > 0 || editTime.is_invalid) ? "text-[#FF3B30]" : "text-white/60"}`}>
+                {(Number(editTime.penalty_seconds) > 0 || editTime.is_invalid)
+                  ? "Begründung (Pflicht, ≥5 Zeichen — wird Spieler angezeigt)"
+                  : "Admin-Notiz (intern)"}
+              </div>
+              <textarea
+                rows={2}
+                value={editTime.admin_note || ""}
+                onChange={(e) => setEditTime({ ...editTime, admin_note: e.target.value })}
+                data-testid="f1-edit-time-note"
+                placeholder={(Number(editTime.penalty_seconds) > 0 || editTime.is_invalid)
+                  ? "z. B. Cut Curb T7 Lap 3 — replay 0:42"
+                  : "optionale Notiz"}
+                className={`w-full bg-[#0A0A0A] border px-3 py-2 rounded-sm text-sm ${
+                  (Number(editTime.penalty_seconds) > 0 || editTime.is_invalid) ? "border-[#FF3B30]/40" : "border-white/10"
+                }`}
+              />
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={!!editTime.is_invalid} onChange={(e) => setEditTime({ ...editTime, is_invalid: e.target.checked })} data-testid="f1-edit-time-invalid" className="accent-[#29B6E8]" />

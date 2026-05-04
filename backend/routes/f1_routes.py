@@ -12,6 +12,22 @@ from models import (
     now_utc, new_id,
 )
 
+def _validate_penalty_note(penalty_seconds: float, is_invalid: bool, admin_note: str | None):
+    """P0 — Penalty Transparency: any penalty MUST have a reason ≥5 chars.
+
+    Raises HTTP 422 when penalty_seconds>0 or is_invalid=True without an explanatory admin_note.
+    """
+    has_penalty = (penalty_seconds or 0) > 0 or bool(is_invalid)
+    if has_penalty:
+        note = (admin_note or "").strip()
+        if len(note) < 5:
+            raise HTTPException(
+                status_code=422,
+                detail="Bei Zeitstrafen oder ungültigen Runden muss eine Begründung "
+                       "(mind. 5 Zeichen) angegeben werden — Spieler haben Anspruch auf Transparenz.",
+            )
+
+
 router = APIRouter(prefix="/api/f1", tags=["f1"])
 
 
@@ -180,6 +196,7 @@ async def leaderboard(cid: str, track_id: str | None = None):
             "time_str": _ms_to_time_str(t["effective_ms"]),
             "raw_time_ms": t["time_ms"],
             "penalty_seconds": t.get("penalty_seconds", 0),
+            "penalty_note": t.get("admin_note") if (t.get("penalty_seconds", 0) > 0) else None,
             "attempts": attempts_per_user.get(uid, 0),
             "last_updated": t.get("created_at"),
         })
@@ -255,6 +272,7 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_a
         raise HTTPException(status_code=400, detail="Strecke gehört nicht zur Challenge")
     if not await db.users.find_one({"id": body.user_id}):
         raise HTTPException(status_code=400, detail="Spieler nicht gefunden")
+    _validate_penalty_note(body.penalty_seconds, body.is_invalid, body.admin_note)
     # Attempt count
     attempt_count = await db.f1_lap_times.count_documents({
         "challenge_id": cid, "track_id": body.track_id, "user_id": body.user_id})
@@ -344,7 +362,15 @@ async def list_times(cid: str, track_id: str | None = None, user_id: str | None 
 @router.patch("/times/{time_id}")
 async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(require_admin())):
     db = get_db()
+    existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Lap-Time nicht gefunden")
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    # P0 validation: compute resulting state and require note
+    final_pen = updates.get("penalty_seconds", existing.get("penalty_seconds", 0))
+    final_inv = updates.get("is_invalid", existing.get("is_invalid", False))
+    final_note = updates.get("admin_note", existing.get("admin_note"))
+    _validate_penalty_note(final_pen or 0, final_inv, final_note)
     updates["updated_at"] = now_utc().isoformat()
     await db.f1_lap_times.update_one({"id": time_id}, {"$set": updates})
     t = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
