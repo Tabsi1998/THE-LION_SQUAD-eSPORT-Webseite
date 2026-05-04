@@ -10,6 +10,7 @@ export default function AdminSettingsPage() {
   const [email, setEmail] = useState({ resend_api_key: "", sender_name: "", sender_email: "", reply_to_email: "", enabled: true, resend_api_key_masked: "" });
   const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_auth: "auto", smtp_security: "starttls", smtp_tls_verify: true, smtp_envelope_from: "", sender_name: "", sender_email: "", reply_to_email: "", message_id_domain: "", enabled: true, smtp_pass_masked: "" });
   const [smtpTestEmail, setSmtpTestEmail] = useState("");
+  const [smtpDiag, setSmtpDiag] = useState(null);
   const [queue, setQueue] = useState([]);
   const [queueFilter, setQueueFilter] = useState("");
   const [brand, setBrand] = useState({ club_name: "", tagline: "", primary_color: "#29B6E8", logo_url: "", mascot_url: "", domain: "", timezone: "Europe/Vienna", imprint: "", privacy_policy: "", discord_invite_url: "", twitch_channel: "" });
@@ -96,6 +97,15 @@ export default function AdminSettingsPage() {
       const { data } = await api.post("/settings/smtp/test", { to: smtpTestEmail });
       if (data.ok) toast.success(`SMTP-Testmail gesendet (ID: ${data.id || "—"})`);
       else toast.error(`Fehler: ${data.reason}`);
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+  const diagnoseSmtp = async () => {
+    if (!smtpTestEmail) return toast.error("E-Mail-Adresse fuer Diagnose eingeben");
+    try {
+      const { data } = await api.post("/settings/smtp/diagnose", { to: smtpTestEmail });
+      setSmtpDiag(data);
+      if (data.ok) toast.success("SMTP Diagnose erfolgreich.");
+      else toast.error("SMTP Diagnose zeigt ein Problem.");
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const processQueueNow = async () => {
@@ -305,8 +315,36 @@ export default function AdminSettingsPage() {
             <div className="font-heading font-bold uppercase">SMTP Testmail</div>
             <div className="flex flex-col sm:flex-row gap-2">
               <input type="email" placeholder="test@example.com" value={smtpTestEmail} onChange={(e) => setSmtpTestEmail(e.target.value)} data-testid="smtp-test-to" className="flex-1 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <button onClick={diagnoseSmtp} data-testid="smtp-diagnose" className="px-4 py-2 border border-[#FFD700] text-[#FFD700] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Diagnose</button>
               <button onClick={sendSmtpTest} data-testid="smtp-test-send" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Senden</button>
             </div>
+            {smtpDiag && (
+              <div data-testid="smtp-diagnose-result" className={`border rounded-sm p-4 text-xs space-y-3 ${smtpDiag.ok ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FF3B30]/25 bg-[#FF3B30]/5"}`}>
+                <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
+                  {smtpDiag.ok ? <CheckCircle2 className="w-4 h-4 text-[#00FF88]" /> : <XCircle className="w-4 h-4 text-[#FF3B30]" />}
+                  SMTP Diagnose: {smtpDiag.ok ? "OK" : "Problem gefunden"}
+                </div>
+                <div className="grid sm:grid-cols-2 gap-2 text-white/55">
+                  <div>Host: <span className="font-mono text-white/75">{smtpDiag.host || "-"}</span></div>
+                  <div>Port: <span className="font-mono text-white/75">{smtpDiag.port || "-"}</span></div>
+                  <div>Security: <span className="font-mono text-white/75">{smtpDiag.security || "-"}</span></div>
+                  <div>AUTH: <span className="font-mono text-white/75">{smtpDiag.auth_supported ? "angeboten" : "nicht angeboten"}</span></div>
+                </div>
+                <div className="space-y-1">
+                  {(smtpDiag.steps || []).map((s, i) => (
+                    <div key={i} className="flex gap-2 text-white/70">
+                      <span className={s.ok ? "text-[#00FF88]" : "text-[#FF3B30]"}>{s.ok ? "OK" : "NO"}</span>
+                      <span className="break-words">{s.label}</span>
+                    </div>
+                  ))}
+                </div>
+                {(smtpDiag.recommendations || []).length > 0 && (
+                  <div className="border-t border-white/10 pt-3 space-y-1 text-white/70">
+                    {(smtpDiag.recommendations || []).map((r, i) => <div key={i}>{r}</div>)}
+                  </div>
+                )}
+              </div>
+            )}
             <p className="text-xs text-white/50">Testet die SMTP-Verbindung direkt. Im Docker-Setup fuer einen lokalen Host-Mailserver meist <code className="font-mono text-white/70">host.docker.internal</code> als SMTP Host nutzen. Bei self-signed Zertifikat "TLS Zertifikat pruefen" deaktivieren.</p>
             <p className="text-xs text-white/50">Wenn der Server "SMTP AUTH extension is not supported" meldet, stelle "SMTP Anmeldung" auf "Ohne Anmeldung" und lasse User/Passwort leer.</p>
           </div>

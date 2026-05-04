@@ -169,6 +169,12 @@ async def smtp_send_test(body: TestEmailBody, me: dict = Depends(require_admin()
     return await smtp_test(body.to)
 
 
+@settings_router.post("/smtp/diagnose")
+async def smtp_diagnose(body: TestEmailBody, me: dict = Depends(require_admin())):
+    from services.mail_queue import smtp_diagnose as run_smtp_diagnose
+    return await run_smtp_diagnose(body.to)
+
+
 @settings_router.get("/mail-queue")
 async def list_mail_queue(status: Optional[str] = None, limit: int = 100,
                           me: dict = Depends(require_admin())):

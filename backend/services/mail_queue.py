@@ -3,6 +3,7 @@ import os
 import logging
 import asyncio
 import ssl
+import smtplib
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -18,6 +19,137 @@ logger = logging.getLogger("tls.mailqueue")
 # Backoff schedule in minutes for retry attempts (1m, 5m, 30m, 2h, 12h)
 RETRY_BACKOFF_MIN = [1, 5, 30, 120, 720]
 MAX_ATTEMPTS = len(RETRY_BACKOFF_MIN) + 1
+
+
+def explain_smtp_error(exc: Exception) -> str:
+    raw = str(exc)
+    if "AUTH extension is not supported" in raw:
+        return (
+            "Der SMTP-Server bietet auf diesem Host/Port keine Anmeldung an. "
+            "Nutze entweder den Submission-Port mit aktivem SMTP AUTH (meist 587 STARTTLS) "
+            "oder stelle SMTP Anmeldung auf 'Ohne Anmeldung' und erlaube dem Docker-Backend "
+            "serverseitig Relay."
+        )
+    if "Relay access denied" in raw:
+        return (
+            "Relay access denied: Der Mailserver erlaubt dem Backend nicht, an externe "
+            "Empfaenger zu senden. Loesung: SMTP AUTH auf dem Submission-Port verwenden "
+            "oder die Docker-/Server-IP im Mailserver als vertrauenswuerdiges Relay eintragen."
+        )
+    if "CERTIFICATE_VERIFY_FAILED" in raw or "self-signed certificate" in raw:
+        return (
+            "TLS-Zertifikat konnte nicht verifiziert werden. Fuer lokale/self-signed Server "
+            "im Admin 'TLS Zertifikat pruefen' deaktivieren oder ein vertrauenswuerdiges Zertifikat installieren."
+        )
+    return raw
+
+
+def _smtp_tls_context(validate_certs: bool):
+    context = ssl.create_default_context()
+    if not validate_certs:
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+    return context
+
+
+def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
+    host = cfg.get("smtp_host")
+    port = int(cfg.get("smtp_port") or 587)
+    security = cfg.get("smtp_security") or "starttls"
+    auth_mode = (cfg.get("smtp_auth") or "auto").lower()
+    validate_certs = bool(cfg.get("smtp_tls_verify", True))
+    username = cfg.get("smtp_user") or ""
+    password = cfg.get("smtp_pass") or ""
+    envelope_from = cfg.get("smtp_envelope_from") or (username if auth_mode != "none" else "") or cfg.get("sender_email")
+
+    result = {
+        "ok": False,
+        "host": host,
+        "port": port,
+        "security": security,
+        "auth_mode": auth_mode,
+        "auth_supported": False,
+        "auth_ok": False,
+        "relay_ok": False,
+        "steps": [],
+        "recommendations": [],
+    }
+    if not host:
+        result["recommendations"].append("SMTP Host fehlt.")
+        return result
+
+    smtp = None
+    try:
+        context = _smtp_tls_context(validate_certs)
+        if security == "tls":
+            smtp = smtplib.SMTP_SSL(host=host, port=port, timeout=15, context=context)
+            result["steps"].append({"ok": True, "label": f"SSL/TLS Verbindung zu {host}:{port} hergestellt."})
+        else:
+            smtp = smtplib.SMTP(host=host, port=port, timeout=15)
+            result["steps"].append({"ok": True, "label": f"SMTP Verbindung zu {host}:{port} hergestellt."})
+
+        code, msg = smtp.ehlo()
+        result["steps"].append({"ok": 200 <= code < 400, "label": f"EHLO: {code} {msg.decode(errors='ignore') if isinstance(msg, bytes) else msg}"})
+        if security == "starttls":
+            if not smtp.has_extn("starttls"):
+                result["steps"].append({"ok": False, "label": "STARTTLS wird von diesem Host/Port nicht angeboten."})
+                result["recommendations"].append("Stelle Sicherheit auf 'Keine' oder nutze den richtigen STARTTLS-Port.")
+                return result
+            smtp.starttls(context=context)
+            result["steps"].append({"ok": True, "label": "STARTTLS erfolgreich aktiviert."})
+            code, msg = smtp.ehlo()
+            result["steps"].append({"ok": 200 <= code < 400, "label": f"EHLO nach STARTTLS: {code}"})
+
+        auth_supported = smtp.has_extn("auth")
+        result["auth_supported"] = auth_supported
+        result["features"] = sorted((smtp.esmtp_features or {}).keys())
+        result["steps"].append({"ok": auth_supported or auth_mode == "none", "label": f"AUTH angeboten: {'ja' if auth_supported else 'nein'}"})
+
+        should_login = auth_mode == "login" or (auth_mode == "auto" and username and password and auth_supported)
+        if auth_mode == "login" and not auth_supported:
+            result["recommendations"].append("Dieser Host/Port bietet kein SMTP AUTH. Nutze einen Submission-Port mit AUTH oder stelle auf 'Ohne Anmeldung'.")
+            return result
+        if should_login:
+            if not username or not password:
+                result["recommendations"].append("SMTP Anmeldung ist aktiv, aber User oder Passwort fehlt.")
+                return result
+            smtp.login(username, password)
+            result["auth_ok"] = True
+            result["steps"].append({"ok": True, "label": "SMTP Login erfolgreich."})
+        elif auth_mode == "none":
+            result["steps"].append({"ok": True, "label": "SMTP Login bewusst uebersprungen."})
+        else:
+            result["steps"].append({"ok": True, "label": "Auto-Modus: kein Login durchgefuehrt, weil AUTH nicht angeboten wird oder Zugangsdaten fehlen."})
+
+        mail_code, mail_msg = smtp.mail(envelope_from)
+        result["steps"].append({"ok": 200 <= mail_code < 400, "label": f"MAIL FROM <{envelope_from}>: {mail_code} {mail_msg.decode(errors='ignore') if isinstance(mail_msg, bytes) else mail_msg}"})
+        if not (200 <= mail_code < 400):
+            result["recommendations"].append("Der technische SMTP-Absender wird vom Server abgelehnt. Nutze office@lionsquad.at oder den eingeloggten SMTP-User.")
+            return result
+
+        rcpt_code, rcpt_msg = smtp.rcpt(to)
+        rcpt_text = rcpt_msg.decode(errors="ignore") if isinstance(rcpt_msg, bytes) else str(rcpt_msg)
+        result["relay_ok"] = 200 <= rcpt_code < 400
+        result["steps"].append({"ok": result["relay_ok"], "label": f"RCPT TO <{to}>: {rcpt_code} {rcpt_text}"})
+        if result["relay_ok"]:
+            result["ok"] = True
+            result["recommendations"].append("SMTP Diagnose erfolgreich. Der Server akzeptiert den Empfaenger vor DATA.")
+        elif "Relay access denied" in rcpt_text:
+            result["recommendations"].append("Relay fehlt: Mailserver muss SMTP AUTH erlauben oder die Docker-/Server-IP in permit_mynetworks/mynetworks aufnehmen.")
+        else:
+            result["recommendations"].append("Empfaenger wurde vor DATA abgelehnt. Pruefe Mailserver-Logs fuer die genaue Regel.")
+        return result
+    except Exception as exc:
+        result["steps"].append({"ok": False, "label": explain_smtp_error(exc)})
+        result["recommendations"].append(explain_smtp_error(exc))
+        return result
+    finally:
+        if smtp is not None:
+            try:
+                smtp.rset()
+                smtp.quit()
+            except Exception:
+                pass
 
 
 async def get_mail_settings() -> dict:
@@ -293,4 +425,11 @@ async def smtp_test(to: str) -> dict:
         msg_id = await _smtp_send(cfg, to, subject, html)
         return {"ok": True, "id": msg_id}
     except Exception as exc:
-        return {"ok": False, "reason": str(exc)}
+        return {"ok": False, "reason": explain_smtp_error(exc), "raw_error": str(exc)[:500]}
+
+
+async def smtp_diagnose(to: str) -> dict:
+    cfg = await get_mail_settings()
+    if cfg["provider"] != "smtp":
+        return {"ok": False, "recommendations": ["Provider ist nicht auf SMTP gesetzt."], "steps": []}
+    return await asyncio.to_thread(_smtp_diagnose_sync, cfg, to)
