@@ -24,7 +24,6 @@ import NewsPage from "@/pages/public/NewsPage";
 import LoginPage from "@/pages/public/LoginPage";
 import RegisterPage from "@/pages/public/RegisterPage";
 import { PrivacyPage, ImprintPage } from "@/pages/public/LegalPages";
-import CmsPage from "@/pages/public/CmsPage";
 
 import DashboardPage from "@/pages/user/DashboardPage";
 import ProfilePage from "@/pages/user/ProfilePage";
@@ -121,8 +120,8 @@ function App() {
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/news" element={<NewsPage />} />
           <Route path="/news/:slug" element={<NewsDetailPage />} />
-          <Route path="/privacy" element={<CmsPage slug="privacy" />} />
-          <Route path="/imprint" element={<CmsPage slug="imprint" />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/imprint" element={<ImprintPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
