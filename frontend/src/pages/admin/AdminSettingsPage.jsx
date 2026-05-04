@@ -8,7 +8,7 @@ import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquar
 export default function AdminSettingsPage() {
   const [tab, setTab] = useState("email");
   const [email, setEmail] = useState({ resend_api_key: "", sender_name: "", sender_email: "", enabled: true, resend_api_key_masked: "" });
-  const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_security: "starttls", smtp_tls_verify: true, sender_name: "", sender_email: "", enabled: true, smtp_pass_masked: "" });
+  const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_security: "starttls", smtp_tls_verify: true, smtp_envelope_from: "", sender_name: "", sender_email: "", enabled: true, smtp_pass_masked: "" });
   const [smtpTestEmail, setSmtpTestEmail] = useState("");
   const [queue, setQueue] = useState([]);
   const [queueFilter, setQueueFilter] = useState("");
@@ -222,6 +222,23 @@ export default function AdminSettingsPage() {
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Absender E-Mail</div>
                 <input type="email" value={smtp.sender_email || ""} onChange={(e) => setSmtp({ ...smtp, sender_email: e.target.value })} data-testid="smtp-sender-email" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="noreply@thelionsquad.at" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Technischer SMTP-Absender</div>
+                <input
+                  type="email"
+                  value={smtp.smtp_envelope_from || ""}
+                  onChange={(e) => setSmtp({ ...smtp, smtp_envelope_from: e.target.value })}
+                  data-testid="smtp-envelope-from"
+                  className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
+                  placeholder="office@lionsquad.at"
+                />
+                <p className="mt-1 text-[11px] text-white/40">MAIL FROM / Return-Path. Leer = SMTP User.</p>
+              </div>
+              <div className="text-xs text-white/45 flex items-end pb-1">
+                Sichtbarer Absender kann weiter noreply sein. Viele Mailserver verlangen aber als technischen Envelope-Sender den eingeloggten User.
               </div>
             </div>
             <button onClick={saveSmtp} data-testid="smtp-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>

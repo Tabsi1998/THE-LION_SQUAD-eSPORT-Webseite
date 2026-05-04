@@ -35,6 +35,7 @@ export default function SetupWizardPage() {
     smtp_pass: "",
     smtp_security: "starttls",
     smtp_tls_verify: true,
+    smtp_envelope_from: "",
     sender_name: "THE LION SQUAD",
     sender_email: "noreply@thelionsquad.at",
     resend_api_key: "",
@@ -73,7 +74,7 @@ export default function SetupWizardPage() {
       if (!payload.new_admin_password) delete payload.new_admin_password;
       if (payload.mail_provider === "resend") {
         delete payload.smtp_host; delete payload.smtp_port; delete payload.smtp_user;
-        delete payload.smtp_pass; delete payload.smtp_security; delete payload.smtp_tls_verify;
+        delete payload.smtp_pass; delete payload.smtp_security; delete payload.smtp_tls_verify; delete payload.smtp_envelope_from;
       } else {
         delete payload.resend_api_key;
       }
@@ -189,6 +190,7 @@ export default function SetupWizardPage() {
                     <Field label="User" testId="wizard-smtp-user" value={data.smtp_user} onChange={(v) => upd("smtp_user", v)} />
                     <Field label="Passwort" type="password" testId="wizard-smtp-pass" value={data.smtp_pass} onChange={(v) => upd("smtp_pass", v)} />
                   </div>
+                  <Field label="Technischer SMTP-Absender" testId="wizard-smtp-envelope-from" value={data.smtp_envelope_from} onChange={(v) => upd("smtp_envelope_from", v)} placeholder="office@lionsquad.at" />
                 </>
               ) : (
                 <Field label="Resend API Key" type="password" testId="wizard-resend-key" value={data.resend_api_key} onChange={(v) => upd("resend_api_key", v)} placeholder="re_..." />

@@ -117,6 +117,7 @@ class SmtpSettings(BaseModel):
     smtp_pass: Optional[str] = None
     smtp_security: Optional[Literal["starttls", "tls", "none"]] = None
     smtp_tls_verify: Optional[bool] = None
+    smtp_envelope_from: Optional[str] = None
     sender_name: Optional[str] = None
     sender_email: Optional[str] = None
     enabled: Optional[bool] = None

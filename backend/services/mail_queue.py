@@ -35,6 +35,7 @@ async def get_mail_settings() -> dict:
         "smtp_pass": s.get("smtp_pass", ""),
         "smtp_security": s.get("smtp_security", "starttls"),  # starttls | tls | none
         "smtp_tls_verify": s.get("smtp_tls_verify", True),
+        "smtp_envelope_from": s.get("smtp_envelope_from", ""),
         "sender_name": s.get("sender_name") or legacy.get("sender_name") or "TLS ARENA",
         "sender_email": s.get("sender_email") or legacy.get("sender_email") or os.environ.get("SENDER_EMAIL", "noreply@thelionsquad.at"),
         "resend_api_key": legacy.get("resend_api_key") or s.get("resend_api_key") or os.environ.get("RESEND_API_KEY", ""),
@@ -55,6 +56,8 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
     msg["Message-ID"] = make_msgid(domain="tls-arena")
     msg.attach(MIMEText(html, "html", "utf-8"))
 
+    envelope_from = cfg.get("smtp_envelope_from") or cfg.get("smtp_user") or cfg["sender_email"]
+
     use_tls = cfg["smtp_security"] == "tls"
     start_tls = cfg["smtp_security"] == "starttls"
     tls_context = None
@@ -69,6 +72,8 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
         "port": cfg["smtp_port"],
         "username": cfg["smtp_user"] or None,
         "password": cfg["smtp_pass"] or None,
+        "sender": envelope_from,
+        "recipients": [to],
         "use_tls": use_tls,
         "start_tls": start_tls,
         "timeout": 30,
