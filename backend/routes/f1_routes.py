@@ -277,6 +277,7 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_a
     doc.pop("_id", None)
     doc["time_str"] = _ms_to_time_str(body.time_ms)
     # Discord trigger: if this submission is the new P1 on this track
+    was_new_leader = False
     if not body.is_invalid:
         try:
             from discord_service import send_discord
@@ -295,10 +296,11 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_a
             best_per_user_sorted = sorted(best.values()) if best else []
             prev_best = best_per_user_sorted[0] if best_per_user_sorted else None
             if prev_best is None or effective < prev_best:
+                was_new_leader = True
                 u = await db.users.find_one({"id": body.user_id}, {"display_name": 1, "username": 1}) or {}
                 tr = await db.f1_tracks.find_one({"id": body.track_id}, {"name": 1}) or {}
                 await send_discord(
-                    f"🏁 Neue Bestzeit · {c.get('title') or 'F1 Challenge'}",
+                    f"🏁 Neue Bestzeit · {c.get('title') or 'Fast Lap'}",
                     f"**{u.get('display_name') or u.get('username') or 'Fahrer'}** führt jetzt auf **{tr.get('name') or '–'}**!",
                     color=0xFFD700,
                     url=f"/f1/{c.get('slug') or cid}",
@@ -310,6 +312,12 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_a
                 )
         except Exception:
             pass
+    # Badge trigger
+    try:
+        from badges import on_lap_submitted
+        await on_lap_submitted(body.user_id, cid, body.track_id, was_new_leader, body.is_invalid)
+    except Exception:
+        pass
     return doc
 
 

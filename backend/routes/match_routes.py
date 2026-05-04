@@ -64,6 +64,17 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(requ
         updated_matches = advance_match_winner(m, all_matches)
         for um in updated_matches:
             await db.matches.update_one({"id": um["id"]}, {"$set": um})
+        # Badge triggers
+        try:
+            from badges import on_match_completed
+            regs = {r["id"]: r.get("user_id") for r in await db.tournament_registrations.find(
+                {"tournament_id": m["tournament_id"]}, {"_id": 0}).to_list(500)}
+            winner_uid = regs.get(m.get("winner_id"))
+            loser_uid = regs.get(m.get("loser_id"))
+            if winner_uid:
+                await on_match_completed(winner_uid, loser_uid, m["tournament_id"], m["id"])
+        except Exception:
+            pass
         # Discord trigger: match completed
         try:
             from discord_service import send_discord

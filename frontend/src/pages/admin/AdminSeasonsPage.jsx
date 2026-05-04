@@ -74,7 +74,7 @@ export default function AdminSeasonsPage() {
             </div>
           </div>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">F1 Challenges einbeziehen</div>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Fast-Lap Challenges einbeziehen</div>
             <div className="max-h-32 overflow-y-auto border border-white/10 rounded-sm p-2 space-y-1 bg-[#0A0A0A]">
               {challenges.map((c)=>(
                 <label key={c.id} className="flex items-center gap-2 text-sm hover:bg-white/5 px-2 py-1 rounded-sm">

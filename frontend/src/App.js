@@ -41,6 +41,9 @@ import AdminSeasonsPage from "@/pages/admin/AdminSeasonsPage";
 import AdminAuditPage from "@/pages/admin/AdminAuditPage";
 import AdminWidgetsPage from "@/pages/admin/AdminWidgetsPage";
 import SeasonPage from "@/pages/public/SeasonPage";
+import PublicProfilePage from "@/pages/public/PublicProfilePage";
+import BadgesPage from "@/pages/public/BadgesPage";
+import AdminSponsorsPage from "@/pages/admin/AdminSponsorsPage";
 
 import F1TVPage from "@/pages/display/F1TVPage";
 import BracketTVPage from "@/pages/display/BracketTVPage";
@@ -93,6 +96,14 @@ function App() {
           <Route path="/admin/widgets" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
 
           <Route path="/seasons/:slug" element={<SeasonPage />} />
+          <Route path="/u/:username" element={<PublicProfilePage />} />
+          <Route path="/players/:username" element={<PublicProfilePage />} />
+          <Route path="/badges" element={<BadgesPage />} />
+          <Route path="/fastlap" element={<F1ListPage />} />
+          <Route path="/fastlap/:slug" element={<F1DetailPage />} />
+
+          {/* Admin */}
+          <Route path="/admin/sponsors" element={<ProtectedRoute requireAdmin><AdminSponsorsPage /></ProtectedRoute>} />
 
           {/* Display / TV */}
           <Route path="/display/f1/:id" element={<F1TVPage />} />

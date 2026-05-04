@@ -55,7 +55,7 @@ export function CurrentEventHero() {
               </span>
             </div>
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] inline-flex items-center gap-2">
-              {kind === "f1" ? <><Flag className="w-3 h-3" /> F1 Fast Lap Challenge</> : <><Trophy className="w-3 h-3" /> Featured Tournament</>}
+              {kind === "f1" ? <><Flag className="w-3 h-3" /> Fast Lap Challenge</> : <><Trophy className="w-3 h-3" /> Featured Tournament</>}
             </span>
             <h2 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase leading-[0.95] tracking-tight">
               {item.title}

@@ -21,7 +21,7 @@ export default function F1ListPage() {
         <img src="https://images.unsplash.com/photo-1771440571270-e27b63085a48" className="absolute inset-0 w-full h-full object-cover opacity-20" alt="" />
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/70 to-[#0A0A0A]" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">F1 Fast Lap Challenge</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Fast Lap Challenge</span>
           <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">Speed. Rhythmus. Beste Runde.</h1>
           <p className="mt-4 text-white/70 max-w-2xl">Time-Trial Events mit Live-Leaderboards, mehreren Strecken und Championship-Wertung.</p>
         </div>

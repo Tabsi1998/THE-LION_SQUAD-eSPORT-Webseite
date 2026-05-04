@@ -59,6 +59,11 @@ async def create_team(body: TeamCreate, me: dict = Depends(get_current_user)):
     }
     await db.teams.insert_one(doc)
     doc.pop("_id", None)
+    try:
+        from badges import on_team_created
+        await on_team_created(me["id"], team_id)
+    except Exception:
+        pass
     return doc
 
 
@@ -89,6 +94,11 @@ async def join_team(team_id: str, body: dict, me: dict = Depends(get_current_use
     if me["id"] in team.get("member_ids", []):
         return {"ok": True, "already_member": True}
     await db.teams.update_one({"id": team_id}, {"$addToSet": {"member_ids": me["id"]}})
+    try:
+        from badges import on_team_joined
+        await on_team_joined(me["id"], team_id)
+    except Exception:
+        pass
     return {"ok": True}
 
 

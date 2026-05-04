@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon,
   CalendarDays, Flag, Building2, Newspaper, LogOut,
   ExternalLink, Menu, X, Settings as SettingsIcon,
-  ShieldCheck, Code2,
+  ShieldCheck, Code2, Star,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -17,13 +17,14 @@ export function AdminLayout({ children }) {
   const items = [
     { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
     { to: "/admin/tournaments", label: "Turniere", icon: Trophy },
-    { to: "/admin/f1", label: "F1 Fast Lap", icon: Flag },
+    { to: "/admin/f1", label: "Fast Lap", icon: Flag },
     { to: "/admin/events", label: "Events", icon: CalendarDays },
     { to: "/admin/seasons", label: "Saisons / Circuit", icon: Trophy },
     { to: "/admin/games", label: "Spiele", icon: Gamepad2 },
     { to: "/admin/stations", label: "Stationen", icon: Building2 },
     { to: "/admin/users", label: "Spieler", icon: UsersIcon },
     { to: "/admin/news", label: "News", icon: Newspaper },
+    { to: "/admin/sponsors", label: "Sponsoren", icon: Star },
     { to: "/admin/widgets", label: "Widgets", icon: Code2 },
     { to: "/admin/audit", label: "Audit Logs", icon: ShieldCheck },
     { to: "/admin/settings", label: "Einstellungen", icon: SettingsIcon },

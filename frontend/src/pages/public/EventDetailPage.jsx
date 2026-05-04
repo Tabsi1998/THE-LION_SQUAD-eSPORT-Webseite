@@ -33,7 +33,7 @@ export default function EventDetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {e.tournaments?.map((t) => <TournamentCard key={t.id} tournament={t} />)}
         </div>
-        <h2 className="mt-12 font-heading text-2xl font-black uppercase mb-5">F1 Challenges</h2>
+        <h2 className="mt-12 font-heading text-2xl font-black uppercase mb-5">Fast-Lap Challenges</h2>
         <div className="space-y-3">
           {e.f1_challenges?.map((c) => (
             <Link key={c.id} to={`/f1/${c.slug || c.id}`} className="block border border-white/10 rounded-sm p-4 bg-[#121212] hover:border-[#29B6E8]/60 transition">

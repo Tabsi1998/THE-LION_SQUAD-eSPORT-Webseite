@@ -1,0 +1,47 @@
+{
+  "summary": "Phase 5 (Badge System + Public Profiles + Sponsor CRUD + Upload + Fast Lap Rename) tested. 11/11 backend tests pass after fixing 1 critical backend KeyError bug in /api/users/public/{username} (dead-code line accessing v['track_id']). Frontend pages render correctly: PublicProfilePage hero/stats/tabs/badges, BadgesPage with 5 categories (TURNIERE/MATCHES/FAST LAP/COMMUNITY/SAISON), nav rename FAST LAP, alternate /players/:username route. Two minor frontend test-hook gaps: data-testid='profile-stat-badges' is passed as prop but QuickStat component does not forward it to DOM; BadgeGrid badge cards lack per-card data-testid (cards visually render fine).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/users/public/{username}", "issue": "KeyError: 'track_id' in user_routes.py:117 set-comprehension iterating over best_per_track.values() (dict only has time_ms+challenge_id, not track_id). Crashes 500 for ANY user with at least 1 valid F1 lap. Fixed (dead variable t_ids_f1 removed). PixelHawk passed earlier because seeded user has 0 lap_times.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "QuickStat (PublicProfilePage.jsx:208)", "issue": "data-testid prop not destructured and not forwarded to root div – stat-level testids (profile-stat-badges, etc.) are silently dropped. Visual rendering correct.", "selector": "[data-testid^='profile-stat-']", "priority": "LOW"},
+      {"component": "BadgeGrid / BadgeCard", "issue": "No per-card data-testid (e.g. badge-card-{code}) – impedes E2E testing of badge cards in grid", "selector": "[data-testid^='badge-card']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase5_badges.py",
+    "/app/test_reports/pytest/phase5_results.xml"
+  ],
+  "action_items": [
+    "(Erledigt) Bug fix: user_routes.py get_public_profile entfernt fehlerhafte Zeile t_ids_f1 = {v['track_id']...} – Public-Profil crash-frei für User mit F1-Laps.",
+    "(Optional) QuickStat in PublicProfilePage.jsx so anpassen, dass data-testid Prop weitergereicht wird (z. B. function QuickStat({ icon, label, value, color, 'data-testid': testId }) → <div data-testid={testId}>) und allen 6 Stats testids zu geben (profile-stat-badges/points/wins/top3/fastlaps/poles).",
+    "(Optional) BadgeGrid-Karten mit data-testid={`badge-card-${code}`} versehen, damit Tests einzelne Cards anwählen können.",
+    "(Optional) Tournament register-Body sollte Default-Body akzeptieren (z. B. RegistrationCreate mit allen Optional Feldern + body=Body(default_factory=...)) – aktuell 422 wenn Client kein Body sendet."
+  ],
+  "critical_code_review_comments": [
+    "user_routes.py get_public_profile: entfernt dead variable 't_ids_f1' der zu KeyError führte. Funktion ist mit ~120 Zeilen recht groß und gemischt aus base/badges/tournaments/matches/F1/teams – Refactoring in helper-Funktionen wäre sinnvoll.",
+    "user_routes.py F1-Pole-Berechnung: pro-Track wird für jeden anderen User gefetcht und in Python ausgewertet (O(N*M)). Bei wachsenden lap_times sollte ein Aggregat ($group min(time_ms+penalty)) verwendet werden, um die Last zu senken.",
+    "badges.py on_match_completed: nutzt 'recent_matches' mit Filter 'winner_id $exists' aber dann reg_map-Lookup. Das Streak-Tracking funktioniert nur bei tournament-Matches. Loss-Logik via reg_map.get(m.get('loser_id')) – 'loser_id' ist im Match-Schema nicht garantiert. Bitte verifizieren oder anders herleiten (z. B. participant_a_id != winner_id).",
+    "upload_routes.py: ALLOWED_IMAGE inklusive image/svg+xml ohne Sanitization – XSS-Risiko bei einzelner SVG-Auslieferung. Zumindest CSP-Header oder svg-stripping erwägen.",
+    "badge_routes.py list_badges: macht für jedes Badge ein zusätzliches count_documents (N+1). Bei 22 Badges ok, sollte aber ggf. via $lookup/aggregation kombiniert werden.",
+    "news_routes.py PATCH /sponsors: akzeptiert dict statt Pydantic-Modell – verliert Pydantic-Validation. SponsorUpdate Modell wäre konsistent mit Rest des Codes.",
+    "Frontend QuickStat (PublicProfilePage.jsx:208): destructured signature ignoriert ALLE additional props (data-testid, aria-label etc.) – sollte {...rest} oder explizit data-testid weitergeben."
+  ],
+  "updated_files": [
+    "/app/backend/routes/user_routes.py",
+    "/app/backend/tests/test_phase5_badges.py"
+  ],
+  "success_rate": {"backend": "100% (11/11 phase5)", "frontend": "Visuell 100%; data-testid-Coverage ~80% (profile-stat-* und badge-card-* fehlen im DOM)"},
+  "test_credentials": "admin@thelionsquad.at / TLSAdmin2026! verifiziert; leon_king@demo.thelionsquad.at / demo123 verifiziert.",
+  "seed_data_creation": "Tests legen temporäre TEST_sponsor_* an und löschen sie wieder. Ferner werden 1-2 neue Random-User (bt_xxx@example.com) angelegt, die im Tournament 'Mario Kart · Gamers Heaven Cup' und an der ersten F1-Challenge ein Lap-Eintrag erhalten – diese werden nicht gelöscht (für Idempotenz-Verifikation).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 5 Suite in /app/backend/tests/test_phase5_badges.py. Tests: TestBadges (22 Badges, Sortierung tier-asc, /badges/first_win mit holders+awarded_count), TestPublicProfile (pixelhawk full payload + 404 für nicht-existent), TestUpload (auth required, PNG round-trip via /api/static/uploads/, 400 bei text/plain), TestSponsorsCRUD (POST→PATCH→DELETE auf /api/sponsors mit admin, 403 ohne admin), TestBadgeTriggers (first_tournament Idempotenz nach Tournament-Register; first_lap-Badge nach Admin-submitted Lap + Re-submit gleich 1 Badge). Sponsor-Routes liegen unter /api/sponsors (NICHT /api/news/sponsors). F1 lap submission ist admin-only und braucht user_id im Body. Tournament-Register braucht JSON-Body {accept_rules,accept_privacy}. PixelHawk hat 8 Badges aber 0 F1-Laps (deshalb crashte der track_id-Bug im UI nicht für ihn). Fix: user_routes.py:117 dead line entfernt.",
+  "rca of the issue": "RCA Public-Profile 500: user_routes.py get_public_profile baut 'best_per_track' als {track_id_key: {time_ms, challenge_id}} – also ohne 'track_id' im VALUE (track_id ist der KEY). Direkt danach versuchte Zeile 117 'list({v[\"track_id\"] for v in best_per_track.values()})' – greift auf den nicht vorhandenen Schlüssel zu → KeyError → Server-Exception 500. Die Variable t_ids_f1 wird zudem nirgendwo genutzt (track_docs query verwendet bereits 'list(best_per_track.keys())'). Behoben durch Streichung der zwei Zeilen. Reproduktion: neuer User + 1 Lap submit + GET /api/users/public/{username}. Nach Fix: 200 mit korrektem f1_bests Array."
+}

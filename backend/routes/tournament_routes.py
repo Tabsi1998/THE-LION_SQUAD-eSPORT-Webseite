@@ -187,6 +187,12 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
         reg["status"] = "waitlist"
     await db.tournament_registrations.insert_one(reg)
     reg.pop("_id", None)
+    # Badge trigger
+    try:
+        from badges import on_tournament_registered
+        await on_tournament_registered(me["id"], tid)
+    except Exception:
+        pass
     return reg
 
 
@@ -225,6 +231,11 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Nicht check-in-fähig")
     await db.tournament_registrations.update_one(
         {"id": reg["id"]}, {"$set": {"status": "checked_in", "updated_at": now_utc().isoformat()}})
+    try:
+        from badges import on_checked_in
+        await on_checked_in(me["id"], tid)
+    except Exception:
+        pass
     return {"ok": True}
 
 

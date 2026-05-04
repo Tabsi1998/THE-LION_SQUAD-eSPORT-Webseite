@@ -47,7 +47,7 @@ export default function F1DetailPage() {
         {challenge.banner_url && <img src={challenge.banner_url} className="absolute inset-0 w-full h-full object-cover opacity-25" alt="" />}
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/70 to-[#0A0A0A]" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-          <Link to="/f1" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← F1 Fast Lap Challenges</Link>
+          <Link to="/f1" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Fast Lap Challenges</Link>
           <div className="mt-2 flex flex-wrap items-center gap-3 mb-3">
             <StatusBadge status={challenge.status} size="lg" />
             {challenge.is_championship && <span className="text-[11px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 px-2 py-1 rounded-sm">Championship</span>}

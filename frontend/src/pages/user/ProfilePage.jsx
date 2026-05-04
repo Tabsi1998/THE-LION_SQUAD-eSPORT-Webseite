@@ -3,6 +3,8 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
+import { ExternalLink } from "lucide-react";
 
 export default function ProfilePage() {
   const { user, refresh } = useAuth();
@@ -36,8 +38,17 @@ export default function ProfilePage() {
   return (
     <PublicLayout>
       <div className="max-w-3xl mx-auto px-4 py-12">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Einstellungen</span>
-        <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Mein Profil</h1>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Einstellungen</span>
+            <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Mein Profil</h1>
+          </div>
+          {user?.username && (
+            <Link to={`/u/${user.username}`} data-testid="profile-view-public" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 transition">
+              <ExternalLink className="w-3.5 h-3.5" /> Öffentliches Profil
+            </Link>
+          )}
+        </div>
         <form onSubmit={submit} className="mt-8 space-y-4">
           <Field label="Display Name" value={form.display_name} onChange={(v) => set("display_name", v)} testId="profile-display-name" />
           <div className="grid sm:grid-cols-2 gap-4">

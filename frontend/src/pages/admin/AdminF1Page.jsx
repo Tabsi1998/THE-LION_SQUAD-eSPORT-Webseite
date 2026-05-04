@@ -12,7 +12,7 @@ export default function AdminF1Page() {
     <AdminLayout>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">F1 Fast Lap</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Fast Lap</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">Challenges</h1>
         </div>
         <Link to="/admin/f1/new" data-testid="admin-f1-new-btn" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2]">

@@ -64,6 +64,16 @@ async def create_sponsor(body: SponsorCreate, me: dict = Depends(require_admin()
     return doc
 
 
+@router.patch("/sponsors/{sid}")
+async def update_sponsor(sid: str, body: dict, me: dict = Depends(require_admin())):
+    db = get_db()
+    updates = {k: v for k, v in body.items() if k in {"name", "logo_url", "link", "description", "tier"}}
+    if not updates:
+        return {"ok": True}
+    await db.sponsors.update_one({"id": sid}, {"$set": updates})
+    return {"ok": True}
+
+
 @router.delete("/sponsors/{sid}")
 async def delete_sponsor(sid: str, me: dict = Depends(require_admin())):
     db = get_db()

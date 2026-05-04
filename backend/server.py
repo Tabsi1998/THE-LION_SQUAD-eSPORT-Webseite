@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 
 from database import get_db, init_indexes, close_client
 from seed import seed_admin, seed_demo_data
+from badges import seed_badges
 from routes.auth_routes import router as auth_router
 from routes.user_routes import router as user_router
 from routes.team_routes import router as team_router
@@ -23,6 +24,8 @@ from routes.f1_routes import router as f1_router
 from routes.station_routes import router as station_router
 from routes.news_routes import router as news_router
 from routes.admin_routes import router as admin_router
+from routes.upload_routes import router as upload_router
+from routes.badge_routes import router as badge_router
 from routes.extras_routes import (
     settings_router, season_router, widget_router, dsgvo_router, pdf_router, audit_router,
 )
@@ -39,6 +42,8 @@ async def lifespan(app: FastAPI):
     await init_indexes()
     logger.info("[TLS ARENA] Seeding admin...")
     await seed_admin()
+    logger.info("[TLS ARENA] Seeding badge catalog...")
+    await seed_badges()
     if os.environ.get("SEED_DEMO", "true").lower() == "true":
         logger.info("[TLS ARENA] Seeding demo data...")
         await seed_demo_data()
@@ -94,6 +99,15 @@ app.include_router(widget_router)
 app.include_router(dsgvo_router)
 app.include_router(pdf_router)
 app.include_router(audit_router)
+app.include_router(upload_router)
+app.include_router(badge_router)
+
+# Static uploads (serve user-uploaded images through /api prefix to survive ingress)
+from fastapi.staticfiles import StaticFiles
+import pathlib
+upload_dir = pathlib.Path("/app/backend/uploads")
+upload_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/api/static/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
 
 
 # Security headers middleware

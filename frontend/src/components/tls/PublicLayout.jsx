@@ -19,8 +19,9 @@ export function PublicLayout({ children }) {
     { to: "/", label: "Home", end: true },
     { to: "/tournaments", label: "Turniere" },
     { to: "/events", label: "Events" },
-    { to: "/f1", label: "F1 Fast Lap" },
+    { to: "/f1", label: "Fast Lap" },
     { to: "/teams", label: "Teams" },
+    { to: "/badges", label: "Badges" },
     { to: "/news", label: "News" },
   ];
 
@@ -139,14 +140,14 @@ export function PublicLayout({ children }) {
           <div className="md:col-span-2">
             <Logo size="lg" asLink={false} />
             <p className="mt-4 text-white/60 text-sm max-w-md">
-              TLS ARENA ist das offizielle Turniersystem des THE LION SQUAD eSports Vereins — für Online-Turniere, Offline-Events und die legendäre F1 Fast Lap Championship.
+              TLS ARENA ist das offizielle Turniersystem des THE LION SQUAD eSports Vereins — für Online-Turniere, Offline-Events und die legendäre Fast Lap Championship.
             </p>
           </div>
           <div>
             <h4 className="font-heading font-bold text-white uppercase tracking-wider text-sm">Arena</h4>
             <ul className="mt-3 space-y-2 text-sm text-white/60">
               <li><Link to="/tournaments" className="hover:text-[#29B6E8]">Turniere</Link></li>
-              <li><Link to="/f1" className="hover:text-[#29B6E8]">F1 Fast Lap</Link></li>
+              <li><Link to="/f1" className="hover:text-[#29B6E8]">Fast Lap</Link></li>
               <li><Link to="/events" className="hover:text-[#29B6E8]">Events</Link></li>
               <li><Link to="/teams" className="hover:text-[#29B6E8]">Teams</Link></li>
             </ul>
