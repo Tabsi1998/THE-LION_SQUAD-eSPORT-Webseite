@@ -1,4 +1,32 @@
 # THE LION SQUAD — eSPORTS · Vereinsplattform PRD
+## Phase F.2 + Phase G + Phase H — IMPLEMENTIERT (04.05.2026 · iteration_17 grün)
+
+### Phase F.2 — Medien-Browser & Navigations-Editor
+- **Backend war bereits in `phase_fg_routes.py` vorhanden** (Media-CRUD + Nav GET/PUT)
+- **Frontend `AdminMediaPage.jsx`** (`/admin/media`): Grid mit Bild-Vorschauen + Datei-Icons, Filter (Alle/Bilder/Dateien), Live-Suche, Detail-Modal mit URL-Copy + Delete (Bestätigung), Datei-Größen + mtime
+- **Frontend `AdminNavPage.jsx`** (`/admin/nav`): 7 Top-Level-Items + Children, Up/Down-Reorder, Visible-Toggle, Inline-Label-Edit, expandable children, Save/Verwerfen
+- **AdminLayout-Sidebar** erweitert um „Medien" (FolderOpen) + „Navigation" (ListOrdered)
+- **App.js Routes** `/admin/media` + `/admin/nav` (admin-only)
+
+### Phase G — SEO
+- **Backend** `/api/sitemap.xml` (bereits vorhanden), `/api/robots.txt` (neu), `/api/seo/page/{slug}` (JSON-LD WebPage + title + meta_description)
+- **Frontend Hook `useSeoPage.js`**: lädt SEO-Meta für CMS-Seite, setzt `document.title`, `meta[name=description]`, injiziert `<script type="application/ld+json">` — Cleanup on Unmount
+- **`CmsPage.jsx`** verwendet `useSeoPage(slug)` → dynamische Page-Titles + JSON-LD pro CMS-Seite
+- Generischer `useJsonLd(obj)` Helper für Tournaments/Events/Profiles
+
+### Phase H — One-Line Installer
+- **`install.sh`** komplett überarbeitet: ASCII-Banner, Pre-Flight (Docker check), Auto-JWT-Generation, interaktive Prompts (Admin Email/PW mit Confirm, Club Name, Public URL, Mail-Provider SMTP/Resend/None), `set_env`/`get_env` Helper (idempotent), Health-Wait mit Progress-Dots
+- **`update.sh`** neu: git pull (falls Repo) + rebuild + restart + Health-Check
+- **`.env.example`** erweitert um `CLUB_NAME`, `MAIL_PROVIDER`, `SMTP_*`, `RESEND_API_KEY`, `DISCORD_WEBHOOK_URL`, `TWITCH_CLIENT_ID/SECRET`
+- Beide Scripts mit `bash -n` syntax-validiert
+
+### Tests (iteration_17 / iteration_18 pytest)
+- **`test_phase_fg_iter18.py`** 10/10 grün: Media-List, Path-Traversal-Schutz, Anon-Block, Nav GET/PUT roundtrip + Public-Filter, Sitemap, Robots, SEO-Meta about + 404
+- **Regression** `test_phase_ef_iter17.py` 22/22 grün
+- **Frontend**: Admin-Login, /admin/media (Grid + Filter + Search + Modal), /admin/nav (7 Rows, Sidebar-Einträge), SEO-Hook auf /about (`document.title='Über uns · THE LION SQUAD'` + JSON-LD injected)
+- Total: **32/32 Backend pytest grün, Frontend 100%**
+
+
 
 **Projekt:** THE LION SQUAD — eSPORTS Vereinsplattform (Re-Brand von TLS ARENA)
 **Verein:** THE LION SQUAD eSports (offiziell eingetragener österreichischer eSports-Verein)
