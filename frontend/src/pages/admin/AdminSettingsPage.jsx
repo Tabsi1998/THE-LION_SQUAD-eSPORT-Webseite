@@ -109,7 +109,6 @@ export default function AdminSettingsPage() {
     toast.success("Standard SMTP-Login gesetzt: 587, STARTTLS, Benutzer/Passwort.");
   };
   const applyLocalIpPreset = () => {
-    const fallbackDomain = smtp.message_id_domain || smtp.sender_email?.split("@")?.[1] || "lionsquad.at";
     setSmtp({
       ...smtp,
       provider: "smtp",
@@ -118,9 +117,10 @@ export default function AdminSettingsPage() {
       smtp_security: "starttls",
       smtp_tls_verify: false,
       smtp_envelope_from: "",
-      smtp_helo_name: smtp.smtp_helo_name || fallbackDomain,
+      smtp_helo_name: "",
+      message_id_domain: "",
     });
-    toast.success("Lokale IP vorbereitet: 587, STARTTLS, Login, Zertifikatspruefung aus.");
+    toast.success("Lokale IP vorbereitet: 587, STARTTLS, Login, ohne Host-Domain.");
   };
   const sendSmtpTest = async () => {
     if (!smtpTestEmail) return toast.error("E-Mail-Adresse eingeben");
@@ -242,7 +242,7 @@ export default function AdminSettingsPage() {
             </div>
             <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4 text-xs text-white/65">
               <div className="font-bold uppercase tracking-widest text-[#29B6E8] mb-2">Einfacher Versand ohne Relay</div>
-              <p>Du kannst als Host auch direkt die lokale IP eintragen, z.B. 192.168.2.106. Entscheidend ist: auf dieser IP muss ein Submission-Port mit Login laufen, normalerweise 587 STARTTLS oder 465 SSL/TLS. Port 25 ohne Anmeldung ist lokaler Relay-Modus.</p>
+              <p>Du kannst als Host direkt die lokale IP eintragen, z.B. 192.168.2.106. Dafuer brauchst du keine SMTP-Host-Domain. Entscheidend ist nur: auf dieser IP muss ein Submission-Port mit Login laufen, normalerweise 587 STARTTLS oder 465 SSL/TLS. Port 25 ohne Anmeldung ist lokaler Relay-Modus.</p>
               <div className="mt-3 flex flex-col sm:flex-row gap-2">
                 <button type="button" onClick={applySubmissionPreset} data-testid="smtp-preset-submission" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm">
                   Standard 587 Login
@@ -349,7 +349,7 @@ export default function AdminSettingsPage() {
                   className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
                   placeholder="lionsquad.at"
                 />
-                <p className="mt-1 text-[11px] text-white/40">Leer = Domain der Absender-E-Mail.</p>
+                <p className="mt-1 text-[11px] text-white/40">Optional. Leer = Domain der Absender-E-Mail. Das ist nicht der SMTP Host.</p>
               </div>
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">HELO/EHLO Name</div>
@@ -360,15 +360,15 @@ export default function AdminSettingsPage() {
                   className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
                   placeholder="lionsquad.at"
                 />
-                <p className="mt-1 text-[11px] text-white/40">Optional. Sinnvoll bei lokalem Mailserver per IP.</p>
+                <p className="mt-1 text-[11px] text-white/40">Optional. Leer lassen ist erlaubt; dann nutzt die SMTP-Bibliothek ihren Standardnamen.</p>
               </div>
               <div className="text-xs text-white/45 flex items-end pb-1">
-                Fuer beste Zustellbarkeit sollten Absender, Envelope-Sender, Message-ID Domain und DNS zur selben Domain passen.
+                Hinweis: Diese Domain-Felder sind Mail-Identitaet, nicht Verbindung. Der SMTP Host darf weiterhin nur die IP sein.
               </div>
             </div>
             <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 text-xs text-white/60">
               <div className="font-bold uppercase tracking-widest text-[#FFD700] mb-2">DNS Checkliste gegen Spam</div>
-              <p>SPF erlaubt den sendenden Server, DKIM signiert fuer lionsquad.at, DMARC ist gesetzt, PTR/rDNS zeigt auf den Mailhost, HELO/EHLO passt zum Mailhost und der Server nutzt ein oeffentlich vertrauenswuerdiges TLS-Zertifikat.</p>
+              <p>Gmail bewertet die oeffentliche Ausgangs-IP deines Mailservers. Wichtig sind SPF, DKIM, DMARC, PTR/rDNS und die Mailserver-Logs. Der SMTP Host in dieser App darf trotzdem eine lokale IP sein.</p>
             </div>
             <button onClick={saveSmtp} data-testid="smtp-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
           </div>

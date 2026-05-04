@@ -168,11 +168,15 @@ Absendername: THE LION SQUAD
 Absender E-Mail: office@lionsquad.at
 Antworten an: office@lionsquad.at
 Message-ID Domain: lionsquad.at
-HELO/EHLO Name: lionsquad.at
+HELO/EHLO Name: leer lassen oder optional den Mailhost-Namen
 ```
 
 Wichtig:
 
+- Der SMTP Host darf direkt die lokale IP sein. Dafuer ist keine Host-Domain noetig.
+- `Message-ID Domain` und `HELO/EHLO Name` sind Mail-/Header-Identitaet, nicht der SMTP Host.
+- `Message-ID Domain` darf leer bleiben; dann nutzt die App die Domain der Absender-E-Mail.
+- `HELO/EHLO Name` darf leer bleiben; dann nutzt die SMTP-Bibliothek ihren Standardnamen.
 - `192.168.2.106:25` ist klassischer Server-zu-Server-SMTP.
 - Wenn Port 25 kein AUTH anbietet, ist das kein normaler Client-Versand.
 - Ohne AUTH auf Port 25 waere externer Versand ein Relay-Betrieb.

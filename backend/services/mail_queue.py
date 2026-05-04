@@ -155,7 +155,7 @@ def _deliverability_sync(cfg: dict) -> dict:
         add(True, "SMTP Host", smtp_host, "info")
 
     if not cfg.get("smtp_helo_name"):
-        add(False, "HELO/EHLO Name", "Kein HELO/EHLO Name gesetzt. Setze z.B. lionsquad.at oder den Mailhost-Namen.", "warning")
+        add(True, "HELO/EHLO Name", "Nicht gesetzt. Das ist erlaubt; die SMTP-Bibliothek nutzt ihren Standardnamen.", "info")
     else:
         add(True, "HELO/EHLO Name", cfg.get("smtp_helo_name"), "info")
 
