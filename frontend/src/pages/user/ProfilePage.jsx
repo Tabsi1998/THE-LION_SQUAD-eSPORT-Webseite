@@ -6,12 +6,14 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MultiSelect } from "@/components/tls/MultiSelect";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye } from "lucide-react";
+import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal } from "lucide-react";
+import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 
 const TABS = [
   { k: "basic", label: "Grunddaten", icon: User },
   { k: "gaming", label: "Gaming", icon: Gamepad2 },
   { k: "socials", label: "Socials", icon: Globe },
+  { k: "achievements", label: "Achievements", icon: Medal },
   { k: "privacy", label: "Privatsphäre", icon: Eye },
 ];
 
@@ -64,6 +66,16 @@ export default function ProfilePage() {
   const [tab, setTab] = useState("basic");
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [achData, setAchData] = useState(null);
+  const [completeness, setCompleteness] = useState(null);
+
+  // Lazy-load achievements when tab is opened
+  useEffect(() => {
+    if (tab === "achievements" && !achData) {
+      api.get("/achievements/me").then(({ data }) => setAchData(data)).catch(() => setAchData({ groups: [], awards: [] }));
+      api.get("/users/me/profile-completeness").then(({ data }) => setCompleteness(data)).catch(() => null);
+    }
+  }, [tab, achData]);
 
   useEffect(() => {
     if (user) {
@@ -268,6 +280,33 @@ export default function ProfilePage() {
             </Section>
           )}
 
+          {tab === "achievements" && (
+            <div className="space-y-6" data-testid="profile-achievements-tab">
+              <div className="border border-white/10 bg-[#121212] rounded-sm p-5 flex items-center gap-4 flex-wrap">
+                <div className="relative w-14 h-14 shrink-0">
+                  <svg viewBox="0 0 36 36" className="w-14 h-14 -rotate-90">
+                    <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+                    <circle cx="18" cy="18" r="16" fill="none" stroke="#A855F7" strokeWidth="3" strokeDasharray={`${completeness?.score || 0} 100`} pathLength="100" strokeLinecap="round" />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="font-heading font-black text-sm">{completeness?.score || 0}%</span>
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#A855F7]">Profil-Pflege & Achievements</div>
+                  <h2 className="font-heading text-2xl md:text-3xl font-black uppercase mt-1">Deine Achievements</h2>
+                  <p className="text-sm text-white/55 mt-1">{achData ? `${achData.awards.length} freigeschaltet · ${achData.groups.reduce((s,g)=>s+g.tier_count,0)} im Katalog verfügbar` : "Lade …"}</p>
+                </div>
+              </div>
+
+              {achData ? (
+                <AchievementGroupsView groups={achData.groups} emptyText="Spiel mit, melde dich für Turniere an oder schalte Fast-Lap-Runden frei – dann tauchen hier deine ersten Achievements auf." />
+              ) : (
+                <div className="text-center py-20 text-white/40 font-display tracking-widest">LADE ACHIEVEMENTS …</div>
+              )}
+            </div>
+          )}
+
           {tab === "privacy" && (
             <Section>
               <label className="flex items-start gap-3 p-4 border border-white/10 rounded-sm bg-[#0A0A0A]">
@@ -318,14 +357,16 @@ export default function ProfilePage() {
             </Section>
           )}
 
-          <div className="pt-4 flex gap-3">
-            <button type="submit" disabled={saving} data-testid="profile-save" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition text-xs">
-              <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
-            </button>
-            <Link to="/privacy-account" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm text-xs">
-              DSGVO / Daten
-            </Link>
-          </div>
+          {tab !== "achievements" && (
+            <div className="pt-4 flex gap-3">
+              <button type="submit" disabled={saving} data-testid="profile-save" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition text-xs">
+                <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
+              </button>
+              <Link to="/privacy-account" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm text-xs">
+                DSGVO / Daten
+              </Link>
+            </div>
+          )}
         </form>
       </div>
     </PublicLayout>
