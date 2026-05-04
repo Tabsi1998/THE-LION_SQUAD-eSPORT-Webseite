@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { api, formatMs } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
-import { BadgeGrid, BadgeCard } from "@/components/tls/BadgeGrid";
+import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import {
   Trophy, Flag, Users as UsersIcon, Medal, Shield, Calendar,
@@ -13,6 +13,7 @@ import {
 export default function PublicProfilePage() {
   const { username } = useParams();
   const [profile, setProfile] = useState(null);
+  const [achievementsData, setAchievementsData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("overview");
 
@@ -22,6 +23,12 @@ export default function PublicProfilePage() {
       try {
         const { data } = await api.get(`/users/public/${username}`);
         setProfile(data);
+        if (data?.id) {
+          try {
+            const { data: ach } = await api.get(`/achievements/user/${data.id}`);
+            setAchievementsData(ach);
+          } catch { setAchievementsData(null); }
+        }
       } catch { setProfile(null); }
       setLoading(false);
     })();
@@ -98,7 +105,7 @@ export default function PublicProfilePage() {
               )}
               {/* Quick stats */}
               <div className="mt-6 grid grid-cols-3 md:grid-cols-6 gap-3">
-                <QuickStat icon={Medal} label="Badges" value={s.badges || 0} testId="profile-stat-badges" />
+                <QuickStat icon={Medal} label="Achievements" value={achievementsData?.awards?.length || 0} testId="profile-stat-badges" />
                 <QuickStat icon={Zap} label="Punkte" value={s.points || 0} color="#29B6E8" testId="profile-stat-points" />
                 <QuickStat icon={Trophy} label="Siege" value={s.wins || 0} color="#FFD700" testId="profile-stat-wins" />
                 <QuickStat icon={Medal} label="Podium" value={s.top3 || 0} color="#C0C0C0" testId="profile-stat-top3" />
@@ -115,7 +122,7 @@ export default function PublicProfilePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 overflow-x-auto">
           {[
             ["overview", "Übersicht"],
-            ["badges", `Badges (${s.badges || 0})`],
+            ["badges", `Achievements (${achievementsData?.awards?.length || 0})`],
             ["tournaments", `Turniere (${profile.tournaments?.length || 0})`],
             ["fastlap", `Fast Lap (${profile.f1_bests?.length || 0})`],
             ["teams", `Teams (${profile.teams?.length || 0})`],
@@ -138,18 +145,29 @@ export default function PublicProfilePage() {
 
         {tab === "overview" && (
           <div className="grid lg:grid-cols-3 gap-8">
-            {/* Recent badges */}
+            {/* Recent achievements */}
             <div className="lg:col-span-2">
-              <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Medal className="w-5 h-5 text-[#FFD700]" /> Letzte Badges</h2>
-              {profile.badges?.length ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {profile.badges.slice(0, 6).map((b) => <BadgeCard key={b.code} badge={b} />)}
+              <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Medal className="w-5 h-5 text-[#FFD700]" /> Letzte Achievements</h2>
+              {achievementsData?.awards?.length ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2" data-testid="profile-recent-awards">
+                  {achievementsData.awards.slice(0, 4).map((a) => (
+                    <div key={a.code} className="flex items-center gap-3 p-3 border border-white/10 rounded-sm bg-[#0F0F10]" style={{ boxShadow: `inset 2px 0 0 ${a.level_color}` }}>
+                      <div className="w-9 h-9 rounded-sm flex items-center justify-center border" style={{ borderColor: a.level_color + "55", backgroundColor: a.level_color + "12" }}>
+                        <Medal className="w-4 h-4" style={{ color: a.level_color }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: a.level_color }}>{a.level_name}</div>
+                        <div className="font-semibold truncate text-sm">{a.name}</div>
+                      </div>
+                      <div className="text-[10px] text-white/40 tabular-nums">+{a.points}</div>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <EmptyState text="Noch keine Badges freigeschaltet." />
+                <EmptyState text="Noch keine Achievements freigeschaltet." />
               )}
-              {profile.badges?.length > 6 && (
-                <button onClick={() => setTab("badges")} className="mt-4 text-sm font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">Alle Badges ansehen →</button>
+              {achievementsData?.awards?.length > 4 && (
+                <button onClick={() => setTab("badges")} className="mt-4 text-sm font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">Alle Achievements ansehen →</button>
               )}
             </div>
             {/* Top tournaments */}
@@ -190,11 +208,7 @@ export default function PublicProfilePage() {
 
         {tab === "badges" && (
           <div>
-            {profile.badges?.length ? (
-              <BadgeGrid badges={profile.badges} />
-            ) : (
-              <EmptyState text="Noch keine Badges freigeschaltet." />
-            )}
+            <AchievementGroupsView groups={achievementsData?.groups || []} emptyText="Noch keine Achievements freigeschaltet." />
           </div>
         )}
 

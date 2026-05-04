@@ -1,199 +1,290 @@
-"""Badge / Achievement routes — audience-aware (Phase 6)."""
+"""Achievement routes (Phase B v4) — group-aware listing, admin CRUD, manual award.
+
+Public/User endpoints (prefix /api/achievements):
+  GET  /api/achievements/groups            — full catalog (no negative for non-admin)
+  GET  /api/achievements/me                — my catalog with progress + earned
+  GET  /api/achievements/user/{user_id}    — public profile achievements
+  POST /api/achievements/evaluate          — re-evaluate (auto-award) for self
+
+Admin endpoints (prefix /api/admin/achievements):
+  GET    /groups                          — all groups (incl. negative)
+  POST   /groups                          — create group
+  PATCH  /groups/{code}
+  DELETE /groups/{code}                   — only if not seeded (is_admin_created=true)
+  GET    /tiers
+  POST   /tiers
+  PATCH  /tiers/{code}
+  DELETE /tiers/{code}
+  POST   /award                           — manual award {user_id, tier_code, note}
+  DELETE /award                           — revoke {user_id, tier_code}
+  GET    /negative/awards                 — admin-only list of negative awards
+"""
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field
+from typing import Optional, Literal
 from database import get_db
 from auth import get_optional_user, get_current_user, require_admin
-from badges import _user_can_see_badge, award_badge, BADGE_BY_CODE, compute_user_progress
+from badges import (
+    award_achievement, list_groups_for_user, list_user_awards,
+    evaluate_user_progress,
+)
 from models import now_utc, new_id
 
-router = APIRouter(prefix="/api/badges", tags=["badges"])
+# ============ Public/User ============
+router = APIRouter(prefix="/api/achievements", tags=["achievements"])
 
-TIER_ORDER = {"platinum": 0, "gold": 1, "silver": 2, "bronze": 3}
 
-
-@router.get("")
-async def list_badges(user: dict | None = Depends(get_optional_user)):
-    db = get_db()
-    badges = await db.badges.find({}, {"_id": 0}).to_list(500)
-    badges.sort(key=lambda b: (TIER_ORDER.get(b.get("tier"), 9), b.get("name", "")))
-    out = []
-    for b in badges:
-        # Hide secret + audience-mismatch from catalog (still visible if user *holds* it)
-        if not _user_can_see_badge(b, user):
-            # Show as ??? if user is logged in and has earned it
-            if user:
-                held = await db.user_badges.find_one({"user_id": user["id"], "badge_code": b["code"]})
-                if not held:
-                    continue
-            else:
-                continue
-        b["awarded_count"] = await db.user_badges.count_documents({"badge_code": b["code"]})
-        out.append(b)
-    return out
+@router.get("/groups")
+async def public_groups(viewer: dict | None = Depends(get_optional_user)):
+    return await list_groups_for_user(None, viewer)
 
 
 @router.get("/me")
-async def list_my_badges(user: dict = Depends(get_current_user)):
-    """Return all badges the calling user has earned (incl. negative + secret)."""
-    db = get_db()
-    earned = await db.user_badges.find({"user_id": user["id"]}, {"_id": 0}).sort("earned_at", -1).to_list(500)
-    codes = [e["badge_code"] for e in earned]
-    badges = {b["code"]: b for b in await db.badges.find({"code": {"$in": codes}}, {"_id": 0}).to_list(500)}
-    out = []
-    for e in earned:
-        b = badges.get(e["badge_code"])
-        if b:
-            out.append({**b, "earned_at": e["earned_at"], "context": e.get("context", {})})
-    return out
-
-
-@router.get("/progress/me")
-async def my_progress(user: dict = Depends(get_current_user)):
-    """Phase B v3 — return locked badges with progress toward unlock.
-
-    Output: list of {badge, current, target, percent}. Only progressable badges
-    visible to the user (and not yet earned) are returned.
-    """
-    db = get_db()
-    counters = await compute_user_progress(user["id"])
-    earned_codes = {b["badge_code"] async for b in db.user_badges.find({"user_id": user["id"]})}
-    catalog = await db.badges.find({}, {"_id": 0}).to_list(500)
-    out = []
-    for b in catalog:
-        if b["code"] in earned_codes:
-            continue
-        target = b.get("progress_target")
-        ck = b.get("condition_key")
-        if not target or not ck or ck not in counters:
-            continue
-        if not _user_can_see_badge(b, user):
-            continue
-        cur = min(counters[ck], target)
-        # Auto-award when user reaches 100% via progress evaluation
-        if counters[ck] >= target:
-            awarded = await award_badge(user["id"], b["code"], {"auto_progress": True, "current": counters[ck], "target": target})
-            if awarded:
-                continue  # show as earned, not as progress
-        out.append({
-            "code": b["code"],
-            "name": b["name"],
-            "tier": b["tier"],
-            "category": b["category"],
-            "icon": b.get("icon"),
-            "points": b.get("points", 0),
-            "current": cur,
-            "target": target,
-            "percent": round(100 * cur / target) if target else 0,
-        })
-    out.sort(key=lambda x: (-x["percent"], x["target"]))
-    return out
+async def my_achievements(user: dict = Depends(get_current_user)):
+    groups = await list_groups_for_user(user["id"], user)
+    awards = await list_user_awards(user["id"], user)
+    return {"groups": groups, "awards": awards}
 
 
 @router.get("/user/{user_id}")
-async def list_user_badges(user_id: str, viewer: dict | None = Depends(get_optional_user)):
-    """Public endpoint for showcasing a user's badges. Hides negative for viewers."""
+async def user_achievements(user_id: str, viewer: dict | None = Depends(get_optional_user)):
     db = get_db()
-    earned = await db.user_badges.find({"user_id": user_id}, {"_id": 0}).sort("earned_at", -1).to_list(500)
-    codes = [e["badge_code"] for e in earned]
-    badges = {b["code"]: b for b in await db.badges.find({"code": {"$in": codes}}, {"_id": 0}).to_list(500)}
-    out = []
-    is_self = viewer and viewer.get("id") == user_id
-    for e in earned:
-        b = badges.get(e["badge_code"])
-        if not b:
-            continue
-        # Negative badges visible only to self (or admins)
-        if b.get("negative") and not is_self and not (viewer and viewer.get("role") in ("club_admin", "superadmin")):
-            continue
-        # Members-only badges hidden from anonymous viewers (catalog rule)
-        if b.get("audience") == "members_only" and not viewer:
-            continue
-        out.append({**b, "earned_at": e["earned_at"]})
-    return out
-
-
-@router.get("/{code}")
-async def get_badge(code: str, user: dict | None = Depends(get_optional_user)):
-    db = get_db()
-    b = await db.badges.find_one({"code": code}, {"_id": 0})
-    if not b:
-        raise HTTPException(status_code=404, detail="Badge nicht gefunden")
-    # Hide details if not visible to user (unless they hold it)
-    if not _user_can_see_badge(b, user):
-        if not user or not await db.user_badges.find_one({"user_id": user["id"], "badge_code": code}):
-            raise HTTPException(404, "Badge nicht gefunden")
-    holders_raw = await db.user_badges.find({"badge_code": code}, {"_id": 0}).sort("earned_at", -1).to_list(500)
-    user_ids = [h["user_id"] for h in holders_raw]
-    users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1,
-         "privacy_public_profile": 1}).to_list(500)}
-    holders = []
-    # Negative/secret holders are private (hidden from catalog) — show count only
-    show_holders = not (b.get("negative") or b.get("secret"))
-    if show_holders:
-        for h in holders_raw:
-            u = users.get(h["user_id"])
-            if u:
-                holders.append({
-                    "username": u.get("username"),
-                    "display_name": u.get("display_name"),
-                    "avatar_url": u.get("avatar_url"),
-                    "earned_at": h["earned_at"],
-                    "private": not u.get("privacy_public_profile"),
-                })
-    b["holders"] = holders
-    b["awarded_count"] = len(holders_raw)
-    return b
-
-
-# ---------- Admin: manual award & revoke (Phase 6) ----------
-@router.post("/admin/award")
-async def admin_award(body: dict, me: dict = Depends(require_admin())):
-    """Manually award a badge (e.g. 'ehrenloewe' / Hall of Fame)."""
-    user_id = body.get("user_id")
-    code = body.get("code")
-    if not user_id or not code:
-        raise HTTPException(400, "user_id und code erforderlich.")
-    if code not in BADGE_BY_CODE:
-        raise HTTPException(404, "Unbekannter Badge-Code.")
-    db = get_db()
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1})
-    if not user:
+    if not await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1}):
         raise HTTPException(404, "Nutzer nicht gefunden.")
-    awarded = await award_badge(user_id, code, {"manual": True, "by": me["id"], "note": body.get("note")})
+    groups = await list_groups_for_user(user_id, viewer)
+    awards = await list_user_awards(user_id, viewer)
+    return {"groups": groups, "awards": awards}
+
+
+@router.post("/evaluate")
+async def evaluate_self(user: dict = Depends(get_current_user)):
+    n = await evaluate_user_progress(user["id"])
+    return {"newly_awarded": n}
+
+
+# ============ Admin CRUD ============
+admin_router = APIRouter(prefix="/api/admin/achievements", tags=["achievements-admin"])
+
+
+# ---- Group CRUD ----
+class GroupCreate(BaseModel):
+    code: str = Field(min_length=2, max_length=80)
+    name: str
+    category: Literal["match", "tournament", "fastlap", "club", "special", "negative"] = "special"
+    icon: str = "trophy"
+    accent_color: str = "#FF3B30"
+    description: str = ""
+    public: bool = True
+    is_special: bool = True
+    is_negative: bool = False
+    sort_order: int = 600
+
+
+class GroupPatch(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    icon: Optional[str] = None
+    accent_color: Optional[str] = None
+    description: Optional[str] = None
+    public: Optional[bool] = None
+    is_special: Optional[bool] = None
+    is_negative: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
+@admin_router.get("/groups")
+async def admin_list_groups(me: dict = Depends(require_admin())):
+    db = get_db()
+    return await db.achievement_groups.find({}, {"_id": 0}).sort("sort_order", 1).to_list(500)
+
+
+@admin_router.post("/groups")
+async def admin_create_group(body: GroupCreate, me: dict = Depends(require_admin())):
+    db = get_db()
+    if await db.achievement_groups.find_one({"code": body.code}):
+        raise HTTPException(409, "Code bereits vergeben.")
+    doc = {**body.model_dump(), "id": body.code, "is_admin_created": True,
+           "created_at": now_utc().isoformat(), "created_by": me["id"]}
+    await db.achievement_groups.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@admin_router.patch("/groups/{code}")
+async def admin_patch_group(code: str, body: GroupPatch, me: dict = Depends(require_admin())):
+    db = get_db()
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    if not updates:
+        raise HTTPException(400, "Keine Änderungen.")
+    res = await db.achievement_groups.update_one({"code": code}, {"$set": updates})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Group nicht gefunden.")
+    return await db.achievement_groups.find_one({"code": code}, {"_id": 0})
+
+
+@admin_router.delete("/groups/{code}")
+async def admin_delete_group(code: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    g = await db.achievement_groups.find_one({"code": code})
+    if not g:
+        raise HTTPException(404, "Group nicht gefunden.")
+    if not g.get("is_admin_created"):
+        raise HTTPException(400, "System-Group kann nicht gelöscht werden — deaktivieren via public=false.")
+    await db.achievements.delete_many({"group_code": code})
+    await db.user_achievements.delete_many({"group_code": code})
+    await db.achievement_groups.delete_one({"code": code})
+    return {"ok": True}
+
+
+# ---- Tier CRUD ----
+class TierCreate(BaseModel):
+    code: str = Field(min_length=2, max_length=80)
+    group_code: str
+    level: int = Field(ge=1, le=5)
+    name: str
+    description: str = ""
+    condition_key: Optional[str] = None
+    progress_target: Optional[int] = None
+    points: int = 10
+    icon: Optional[str] = None
+    manual_only: bool = False
+
+
+class TierPatch(BaseModel):
+    level: Optional[int] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    condition_key: Optional[str] = None
+    progress_target: Optional[int] = None
+    points: Optional[int] = None
+    icon: Optional[str] = None
+    manual_only: Optional[bool] = None
+
+
+@admin_router.get("/tiers")
+async def admin_list_tiers(group_code: Optional[str] = None,
+                            me: dict = Depends(require_admin())):
+    db = get_db()
+    q: dict = {}
+    if group_code:
+        q["group_code"] = group_code
+    return await db.achievements.find(q, {"_id": 0}).sort([("group_code", 1), ("level", 1)]).to_list(2000)
+
+
+@admin_router.post("/tiers")
+async def admin_create_tier(body: TierCreate, me: dict = Depends(require_admin())):
+    db = get_db()
+    if not await db.achievement_groups.find_one({"code": body.group_code}):
+        raise HTTPException(404, "Group nicht gefunden.")
+    if await db.achievements.find_one({"code": body.code}):
+        raise HTTPException(409, "Tier-Code bereits vergeben.")
+    doc = {**body.model_dump(), "id": body.code, "created_at": now_utc().isoformat()}
+    await db.achievements.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@admin_router.patch("/tiers/{code}")
+async def admin_patch_tier(code: str, body: TierPatch, me: dict = Depends(require_admin())):
+    db = get_db()
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    if not updates:
+        raise HTTPException(400, "Keine Änderungen.")
+    res = await db.achievements.update_one({"code": code}, {"$set": updates})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Tier nicht gefunden.")
+    return await db.achievements.find_one({"code": code}, {"_id": 0})
+
+
+@admin_router.delete("/tiers/{code}")
+async def admin_delete_tier(code: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    res = await db.achievements.delete_one({"code": code})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Tier nicht gefunden.")
+    await db.user_achievements.delete_many({"tier_code": code})
+    return {"ok": True}
+
+
+# ---- Manual award/revoke ----
+class AwardBody(BaseModel):
+    user_id: str
+    tier_code: str
+    note: Optional[str] = None
+
+
+@admin_router.post("/award")
+async def admin_award(body: AwardBody, me: dict = Depends(require_admin())):
+    db = get_db()
+    if not await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(404, "Nutzer nicht gefunden.")
+    if not await db.achievements.find_one({"code": body.tier_code}):
+        raise HTTPException(404, "Tier nicht gefunden.")
+    awarded = await award_achievement(body.user_id, body.tier_code,
+                                       context={"manual": True, "by": me["id"], "note": body.note},
+                                       awarded_by=me["id"])
     if not awarded:
-        # Either already held or membership requirement missing
-        existing = await db.user_badges.find_one({"user_id": user_id, "badge_code": code})
-        if existing:
-            return {"ok": True, "already_awarded": True}
-        raise HTTPException(400, "Vergabe nicht möglich (z. B. Mitgliedschaft erforderlich).")
+        return {"ok": True, "already_awarded": True}
     await db.audit_logs.insert_one({
         "id": new_id(),
-        "action": "badge.manual_award",
-        "actor_id": me["id"],
-        "target_id": user_id,
-        "data": {"code": code, "note": body.get("note")},
+        "action": "achievement.manual_award",
+        "actor_id": me["id"], "target_id": body.user_id,
+        "data": {"tier_code": body.tier_code, "note": body.note},
         "created_at": now_utc().isoformat(),
     })
     return {"ok": True, "newly_awarded": True}
 
 
-@router.delete("/admin/revoke")
-async def admin_revoke(body: dict, me: dict = Depends(require_admin())):
-    user_id = body.get("user_id")
-    code = body.get("code")
-    if not user_id or not code:
-        raise HTTPException(400, "user_id und code erforderlich.")
+@admin_router.delete("/award")
+async def admin_revoke(body: AwardBody, me: dict = Depends(require_admin())):
     db = get_db()
-    res = await db.user_badges.delete_one({"user_id": user_id, "badge_code": code})
+    res = await db.user_achievements.delete_one({"user_id": body.user_id, "tier_code": body.tier_code})
     if res.deleted_count == 0:
-        raise HTTPException(404, "Badge nicht vergeben.")
+        raise HTTPException(404, "Nicht vergeben.")
     await db.audit_logs.insert_one({
         "id": new_id(),
-        "action": "badge.manual_revoke",
-        "actor_id": me["id"],
-        "target_id": user_id,
-        "data": {"code": code},
+        "action": "achievement.manual_revoke",
+        "actor_id": me["id"], "target_id": body.user_id,
+        "data": {"tier_code": body.tier_code, "note": body.note},
         "created_at": now_utc().isoformat(),
     })
     return {"ok": True}
+
+
+@admin_router.get("/negative/awards")
+async def admin_list_negative_awards(me: dict = Depends(require_admin())):
+    """List all awarded negative achievements with user info — admin-only view."""
+    db = get_db()
+    neg_groups = [g["code"] async for g in db.achievement_groups.find({"is_negative": True}, {"_id": 0, "code": 1})]
+    awards = await db.user_achievements.find({"group_code": {"$in": neg_groups}}, {"_id": 0}).sort("earned_at", -1).to_list(2000)
+    user_ids = list({a["user_id"] for a in awards})
+    users = {u["id"]: u for u in await db.users.find(
+        {"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1}).to_list(500)}
+    tiers_map = {t["code"]: t async for t in db.achievements.find({}, {"_id": 0, "code": 1, "name": 1, "group_code": 1, "icon": 1})}
+    out = []
+    for a in awards:
+        u = users.get(a["user_id"])
+        t = tiers_map.get(a["tier_code"], {})
+        out.append({
+            "user_id": a["user_id"],
+            "username": u.get("username") if u else None,
+            "display_name": u.get("display_name") if u else None,
+            "tier_code": a["tier_code"],
+            "tier_name": t.get("name"),
+            "group_code": a.get("group_code"),
+            "earned_at": a["earned_at"],
+            "context": a.get("context", {}),
+        })
+    return out
+
+
+@admin_router.get("/users/search")
+async def admin_search_users(q: str = "", me: dict = Depends(require_admin())):
+    """Quick user search for the admin manual-award picker."""
+    db = get_db()
+    query: dict = {}
+    if q:
+        rx = {"$regex": q.strip(), "$options": "i"}
+        query = {"$or": [{"username": rx}, {"display_name": rx}, {"email": rx}]}
+    users = await db.users.find(query, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "email": 1}).limit(20).to_list(20)
+    return users

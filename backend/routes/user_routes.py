@@ -90,6 +90,7 @@ async def get_public_profile(username: str):
         }
     # Base profile (always visible)
     base = {
+        "id": u["id"],
         "username": u["username"], "display_name": u.get("display_name"),
         "avatar_url": u.get("avatar_url"), "banner_url": u.get("banner_url"),
         "bio": u.get("bio") if public else None,
@@ -118,16 +119,27 @@ async def get_public_profile(username: str):
         {"user_id": u["id"], "visibility": "public"},
         {"_id": 0, "platform": 1, "value": 1, "url": 1},
     ).to_list(50)
-    # Badges (always visible – they're achievements)
+    # Achievements v4 (group-aware) — flat list of awarded tiers
     user_id = u["id"]
-    ub = await db.user_badges.find({"user_id": user_id}, {"_id": 0})\
-        .sort("earned_at", -1).to_list(200)
-    catalog = {b["code"]: b async for b in db.badges.find({}, {"_id": 0})}
+    ua = await db.user_achievements.find({"user_id": user_id}, {"_id": 0})\
+        .sort("earned_at", -1).to_list(500)
+    tier_map = {t["code"]: t async for t in db.achievements.find({}, {"_id": 0})}
+    group_map = {g["code"]: g async for g in db.achievement_groups.find({}, {"_id": 0})}
     badges = []
-    for b in ub:
-        meta = catalog.get(b["badge_code"])
-        if meta:
-            badges.append({**meta, "earned_at": b["earned_at"], "context": b.get("context", {})})
+    for a in ua:
+        t = tier_map.get(a["tier_code"])
+        g = group_map.get(a.get("group_code")) if a.get("group_code") else None
+        if not t:
+            continue
+        # Negative achievements never appear on public profiles
+        if g and g.get("is_negative"):
+            continue
+        badges.append({
+            **t,
+            "earned_at": a["earned_at"],
+            "group_name": g["name"] if g else None,
+            "group_accent": g.get("accent_color") if g else None,
+        })
     total_points = sum(b.get("points", 0) for b in badges)
     # Tournament participation (only if public)
     tournaments = []

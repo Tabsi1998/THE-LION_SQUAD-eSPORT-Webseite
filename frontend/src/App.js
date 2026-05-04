@@ -46,7 +46,7 @@ import AdminGalleryPage from "@/pages/admin/AdminGalleryPage";
 import AdminDocumentsPage from "@/pages/admin/AdminDocumentsPage";
 import SeasonPage from "@/pages/public/SeasonPage";
 import PublicProfilePage from "@/pages/public/PublicProfilePage";
-import BadgesPage from "@/pages/public/BadgesPage";
+import AdminAchievementsPage from "@/pages/admin/AdminAchievementsPage";
 import AdminSponsorsPage from "@/pages/admin/AdminSponsorsPage";
 
 import AboutPage from "@/pages/public/AboutPage";
@@ -150,7 +150,6 @@ function App() {
           <Route path="/seasons/:slug" element={<SeasonPage />} />
           <Route path="/u/:username" element={<PublicProfilePage />} />
           <Route path="/players/:username" element={<PublicProfilePage />} />
-          <Route path="/badges" element={<BadgesPage />} />
           <Route path="/fastlap" element={<F1ListPage />} />
           <Route path="/fastlap/:slug" element={<F1DetailPage />} />
           <Route path="/galerie" element={<GalleryPage />} />
@@ -160,6 +159,7 @@ function App() {
 
           {/* Admin */}
           <Route path="/admin/sponsors" element={<ProtectedRoute requireAdmin><AdminSponsorsPage /></ProtectedRoute>} />
+          <Route path="/admin/achievements" element={<ProtectedRoute requireAdmin><AdminAchievementsPage /></ProtectedRoute>} />
           <Route path="/admin/prizes" element={<ProtectedRoute requireAdmin><AdminPrizesPage /></ProtectedRoute>} />
           <Route path="/admin/contact" element={<ProtectedRoute requireAdmin><AdminContactPage /></ProtectedRoute>} />
           <Route path="/admin/board" element={<ProtectedRoute requireAdmin><AdminBoardPage /></ProtectedRoute>} />

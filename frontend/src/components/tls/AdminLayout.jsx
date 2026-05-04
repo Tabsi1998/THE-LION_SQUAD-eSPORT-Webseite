@@ -6,7 +6,7 @@ import {
   CalendarDays, Flag, Building2, Newspaper, LogOut,
   ExternalLink, Menu, X, Settings as SettingsIcon,
   ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon, FileText,
-  Award, Inbox, UserCheck,
+  Award, Inbox, UserCheck, Medal,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -29,6 +29,7 @@ export function AdminLayout({ children }) {
     { to: "/admin/news", label: "News", icon: Newspaper },
     { to: "/admin/gallery", label: "Galerie", icon: ImageIcon },
     { to: "/admin/sponsors", label: "Sponsoren", icon: Star },
+    { to: "/admin/achievements", label: "Achievements", icon: Medal },
     { to: "/admin/board", label: "Vorstand", icon: UserCheck },
     { to: "/admin/contact", label: "Inbox", icon: Inbox },
     { to: "/admin/prizes", label: "Gewinne", icon: Award },

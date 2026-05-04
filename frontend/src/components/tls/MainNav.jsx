@@ -32,7 +32,6 @@ export const NAV_STRUCTURE = [
       { to: "/fastlap", label: "Fast Lap" },
       { to: "/teams", label: "Teams" },
       { to: "/seasons/current", label: "Season Pass" },
-      { to: "/badges", label: "Achievements" },
     ],
   },
   {

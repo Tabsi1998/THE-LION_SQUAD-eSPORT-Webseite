@@ -1,0 +1,42 @@
+{
+  "summary": "Phase B v4 (Achievement-System) backend + frontend e2e Test. Backend: 17/18 pytest PASS (test_phase_b_v4_achievements.py). Eine PRIVACY-Verletzung gefunden: /api/achievements/user/{id} liefert negative Awards an Admin-Viewer (spec verlangt 'auch nicht für Admin selbst — nur via /admin/achievements/negative/awards'). Anonym ist die Filterung korrekt. Frontend: Alle Kern-Flows OK — /u/admin zeigt 'Achievements (3)' Quickstat + Tab, Group-Cards mit Locked-Lock + Progress-Bar (z.B. Match Master 0/10 für Bronze) + Im Rudel Bronze-Highlight, /badges 404 (Catch-all), /admin/achievements zeigt 4 Tabs (Groups · Tiers · Manuell vergeben · Negative Vorfälle), Group-Tabelle '39 Groups · 5 negativ · 6 special', Manuell-Vergeben Spielersuche findet 'TLS Admin' und Tier-Dropdown gefüllt, AdminLayout-Sidebar enthält 'Achievements'-Link, MainNav + Footer enthalten KEIN 'Achievement' mehr.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "/api/achievements/user/{user_id}", "issue": "Negative-Awards leaken in 'awards' Liste wenn Admin-Viewer authentifiziert ist (z.B. Admin betrachtet eigenes Profil via /user/{id}). Spec: NIEMALS in user-facing endpoints sichtbar — nur via /admin/achievements/negative/awards. Reproduktion: POST /admin/achievements/award {tier_code:'neg_afk'} → GET /api/achievements/user/{admin_id} mit Admin-Auth listet 'neg_afk' in awards.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "/api/achievements/me", "issue": "list_groups_for_user hat show_negative=is_admin → /me zeigt für Admin auch negative Groups+Tiers. Spec sagt 'NIEMALS öffentlich sichtbar — auch nicht im eigenen Profil'. Konsistente Behandlung: Admin sollte /me UND /user/{id} ohne negative sehen, ausschließlich /admin/achievements/negative/awards listet sie."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AdminAchievementsPage (Manuell vergeben Tab, Tier-Select)", "issue": "Hydration-Warning: <span> cannot be a child of <option>. Quelle: AdminAchievementsPage line 388 — Tier-Optionen rendern dynamisch eingefügte <span data-ve-dynamic>. Funktional OK, sollte aber bereinigt werden.", "selector": "[data-testid='award-tier...'] option", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_b_v4_achievements.py",
+    "/app/test_reports/pytest/phase_b_v4.xml"
+  ],
+  "action_items": [
+    "Privacy-Fix in /app/backend/badges.py: list_user_awards() darf negative Awards NIE zurückgeben (Filter unabhängig vom Viewer-Role). list_groups_for_user() sollte gleiche Logik beibehalten — show_negative immer False für /me und /user/{id}. Alternative: separater Pfad nur für /admin/achievements/negative/awards (bereits implementiert) — Public/User-Endpoints filtern hart auf is_negative=false.",
+    "AdminAchievementsPage line 388 Hydration-Warning beheben — kein <span>-Wrapping innerhalb von <option> rendern (Tier-Dropdown).",
+    "Optional Code-Review: badge_routes.py admin_create_group setzt is_admin_created=True nur über Body-Default — wenn ein Admin per Body is_admin_created:false setzt, bleibt es trotzdem True (Spread-Reihenfolge schützt). OK, aber explizit defensive setzen wäre robuster."
+  ],
+  "critical_code_review_comments": [
+    "badges.py list_user_awards (Zeile 297) und list_groups_for_user (Zeile 248): show_negative=is_admin verletzt das Privacy-Spec. Negative-Achievements sind ausschließlich admin-verwaltet via /admin/achievements/negative/awards — Profil-Endpoints (/me, /user/{id}) müssen sie immer ausblenden, auch für Admin als Viewer.",
+    "badge_routes.py /api/admin/achievements/negative/awards: Tiers werden via async generator dict-comprehension geladen (Zeile 263). Funktional, aber bei vielen Tiers DB-IO heavy. Cache oder $lookup empfehlenswert.",
+    "AdminAchievementsPage.jsx ~388: <option>{t.group_code} · ... · {t.name}</option> — Vermutlich ein <span>-Wrapper wegen i18n/string-replace. Fix: reine Text-Konkatenation."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase_b_v4_achievements.py (NEU)"
+  ],
+  "success_rate": {"backend": "94% (17/18)", "frontend": "100% (alle Smoke-Checks OK; 1 Hydration-Warning ist kosmetisch)"},
+  "test_credentials": "admin@thelionsquad.at / TLSAdmin2026! (verifiziert, JWT in 'access_token' Feld der /api/auth/login Response)",
+  "seed_data_creation": "Während Pytest temporär: TEST_custom_grp Group, TEST_tier_xyz Tier, gamers_heaven_p Award an admin, neg_afk Award an admin — alle wieder gelöscht (try/finally). Keine Reststände in DB.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_phase_b_v4_achievements.py kann als Regressions-Suite wiederverwendet werden. Login-Response liefert JWT als 'access_token' (NICHT 'token') — wichtig für Fixtures. Negative-Privacy-Test (TestNegativePrivacy.test_negative_award_hidden_from_public_profile) FAILED bis Privacy-Fix in badges.py gemerged; nach Fix wird er PASS. Alte Tests in test_phase5_badges.py / test_phase567.py / test_phase_d_v3.py verwenden /api/badges-Schema und sind OBSOLET (laut Hauptagent ignorieren).",
+  "rca of the issue": "Privacy-Bug RCA: In badges.py wird show_negative = bool(viewer.role in ('club_admin', 'superadmin')) gesetzt. Das war unter dem alten Modell ('Admin sieht alles') OK, widerspricht aber der neuen v4-Spec, die strikt zwischen 'User-facing' (/me, /user/{id}, /groups) und 'Admin-Inbox' (/admin/achievements/negative/awards) trennt. Reproduktions­schritte: 1) POST /api/admin/achievements/award {user_id: <admin>, tier_code:'neg_afk'} 2) GET /api/achievements/user/<admin> mit Admin-Auth → 'neg_afk' erscheint in awards-Liste. Mitigation: in list_user_awards/list_groups_for_user is_admin-Flag entfernen oder show_negative hart auf False setzen; nur admin/negative-Endpoint listet Negative."
+}

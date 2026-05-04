@@ -25,7 +25,7 @@ from routes.station_routes import router as station_router
 from routes.news_routes import router as news_router
 from routes.admin_routes import router as admin_router
 from routes.upload_routes import router as upload_router
-from routes.badge_routes import router as badge_router
+from routes.badge_routes import router as badge_router, admin_router as achievement_admin_router
 from routes.membership_routes import router as membership_router
 from routes.document_routes import router as document_router
 from routes.home_routes import router as home_router
@@ -58,7 +58,8 @@ async def lifespan(app: FastAPI):
             "tournament_groups", "memberships", "member_benefits", "user_socials",
             "gallery_albums", "gallery_photos", "documents", "season_points",
             "audit_logs", "email_logs", "notifications", "password_reset_tokens",
-            "login_attempts", "user_badges", "mail_jobs", "prize_pickups",
+            "login_attempts", "user_achievements", "achievements", "achievement_groups",
+            "mail_jobs", "prize_pickups",
         ]:
             try:
                 await db[coll].delete_many({})
@@ -138,6 +139,7 @@ app.include_router(pdf_router)
 app.include_router(audit_router)
 app.include_router(upload_router)
 app.include_router(badge_router)
+app.include_router(achievement_admin_router)
 app.include_router(membership_router)
 app.include_router(document_router)
 app.include_router(home_router)

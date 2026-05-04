@@ -107,10 +107,14 @@ async def init_indexes():
     await db.season_points.create_index([("season_id", 1), ("user_id", 1)])
     await db.season_points.create_index([("season_id", 1), ("team_id", 1)])
     await db.season_points.create_index([("user_id", 1), ("source_type", 1), ("created_at", -1)])
-    # Badges (Phase 6)
-    await db.badges.create_index("code", unique=True)
-    await db.badges.create_index("audience")
-    await db.user_badges.create_index([("user_id", 1), ("badge_code", 1)], unique=True)
+    # Achievements v4 (Phase B Final) — replaces legacy badges/user_badges
+    await db.achievement_groups.create_index("code", unique=True)
+    await db.achievement_groups.create_index("category")
+    await db.achievement_groups.create_index("is_negative")
+    await db.achievements.create_index("code", unique=True)
+    await db.achievements.create_index([("group_code", 1), ("level", 1)])
+    await db.user_achievements.create_index([("user_id", 1), ("tier_code", 1)], unique=True)
+    await db.user_achievements.create_index([("user_id", 1), ("earned_at", -1)])
     # Phase 8: Mail queue
     await db.mail_jobs.create_index("id", unique=True)
     await db.mail_jobs.create_index([("status", 1), ("next_attempt_at", 1)])

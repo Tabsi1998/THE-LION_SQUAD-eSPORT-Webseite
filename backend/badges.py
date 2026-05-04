@@ -1,514 +1,392 @@
-"""Phase 6 — Achievements with audiences (members-only, secret, negative-fun, etc.).
+"""Achievement Engine v4 (Phase B Final) — Group-aware tiers + Admin CRUD support.
 
-Each badge entry now defines:
-* `audience` — public / community / members_only / admins_only / hidden_secret
-* `negative` — true for tongue-in-cheek "Holzmedaille" style awards (not showcaseable)
-* `secret` — hidden until earned
-* `requires_membership` — only club members can earn it
+Backwards-compatible function names so existing route hooks keep firing.
+
+Collections:
+  - achievement_groups  (groups, public/private/special/negative)
+  - achievements        (tier entries, group_code + level)
+  - user_achievements   (per-user awards keyed by tier-code)
+
+Public/profile listing rules:
+  - Negative groups (is_negative=True) NEVER appear in any user-facing list
+    (only in /admin/achievements/negative).
+  - Special manual-only tiers appear once awarded (or in catalog when group.public=True).
+  - Within a public group, all tiers are listed; locked tiers are returned with
+    a `locked=True` flag plus current/target progress so the UI can grey them out.
 """
 import logging
+from datetime import datetime, timezone
 from database import get_db
 from models import now_utc, new_id
+from achievement_catalog import (
+    ACHIEVEMENT_GROUPS, ACHIEVEMENT_TIERS, GROUP_BY_CODE, TIER_BY_CODE,
+)
 
-logger = logging.getLogger("tls.badges")
-
-
-# Helper to keep the catalog readable
-def _b(code, name, description, *, tier="bronze", category="tournament", icon="flag",
-       points=5, audience="public", secret=False, negative=False,
-       requires_membership=False, can_showcase=True,
-       progress_target=None, condition_key=None, severity=None):
-    return {
-        "code": code, "name": name, "description": description,
-        "tier": tier, "category": category, "icon": icon, "points": points,
-        "audience": audience, "secret": secret, "negative": negative,
-        "requires_membership": requires_membership, "can_showcase": can_showcase,
-        "progress_target": progress_target, "condition_key": condition_key,
-        "severity": severity,
-    }
+logger = logging.getLogger("tls.achievements")
 
 
-BADGE_CATALOG = [
-    # ---------- Public / Community: Tournaments ----------
-    _b("first_tournament", "Erste Anmeldung", "Melde dich für dein erstes Turnier an.",
-       tier="bronze", category="tournament", icon="flag", points=5, audience="community"),
-    _b("first_checkin", "Erster Check-in", "Melde dich erfolgreich beim ersten Turnier an.",
-       tier="bronze", category="tournament", icon="check-circle", points=5, audience="community"),
-    _b("first_win", "First Blood", "Gewinne dein erstes Match.",
-       tier="bronze", category="match", icon="target", points=10, audience="community"),
-    _b("podium_finisher", "Podium Finisher", "Erreiche Top 3 in einem Turnier.",
-       tier="silver", category="tournament", icon="medal", points=25, audience="public"),
-    _b("tournament_champion", "Turniersieger", "Gewinne ein ganzes Turnier.",
-       tier="gold", category="tournament", icon="trophy", points=50, audience="public"),
-    _b("grand_champion", "Grand Champion", "Gewinne 3 Turniere.",
-       tier="platinum", category="tournament", icon="crown", points=150, audience="public"),
-    _b("veteran_10", "Veteran I", "Nimm an 10 Turnieren teil.",
-       tier="silver", category="tournament", icon="shield", points=20, audience="community",
-       progress_target=10, condition_key="tournaments_registered"),
-    _b("veteran_25", "Veteran II", "Nimm an 25 Turnieren teil.",
-       tier="gold", category="tournament", icon="shield-check", points=75, audience="community",
-       progress_target=25, condition_key="tournaments_registered"),
-
-    # Matches
-    _b("win_streak_3", "Drei in Folge", "Gewinne 3 Matches am Stück.",
-       tier="silver", category="match", icon="flame", points=20, audience="public"),
-    _b("win_streak_5", "Ungeschlagen", "Gewinne 5 Matches am Stück.",
-       tier="gold", category="match", icon="zap", points=40, audience="public"),
-    _b("clutch_reverse", "Clutch", "Gewinne ein Match nach Comeback-Score.",
-       tier="gold", category="match", icon="sparkles", points=30, audience="public"),
-
-    # Fast Lap
-    _b("first_lap", "Erster Versuch", "Trage deine erste Fast-Lap-Zeit ein.",
-       tier="bronze", category="fastlap", icon="flag", points=5, audience="community"),
-    _b("laps_10", "10 Runden", "Fahre 10 Fast-Lap Versuche.",
-       tier="silver", category="fastlap", icon="flag", points=15, audience="community",
-       progress_target=10, condition_key="fastlap_valid_count"),
-    _b("laps_50", "50 Runden", "Fahre 50 Fast-Lap Versuche.",
-       tier="gold", category="fastlap", icon="flag-triangle-right", points=60, audience="community",
-       progress_target=50, condition_key="fastlap_valid_count"),
-    _b("lap_pole_position", "Pole Position", "Fahre die schnellste Zeit auf einer Strecke.",
-       tier="gold", category="fastlap", icon="trophy", points=40, audience="public"),
-    _b("lap_sub_target", "Sub-Grenze", "Knacke die Sekunden-Zielzeit eines Admins.",
-       tier="platinum", category="fastlap", icon="timer", points=100, audience="public"),
-
-    # Community
-    _b("dispute_free_20", "Fair Play", "20 Matches ohne Dispute.",
-       tier="silver", category="community", icon="heart-handshake", points=30, audience="public"),
-    _b("dispute_free_50", "Sportsmanship", "50 Matches ohne Dispute.",
-       tier="gold", category="community", icon="heart-handshake", points=75, audience="public"),
-    _b("team_founder", "Team-Gründer", "Gründe ein eigenes Team.",
-       tier="bronze", category="community", icon="users", points=10, audience="community"),
-    _b("clan_member", "Clan-Mitglied", "Werde offizielles Team-Mitglied.",
-       tier="bronze", category="community", icon="users", points=5, audience="community"),
-
-    # Season
-    _b("season_top10", "Season Top 10", "Erreiche Top 10 in einer Saison.",
-       tier="gold", category="season", icon="trending-up", points=75, audience="public"),
-    _b("season_champion", "Season Champion", "Gewinne die Saisonwertung.",
-       tier="platinum", category="season", icon="crown", points=200, audience="public"),
-
-    # ---------- Members-only ----------
-    _b("offiziell_im_rudel", "Offiziell im Rudel", "Du bist offizielles Vereinsmitglied.",
-       tier="gold", category="club", icon="crown", points=50,
-       audience="members_only", requires_membership=True),
-    _b("vereinsmitglied_bronze", "Vereinsmitglied Bronze", "3 Monate offizielles Vereinsmitglied.",
-       tier="bronze", category="club", icon="badge", points=30,
-       audience="members_only", requires_membership=True),
-    _b("vereinsmitglied_silber", "Vereinsmitglied Silber", "6 Monate offizielles Vereinsmitglied.",
-       tier="silver", category="club", icon="badge", points=60,
-       audience="members_only", requires_membership=True),
-    _b("vereinsmitglied_gold", "Vereinsmitglied Gold", "12 Monate offizielles Vereinsmitglied.",
-       tier="gold", category="club", icon="badge", points=100,
-       audience="members_only", requires_membership=True),
-    _b("vereinsmitglied_platin", "Vereinsmitglied Platin", "24 Monate offizielles Vereinsmitglied.",
-       tier="platinum", category="club", icon="award", points=200,
-       audience="members_only", requires_membership=True),
-    _b("ehrenloewe", "Ehrenlöwe", "Manuell durch den Vorstand vergeben — Hall of Fame.",
-       tier="platinum", category="club", icon="crown", points=300,
-       audience="members_only", requires_membership=True, secret=True),
-
-    # ---------- Negative Fun (auto-awarded, not showcaseable, not visible until earned) ----------
-    _b("holzmedaille", "Holzmedaille", "Knapp am Podest vorbei — 4. Platz.",
-       tier="bronze", category="fun", icon="frown", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True),
-    _b("afk_legende", "AFK-Legende", "Check-in verpasst.",
-       tier="bronze", category="fun", icon="user-x", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True),
-    _b("wandmagnet", "Wandmagnet", "Mehrere ungültige Fast-Lap-Runden in einer Challenge.",
-       tier="bronze", category="fun", icon="zap-off", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True),
-    _b("last_minute_panic", "Last Minute Panic", "Anmeldung in den letzten 5 Minuten.",
-       tier="bronze", category="fun", icon="clock", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True),
-    _b("controller_leer", "Controller leer", "Match-Start verzögert > 5 min.",
-       tier="bronze", category="fun", icon="battery-low", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True),
-    _b("ehrenvoll_untergegangen", "Ehrenvoll untergegangen", "Klare Niederlage im Finale.",
-       tier="bronze", category="fun", icon="skull", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True),
-
-    # ---------- Phase B v3 — Positive Fun (public, showcaseable) ----------
-    _b("first_dispute_resolved", "Friedenstifter", "Dein erster Dispute wurde gütlich gelöst.",
-       tier="bronze", category="community", icon="handshake", points=10, audience="public"),
-    _b("nightowl", "Nachteule", "Spiele ein Match zwischen 02:00 und 05:00 Uhr.",
-       tier="bronze", category="fun", icon="moon", points=5, audience="public"),
-    _b("early_bird", "Frühaufsteher", "Spiele ein Match zwischen 05:00 und 08:00 Uhr.",
-       tier="bronze", category="fun", icon="sun", points=5, audience="public"),
-    _b("perfect_attendance", "100 % Anwesenheit", "Check-in ohne Verspätung bei 5 Turnieren in Folge.",
-       tier="silver", category="community", icon="check-check", points=25, audience="public",
-       progress_target=5, condition_key="checkins_in_a_row"),
-    _b("comeback_king", "Comeback-King", "Verliere ein Match, gewinne das nächste.",
-       tier="silver", category="match", icon="rotate-cw", points=15, audience="public"),
-    _b("multi_game", "Multitalent", "Nimm an Turnieren in 3 verschiedenen Spielen teil.",
-       tier="silver", category="tournament", icon="layers", points=25, audience="public",
-       progress_target=3, condition_key="distinct_games_registered"),
-    _b("multi_platform", "Plattform-Held", "Spiele auf 2+ Plattformen.",
-       tier="silver", category="community", icon="cpu", points=20, audience="public",
-       progress_target=2, condition_key="distinct_platforms"),
-    _b("season_silver", "Season Silber", "Erreiche Top 25 in einer Saison.",
-       tier="silver", category="season", icon="trending-up", points=40, audience="public"),
-    _b("invite_friend", "Bring a Friend", "Lade einen Freund ein, der sich registriert.",
-       tier="silver", category="community", icon="user-plus", points=20, audience="public"),
-    _b("streamer_spotted", "Streamer Spotted", "Verlinke einen Twitch-Stream in deinem Profil.",
-       tier="bronze", category="community", icon="tv", points=10, audience="public"),
-    _b("photo_op", "Photo Op", "Werde im Album eines Vereinsevents getaggt.",
-       tier="bronze", category="community", icon="camera", points=10, audience="community"),
-    _b("event_attendance_5", "Stammgast", "Nimm an 5 Vereinsevents teil.",
-       tier="silver", category="community", icon="calendar-check", points=30, audience="community",
-       progress_target=5, condition_key="events_attended"),
-    _b("badge_collector_10", "Sammler", "Schalte 10 Badges frei.",
-       tier="silver", category="community", icon="layers", points=30, audience="public",
-       progress_target=10, condition_key="badges_unlocked"),
-    _b("badge_collector_25", "Trophäenjäger", "Schalte 25 Badges frei.",
-       tier="gold", category="community", icon="trophy", points=80, audience="public",
-       progress_target=25, condition_key="badges_unlocked"),
-
-    # ---------- Phase B v3 — Negative Fun: Player (mehr Würze) ----------
-    _b("ghost_player", "Geist", "Anmeldung ohne jemals zu erscheinen.",
-       tier="bronze", category="fun", icon="ghost", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
-    _b("rage_quitter", "Rage Quitter", "Match abgebrochen mit weniger als 30 % Spielzeit.",
-       tier="bronze", category="fun", icon="x-circle", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
-    _b("nullachter", "Null-Achter", "Verloren mit 0:8 oder schlechter.",
-       tier="bronze", category="fun", icon="frown", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-    _b("tilt_master", "Tilt Master", "3 Niederlagen in Folge.",
-       tier="bronze", category="fun", icon="alert-triangle", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-    _b("captain_obvious", "Captain Obvious", "Score gemeldet, der nie bestätigt wurde.",
-       tier="bronze", category="fun", icon="circle-help", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-    _b("disconnect_diva", "DC-Diva", "3 Disconnects in einer Session.",
-       tier="bronze", category="fun", icon="wifi-off", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
-    _b("snack_break", "Snack-Break-Pro", "Match-Pause länger als der eigene Match.",
-       tier="bronze", category="fun", icon="cookie", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-    _b("forgot_to_register", "Anmeldung? Welche Anmeldung?", "Turnier verpasst trotz angekündigter Teilnahme.",
-       tier="bronze", category="fun", icon="bell-off", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
-    _b("backseat_pro", "Backseat-Profi", "5 Kommentare ohne selbst zu spielen.",
-       tier="bronze", category="fun", icon="armchair", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-    _b("toxic_chat_warning", "Verbalakrobat", "Chat-Verwarnung erhalten.",
-       tier="bronze", category="fun", icon="message-square-warning", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="savage"),
-    _b("no_show_admin", "Admin-Schreck", "Admin musste 3-mal nachhaken.",
-       tier="bronze", category="fun", icon="megaphone-off", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
-    _b("controller_throw", "Controller-Wurf", "Hardware-Schaden gemeldet.",
-       tier="bronze", category="fun", icon="alert-octagon", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="savage"),
-    _b("lucky_loser", "Lucky Loser", "Erstes Match verloren — trotzdem ins Finale.",
-       tier="bronze", category="fun", icon="dice-3", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-    _b("flagged_screenshot", "Beweisfoto vergessen", "Score ohne Proof eingereicht (3-mal).",
-       tier="bronze", category="fun", icon="image-off", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-    _b("warmup_master", "Aufwärm-Spezialist", "Warmup länger als das eigentliche Match.",
-       tier="bronze", category="fun", icon="thermometer-snowflake", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-
-    # ---------- Phase B v3 — Negative Fun: Team (7) ----------
-    _b("team_one_man", "Einzelkämpfer", "Team-Match mit nur einem aktiven Spieler.",
-       tier="bronze", category="fun", icon="user-minus", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
-    _b("team_no_show", "Geisterclan", "Team komplett im No-Show-Modus.",
-       tier="bronze", category="fun", icon="ghost", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="savage"),
-    _b("team_friendly_fire", "Friendly Fire Champ", "Eigentor / Teamkill > 3 in einem Match.",
-       tier="bronze", category="fun", icon="crosshair", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-    _b("team_late_arrival", "Verspäteter Clan", "Komplettes Team verpasst Check-in.",
-       tier="bronze", category="fun", icon="clock-alert", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
-    _b("team_dispute_loop", "Streit-Verein", "5+ offene Disputes als Team.",
-       tier="bronze", category="fun", icon="messages-square", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="savage"),
-    _b("team_drama_queen", "Drama-Queen-Team", "Team mit den meisten Forum-Beschwerden.",
-       tier="bronze", category="fun", icon="theater", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-    _b("team_revolving_door", "Drehtür", "Mehr als 50 % Mitgliederwechsel pro Saison.",
-       tier="bronze", category="fun", icon="door-open", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-
-    # ---------- Phase B v3 — Negative Fun: Fast Lap (8) ----------
-    _b("offroad_artist", "Offroad-Künstler", "Mehr als 10 Mal von der Strecke abgekommen.",
-       tier="bronze", category="fun", icon="map-off", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-    _b("reverse_gear", "Rückwärtsgang", "Eine ganze Runde rückwärts gefahren.",
-       tier="bronze", category="fun", icon="rotate-ccw", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-    _b("slowest_lap", "Schneckenrennen", "Langsamste Rundenzeit auf einer Strecke.",
-       tier="bronze", category="fun", icon="snail", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-    _b("crash_test_dummy", "Crash-Test", "5+ Crashes in einer einzigen Session.",
-       tier="bronze", category="fun", icon="car-front", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
-    _b("invalid_streak", "Ungültig-Marathon", "10+ ungültige Runden in einer Challenge.",
-       tier="bronze", category="fun", icon="ban", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
-    _b("pit_lane_pro", "Boxengassen-Profi", "Mehr als 3 Pit-Stops pro Runde.",
-       tier="bronze", category="fun", icon="construction", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="mild"),
-    _b("dnf_legend", "DNF-Legende", "5 Did-Not-Finish Einträge in einer Saison.",
-       tier="bronze", category="fun", icon="x-octagon", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="medium"),
-    _b("ghost_lap", "Phantom-Runde", "Zeit gemeldet, aber kein Beweis.",
-       tier="bronze", category="fun", icon="cloud-off", points=0,
-       audience="public", negative=True, can_showcase=False, secret=True, severity="savage"),
-]
-
-BADGE_BY_CODE = {b["code"]: b for b in BADGE_CATALOG}
-
-
+# ---------------- Seed / Migration ----------------
 async def seed_badges():
-    """Upsert badge catalog on startup."""
+    """Seed groups + tiers; one-time wipe of legacy `badges` / `user_badges`."""
     db = get_db()
-    for b in BADGE_CATALOG:
-        await db.badges.update_one(
-            {"code": b["code"]},
-            {"$set": {**b, "id": b["code"]},
+    legacy_marker = await db.settings.find_one({"id": "achievements_v4_migrated"})
+    if not legacy_marker:
+        try:
+            await db.badges.drop()
+            await db.user_badges.drop()
+        except Exception:
+            pass
+        await db.settings.update_one(
+            {"id": "achievements_v4_migrated"},
+            {"$set": {"id": "achievements_v4_migrated", "migrated_at": now_utc().isoformat()}},
+            upsert=True,
+        )
+        logger.info("[achievements] v4 migration complete — legacy collections dropped.")
+
+    for g in ACHIEVEMENT_GROUPS:
+        await db.achievement_groups.update_one(
+            {"code": g["code"]},
+            {"$set": {**g, "id": g["code"]},
+             "$setOnInsert": {"created_at": now_utc().isoformat(), "is_admin_created": False}},
+            upsert=True,
+        )
+    for t in ACHIEVEMENT_TIERS:
+        await db.achievements.update_one(
+            {"code": t["code"]},
+            {"$set": {**t, "id": t["code"]},
              "$setOnInsert": {"created_at": now_utc().isoformat()}},
             upsert=True,
         )
+    await db.user_achievements.create_index([("user_id", 1), ("tier_code", 1)], unique=True)
+    await db.user_achievements.create_index([("user_id", 1), ("earned_at", -1)])
+    await db.achievements.create_index([("group_code", 1), ("level", 1)])
 
 
-def _user_can_see_badge(badge: dict, user: dict | None) -> bool:
-    """Catalog visibility — does this user even know the badge exists?"""
-    if badge.get("secret"):
-        # Secrets are hidden until earned (handled elsewhere). Catalog hides them.
-        return False
-    aud = badge.get("audience", "public")
-    if aud == "public":
-        return True
-    if not user:
-        return False
-    if aud == "admins_only":
-        return user.get("role") in ("club_admin", "superadmin")
-    if aud == "community":
-        return True
-    if aud == "members_only":
-        return bool(user.get("is_club_member") or user.get("role") in (
-            "moderator", "tournament_admin", "club_admin", "superadmin"
-        ))
-    return True
-
-
-async def award_badge(user_id: str, code: str, context: dict | None = None) -> bool:
-    """Award a badge if not already held. Enforces `requires_membership`.
-    Returns True if newly awarded."""
+# ---------------- Award ----------------
+async def award_achievement(user_id: str, tier_code: str, context: dict | None = None,
+                             awarded_by: str | None = None) -> bool:
     db = get_db()
-    if code not in BADGE_BY_CODE:
+    tier = await db.achievements.find_one({"code": tier_code}, {"_id": 0})
+    if not tier:
         return False
-    badge = BADGE_BY_CODE[code]
-    if badge.get("requires_membership"):
-        member = await db.memberships.find_one({"user_id": user_id})
-        if not member or member.get("member_status") not in ("active", "honorary"):
-            return False
-    existing = await db.user_badges.find_one({"user_id": user_id, "badge_code": code})
+    group = await db.achievement_groups.find_one({"code": tier["group_code"]}, {"_id": 0})
+    if not group:
+        return False
+    existing = await db.user_achievements.find_one({"user_id": user_id, "tier_code": tier_code})
     if existing:
         return False
     doc = {
         "id": new_id(),
         "user_id": user_id,
-        "badge_code": code,
+        "tier_code": tier_code,
+        "group_code": tier["group_code"],
+        "level": tier["level"],
         "earned_at": now_utc().isoformat(),
         "context": context or {},
+        "awarded_by": awarded_by,
     }
-    await db.user_badges.insert_one(doc)
-    # Discord notification (positive badges only)
-    if not badge.get("negative"):
+    await db.user_achievements.insert_one(doc)
+    if not group.get("is_negative"):
         try:
             from discord_service import send_discord
             user = await db.users.find_one({"id": user_id},
-                                            {"display_name": 1, "username": 1, "slug": 1}) or {}
-            tier_colors = {"bronze": 0xCD7F32, "silver": 0xC0C0C0, "gold": 0xFFD700, "platinum": 0x29B6E8}
+                                            {"display_name": 1, "username": 1}) or {}
+            level_color = {1: 0xCD7F32, 2: 0xC0C0C0, 3: 0xFFD700, 4: 0x29B6E8, 5: 0xFF3B30}
+            level_name = {1: "Bronze", 2: "Silber", 3: "Gold", 4: "Platin", 5: "Special"}
             await send_discord(
-                f"🏅 Neues Badge · {badge['name']}",
-                f"**{user.get('display_name') or user.get('username') or 'Fahrer'}** hat **{badge['name']}** freigeschaltet!\n_{badge['description']}_",
-                color=tier_colors.get(badge["tier"], 0x29B6E8),
-                url=f"/u/{user.get('username') or user_id}",
-                fields=[
-                    {"name": "Tier", "value": badge["tier"].upper(), "inline": True},
-                    {"name": "Punkte", "value": f"+{badge['points']}", "inline": True},
-                ],
-                event_key="badge.awarded",
+                f"🏆 {group['name']} · {level_name.get(tier['level'], '?')}",
+                f"**{user.get('display_name') or user.get('username') or 'Spieler'}** hat **{tier['name']}** freigeschaltet!\n_{tier.get('description','')}_",
+                color=level_color.get(tier["level"], 0x29B6E8),
+                fields=[{"name": "Punkte", "value": f"+{tier.get('points', 0)}", "inline": True}],
+                event_key="achievement.awarded",
             )
         except Exception as e:
-            logger.debug(f"Discord badge trigger failed: {e}")
+            logger.debug(f"Discord achievement trigger failed: {e}")
     return True
 
 
-# -------- Members-only auto-awards --------
-async def evaluate_membership_badges(user_id: str):
-    """After membership status change — award tenure badges (Bronze/Silber/Gold/Platin)."""
+# Legacy alias used by older code/tests
+async def award_badge(user_id: str, code: str, context: dict | None = None) -> bool:
+    return await award_achievement(user_id, code, context=context)
+
+
+BADGE_BY_CODE = TIER_BY_CODE
+
+
+def _user_can_see_badge(group: dict, user: dict | None) -> bool:
+    if group.get("is_negative"):
+        return bool(user and user.get("role") in ("club_admin", "superadmin"))
+    if not group.get("public", True):
+        return bool(user and user.get("role") in ("club_admin", "superadmin"))
+    return True
+
+
+# ---------------- Progress Counters ----------------
+async def compute_user_progress(user_id: str) -> dict[str, int]:
     db = get_db()
+    p: dict[str, int] = {}
+
+    regs = await db.tournament_registrations.find({"user_id": user_id}, {"_id": 0, "tournament_id": 1, "id": 1}).to_list(2000)
+    p["tournaments_registered"] = len(regs)
+    reg_ids = {r["id"] for r in regs}
+    tids = list({r["tournament_id"] for r in regs if r.get("tournament_id")})
+    games = await db.tournaments.distinct("game_id", {"id": {"$in": tids}}) if tids else []
+    p["distinct_games_registered"] = len([g for g in games if g])
+    formats = await db.tournaments.distinct("format", {"id": {"$in": tids}}) if tids else []
+    p["distinct_formats"] = len([f for f in formats if f])
+
+    p["matches_played"] = await db.matches.count_documents({"$or": [{"winner_id": {"$in": list(reg_ids)}}, {"loser_id": {"$in": list(reg_ids)}}], "status": "completed"}) if reg_ids else 0
+    p["matches_won"] = await db.matches.count_documents({"winner_id": {"$in": list(reg_ids)}, "status": "completed"}) if reg_ids else 0
+
+    streak_max = 0
+    if reg_ids:
+        recent = await db.matches.find(
+            {"status": "completed", "$or": [{"winner_id": {"$in": list(reg_ids)}}, {"loser_id": {"$in": list(reg_ids)}}]},
+            {"_id": 0, "winner_id": 1, "loser_id": 1, "updated_at": 1},
+        ).sort("updated_at", 1).to_list(2000)
+        cur = 0
+        for m in recent:
+            if m.get("winner_id") in reg_ids:
+                cur += 1
+                streak_max = max(streak_max, cur)
+            else:
+                cur = 0
+    p["match_streak_max"] = streak_max
+
+    wins = podium = rank4 = 0
+    for r in regs:
+        if await db.matches.find_one({"tournament_id": r.get("tournament_id"), "winner_id": r["id"], "final_position": 1}):
+            wins += 1
+        if await db.matches.find_one({"tournament_id": r.get("tournament_id"), "winner_id": r["id"], "final_position": {"$lte": 3}}):
+            podium += 1
+        if await db.matches.find_one({"tournament_id": r.get("tournament_id"), "loser_id": r["id"], "final_position": 4}):
+            rank4 += 1
+    p["tournaments_won"] = wins
+    p["podium_finishes"] = podium
+    p["rank_4_count"] = rank4
+
+    p["fastlap_valid_count"] = await db.f1_lap_times.count_documents({"user_id": user_id, "is_invalid": {"$ne": True}})
+    distinct_tracks = await db.f1_lap_times.distinct("track_id", {"user_id": user_id, "is_invalid": {"$ne": True}})
+    p["distinct_tracks"] = len([t for t in distinct_tracks if t])
+    pole_count = 0
+    for tid in distinct_tracks:
+        if not tid:
+            continue
+        best = await db.f1_lap_times.find_one(
+            {"track_id": tid, "is_invalid": {"$ne": True}},
+            {"_id": 0, "user_id": 1, "time_ms": 1},
+            sort=[("time_ms", 1)],
+        )
+        if best and best.get("user_id") == user_id:
+            pole_count += 1
+    p["pole_count"] = pole_count
+
+    membership_days = 0
     m = await db.memberships.find_one({"user_id": user_id})
-    if not m or m.get("member_status") not in ("active", "honorary"):
-        return
-    await award_badge(user_id, "offiziell_im_rudel", {"member_number": m.get("member_number")})
-    if m.get("member_since"):
-        from datetime import datetime, timezone
+    if m and m.get("member_since") and m.get("member_status") in ("active", "honorary"):
         try:
             since = datetime.fromisoformat(m["member_since"].replace("Z", "+00:00"))
             if since.tzinfo is None:
                 since = since.replace(tzinfo=timezone.utc)
-            days = (datetime.now(timezone.utc) - since).days
-            if days >= 90:
-                await award_badge(user_id, "vereinsmitglied_bronze", {"days": days})
-            if days >= 180:
-                await award_badge(user_id, "vereinsmitglied_silber", {"days": days})
-            if days >= 365:
-                await award_badge(user_id, "vereinsmitglied_gold", {"days": days})
-            if days >= 730:
-                await award_badge(user_id, "vereinsmitglied_platin", {"days": days})
+            membership_days = max((datetime.now(timezone.utc) - since).days, 1)
         except (ValueError, TypeError):
             pass
+    p["membership_days"] = membership_days
+
+    if "event_registrations" in await db.list_collection_names():
+        p["events_attended"] = await db.event_registrations.count_documents({"user_id": user_id, "checked_in": True})
+    else:
+        p["events_attended"] = 0
+
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "main_platforms": 1, "main_platform": 1})
+    plats = set()
+    if user:
+        for x in (user.get("main_platforms") or []):
+            if x:
+                plats.add(x)
+        if user.get("main_platform"):
+            plats.add(user["main_platform"])
+    p["distinct_platforms"] = len(plats)
+
+    p["achievements_unlocked"] = await db.user_achievements.count_documents({"user_id": user_id})
+
+    teams = await db.teams.find({"members.user_id": user_id}, {"_id": 0, "id": 1, "founder_id": 1}).to_list(50)
+    p["teams_founded"] = sum(1 for t in teams if t.get("founder_id") == user_id)
+    p["team_days_max"] = 0
+
+    p["best_season_rank_inv"] = 0
+    p["best_championship_rank_inv"] = 0
+
+    for k in [
+        "checkins_in_a_row", "fast_registrations", "clutch_count",
+        "dispute_free_matches", "long_matches_60", "long_matches_120",
+        "matches_early", "matches_late", "sub_target_count", "discord_messages",
+        "afk_count", "no_show_count", "late_checkins", "ghost_count",
+        "disputes_opened", "disputes_opened_season", "chat_warnings", "rage_quits",
+        "hardware_incidents", "invalid_laps_session", "dnfs_season",
+        "offroad_count", "reverse_lap_count", "slowest_lap_count", "unproven_laps",
+        "team_no_show_count", "team_kills", "team_late_count", "team_member_churn",
+        "zero_eight_losses", "long_warmup_count", "long_break_count", "loss_streak",
+    ]:
+        p.setdefault(k, 0)
+
+    return p
 
 
-# -------- Event Hooks --------
-async def on_tournament_registered(user_id: str, tournament_id: str):
+# ---------------- Group-aware listing ----------------
+def _color_for_level(level: int) -> str:
+    return {1: "#CD7F32", 2: "#C0C0C0", 3: "#FFD700", 4: "#29B6E8", 5: "#FF3B30"}.get(level, "#CD7F32")
+
+
+def _level_name(level: int) -> str:
+    return {1: "Bronze", 2: "Silber", 3: "Gold", 4: "Platin", 5: "Special"}.get(level, "?")
+
+
+async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list[dict]:
     db = get_db()
-    await award_badge(user_id, "first_tournament", {"tournament_id": tournament_id})
-    count = await db.tournament_registrations.count_documents({"user_id": user_id})
-    if count >= 10:
-        await award_badge(user_id, "veteran_10", {"count": count})
-    if count >= 25:
-        await award_badge(user_id, "veteran_25", {"count": count})
-    # Last-minute panic check
-    from datetime import datetime, timezone
-    t = await db.tournaments.find_one({"id": tournament_id})
-    if t and t.get("registration_open_until"):
-        try:
-            close = datetime.fromisoformat(t["registration_open_until"].replace("Z", "+00:00"))
-            if close.tzinfo is None:
-                close = close.replace(tzinfo=timezone.utc)
-            if (close - datetime.now(timezone.utc)).total_seconds() < 300:
-                await award_badge(user_id, "last_minute_panic", {"tournament_id": tournament_id})
-        except (ValueError, TypeError):
-            pass
+    is_admin = bool(viewer and viewer.get("role") in ("club_admin", "superadmin"))
+    show_negative = is_admin
+
+    groups = await db.achievement_groups.find({}, {"_id": 0}).sort("sort_order", 1).to_list(500)
+    tiers = await db.achievements.find({}, {"_id": 0}).sort("level", 1).to_list(2000)
+    awards: list = []
+    progress: dict = {}
+    if user_id:
+        awards = await db.user_achievements.find({"user_id": user_id}, {"_id": 0}).to_list(500)
+        progress = await compute_user_progress(user_id)
+    awarded_codes = {a["tier_code"]: a for a in awards}
+
+    out = []
+    for g in groups:
+        if g.get("is_negative") and not show_negative:
+            continue
+        if not g.get("public") and not is_admin:
+            continue
+        gtiers = [t for t in tiers if t.get("group_code") == g["code"]]
+        gtiers.sort(key=lambda x: x.get("level", 0))
+        out_tiers = []
+        for t in gtiers:
+            ck = t.get("condition_key")
+            target = t.get("progress_target") or 0
+            cur = progress.get(ck, 0) if ck else 0
+            earned_doc = awarded_codes.get(t["code"])
+            out_tiers.append({
+                **t,
+                "level_name": _level_name(t.get("level", 1)),
+                "level_color": _color_for_level(t.get("level", 1)),
+                "earned": bool(earned_doc),
+                "earned_at": earned_doc["earned_at"] if earned_doc else None,
+                "current": min(cur, target) if target else cur,
+                "target": target,
+                "percent": (round(100 * min(cur, target) / target) if target else (100 if earned_doc else 0)),
+                "manual_only": bool(t.get("manual_only")),
+            })
+        earned_levels = [t["level"] for t in out_tiers if t["earned"]]
+        out.append({
+            **g,
+            "tiers": out_tiers,
+            "highest_earned_level": max(earned_levels) if earned_levels else 0,
+            "tier_count": len(out_tiers),
+            "earned_count": len(earned_levels),
+        })
+    return out
+
+
+async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
+    db = get_db()
+    is_admin = bool(viewer and viewer.get("role") in ("club_admin", "superadmin"))
+    awards = await db.user_achievements.find({"user_id": user_id}, {"_id": 0}).sort("earned_at", -1).to_list(500)
+    out = []
+    for a in awards:
+        t = await db.achievements.find_one({"code": a["tier_code"]}, {"_id": 0})
+        if not t:
+            continue
+        g = await db.achievement_groups.find_one({"code": t["group_code"]}, {"_id": 0})
+        if not g:
+            continue
+        if g.get("is_negative") and not is_admin:
+            continue
+        out.append({
+            **t,
+            "group_name": g["name"],
+            "group_category": g["category"],
+            "group_icon": g["icon"],
+            "group_accent": g["accent_color"],
+            "level_name": _level_name(t.get("level", 1)),
+            "level_color": _color_for_level(t.get("level", 1)),
+            "earned_at": a["earned_at"],
+        })
+    return out
+
+
+# ---------------- Auto-eval ----------------
+async def evaluate_user_progress(user_id: str) -> int:
+    db = get_db()
+    counters = await compute_user_progress(user_id)
+    earned_codes = {a["tier_code"] async for a in db.user_achievements.find({"user_id": user_id})}
+    new_count = 0
+    tiers = await db.achievements.find({"manual_only": {"$ne": True}}, {"_id": 0}).to_list(2000)
+    for t in tiers:
+        if t["code"] in earned_codes:
+            continue
+        ck = t.get("condition_key")
+        target = t.get("progress_target") or 0
+        if not ck or not target:
+            continue
+        if counters.get(ck, 0) >= target:
+            ok = await award_achievement(user_id, t["code"], {"auto_progress": True, "current": counters.get(ck), "target": target})
+            if ok:
+                new_count += 1
+    return new_count
+
+
+# ---------------- Hooks (preserve old function names) ----------------
+async def evaluate_membership_badges(user_id: str):
+    await evaluate_user_progress(user_id)
+
+
+async def on_tournament_registered(user_id: str, tournament_id: str):
+    await evaluate_user_progress(user_id)
 
 
 async def on_checked_in(user_id: str, tournament_id: str):
-    await award_badge(user_id, "first_checkin", {"tournament_id": tournament_id})
+    await evaluate_user_progress(user_id)
 
 
 async def on_match_completed(winner_user_id: str, loser_user_id: str | None,
-                             tournament_id: str, match_id: str):
-    db = get_db()
+                              tournament_id: str, match_id: str):
     if winner_user_id:
-        await award_badge(winner_user_id, "first_win", {"match_id": match_id})
-        recent_matches = await db.matches.find(
-            {"tournament_id": tournament_id, "status": "completed"},
-            {"_id": 0},
-        ).sort("updated_at", -1).to_list(20)
-        reg_map = {r["id"]: r.get("user_id")
-                   for r in await db.tournament_registrations.find(
-                       {"tournament_id": tournament_id}, {"_id": 0}).to_list(500)}
-        streak = 0
-        for m in recent_matches:
-            w = reg_map.get(m.get("winner_id"))
-            lost = reg_map.get(m.get("loser_id"))
-            if w == winner_user_id:
-                streak += 1
-            elif lost == winner_user_id:
-                break
-        if streak >= 3:
-            await award_badge(winner_user_id, "win_streak_3", {"streak": streak})
-        if streak >= 5:
-            await award_badge(winner_user_id, "win_streak_5", {"streak": streak})
+        await evaluate_user_progress(winner_user_id)
+    if loser_user_id:
+        await evaluate_user_progress(loser_user_id)
 
 
 async def on_tournament_completed(tournament_id: str, placements: list[dict]):
-    db = get_db()
     for p in placements:
         uid = p.get("user_id")
-        rank = p.get("rank")
-        if not uid:
-            continue
-        if rank == 4:
-            await award_badge(uid, "holzmedaille", {"tournament_id": tournament_id})
-        if rank and rank <= 3:
-            await award_badge(uid, "podium_finisher", {"tournament_id": tournament_id, "rank": rank})
-        if rank == 1:
-            await award_badge(uid, "tournament_champion", {"tournament_id": tournament_id})
-            wins = 0
-            async for reg in db.tournament_registrations.find({"user_id": uid}):
-                tid = reg.get("tournament_id")
-                matches = await db.matches.find(
-                    {"tournament_id": tid, "final_position": 1, "winner_id": reg["id"]}).to_list(5)
-                if matches:
-                    wins += 1
-            if wins >= 3:
-                await award_badge(uid, "grand_champion", {"wins": wins})
+        if uid:
+            await evaluate_user_progress(uid)
+            if p.get("rank") == 4:
+                await award_achievement(uid, "neg_holzmedaille", {"tournament_id": tournament_id})
 
 
 async def on_lap_submitted(user_id: str, challenge_id: str, track_id: str,
-                           was_new_leader: bool, is_invalid: bool = False):
+                            was_new_leader: bool, is_invalid: bool = False):
     db = get_db()
     if is_invalid:
-        # Wandmagnet: 5+ invalid laps in same challenge
         invalids = await db.f1_lap_times.count_documents(
             {"user_id": user_id, "challenge_id": challenge_id, "is_invalid": True}
         )
         if invalids >= 5:
-            await award_badge(user_id, "wandmagnet", {"challenge_id": challenge_id, "invalids": invalids})
+            await award_achievement(user_id, "neg_invalid_lap",
+                                    {"challenge_id": challenge_id, "invalids": invalids})
         return
-    await award_badge(user_id, "first_lap", {"challenge_id": challenge_id})
-    if was_new_leader:
-        await award_badge(user_id, "lap_pole_position", {"challenge_id": challenge_id, "track_id": track_id})
-    total = await db.f1_lap_times.count_documents({"user_id": user_id, "is_invalid": {"$ne": True}})
-    if total >= 10:
-        await award_badge(user_id, "laps_10", {"total": total})
-    if total >= 50:
-        await award_badge(user_id, "laps_50", {"total": total})
+    await evaluate_user_progress(user_id)
 
 
 async def on_team_created(user_id: str, team_id: str):
-    await award_badge(user_id, "team_founder", {"team_id": team_id})
+    await evaluate_user_progress(user_id)
 
 
 async def on_team_joined(user_id: str, team_id: str):
-    await award_badge(user_id, "clan_member", {"team_id": team_id})
-
-
-# ---------- Phase B v3 — Progress Aggregator ----------
-async def compute_user_progress(user_id: str) -> dict[str, int]:
-    """Aggregate counters used by progress_target / condition_key fields.
-
-    Returns dict {condition_key: current_count} to be merged into badge listings.
-    """
-    db = get_db()
-    progress: dict[str, int] = {}
-
-    progress["tournaments_registered"] = await db.tournament_registrations.count_documents({"user_id": user_id})
-    progress["fastlap_valid_count"] = await db.f1_lap_times.count_documents({"user_id": user_id, "is_invalid": {"$ne": True}})
-    progress["badges_unlocked"] = await db.user_badges.count_documents({"user_id": user_id})
-    progress["events_attended"] = await db.event_registrations.count_documents({"user_id": user_id, "checked_in": True}) if "event_registrations" in await db.list_collection_names() else 0
-
-    # Distinct games via tournament -> game_id
-    regs = await db.tournament_registrations.find({"user_id": user_id}, {"_id": 0, "tournament_id": 1}).to_list(500)
-    tids = list({r["tournament_id"] for r in regs if r.get("tournament_id")})
-    distinct_games = 0
-    if tids:
-        games = await db.tournaments.distinct("game_id", {"id": {"$in": tids}})
-        distinct_games = len([g for g in games if g])
-    progress["distinct_games_registered"] = distinct_games
-
-    # Distinct platforms from user profile
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "main_platforms": 1, "main_platform": 1})
-    platforms = set()
-    if user:
-        for p in (user.get("main_platforms") or []):
-            if p:
-                platforms.add(p)
-        if user.get("main_platform"):
-            platforms.add(user.get("main_platform"))
-    progress["distinct_platforms"] = len(platforms)
-
-    # Streak counters — best-effort (placeholders, computed conservatively)
-    progress["checkins_in_a_row"] = 0  # filled by tournament hook on success
-
-    return progress
+    await evaluate_user_progress(user_id)
