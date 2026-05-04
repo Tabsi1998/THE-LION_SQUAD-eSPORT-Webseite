@@ -14,7 +14,8 @@ export default function AdminAuditPage() {
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Audit Logs</h1>
       <input placeholder="Nach Aktion filtern …" value={q} onChange={(e)=>setQ(e.target.value)} data-testid="audit-filter" className="w-full max-w-md bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm mb-5"/>
       <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
             <tr><th className="text-left px-4 py-3">Zeit</th><th className="text-left px-4 py-3">Aktion</th><th className="text-left px-4 py-3">Akteur</th><th className="text-left px-4 py-3">Ziel / Details</th></tr>
           </thead>
@@ -30,6 +31,7 @@ export default function AdminAuditPage() {
             {logs.length === 0 && <tr><td colSpan="4" className="text-center py-10 text-white/40">Keine Einträge</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </AdminLayout>
   );

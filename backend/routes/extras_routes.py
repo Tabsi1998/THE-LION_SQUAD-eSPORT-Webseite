@@ -42,6 +42,13 @@ class TestEmailBody(BaseModel):
     to: EmailStr
 
 
+class DiscordSettings(BaseModel):
+    webhook_url: Optional[str] = None
+    username: Optional[str] = None
+    avatar_url: Optional[str] = None
+    enabled: bool = True
+
+
 @settings_router.get("/public")
 async def public_settings():
     """Public-safe settings for branding on public pages."""
@@ -118,6 +125,44 @@ async def email_logs(me: dict = Depends(require_admin())):
     return await db.email_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
 
 
+# ---- Discord webhook ----
+@settings_router.get("/discord")
+async def get_discord(me: dict = Depends(require_admin())):
+    db = get_db()
+    s = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
+    if s.get("webhook_url"):
+        u = s["webhook_url"]
+        s["webhook_url_masked"] = u[:30] + "…" if len(u) > 30 else "***"
+        s.pop("webhook_url", None)
+    return s
+
+
+@settings_router.put("/discord")
+async def update_discord(body: DiscordSettings, me: dict = Depends(require_admin())):
+    db = get_db()
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    if "webhook_url" in updates and not updates["webhook_url"]:
+        updates.pop("webhook_url")
+    updates["updated_at"] = now_utc().isoformat()
+    await db.settings.update_one(
+        {"id": "discord"}, {"$set": updates, "$setOnInsert": {"id": "discord"}}, upsert=True,
+    )
+    await db.audit_logs.insert_one({"id": new_id(), "action": "settings.discord.update",
+                                     "actor_id": me["id"], "created_at": now_utc().isoformat()})
+    return {"ok": True}
+
+
+@settings_router.post("/discord/test")
+async def discord_test(me: dict = Depends(require_admin())):
+    from discord_service import send_discord
+    res = await send_discord(
+        "TLS ARENA · Testnachricht",
+        "Diese Nachricht bestätigt, dass dein Discord-Webhook korrekt funktioniert. 🦁",
+        event_key="test",
+    )
+    return res
+
+
 # ---------- Seasons / Circuits ----------
 season_router = APIRouter(prefix="/api/seasons", tags=["seasons"])
 
@@ -152,6 +197,21 @@ class SeasonUpdate(BaseModel):
 async def list_seasons():
     db = get_db()
     return await db.seasons.find({}, {"_id": 0}).sort("start_date", -1).to_list(200)
+
+
+@season_router.get("/active/featured")
+async def featured_season():
+    """Returns the most relevant active season + top 5 standings for public widgets."""
+    db = get_db()
+    s = await db.seasons.find_one({"status": "active"}, {"_id": 0},
+                                    sort=[("start_date", -1)])
+    if not s:
+        s = await db.seasons.find_one({}, {"_id": 0}, sort=[("start_date", -1)])
+    if not s:
+        return {"season": None, "standings": []}
+    # Reuse standings logic (season_standings defined below in this module)
+    lb = await season_standings(s.get("slug") or s["id"])
+    return {"season": lb["season"], "standings": (lb.get("standings") or [])[:5]}
 
 
 @season_router.get("/{slug_or_id}")

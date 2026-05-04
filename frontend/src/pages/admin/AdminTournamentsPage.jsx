@@ -40,7 +40,8 @@ export default function AdminTournamentsPage() {
         </Link>
       </div>
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[720px]">
           <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
             <tr>
               <th className="text-left px-4 py-3">Titel</th>
@@ -73,6 +74,7 @@ export default function AdminTournamentsPage() {
             {list.length === 0 && <tr><td colSpan="6" className="text-center py-10 text-white/40">Keine Turniere</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </AdminLayout>
   );

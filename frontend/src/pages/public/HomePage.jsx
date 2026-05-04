@@ -5,6 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentCard } from "@/components/tls/TournamentCard";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { MascotBadge } from "@/components/tls/Logo";
+import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
 import { motion } from "framer-motion";
 import { ArrowRight, Flag, Trophy, Zap, Users as UsersIcon } from "lucide-react";
 
@@ -109,6 +110,9 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      {/* Season Pass */}
+      <SeasonPassWidget />
 
       {/* F1 Fast Lap */}
       <section className="relative overflow-hidden border-y border-white/10 bg-[#0A0A0A]">

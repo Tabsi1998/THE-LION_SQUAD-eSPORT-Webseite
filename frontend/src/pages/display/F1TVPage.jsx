@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { MascotBadge } from "@/components/tls/Logo";
 import { motion, AnimatePresence } from "framer-motion";
+import { QRCodeSVG } from "qrcode.react";
 
 const medalColors = ["#FFD700", "#C0C0C0", "#CD7F32"];
 
@@ -11,11 +12,17 @@ export default function F1TVPage() {
   const [challenge, setChallenge] = useState(null);
   const [activeTrackIdx, setActiveTrackIdx] = useState(0);
   const [board, setBoard] = useState(null);
+  const [sponsors, setSponsors] = useState([]);
+  const [sponsorIdx, setSponsorIdx] = useState(0);
 
   useEffect(() => {
     (async () => {
       const { data } = await api.get(`/f1/challenges/${id}`);
       setChallenge(data);
+      try {
+        const { data: sp } = await api.get("/sponsors");
+        setSponsors(sp || []);
+      } catch { setSponsors([]); }
     })();
   }, [id]);
 
@@ -38,12 +45,21 @@ export default function F1TVPage() {
     return () => clearInterval(iv);
   }, [challenge]);
 
+  // Rotate sponsors every 8s
+  useEffect(() => {
+    if (sponsors.length < 2) return;
+    const iv = setInterval(() => setSponsorIdx((i) => (i + 1) % sponsors.length), 8000);
+    return () => clearInterval(iv);
+  }, [sponsors]);
+
   if (!challenge) return <div className="min-h-screen bg-black flex items-center justify-center font-display tracking-widest text-white/40">LADE …</div>;
 
   const track = board?.track;
   const entries = board?.entries || [];
   const top3 = entries.slice(0, 3);
   const rest = entries.slice(3, 13);
+  const publicUrl = `${window.location.origin}/f1/${challenge.slug || challenge.id}`;
+  const currentSponsor = sponsors[sponsorIdx];
 
   return (
     <div className="min-h-screen tv-bg text-white overflow-hidden relative">
@@ -108,9 +124,40 @@ export default function F1TVPage() {
         </div>
       </div>
 
-      <footer className="absolute bottom-0 left-0 right-0 px-8 py-4 border-t border-white/5 flex items-center justify-between text-[11px] uppercase tracking-[0.3em] text-white/40">
-        <span>TLS ARENA · Live Leaderboard</span>
-        <span className="text-[#29B6E8]">AUTO-REFRESH · 7s</span>
+      <footer className="absolute bottom-0 left-0 right-0 px-8 py-4 border-t border-white/5 flex items-center justify-between gap-4 bg-[#0A0A0A]/80 backdrop-blur-sm">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="bg-white p-1.5 rounded-sm shrink-0">
+            <QRCodeSVG value={publicUrl} size={64} bgColor="#ffffff" fgColor="#0A0A0A" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">Join The Race</div>
+            <div className="text-sm text-white/80 truncate font-mono">{publicUrl.replace(/^https?:\/\//, "")}</div>
+          </div>
+        </div>
+        <AnimatePresence mode="wait">
+          {currentSponsor ? (
+            <motion.div
+              key={currentSponsor.id}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.6 }}
+              className="flex items-center gap-4 min-w-0"
+            >
+              <div className="text-right min-w-0">
+                <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 font-bold">Presented by</div>
+                <div className="font-heading text-lg md:text-xl font-bold text-white truncate uppercase">{currentSponsor.name}</div>
+              </div>
+              {currentSponsor.logo_url && (
+                <div className="bg-white/5 border border-white/10 rounded-sm px-3 py-2 shrink-0">
+                  <img src={currentSponsor.logo_url} alt={currentSponsor.name} className="h-10 w-auto object-contain" />
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8]">AUTO-REFRESH · 7s</div>
+          )}
+        </AnimatePresence>
       </footer>
     </div>
   );

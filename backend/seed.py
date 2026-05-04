@@ -237,8 +237,9 @@ async def seed_demo_data():
         })
 
     # Smash Tournament - Double Elim, Draft
+    smash_tid = new_id()
     await db.tournaments.insert_one({
-        "id": new_id(), "slug": "smash-showdown-q1",
+        "id": smash_tid, "slug": "smash-showdown-q1",
         "title": "Smash Showdown Q1",
         "description": "Super Smash Bros. Ultimate. Double Elimination, Best of 5 im Finale.",
         "game_id": smash_id, "platform": "Nintendo Switch",
@@ -341,5 +342,37 @@ async def seed_demo_data():
          "banner_url": None, "published": True,
          "created_at": now_utc().isoformat(), "updated_at": now_utc().isoformat()},
     ])
+
+    # Sponsors (Demo)
+    await db.sponsors.insert_many([
+        {"id": new_id(), "name": "Löwen Energy", "logo_url": None, "link": "https://example.com",
+         "description": "Official Energy Partner", "tier": "gold",
+         "created_at": now_utc().isoformat()},
+        {"id": new_id(), "name": "Pixel Arena Hardware", "logo_url": None, "link": "https://example.com",
+         "description": "Gaming Peripherie", "tier": "silver",
+         "created_at": now_utc().isoformat()},
+        {"id": new_id(), "name": "Vienna eSports Hub", "logo_url": None, "link": "https://example.com",
+         "description": "Community Partner", "tier": "standard",
+         "created_at": now_utc().isoformat()},
+    ])
+
+    # Season 2026 — aggregated across both tournaments + F1 championship
+    season_id = new_id()
+    await db.seasons.insert_one({
+        "id": season_id, "slug": "season-2026",
+        "name": "TLS Season 2026",
+        "description": "Die große TLS Arena Meisterschaft: alle Turniere und F1-Rennen der Saison zählen für den Champion-Titel.",
+        "kind": "season", "status": "active",
+        "tournament_ids": [mk_tid, smash_tid],
+        "f1_challenge_ids": [f1_cid],
+        "points_per_position": [25, 18, 15, 12, 10, 8, 6, 4, 2, 1],
+        "drop_worst": 0, "bonus_points": {},
+        "banner_url": None,
+        "start_date": now_utc().isoformat(),
+        "end_date": None,
+        "created_at": now_utc().isoformat(),
+        "updated_at": now_utc().isoformat(),
+        "created_by": admin_id,
+    })
 
     print(f"[seed] Demo data created: {len(game_docs)} games, {len(player_ids)} players, 2 tournaments, F1 championship with {len(track_ids)} tracks, {len(stations)} stations.")

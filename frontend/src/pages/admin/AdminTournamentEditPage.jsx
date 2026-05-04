@@ -108,7 +108,8 @@ export default function AdminTournamentEditPage() {
 
       {tab === "participants" && (
         <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
               <tr>
                 <th className="text-left px-4 py-3">#</th>
@@ -135,6 +136,7 @@ export default function AdminTournamentEditPage() {
               {regs.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-white/40">Keine Anmeldungen</td></tr>}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -150,7 +152,8 @@ export default function AdminTournamentEditPage() {
 
       {tab === "matches" && bracket?.matches && (
         <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[720px]">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
               <tr>
                 <th className="text-left px-4 py-3">Runde</th>
@@ -180,6 +183,7 @@ export default function AdminTournamentEditPage() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
       {tab === "edit" && (

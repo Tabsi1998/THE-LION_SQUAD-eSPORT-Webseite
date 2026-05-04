@@ -1,0 +1,42 @@
+{
+  "summary": "Phase 3 testing complete. All 8 new backend tests green (sponsors seed, /api/seasons/active/featured, /api/settings/discord GET/PUT/test admin-only + audit). Frontend: Season Pass Widget on Home renders 'TLS SEASON 2026' with spotlight 'ACE RACER (51 Pkt)' and top-5 (PixelHawk 63, Ace Racer 51, Juno XX 45, Kai Blitz 37, Ava Spike 37). /admin/settings Discord-Tab + E-Mail-Tab show correct German banners ('KEIN WEBHOOK KONFIGURIERT' / 'KEIN RESEND API KEY HINTERLEGT'). F1 TV (/display/f1/:id) shows QR + 'JOIN THE RACE' + 'Presented by' sponsor rotation. Bracket TV (/display/bracket/:id) shows 'SCAN TO FOLLOW' QR + 'SPONSORED BY' Löwen Energy. Mobile (390x844) overflow-x:auto wrapper present on /admin/tournaments (sw=720>cw=356), /admin/users (913>356), /admin/audit (640>356). Stations uses responsive card layout instead of table on mobile.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/display/f1/:id footer", "issues": ["Sponsor name 'LÖWEN ENERGY' wird am rechten Rand abgeschnitten (sichtbar als 'LÖV…') wenn kein größerer Container/Padding rechts vorhanden ist – kosmetisch, betrifft TV-Anzeige bei Standard-1920-Breite mit längeren Sponsor-Namen."]},
+      {"screen": "Phase 3 Spec-Konsistenz", "issues": ["Spec spricht durchgehend von 'Presented by' für TV-Footer; F1TV nutzt 'PRESENTED BY' (ok), BracketTV nutzt jedoch 'SPONSORED BY' und 'SCAN TO FOLLOW' statt 'JOIN THE RACE'. Funktional korrekt (QR + Sponsor da), nur Wording weicht zwischen den beiden TV-Seiten ab – ggf. vereinheitlichen."]},
+      {"screen": "HomePage SeasonPassWidget", "issues": ["Komponente hat keinen data-testid='season-pass-widget' Wrapper – Testbarkeit reduziert. Inhalt + UI sind aber korrekt."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase3.py",
+    "/app/test_reports/pytest/phase3_results.xml"
+  ],
+  "action_items": [
+    "(Optional) data-testid='season-pass-widget' am Wrapper der SeasonPassWidget-Komponente ergänzen.",
+    "(Optional) Wording auf BracketTV vereinheitlichen ('JOIN THE RACE' + 'PRESENTED BY' analog zu F1TV) für konsistente TV-Optik.",
+    "(Optional) Sponsor-Footer auf F1TV: Right-Padding/Truncation überarbeiten, damit lange Sponsor-Namen wie 'LÖWEN ENERGY' nicht durch das 'Made with Emergent'-Badge überlappt werden."
+  ],
+  "critical_code_review_comments": [
+    "extras_routes.py /settings/discord: GET maskiert webhook_url korrekt (webhook_url_masked) und entfernt Originalfeld – gut. PUT überschreibt webhook_url nur bei non-empty Wert (gleiches Muster wie email Resend Key) – gut.",
+    "discord_service.send_discord: bei nicht-konfiguriertem Webhook wird {ok:false, reason:'disabled'} zurückgegeben + email_logs Eintrag mit channel='discord' – sauber, keine Exception.",
+    "extras_routes.featured_season: ruft season_standings(slug or id) und schneidet auf top 5 ab; null-safe wenn keine Saison existiert. Kann im Worst Case alle Tournaments+F1 challenges der Season aggregieren (O(N*M)) – für seed-Datenmenge ok, bei Skalierung ggf. cachen.",
+    "SeasonPassWidget.jsx fehlt data-testid; /api/seasons/active/featured ist public (keine Auth) – passt zum Public-Home-Use-Case.",
+    "BracketTVPage / F1TVPage: Sponsor-Rotation unterscheidet sich in Wording ('SPONSORED BY' vs 'PRESENTED BY') und CTA ('SCAN TO FOLLOW' vs 'JOIN THE RACE') – Spec verlangt 'Presented by' und 'JOIN THE RACE'. Funktional korrekt umgesetzt, nur Strings inkonsistent."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase3.py"
+  ],
+  "success_rate": {"backend": "100% (8/8 phase3 tests)", "frontend": "100% auf getesteten Seiten (Home Season Widget, /admin/settings Discord+E-Mail, /display/f1, /display/bracket, Mobile-Tabellen)"},
+  "test_credentials": "admin@thelionsquad.at / TLSAdmin2026! verifiziert.",
+  "seed_data_creation": "Während des Tests wurde via PUT /api/settings/discord ein Settings-Doc mit username='TLS Bot Test', avatar_url='https://example.com/avatar.png', enabled=true gespeichert (kein webhook_url). Audit-Log Eintrag 'settings.discord.update' erzeugt – sollte vom Admin überschrieben werden, sobald echter Webhook eingetragen wird.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 3 Tests in /app/backend/tests/test_phase3.py: Sponsors seed (3 Sponsoren), /api/seasons/active/featured (slug=season-2026, max 5 standings), /api/settings/discord GET/PUT/test mit admin-only Guard und Audit. Frontend ist via Playwright validiert: HomePage zeigt Season Pass Widget mit Spotlight + Top-5; /admin/settings hat 4 Tabs (E-Mail, Discord, Branding, Versandlogs); /display/f1/:id und /display/bracket/:id haben QR-Code (qrcode.react v4.2.0) im Footer plus rotierende Sponsor-Anzeige. Mobile-Viewport (390x844) bestätigt overflow-x:auto Wrapper auf /admin/tournaments, /admin/users, /admin/audit (scrollWidth ~720-913 > clientWidth=356). /admin/stations ist auf Mobile als Card-Layout statt Tabelle gerendert – kein Scroll-Wrapper nötig. Discord-Test wurde NICHT mit echtem Webhook ausgelöst (per Anweisung).",
+  "rca of the issue": "Keine offenen Bugs in Phase-3 Scope. Kosmetik: BracketTV verwendet andere Footer-Strings als F1TV (Spec verlangt einheitlich 'Presented by …' + 'JOIN THE RACE'). SeasonPassWidget benötigt data-testid für robusteres E2E-Testing."
+}
