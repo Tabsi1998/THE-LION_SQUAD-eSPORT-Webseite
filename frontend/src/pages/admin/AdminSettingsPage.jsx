@@ -8,7 +8,7 @@ import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquar
 export default function AdminSettingsPage() {
   const [tab, setTab] = useState("email");
   const [email, setEmail] = useState({ resend_api_key: "", sender_name: "", sender_email: "", enabled: true, resend_api_key_masked: "" });
-  const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_security: "starttls", sender_name: "", sender_email: "", enabled: true, smtp_pass_masked: "" });
+  const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_security: "starttls", smtp_tls_verify: true, sender_name: "", sender_email: "", enabled: true, smtp_pass_masked: "" });
   const [smtpTestEmail, setSmtpTestEmail] = useState("");
   const [queue, setQueue] = useState([]);
   const [queueFilter, setQueueFilter] = useState("");
@@ -199,7 +199,7 @@ export default function AdminSettingsPage() {
                 <input type="password" value={smtp.smtp_pass || ""} onChange={(e) => setSmtp({ ...smtp, smtp_pass: e.target.value })} data-testid="smtp-pass" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder="••••••" />
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Sicherheit</div>
                 <select value={smtp.smtp_security || "starttls"} onChange={(e) => setSmtp({ ...smtp, smtp_security: e.target.value })} data-testid="smtp-security" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
@@ -207,6 +207,13 @@ export default function AdminSettingsPage() {
                   <option value="tls">SSL/TLS (465)</option>
                   <option value="none">Keine (25)</option>
                 </select>
+              </div>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">TLS Zertifikat</div>
+                <label className="h-[38px] flex items-center gap-2 bg-[#0A0A0A] border border-white/10 px-3 rounded-sm text-sm">
+                  <input type="checkbox" checked={smtp.smtp_tls_verify !== false} onChange={(e) => setSmtp({ ...smtp, smtp_tls_verify: e.target.checked })} data-testid="smtp-tls-verify" className="accent-[#29B6E8]" />
+                  <span>Pruefen</span>
+                </label>
               </div>
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Absendername</div>
@@ -226,7 +233,7 @@ export default function AdminSettingsPage() {
               <input type="email" placeholder="test@example.com" value={smtpTestEmail} onChange={(e) => setSmtpTestEmail(e.target.value)} data-testid="smtp-test-to" className="flex-1 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               <button onClick={sendSmtpTest} data-testid="smtp-test-send" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Senden</button>
             </div>
-            <p className="text-xs text-white/50">Testet die SMTP-Verbindung direkt — ohne Queue. Provider muss auf SMTP gesetzt sein.</p>
+            <p className="text-xs text-white/50">Testet die SMTP-Verbindung direkt. Im Docker-Setup fuer einen lokalen Host-Mailserver meist <code className="font-mono text-white/70">host.docker.internal</code> als SMTP Host nutzen. Bei self-signed Zertifikat "TLS Zertifikat pruefen" deaktivieren.</p>
           </div>
         </div>
       )}

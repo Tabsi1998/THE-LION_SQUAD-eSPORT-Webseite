@@ -34,6 +34,7 @@ export default function SetupWizardPage() {
     smtp_user: "",
     smtp_pass: "",
     smtp_security: "starttls",
+    smtp_tls_verify: true,
     sender_name: "THE LION SQUAD",
     sender_email: "noreply@thelionsquad.at",
     resend_api_key: "",
@@ -72,7 +73,7 @@ export default function SetupWizardPage() {
       if (!payload.new_admin_password) delete payload.new_admin_password;
       if (payload.mail_provider === "resend") {
         delete payload.smtp_host; delete payload.smtp_port; delete payload.smtp_user;
-        delete payload.smtp_pass; delete payload.smtp_security;
+        delete payload.smtp_pass; delete payload.smtp_security; delete payload.smtp_tls_verify;
       } else {
         delete payload.resend_api_key;
       }
@@ -180,6 +181,10 @@ export default function SetupWizardPage() {
                       </select>
                     </div>
                   </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={data.smtp_tls_verify !== false} onChange={(e) => upd("smtp_tls_verify", e.target.checked)} data-testid="wizard-smtp-tls-verify" className="accent-[#29B6E8]" />
+                    <span>TLS Zertifikat pruefen</span>
+                  </label>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="User" testId="wizard-smtp-user" value={data.smtp_user} onChange={(v) => upd("smtp_user", v)} />
                     <Field label="Passwort" type="password" testId="wizard-smtp-pass" value={data.smtp_pass} onChange={(v) => upd("smtp_pass", v)} />

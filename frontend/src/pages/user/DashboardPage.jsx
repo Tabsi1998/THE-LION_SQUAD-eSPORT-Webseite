@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
-import { Trophy, Flag, Bell, Crown, Gift, Award, UserCheck, AlertTriangle } from "lucide-react";
+import { Trophy, Bell, Crown, Gift, Award, UserCheck, AlertTriangle, Medal } from "lucide-react";
 
 export default function DashboardPage() {
   const { user, isClubMember } = useAuth();
@@ -135,6 +135,13 @@ export default function DashboardPage() {
           <Link to="/profile" data-testid="dashboard-profile-link" className="border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-5 bg-[#121212] transition">
             <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Profil</div>
             <div className="mt-2 font-heading text-lg font-bold">Einstellungen</div>
+          </Link>
+          <Link to="/profile?tab=achievements" data-testid="dashboard-achievements-link" className="border border-[#A855F7]/30 hover:border-[#A855F7]/70 rounded-sm p-5 bg-[#121212] transition">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] uppercase tracking-widest text-[#A855F7] font-bold">Profil</div>
+              <Medal className="w-4 h-4 text-[#A855F7]" />
+            </div>
+            <div className="mt-2 font-heading text-lg font-bold">Achievements</div>
           </Link>
           <Link to="/tournaments" data-testid="dashboard-tournaments-link" className="border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-5 bg-[#121212] transition">
             <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Turniere</div>

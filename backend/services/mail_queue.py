@@ -34,6 +34,7 @@ async def get_mail_settings() -> dict:
         "smtp_user": s.get("smtp_user", ""),
         "smtp_pass": s.get("smtp_pass", ""),
         "smtp_security": s.get("smtp_security", "starttls"),  # starttls | tls | none
+        "smtp_tls_verify": s.get("smtp_tls_verify", True),
         "sender_name": s.get("sender_name") or legacy.get("sender_name") or "TLS ARENA",
         "sender_email": s.get("sender_email") or legacy.get("sender_email") or os.environ.get("SENDER_EMAIL", "noreply@thelionsquad.at"),
         "resend_api_key": legacy.get("resend_api_key") or s.get("resend_api_key") or os.environ.get("RESEND_API_KEY", ""),
@@ -56,6 +57,12 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
 
     use_tls = cfg["smtp_security"] == "tls"
     start_tls = cfg["smtp_security"] == "starttls"
+    tls_context = None
+    validate_certs = bool(cfg.get("smtp_tls_verify", True))
+    if (use_tls or start_tls) and not validate_certs:
+        tls_context = ssl.create_default_context()
+        tls_context.check_hostname = False
+        tls_context.verify_mode = ssl.CERT_NONE
 
     kwargs = {
         "hostname": cfg["smtp_host"],
@@ -66,6 +73,8 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
         "start_tls": start_tls,
         "timeout": 30,
     }
+    if tls_context is not None:
+        kwargs["tls_context"] = tls_context
     # If both falsy -> plain
     if not (use_tls or start_tls):
         kwargs["use_tls"] = False
