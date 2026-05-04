@@ -21,6 +21,18 @@ Ein Rudel — online wie offline.
 
 NIE einen registrierten Nutzer als „Mitglied" bezeichnen. Stattdessen „Community" oder „Spieler".
 
+## Phase D — Navigation & Vereins-Identität (04.05.2026 · 35/36 grün)
+
+- [x] **Neue Hauptnavigation** mit Hover-Dropdowns: Home / Verein / Community / Mitglieder / Events / eSports / News (`MainNav.jsx`, `NAV_STRUCTURE`)
+- [x] **memberOnly-Filter** im Mitglieder-Dropdown (Mitgliederbereich/Vorteile/Dokumente nur für Vereinsmitglieder)
+- [x] **Mobile-Akkordeon** mit aufklappbaren Sub-Items, automatischem Close beim Klick
+- [x] **Breadcrumbs** auf Tournament-, Event-, News-, F1- und Public-Profile-Detail-Seiten (`Breadcrumbs.jsx`)
+- [x] **Neue Public-Pages**: `/board` (Vorstand-Stub mit 6 Rollen), `/values` (Werte & Ziele mit 3 Pillars + 5 Zielen) — später CMS-editierbar in Phase F
+- [x] **`/seasons/current` Redirect** zur aktiven Season (`CurrentSeasonRedirect.jsx` → `/api/seasons/active/featured`)
+- [x] **Branding-Cleanup**: „TLS ARENA" überall durch „THE LION SQUAD" ersetzt (LoginPage, BracketTV, F1TV, PublicProfile, Legal). Footer-Spalte „Arena" → „eSports".
+- [x] **Bug-Fix**: `/news/:slug` Route registriert (war versehentlich nicht in App.js)
+- [x] **Tests**: 35/36 Frontend-Checks grün, alle Backend-Tests weiterhin grün
+
 ## Phase A — Quick-Wins (04.05.2026 · 11/11 grün)
 
 - [x] **Galerie-Bug-Fix**: `/galerie` und `/gallery` Routes registriert (vorher Catch-all 404)
