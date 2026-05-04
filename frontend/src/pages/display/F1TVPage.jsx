@@ -124,7 +124,7 @@ export default function F1TVPage() {
         </div>
       </div>
 
-      <footer className="absolute bottom-0 left-0 right-0 px-8 py-4 border-t border-white/5 flex items-center justify-between gap-4 bg-[#0A0A0A]/80 backdrop-blur-sm">
+      <footer className="absolute bottom-0 left-0 right-0 px-8 py-4 pr-40 border-t border-white/5 flex items-center justify-between gap-4 bg-[#0A0A0A]/80 backdrop-blur-sm">
         <div className="flex items-center gap-4 min-w-0">
           <div className="bg-white p-1.5 rounded-sm shrink-0">
             <QRCodeSVG value={publicUrl} size={64} bgColor="#ffffff" fgColor="#0A0A0A" />

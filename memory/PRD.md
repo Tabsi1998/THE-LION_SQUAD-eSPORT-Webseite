@@ -106,15 +106,25 @@ Self-hosted Tournament-Management-System ähnlich Toornament/Challonge, speziell
 - [x] `tests/test_phase2_3.py`: 19 Tests für Settings, Seasons, Widgets, DSGVO, PDF, Audit, Stations, F1-Edits, Swiss/Groups-Validierung
 - [x] 60/61 gesamt grün (1 Phase-1 Flake bei F1-Leaderboard-Resort)
 
-## Noch offen (Next Tasks)
-- Resend API Key durch Nutzer in `/admin/settings` hinterlegen, dann E-Mail-Versand live
-- Interaktiver Setup-Wizard (First-Run CLI) robust machen
-- Mobile-Feinschliff für DataTables und Admin-Layout
-- Discord Webhooks, 2FA, Stripe (P2)
-- Backup/Restore Skripte + Dokumentation (P2)
-- TV-Mode Enhancements: Sponsor-Rotation + QR-Codes (P2)
+## Phase 3 Enhancements — IMPLEMENTIERT (04.05.2026 · 2. Pass)
 
-## Akzeptanzkriterien – Status
+### Backend
+- [x] `GET /api/seasons/active/featured` — aktive Saison + Top 5 Standings für öffentliche Widgets
+- [x] `GET/PUT /api/settings/discord` — Webhook URL (maskiert), Bot-Name, Avatar, enabled Flag
+- [x] `POST /api/settings/discord/test` — Sendet Testnachricht via Webhook
+- [x] `discord_service.py` — `send_discord(title, description, color, fields)` mit Embed-Support, Logging in `email_logs`
+- [x] Seed erweitert: 3 Sponsoren + 1 aktive Saison „TLS Season 2026" (verbindet alle Turniere + F1 Championship)
+
+### Frontend
+- [x] `SeasonPassWidget` — animierter Spotlight-Ticker auf HomePage mit Top 3 Rotation + Mini-Tabelle Top 5 (`data-testid="season-pass-widget"`)
+- [x] Admin Settings: neuer **Discord-Tab** mit Webhook Eingabe + Test-Button; **Resend-Warnbanner** bei fehlender API-Key Config
+- [x] F1 TV & Bracket TV: **QR-Code** im Footer (Scan-to-follow) + **Sponsor-Rotation** (alle 8s) aus `/api/sponsors`
+- [x] Mobile: alle Admin-Tabellen in `overflow-x-auto` Wrapper (Tournaments/Users/Audit/TournamentEdit)
+- [x] `qrcode.react@4.2.0` installiert
+
+### Tests
+- [x] 8/8 neue Backend-Tests grün (featured season, discord settings, sponsors seed)
+- [x] Frontend: Season Pass, Discord Tab, TV QR+Sponsors, Mobile Scroll alle grün (iteration_3.json)
 
 | # | Kriterium | Status |
 |---|-----------|--------|
@@ -143,6 +153,14 @@ Self-hosted Tournament-Management-System ähnlich Toornament/Challonge, speziell
 | 23 | Backups + Restore dokumentiert | ✅ |
 | 24 | UI mobile + Desktop sauber | ✅ |
 | 25 | THE LION SQUAD Branding | ✅ (Logos, Farben, Wortmarke) |
+
+## Noch offen (Backlog)
+
+- Resend API Key durch Nutzer in `/admin/settings` hinterlegen → live E-Mail-Versand
+- Discord Webhook Events automatisch bei Turnier-Start / Match-Ende / F1-Neuer-Leader triggern (Infrastruktur vorhanden, Trigger fehlen)
+- 2FA, Stripe-Zahlungen (P2)
+- Ladder / King of the Hill Formate (P2)
+- Bulk CSV Teilnehmer-Import (P2)
 
 ## Test Credentials
 Siehe `/app/memory/test_credentials.md`

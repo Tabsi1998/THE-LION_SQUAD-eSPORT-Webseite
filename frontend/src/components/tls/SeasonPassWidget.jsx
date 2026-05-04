@@ -37,7 +37,7 @@ export function SeasonPassWidget() {
   const rest = standings.slice(3, 5);
 
   return (
-    <section className="relative overflow-hidden border-y border-white/10 bg-[#0A0A0A]">
+    <section data-testid="season-pass-widget" className="relative overflow-hidden border-y border-white/10 bg-[#0A0A0A]">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -top-20 -left-20 w-96 h-96 rounded-full bg-[#FFD700] blur-[140px] opacity-10" />
         <div className="absolute -bottom-20 -right-20 w-96 h-96 rounded-full bg-[#29B6E8] blur-[140px] opacity-10" />
