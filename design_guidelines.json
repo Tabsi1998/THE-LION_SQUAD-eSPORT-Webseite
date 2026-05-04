@@ -1,0 +1,117 @@
+{
+  "project_name": "TLS ARENA - THE LION SQUAD eSPORTS",
+  "theme": "dark",
+  "archetype": "Hybrid of Archetype 7 (Electric & Neon) and Archetype 2 (Performance Pro)",
+  "brand_colors": {
+    "primary": "#29B6E8",
+    "primary_hover": "#1E95C2",
+    "background_base": "#0A0A0A",
+    "background_surface": "#121212",
+    "background_card": "#18181B",
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#A1A1AA",
+    "border_subtle": "rgba(255, 255, 255, 0.1)",
+    "border_accent": "rgba(41, 182, 232, 0.3)",
+    "accent_live": "#FF3B30",
+    "accent_success": "#00FF88",
+    "accent_gold": "#FFD700"
+  },
+  "typography": {
+    "primary_heading_font": "Unbounded, sans-serif",
+    "secondary_body_font": "Outfit, sans-serif",
+    "display_data_font": "Rajdhani, sans-serif",
+    "scale": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter uppercase",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight uppercase",
+      "h3": "text-xl sm:text-2xl font-semibold tracking-tight",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-base font-normal leading-relaxed",
+      "small_label": "text-xs font-semibold uppercase tracking-[0.2em]",
+      "tv_display_data": "text-5xl lg:text-8xl font-bold tracking-tight"
+    }
+  },
+  "layout_and_spacing": {
+    "spacing_scale": "p-2, p-4, p-6, p-8, p-12, p-16, p-24, p-32",
+    "container_padding": "p-6 sm:p-8 md:p-12",
+    "grid_strategy": {
+      "marketing": "Asymmetrical 'Bento' grid with gap-8 to gap-12. Base: grid-cols-1 md:grid-cols-8 lg:grid-cols-12.",
+      "dashboard": "Dense 'Control Room' grid with gap-4 or gap-6. Base: grid-cols-1 md:grid-cols-3 lg:grid-cols-4."
+    },
+    "borderRadius": "rounded-none md:rounded-sm",
+    "borders": "1px solid rgba(255, 255, 255, 0.1) or rgba(41, 182, 232, 0.2)"
+  },
+  "component_strategies": {
+    "buttons": {
+      "primary": "bg-[#29B6E8] text-black font-bold uppercase tracking-wide hover:bg-[#1E95C2] hover:shadow-[0_0_15px_rgba(41,182,232,0.6)] transition-all rounded-sm",
+      "secondary": "bg-transparent border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wide hover:bg-[rgba(41,182,232,0.1)] transition-all rounded-sm",
+      "ghost": "bg-transparent text-white hover:text-[#29B6E8] hover:bg-white/5 transition-all rounded-sm"
+    },
+    "cards": {
+      "default": "bg-[#18181B] border border-white/10 rounded-sm hover:border-[#29B6E8]/40 hover:-translate-y-1 transition-all duration-300",
+      "active": "bg-[#18181B] border border-[#29B6E8] shadow-[0_0_10px_rgba(41,182,232,0.2)] rounded-sm"
+    },
+    "headers": {
+      "main": "sticky top-0 z-50 bg-[#0A0A0A]/80 backdrop-blur-xl border-b border-white/10"
+    },
+    "badges": {
+      "live": "bg-[#FF3B30]/20 text-[#FF3B30] border border-[#FF3B30]/50 text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-sm animate-pulse",
+      "check_in": "bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/50 text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-sm",
+      "open": "bg-[#00FF88]/20 text-[#00FF88] border border-[#00FF88]/50 text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-sm",
+      "ended": "bg-white/10 text-white/70 border border-white/20 text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-sm"
+    }
+  },
+  "specialized_views": {
+    "bracket_tree": {
+      "background": "bg-[#0A0A0A] with faint cyan neon grid overlay or radial gradient",
+      "match_node": "bg-[#18181B] border border-white/10 rounded-sm overflow-hidden",
+      "winner_line": "border-[#29B6E8] shadow-[0_0_8px_rgba(41,182,232,0.5)]",
+      "loser_line": "border-white/10 opacity-50",
+      "typography": "Use Outfit for team names, Rajdhani for scores. High contrast."
+    },
+    "tv_beamer_mode": {
+      "background": "Pure black (#000000) for highest contrast on projectors/displays",
+      "typography": "Rajdhani font, massive scale (e.g., text-6xl to text-9xl). All caps.",
+      "layout": "Top 3 podium highlight (center, left, right), scrolling list for remaining ranks.",
+      "animations": "Smooth row transitions for live updates (Framer Motion).",
+      "colors": "Gold for 1st, Silver for 2nd, Bronze for 3rd, Cyan for active player/lap."
+    }
+  },
+  "visual_enhancers": {
+    "shadows": "Use colored glows instead of drop shadows (e.g., shadow-[0_0_20px_rgba(41,182,232,0.15)])",
+    "glassmorphism": "Used only for floating UI (nav, modals): bg-[#0A0A0A]/70 backdrop-blur-2xl border border-white/10",
+    "textures": "Subtle CRT scanline or noise texture overlay on dark backgrounds to add grit and depth.",
+    "hover_states": "Always explicit. Change text color and border color on hover. Increase neon glow."
+  },
+  "media_assets": {
+    "logos": {
+      "primary_mascot": "https://customer-assets.emergentagent.com/job_esports-hub-134/artifacts/2rsp6zmh_Lo%CC%88we_aufSchwarz_Web.png",
+      "primary_wordmark": "https://customer-assets.emergentagent.com/job_esports-hub-134/artifacts/e3zukpsb_TheLionSquad_Logo_%20aufSchwarz_Quer_Web.png"
+    },
+    "images": {
+      "hero_esports_arena": "https://images.pexels.com/photos/7915213/pexels-photo-7915213.jpeg",
+      "f1_sim_racing_bg": "https://images.unsplash.com/photo-1771440571270-e27b63085a48",
+      "generic_gaming": "https://images.unsplash.com/photo-1683813479722-29b14f530507",
+      "tournament_bracket_bg": "https://images.unsplash.com/photo-1725273549300-cda8de33868c"
+    }
+  },
+  "libraries_and_tools": {
+    "icons": "lucide-react",
+    "animations": "framer-motion",
+    "scrolling": "lenis",
+    "ui_components": "shadcn/ui (highly customized with 0-2px border-radius and neon borders)"
+  },
+  "accessibility_and_testing": {
+    "contrast": "Ensure minimum 4.5:1 ratio for normal text and 3:1 for large text. Use pure white for primary text against #0A0A0A.",
+    "focus_states": "focus:outline-none focus:ring-2 focus:ring-[#29B6E8] focus:ring-offset-2 focus:ring-offset-[#0A0A0A]",
+    "testing": "All interactive and key informational elements MUST include a data-testid attribute (e.g., data-testid='hero-cta-button')."
+  },
+  "instructions_to_main_agent": [
+    "Strictly adhere to the dark theme and the provided brand colors (#29B6E8, #0A0A0A). Do not use default SaaS blue or Vercel aesthetics.",
+    "For typography, use Unbounded for all major headings, Outfit for body text, and Rajdhani for scores/leaderboards/TV mode numbers.",
+    "Implement a dedicated TV/Beamer display view that utilizes extremely large typography (Rajdhani) and high contrast for F1 Fast Laps.",
+    "Use the provided official Lion Squad logos for the header, footer, and branding moments.",
+    "Avoid heavily rounded corners (rounded-xl, rounded-2xl). Keep the UI sharp and tactical (rounded-sm or rounded-none).",
+    "Implement 'Tracing Beam' or glowing border effects on primary CTA cards and the active tournament brackets.",
+    "Use data-testid attributes on all interactive elements as specified in the testing guidelines."
+  ]
+}
