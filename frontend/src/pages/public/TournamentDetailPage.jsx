@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { toast } from "sonner";
 import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, Twitch } from "lucide-react";
 import { PrizeList } from "@/components/tls/PrizeList";
+import { StreamEmbed } from "@/components/tls/StreamEmbed";
 
 export default function TournamentDetailPage() {
   const { slug } = useParams();
@@ -126,18 +127,8 @@ export default function TournamentDetailPage() {
               <PrizeList prizePlaces={t.prize_places} prizePool={t.prize_pool} />
             </section>
           )}
-          {t.twitch_enabled && t.twitch_channel && (
-            <section data-testid="twitch-embed">
-              <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Twitch className="w-4 h-4 text-[#9146FF]" /> Live Stream</h2>
-              <div className="rounded-sm overflow-hidden border border-[#9146FF]/30 bg-black aspect-video">
-                <iframe
-                  src={`https://player.twitch.tv/?channel=${encodeURIComponent(t.twitch_channel)}&parent=${window.location.hostname}&muted=true`}
-                  title="Twitch Stream"
-                  allowFullScreen
-                  className="w-full h-full"
-                />
-              </div>
-            </section>
+          {(t.has_live_stream || (t.twitch_enabled && t.twitch_channel)) && (
+            <section data-testid="tournament-stream"><StreamEmbed source={t} /></section>
           )}
           <section>
             <h2 className="font-heading text-2xl font-bold uppercase mb-3">Teilnehmer ({regs.length})</h2>

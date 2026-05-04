@@ -28,6 +28,7 @@ from routes.upload_routes import router as upload_router
 from routes.badge_routes import router as badge_router
 from routes.membership_routes import router as membership_router
 from routes.document_routes import router as document_router
+from routes.home_routes import router as home_router
 from routes.extras_routes import (
     settings_router, season_router, widget_router, dsgvo_router, pdf_router, audit_router,
 )
@@ -52,7 +53,7 @@ async def lifespan(app: FastAPI):
             "tournament_registrations", "matches", "f1_challenges", "f1_tracks",
             "f1_lap_times", "stations", "news_posts", "sponsors", "seasons",
             "tournament_groups", "memberships", "member_benefits", "user_socials",
-            "gallery_albums", "gallery_photos", "documents",
+            "gallery_albums", "gallery_photos", "documents", "season_points",
             "audit_logs", "email_logs", "notifications", "password_reset_tokens",
             "login_attempts", "user_badges",
         ]:
@@ -124,6 +125,7 @@ app.include_router(upload_router)
 app.include_router(badge_router)
 app.include_router(membership_router)
 app.include_router(document_router)
+app.include_router(home_router)
 
 # Static uploads (serve user-uploaded images through /api prefix to survive ingress)
 from fastapi.staticfiles import StaticFiles

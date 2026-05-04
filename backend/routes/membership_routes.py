@@ -128,6 +128,12 @@ async def update_user_membership(
             display_name=user.get("display_name") or user.get("username"),
             member_number=m.get("member_number") or "",
         )
+        # Phase 6: Auto-award members-only badges
+        try:
+            from badges import evaluate_membership_badges
+            await evaluate_membership_badges(user_id)
+        except Exception:
+            pass
     elif new_status == "blocked":
         await send_template(
             "membership_blocked",

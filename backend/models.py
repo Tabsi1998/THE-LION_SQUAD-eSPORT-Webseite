@@ -302,10 +302,15 @@ TournamentFormat = Literal[
     "single_elim", "double_elim", "round_robin", "swiss",
     "groups", "ffa", "battle_royale", "league", "time_trial", "grand_prix"
 ]
+# Unified status vocabulary across Events / Tournaments / Challenges / Fast-Lap.
+# `scheduled` = "Warten auf Öffnung" (announced but not open for registration yet)
 TournamentStatus = Literal[
-    "draft", "registration_open", "check_in", "live", "paused", "completed", "archived"
+    "draft", "scheduled", "registration_open", "registration_closed",
+    "check_in", "live", "paused", "completed", "results_published",
+    "archived", "cancelled",
 ]
 TeamMode = Literal["solo", "duo", "team", "squad"]
+StreamPlatform = Literal["twitch", "youtube", "kick", "custom"]
 
 
 class TournamentCreate(BaseModel):
@@ -371,6 +376,12 @@ class TournamentUpdate(BaseModel):
     location: Optional[str] = None
     banner_url: Optional[str] = None
     seeding_mode: Optional[Literal["manual", "random", "ranking"]] = None
+    has_live_stream: Optional[bool] = None
+    stream_platform: Optional[StreamPlatform] = None
+    stream_url: Optional[str] = None
+    stream_title: Optional[str] = None
+    show_chat: Optional[bool] = None
+    season_weight: Optional[float] = None
 
 
 class RegistrationCreate(BaseModel):
@@ -455,12 +466,21 @@ class F1ChallengeCreate(BaseModel):
     banner_url: Optional[str] = None
     twitch_channel: Optional[str] = None
     twitch_enabled: bool = False
+    # Unified stream-per-object (Phase 5)
+    has_live_stream: bool = False
+    stream_platform: Optional[StreamPlatform] = None
+    stream_url: Optional[str] = None
+    stream_title: Optional[str] = None
+    show_chat: bool = False
+    # Phase 7 weighting
+    season_weight: float = 1.0  # default = "Fast-Lap-Challenge"
+    visibility: Literal["public", "community", "members", "internal"] = "public"
 
 
 class F1ChallengeUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
-    status: Optional[Literal["draft", "registration_open", "live", "paused", "completed"]] = None
+    status: Optional[TournamentStatus] = None
     vehicle: Optional[str] = None
     weather: Optional[str] = None
     assists_allowed: Optional[str] = None
@@ -476,6 +496,13 @@ class F1ChallengeUpdate(BaseModel):
     banner_url: Optional[str] = None
     twitch_channel: Optional[str] = None
     twitch_enabled: Optional[bool] = None
+    has_live_stream: Optional[bool] = None
+    stream_platform: Optional[StreamPlatform] = None
+    stream_url: Optional[str] = None
+    stream_title: Optional[str] = None
+    show_chat: Optional[bool] = None
+    season_weight: Optional[float] = None
+    visibility: Optional[Literal["public", "community", "members", "internal"]] = None
 
 
 class F1LapTimeCreate(BaseModel):

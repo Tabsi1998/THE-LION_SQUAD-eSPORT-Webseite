@@ -1,39 +1,27 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, formatMs } from "@/lib/api";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentCard } from "@/components/tls/TournamentCard";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { MascotBadge } from "@/components/tls/Logo";
 import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
-import { CurrentEventHero } from "@/components/tls/CurrentEventHero";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { motion } from "framer-motion";
-import { ArrowRight, Flag, Trophy, Zap, Users as UsersIcon } from "lucide-react";
+import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Crown, Pin, Radio, Users as UsersIcon } from "lucide-react";
 
 export default function HomePage() {
-  const [tournaments, setTournaments] = useState([]);
-  const [challenges, setChallenges] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [news, setNews] = useState([]);
+  const [state, setState] = useState(null);
 
   useEffect(() => {
-    (async () => {
-      const [t, c, e, n] = await Promise.allSettled([
-        api.get("/tournaments?limit=6"),
-        api.get("/f1/challenges?limit=3"),
-        api.get("/events"),
-        api.get("/news"),
-      ]);
-      if (t.status === "fulfilled") setTournaments(t.value.data);
-      if (c.status === "fulfilled") setChallenges(c.value.data);
-      if (e.status === "fulfilled") setEvents(e.value.data);
-      if (n.status === "fulfilled") setNews(n.value.data);
-    })();
+    api.get("/home/state").then(({ data }) => setState(data)).catch(() => {});
   }, []);
 
   return (
     <PublicLayout>
+      {/* Live Banner — only when something is actually live */}
+      {state?.has_live && <LiveBanner state={state} />}
+
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-white/10 bg-grid-dense">
         <div className="absolute inset-0 pointer-events-none">
@@ -46,53 +34,30 @@ export default function HomePage() {
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28">
           <div className="grid lg:grid-cols-12 gap-8 items-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="lg:col-span-7"
-            >
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="lg:col-span-7">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#29B6E8]/10 border border-[#29B6E8]/30 rounded-sm mb-6" data-testid="hero-tag">
                 <span className="w-2 h-2 rounded-full bg-[#29B6E8] animate-pulse" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">
-                  Powered by The Lion Squad
-                </span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">THE LION SQUAD · eSPORTS</span>
               </div>
               <h1 className="font-heading text-4xl sm:text-5xl lg:text-7xl font-black uppercase tracking-tighter leading-[0.95] text-white">
-                Die Arena der<br />
-                <span className="tls-gradient-text">Lions</span> ist offen.
+                Ein Rudel.<br /><span className="tls-gradient-text">Eine Familie.</span>
               </h1>
               <p className="mt-6 text-base md:text-lg text-white/70 max-w-xl leading-relaxed">
-                TLS ARENA vereint Turniere, Ligen, Live-Brackets und die legendäre Fast Lap Championship unter einem Dach — mit Lion-Squad-DNA.
+                Vereinsplattform, Turnierarena, Fast-Lap-Championship und Mitgliederportal — alles unter einem Dach. Bei uns geht es nicht nur ums Zocken, sondern um Gemeinschaft, Spaß und Zusammenhalt.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link
-                  to="/tournaments"
-                  data-testid="hero-cta-tournaments"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] hover:shadow-[0_0_24px_rgba(41,182,232,0.6)] transition-all"
-                >
-                  Turniere entdecken <ArrowRight className="w-4 h-4" />
+                <Link to="/about" data-testid="hero-cta-about" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] hover:shadow-[0_0_24px_rgba(41,182,232,0.6)] transition-all">
+                  Über den Verein <ArrowRight className="w-4 h-4" />
                 </Link>
-                <Link
-                  to="/f1"
-                  data-testid="hero-cta-f1"
-                  className="inline-flex items-center gap-2 px-6 py-3 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10 transition-all"
-                >
-                  F1 Leaderboards <Flag className="w-4 h-4" />
+                <Link to="/membership/join" data-testid="hero-cta-join" className="inline-flex items-center gap-2 px-6 py-3 border border-[#FFD700] text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition-all">
+                  <Crown className="w-4 h-4" /> Mitglied werden
                 </Link>
-              </div>
-              <div className="mt-10 flex items-center gap-6 text-white/60 text-sm">
-                <Stat label="Games" value="6+" />
-                <Stat label="Formate" value="10" />
-                <Stat label="Live" value={<span className="text-[#FF3B30]">ON AIR</span>} />
+                <Link to="/tournaments" data-testid="hero-cta-tournaments" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm transition-all">
+                  Turniere
+                </Link>
               </div>
             </motion.div>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="lg:col-span-5 flex items-center justify-center"
-            >
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.2 }} className="lg:col-span-5 flex items-center justify-center">
               <div className="relative">
                 <div className="absolute inset-0 bg-[#29B6E8] blur-[80px] opacity-20" />
                 <MascotBadge className="relative w-64 h-64 md:w-80 md:h-80 drop-shadow-[0_0_40px_rgba(41,182,232,0.3)]" />
@@ -102,140 +67,181 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Live + Tournaments */}
-      <CurrentEventHero />
+      {/* TODAY — only shown when something is happening today */}
+      {state?.today && hasContent(state.today) && (
+        <Section icon={Calendar} accent="#9F7AEA" title="Heute" subtitle="Was heute im Rudel los ist">
+          <ItemGrid lists={state.today} variant="today" />
+        </Section>
+      )}
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <SectionHeader title="Aktuelle Turniere" subtitle="Anmeldung offen, Live und beendet" actionLabel="Alle Turniere" actionTo="/tournaments" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
-          {tournaments.slice(0, 6).map((t, i) => <TournamentCard key={t.id} tournament={t} index={i} />)}
-          {tournaments.length === 0 && (
-            <div className="col-span-full text-white/40 text-center py-20 font-display tracking-widest">KEINE TURNIERE VORHANDEN</div>
-          )}
-        </div>
-      </section>
+      {/* SOON */}
+      {state?.soon && hasContent(state.soon) && (
+        <Section icon={ArrowRight} accent="#29B6E8" title="In Kürze" subtitle="Anmeldung läuft oder bald öffnend">
+          <ItemGrid lists={state.soon} variant="soon" />
+        </Section>
+      )}
 
-      {/* Season Pass */}
+      {/* If nothing live/today/soon: show CTA grid */}
+      {state && !state.has_live && !hasContent(state.today || {}) && !hasContent(state.soon || {}) && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="border border-dashed border-white/15 rounded-sm p-12 text-center">
+            <Trophy className="w-10 h-10 mx-auto text-white/20 mb-4" />
+            <h2 className="font-heading text-2xl font-black uppercase">Aktuell ruht das Rudel</h2>
+            <p className="mt-3 text-white/60 max-w-xl mx-auto">Keine laufenden oder anstehenden Events. Folge uns auf Discord oder schau bei den News, um keine Ankündigung zu verpassen.</p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Link to="/news" className="px-5 py-2.5 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm">News lesen</Link>
+              <Link to="/membership/join" className="px-5 py-2.5 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm">Mitglied werden</Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Season Pass widget */}
       <SeasonPassWidget />
 
-      {/* Fast Lap */}
-      <section className="relative overflow-hidden border-y border-white/10 bg-[#0A0A0A]">
-        <div className="absolute inset-0 pointer-events-none">
-          <img src="https://images.unsplash.com/photo-1771440571270-e27b63085a48" className="w-full h-full object-cover opacity-20" alt="" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0A] via-[#0A0A0A]/70 to-[#0A0A0A]/40" />
-        </div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="grid lg:grid-cols-12 gap-10 items-start">
-            <div className="lg:col-span-5">
-              <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Fast Lap Challenge</span>
-              <h2 className="mt-3 font-heading text-3xl md:text-5xl font-black uppercase leading-tight">Jede Millisekunde zählt.</h2>
-              <p className="mt-4 text-white/70 text-base max-w-md">
-                Rangliste in Echtzeit. Adminverwaltung der Zeiten. Championship über mehrere Strecken. Bildschirmmodus für TV und Beamer.
-              </p>
-              <Link to="/f1" data-testid="f1-section-cta" className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 border border-[#29B6E8] text-[#29B6E8] rounded-sm uppercase tracking-wider text-sm font-bold hover:bg-[#29B6E8]/10">
-                Zur Rangliste <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-            <div className="lg:col-span-7 space-y-4">
-              {challenges.map((c) => (
-                <Link
-                  key={c.id}
-                  to={`/f1/${c.slug || c.id}`}
-                  data-testid={`f1-home-${c.slug}`}
-                  className="block group border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-5 bg-[#121212] hover:bg-[#18181B] transition-all"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <StatusBadge status={c.status} />
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-white/50">{c.track_count} Strecken · {c.participant_count} Fahrer</span>
-                      </div>
-                      <h3 className="font-heading text-xl md:text-2xl font-bold group-hover:text-[#29B6E8] transition">{c.title}</h3>
-                      <p className="mt-2 text-sm text-white/60 line-clamp-2">{c.description}</p>
-                    </div>
-                    <Flag className="w-8 h-8 text-[#29B6E8] shrink-0" />
+      {/* News */}
+      {state?.news?.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <SectionHeader icon={Newspaper} accent="#29B6E8" title="Aktuelle News" actionLabel="Alle News" actionTo="/news" />
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 mt-8">
+            {state.news.map((n) => (
+              <Link key={n.id} to={`/news/${n.slug}`} data-testid={`home-news-${n.slug}`} className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] overflow-hidden transition flex flex-col">
+                {n.banner_url ? (
+                  <div className="aspect-video bg-[#0A0A0A] overflow-hidden"><img src={n.banner_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" /></div>
+                ) : (
+                  <div className="aspect-video bg-gradient-to-br from-[#29B6E8]/20 via-[#0A0A0A] to-[#0A0A0A]" />
+                )}
+                <div className="p-4 flex-1">
+                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
+                    {n.category}
+                    {n.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
                   </div>
-                </Link>
-              ))}
-              {challenges.length === 0 && (
-                <div className="text-white/40 text-sm">Keine aktiven Challenges.</div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Events + News */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid lg:grid-cols-2 gap-10">
-          <div>
-            <SectionHeader title="Events" subtitle="Vor Ort & Online" actionLabel="Alle" actionTo="/events" />
-            <div className="mt-6 space-y-4">
-              {events.slice(0, 3).map((e) => (
-                <Link
-                  key={e.id}
-                  to={`/events/${e.slug || e.id}`}
-                  data-testid={`event-home-${e.slug}`}
-                  className="group flex items-center gap-4 border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-4 bg-[#121212] transition"
-                >
-                  <div className="w-20 h-20 bg-[#0A0A0A] border border-white/10 rounded-sm overflow-hidden shrink-0">
-                    {e.banner_url && <img src={e.banner_url} alt="" className="w-full h-full object-cover" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1"><StatusBadge status={e.status || "upcoming"} /></div>
-                    <h4 className="font-heading text-lg font-bold group-hover:text-[#29B6E8] transition">{e.name}</h4>
-                    <p className="text-sm text-white/60 truncate">{e.location || "Online"}</p>
-                  </div>
-                </Link>
-              ))}
-              {events.length === 0 && <div className="text-white/40 text-sm">Keine Events geplant.</div>}
-            </div>
-          </div>
-          <div>
-            <SectionHeader title="News" subtitle="Ankündigungen & Updates" actionLabel={null} actionTo={null} />
-            <div className="mt-6 space-y-4">
-              {news.slice(0, 3).map((n) => (
-                <div key={n.id} data-testid={`news-${n.slug}`} className="border border-white/10 rounded-sm p-4 bg-[#121212]">
-                  <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">
-                    {new Date(n.created_at).toLocaleDateString("de-DE")}
-                  </div>
-                  <h4 className="mt-1 font-heading text-lg font-bold">{n.title}</h4>
-                  <p className="mt-1 text-sm text-white/70">{n.excerpt}</p>
+                  <h3 className="mt-2 font-heading font-black uppercase line-clamp-2 group-hover:text-[#29B6E8] transition">{n.title}</h3>
+                  {n.excerpt && <p className="mt-2 text-xs text-white/60 line-clamp-2">{n.excerpt}</p>}
                 </div>
-              ))}
-              {news.length === 0 && <div className="text-white/40 text-sm">Keine News.</div>}
-            </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <SponsorTicker />
+
+      {/* Vereins-CTA */}
+      <section className="border-t border-white/10 bg-gradient-to-b from-[#0F0F0F] to-black">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+          <Crown className="w-10 h-10 mx-auto text-[#FFD700] mb-4" />
+          <h2 className="font-heading text-3xl md:text-5xl font-black uppercase">Du willst Teil des Rudels werden?</h2>
+          <p className="mt-4 text-white/70 max-w-2xl mx-auto">
+            Registriere dich, lerne uns kennen und bewirb dich auf eine offizielle Vereinsmitgliedschaft.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Link to="/register" className="px-7 py-3.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">Account erstellen</Link>
+            <Link to="/membership/join" className="px-7 py-3.5 border-2 border-[#FFD700] text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700] hover:text-black transition">Mitglied werden</Link>
           </div>
         </div>
       </section>
-
-      {/* Sponsor Ticker */}
-      <SponsorTicker />
     </PublicLayout>
   );
 }
 
-function Stat({ label, value }) {
+function LiveBanner({ state }) {
+  const live = state.live;
+  const all = [
+    ...(live.tournaments || []).map((x) => ({ ...x, kind: "tournament", url: `/tournaments/${x.slug}` })),
+    ...(live.challenges || []).map((x) => ({ ...x, kind: "fastlap", url: `/f1/${x.slug}` })),
+    ...(live.events || []).map((x) => ({ ...x, kind: "event", url: `/events/${x.slug}` })),
+  ];
+  if (!all.length) return null;
   return (
-    <div>
-      <div className="font-display text-2xl font-bold tracking-tight">{value}</div>
-      <div className="text-[10px] uppercase tracking-widest text-white/40">{label}</div>
+    <div className="relative bg-gradient-to-r from-[#FF3B30] via-[#FF3B30]/80 to-[#FF3B30] border-b border-[#FF3B30]/40">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2 text-white">
+          <Radio className="w-4 h-4 animate-pulse" />
+          <span className="font-display tracking-widest font-bold text-sm">LIVE JETZT</span>
+        </div>
+        <div className="flex-1 flex items-center gap-3 flex-wrap">
+          {all.slice(0, 3).map((x) => (
+            <Link key={x.id} to={x.url} data-testid={`live-banner-${x.kind}-${x.slug}`} className="inline-flex items-center gap-2 px-3 py-1.5 bg-black/30 hover:bg-black/50 text-white border border-white/20 rounded-sm transition text-sm">
+              <span className="font-bold">{x.title || x.name}</span>
+              {x.kind === "fastlap" && <Flag className="w-3 h-3" />}
+              {x.kind === "tournament" && <Trophy className="w-3 h-3" />}
+              {x.kind === "event" && <Calendar className="w-3 h-3" />}
+            </Link>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
-function SectionHeader({ title, subtitle, actionLabel, actionTo }) {
+function Section({ icon: Icon, accent, title, subtitle, children }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{subtitle}</span>
-        <h2 className="mt-2 font-heading text-3xl md:text-4xl font-black uppercase leading-tight">{title}</h2>
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+      <div className="flex items-end justify-between gap-4 flex-wrap mb-6">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.3em] font-bold flex items-center gap-2" style={{ color: accent }}>
+            <Icon className="w-3.5 h-3.5" /> {title}
+          </div>
+          {subtitle && <h2 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">{subtitle}</h2>}
+        </div>
       </div>
-      {actionLabel && actionTo && (
-        <Link to={actionTo} data-testid={`section-action-${actionTo}`} className="text-sm font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white inline-flex items-center gap-1.5">
-          {actionLabel} <ArrowRight className="w-3.5 h-3.5" />
+      {children}
+    </section>
+  );
+}
+
+function ItemGrid({ lists, variant }) {
+  const all = [
+    ...(lists.tournaments || []).map((x) => ({ ...x, kind: "tournament", url: `/tournaments/${x.slug}`, label: x.title })),
+    ...(lists.events || []).map((x) => ({ ...x, kind: "event", url: `/events/${x.slug}`, label: x.name })),
+    ...(lists.challenges || []).map((x) => ({ ...x, kind: "fastlap", url: `/f1/${x.slug}`, label: x.title })),
+  ];
+  return (
+    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {all.map((x) => (
+        <Link key={`${x.kind}-${x.id}`} to={x.url} data-testid={`home-${variant}-${x.kind}-${x.slug}`} className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] p-5 transition flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <KindIcon kind={x.kind} />
+            <StatusBadge status={x.status} />
+            {x.has_live_stream && <Radio className="w-3 h-3 text-[#FF3B30] animate-pulse" />}
+          </div>
+          <div className="font-heading font-black text-lg group-hover:text-[#29B6E8] transition line-clamp-2">{x.label}</div>
+          {x.start_date && (
+            <div className="text-xs text-white/50 inline-flex items-center gap-1.5">
+              <Calendar className="w-3 h-3" /> {new Date(x.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}
+            </div>
+          )}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function KindIcon({ kind }) {
+  if (kind === "tournament") return <Trophy className="w-3.5 h-3.5 text-[#FFD700]" />;
+  if (kind === "fastlap") return <Flag className="w-3.5 h-3.5 text-[#29B6E8]" />;
+  return <Calendar className="w-3.5 h-3.5 text-[#9F7AEA]" />;
+}
+
+function SectionHeader({ icon: Icon, accent, title, actionLabel, actionTo }) {
+  return (
+    <div className="flex items-end justify-between gap-4 flex-wrap">
+      <div>
+        <div className="text-[11px] uppercase tracking-[0.3em] font-bold flex items-center gap-2" style={{ color: accent }}>
+          <Icon className="w-3.5 h-3.5" /> {title}
+        </div>
+      </div>
+      {actionTo && (
+        <Link to={actionTo} className="inline-flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-white/60 hover:text-[#29B6E8] transition">
+          {actionLabel} <ArrowRight className="w-3 h-3" />
         </Link>
       )}
     </div>
   );
+}
+
+function hasContent(group) {
+  if (!group) return false;
+  return Object.values(group).some((arr) => Array.isArray(arr) && arr.length > 0);
 }

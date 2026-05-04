@@ -4,6 +4,7 @@ import { api, formatMs } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { PrizeList } from "@/components/tls/PrizeList";
+import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { Tv, Trophy, Flag, Download, Twitch, FileDown } from "lucide-react";
 
 export default function F1DetailPage() {
@@ -88,18 +89,8 @@ export default function F1DetailPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-        {challenge.twitch_enabled && challenge.twitch_channel && (
-          <section data-testid="f1-twitch-embed">
-            <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2"><Twitch className="w-4 h-4 text-[#9146FF]" /> Live Stream</h2>
-            <div className="rounded-sm overflow-hidden border border-[#9146FF]/30 bg-black aspect-video max-w-4xl">
-              <iframe
-                src={`https://player.twitch.tv/?channel=${encodeURIComponent(challenge.twitch_channel)}&parent=${window.location.hostname}&muted=true`}
-                title="Twitch Stream"
-                allowFullScreen
-                className="w-full h-full"
-              />
-            </div>
-          </section>
+        {(challenge.has_live_stream || (challenge.twitch_enabled && challenge.twitch_channel)) && (
+          <section data-testid="f1-stream"><StreamEmbed source={challenge} /></section>
         )}
         {(challenge.prize_places?.length > 0) && (
           <section>

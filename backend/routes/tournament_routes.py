@@ -49,11 +49,15 @@ async def _resolve_tid(slug_or_id: str) -> str:
 
 @router.get("")
 async def list_tournaments(status: str | None = None, game_id: str | None = None,
-                           event_id: str | None = None, limit: int = 100):
+                           event_id: str | None = None, limit: int = 100,
+                           user=Depends(get_optional_user)):
     db = get_db()
+    is_admin = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
     q = {}
     if status:
         q["status"] = status
+    elif not is_admin:
+        q["status"] = {"$ne": "draft"}
     if game_id:
         q["game_id"] = game_id
     if event_id:
@@ -69,6 +73,9 @@ async def get_tournament(slug_or_id: str, user=Depends(get_optional_user)):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    is_admin = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
+    if t.get("status") == "draft" and not is_admin:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     await _enrich_tournament(t)
     return t
@@ -276,18 +283,78 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
     db = get_db()
     tid = await _resolve_tid(tid)
     status = body.get("status")
-    allowed = {"draft", "registration_open", "check_in", "live", "paused", "completed", "archived"}
+    allowed = {
+        "draft", "scheduled", "registration_open", "registration_closed",
+        "check_in", "live", "paused", "completed", "results_published",
+        "archived", "cancelled",
+    }
     if status not in allowed:
         raise HTTPException(status_code=400, detail="Ungültiger Status")
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
     prev = t.get("status")
     await db.tournaments.update_one({"id": tid}, {"$set": {"status": status, "updated_at": now_utc().isoformat()}})
+
+    # ---------- Season Points + Badges on results_published ----------
+    if prev != status and status == "results_published":
+        try:
+            from services.season_service import award_points
+            from badges import on_tournament_completed
+            # Build placements from matches.final_position
+            regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+            reg_map = {r["id"]: r for r in regs}
+            num_participants = len(regs)
+            matches = await db.matches.find({"tournament_id": tid, "final_position": {"$ne": None}}, {"_id": 0}).to_list(200)
+            placements = []
+            seen = set()
+            for m in matches:
+                rid = m.get("winner_id")
+                if rid and rid in reg_map and rid not in seen:
+                    reg = reg_map[rid]
+                    placements.append({
+                        "user_id": reg.get("user_id"),
+                        "team_id": reg.get("team_id"),
+                        "rank": m["final_position"],
+                    })
+                    seen.add(rid)
+            # Source type by season weight: <=1.5 mini, <=2.5 normal, else major
+            weight = float(t.get("season_weight") or 2.0)
+            source_type = "mini" if weight < 1.5 else ("major" if weight >= 2.5 else "tournament")
+            for p in placements:
+                if not (p.get("user_id") or p.get("team_id")):
+                    continue
+                await award_points(
+                    user_id=p.get("user_id"),
+                    team_id=p.get("team_id"),
+                    source_type=source_type,
+                    source_id=tid,
+                    source_name=t.get("title"),
+                    rank=p["rank"],
+                    num_participants=num_participants,
+                    weight=weight,
+                )
+            # Participation points for everyone else
+            placed_user_ids = {p.get("user_id") for p in placements}
+            for r in regs:
+                uid = r.get("user_id")
+                if uid and uid not in placed_user_ids:
+                    await award_points(
+                        user_id=uid, source_type=source_type, source_id=tid,
+                        source_name=t.get("title"), rank=None,
+                        num_participants=num_participants, weight=weight,
+                    )
+            await on_tournament_completed(tid, placements)
+        except Exception as exc:
+            import logging
+            logging.getLogger("tls.tournament").warning(f"results_published hook: {exc}")
+
     # Discord trigger
-    if prev != status and status in ("registration_open", "live", "completed"):
+    if prev != status and status in ("registration_open", "live", "completed", "results_published"):
         try:
             from discord_service import send_discord
-            colors = {"registration_open": 0x00FF88, "live": 0x29B6E8, "completed": 0xFFD700}
-            labels = {"registration_open": "Anmeldung offen", "live": "Jetzt live", "completed": "Beendet"}
+            colors = {"registration_open": 0x00FF88, "live": 0x29B6E8,
+                      "completed": 0xFFD700, "results_published": 0xFFD700}
+            labels = {"registration_open": "Anmeldung offen", "live": "Jetzt live",
+                      "completed": "Beendet", "results_published": "Ergebnisse veröffentlicht"}
             game_id = t.get("game_id")
             game = await db.games.find_one({"id": game_id}, {"name": 1}) if game_id else None
             url = f"/tournaments/{t.get('slug') or tid}"

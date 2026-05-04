@@ -101,6 +101,16 @@ async def init_indexes():
     await db.documents.create_index("id", unique=True)
     await db.documents.create_index("category")
     await db.documents.create_index([("pinned", -1), ("order_index", 1)])
+    # Season points (Phase 7)
+    await db.season_points.create_index("id", unique=True)
+    await db.season_points.create_index("season_id")
+    await db.season_points.create_index([("season_id", 1), ("user_id", 1)])
+    await db.season_points.create_index([("season_id", 1), ("team_id", 1)])
+    await db.season_points.create_index([("user_id", 1), ("source_type", 1), ("created_at", -1)])
+    # Badges (Phase 6)
+    await db.badges.create_index("code", unique=True)
+    await db.badges.create_index("audience")
+    await db.user_badges.create_index([("user_id", 1), ("badge_code", 1)], unique=True)
 
 
 async def close_client():
