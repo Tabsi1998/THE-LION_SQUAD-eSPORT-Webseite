@@ -4,6 +4,7 @@ import logging
 import asyncio
 import ssl
 import smtplib
+import ipaddress
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -53,6 +54,14 @@ def _smtp_tls_context(validate_certs: bool):
     return context
 
 
+def _is_ip_literal(value: str | None) -> bool:
+    try:
+        ipaddress.ip_address((value or "").strip())
+        return True
+    except ValueError:
+        return False
+
+
 def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
     host = cfg.get("smtp_host")
     port = int(cfg.get("smtp_port") or 587)
@@ -62,6 +71,7 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
     username = cfg.get("smtp_user") or ""
     password = cfg.get("smtp_pass") or ""
     envelope_from = cfg.get("smtp_envelope_from") or (username if auth_mode != "none" else "") or cfg.get("sender_email")
+    helo_name = (cfg.get("smtp_helo_name") or "").strip() or None
 
     result = {
         "ok": False,
@@ -72,6 +82,7 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
         "auth_supported": False,
         "auth_ok": False,
         "relay_ok": False,
+        "helo_name": helo_name or "",
         "steps": [],
         "recommendations": [],
     }
@@ -82,11 +93,13 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
     smtp = None
     try:
         context = _smtp_tls_context(validate_certs)
+        if _is_ip_literal(host) and security in {"starttls", "tls"} and validate_certs:
+            result["recommendations"].append("Du verbindest per IP. Falls das Zertifikat auf einen DNS-Namen ausgestellt ist, deaktiviere TLS-Zertifikat pruefen oder nutze den Zertifikatsnamen als Host.")
         if security == "tls":
-            smtp = smtplib.SMTP_SSL(host=host, port=port, timeout=15, context=context)
+            smtp = smtplib.SMTP_SSL(host=host, port=port, timeout=15, context=context, local_hostname=helo_name)
             result["steps"].append({"ok": True, "label": f"SSL/TLS Verbindung zu {host}:{port} hergestellt."})
         else:
-            smtp = smtplib.SMTP(host=host, port=port, timeout=15)
+            smtp = smtplib.SMTP(host=host, port=port, timeout=15, local_hostname=helo_name)
             result["steps"].append({"ok": True, "label": f"SMTP Verbindung zu {host}:{port} hergestellt."})
 
         code, msg = smtp.ehlo()
@@ -108,8 +121,8 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
 
         should_login = auth_mode == "login" or (auth_mode == "auto" and username and password and auth_supported)
         if auth_mode == "login" and not auth_supported:
-            result["recommendations"].append("Dieser Host/Port bietet kein SMTP AUTH. Fuer Versand ohne Relay brauchst du Port 587 mit STARTTLS und SMTP Anmeldung.")
-            result["recommendations"].append("Port 25 ist fuer Server-zu-Server-Transport gedacht und ist ohne besondere Mailserver-Regel kein normaler Client-Versand.")
+            result["recommendations"].append("Dieser Host/Port bietet kein SMTP AUTH. Die IP ist okay, aber du brauchst auf dieser IP einen Submission-Port mit AUTH, meistens 587 STARTTLS oder 465 SSL/TLS.")
+            result["recommendations"].append("Port 25 ist fuer Server-zu-Server-Transport gedacht und ist ohne Relay-Regel kein normaler Client-Versand.")
             return result
         if should_login:
             if not username or not password:
@@ -140,7 +153,7 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
             result["recommendations"].append("SMTP Diagnose erfolgreich. Der Server akzeptiert den Empfaenger vor DATA.")
         elif "Relay access denied" in rcpt_text:
             result["recommendations"].append("Relay fehlt: Der Mailserver akzeptiert den Absender, erlaubt diesem Backend aber keine externen Empfaenger.")
-            result["recommendations"].append("Empfohlen: Submission-Port 587 mit STARTTLS und SMTP Anmeldung fuer office@lionsquad.at aktivieren.")
+            result["recommendations"].append("Wenn du per lokaler IP verbinden musst, ist das okay: auf dieser IP muss aber Port 587 oder 465 mit SMTP AUTH aktiv sein.")
             result["recommendations"].append("Alternative fuer lokalen Relay-Betrieb: Port 25 ohne Anmeldung lassen, aber nur die exakte Webserver-/Docker-IP in mynetworks/permit_mynetworks erlauben. Nicht 0.0.0.0/0 freigeben.")
             result["recommendations"].append("Pruefe im Mailserver-Log, welche Quell-IP beim RCPT-Versuch ankommt; genau diese IP muss erlaubt werden.")
         else:
@@ -177,6 +190,7 @@ async def get_mail_settings() -> dict:
         "smtp_security": s.get("smtp_security", "starttls"),  # starttls | tls | none
         "smtp_tls_verify": s.get("smtp_tls_verify", True),
         "smtp_envelope_from": s.get("smtp_envelope_from", ""),
+        "smtp_helo_name": s.get("smtp_helo_name", ""),
         "sender_name": s.get("sender_name") or legacy.get("sender_name") or "TLS ARENA",
         "sender_email": s.get("sender_email") or legacy.get("sender_email") or os.environ.get("SENDER_EMAIL", "noreply@lionsquad.at"),
         "reply_to_email": s.get("reply_to_email") or legacy.get("reply_to_email") or s.get("sender_email") or legacy.get("sender_email") or os.environ.get("SENDER_EMAIL", "noreply@lionsquad.at"),
@@ -244,6 +258,8 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
         "start_tls": start_tls,
         "timeout": 30,
     }
+    if cfg.get("smtp_helo_name"):
+        kwargs["local_hostname"] = cfg["smtp_helo_name"]
     if tls_context is not None:
         kwargs["tls_context"] = tls_context
     # If both falsy -> plain

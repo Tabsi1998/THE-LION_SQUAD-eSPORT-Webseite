@@ -54,6 +54,7 @@ class SetupWizardBody(BaseModel):
     smtp_security: Optional[str] = None
     smtp_tls_verify: Optional[bool] = None
     smtp_envelope_from: Optional[str] = None
+    smtp_helo_name: Optional[str] = None
     sender_name: Optional[str] = None
     sender_email: Optional[str] = None
     reply_to_email: Optional[str] = None
@@ -83,7 +84,7 @@ async def complete_setup(body: SetupWizardBody, me: dict = Depends(require_super
     # Mail/SMTP
     mail_keys = ["smtp_host", "smtp_port", "smtp_user", "smtp_pass",
                  "smtp_auth", "smtp_security", "smtp_tls_verify", "smtp_envelope_from",
-                 "sender_name", "sender_email", "reply_to_email", "message_id_domain"]
+                 "smtp_helo_name", "sender_name", "sender_email", "reply_to_email", "message_id_domain"]
     mail_updates = {k: getattr(body, k) for k in mail_keys if getattr(body, k) not in (None, "")}
     if body.mail_provider:
         mail_updates["provider"] = body.mail_provider

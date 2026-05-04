@@ -132,6 +132,7 @@ class SmtpSettings(BaseModel):
     smtp_security: Optional[Literal["starttls", "tls", "none"]] = None
     smtp_tls_verify: Optional[bool] = None
     smtp_envelope_from: Optional[str] = None
+    smtp_helo_name: Optional[str] = None
     sender_name: Optional[str] = None
     sender_email: Optional[str] = None
     reply_to_email: Optional[str] = None
@@ -154,6 +155,7 @@ async def get_smtp_settings(me: dict = Depends(require_admin())):
     s.setdefault("smtp_security", "starttls")
     s.setdefault("smtp_port", 587)
     s.setdefault("smtp_tls_verify", True)
+    s.setdefault("smtp_helo_name", "")
     s.setdefault("enabled", True)
     s.setdefault("reply_to_email", s.get("sender_email") or "")
     s.setdefault("message_id_domain", "")

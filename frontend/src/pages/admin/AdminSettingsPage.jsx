@@ -8,7 +8,7 @@ import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquar
 export default function AdminSettingsPage() {
   const [tab, setTab] = useState("email");
   const [email, setEmail] = useState({ resend_api_key: "", sender_name: "", sender_email: "", reply_to_email: "", enabled: true, resend_api_key_masked: "" });
-  const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_auth: "login", smtp_security: "starttls", smtp_tls_verify: true, smtp_envelope_from: "", sender_name: "", sender_email: "", reply_to_email: "", message_id_domain: "", enabled: true, smtp_pass_masked: "" });
+  const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_auth: "login", smtp_security: "starttls", smtp_tls_verify: true, smtp_envelope_from: "", smtp_helo_name: "", sender_name: "", sender_email: "", reply_to_email: "", message_id_domain: "", enabled: true, smtp_pass_masked: "" });
   const [smtpTestEmail, setSmtpTestEmail] = useState("");
   const [smtpDiag, setSmtpDiag] = useState(null);
   const [queue, setQueue] = useState([]);
@@ -106,6 +106,20 @@ export default function AdminSettingsPage() {
       smtp_envelope_from: "",
     });
     toast.success("Standard SMTP-Login gesetzt: 587, STARTTLS, Benutzer/Passwort.");
+  };
+  const applyLocalIpPreset = () => {
+    const fallbackDomain = smtp.message_id_domain || smtp.sender_email?.split("@")?.[1] || "lionsquad.at";
+    setSmtp({
+      ...smtp,
+      provider: "smtp",
+      smtp_port: 587,
+      smtp_auth: "login",
+      smtp_security: "starttls",
+      smtp_tls_verify: false,
+      smtp_envelope_from: "",
+      smtp_helo_name: smtp.smtp_helo_name || fallbackDomain,
+    });
+    toast.success("Lokale IP vorbereitet: 587, STARTTLS, Login, Zertifikatspruefung aus.");
   };
   const sendSmtpTest = async () => {
     if (!smtpTestEmail) return toast.error("E-Mail-Adresse eingeben");
@@ -219,10 +233,15 @@ export default function AdminSettingsPage() {
             </div>
             <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4 text-xs text-white/65">
               <div className="font-bold uppercase tracking-widest text-[#29B6E8] mb-2">Einfacher Versand ohne Relay</div>
-              <p>Nutze den Submission-Port deines Mailservers: Port 587, STARTTLS, SMTP Anmeldung mit deiner Mailbox. Port 25 ohne Anmeldung ist lokaler Relay-Modus und hier nicht empfohlen.</p>
-              <button type="button" onClick={applySubmissionPreset} data-testid="smtp-preset-submission" className="mt-3 px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm">
-                Standard 587 Login setzen
-              </button>
+              <p>Du kannst als Host auch direkt die lokale IP eintragen, z.B. 192.168.2.106. Entscheidend ist: auf dieser IP muss ein Submission-Port mit Login laufen, normalerweise 587 STARTTLS oder 465 SSL/TLS. Port 25 ohne Anmeldung ist lokaler Relay-Modus.</p>
+              <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                <button type="button" onClick={applySubmissionPreset} data-testid="smtp-preset-submission" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm">
+                  Standard 587 Login
+                </button>
+                <button type="button" onClick={applyLocalIpPreset} data-testid="smtp-preset-local-ip" className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm">
+                  Lokale IP vorbereiten
+                </button>
+              </div>
             </div>
             <div>
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Provider</div>
@@ -323,6 +342,17 @@ export default function AdminSettingsPage() {
                 />
                 <p className="mt-1 text-[11px] text-white/40">Leer = Domain der Absender-E-Mail.</p>
               </div>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">HELO/EHLO Name</div>
+                <input
+                  value={smtp.smtp_helo_name || ""}
+                  onChange={(e) => setSmtp({ ...smtp, smtp_helo_name: e.target.value })}
+                  data-testid="smtp-helo-name"
+                  className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
+                  placeholder="lionsquad.at"
+                />
+                <p className="mt-1 text-[11px] text-white/40">Optional. Sinnvoll bei lokalem Mailserver per IP.</p>
+              </div>
               <div className="text-xs text-white/45 flex items-end pb-1">
                 Fuer beste Zustellbarkeit sollten Absender, Envelope-Sender, Message-ID Domain und DNS zur selben Domain passen.
               </div>
@@ -368,7 +398,7 @@ export default function AdminSettingsPage() {
                 )}
               </div>
             )}
-            <p className="text-xs text-white/50">Testet die SMTP-Verbindung direkt. Fuer normalen Versand muss der Server nach STARTTLS AUTH anbieten. Falls "AUTH extension is not supported" kommt, ist das der falsche Port/Endpoint: nutze Submission 587 mit Login.</p>
+            <p className="text-xs text-white/50">Testet die SMTP-Verbindung direkt. Die lokale IP als Host ist okay. Fuer normalen Versand muss aber genau dieser IP:Port nach STARTTLS AUTH anbieten. Falls "AUTH extension is not supported" kommt, laeuft auf diesem Port kein Client-Login.</p>
             <p className="text-xs text-white/50">Bei self-signed Zertifikat kann "TLS Zertifikat pruefen" deaktiviert werden; besser ist ein vertrauenswuerdiges Zertifikat am Mailserver.</p>
           </div>
         </div>
