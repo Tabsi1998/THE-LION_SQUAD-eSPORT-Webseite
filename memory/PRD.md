@@ -75,7 +75,46 @@ Self-hosted Tournament-Management-System ähnlich Toornament/Challonge, speziell
 - Streckenverwaltung mit Lap-Analyse (Sektoren)
 - Saison-Archiv + Exports
 
-## Akzeptanzkriterien – Phase 1 Status
+## Phase 2/3 — IMPLEMENTIERT (04.05.2026)
+
+### Backend
+- [x] Settings-Modul: Public Branding, Email (Resend) API Key + Absender, Versand-Logs
+- [x] Email Service (Resend) mit deutschen HTML-Templates (Registrierung, Passwort-Reset, Anmeldung eingegangen/bestätigt/abgelehnt, Check-in, Match-Reminder, Score gemeldet, Dispute eröffnet/entschieden, Test)
+- [x] Seasons/Circuits: CRUD + aggregierte Standings (Turniere + F1) mit Punkte-Formel + Streichresultaten
+- [x] Widgets: read-only `/api/widgets/tournament/:slug/bracket` und `/api/widgets/f1/:slug/leaderboard` (sensible Felder werden entfernt)
+- [x] DSGVO: `/api/dsgvo/export-my-data` (User, Anmeldungen, F1-Zeiten, Teams, Email-Logs), `/api/dsgvo/anonymize-me` (Self + Admin)
+- [x] PDF Exports (ReportLab, TLS Cyan/Schwarz Design): Teilnehmer, Check-in, Matches (landscape), Standings, F1 Leaderboard
+- [x] Audit Logs: `/api/audit` mit Filter, automatisches Logging bei Settings-Änderungen
+- [x] Swiss-System: Greedy Pairing mit Opponent-History, Buchholz-Tiebreaker — `/api/tournaments/:id/swiss/next-round`
+- [x] Group Stage: Gruppen-Zuteilung + Round-Robin pro Gruppe — `/api/tournaments/:id/groups/generate`
+- [x] F1 Enhancements: ms-Zeiten, Strafsekunden, is_invalid Flag, proof_url, admin_note, Edit via PATCH
+
+### Frontend (100% deutsche UI)
+- [x] Admin Einstellungen (`/admin/settings`): Tabs E-Mail / Branding / Versandlogs
+- [x] Admin Widgets (`/admin/widgets`): iframe-Generator mit Live-Vorschau
+- [x] Admin Seasons (`/admin/seasons`): Saison/Circuit anlegen mit Punkte-Formel, Streichresultat, Turnier+F1 Selection
+- [x] Admin Audit Logs (`/admin/audit`): Gefilterte Liste mit Zeitstempel + Akteur
+- [x] Admin Stationen (`/admin/stations`): Station-CRUD + Match-Zuweisung via Modal (offene Matches pro Turnier)
+- [x] Admin Turnier-Edit: PDF-Export-Buttons (Teilnehmer, Check-in, Matches), Swiss-Runden-Button, Gruppen-Generieren-Button, Gruppen-Tab
+- [x] Admin F1-Edit: neues proof_url Feld, Edit-Modal pro Zeit (Zeit/Strafe/Invalid/Proof/Admin-Notiz)
+- [x] Public Season-Seite (`/seasons/:slug`): Standings + Event-Übersicht
+- [x] User DSGVO-Seite (`/privacy-account`): JSON-Export Download + Anonymisierung (mit Bestätigungs-Prompt)
+- [x] Dashboard-Kachel „Meine Daten" → DSGVO
+- [x] Admin-Nav mit klaren Icons (Settings/Audit/Widgets separat)
+
+### Tests
+- [x] `tests/test_phase2_3.py`: 19 Tests für Settings, Seasons, Widgets, DSGVO, PDF, Audit, Stations, F1-Edits, Swiss/Groups-Validierung
+- [x] 60/61 gesamt grün (1 Phase-1 Flake bei F1-Leaderboard-Resort)
+
+## Noch offen (Next Tasks)
+- Resend API Key durch Nutzer in `/admin/settings` hinterlegen, dann E-Mail-Versand live
+- Interaktiver Setup-Wizard (First-Run CLI) robust machen
+- Mobile-Feinschliff für DataTables und Admin-Layout
+- Discord Webhooks, 2FA, Stripe (P2)
+- Backup/Restore Skripte + Dokumentation (P2)
+- TV-Mode Enhancements: Sponsor-Rotation + QR-Codes (P2)
+
+## Akzeptanzkriterien – Status
 
 | # | Kriterium | Status |
 |---|-----------|--------|

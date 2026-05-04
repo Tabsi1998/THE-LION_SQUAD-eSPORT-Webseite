@@ -1,6 +1,7 @@
 """F1 Fast Lap Challenge routes."""
 import io
 import csv
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Response
 from fastapi.responses import StreamingResponse
 from database import get_db
@@ -182,7 +183,8 @@ async def leaderboard(cid: str, track_id: str | None = None):
             "attempts": attempts_per_user.get(uid, 0),
             "last_updated": t.get("created_at"),
         })
-    entries.sort(key=lambda e: e["time_ms"])
+    # Sort by effective time; tie-break by newer submission (last_updated desc)
+    entries.sort(key=lambda e: (e["time_ms"], -(datetime.fromisoformat(e["last_updated"].replace("Z","+00:00")).timestamp() if e.get("last_updated") else 0)))
     for i, e in enumerate(entries):
         e["rank"] = i + 1
         e["gap_ms"] = e["time_ms"] - entries[0]["time_ms"] if i > 0 else 0
