@@ -159,7 +159,7 @@ Empfohlene Einstellung fuer lokalen Mailserver per IP:
 Provider: SMTP
 Host: 192.168.2.106
 Port: 587
-Sicherheit: STARTTLS
+Sicherheit: Auto nach Port
 TLS Zertifikat pruefen: aus, wenn self-signed oder Zertifikat passt nicht zur IP
 SMTP Anmeldung: Mit Benutzer/Passwort
 User: office@lionsquad.at
@@ -174,6 +174,7 @@ HELO/EHLO Name: leer lassen oder optional den Mailhost-Namen
 Wichtig:
 
 - Der SMTP Host darf direkt die lokale IP sein. Dafuer ist keine Host-Domain noetig.
+- `Auto nach Port` funktioniert wie beim OmniFM-Bot: `465 = SSL/TLS`, `25 = ohne TLS`, alles andere = `STARTTLS`.
 - `Message-ID Domain` und `HELO/EHLO Name` sind Mail-/Header-Identitaet, nicht der SMTP Host.
 - `Message-ID Domain` darf leer bleiben; dann nutzt die App die Domain der Absender-E-Mail.
 - `HELO/EHLO Name` darf leer bleiben; dann nutzt die SMTP-Bibliothek ihren Standardnamen.

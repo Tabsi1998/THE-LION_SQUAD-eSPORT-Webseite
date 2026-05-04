@@ -25,6 +25,17 @@ RETRY_BACKOFF_MIN = [1, 5, 30, 120, 720]
 MAX_ATTEMPTS = len(RETRY_BACKOFF_MIN) + 1
 
 
+def resolve_smtp_security(port: int, raw_mode: str | None) -> str:
+    mode = (raw_mode or "auto").strip().lower()
+    if mode in {"starttls", "tls", "none"}:
+        return mode
+    if port == 465:
+        return "tls"
+    if port == 25:
+        return "none"
+    return "starttls"
+
+
 def explain_smtp_error(exc: Exception) -> str:
     raw = str(exc)
     if "AUTH extension is not supported" in raw:
@@ -247,7 +258,8 @@ def _append_port_probe_recommendations(result: dict):
 def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
     host = cfg.get("smtp_host")
     port = int(cfg.get("smtp_port") or 587)
-    security = cfg.get("smtp_security") or "starttls"
+    configured_security = cfg.get("smtp_security") or "auto"
+    security = resolve_smtp_security(port, configured_security)
     auth_mode = (cfg.get("smtp_auth") or "login").lower()
     validate_certs = bool(cfg.get("smtp_tls_verify", True))
     username = cfg.get("smtp_user") or ""
@@ -260,6 +272,7 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
         "host": host,
         "port": port,
         "security": security,
+        "configured_security": configured_security,
         "auth_mode": auth_mode,
         "auth_supported": False,
         "auth_ok": False,
@@ -374,8 +387,8 @@ async def get_mail_settings() -> dict:
         "smtp_user": s.get("smtp_user", ""),
         "smtp_pass": s.get("smtp_pass", ""),
         "smtp_auth": s.get("smtp_auth", "login"),
-        "smtp_security": s.get("smtp_security", "starttls"),  # starttls | tls | none
-        "smtp_tls_verify": s.get("smtp_tls_verify", True),
+        "smtp_security": s.get("smtp_security", "auto"),  # auto | starttls | tls | none
+        "smtp_tls_verify": s.get("smtp_tls_verify", False),
         "smtp_envelope_from": s.get("smtp_envelope_from", ""),
         "smtp_helo_name": s.get("smtp_helo_name", ""),
         "sender_name": s.get("sender_name") or legacy.get("sender_name") or "TLS ARENA",
@@ -417,8 +430,9 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
     msg.attach(MIMEText(html_to_text(html), "plain", "utf-8"))
     msg.attach(MIMEText(html, "html", "utf-8"))
 
-    use_tls = cfg["smtp_security"] == "tls"
-    start_tls = cfg["smtp_security"] == "starttls"
+    resolved_security = resolve_smtp_security(int(cfg["smtp_port"]), cfg.get("smtp_security"))
+    use_tls = resolved_security == "tls"
+    start_tls = resolved_security == "starttls"
     tls_context = None
     validate_certs = bool(cfg.get("smtp_tls_verify", True))
     if (use_tls or start_tls) and not validate_certs:
