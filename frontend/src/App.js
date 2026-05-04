@@ -96,9 +96,9 @@ function App() {
         <Routes>
           {/* Public — Verein */}
           <Route path="/" element={<HomePage />} />
-          <Route path="/about" element={<CmsPage slug="about" />} />
+          <Route path="/about" element={<AboutPage />} />
           <Route path="/board" element={<BoardPage />} />
-          <Route path="/values" element={<CmsPage slug="values" />} />
+          <Route path="/values" element={<ValuesPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/sponsors" element={<SponsorsPage />} />
           <Route path="/partners" element={<PartnersPage />} />
