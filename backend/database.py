@@ -85,6 +85,18 @@ async def init_indexes():
     await db.memberships.create_index("member_status")
     await db.member_benefits.create_index("id", unique=True)
     await db.user_socials.create_index([("user_id", 1), ("platform", 1)], unique=True)
+    # Gallery
+    await db.gallery_albums.create_index("id", unique=True)
+    await db.gallery_albums.create_index("slug", unique=True)
+    await db.gallery_albums.create_index("event_id")
+    await db.gallery_photos.create_index("id", unique=True)
+    await db.gallery_photos.create_index("album_id")
+    # News indexes for category / pinning
+    await db.news_posts.create_index("category")
+    await db.news_posts.create_index([("pinned", -1), ("created_at", -1)])
+    # Events
+    await db.events.create_index("event_type")
+    await db.events.create_index("status")
 
 
 async def close_client():

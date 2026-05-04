@@ -23,7 +23,7 @@ export function PublicLayout({ children }) {
     { to: "/tournaments", label: "Turniere" },
     { to: "/f1", label: "Fast Lap" },
     { to: "/teams", label: "Teams" },
-    { to: "/players", label: "Spieler" },
+    { to: "/gallery", label: "Galerie" },
     { to: "/members", label: "Mitglieder" },
   ];
 

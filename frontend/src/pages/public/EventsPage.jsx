@@ -2,44 +2,122 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { StatusBadge } from "@/components/tls/StatusBadge";
-import { MapPin, Calendar } from "lucide-react";
+import { Calendar, MapPin, Users as UsersIcon, Crown, Lock } from "lucide-react";
+
+const STATUS_LABELS = {
+  draft: "Entwurf", scheduled: "Bald öffnend", registration_open: "Anmeldung offen",
+  registration_closed: "Anmeldung geschlossen", checkin_open: "Check-in offen",
+  live: "LIVE", paused: "Pausiert", completed: "Beendet", results_published: "Ergebnisse",
+  archived: "Archiviert", cancelled: "Abgesagt",
+};
+
+const STATUS_COLORS = {
+  registration_open: "#10B981", live: "#FF3B30", scheduled: "#29B6E8",
+  checkin_open: "#FFD700", completed: "#6B7280", cancelled: "#FF3B30",
+};
+
+const VIS_ICON = { members: Crown, internal: Lock };
 
 export default function EventsPage() {
   const [list, setList] = useState([]);
-  useEffect(() => { api.get("/events").then(({ data }) => setList(data)); }, []);
+  const [meta, setMeta] = useState({ types: [], statuses: [] });
+  const [typeFilter, setTypeFilter] = useState("");
+  const [tab, setTab] = useState("upcoming"); // upcoming | past
+
+  useEffect(() => { api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, []);
+  useEffect(() => {
+    const url = tab === "upcoming" ? "/events?upcoming=true" : "/events";
+    api.get(url).then(({ data }) => setList(data)).catch(() => {});
+  }, [tab]);
+
+  const filtered = list.filter((e) => {
+    if (typeFilter && e.event_type !== typeFilter) return false;
+    if (tab === "past" && !["completed", "archived", "results_published"].includes(e.status)) return false;
+    return true;
+  });
 
   return (
     <PublicLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Events</span>
-        <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">Vereinsevents</h1>
-        <div className="mt-10 grid md:grid-cols-2 gap-6">
-          {list.map((e) => (
-            <Link
-              key={e.id}
-              to={`/events/${e.slug || e.id}`}
-              data-testid={`event-card-${e.slug}`}
-              className="group block border border-white/10 hover:border-[#29B6E8]/60 rounded-sm overflow-hidden bg-[#121212] transition"
-            >
-              <div className="aspect-[16/9] overflow-hidden relative">
-                {e.banner_url && <img src={e.banner_url} className="w-full h-full object-cover group-hover:scale-105 transition" alt="" />}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] to-transparent" />
-                <div className="absolute top-3 left-3"><StatusBadge status={e.status || "upcoming"} /></div>
-              </div>
-              <div className="p-5">
-                <h3 className="font-heading text-2xl font-bold group-hover:text-[#29B6E8] transition">{e.name}</h3>
-                <p className="mt-2 text-sm text-white/60 line-clamp-2">{e.description}</p>
-                <div className="mt-3 flex flex-wrap gap-4 text-xs text-white/60">
-                  {e.start_date && <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{new Date(e.start_date).toLocaleDateString("de-DE")}</span>}
-                  {e.location && <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{e.location}</span>}
-                </div>
-              </div>
-            </Link>
-          ))}
-          {list.length === 0 && <div className="col-span-full text-center py-20 text-white/40 font-display tracking-widest">KEINE EVENTS</div>}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#9F7AEA]">VEREINSEVENTS</span>
+        <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">Events</h1>
+        <p className="mt-3 text-white/60 max-w-2xl">
+          LAN-Partys, Grillabende, Vereinsabende, Messen — alles, wo wir gemeinsam abhängen oder den Vereinsspirit feiern.
+        </p>
+
+        <div className="mt-8 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+          <div className="flex gap-2">
+            <button onClick={() => setTab("upcoming")} data-testid="events-tab-upcoming" className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${tab === "upcoming" ? "bg-[#9F7AEA] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}>Kommend</button>
+            <button onClick={() => setTab("past")} data-testid="events-tab-past" className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${tab === "past" ? "bg-white/15 text-white" : "border border-white/10 text-white/60 hover:text-white"}`}>Vergangen</button>
+          </div>
+          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} data-testid="events-type-filter" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+            <option value="">Alle Typen</option>
+            {meta.types.map((t) => <option key={t.k} value={t.k}>{t.l}</option>)}
+          </select>
         </div>
-      </div>
+
+        {filtered.length === 0 ? (
+          <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
+            <Calendar className="w-10 h-10 mx-auto opacity-40 mb-3" />
+            <div className="font-heading font-bold text-lg">Keine Events</div>
+            <div className="text-sm mt-1">{tab === "upcoming" ? "Aktuell sind keine Events geplant. Schau bald wieder vorbei." : "Keine vergangenen Events in dieser Auswahl."}</div>
+          </div>
+        ) : (
+          <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filtered.map((e) => <EventCard key={e.id} e={e} meta={meta} />)}
+          </div>
+        )}
+      </section>
     </PublicLayout>
+  );
+}
+
+function EventCard({ e, meta }) {
+  const VIcon = VIS_ICON[e.visibility];
+  const statusColor = STATUS_COLORS[e.status] || "#6B7280";
+  const typeLabel = meta.types.find((t) => t.k === e.event_type)?.l || e.event_type;
+  return (
+    <Link
+      to={`/events/${e.slug}`}
+      data-testid={`event-card-${e.slug}`}
+      className="group border border-white/10 hover:border-[#9F7AEA]/50 rounded-sm bg-[#121212] overflow-hidden flex flex-col transition"
+    >
+      {e.banner_url ? (
+        <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
+          <img src={e.banner_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+        </div>
+      ) : (
+        <div className="aspect-video bg-gradient-to-br from-[#9F7AEA]/20 via-[#0A0A0A] to-[#0A0A0A] flex items-center justify-center">
+          <Calendar className="w-10 h-10 text-[#9F7AEA]/40" />
+        </div>
+      )}
+      <div className="p-5 flex-1 flex flex-col">
+        <div className="flex items-center gap-2 flex-wrap text-[10px] uppercase tracking-widest font-bold">
+          <span className="text-[#9F7AEA]">{typeLabel}</span>
+          <span className="px-2 py-0.5 rounded-sm border" style={{ color: statusColor, borderColor: `${statusColor}40` }}>
+            {STATUS_LABELS[e.status] || e.status}
+          </span>
+          {VIcon && <VIcon className="w-3 h-3 text-[#FFD700]" />}
+        </div>
+        <h3 className="mt-2 font-heading font-black text-lg group-hover:text-[#9F7AEA] transition">{e.name}</h3>
+        {e.start_date && (
+          <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-white/60">
+            <Calendar className="w-3 h-3" />
+            {new Date(e.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}
+          </div>
+        )}
+        {e.location && (
+          <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/60">
+            <MapPin className="w-3 h-3" /> {e.location}
+          </div>
+        )}
+        {e.max_participants && (
+          <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/50">
+            <UsersIcon className="w-3 h-3" /> max. {e.max_participants}
+          </div>
+        )}
+        {e.description && <p className="mt-3 text-sm text-white/65 line-clamp-2 flex-1">{e.description}</p>}
+      </div>
+    </Link>
   );
 }

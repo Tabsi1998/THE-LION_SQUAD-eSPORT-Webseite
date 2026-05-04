@@ -1,0 +1,49 @@
+{
+  "summary": "Phase 3 Re-Plattform (News + Events + Galerie) backend-only getestet. 36 Tests in /app/backend/tests/test_phase3_news_events_gallery.py — alle 36 PASSED. Abgedeckt: news-meta + events/meta (10 Kategorien, 13 Eventtypen, 11 Status, 4 Sichtbarkeiten), Pinning-Sortierung, Sichtbarkeitsregeln (public/community/members/internal) für News/Events/Albums, draft-Hiding für Anon/CU vs Admin, linked_events-Resolve, Event-Detail liefert tournaments/f1_challenges/albums/news, Galerie-Cascade-Delete, Authorisierung (CU bekommt 403 auf POST /news, /events, /gallery). Keine Backend-Bugs gefunden.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PATCH /api/events/{id}", "issue": "exclude_unset wird gefiltert via 'if v is not None' — d. h. Felder können NICHT explizit auf None/null zurückgesetzt werden (z. B. location='' geht, location=null wird verworfen). Bei /api/news und /api/gallery PATCH werden None-Werte hingegen mitgesetzt, weil dort kein None-Filter ist. Inkonsistenz."},
+      {"endpoint": "PATCH /api/gallery/{aid}", "issue": "Idempotenz: gibt nicht 404 zurück, wenn aid nicht existiert (update_one matched_count=0 wird ignoriert; Response = None bzw. {}). News-PATCH wirft korrekt 404 — Inkonsistenz."},
+      {"endpoint": "PATCH /api/gallery/photos/{pid}", "issue": "Selbe wie oben — gibt None zurück statt 404, wenn pid nicht existiert."},
+      {"endpoint": "DELETE /api/gallery/{aid} | /api/gallery/photos/{pid} | /api/news/{nid} | /api/events/{event_id}", "issue": "Idempotent (200 OK auch wenn id nicht existiert). Fachlich OK, aber API-Kunden bekommen keinen Hinweis. Optional 404 bei deleted_count==0."},
+      {"endpoint": "GET /api/events?upcoming=true&status=...", "issue": "Wenn beide Query-Parameter gesetzt sind, überschreibt 'upcoming' den 'status'-Filter (q['status'] wird neu zugewiesen). Eindeutigere Logik: status-Param hätte Vorrang und upcoming wäre nur dann aktiv, wenn status fehlt."},
+      {"endpoint": "POST /api/events", "issue": "Status wird hardcoded auf 'draft' überschrieben; in EventCreate gibt es kein Status-Feld. Damit kann Admin nicht direkt einen 'scheduled'-Event anlegen — es ist immer ein 2-step (POST + PATCH). Fachlich akzeptabel, aber Admin-UX leidet."},
+      {"endpoint": "GET /api/news (pinned_only=true)", "issue": "Query-Param dokumentiert sich nicht selbst (kein Eintrag in news-meta). Nur über Code/Tests entdeckbar."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_phase3_news_events_gallery.py",
+    "/app/test_reports/pytest/phase3_news_events_gallery.xml"
+  ],
+  "action_items": [
+    "(Optional) Konsistente PATCH-Semantik: alle PATCH-Endpunkte sollten 404 werfen, wenn id nicht existiert (gallery/photos derzeit nicht).",
+    "(Optional) PATCH /api/events None-Filter entfernen, damit Felder explizit gelöscht werden können (analog news_routes).",
+    "(Optional) GET /api/events?upcoming=true overruling status-Param — Vorrang umkehren oder dokumentieren.",
+    "(Optional) POST /api/events: erlaubten initial-Status (draft|scheduled) als Eingabefeld unterstützen — spart 2-Step.",
+    "(Optional) Idempotente DELETE-Endpunkte sollten dokumentiert werden (oder 404 bei deleted_count==0)."
+  ],
+  "critical_code_review_comments": [
+    "news_routes.get_news: get_db() wird zweimal aufgerufen (Zeilen 66 und 73). Reduntant, aber funktional — Cleanup-Hinweis.",
+    "news_routes.update_news: published_at wird nur isoformatted, wenn Wahrheitswert truthy (nicht None) — wenn Admin published_at explizit auf null/leer setzen wollte, geht das nicht (Pydantic-Optional Datetime). Konsistent mit anderen Datetime-Feldern, aber dokumentieren.",
+    "event_routes.list_events: bei upcoming=true wird q['status'] = {'$nin': [...]} hart gesetzt, damit überschreibt es einen ggf. mitgegebenen status-Param. Lösung: if status: q['status']=status; elif upcoming: q['status']={'$nin':[...]}; else: hide drafts.",
+    "event_routes.create_event: doc['status']='draft' hardcoded — EventCreate hat kein status-Feld. Sollte EventCreate.status optional erlauben (default 'draft', allowed: draft|scheduled).",
+    "event_routes.update_event: filter 'if v is not None' verhindert Reset auf None, aber lässt False/0/'' durch (geprüft). News + Gallery Update machen das anders (kein None-Filter) — Inkonsistenz.",
+    "news_routes._user_can_see vs event_routes._user_can_see: identische Funktion in beiden Dateien dupliziert (>20 Zeilen). DRY: in services/visibility.py auslagern.",
+    "gallery: update_album / update_photo geben None zurück statt 404, wenn id fehlt (matched_count nicht geprüft). Bug-Prone.",
+    "news_routes.create_news + update_news: Slug-Eindeutigkeit nur bei create geprüft, nicht bei update. PATCH erlaubt zwar kein slug-Feld (NewsUpdate hat kein slug), aber dann sollte das auch dokumentiert sein (Slugs sind immutable).",
+    "event_routes.get_event: filter 'status==draft && !is_admin -> 404' OK; aber für admin sieht man in 'albums' nur published=True. Bei Event-Vorbereitung könnte ein Admin-Mode auch unpublished Albums sehen wollen. Aktuell sind unpublished Albums nur via /api/admin/gallery sichtbar.",
+    "models.NewsCreate.published default=True: Standardmäßig wird News sofort live geschaltet, auch wenn Admin nur 'speichern' drücken wollte. UX-Risiko — empfehlenswert default=False (Draft) und Admin muss 'Veröffentlichen' explizit klicken."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase3_news_events_gallery.py"
+  ],
+  "success_rate": {"backend": "100% (36/36)", "frontend": "n/a (out of scope)"},
+  "test_credentials": "Admin: admin@thelionsquad.at / TLSAdmin2026! verifiziert. Test-CU + Test-Member werden pro Modul-Run via /auth/register erzeugt und Member via PUT /api/membership/user/{id} promoted.",
+  "seed_data_creation": "Pro Run werden TEST_-prefixed News (5x), Events (3x + Wegwerf-DELETE), Albums (3x + Cascade-Test) und Photos (2x) erzeugt. Cleanup nicht implementiert (TLS_RESET kann global wipen). Test-Slugs sind uuid-suffixed und kollidieren nicht.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Suite /app/backend/tests/test_phase3_news_events_gallery.py (36 pass). Deckt News-CRUD inkl. Pinning + Sichtbarkeit + Linked-Events-Resolve + Auth, Events-CRUD inkl. draft-hiding + upcoming/event_type-Filter + Sichtbarkeit + members-403 + relations (tournaments/f1/albums/news), Galerie-CRUD inkl. visibility + photo_count + Cascade-Delete + Photo-CRUD. Wichtige Beobachtungen: Events-PATCH filtert v is not None (anders als News/Gallery), POST /api/events ignoriert übergebenen status (immer draft), DELETE-Endpoints sind alle idempotent (kein 404 bei nicht-existierender id), PATCH /api/gallery/{aid} und /api/gallery/photos/{pid} prüfen matched_count nicht (geben null zurück bei nicht-existierender id). Existierender Smoke-Datensatz (slug=vereinsgruendung, lan-spring-2026 aus iteration_6) wurde NICHT genutzt — Tests erzeugen eigene Fixtures.",
+  "rca of the issue": "Keine Bugs zu reportieren — alle Phase 3 Endpoints verhalten sich gemäß Spezifikation. Identifizierte Inkonsistenzen (PATCH None-Filter, Idempotenz von PATCH/DELETE, status hardcoded in POST /api/events) sind Code-Quality-Hinweise, keine Funktionsfehler."
+}

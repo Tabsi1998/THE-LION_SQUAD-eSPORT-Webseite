@@ -233,30 +233,67 @@ class GameUpdate(BaseModel):
 
 
 # ---------- Events ----------
+EventType = Literal[
+    "club_evening", "lan_party", "public_event", "community_evening",
+    "grill_evening", "mario_kart_event", "f1_event", "expo", "online_event",
+    "internal", "sponsor_action", "tournament_finals", "general",
+]
+EventStatus = Literal[
+    "draft", "scheduled", "registration_open", "registration_closed",
+    "checkin_open", "live", "paused", "completed", "results_published",
+    "archived", "cancelled",
+]
+EventVisibility = Literal["public", "community", "members", "internal"]
+
+
 class EventCreate(BaseModel):
     name: str
     slug: str
     description: Optional[str] = None
+    event_type: EventType = "general"
+    visibility: EventVisibility = "public"
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    door_time: Optional[datetime] = None
+    registration_opens_at: Optional[datetime] = None
+    registration_closes_at: Optional[datetime] = None
     location: Optional[str] = None
+    address: Optional[str] = None
     is_online: bool = False
     is_hybrid: bool = False
     banner_url: Optional[str] = None
     contact: Optional[str] = None
+    max_participants: Optional[int] = None
+    show_participants: bool = True
+    program: Optional[str] = None  # markdown / freitext mit Tagesablauf
+    has_live_stream: bool = False
+    stream_platform: Optional[str] = None
+    stream_url: Optional[str] = None
 
 
 class EventUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    event_type: Optional[EventType] = None
+    visibility: Optional[EventVisibility] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    door_time: Optional[datetime] = None
+    registration_opens_at: Optional[datetime] = None
+    registration_closes_at: Optional[datetime] = None
     location: Optional[str] = None
+    address: Optional[str] = None
     is_online: Optional[bool] = None
     is_hybrid: Optional[bool] = None
     banner_url: Optional[str] = None
     contact: Optional[str] = None
-    status: Optional[str] = None
+    max_participants: Optional[int] = None
+    show_participants: Optional[bool] = None
+    program: Optional[str] = None
+    has_live_stream: Optional[bool] = None
+    stream_platform: Optional[str] = None
+    stream_url: Optional[str] = None
+    status: Optional[EventStatus] = None
 
 
 # ---------- Tournaments ----------
@@ -476,13 +513,42 @@ class StationUpdate(BaseModel):
 
 
 # ---------- News & Sponsors ----------
+NewsCategory = Literal[
+    "club", "tournaments", "events", "community", "sponsors",
+    "members", "teams", "announcement", "recap", "maintenance",
+]
+NewsVisibility = Literal["public", "community", "members", "internal"]
+
+
 class NewsCreate(BaseModel):
     title: str
     slug: str
     excerpt: Optional[str] = None
     content: str
     banner_url: Optional[str] = None
+    category: NewsCategory = "club"
+    visibility: NewsVisibility = "public"
     published: bool = True
+    published_at: Optional[datetime] = None
+    pinned: bool = False
+    linked_event_ids: List[str] = []
+    linked_tournament_ids: List[str] = []
+    linked_team_ids: List[str] = []
+
+
+class NewsUpdate(BaseModel):
+    title: Optional[str] = None
+    excerpt: Optional[str] = None
+    content: Optional[str] = None
+    banner_url: Optional[str] = None
+    category: Optional[NewsCategory] = None
+    visibility: Optional[NewsVisibility] = None
+    published: Optional[bool] = None
+    published_at: Optional[datetime] = None
+    pinned: Optional[bool] = None
+    linked_event_ids: Optional[List[str]] = None
+    linked_tournament_ids: Optional[List[str]] = None
+    linked_team_ids: Optional[List[str]] = None
 
 
 class SponsorCreate(BaseModel):
@@ -491,6 +557,47 @@ class SponsorCreate(BaseModel):
     link: Optional[str] = None
     description: Optional[str] = None
     tier: Optional[str] = "standard"
+
+
+# ---------- Gallery ----------
+GalleryVisibility = Literal["public", "community", "members"]
+
+
+class GalleryAlbumCreate(BaseModel):
+    title: str
+    slug: str
+    description: Optional[str] = None
+    cover_url: Optional[str] = None
+    event_id: Optional[str] = None
+    tournament_id: Optional[str] = None
+    visibility: GalleryVisibility = "public"
+    taken_at: Optional[datetime] = None
+    published: bool = True
+    order_index: int = 0
+
+
+class GalleryAlbumUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    cover_url: Optional[str] = None
+    event_id: Optional[str] = None
+    tournament_id: Optional[str] = None
+    visibility: Optional[GalleryVisibility] = None
+    taken_at: Optional[datetime] = None
+    published: Optional[bool] = None
+    order_index: Optional[int] = None
+
+
+class GalleryPhotoCreate(BaseModel):
+    image_url: str
+    thumbnail_url: Optional[str] = None
+    caption: Optional[str] = None
+    order_index: int = 0
+
+
+class GalleryPhotoUpdate(BaseModel):
+    caption: Optional[str] = None
+    order_index: Optional[int] = None
 
 
 # ---------- Admin ----------

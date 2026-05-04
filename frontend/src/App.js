@@ -42,6 +42,7 @@ import AdminAuditPage from "@/pages/admin/AdminAuditPage";
 import AdminWidgetsPage from "@/pages/admin/AdminWidgetsPage";
 import AdminMembersPage from "@/pages/admin/AdminMembersPage";
 import AdminBenefitsPage from "@/pages/admin/AdminBenefitsPage";
+import AdminGalleryPage from "@/pages/admin/AdminGalleryPage";
 import SeasonPage from "@/pages/public/SeasonPage";
 import PublicProfilePage from "@/pages/public/PublicProfilePage";
 import BadgesPage from "@/pages/public/BadgesPage";
@@ -54,6 +55,9 @@ import PartnersPage from "@/pages/public/PartnersPage";
 import PlayersPage from "@/pages/public/PlayersPage";
 import MembersDirectoryPage from "@/pages/public/MembersDirectoryPage";
 import JoinMembershipPage from "@/pages/public/JoinMembershipPage";
+import NewsDetailPage from "@/pages/public/NewsDetailPage";
+import GalleryPage from "@/pages/public/GalleryPage";
+import GalleryAlbumPage from "@/pages/public/GalleryAlbumPage";
 import MemberAreaPage from "@/pages/user/MemberAreaPage";
 import MemberBenefitsPage from "@/pages/user/MemberBenefitsPage";
 
@@ -117,6 +121,7 @@ function App() {
           <Route path="/admin/stations" element={<ProtectedRoute requireAdmin><AdminStationsPage /></ProtectedRoute>} />
           <Route path="/admin/events" element={<ProtectedRoute requireAdmin><AdminEventsPage /></ProtectedRoute>} />
           <Route path="/admin/news" element={<ProtectedRoute requireAdmin><AdminNewsPage /></ProtectedRoute>} />
+          <Route path="/admin/gallery" element={<ProtectedRoute requireAdmin><AdminGalleryPage /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requireAdmin><AdminSettingsPage /></ProtectedRoute>} />
           <Route path="/admin/seasons" element={<ProtectedRoute requireAdmin><AdminSeasonsPage /></ProtectedRoute>} />
           <Route path="/admin/audit" element={<ProtectedRoute requireAdmin><AdminAuditPage /></ProtectedRoute>} />
