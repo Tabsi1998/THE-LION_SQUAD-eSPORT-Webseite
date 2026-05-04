@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 18 (Phase F.2 + G + H scripts) — Backend 32/32 pytest passing (10 new + 22 regression). Frontend admin login, /admin/media (grid+filter+search+modal), /admin/nav (7 nav rows + sidebar entries Medien & Navigation visible), and SEO hook on /about all working. SEO hook required a frontend supervisor restart because webpack hot-reload did NOT pick up the new useSeoPage.js file — bundle.js was missing the module until restart.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "useSeoPage hook bundling",
+        "issue": "Initial test showed /api/seo/page/about was never called and document.title remained the global default. Root cause: webpack-dev-server hot-reload missed the newly added /app/frontend/src/hooks/useSeoPage.js (bundle.js had 0 occurrences of 'seo/page'). After `sudo supervisorctl restart frontend` the bundle rebuilt (2 occurrences) and hook fires correctly: document.title='Über uns · THE LION SQUAD' and JSON-LD script injected. Not a code bug — environmental rebuild issue. Deployed builds will be fine.",
+        "affected_selectors": []
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_fg_iter18.py",
+    "/app/backend/tests/test_phase_ef_iter17.py",
+    "/app/test_reports/pytest/iter18_results.xml",
+    "/app/test_reports/pytest/iter17_results.xml"
+  ],
+  "action_items": [
+    "No code changes needed. Phase F.2 + G fully working end-to-end.",
+    "Note for future: when adding new top-level files under /app/frontend/src/hooks/ webpack-dev-server may need a manual 'supervisorctl restart frontend' to pick them up — in production builds (yarn build) this is not an issue."
+  ],
+  "critical_code_review_comments": [
+    "AdminMediaPage.jsx and AdminNavPage.jsx have all required data-testid attributes (media-grid, media-filter-*, media-search, media-tile-*, media-copy-url, media-delete, nav-list, nav-row-*, nav-toggle-*, nav-save).",
+    "useSeoPage.js correctly cleans up document.title and removes injected JSON-LD on unmount.",
+    "Path-traversal protection on DELETE /api/admin/media/{filename} verified (returns 400/404 for '..%2Fevil').",
+    "Public /api/nav correctly filters items where visible=false; admin PUT round-trip persists and is restored after test (no broken nav left over)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (32/32)", "frontend": "100%"},
+  "test_credentials": "admin@thelionsquad.at / TLSAdmin2026! (from /app/memory/test_credentials.md) — login successful",
+  "seed_data_creation": "None — used existing seeded admin and existing media/nav data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests test_phase_fg_iter18.py + test_phase_ef_iter17.py both green (32 total). Admin pages /admin/media and /admin/nav fully wired to backend. SEO hook works after frontend restart. Phase H install.sh/update.sh were NOT runtime-tested (per request).",
+  "rca of the issue": "Initial false-positive 'SEO hook broken' was caused by webpack-dev-server failing to detect a newly created file (useSeoPage.js) — bundle.js had 0 references. Fix: `sudo supervisorctl restart frontend` rebuilt the bundle with 2 references, hook now fires /api/seo/page/about, sets document.title='Über uns · THE LION SQUAD' and injects JSON-LD@type=WebPage. Confirmed working."
+}

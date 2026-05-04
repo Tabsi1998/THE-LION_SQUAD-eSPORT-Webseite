@@ -56,6 +56,8 @@ import PublicProfilePage from "@/pages/public/PublicProfilePage";
 import AdminAchievementsPage from "@/pages/admin/AdminAchievementsPage";
 import AdminMembershipApplicationsPage from "@/pages/admin/AdminMembershipApplicationsPage";
 import AdminCmsPage from "@/pages/admin/AdminCmsPage";
+import AdminMediaPage from "@/pages/admin/AdminMediaPage";
+import AdminNavPage from "@/pages/admin/AdminNavPage";
 import MembershipApplyPage from "@/pages/public/MembershipApplyPage";
 import AdminSponsorsPage from "@/pages/admin/AdminSponsorsPage";
 
@@ -174,6 +176,8 @@ function App() {
           <Route path="/admin/achievements" element={<ProtectedRoute requireAdmin><AdminAchievementsPage /></ProtectedRoute>} />
           <Route path="/admin/membership-applications" element={<ProtectedRoute requireAdmin><AdminMembershipApplicationsPage /></ProtectedRoute>} />
           <Route path="/admin/cms" element={<ProtectedRoute requireAdmin><AdminCmsPage /></ProtectedRoute>} />
+          <Route path="/admin/media" element={<ProtectedRoute requireAdmin><AdminMediaPage /></ProtectedRoute>} />
+          <Route path="/admin/nav" element={<ProtectedRoute requireAdmin><AdminNavPage /></ProtectedRoute>} />
           <Route path="/admin/prizes" element={<ProtectedRoute requireAdmin><AdminPrizesPage /></ProtectedRoute>} />
           <Route path="/admin/contact" element={<ProtectedRoute requireAdmin><AdminContactPage /></ProtectedRoute>} />
           <Route path="/admin/board" element={<ProtectedRoute requireAdmin><AdminBoardPage /></ProtectedRoute>} />

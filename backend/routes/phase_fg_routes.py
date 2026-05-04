@@ -146,61 +146,11 @@ async def admin_put_nav(body: NavBody, me: dict = Depends(require_admin())):
     return await db.cms_nav.find_one({"id": NAV_DOC_ID}, {"_id": 0})
 
 
-# ============= SEO — Sitemap & robots.txt =============
+# ============= SEO — robots.txt =============
 seo_router = APIRouter(tags=["seo"])
 
 
-@seo_router.get("/sitemap.xml")
-async def sitemap():
-    db = get_db()
-    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
-    base = (branding.get("domain") or "").rstrip("/") or os.environ.get("PUBLIC_URL", "").rstrip("/")
-    if not base:
-        base = ""
-
-    urls: list[tuple[str, str]] = [
-        ("/", "1.0"),
-        ("/about", "0.7"), ("/values", "0.7"), ("/contact", "0.7"),
-        ("/news", "0.7"), ("/events", "0.7"),
-        ("/tournaments", "0.8"), ("/fastlap", "0.8"), ("/teams", "0.7"),
-        ("/players", "0.6"), ("/members", "0.6"),
-        ("/membership/join", "0.7"), ("/membership/apply", "0.5"),
-        ("/imprint", "0.3"), ("/privacy", "0.3"),
-    ]
-
-    # Public CMS pages
-    pages = await db.cms_pages.find({"is_published": {"$ne": False}}, {"_id": 0, "slug": 1}).to_list(500)
-    for p in pages:
-        slug = p["slug"]
-        if slug not in {"about", "values", "imprint", "privacy"}:
-            urls.append((f"/{slug}", "0.5"))
-
-    # Tournaments + Fast Lap challenges
-    tours = await db.tournaments.find({"is_public": {"$ne": False}}, {"_id": 0, "id": 1}).to_list(500)
-    for t in tours:
-        urls.append((f"/tournaments/{t['id']}", "0.7"))
-    fls = await db.f1_challenges.find({"is_public": {"$ne": False}}, {"_id": 0, "id": 1}).to_list(500)
-    for f in fls:
-        urls.append((f"/fastlap/{f['id']}", "0.7"))
-
-    # Public profiles
-    users = await db.users.find(
-        {"privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}},
-        {"_id": 0, "username": 1}
-    ).limit(2000).to_list(2000)
-    for u in users:
-        urls.append((f"/u/{u['username']}", "0.4"))
-
-    now_iso = now_utc().date().isoformat()
-    body = ["<?xml version='1.0' encoding='UTF-8'?>",
-            "<urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>"]
-    for path, prio in urls:
-        body.append(f"  <url><loc>{base}{path}</loc><lastmod>{now_iso}</lastmod><priority>{prio}</priority></url>")
-    body.append("</urlset>")
-    return Response(content="\n".join(body), media_type="application/xml")
-
-
-@seo_router.get("/robots.txt")
+@seo_router.get("/api/robots.txt")
 async def robots():
     db = get_db()
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
@@ -210,7 +160,7 @@ async def robots():
         "Allow: /",
         "Disallow: /admin/",
         "Disallow: /api/",
-        f"Sitemap: {base}/sitemap.xml" if base else "",
+        f"Sitemap: {base}/sitemap.xml" if base else "Sitemap: /api/sitemap.xml",
     ]
     return Response(content="\n".join(filter(None, body)), media_type="text/plain")
 

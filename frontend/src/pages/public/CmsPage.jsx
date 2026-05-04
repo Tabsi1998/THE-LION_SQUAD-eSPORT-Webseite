@@ -11,12 +11,14 @@ import { useParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { useSeoPage } from "@/hooks/useSeoPage";
 
 export default function CmsPage({ slug: forced }) {
   const params = useParams();
   const slug = forced || params.slug;
   const [page, setPage] = useState(null);
   const [error, setError] = useState(null);
+  useSeoPage(slug);
   useEffect(() => {
     api.get(`/pages/${slug}`).then(({ data }) => setPage(data)).catch((e) => setError(e?.response?.status || "error"));
   }, [slug]);
