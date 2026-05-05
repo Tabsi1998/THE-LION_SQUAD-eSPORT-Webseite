@@ -42,7 +42,7 @@ IMAGE_REFERENCE_FIELDS = [
     ("f1_tracks", {}, ["image_url"]),
     ("gallery_albums", {}, ["cover_url"]),
     ("gallery_photos", {}, ["image_url", "thumbnail_url"]),
-    ("benefits", {}, ["image_url"]),
+    ("member_benefits", {}, ["image_url"]),
 ]
 
 

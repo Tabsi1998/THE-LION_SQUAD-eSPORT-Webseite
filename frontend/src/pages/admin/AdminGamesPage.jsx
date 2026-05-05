@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ export default function AdminGamesPage() {
   const [editing, setEditing] = useState(null);
   const load = async () => { const { data } = await api.get("/games"); setList(data); };
   useEffect(() => { load(); }, []);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -31,7 +32,7 @@ export default function AdminGamesPage() {
       toast.success("Spiel erstellt.");
       setForm({ name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "" });
       load();
-    } catch (err) { toast.error(err.response?.data?.detail || "Fehler."); }
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
   };
 
   const del = async (id) => {
@@ -48,13 +49,13 @@ export default function AdminGamesPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         <form onSubmit={submit} className="lg:col-span-1 border border-white/10 rounded-sm bg-[#121212] p-5 space-y-3">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Neues Spiel</div>
-          <Input placeholder="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v, slug: form.slug || slugFrom(v) })} required testId="game-name" />
-          <Input placeholder="Slug" value={form.slug} onChange={(v) => setForm({ ...form, slug: slugFrom(v) })} required testId="game-slug" />
-          <Input placeholder="Kurzname (z.B. MK8DX)" value={form.short_name} onChange={(v) => setForm({ ...form, short_name: v })} testId="game-short" />
-          <Input placeholder="Genre" value={form.genre} onChange={(v) => setForm({ ...form, genre: v })} testId="game-genre" />
-          <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => setForm({ ...form, platforms: v })} testId="game-platforms" />
-          <ImageUpload value={form.logo_url} onChange={(v) => setForm({ ...form, logo_url: v })} label="Logo" testId="game-logo" variant="square" allowLibrary />
-          <ImageUpload value={form.cover_url} onChange={(v) => setForm({ ...form, cover_url: v })} label="Cover" testId="game-cover" variant="wide" allowLibrary />
+          <Input placeholder="Name" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v, slug: f.slug || slugFrom(v) }))} required testId="game-name" />
+          <Input placeholder="Slug" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} required testId="game-slug" />
+          <Input placeholder="Kurzname (z.B. MK8DX)" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-short" />
+          <Input placeholder="Genre" value={form.genre} onChange={(v) => set("genre", v)} testId="game-genre" />
+          <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-platforms" />
+          <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="game-logo" variant="square" allowLibrary />
+          <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Cover" testId="game-cover" variant="wide" allowLibrary />
           <button data-testid="game-submit" className="w-full px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] inline-flex items-center justify-center gap-2">
             <Plus className="w-4 h-4" /> Anlegen
           </button>
@@ -137,7 +138,7 @@ function EditGameModal({ game, onClose, onSaved }) {
       toast.success("Spiel gespeichert.");
       onSaved();
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Spiel konnte nicht gespeichert werden.");
+      toast.error(formatApiError(err.response?.data?.detail) || "Spiel konnte nicht gespeichert werden.");
     }
     setSaving(false);
   };

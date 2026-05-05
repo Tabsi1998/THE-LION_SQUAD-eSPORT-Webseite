@@ -1,23 +1,27 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
+import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 
 export const TLS_MASCOT = "/assets/brand/tls-mascot.png";
 export const TLS_WORDMARK = "/assets/brand/tls-wordmark.png";
 
-let cachedBranding = null;
-
 function useBrandingAssets() {
-  const [branding, setBranding] = useState(cachedBranding);
+  const [branding, setBranding] = useState(getCachedBranding());
   useEffect(() => {
-    if (cachedBranding) return;
     let cancelled = false;
+    const unsubscribe = onBrandingUpdated((next) => {
+      if (!cancelled) setBranding(next || {});
+    });
     api.get("/settings/public").then(({ data }) => {
       if (cancelled) return;
-      cachedBranding = data || {};
-      setBranding(cachedBranding);
+      setCachedBranding(data || {});
+      setBranding(data || {});
     }).catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
   return branding || {};
 }

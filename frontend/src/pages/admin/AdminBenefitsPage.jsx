@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
@@ -28,7 +28,7 @@ export default function AdminBenefitsPage() {
   const remove = async (id) => {
     if (!window.confirm("Mitgliedervorteil löschen?")) return;
     try { await api.delete(`/membership/benefits/${id}`); toast.success("Gelöscht."); load(); }
-    catch { toast.error("Fehler beim Löschen."); }
+    catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
   };
 
   return (
@@ -107,7 +107,7 @@ function BenefitModal({ benefit, meta, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Fehler.");
+      toast.error(formatApiError(err.response?.data?.detail));
     }
     setSaving(false);
   };

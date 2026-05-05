@@ -21,6 +21,8 @@ export default function AdminF1EditPage() {
   const [editTrack, setEditTrack] = useState(null);
   const [newTime, setNewTime] = useState({ user_id: "", time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "" });
   const [editTime, setEditTime] = useState(null);
+  const setNewTrackField = (k, v) => setNewTrack((track) => ({ ...track, [k]: v }));
+  const setEditTrackField = (k, v) => setEditTrack((track) => ({ ...(track || {}), [k]: v }));
 
   const load = async () => {
     const { data: c } = await api.get(`/f1/challenges/${id}`);
@@ -181,10 +183,10 @@ export default function AdminF1EditPage() {
                 <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Strecke bearbeiten</div>
                 <button type="button" onClick={() => setEditTrack(null)} className="text-white/40 hover:text-white"><XIcon className="w-3.5 h-3.5" /></button>
               </div>
-              <input placeholder="Name" value={editTrack.name || ""} onChange={(e) => setEditTrack({ ...editTrack, name: e.target.value })} required data-testid="f1-edit-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-              <ImageUpload value={editTrack.image_url || ""} onChange={(v) => setEditTrack({ ...editTrack, image_url: v })} label="Streckenbild" testId="f1-edit-track-image-upload" variant="wide" allowLibrary />
-              <input placeholder="Land" value={editTrack.country || ""} onChange={(e) => setEditTrack({ ...editTrack, country: e.target.value })} data-testid="f1-edit-track-country" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-              <input type="number" placeholder="Reihenfolge" value={editTrack.order_index ?? 0} onChange={(e) => setEditTrack({ ...editTrack, order_index: e.target.value })} data-testid="f1-edit-track-order" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <input placeholder="Name" value={editTrack.name || ""} onChange={(e) => setEditTrackField("name", e.target.value)} required data-testid="f1-edit-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <ImageUpload value={editTrack.image_url || ""} onChange={(v) => setEditTrackField("image_url", v)} label="Streckenbild" testId="f1-edit-track-image-upload" variant="wide" allowLibrary />
+              <input placeholder="Land" value={editTrack.country || ""} onChange={(e) => setEditTrackField("country", e.target.value)} data-testid="f1-edit-track-country" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <input type="number" placeholder="Reihenfolge" value={editTrack.order_index ?? 0} onChange={(e) => setEditTrackField("order_index", e.target.value)} data-testid="f1-edit-track-order" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               <button data-testid="f1-edit-track-save" className="w-full px-3 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#1E95C2]">
                 Strecke speichern
               </button>
@@ -192,9 +194,9 @@ export default function AdminF1EditPage() {
           )}
           {isAdmin && <form onSubmit={addTrack} className="mt-4 space-y-2 border-t border-white/5 pt-4">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Neue Strecke</div>
-            <input placeholder="Name" value={newTrack.name} onChange={(e) => setNewTrack({ ...newTrack, name: e.target.value })} required data-testid="f1-new-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-            <ImageUpload value={newTrack.image_url} onChange={(v) => setNewTrack({ ...newTrack, image_url: v })} label="Streckenbild" testId="f1-new-track-image-upload" variant="wide" allowLibrary />
-            <input placeholder="Land" value={newTrack.country} onChange={(e) => setNewTrack({ ...newTrack, country: e.target.value })} data-testid="f1-new-track-country" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            <input placeholder="Name" value={newTrack.name} onChange={(e) => setNewTrackField("name", e.target.value)} required data-testid="f1-new-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            <ImageUpload value={newTrack.image_url} onChange={(v) => setNewTrackField("image_url", v)} label="Streckenbild" testId="f1-new-track-image-upload" variant="wide" allowLibrary />
+            <input placeholder="Land" value={newTrack.country} onChange={(e) => setNewTrackField("country", e.target.value)} data-testid="f1-new-track-country" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             <button data-testid="f1-add-track-btn" className="w-full px-3 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#1E95C2] inline-flex items-center justify-center gap-2">
               <Plus className="w-3.5 h-3.5" /> Hinzufügen
             </button>

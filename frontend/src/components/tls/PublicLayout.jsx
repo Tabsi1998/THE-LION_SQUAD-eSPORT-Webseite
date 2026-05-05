@@ -2,17 +2,22 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
 import { MainNav, MobileNav } from "@/components/tls/MainNav";
+import { api } from "@/lib/api";
+import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { Menu, X, User, LogOut, Shield, Crown } from "lucide-react";
 import { useState, useEffect } from "react";
 
 export function PublicLayout({ children }) {
   const { user, logout, isAdmin, isClubMember } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [branding, setBranding] = useState(null);
+  const [branding, setBranding] = useState(getCachedBranding());
   useEffect(() => {
-    import("@/lib/api").then(({ api }) => {
-      api.get("/settings/public").then(({ data }) => setBranding(data)).catch(() => {});
-    });
+    const unsubscribe = onBrandingUpdated((next) => setBranding(next || {}));
+    api.get("/settings/public").then(({ data }) => {
+      setCachedBranding(data || {});
+      setBranding(data || {});
+    }).catch(() => {});
+    return unsubscribe;
   }, []);
   const nav = useNavigate();
   const closeMobile = () => setMobileOpen(false);

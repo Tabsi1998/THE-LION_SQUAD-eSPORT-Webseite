@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
+import { onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { TLS_MASCOT } from "@/components/tls/Logo";
 
 const DEFAULT_TITLE = "THE LION SQUAD - eSports Vereinsplattform";
@@ -30,7 +31,7 @@ export function BrandingHead() {
   useEffect(() => {
     let cancelled = false;
 
-    api.get("/settings/public").then(({ data }) => {
+    const applyBranding = (data) => {
       if (cancelled || !data) return;
 
       const name = data.club_name || "THE LION SQUAD";
@@ -52,9 +53,18 @@ export function BrandingHead() {
       upsertMeta('meta[property="og:site_name"]', { property: "og:site_name", content: name });
       upsertMeta('meta[property="og:title"]', { property: "og:title", content: `${name} - eSports Vereinsplattform` });
       upsertMeta('meta[property="og:description"]', { property: "og:description", content: description });
+    };
+
+    const unsubscribe = onBrandingUpdated(applyBranding);
+    api.get("/settings/public").then(({ data }) => {
+      setCachedBranding(data || {});
+      applyBranding(data);
     }).catch(() => {});
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   return null;

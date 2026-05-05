@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Upload, X, Image as ImageIcon } from "lucide-react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { toast } from "sonner";
@@ -10,6 +10,28 @@ const parseUploadMb = (value, fallback) => {
 
 const DEFAULT_IMAGE_UPLOAD_MB = parseUploadMb(process.env.REACT_APP_MAX_IMAGE_UPLOAD_MB, 50);
 const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(process.env.REACT_APP_PROXY_UPLOAD_LIMIT_MB, Math.ceil(DEFAULT_IMAGE_UPLOAD_MB * 1.2));
+let activeImageUploads = 0;
+const uploadBusyListeners = new Set();
+
+function emitUploadBusy() {
+  const busy = activeImageUploads > 0;
+  uploadBusyListeners.forEach((listener) => listener(busy));
+}
+
+function changeActiveUploads(delta) {
+  activeImageUploads = Math.max(0, activeImageUploads + delta);
+  emitUploadBusy();
+}
+
+export function useImageUploadBusy() {
+  const [busy, setBusy] = useState(activeImageUploads > 0);
+  useEffect(() => {
+    uploadBusyListeners.add(setBusy);
+    setBusy(activeImageUploads > 0);
+    return () => uploadBusyListeners.delete(setBusy);
+  }, []);
+  return busy;
+}
 
 /**
  * Reusable image upload field. Renders preview + upload button.
@@ -37,6 +59,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
       return;
     }
     setUploading(true);
+    changeActiveUploads(1);
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -53,6 +76,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     } finally {
       if (fileRef.current) fileRef.current.value = "";
       setUploading(false);
+      changeActiveUploads(-1);
     }
   };
 

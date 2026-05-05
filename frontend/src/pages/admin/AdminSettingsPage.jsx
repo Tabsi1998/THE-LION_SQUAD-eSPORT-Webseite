@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
+import { setCachedBranding } from "@/lib/brandingEvents";
 import { AdminLayout } from "@/components/tls/AdminLayout";
-import { ImageUpload } from "@/components/tls/ImageUpload";
+import { ImageUpload, useImageUploadBusy } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
 import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity } from "lucide-react";
 
@@ -29,8 +30,13 @@ export default function AdminSettingsPage() {
   const [testEmail, setTestEmail] = useState("");
   const [logs, setLogs] = useState([]);
   const [systemStatus, setSystemStatus] = useState(null);
+  const imageUploadBusy = useImageUploadBusy();
+  const brandDirtyRef = useRef(false);
+  const discordDirtyRef = useRef(false);
+  const loadSeqRef = useRef(0);
 
   const load = async () => {
+    const seq = ++loadSeqRef.current;
     const requests = await Promise.allSettled([
       api.get("/settings/email"),
       api.get("/settings/branding"),
@@ -40,11 +46,12 @@ export default function AdminSettingsPage() {
       api.get("/settings/mail-queue?limit=100"),
       api.get("/admin/system-status"),
     ]);
+    if (seq !== loadSeqRef.current) return;
     const value = (i) => requests[i].status === "fulfilled" ? requests[i].value.data : null;
     const e = value(0), b = value(1), d = value(2), l = value(3), sm = value(4), q = value(5), st = value(6);
     if (e) setEmail((prev) => ({ ...prev, ...e, resend_api_key: "" }));
-    if (b) setBrand((prev) => ({ ...prev, ...b }));
-    if (d) setDiscord((prev) => ({ ...prev, ...d, webhook_url: "" }));
+    if (b && !brandDirtyRef.current) setBrand((prev) => ({ ...prev, ...b }));
+    if (d && !discordDirtyRef.current) setDiscord((prev) => ({ ...prev, ...d, webhook_url: "" }));
     if (l) setLogs(l);
     if (sm) setSmtp((prev) => ({ ...prev, ...sm, smtp_pass: "" }));
     if (q) setQueue(q);
@@ -56,6 +63,25 @@ export default function AdminSettingsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
+  const setBrandField = (key, value) => {
+    brandDirtyRef.current = true;
+    setBrand((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const setDiscordField = (key, value) => {
+    discordDirtyRef.current = true;
+    setDiscord((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const refreshPublicBranding = async () => {
+    try {
+      const { data } = await api.get("/settings/public", { params: { _: Date.now() } });
+      setCachedBranding(data || {});
+    } catch {
+      setCachedBranding(brand);
+    }
+  };
+
   const saveEmail = async () => {
     const payload = { ...email };
     if (!payload.resend_api_key) delete payload.resend_api_key;
@@ -63,15 +89,20 @@ export default function AdminSettingsPage() {
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const saveBrand = async () => {
+    if (imageUploadBusy) return toast.error("Bild-Upload laeuft noch. Bitte kurz warten und dann speichern.");
     try {
+      loadSeqRef.current += 1;
       const { data } = await api.put("/settings/branding", brand);
+      brandDirtyRef.current = false;
       if (data && !data.ok) setBrand((prev) => ({ ...prev, ...data }));
+      await refreshPublicBranding();
       toast.success("Branding gespeichert.");
       load();
     }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const saveDiscord = async () => {
+    if (imageUploadBusy) return toast.error("Bild-Upload laeuft noch. Bitte kurz warten und dann speichern.");
     const payload = { ...discord };
     if (!payload.webhook_url) delete payload.webhook_url;
     delete payload.configured;
@@ -80,7 +111,7 @@ export default function AdminSettingsPage() {
     delete payload.last_error;
     delete payload.last_event_key;
     delete payload.last_checked_at;
-    try { await api.put("/settings/discord", payload); toast.success("Discord gespeichert."); load(); }
+    try { loadSeqRef.current += 1; await api.put("/settings/discord", payload); discordDirtyRef.current = false; toast.success("Discord gespeichert."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const sendTest = async () => {
@@ -553,13 +584,13 @@ export default function AdminSettingsPage() {
             <div className="flex items-center justify-between">
               <div className="font-heading font-bold uppercase">Discord Webhook</div>
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={discord.enabled} onChange={(e) => setDiscord({ ...discord, enabled: e.target.checked })} className="accent-[#29B6E8]" data-testid="discord-enabled" />
+                <input type="checkbox" checked={discord.enabled} onChange={(e) => setDiscordField("enabled", e.target.checked)} className="accent-[#29B6E8]" data-testid="discord-enabled" />
                 <span>Versand aktiv</span>
               </label>
             </div>
             <div>
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Webhook URL {discord.webhook_url_masked && <span className="text-white/40 normal-case">(aktuell: {discord.webhook_url_masked})</span>}</div>
-              <input type="password" placeholder="https://discord.com/api/webhooks/…" value={discord.webhook_url} onChange={(e) => setDiscord({ ...discord, webhook_url: e.target.value })} data-testid="discord-webhook" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
+              <input type="password" placeholder="https://discord.com/api/webhooks/…" value={discord.webhook_url} onChange={(e) => setDiscordField("webhook_url", e.target.value)} data-testid="discord-webhook" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
               <p className="text-xs text-white/40 mt-1">Leer lassen um den bestehenden Webhook beizubehalten. Erlaubt sind https://discord.com/api/webhooks/... URLs.</p>
             </div>
             {discord.last_status && (
@@ -572,12 +603,12 @@ export default function AdminSettingsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Bot-Name</div>
-                <input value={discord.username || ""} onChange={(e) => setDiscord({ ...discord, username: e.target.value })} data-testid="discord-username" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="THE LION SQUAD" />
+                <input value={discord.username || ""} onChange={(e) => setDiscordField("username", e.target.value)} data-testid="discord-username" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="THE LION SQUAD" />
               </div>
-              <ImageUpload value={discord.avatar_url || ""} onChange={(v) => setDiscord({ ...discord, avatar_url: v })} label="Avatar" testId="discord-avatar" variant="square" allowLibrary />
+              <ImageUpload value={discord.avatar_url || ""} onChange={(v) => setDiscordField("avatar_url", v)} label="Avatar" testId="discord-avatar" variant="square" allowLibrary />
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
-              <button onClick={saveDiscord} data-testid="discord-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
+            <button onClick={saveDiscord} disabled={imageUploadBusy} data-testid="discord-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">Speichern</button>
               <button onClick={sendDiscordTest} data-testid="discord-test" className="px-4 py-2 border border-[#5865F2] text-[#5865F2] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Test senden</button>
               {discord.configured && <button onClick={clearDiscordWebhook} data-testid="discord-clear" className="px-4 py-2 border border-[#FF3B30]/60 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm">Webhook entfernen</button>}
             </div>
@@ -588,28 +619,28 @@ export default function AdminSettingsPage() {
       {tab === "brand" && (
         <div className="max-w-2xl space-y-4">
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
-            <BrandField label="Vereinsname" value={brand.club_name} onChange={(v) => setBrand({ ...brand, club_name: v })} testId="brand-club-name" />
-            <BrandField label="Tagline" value={brand.tagline} onChange={(v) => setBrand({ ...brand, tagline: v })} testId="brand-tagline" />
-            <BrandField label="SEO Beschreibung" value={brand.site_description} onChange={(v) => setBrand({ ...brand, site_description: v })} testId="brand-site-description" />
+            <BrandField label="Vereinsname" value={brand.club_name} onChange={(v) => setBrandField("club_name", v)} testId="brand-club-name" />
+            <BrandField label="Tagline" value={brand.tagline} onChange={(v) => setBrandField("tagline", v)} testId="brand-tagline" />
+            <BrandField label="SEO Beschreibung" value={brand.site_description} onChange={(v) => setBrandField("site_description", v)} testId="brand-site-description" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <BrandField label="Akzentfarbe (HEX)" value={brand.primary_color} onChange={(v) => setBrand({ ...brand, primary_color: v })} testId="brand-color" />
-              <BrandField label="Domain" value={brand.domain} onChange={(v) => setBrand({ ...brand, domain: v })} testId="brand-domain" />
+              <BrandField label="Akzentfarbe (HEX)" value={brand.primary_color} onChange={(v) => setBrandField("primary_color", v)} testId="brand-color" />
+              <BrandField label="Domain" value={brand.domain} onChange={(v) => setBrandField("domain", v)} testId="brand-domain" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <BrandField label="Zeitzone" value={brand.timezone} onChange={(v) => setBrand({ ...brand, timezone: v })} testId="brand-tz" />
-              <BrandField label="Kontakt E-Mail" value={brand.contact_email} onChange={(v) => setBrand({ ...brand, contact_email: v })} testId="brand-contact-email" />
+              <BrandField label="Zeitzone" value={brand.timezone} onChange={(v) => setBrandField("timezone", v)} testId="brand-tz" />
+              <BrandField label="Kontakt E-Mail" value={brand.contact_email} onChange={(v) => setBrandField("contact_email", v)} testId="brand-contact-email" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <BrandField label="Discord Einladung" value={brand.discord_invite_url} onChange={(v) => setBrand({ ...brand, discord_invite_url: v })} testId="brand-discord-invite" />
-              <BrandField label="Twitch Channel" value={brand.twitch_channel} onChange={(v) => setBrand({ ...brand, twitch_channel: v })} testId="brand-twitch-channel" />
+              <BrandField label="Discord Einladung" value={brand.discord_invite_url} onChange={(v) => setBrandField("discord_invite_url", v)} testId="brand-discord-invite" />
+              <BrandField label="Twitch Channel" value={brand.twitch_channel} onChange={(v) => setBrandField("twitch_channel", v)} testId="brand-twitch-channel" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ImageUpload value={brand.logo_url} onChange={(v) => setBrand({ ...brand, logo_url: v })} label="Vereinslogo" testId="brand-logo" variant="square" allowLibrary />
-              <ImageUpload value={brand.mascot_url} onChange={(v) => setBrand({ ...brand, mascot_url: v })} label="Maskottchen" testId="brand-mascot" variant="square" allowLibrary />
-              <ImageUpload value={brand.favicon_url} onChange={(v) => setBrand({ ...brand, favicon_url: v })} label="Favicon / Browser Icon" testId="brand-favicon" variant="square" allowLibrary />
+              <ImageUpload value={brand.logo_url} onChange={(v) => setBrandField("logo_url", v)} label="Vereinslogo" testId="brand-logo" variant="square" allowLibrary />
+              <ImageUpload value={brand.mascot_url} onChange={(v) => setBrandField("mascot_url", v)} label="Maskottchen" testId="brand-mascot" variant="square" allowLibrary />
+              <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Favicon / Browser Icon" testId="brand-favicon" variant="square" allowLibrary />
             </div>
             <p className="text-xs text-white/45">Impressum, Datenschutz und Vereinsdaten liegen im Tab Rechtliches.</p>
-            <button onClick={saveBrand} data-testid="brand-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
+            <button onClick={saveBrand} disabled={imageUploadBusy} data-testid="brand-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">Speichern</button>
           </div>
         </div>
       )}
@@ -622,42 +653,42 @@ export default function AdminSettingsPage() {
               <p className="text-xs text-white/50 mt-1">Diese Angaben werden dynamisch auf /imprint und /privacy ausgegeben. ZVR, Adresse und vertretungsbefugte Person bitte mit den echten Vereinsdaten eintragen.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <BrandField label="Rechtlicher Vereinsname" value={brand.legal_name} onChange={(v) => setBrand({ ...brand, legal_name: v })} testId="legal-name" />
-              <BrandField label="ZVR-Zahl" value={brand.zvr_number} onChange={(v) => setBrand({ ...brand, zvr_number: v })} testId="legal-zvr" />
-              <BrandField label="Rechtsform" value={brand.legal_form} onChange={(v) => setBrand({ ...brand, legal_form: v })} testId="legal-form" />
-              <BrandField label="Vereinssitz" value={brand.registered_seat} onChange={(v) => setBrand({ ...brand, registered_seat: v })} testId="legal-seat" />
+              <BrandField label="Rechtlicher Vereinsname" value={brand.legal_name} onChange={(v) => setBrandField("legal_name", v)} testId="legal-name" />
+              <BrandField label="ZVR-Zahl" value={brand.zvr_number} onChange={(v) => setBrandField("zvr_number", v)} testId="legal-zvr" />
+              <BrandField label="Rechtsform" value={brand.legal_form} onChange={(v) => setBrandField("legal_form", v)} testId="legal-form" />
+              <BrandField label="Vereinssitz" value={brand.registered_seat} onChange={(v) => setBrandField("registered_seat", v)} testId="legal-seat" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <BrandField label="Strasse und Hausnummer" value={brand.street_address} onChange={(v) => setBrand({ ...brand, street_address: v })} testId="legal-street" />
-              <BrandField label="Adresszusatz" value={brand.address_extra} onChange={(v) => setBrand({ ...brand, address_extra: v })} testId="legal-address-extra" />
-              <BrandField label="PLZ" value={brand.postal_code} onChange={(v) => setBrand({ ...brand, postal_code: v })} testId="legal-postal" />
-              <BrandField label="Ort" value={brand.city} onChange={(v) => setBrand({ ...brand, city: v })} testId="legal-city" />
-              <BrandField label="Bundesland" value={brand.state} onChange={(v) => setBrand({ ...brand, state: v })} testId="legal-state" />
-              <BrandField label="Land" value={brand.country} onChange={(v) => setBrand({ ...brand, country: v })} testId="legal-country" />
+              <BrandField label="Strasse und Hausnummer" value={brand.street_address} onChange={(v) => setBrandField("street_address", v)} testId="legal-street" />
+              <BrandField label="Adresszusatz" value={brand.address_extra} onChange={(v) => setBrandField("address_extra", v)} testId="legal-address-extra" />
+              <BrandField label="PLZ" value={brand.postal_code} onChange={(v) => setBrandField("postal_code", v)} testId="legal-postal" />
+              <BrandField label="Ort" value={brand.city} onChange={(v) => setBrandField("city", v)} testId="legal-city" />
+              <BrandField label="Bundesland" value={brand.state} onChange={(v) => setBrandField("state", v)} testId="legal-state" />
+              <BrandField label="Land" value={brand.country} onChange={(v) => setBrandField("country", v)} testId="legal-country" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <BrandField label="Vereinsbehoerde" value={brand.register_authority} onChange={(v) => setBrand({ ...brand, register_authority: v })} testId="legal-authority" />
-              <BrandField label="Telefon" value={brand.phone} onChange={(v) => setBrand({ ...brand, phone: v })} testId="legal-phone" />
-              <BrandField label="Vertretungsbefugte Person" value={brand.representative_name} onChange={(v) => setBrand({ ...brand, representative_name: v })} testId="legal-representative" />
-              <BrandField label="Funktion" value={brand.representative_role} onChange={(v) => setBrand({ ...brand, representative_role: v })} testId="legal-role" />
-              <BrandField label="Inhaltlich verantwortlich" value={brand.content_responsible} onChange={(v) => setBrand({ ...brand, content_responsible: v })} testId="legal-content-responsible" />
-              <BrandField label="Datenschutz E-Mail" value={brand.privacy_contact_email} onChange={(v) => setBrand({ ...brand, privacy_contact_email: v })} testId="legal-privacy-email" />
+              <BrandField label="Vereinsbehoerde" value={brand.register_authority} onChange={(v) => setBrandField("register_authority", v)} testId="legal-authority" />
+              <BrandField label="Telefon" value={brand.phone} onChange={(v) => setBrandField("phone", v)} testId="legal-phone" />
+              <BrandField label="Vertretungsbefugte Person" value={brand.representative_name} onChange={(v) => setBrandField("representative_name", v)} testId="legal-representative" />
+              <BrandField label="Funktion" value={brand.representative_role} onChange={(v) => setBrandField("representative_role", v)} testId="legal-role" />
+              <BrandField label="Inhaltlich verantwortlich" value={brand.content_responsible} onChange={(v) => setBrandField("content_responsible", v)} testId="legal-content-responsible" />
+              <BrandField label="Datenschutz E-Mail" value={brand.privacy_contact_email} onChange={(v) => setBrandField("privacy_contact_email", v)} testId="legal-privacy-email" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <BrandField label="Hosting / Betreiber" value={brand.hosting_provider} onChange={(v) => setBrand({ ...brand, hosting_provider: v })} testId="legal-hosting" />
-              <BrandField label="Hosting-Region" value={brand.hosting_country} onChange={(v) => setBrand({ ...brand, hosting_country: v })} testId="legal-hosting-country" />
-              <BrandField label="UID-Nummer falls vorhanden" value={brand.vat_number} onChange={(v) => setBrand({ ...brand, vat_number: v })} testId="legal-vat" />
-              <BrandField label="Turnierbedingungen URL" value={brand.tournament_terms_url} onChange={(v) => setBrand({ ...brand, tournament_terms_url: v })} testId="legal-terms-url" />
+              <BrandField label="Hosting / Betreiber" value={brand.hosting_provider} onChange={(v) => setBrandField("hosting_provider", v)} testId="legal-hosting" />
+              <BrandField label="Hosting-Region" value={brand.hosting_country} onChange={(v) => setBrandField("hosting_country", v)} testId="legal-hosting-country" />
+              <BrandField label="UID-Nummer falls vorhanden" value={brand.vat_number} onChange={(v) => setBrandField("vat_number", v)} testId="legal-vat" />
+              <BrandField label="Turnierbedingungen URL" value={brand.tournament_terms_url} onChange={(v) => setBrandField("tournament_terms_url", v)} testId="legal-terms-url" />
             </div>
             <label className="flex items-start gap-2 text-sm text-white/75">
-              <input type="checkbox" checked={!!brand.paid_tournaments_enabled} onChange={(e) => setBrand({ ...brand, paid_tournaments_enabled: e.target.checked })} data-testid="legal-paid-tournaments" className="accent-[#29B6E8] mt-1" />
+              <input type="checkbox" checked={!!brand.paid_tournaments_enabled} onChange={(e) => setBrandField("paid_tournaments_enabled", e.target.checked)} data-testid="legal-paid-tournaments" className="accent-[#29B6E8] mt-1" />
               <span>Preisturniere oder Turniere mit Startgeld koennen stattfinden.</span>
             </label>
-            <LegalTextArea label="Freitext Impressum" value={brand.imprint} onChange={(v) => setBrand({ ...brand, imprint: v })} testId="brand-imprint" rows={4} />
-            <LegalTextArea label="Zusaetzliche rechtliche Hinweise" value={brand.legal_extra} onChange={(v) => setBrand({ ...brand, legal_extra: v })} testId="legal-extra" rows={4} />
-            <LegalTextArea label="Freitext Datenschutz" value={brand.privacy_policy} onChange={(v) => setBrand({ ...brand, privacy_policy: v })} testId="brand-privacy" rows={5} />
-            <LegalTextArea label="Zusaetzliche Datenschutzhinweise" value={brand.privacy_extra} onChange={(v) => setBrand({ ...brand, privacy_extra: v })} testId="privacy-extra" rows={5} />
-            <button onClick={saveBrand} data-testid="legal-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Rechtliches speichern</button>
+            <LegalTextArea label="Freitext Impressum" value={brand.imprint} onChange={(v) => setBrandField("imprint", v)} testId="brand-imprint" rows={4} />
+            <LegalTextArea label="Zusaetzliche rechtliche Hinweise" value={brand.legal_extra} onChange={(v) => setBrandField("legal_extra", v)} testId="legal-extra" rows={4} />
+            <LegalTextArea label="Freitext Datenschutz" value={brand.privacy_policy} onChange={(v) => setBrandField("privacy_policy", v)} testId="brand-privacy" rows={5} />
+            <LegalTextArea label="Zusaetzliche Datenschutzhinweise" value={brand.privacy_extra} onChange={(v) => setBrandField("privacy_extra", v)} testId="privacy-extra" rows={5} />
+            <button onClick={saveBrand} disabled={imageUploadBusy} data-testid="legal-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">Rechtliches speichern</button>
           </div>
         </div>
       )}

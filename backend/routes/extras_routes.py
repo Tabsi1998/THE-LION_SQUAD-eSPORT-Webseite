@@ -89,8 +89,9 @@ class DiscordSettings(BaseModel):
 
 
 @settings_router.get("/public")
-async def public_settings():
+async def public_settings(response: Response):
     """Public-safe settings for branding on public pages."""
+    response.headers["Cache-Control"] = "no-store"
     db = get_db()
     b = await db.settings.find_one({"id": "branding"}) or {}
     b.pop("_id", None)
@@ -303,9 +304,10 @@ async def delete_mail_job(job_id: str, me: dict = Depends(require_admin())):
 
 
 @settings_router.get("/branding")
-async def get_branding(me: dict = Depends(require_admin())):
+async def get_branding(response: Response, me: dict = Depends(require_admin())):
     """Returns the branding doc, merging in social-default URLs so the admin form
     pre-fills with sensible defaults instead of empty fields."""
+    response.headers["Cache-Control"] = "no-store"
     db = get_db()
     saved = (await db.settings.find_one({"id": "branding"}, {"_id": 0})) or {}
     defaults = {

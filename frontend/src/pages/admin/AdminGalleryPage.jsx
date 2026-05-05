@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
@@ -22,7 +22,7 @@ export default function AdminGalleryPage() {
 
   const remove = async (id) => {
     if (!window.confirm("Album mit allen Fotos löschen?")) return;
-    try { await api.delete(`/gallery/${id}`); toast.success("Gelöscht."); load(); } catch { toast.error("Fehler."); }
+    try { await api.delete(`/gallery/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
   };
 
   if (activeAlbum) {
@@ -113,7 +113,7 @@ function AlbumModal({ album, events, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Fehler.");
+      toast.error(formatApiError(err.response?.data?.detail));
     }
     setSaving(false);
   };
@@ -201,7 +201,7 @@ function AlbumPhotos({ album, events, onBack }) {
   };
   const remove = async (id) => {
     if (!window.confirm("Foto löschen?")) return;
-    try { await api.delete(`/gallery/photos/${id}`); load(); } catch { toast.error("Fehler."); }
+    try { await api.delete(`/gallery/photos/${id}`); load(); } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
   };
   const openMedia = async () => {
     setMediaOpen(true);

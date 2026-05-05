@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { API, api } from "@/lib/api";
+import { API, api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { toast } from "sonner";
 import { Plus, Save, X, Trash2, FileText, Pin, UploadCloud } from "lucide-react";
@@ -157,7 +157,7 @@ function DocModal({ doc, meta, onClose, onSaved }) {
       const detail = err.response?.data?.detail;
       const message = status === 413
         ? `Datei zu gross oder Reverse Proxy blockiert den Upload. App-Limit: ${DOCUMENT_UPLOAD_LIMIT_MB} MB, externer Proxy bitte auf mindestens ${PROXY_UPLOAD_LIMIT_MB} MB setzen.`
-        : detail || "Upload fehlgeschlagen.";
+        : detail ? formatApiError(detail) : "Upload fehlgeschlagen.";
       toast.error(status ? `Upload fehlgeschlagen (${status}): ${message}` : message);
     } finally {
       e.target.value = "";
@@ -182,7 +182,7 @@ function DocModal({ doc, meta, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Fehler.");
+      toast.error(formatApiError(err.response?.data?.detail));
     }
     setSaving(false);
   };

@@ -115,6 +115,7 @@ function SponsorForm({ sponsor, onClose, onSaved }) {
     order_index: sponsor?.order_index ?? 0,
   });
   const [saving, setSaving] = useState(false);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const save = async (e) => {
     e.preventDefault();
@@ -135,38 +136,38 @@ function SponsorForm({ sponsor, onClose, onSaved }) {
           <h3 className="font-heading text-xl font-bold uppercase">{sponsor ? "Sponsor bearbeiten" : "Neuer Sponsor"}</h3>
           <button type="button" onClick={onClose} className="text-white/40 hover:text-white"><XIcon className="w-4 h-4" /></button>
         </div>
-        <Field label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required testId="sponsor-name" />
-        <ImageUpload value={form.logo_url} onChange={(v) => setForm({ ...form, logo_url: v })} label="Logo" testId="sponsor-logo" variant="square" endpoint="/uploads/sponsor-logo" allowLibrary />
-        <Field label="Link (URL)" value={form.link} onChange={(v) => setForm({ ...form, link: v })} testId="sponsor-link" placeholder="https://…" />
+        <Field label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="sponsor-name" />
+        <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="sponsor-logo" variant="square" endpoint="/uploads/sponsor-logo" allowLibrary />
+        <Field label="Link (URL)" value={form.link} onChange={(v) => set("link", v)} testId="sponsor-link" placeholder="https://…" />
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Tier</div>
-            <select value={form.tier} onChange={(e) => setForm({ ...form, tier: e.target.value, show_on_home: undefined, show_on_footer: undefined })} data-testid="sponsor-tier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+            <select value={form.tier} onChange={(e) => setForm((f) => ({ ...f, tier: e.target.value, show_on_home: undefined, show_on_footer: undefined }))} data-testid="sponsor-tier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
               {TIERS.map((t) => <option key={t} value={t}>{TIER_LABELS[t]}</option>)}
             </select>
           </label>
           <label className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Reihenfolge</div>
-            <input type="number" value={form.order_index ?? 0} onChange={(e) => setForm({ ...form, order_index: parseInt(e.target.value, 10) || 0 })} data-testid="sponsor-order" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            <input type="number" value={form.order_index ?? 0} onChange={(e) => set("order_index", parseInt(e.target.value, 10) || 0)} data-testid="sponsor-order" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           </label>
         </div>
         <div className="grid grid-cols-3 gap-3 text-sm">
           <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.is_active !== false} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} data-testid="sponsor-active" className="accent-[#29B6E8]" />
+            <input type="checkbox" checked={form.is_active !== false} onChange={(e) => set("is_active", e.target.checked)} data-testid="sponsor-active" className="accent-[#29B6E8]" />
             Aktiv
           </label>
           <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_home === true || (form.show_on_home === undefined && ["main", "platinum", "gold"].includes(form.tier))} onChange={(e) => setForm({ ...form, show_on_home: e.target.checked })} data-testid="sponsor-show-home" className="accent-[#29B6E8]" />
+            <input type="checkbox" checked={form.show_on_home === true || (form.show_on_home === undefined && ["main", "platinum", "gold"].includes(form.tier))} onChange={(e) => set("show_on_home", e.target.checked)} data-testid="sponsor-show-home" className="accent-[#29B6E8]" />
             Auf Home
           </label>
           <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_footer === true || (form.show_on_footer === undefined && ["main", "platinum", "gold", "silver"].includes(form.tier))} onChange={(e) => setForm({ ...form, show_on_footer: e.target.checked })} data-testid="sponsor-show-footer" className="accent-[#29B6E8]" />
+            <input type="checkbox" checked={form.show_on_footer === true || (form.show_on_footer === undefined && ["main", "platinum", "gold", "silver"].includes(form.tier))} onChange={(e) => set("show_on_footer", e.target.checked)} data-testid="sponsor-show-footer" className="accent-[#29B6E8]" />
             Im Footer
           </label>
         </div>
         <label className="block">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Beschreibung</div>
-          <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} data-testid="sponsor-description" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+          <textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} data-testid="sponsor-description" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
         </label>
         <div className="flex gap-2 pt-2">
           <button type="submit" disabled={saving} data-testid="sponsor-save" className="flex-1 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
