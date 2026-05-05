@@ -6,6 +6,13 @@ export const API_BASE =
   configuredBackendUrl || (typeof window !== "undefined" ? window.location.origin : "");
 export const API = `${API_BASE}/api`;
 
+export function resolveMediaUrl(url) {
+  if (!url) return "";
+  const value = String(url);
+  if (/^(https?:|data:|blob:)/i.test(value)) return value;
+  return `${API_BASE}${value.startsWith("/") ? value : `/${value}`}`;
+}
+
 function getCookie(name) {
   const prefix = `${name}=`;
   return document.cookie

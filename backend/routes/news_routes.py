@@ -196,7 +196,9 @@ async def create_sponsor(body: SponsorCreate, me: dict = Depends(require_admin()
 @router.patch("/sponsors/{sid}")
 async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(require_admin())):
     db = get_db()
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    nullable_fields = {"logo_url", "link", "description"}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if not updates:
         return {"ok": True}
     # When tier changes and home/footer flags not set, recompute defaults

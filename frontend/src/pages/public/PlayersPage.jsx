@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Search, Crown } from "lucide-react";
 
@@ -75,7 +75,7 @@ export default function PlayersPage() {
                       <div className="relative">
                         <div className={`w-12 h-12 rounded-sm border ${isMember ? "border-[#FFD700]/50" : "border-white/15"} bg-[#0A0A0A] flex items-center justify-center overflow-hidden`}>
                           {p.avatar_url ? (
-                            <img src={p.avatar_url} alt={p.display_name} className="w-full h-full object-cover" />
+                            <img src={resolveMediaUrl(p.avatar_url)} alt={p.display_name} className="w-full h-full object-cover" />
                           ) : (
                             <span className={`font-heading font-black ${isMember ? "text-[#FFD700]" : "text-white/40"}`}>{(p.display_name || p.username)[0]}</span>
                           )}

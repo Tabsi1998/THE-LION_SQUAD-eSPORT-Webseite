@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { Pin, ArrowLeft, Calendar, Trophy, Users } from "lucide-react";
@@ -44,7 +44,7 @@ export default function NewsDetailPage() {
         {post.author_name && <div className="mt-3 text-xs text-white/50">Von <strong className="text-white/80">{post.author_name}</strong></div>}
         {post.banner_url && (
           <div className="mt-8 rounded-sm overflow-hidden border border-white/10">
-            <img src={post.banner_url} alt="" className="w-full h-auto" />
+            <img src={resolveMediaUrl(post.banner_url)} alt="" className="w-full h-auto" />
           </div>
         )}
         <div className="mt-8 prose prose-invert max-w-none text-white/85 whitespace-pre-line leading-relaxed">

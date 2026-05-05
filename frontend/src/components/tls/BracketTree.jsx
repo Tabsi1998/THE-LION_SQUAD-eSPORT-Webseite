@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { resolveMediaUrl } from "@/lib/api";
 
 /**
  * Renders a Single/Double Elimination bracket as columns of match nodes.
@@ -109,7 +110,7 @@ function Row({ label, score, isWinner, avatar }) {
     <div className={`flex items-center justify-between px-3 py-2 ${isWinner ? "bg-[#29B6E8]/10" : ""}`}>
       <div className="flex items-center gap-2 min-w-0">
         {avatar ? (
-          <img src={avatar} alt="" className="w-6 h-6 rounded-sm object-cover" />
+          <img src={resolveMediaUrl(avatar)} alt="" className="w-6 h-6 rounded-sm object-cover" />
         ) : (
           <div className="w-6 h-6 rounded-sm bg-white/5 border border-white/10" />
         )}

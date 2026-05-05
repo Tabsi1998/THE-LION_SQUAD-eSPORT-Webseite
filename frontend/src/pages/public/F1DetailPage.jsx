@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { API, api, formatMs } from "@/lib/api";
+import { API, api, formatMs, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StatusBadge } from "@/components/tls/StatusBadge";
@@ -49,7 +49,7 @@ export default function F1DetailPage() {
   return (
     <PublicLayout>
       <div className="relative border-b border-white/10 overflow-hidden bg-grid-dense">
-        {challenge.banner_url && <img src={challenge.banner_url} className="absolute inset-0 w-full h-full object-cover opacity-25" alt="" />}
+        {challenge.banner_url && <img src={resolveMediaUrl(challenge.banner_url)} className="absolute inset-0 w-full h-full object-cover opacity-25" alt="" />}
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/70 to-[#0A0A0A]" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
           <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "eSports", to: "/fastlap" }, { label: "Fast Lap", to: "/fastlap" }, { label: challenge.title }]} className="mb-3" />
@@ -152,7 +152,7 @@ export default function F1DetailPage() {
                     }`}
                   >
                     {tr.image_url ? (
-                      <img src={tr.image_url} alt="" className="w-14 h-10 object-cover rounded-sm" />
+                      <img src={resolveMediaUrl(tr.image_url)} alt="" className="w-14 h-10 object-cover rounded-sm" />
                     ) : (
                       <div className="w-14 h-10 rounded-sm bg-[#0A0A0A] border border-white/5" />
                     )}
@@ -167,7 +167,7 @@ export default function F1DetailPage() {
             <div className="lg:col-span-3">
               {board?.track?.image_url ? (
                 <div className="mb-4 rounded-sm overflow-hidden border border-white/10">
-                  <img src={board.track.image_url} alt={board.track.name} className="w-full h-48 object-cover" />
+                  <img src={resolveMediaUrl(board.track.image_url)} alt={board.track.name} className="w-full h-48 object-cover" />
                 </div>
               ) : null}
               <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">

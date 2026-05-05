@@ -92,7 +92,9 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
             raise HTTPException(status_code=403, detail="Keine Berechtigung")
     if body.tag and body.tag != team.get("tag") and await db.teams.find_one({"tag": body.tag}):
         raise HTTPException(status_code=409, detail="Team-Tag bereits vergeben")
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    nullable_fields = {"description", "logo_url", "discord_link", "social_links"}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     updates["updated_at"] = now_utc().isoformat()
     await db.teams.update_one({"id": team_id}, {"$set": updates})
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})

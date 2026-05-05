@@ -38,6 +38,18 @@ def _achievement_level(points: int) -> dict:
     }
 
 
+USER_NULLABLE_FIELDS = {
+    "display_name", "avatar_url", "banner_url", "bio", "first_name", "last_name",
+    "nickname", "birth_date", "country", "state", "city", "favorite_games",
+    "main_platform", "main_platforms", "preferred_role", "input_device",
+    "input_devices", "gaming_subscriptions", "website", "discord_name",
+    "discord_id", "switch_code", "steam_id", "epic_id", "psn_id", "xbox_id",
+    "riot_id", "twitch_handle", "youtube_handle", "tiktok_handle",
+    "instagram_handle", "x_handle", "nintendo_fc", "ea_id", "battlenet_id",
+    "profile_visibility",
+}
+
+
 async def _attach_membership(user: dict) -> dict:
     """Annotate user dict with current membership info."""
     if not user:
@@ -469,7 +481,8 @@ async def get_user(user_id: str, me: dict = Depends(get_current_user)):
 @router.patch("/me")
 async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
     db = get_db()
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}
     if not updates:
         await _attach_membership(me)
         return me
@@ -529,7 +542,8 @@ async def delete_my_social(social_id: str, me: dict = Depends(get_current_user))
 async def admin_update_user(user_id: str, body: UserUpdate,
                              me: dict = Depends(require_admin())):
     db = get_db()
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}
     updates["updated_at"] = now_utc().isoformat()
     await db.users.update_one({"id": user_id}, {"$set": updates})
     u = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})

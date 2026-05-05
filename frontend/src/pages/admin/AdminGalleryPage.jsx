@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
@@ -51,7 +51,7 @@ export default function AdminGalleryPage() {
           {albums.map((a) => (
             <div key={a.id} className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
               <div className="aspect-video bg-[#0A0A0A]">
-                {a.cover_url ? <img src={a.cover_url} alt={a.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-10 h-10 text-white/15" /></div>}
+                {a.cover_url ? <img src={resolveMediaUrl(a.cover_url)} alt={a.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-10 h-10 text-white/15" /></div>}
               </div>
               <div className="p-4">
                 <div className="flex items-center justify-between gap-2">
@@ -222,7 +222,7 @@ function AlbumPhotos({ album, events, onBack }) {
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
           {photos.map((p) => (
             <div key={p.id} className="relative group aspect-square bg-[#0A0A0A] border border-white/10">
-              <img src={p.thumbnail_url || p.image_url} alt={p.caption || ""} className="w-full h-full object-cover" />
+              <img src={resolveMediaUrl(p.thumbnail_url || p.image_url)} alt={p.caption || ""} className="w-full h-full object-cover" />
               <button onClick={() => remove(p.id)} className="absolute top-1 right-1 p-1 bg-black/70 text-[#FF3B30] opacity-0 group-hover:opacity-100 transition" aria-label="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>
             </div>
           ))}

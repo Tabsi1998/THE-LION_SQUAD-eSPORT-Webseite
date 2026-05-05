@@ -4,7 +4,7 @@
  * BoardPage ist jetzt dynamisch: liest /api/board und rendert nur is_active=true.
  */
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -70,7 +70,7 @@ function BoardCard({ p }) {
       {u ? (
         <Link to={`/u/${u.username}`} className="mt-4 flex items-center gap-3 group">
           {u.avatar_url ? (
-            <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover border border-white/10" />
+            <img src={resolveMediaUrl(u.avatar_url)} alt="" className="w-10 h-10 rounded-full object-cover border border-white/10" />
           ) : (
             <div className="w-10 h-10 rounded-full bg-[#0A0A0A] border border-white/10 flex items-center justify-center">
               <UserIcon className="w-5 h-5 text-white/40" />

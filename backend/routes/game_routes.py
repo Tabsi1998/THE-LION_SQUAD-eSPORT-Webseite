@@ -42,7 +42,9 @@ async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
 @router.patch("/{game_id}")
 async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require_admin())):
     db = get_db()
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    nullable_fields = {"short_name", "logo_url", "cover_url", "genre"}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if "slug" in updates:
         updates["slug"] = updates["slug"].strip().lower()
         existing = await db.games.find_one({"slug": updates["slug"], "id": {"$ne": game_id}}, {"_id": 0, "id": 1})

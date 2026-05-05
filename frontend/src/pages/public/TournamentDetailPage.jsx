@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -64,7 +64,7 @@ export default function TournamentDetailPage() {
       <div className="relative border-b border-white/10 bg-grid-dense">
         {t.banner_url && (
           <div className="absolute inset-0">
-            <img src={t.banner_url} alt="" className="w-full h-full object-cover opacity-20" />
+            <img src={resolveMediaUrl(t.banner_url)} alt="" className="w-full h-full object-cover opacity-20" />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#0A0A0A]" />
           </div>
         )}

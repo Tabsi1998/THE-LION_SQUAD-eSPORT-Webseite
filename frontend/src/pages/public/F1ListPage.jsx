@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { Flag, Users, Clock, ChevronRight } from "lucide-react";
@@ -44,7 +44,7 @@ function FastLapCard({ challenge: c }) {
       className="group block border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-6 bg-[#121212] transition-all"
     >
       <div className="flex items-start gap-5">
-        {c.banner_url && <img src={c.banner_url} alt="" className="w-32 h-20 object-cover rounded-sm hidden sm:block" />}
+        {c.banner_url && <img src={resolveMediaUrl(c.banner_url)} alt="" className="w-32 h-20 object-cover rounded-sm hidden sm:block" />}
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <StatusBadge status={c.status} />

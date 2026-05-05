@@ -144,10 +144,6 @@ export default function ProfilePage() {
         payload.favorite_games = payload.favorite_games
           .split(",").map((s) => s.trim()).filter(Boolean);
       }
-      // strip empty strings to avoid overwriting with ""
-      Object.keys(payload).forEach((k) => {
-        if (payload[k] === "" && k !== "bio") delete payload[k];
-      });
       await api.patch("/users/me", payload);
       await refresh();
       toast.success("Profil gespeichert.");

@@ -201,7 +201,11 @@ async def update_benefit(
     benefit_id: str, body: MemberBenefitUpdate, me: dict = Depends(require_admin()),
 ):
     db = get_db()
-    update = body.model_dump(exclude_unset=True)
+    nullable_fields = {
+        "description", "category", "image_url", "link_url", "valid_from", "valid_until",
+    }
+    raw = body.model_dump(exclude_unset=True)
+    update = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if not update:
         raise HTTPException(400, "Keine Änderungen.")
     update["updated_at"] = now_utc().isoformat()

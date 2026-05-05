@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Calendar, MapPin, Users as UsersIcon, Crown, Lock } from "lucide-react";
 
@@ -84,7 +84,7 @@ function EventCard({ e, meta }) {
     >
       {e.banner_url ? (
         <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
-          <img src={e.banner_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+          <img src={resolveMediaUrl(e.banner_url)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
         </div>
       ) : (
         <div className="aspect-video bg-gradient-to-br from-[#9F7AEA]/20 via-[#0A0A0A] to-[#0A0A0A] flex items-center justify-center">

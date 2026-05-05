@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { StatusBadge } from "./StatusBadge";
 import { Calendar, Users, Trophy } from "lucide-react";
 import { formatDate, getRegistrationState } from "@/lib/datetime";
+import { resolveMediaUrl } from "@/lib/api";
 
 export function TournamentCard({ tournament, index = 0 }) {
   const t = tournament;
@@ -17,7 +18,7 @@ export function TournamentCard({ tournament, index = 0 }) {
     >
       <div className="aspect-[16/9] relative overflow-hidden">
         <img
-          src={bg}
+          src={resolveMediaUrl(bg)}
           alt={t.title}
           className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-60 group-hover:scale-105 transition-all duration-500"
         />

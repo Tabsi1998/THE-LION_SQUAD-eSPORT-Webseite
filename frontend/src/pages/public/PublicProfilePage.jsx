@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, formatMs } from "@/lib/api";
+import { api, formatMs, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
@@ -58,7 +58,7 @@ export default function PublicProfilePage() {
           <div className="flex flex-col md:flex-row gap-8 items-start">
             <div className="shrink-0">
               {profile.avatar_url ? (
-                <img src={profile.avatar_url} alt={profile.display_name} className="w-32 h-32 md:w-40 md:h-40 rounded-sm border-2 border-[#29B6E8]/40 object-cover" />
+                <img src={resolveMediaUrl(profile.avatar_url)} alt={profile.display_name} className="w-32 h-32 md:w-40 md:h-40 rounded-sm border-2 border-[#29B6E8]/40 object-cover" />
               ) : (
                 <div className="w-32 h-32 md:w-40 md:h-40 rounded-sm border-2 border-[#29B6E8]/40 bg-gradient-to-br from-[#29B6E8]/20 to-[#121212] flex items-center justify-center font-display font-black text-5xl text-[#29B6E8]">
                   {(profile.display_name || profile.username || "?").slice(0, 2).toUpperCase()}

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { TLS_MASCOT } from "@/components/tls/Logo";
 
 const DEFAULT_TITLE = "THE LION SQUAD - eSports Vereinsplattform";
@@ -42,8 +42,8 @@ export function BrandingHead() {
         document.title = `${name} - eSports Vereinsplattform`;
       }
 
-      upsertLink("icon", icon);
-      upsertLink("apple-touch-icon", icon);
+      upsertLink("icon", resolveMediaUrl(icon));
+      upsertLink("apple-touch-icon", resolveMediaUrl(icon));
       upsertLink("manifest", "/api/manifest.webmanifest");
 
       upsertMeta('meta[name="application-name"]', { name: "application-name", content: name });

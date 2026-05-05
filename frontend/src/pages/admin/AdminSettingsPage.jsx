@@ -569,10 +569,7 @@ export default function AdminSettingsPage() {
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Bot-Name</div>
                 <input value={discord.username || ""} onChange={(e) => setDiscord({ ...discord, username: e.target.value })} data-testid="discord-username" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="THE LION SQUAD" />
               </div>
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Avatar URL</div>
-                <input value={discord.avatar_url || ""} onChange={(e) => setDiscord({ ...discord, avatar_url: e.target.value })} data-testid="discord-avatar" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-              </div>
+              <ImageUpload value={discord.avatar_url || ""} onChange={(v) => setDiscord({ ...discord, avatar_url: v })} label="Avatar" testId="discord-avatar" variant="square" allowLibrary />
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <button onClick={saveDiscord} data-testid="discord-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>

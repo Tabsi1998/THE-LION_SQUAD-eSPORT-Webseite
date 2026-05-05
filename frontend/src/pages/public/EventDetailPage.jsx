@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { TournamentCard } from "@/components/tls/TournamentCard";
@@ -38,7 +38,7 @@ export default function EventDetailPage() {
   return (
     <PublicLayout>
       <div className="relative border-b border-white/10">
-        {e.banner_url && <img src={e.banner_url} className="absolute inset-0 w-full h-full object-cover opacity-25" alt="" />}
+        {e.banner_url && <img src={resolveMediaUrl(e.banner_url)} className="absolute inset-0 w-full h-full object-cover opacity-25" alt="" />}
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/40 via-[#0A0A0A]/80 to-[#0A0A0A]" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
           <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Events", to: "/events" }, { label: e.name }]} className="mb-4" />
@@ -102,7 +102,7 @@ export default function EventDetailPage() {
               {e.albums.map((a) => (
                 <Link key={a.id} to={`/gallery/${a.slug}`} className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] overflow-hidden">
                   <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
-                    {a.cover_url ? <img src={a.cover_url} alt={a.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-8 h-8 text-white/15" /></div>}
+                    {a.cover_url ? <img src={resolveMediaUrl(a.cover_url)} alt={a.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-8 h-8 text-white/15" /></div>}
                   </div>
                   <div className="p-4"><div className="font-heading font-bold">{a.title}</div></div>
                 </Link>

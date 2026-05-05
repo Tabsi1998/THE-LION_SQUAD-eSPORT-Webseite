@@ -113,7 +113,12 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
     cid = await _resolve_cid(cid)
     existing = await db.f1_challenges.find_one({"id": cid}, {"_id": 0}) or {}
     raw = body.model_dump(exclude_unset=True)
-    nullable_fields = {"banner_url", "twitch_channel", "stream_url", "stream_title", "max_attempts", "prize_places"}
+    nullable_fields = {
+        "description", "vehicle", "weather", "assists_allowed", "controller_type",
+        "platform", "banner_url", "twitch_channel", "stream_platform",
+        "stream_url", "stream_title", "max_attempts", "prize_places",
+        "registration_open_from", "registration_open_until", "start_date", "end_date",
+    }
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     for k in ["registration_open_from", "registration_open_until", "start_date", "end_date"]:
         if k in updates:
@@ -192,7 +197,9 @@ async def add_track(cid: str, body: F1TrackCreate, me: dict = Depends(require_ad
 @router.patch("/tracks/{tid}")
 async def update_track(tid: str, body: F1TrackUpdate, me: dict = Depends(require_admin())):
     db = get_db()
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    nullable_fields = {"image_url", "country"}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     await db.f1_tracks.update_one({"id": tid}, {"$set": updates})
     tr = await db.f1_tracks.find_one({"id": tid}, {"_id": 0})
     return tr
@@ -420,7 +427,9 @@ async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(re
     existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Lap-Time nicht gefunden")
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    nullable_fields = {"proof_url", "admin_note"}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     # P0 validation: compute resulting state and require note
     final_pen = updates.get("penalty_seconds", existing.get("penalty_seconds", 0))
     final_inv = updates.get("is_invalid", existing.get("is_invalid", False))

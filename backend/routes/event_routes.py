@@ -131,7 +131,13 @@ async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
 @router.patch("/{event_id}")
 async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(require_admin())):
     db = get_db()
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    nullable_fields = {
+        "description", "location", "address", "banner_url", "registration_url",
+        "twitch_channel", "stream_url", "stream_title", "event_url",
+        "door_time", "registration_opens_at", "registration_closes_at", "end_date",
+    }
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     for k in ("start_date", "end_date", "door_time", "registration_opens_at", "registration_closes_at"):
         if updates.get(k):
             updates[k] = updates[k].isoformat()

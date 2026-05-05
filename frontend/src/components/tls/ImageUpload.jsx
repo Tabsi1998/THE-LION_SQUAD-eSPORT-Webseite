@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Upload, X, Image as ImageIcon } from "lucide-react";
-import { API_BASE, api, formatApiError } from "@/lib/api";
+import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { toast } from "sonner";
 
 /**
@@ -64,12 +64,6 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
   const previewClass = variant === "wide"
     ? "aspect-[16/9] w-full"
     : "w-20 h-20";
-  const mediaSrc = (url) => {
-    if (!url) return "";
-    if (/^https?:\/\//i.test(url) || url.startsWith("data:")) return url;
-    return `${API_BASE}${url.startsWith("/") ? url : `/${url}`}`;
-  };
-
   return (
     <div>
       {label && <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>}
@@ -77,7 +71,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
         <div className={`${previewClass} bg-[#0A0A0A] border ${value ? "border-white/10" : "border-dashed border-white/20"} rounded-sm overflow-hidden shrink-0 relative group`}>
           {value ? (
             <>
-              <img src={mediaSrc(value)} alt="" className="w-full h-full object-contain" />
+              <img src={resolveMediaUrl(value)} alt="" className="w-full h-full object-contain" />
               <button type="button" onClick={() => onChange("")} className="absolute top-1 right-1 p-1 bg-black/70 text-white/80 rounded-sm opacity-0 group-hover:opacity-100 transition" data-testid={`${testId}-clear`}>
                 <X className="w-3 h-3" />
               </button>
@@ -140,7 +134,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                     className="aspect-square border border-white/10 bg-[#0A0A0A] rounded-sm overflow-hidden hover:border-[#29B6E8]/70 transition"
                     title={item.filename}
                   >
-                    <img src={mediaSrc(item.url)} alt="" className="w-full h-full object-cover" />
+                    <img src={resolveMediaUrl(item.url)} alt="" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { Trophy } from "lucide-react";
@@ -19,7 +19,7 @@ export default function SeasonPage() {
   return (
     <PublicLayout>
       <div className="relative border-b border-white/10 bg-grid-dense overflow-hidden">
-        {s.banner_url && <img src={s.banner_url} className="absolute inset-0 w-full h-full object-cover opacity-20" alt=""/>}
+        {s.banner_url && <img src={resolveMediaUrl(s.banner_url)} className="absolute inset-0 w-full h-full object-cover opacity-20" alt=""/>}
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/70 to-[#0A0A0A]"/>
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{s.kind === "circuit" ? "Circuit" : "Saison"}</span>

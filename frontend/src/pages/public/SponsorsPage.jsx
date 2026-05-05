@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Star, ExternalLink } from "lucide-react";
 
@@ -54,7 +54,7 @@ export default function SponsorsPage() {
                   >
                     <div className="aspect-video bg-[#0A0A0A] rounded-sm mb-4 flex items-center justify-center overflow-hidden">
                       {s.logo_url ? (
-                        <img src={s.logo_url} alt={s.name} className="w-full h-full object-contain p-3" />
+                        <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="w-full h-full object-contain p-3" />
                       ) : (
                         <span className="font-heading font-black text-2xl text-white/30">{s.name[0]}</span>
                       )}

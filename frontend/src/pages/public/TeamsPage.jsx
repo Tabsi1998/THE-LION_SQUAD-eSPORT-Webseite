@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -244,7 +244,7 @@ function TeamLogo({ team, size = "md" }) {
   const cls = size === "lg" ? "w-28 h-28 text-3xl" : "w-16 h-16 text-xl";
   return (
     <div className={`${cls} bg-[#0A0A0A] border border-white/10 rounded-sm flex items-center justify-center shrink-0 overflow-hidden`}>
-      {team.logo_url ? <img src={team.logo_url} alt={team.name} className="w-full h-full object-cover" /> : <span className="font-heading font-black text-[#29B6E8]">{team.tag}</span>}
+      {team.logo_url ? <img src={resolveMediaUrl(team.logo_url)} alt={team.name} className="w-full h-full object-cover" /> : <span className="font-heading font-black text-[#29B6E8]">{team.tag}</span>}
     </div>
   );
 }

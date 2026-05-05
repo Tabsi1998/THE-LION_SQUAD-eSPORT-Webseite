@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { API, api, formatApiError, formatMs, parseTimeStr } from "@/lib/api";
+import { API, api, formatApiError, formatMs, parseTimeStr, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -167,7 +167,7 @@ export default function AdminF1EditPage() {
             {tracks.map((tr) => (
               <div key={tr.id} className={`flex items-center justify-between gap-2 border rounded-sm p-2 ${activeTrack === tr.id ? "border-[#29B6E8] bg-[#29B6E8]/5" : "border-white/10"}`}>
                 <button onClick={() => setActiveTrack(tr.id)} data-testid={`f1-track-${tr.id}`} className="flex items-center gap-2 flex-1 text-left">
-                  {tr.image_url && <img src={tr.image_url} className="w-10 h-7 object-cover rounded-sm" alt="" />}
+                  {tr.image_url && <img src={resolveMediaUrl(tr.image_url)} className="w-10 h-7 object-cover rounded-sm" alt="" />}
                   <div className="min-w-0"><div className="text-sm font-bold truncate">{tr.name}</div><div className="text-[10px] text-white/50">{tr.country}</div></div>
                 </button>
                 {isAdmin && <button onClick={() => setEditTrack({ ...tr })} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Strecke bearbeiten"><Pencil className="w-3.5 h-3.5" /></button>}

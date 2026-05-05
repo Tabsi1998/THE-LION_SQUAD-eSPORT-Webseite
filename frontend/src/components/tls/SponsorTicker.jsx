@@ -3,7 +3,7 @@
  * Duplicates the sponsor list once so the CSS animation can loop seamlessly.
  */
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 
 export function SponsorTicker({ className = "", compact = false, placement = "home" }) {
   const [sponsors, setSponsors] = useState([]);
@@ -31,7 +31,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
           {items.map((s, i) => (
             <div key={`${s.id}-${i}`} className="inline-flex items-center gap-3 py-4 px-2 shrink-0">
               {s.logo_url ? (
-                <img src={s.logo_url} alt={s.name} className={`${compact ? "h-8" : "h-10"} w-auto object-contain opacity-80 group-hover:opacity-100 transition`} />
+                <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className={`${compact ? "h-8" : "h-10"} w-auto object-contain opacity-80 group-hover:opacity-100 transition`} />
               ) : (
                 <div className={`${compact ? "h-8 w-8" : "h-10 w-10"} rounded-sm bg-[#29B6E8]/10 border border-[#29B6E8]/20 flex items-center justify-center text-[#29B6E8] font-display font-bold text-xs`}>
                   {s.name.slice(0, 2).toUpperCase()}
@@ -70,7 +70,7 @@ export function SponsorGrid({ max = 4 }) {
       {sponsors.slice(0, max).map((s) => (
         <div key={s.id} className="flex items-center gap-2 px-3 py-1.5 border border-white/10 rounded-sm bg-white/[0.02]">
           {s.logo_url ? (
-            <img src={s.logo_url} alt={s.name} className="h-6 w-auto object-contain" />
+            <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="h-6 w-auto object-contain" />
           ) : (
             <div className="h-6 w-6 rounded-sm bg-[#29B6E8]/10 border border-[#29B6E8]/20 flex items-center justify-center text-[#29B6E8] text-[10px] font-display font-bold">
               {s.name.slice(0, 2).toUpperCase()}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentCard } from "@/components/tls/TournamentCard";
 import { StatusBadge } from "@/components/tls/StatusBadge";
@@ -111,7 +111,7 @@ export default function HomePage() {
             {state.news.map((n) => (
               <Link key={n.id} to={`/news/${n.slug}`} data-testid={`home-news-${n.slug}`} className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] overflow-hidden transition flex flex-col">
                 {n.banner_url ? (
-                  <div className="aspect-video bg-[#0A0A0A] overflow-hidden"><img src={n.banner_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" /></div>
+                  <div className="aspect-video bg-[#0A0A0A] overflow-hidden"><img src={resolveMediaUrl(n.banner_url)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" /></div>
                 ) : (
                   <div className="aspect-video bg-gradient-to-br from-[#29B6E8]/20 via-[#0A0A0A] to-[#0A0A0A]" />
                 )}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { API, api, formatMemberSince } from "@/lib/api";
+import { API, api, formatMemberSince, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Crown, Gift, FileText, Bell, Calendar, Hash, Newspaper, Download, ArrowRight, User } from "lucide-react";
@@ -77,7 +77,7 @@ export default function MemberAreaPage() {
                   {benefits.slice(0, 3).map((b) => (
                     <div key={b.id} className="flex items-start gap-4 p-3 border border-white/10 rounded-sm hover:border-[#FFD700]/30 transition">
                       <div className="w-10 h-10 rounded-sm bg-[#0A0A0A] border border-[#FFD700]/30 flex items-center justify-center shrink-0 overflow-hidden">
-                        {b.image_url ? <img src={b.image_url} alt="" className="w-full h-full object-cover" /> : <Gift className="w-4 h-4 text-[#FFD700]" />}
+                        {b.image_url ? <img src={resolveMediaUrl(b.image_url)} alt="" className="w-full h-full object-cover" /> : <Gift className="w-4 h-4 text-[#FFD700]" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-white">{b.title}</div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Gift, ExternalLink } from "lucide-react";
 
@@ -35,7 +35,7 @@ export default function MemberBenefitsPage() {
                 <article key={b.id} data-testid={`benefit-${b.id}`} className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden hover:border-[#FFD700]/40 transition flex flex-col">
                   {b.image_url && (
                     <div className="aspect-video bg-[#0A0A0A]">
-                      <img src={b.image_url} alt="" className="w-full h-full object-cover" />
+                      <img src={resolveMediaUrl(b.image_url)} alt="" className="w-full h-full object-cover" />
                     </div>
                   )}
                   <div className="p-5 flex-1 flex flex-col">

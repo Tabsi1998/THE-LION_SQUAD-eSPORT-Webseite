@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 
 export const TLS_MASCOT = "/assets/brand/tls-mascot.png";
 export const TLS_WORDMARK = "/assets/brand/tls-wordmark.png";
@@ -35,7 +35,7 @@ export function Logo({ variant = "wordmark", size = "md", asLink = true, classNa
     : (branding.logo_url || TLS_WORDMARK);
   const img = (
     <img
-      src={src}
+      src={resolveMediaUrl(src)}
       alt={`${branding.club_name || "The Lion Squad"} eSports`}
       className={`${sizes[size]} w-auto object-contain ${className}`}
       data-testid="tls-logo"
@@ -50,7 +50,7 @@ export function MascotBadge({ className = "" }) {
   const branding = useBrandingAssets();
   return (
     <img
-      src={branding.mascot_url || branding.logo_url || TLS_MASCOT}
+      src={resolveMediaUrl(branding.mascot_url || branding.logo_url || TLS_MASCOT)}
       alt={branding.club_name || "TLS"}
       className={`object-contain ${className}`}
       draggable="false"

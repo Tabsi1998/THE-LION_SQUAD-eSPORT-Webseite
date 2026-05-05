@@ -5,7 +5,7 @@
  *   Groups · Tiers · Manuell vergeben · Negative Vorfälle
  */
 import { useEffect, useState } from "react";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { toast } from "sonner";
 import {
@@ -370,7 +370,7 @@ function AwardTab() {
         <div className="mt-3 max-h-72 overflow-y-auto divide-y divide-white/5 border border-white/5 rounded-sm">
           {users.map(u => (
             <button key={u.id} type="button" onClick={() => setSelectedUser(u)} data-testid={`award-user-${u.id}`} className={`w-full text-left px-3 py-2 hover:bg-white/5 transition flex items-center gap-3 ${selectedUser?.id === u.id ? "bg-[#FFD700]/10" : ""}`}>
-              {u.avatar_url ? <img src={u.avatar_url} alt="" className="w-8 h-8 rounded-sm object-cover" /> : <div className="w-8 h-8 rounded-sm bg-[#0A0A0A] border border-white/10" />}
+              {u.avatar_url ? <img src={resolveMediaUrl(u.avatar_url)} alt="" className="w-8 h-8 rounded-sm object-cover" /> : <div className="w-8 h-8 rounded-sm bg-[#0A0A0A] border border-white/10" />}
               <div className="min-w-0">
                 <div className="text-sm font-semibold truncate">{u.display_name || u.username}</div>
                 <div className="text-[10px] text-white/40">{u.email}</div>

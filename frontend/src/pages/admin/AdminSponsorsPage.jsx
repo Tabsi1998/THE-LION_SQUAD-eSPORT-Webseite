@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
@@ -65,7 +65,7 @@ export default function AdminSponsorsPage() {
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-3 min-w-0">
                 {s.logo_url ? (
-                  <img src={s.logo_url} alt={s.name} className="w-14 h-14 object-contain rounded-sm bg-white/5 p-2 border border-white/10" />
+                  <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="w-14 h-14 object-contain rounded-sm bg-white/5 p-2 border border-white/10" />
                 ) : (
                   <div className="w-14 h-14 rounded-sm bg-[#29B6E8]/10 border border-[#29B6E8]/30 flex items-center justify-center font-display font-bold text-[#29B6E8]">
                     {s.name.slice(0, 2).toUpperCase()}

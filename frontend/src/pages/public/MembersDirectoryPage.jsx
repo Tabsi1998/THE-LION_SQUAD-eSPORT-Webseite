@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useAuth } from "@/context/AuthContext";
 import { Crown, Users as UsersIcon, MapPin } from "lucide-react";
@@ -51,7 +51,7 @@ export default function MembersDirectoryPage() {
               >
                 <div className="w-14 h-14 rounded-sm border border-[#FFD700]/40 bg-[#0A0A0A] flex items-center justify-center overflow-hidden">
                   {m.avatar_url ? (
-                    <img src={m.avatar_url} alt={m.display_name} className="w-full h-full object-cover" />
+                    <img src={resolveMediaUrl(m.avatar_url)} alt={m.display_name} className="w-full h-full object-cover" />
                   ) : (
                     <span className="font-heading font-black text-[#FFD700] text-xl">{(m.display_name || m.username)[0]}</span>
                   )}
