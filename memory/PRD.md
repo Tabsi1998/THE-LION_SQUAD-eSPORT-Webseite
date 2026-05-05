@@ -1,4 +1,30 @@
 # THE LION SQUAD — eSPORTS · Vereinsplattform PRD
+## Iteration 20 — Post-GitHub-Sync Bug-Hunt & Fixes (05.05.2026 · iteration_20 grün · 13/13)
+
+**Kontext**: Repo wurde frisch von github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite (branch main) gepullt nach User-Self-Edits. Testing-Agent fand 3 kritische Bugs + 1 unfertiges Feature.
+
+### 🟢 Mechanische Updates (vor Bug-Hunt)
+- **5 Sponsor-Tiers**: SponsorTier `Literal["main","platinum","gold","silver","bronze"]` (war 6 mit supporter/partner)
+- **Auto-Migration**: `_normalize_tier` mappt Legacy `supporter`/`partner` → `bronze` in-flight; default für neue Sponsoren = `bronze`
+- **Placement**: Hauptsponsor+Platin+Gold auf Home, +Silber im Footer, Bronze nur Sponsorenseite
+- **Social Icons** (PublicLayout footer): 6 in korrekter Reihenfolge — Discord, Facebook, Instagram, TikTok, YouTube, Twitch (Streaming hinten); SVG-Icons + Brand-Farben
+- **BrandingSettings**: neue Felder `facebook_url`, `instagram_url`, `tiktok_url`, `youtube_url` mit `thelionsquadesports`-Defaults im public-branding endpoint
+- **ARENA-Cleanup**: models.py Doc-String, seed.py news + season + sponsor tier
+
+### 🔴 Bug-Fixes (vom Testing-Agent gefunden)
+1. **CRITICAL `POST /api/users` (admin invite) → 500 DuplicateKey** auf `audit_logs`. Fix: `id: new_id()` zu allen 6 audit_logs.insert_one Calls in user_routes.py hinzugefügt (create/invite/ban/unban/role/delete)
+2. **HIGH `GET /api/settings/branding`** lieferte leere Felder für nicht-gesetzte Socials → Admin-Form leer. Fix: `get_branding` mergt jetzt 6 Default-URLs (discord/twitch/facebook/instagram/tiktok/youtube)
+3. **HIGH Team-System unfertig** — keine Möglichkeit Member zu kicken, Co-Leader zu (de-)promoten oder Leadership zu übergeben. Fix: 3 neue Endpoints in team_routes.py:
+   - `DELETE /api/teams/{id}/members/{user_id}` — Leader/Co-Leader/Admin kickt Member (Leader nicht kickbar)
+   - `POST /api/teams/{id}/members/{user_id}/role` body `{"role": "co_leader"|"member"}` — nur Leader+Admin
+   - `POST /api/teams/{id}/transfer-leader` body `{"new_leader_id": "..."}` — alter Leader wird automatisch Co-Leader
+4. **Frontend TeamsPage**: TeamDetail rendert pro Member Role-Badge (Leader gold / Co-Leader blau / Mitglied grau) + Action-Buttons (↑ Co-Leader / ↓ Mitglied / ★ Leader machen / Entfernen) sichtbar je nach Berechtigung
+
+### Tests (`test_iter20_bugfixes.py`)
+- 5/5 grün: branding-defaults, admin-invite no-500, full team kick+role+transfer flow, kick anonymous blocked, kick leader rejected
+- Testing-Agent: 13/13 inkl. Edge-Cases + Frontend Smoke
+
+
 ## Phase P0 — Penalty-Transparenz (04.05.2026 · iteration_18 grün · 42/42)
 
 **User-Wunsch**: Bei jeder Strafe (Turnier oder Fast Lap) muss zwingend ein Kommentar/Begründung gemacht werden, und der Spieler MUSS sehen warum.
