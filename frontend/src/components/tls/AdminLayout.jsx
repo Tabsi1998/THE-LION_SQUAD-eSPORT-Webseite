@@ -5,9 +5,9 @@ import {
   LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon,
   CalendarDays, Flag, Building2, Newspaper, LogOut,
   ExternalLink, Menu, X, Settings as SettingsIcon,
-  ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon, FileText,
-  Award, Inbox, UserCheck, Medal, FileEdit, Tv,
-  FolderOpen, ListOrdered, AlertTriangle,
+  ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon,
+  Award, Inbox, UserCheck, Medal,
+  FolderOpen, AlertTriangle,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -33,9 +33,7 @@ export function AdminLayout({ children }) {
     { to: "/admin/achievements", label: "Achievements", icon: Medal },
     { to: "/admin/board", label: "Vorstand", icon: UserCheck },
     { to: "/admin/membership-applications", label: "Bewerbungen", icon: Inbox },
-    { to: "/admin/cms", label: "CMS / Mails", icon: FileEdit },
     { to: "/admin/media", label: "Medien", icon: FolderOpen },
-    { to: "/admin/nav", label: "Navigation", icon: ListOrdered },
     { to: "/admin/contact", label: "Inbox", icon: Inbox },
     { to: "/admin/prizes", label: "Gewinne", icon: Award },
     { to: "/admin/penalties", label: "Strafen", icon: AlertTriangle },

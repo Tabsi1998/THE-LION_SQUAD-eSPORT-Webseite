@@ -136,7 +136,7 @@ function SponsorForm({ sponsor, onClose, onSaved }) {
           <button type="button" onClick={onClose} className="text-white/40 hover:text-white"><XIcon className="w-4 h-4" /></button>
         </div>
         <Field label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required testId="sponsor-name" />
-        <ImageUpload value={form.logo_url} onChange={(v) => setForm({ ...form, logo_url: v })} label="Logo" testId="sponsor-logo" variant="square" endpoint="/uploads/sponsor-logo" />
+        <ImageUpload value={form.logo_url} onChange={(v) => setForm({ ...form, logo_url: v })} label="Logo" testId="sponsor-logo" variant="square" endpoint="/uploads/sponsor-logo" allowLibrary />
         <Field label="Link (URL)" value={form.link} onChange={(v) => setForm({ ...form, link: v })} testId="sponsor-link" placeholder="https://…" />
         <div className="grid grid-cols-2 gap-3">
           <label className="block">

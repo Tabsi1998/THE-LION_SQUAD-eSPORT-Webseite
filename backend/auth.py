@@ -4,6 +4,7 @@ import bcrypt
 import jwt
 import hashlib
 import secrets
+from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException, Request, Depends, Response
 from database import get_db
@@ -78,23 +79,40 @@ def _secure_cookies() -> bool:
     return fu.startswith("https://")
 
 
+def _cookie_domain() -> str | None:
+    explicit = os.environ.get("AUTH_COOKIE_DOMAIN", "").strip()
+    if explicit:
+        return explicit if explicit.startswith(".") else f".{explicit}"
+    host = urlparse(os.environ.get("FRONTEND_URL", "")).hostname or ""
+    host = host.lower().strip(".")
+    if not host or host in {"localhost", "127.0.0.1"} or host.endswith(".local"):
+        return None
+    if host.startswith("www."):
+        host = host[4:]
+    parts = host.split(".")
+    if len(parts) >= 2:
+        return "." + ".".join(parts[-2:])
+    return None
+
+
 def set_auth_cookies(response: Response, access: str, refresh: str, csrf_token: str | None = None):
     secure = _secure_cookies()
     # When on HTTPS (cross-site scenarios behind CDN), use SameSite=None + Secure.
     # When purely local HTTP, use SameSite=Lax.
     samesite = "none" if secure else "lax"
     csrf_token = csrf_token or new_csrf_token()
+    domain = _cookie_domain()
     response.set_cookie(
         "access_token", access, httponly=True, secure=secure, samesite=samesite,
-        max_age=ACCESS_TOKEN_MINUTES * 60, path="/",
+        max_age=ACCESS_TOKEN_MINUTES * 60, path="/", domain=domain,
     )
     response.set_cookie(
         "refresh_token", refresh, httponly=True, secure=secure, samesite=samesite,
-        max_age=REFRESH_TOKEN_DAYS * 24 * 3600, path="/",
+        max_age=REFRESH_TOKEN_DAYS * 24 * 3600, path="/", domain=domain,
     )
     response.set_cookie(
         "csrf_token", csrf_token, httponly=False, secure=secure, samesite=samesite,
-        max_age=REFRESH_TOKEN_DAYS * 24 * 3600, path="/",
+        max_age=REFRESH_TOKEN_DAYS * 24 * 3600, path="/", domain=domain,
     )
 
 
@@ -102,6 +120,11 @@ def clear_auth_cookies(response: Response):
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/")
     response.delete_cookie("csrf_token", path="/")
+    domain = _cookie_domain()
+    if domain:
+        response.delete_cookie("access_token", path="/", domain=domain)
+        response.delete_cookie("refresh_token", path="/", domain=domain)
+        response.delete_cookie("csrf_token", path="/", domain=domain)
 
 
 def _decode(token: str) -> dict:

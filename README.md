@@ -87,7 +87,12 @@ ADMIN_PASSWORD=sehr-langes-admin-passwort
 SEED_DEMO=false
 DISABLE_SCHEDULER=false
 UPLOAD_DIR=/app/backend/uploads
+AUTH_COOKIE_DOMAIN=.lionsquad.at
 ```
+
+Wenn die Seite sowohl unter `lionsquad.at` als auch unter `www.lionsquad.at` erreichbar ist,
+setze `AUTH_COOKIE_DOMAIN=.lionsquad.at` und nimm beide Origins in `CORS_ORIGINS` auf. Sonst
+kann ein Login auf einer Host-Variante fuer die andere Host-Variante unsichtbar sein.
 
 `JWT_SECRET` und `ADMIN_PASSWORD` muessen in Produktion gesetzt sein. Docker Compose bricht
 sonst bewusst ab.

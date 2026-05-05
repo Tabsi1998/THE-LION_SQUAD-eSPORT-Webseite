@@ -160,7 +160,7 @@ function NewsModal({ post, meta, onClose, onSaved }) {
           <Field label="Inhalt (Markdown / Plaintext)">
             <textarea value={form.content} onChange={(e) => set("content", e.target.value)} rows={10} required data-testid="news-content" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-mono text-sm" />
           </Field>
-          <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="news-banner" variant="wide" /></Field>
+          <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="news-banner" variant="wide" allowLibrary /></Field>
 
           <Field label="Veröffentlichungsdatum (optional, sonst jetzt)">
             <input

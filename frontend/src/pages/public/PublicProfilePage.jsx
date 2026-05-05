@@ -41,6 +41,7 @@ export default function PublicProfilePage() {
   </div></PublicLayout>;
 
   const s = profile.stats || {};
+  const level = profile.achievement_level || { level: s.level || 1, progress: 0, points: s.points || 0, next_level_points: 100 };
   const isPrivate = profile.privacy_public_profile === false;
   const joinedDate = profile.created_at ? new Date(profile.created_at) : null;
 
@@ -74,6 +75,9 @@ export default function PublicProfilePage() {
               </h1>
               <div className="mt-2 text-white/50 text-sm flex flex-wrap items-center gap-3">
                 <span>@{profile.username}</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#29B6E8]/40 text-[#29B6E8] text-[10px] uppercase tracking-widest rounded-sm">
+                  <Zap className="w-3 h-3" /> Level {level.level}
+                </span>
                 {profile.country && <span>· <MapPin className="w-3.5 h-3.5 inline mr-1" />{profile.country}</span>}
                 {joinedDate && <span>· <Calendar className="w-3.5 h-3.5 inline mr-1" />Mitglied seit {joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" })}</span>}
                 {profile.role && profile.role !== "player" && (
@@ -103,14 +107,23 @@ export default function PublicProfilePage() {
                   <span className="text-white">{profile.discord_name}</span>
                 </div>
               )}
+              <div className="mt-4 max-w-md" data-testid="profile-level-progress">
+                <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/45 font-bold">
+                  <span>Achievement-Level</span>
+                  <span>{level.points} / {level.next_level_points} Punkte</span>
+                </div>
+                <div className="mt-2 h-2 rounded-sm bg-white/10 overflow-hidden">
+                  <div className="h-full bg-[#29B6E8]" style={{ width: `${level.progress || 0}%` }} />
+                </div>
+              </div>
               {/* Quick stats */}
               <div className="mt-6 grid grid-cols-3 md:grid-cols-6 gap-3">
+                <QuickStat icon={Zap} label="Level" value={level.level} color="#29B6E8" testId="profile-stat-level" />
                 <QuickStat icon={Medal} label="Achievements" value={achievementsData?.awards?.length || 0} testId="profile-stat-badges" />
                 <QuickStat icon={Zap} label="Punkte" value={s.points || 0} color="#29B6E8" testId="profile-stat-points" />
                 <QuickStat icon={Trophy} label="Siege" value={s.wins || 0} color="#FFD700" testId="profile-stat-wins" />
                 <QuickStat icon={Medal} label="Podium" value={s.top3 || 0} color="#C0C0C0" testId="profile-stat-top3" />
                 <QuickStat icon={TrendingUp} label="Fast Laps" value={s.fast_laps || 0} testId="profile-stat-fastlaps" />
-                <QuickStat icon={Flag} label="Pole Pos." value={s.pole_positions || 0} color="#FFD700" testId="profile-stat-poles" />
               </div>
             </div>
           </div>

@@ -182,7 +182,7 @@ export default function AdminF1EditPage() {
                 <button type="button" onClick={() => setEditTrack(null)} className="text-white/40 hover:text-white"><XIcon className="w-3.5 h-3.5" /></button>
               </div>
               <input placeholder="Name" value={editTrack.name || ""} onChange={(e) => setEditTrack({ ...editTrack, name: e.target.value })} required data-testid="f1-edit-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-              <ImageUpload value={editTrack.image_url || ""} onChange={(v) => setEditTrack({ ...editTrack, image_url: v })} label="Streckenbild" testId="f1-edit-track-image-upload" variant="wide" />
+              <ImageUpload value={editTrack.image_url || ""} onChange={(v) => setEditTrack({ ...editTrack, image_url: v })} label="Streckenbild" testId="f1-edit-track-image-upload" variant="wide" allowLibrary />
               <input placeholder="Land" value={editTrack.country || ""} onChange={(e) => setEditTrack({ ...editTrack, country: e.target.value })} data-testid="f1-edit-track-country" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               <input type="number" placeholder="Reihenfolge" value={editTrack.order_index ?? 0} onChange={(e) => setEditTrack({ ...editTrack, order_index: e.target.value })} data-testid="f1-edit-track-order" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               <button data-testid="f1-edit-track-save" className="w-full px-3 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#1E95C2]">
@@ -193,7 +193,7 @@ export default function AdminF1EditPage() {
           {isAdmin && <form onSubmit={addTrack} className="mt-4 space-y-2 border-t border-white/5 pt-4">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Neue Strecke</div>
             <input placeholder="Name" value={newTrack.name} onChange={(e) => setNewTrack({ ...newTrack, name: e.target.value })} required data-testid="f1-new-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-            <ImageUpload value={newTrack.image_url} onChange={(v) => setNewTrack({ ...newTrack, image_url: v })} label="Streckenbild" testId="f1-new-track-image-upload" variant="wide" />
+            <ImageUpload value={newTrack.image_url} onChange={(v) => setNewTrack({ ...newTrack, image_url: v })} label="Streckenbild" testId="f1-new-track-image-upload" variant="wide" allowLibrary />
             <input placeholder="Land" value={newTrack.country} onChange={(e) => setNewTrack({ ...newTrack, country: e.target.value })} data-testid="f1-new-track-country" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             <button data-testid="f1-add-track-btn" className="w-full px-3 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#1E95C2] inline-flex items-center justify-center gap-2">
               <Plus className="w-3.5 h-3.5" /> Hinzufügen
@@ -358,7 +358,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
         <SmallField label="Titel" value={form.title} onChange={(v)=>set("title", v)} />
         <SmallField label="Plattform" value={form.platform} onChange={(v)=>set("platform", v)} />
       </div>
-      <ImageUpload value={form.banner_url} onChange={(v)=>set("banner_url", v)} label="Challenge-Banner" testId="f1-edit-banner-upload" variant="wide" />
+      <ImageUpload value={form.banner_url} onChange={(v)=>set("banner_url", v)} label="Challenge-Banner" testId="f1-edit-banner-upload" variant="wide" allowLibrary />
       <div className="grid md:grid-cols-2 gap-4">
         <SmallField label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v)=>set("start_date", v)} />
         <SmallField label="Ende Challenge/Event" type="datetime-local" value={form.end_date} onChange={(v)=>set("end_date", v)} />

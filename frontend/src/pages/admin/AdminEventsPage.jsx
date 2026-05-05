@@ -177,7 +177,7 @@ function EventModal({ event, meta, onClose, onSaved }) {
             <Field label="Anmeldung schließt"><input type="datetime-local" value={form.registration_closes_at} onChange={(e) => set("registration_closes_at", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
             <Field label="Ort / Location"><Input value={form.location} onChange={(v) => set("location", v)} placeholder="Innsbruck" /></Field>
             <Field label="Adresse"><Input value={form.address} onChange={(v) => set("address", v)} placeholder="Maria-Theresien-Str. 1" /></Field>
-            <Field label="Banner-Bild"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="event-banner" variant="wide" /></Field>
+            <Field label="Banner-Bild"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="event-banner" variant="wide" allowLibrary /></Field>
             <Field label="Kontakt"><Input value={form.contact} onChange={(v) => set("contact", v)} placeholder="Name oder E-Mail" /></Field>
           </div>
           <Field label="Programm / Tagesablauf">

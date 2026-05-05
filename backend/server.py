@@ -6,6 +6,7 @@ load_dotenv(ROOT / ".env")
 
 import os
 import logging
+from urllib.parse import urlparse
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from starlette.middleware.cors import CORSMiddleware
@@ -136,6 +137,19 @@ explicit_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip() 
 frontend_url = os.environ.get("FRONTEND_URL", "").strip()
 if frontend_url and frontend_url not in explicit_origins:
     explicit_origins.append(frontend_url)
+for origin in list(explicit_origins):
+    parsed = urlparse(origin)
+    host = (parsed.hostname or "").lower()
+    scheme = parsed.scheme or "https"
+    if not host or host in {"localhost", "127.0.0.1"}:
+        continue
+    variants = [host[4:]] if host.startswith("www.") else [f"www.{host}"]
+    for variant in variants:
+        candidate = f"{scheme}://{variant}"
+        if parsed.port:
+            candidate += f":{parsed.port}"
+        if candidate not in explicit_origins:
+            explicit_origins.append(candidate)
 if not explicit_origins and not allow_insecure_cors:
     explicit_origins.extend(["http://localhost:3000", "http://127.0.0.1:3000"])
 

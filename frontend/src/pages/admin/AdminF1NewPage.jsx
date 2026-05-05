@@ -50,7 +50,7 @@ export default function AdminF1NewPage() {
         <Field label="Titel" value={form.title} onChange={(v) => { set("title", v); if (!form.slug) set("slug", autoSlug(v)); }} required testId="f1-new-title" />
         <Field label="Slug (URL)" value={form.slug} onChange={(v) => set("slug", v)} required testId="f1-new-slug" />
         <Textarea label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="f1-new-description" />
-        <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Challenge-Banner" testId="f1-new-banner-upload" variant="wide" />
+        <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Challenge-Banner" testId="f1-new-banner-upload" variant="wide" allowLibrary />
         <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeitplan & Einreichung</div>
           <div className="grid md:grid-cols-2 gap-4">

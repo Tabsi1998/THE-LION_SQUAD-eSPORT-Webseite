@@ -102,9 +102,10 @@ export default function PlayersPage() {
                         </span>
                       </div>
                     )}
-                    {p.achievements_count > 0 && (
-                      <div className="mt-2 text-[10px] uppercase tracking-widest text-white/35">{p.achievements_count} Achievements</div>
-                    )}
+                    <div className="mt-2 flex items-center justify-between gap-2 text-[10px] uppercase tracking-widest text-white/35">
+                      <span>{p.achievements_count || 0} Achievements</span>
+                      {p.achievement_level && <span className="text-[#29B6E8] font-bold">Level {p.achievement_level.level}</span>}
+                    </div>
                   </Link>
                 );
               })}

@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { toast } from "sonner";
+import { Plus, Trash2, X } from "lucide-react";
 
 export default function AdminUsersPage() {
+  const { isSuperAdmin } = useAuth();
   const [list, setList] = useState([]);
   const [q, setQ] = useState("");
+  const [creating, setCreating] = useState(false);
   const load = async () => {
     const { data } = await api.get(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     setList(data);
@@ -22,11 +26,28 @@ export default function AdminUsersPage() {
     toast.success(u.is_banned ? "Entbannt." : "Gebannt.");
     load();
   };
+  const deleteUser = async (u) => {
+    if (!window.confirm(`Benutzer "${u.username}" wirklich endgültig löschen? Das entfernt auch Login, Mitgliedschaft, Registrierungen, Achievements und Zeiten.`)) return;
+    try {
+      await api.delete(`/users/${u.id}`);
+      toast.success("Benutzer gelöscht.");
+      load();
+    } catch (e) { toast.error(e.response?.data?.detail || "Löschen fehlgeschlagen."); }
+  };
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Spieler</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Benutzer</h1>
+      <div className="flex items-end justify-between gap-4 flex-wrap mb-6">
+        <div>
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Spieler</span>
+          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Benutzer</h1>
+        </div>
+        {isSuperAdmin && (
+          <button onClick={() => setCreating(true)} data-testid="user-create-open" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs font-bold uppercase tracking-wider">
+            <Plus className="w-3.5 h-3.5" /> Benutzer anlegen
+          </button>
+        )}
+      </div>
       <input placeholder="Suche…" value={q} onChange={(e) => setQ(e.target.value)} data-testid="users-search" className="w-full max-w-md bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm mb-5" />
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
         <div className="overflow-x-auto">
@@ -52,9 +73,16 @@ export default function AdminUsersPage() {
                   </select>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <button onClick={() => toggleBan(u)} data-testid={`user-ban-${u.username}`} className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-sm ${u.is_banned ? "text-[#00FF88] border border-[#00FF88]/40" : "text-[#FF3B30] border border-[#FF3B30]/40 hover:bg-[#FF3B30]/10"}`}>
-                    {u.is_banned ? "Entbannen" : "Bannen"}
-                  </button>
+                  <div className="inline-flex items-center gap-2">
+                    <button onClick={() => toggleBan(u)} data-testid={`user-ban-${u.username}`} className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-sm ${u.is_banned ? "text-[#00FF88] border border-[#00FF88]/40" : "text-[#FF3B30] border border-[#FF3B30]/40 hover:bg-[#FF3B30]/10"}`}>
+                      {u.is_banned ? "Entbannen" : "Bannen"}
+                    </button>
+                    {isSuperAdmin && (
+                      <button onClick={() => deleteUser(u)} data-testid={`user-delete-${u.username}`} className="p-1.5 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm hover:bg-[#FF3B30]/10" title="Benutzer löschen">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -62,6 +90,62 @@ export default function AdminUsersPage() {
         </table>
         </div>
       </div>
+      {creating && <CreateUserModal onClose={() => setCreating(false)} onSaved={() => { setCreating(false); load(); }} />}
     </AdminLayout>
   );
+}
+
+function CreateUserModal({ onClose, onSaved }) {
+  const [form, setForm] = useState({ username: "", display_name: "", email: "", password: "", role: "player", is_active: true, privacy_public_profile: true });
+  const [saving, setSaving] = useState(false);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.post("/users", form);
+      toast.success("Benutzer angelegt.");
+      onSaved();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Benutzer konnte nicht angelegt werden.");
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <form onSubmit={submit} className="w-full max-w-lg bg-[#121212] border border-white/10 rounded-sm">
+        <div className="flex items-center justify-between p-5 border-b border-white/10">
+          <h2 className="font-heading font-black uppercase">Benutzer anlegen</h2>
+          <button type="button" onClick={onClose} className="text-white/50 hover:text-white"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <Field label="Username"><Input value={form.username} onChange={(v) => set("username", v)} required testId="create-user-username" /></Field>
+          <Field label="Display Name"><Input value={form.display_name} onChange={(v) => set("display_name", v)} testId="create-user-display" /></Field>
+          <Field label="E-Mail"><Input type="email" value={form.email} onChange={(v) => set("email", v)} required testId="create-user-email" /></Field>
+          <Field label="Passwort"><Input type="password" value={form.password} onChange={(v) => set("password", v)} required testId="create-user-password" /></Field>
+          <Field label="Rolle">
+            <select value={form.role} onChange={(e) => set("role", e.target.value)} data-testid="create-user-role" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+              {["player", "team_leader", "moderator", "tournament_admin", "club_admin", "superadmin"].map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </Field>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_active} onChange={(e) => set("is_active", e.target.checked)} className="accent-[#29B6E8]" /> Aktiv</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.privacy_public_profile} onChange={(e) => set("privacy_public_profile", e.target.checked)} className="accent-[#29B6E8]" /> Öffentliches Profil</label>
+        </div>
+        <div className="flex justify-end gap-2 p-5 border-t border-white/10">
+          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
+          <button disabled={saving} data-testid="create-user-submit" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Anlegen"}</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return <label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>{children}</label>;
+}
+
+function Input({ value, onChange, type = "text", required, testId }) {
+  return <input type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} required={required} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />;
 }

@@ -63,7 +63,7 @@ export default function AdminTournamentNewPage() {
       // Filter empty prize places
       payload.prize_places = (payload.prize_places || [])
         .filter((p) => p.value && p.value.trim())
-        .map((p) => ({ place: Number(p.place) || 0, label: p.label || `Platz ${p.place}`, value: p.value }));
+        .map((p) => ({ place: p.place === "last" ? "last" : Number(p.place) || 0, label: p.label || (p.place === "last" ? "Letzter Platz" : `Platz ${p.place}`), value: p.value }));
       if (payload.prize_places.length === 0) payload.prize_places = null;
       const { data } = await api.post("/tournaments", payload);
       toast.success("Turnier erstellt.");
@@ -87,7 +87,7 @@ export default function AdminTournamentNewPage() {
           <Field label="Slug (URL)" value={form.slug} onChange={(v) => set("slug", v)} required testId="new-tr-slug" />
         </Row>
         <Textarea label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="new-tr-description" />
-        <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Turnier-Banner" testId="new-tr-banner-upload" variant="wide" />
+        <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Turnier-Banner" testId="new-tr-banner-upload" variant="wide" allowLibrary />
         <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeitplan & Anmeldung</div>
           <Row>
@@ -149,13 +149,19 @@ export default function AdminTournamentNewPage() {
               <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Preise (strukturiert)</div>
               <div className="text-xs text-white/50 mt-0.5">Jede Zeile erscheint als eigene Preis-Karte auf der Turnierseite.</div>
             </div>
-            <button type="button" onClick={() => set("prize_places", [...form.prize_places, { place: form.prize_places.length + 1, label: `Platz ${form.prize_places.length + 1}`, value: "" }])} data-testid="new-tr-prize-add" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => set("prize_places", [...form.prize_places, { place: form.prize_places.length + 1, label: `Platz ${form.prize_places.length + 1}`, value: "" }])} data-testid="new-tr-prize-add" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
+              <button type="button" onClick={() => set("prize_places", [...form.prize_places, { place: "last", label: "Letzter Platz", value: "" }])} data-testid="new-tr-prize-last" className="text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">+ Letzter Platz</button>
+            </div>
           </div>
           {form.prize_places.map((p, i) => (
             <div key={i} className="grid grid-cols-12 gap-2 items-start">
-              <input type="number" min="1" value={p.place} onChange={(e) => {
-                const np = [...form.prize_places]; np[i] = { ...p, place: Number(e.target.value) || 1 }; set("prize_places", np);
-              }} data-testid={`new-tr-prize-place-${i}`} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm tabular-nums" placeholder="#" />
+              <select value={p.place} onChange={(e) => {
+                const np = [...form.prize_places]; np[i] = { ...p, place: e.target.value === "last" ? "last" : Number(e.target.value) || 1 }; set("prize_places", np);
+              }} data-testid={`new-tr-prize-place-${i}`} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm">
+                {[1,2,3,4,5,6,7,8].map((n) => <option key={n} value={n}>{n}.</option>)}
+                <option value="last">Letzter</option>
+              </select>
               <input value={p.label || ""} onChange={(e) => {
                 const np = [...form.prize_places]; np[i] = { ...p, label: e.target.value }; set("prize_places", np);
               }} data-testid={`new-tr-prize-label-${i}`} className="col-span-4 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Label (z.B. Champion)" />

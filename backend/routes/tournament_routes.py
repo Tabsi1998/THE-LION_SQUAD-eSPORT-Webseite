@@ -138,7 +138,9 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
 async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends(require_admin())):
     db = get_db()
     tid = await _resolve_tid(tid)
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    raw_updates = body.model_dump(exclude_unset=True)
+    nullable_fields = {"prize_places", "banner_url", "stream_link", "discord_link", "location", "prize_pool"}
+    updates = {k: v for k, v in raw_updates.items() if v is not None or k in nullable_fields}
     for k in ["registration_open_from", "registration_open_until", "check_in_from",
               "check_in_until", "start_date", "end_date"]:
         if k in updates:

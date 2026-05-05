@@ -51,11 +51,12 @@ export function AuthProvider({ children }) {
 
   const isAdmin = user && ["tournament_admin", "club_admin", "superadmin"].includes(user.role);
   const isModerator = user && ["moderator", "tournament_admin", "club_admin", "superadmin"].includes(user.role);
+  const isSuperAdmin = user?.role === "superadmin";
   const isClubMember = !!user?.is_club_member;
   const userType = user?.user_type || (user ? "community_user" : "guest");
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, register, logout, error, isAdmin, isModerator, isClubMember, userType, refresh: fetchMe }}>
+    <AuthContext.Provider value={{ user, setUser, login, register, logout, error, isAdmin, isModerator, isSuperAdmin, isClubMember, userType, refresh: fetchMe }}>
       {children}
     </AuthContext.Provider>
   );

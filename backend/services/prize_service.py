@@ -52,12 +52,14 @@ async def auto_create_for_tournament(tid: str) -> int:
             "user_id": reg.get("user_id"),
             "team_id": reg.get("team_id"),
         }
+    last_rank = max(placement_by_rank.keys(), default=0)
 
     created = 0
     deadline = (now_utc() + timedelta(days=DEFAULT_PICKUP_WINDOW_DAYS)).isoformat()
     for prize in prize_places:
         try:
-            place = int(prize.get("place"))
+            raw_place = prize.get("place")
+            place = last_rank if str(raw_place).lower() in {"last", "letzter", "-1"} else int(raw_place)
         except Exception:
             continue
         winner = placement_by_rank.get(place)

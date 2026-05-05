@@ -98,6 +98,7 @@ function AlbumModal({ album, events, onClose, onSaved }) {
     try {
       const payload = { ...form };
       Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
+      if (payload.taken_at) payload.taken_at = `${payload.taken_at}T00:00:00`;
       payload.order_index = parseInt(form.order_index) || 0;
       if (isNew) await api.post("/gallery", payload);
       else await api.patch(`/gallery/${album.id}`, payload);
@@ -121,7 +122,7 @@ function AlbumModal({ album, events, onClose, onSaved }) {
           <Field label="Titel"><Input value={form.title} onChange={(v) => { set("title", v); if (isNew && !form.slug) set("slug", slugFrom(v)); }} testId="album-title" required /></Field>
           <Field label="Slug"><Input value={form.slug} onChange={(v) => set("slug", v)} testId="album-slug" required /></Field>
           <Field label="Beschreibung"><textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={2} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-          <Field label="Cover-Bild"><ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} testId="album-cover" variant="wide" /></Field>
+          <Field label="Cover-Bild"><ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} testId="album-cover" variant="wide" allowLibrary /></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Verknüpftes Event">
               <select value={form.event_id || ""} onChange={(e) => set("event_id", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">

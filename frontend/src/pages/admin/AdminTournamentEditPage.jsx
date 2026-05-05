@@ -241,6 +241,7 @@ function TournamentEditForm({ tournament, onSaved }) {
     description: tournament.description || "",
     rules: tournament.rules || "",
     prize_pool: tournament.prize_pool || "",
+    prize_places: tournament.prize_places || [],
     banner_url: tournament.banner_url || "",
     stream_link: tournament.stream_link || "",
     discord_link: tournament.discord_link || "",
@@ -263,6 +264,10 @@ function TournamentEditForm({ tournament, onSaved }) {
     try {
       const payload = { ...f };
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
+      payload.prize_places = (payload.prize_places || [])
+        .filter((p) => p.value && String(p.value).trim())
+        .map((p) => ({ place: p.place === "last" ? "last" : Number(p.place) || 0, label: p.label || (p.place === "last" ? "Letzter Platz" : `Platz ${p.place}`), value: p.value }));
+      if (payload.prize_places.length === 0) payload.prize_places = null;
       await api.patch(`/tournaments/${tournament.id}`, payload);
       toast.success("Gespeichert.");
       onSaved();
@@ -271,7 +276,7 @@ function TournamentEditForm({ tournament, onSaved }) {
   return (
     <div className="max-w-2xl space-y-3 border border-white/10 bg-[#121212] rounded-sm p-5">
       <Fld label="Titel" value={f.title} onChange={(v)=>set("title",v)} testId="tr-edit-title"/>
-      <ImageUpload value={f.banner_url} onChange={(v)=>set("banner_url",v)} label="Turnier-Banner" testId="tr-edit-banner-upload" variant="wide" />
+      <ImageUpload value={f.banner_url} onChange={(v)=>set("banner_url",v)} label="Turnier-Banner" testId="tr-edit-banner-upload" variant="wide" allowLibrary />
       <Fld label="Location" value={f.location} onChange={(v)=>set("location",v)} testId="tr-edit-location"/>
       <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
         <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeitplan & Anmeldung</div>
@@ -296,6 +301,7 @@ function TournamentEditForm({ tournament, onSaved }) {
       </div>
       <Txt label="Beschreibung" value={f.description} onChange={(v)=>set("description",v)} testId="tr-edit-desc"/>
       <Txt label="Regeln" value={f.rules} onChange={(v)=>set("rules",v)} testId="tr-edit-rules"/>
+      <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} />
       <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.bronze_match} onChange={(e)=>set("bronze_match",e.target.checked)} className="accent-[#29B6E8]"/><span>Bronze Match</span></label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_public} onChange={(e)=>set("is_public",e.target.checked)} className="accent-[#29B6E8]"/><span>Öffentlich</span></label>
@@ -332,4 +338,35 @@ function Fld({ label, value, onChange, type="text", testId }) {
 }
 function Txt({ label, value, onChange, testId }) {
   return (<label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><textarea rows={3} value={value ?? ""} onChange={(e)=>onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"/></label>);
+}
+
+function PrizeEditor({ value = [], onChange }) {
+  const add = (place) => onChange([...(value || []), { place, label: place === "last" ? "Letzter Platz" : `Platz ${place}`, value: "" }]);
+  const update = (i, patch) => {
+    const next = [...(value || [])];
+    next[i] = { ...next[i], ...patch };
+    onChange(next);
+  };
+  return (
+    <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Platzierungs-Preise</div>
+        <div className="flex gap-3">
+          <button type="button" onClick={() => add((value?.length || 0) + 1)} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8]">+ Platz</button>
+          <button type="button" onClick={() => add("last")} className="text-xs font-bold uppercase tracking-wider text-[#FFD700]">+ Letzter</button>
+        </div>
+      </div>
+      {(value || []).map((p, i) => (
+        <div key={i} className="grid grid-cols-12 gap-2">
+          <select value={p.place} onChange={(e)=>update(i, { place: e.target.value === "last" ? "last" : Number(e.target.value) || 1 })} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm">
+            {[1,2,3,4,5,6,7,8].map((n) => <option key={n} value={n}>{n}.</option>)}
+            <option value="last">Letzter</option>
+          </select>
+          <input value={p.label || ""} onChange={(e)=>update(i, { label: e.target.value })} className="col-span-4 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Label" />
+          <input value={p.value || ""} onChange={(e)=>update(i, { value: e.target.value })} className="col-span-5 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Preis" />
+          <button type="button" onClick={() => onChange(value.filter((_, j) => j !== i))} className="col-span-1 text-white/40 hover:text-[#FF3B30]">×</button>
+        </div>
+      ))}
+    </div>
+  );
 }

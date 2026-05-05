@@ -1,9 +1,9 @@
 """User profile + admin user management routes."""
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
-from auth import get_current_user, require_admin, require_super
+from auth import get_current_user, require_admin, require_super, hash_password
 from services.membership_service import get_membership, derived_user_type, is_active_member
-from models import UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate, now_utc, new_id
+from models import AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -12,6 +12,26 @@ def _clean(u: dict) -> dict:
     u.pop("_id", None)
     u.pop("password_hash", None)
     return u
+
+
+def _achievement_level(points: int) -> dict:
+    points = max(int(points or 0), 0)
+    # Gentle curve: first levels come fast, later levels need visible commitment.
+    level = 1
+    while points >= (level * level * 100):
+        level += 1
+    current_floor = (level - 1) * (level - 1) * 100
+    next_floor = level * level * 100
+    span = max(next_floor - current_floor, 1)
+    progress = round(((points - current_floor) / span) * 100)
+    return {
+        "level": level,
+        "points": points,
+        "current_level_points": current_floor,
+        "next_level_points": next_floor,
+        "progress": max(0, min(progress, 100)),
+        "title": f"Level {level}",
+    }
 
 
 async def _attach_membership(user: dict) -> dict:
@@ -55,6 +75,44 @@ async def list_users(q: str | None = None, role: str | None = None,
         u["is_club_member"] = is_active_member(m)
         u["user_type"] = derived_user_type(u, m)
     return users
+
+
+@router.post("")
+async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_super())):
+    db = get_db()
+    username = body.username.strip()
+    email = str(body.email).lower().strip()
+    if await db.users.find_one({"$or": [{"username": username}, {"email": email}]}):
+        raise HTTPException(status_code=409, detail="Username oder E-Mail bereits vergeben")
+    user_id = new_id()
+    doc = {
+        "id": user_id,
+        "username": username,
+        "email": email,
+        "password_hash": hash_password(body.password),
+        "display_name": body.display_name or username,
+        "role": body.role,
+        "roles": [body.role],
+        "user_type": "community_user",
+        "is_active": body.is_active,
+        "is_banned": False,
+        "privacy_public_profile": body.privacy_public_profile,
+        "accepted_privacy": True,
+        "accepted_terms": True,
+        "newsletter_consent": False,
+        "favorite_games": [],
+        "created_at": now_utc().isoformat(),
+        "updated_at": now_utc().isoformat(),
+        "created_by": me["id"],
+    }
+    await db.users.insert_one(doc)
+    await db.audit_logs.insert_one({
+        "action": "user.create",
+        "target_id": user_id,
+        "actor_id": me["id"],
+        "created_at": now_utc().isoformat(),
+    })
+    return _clean(doc)
 
 
 @router.get("/public-list")
@@ -109,6 +167,7 @@ async def list_public_users():
                     "points": t.get("points", 0),
                     "icon": t.get("icon"),
                 }
+        total_points = sum(tiers.get(a["tier_code"], {}).get("points", 0) for a in ua)
         out.append({
             "id": u["id"], "username": u["username"], "display_name": u.get("display_name"),
             "avatar_url": u.get("avatar_url"), "country": u.get("country"),
@@ -119,6 +178,7 @@ async def list_public_users():
             "profile_completeness": score,
             "achievements_count": len(ua),
             "top_achievement": top,
+            "achievement_level": _achievement_level(total_points),
         })
     return out
 
@@ -194,12 +254,14 @@ async def get_public_profile(username: str):
             "group_accent": g.get("accent_color") if g else None,
         })
     total_points = sum(b.get("points", 0) for b in badges)
+    achievement_level = _achievement_level(total_points)
     # Tournament participation (only if public)
     tournaments = []
     f1_bests = []
     teams = []
     stats = {"tournaments": 0, "wins": 0, "top3": 0, "matches_played": 0, "matches_won": 0,
-             "fast_laps": 0, "pole_positions": 0, "badges": len(badges), "points": total_points}
+             "fast_laps": 0, "pole_positions": 0, "badges": len(badges), "points": total_points,
+             "level": achievement_level["level"]}
     if public:
         regs = await db.tournament_registrations.find({"user_id": user_id}, {"_id": 0}).to_list(200)
         t_ids = list({r["tournament_id"] for r in regs})
@@ -288,11 +350,15 @@ async def get_public_profile(username: str):
         # Teams
         team_ids = [tm["team_id"] for tm in await db.team_members.find(
             {"user_id": user_id}, {"_id": 0}).to_list(50)]
-        teams = await db.teams.find({"id": {"$in": team_ids}}, {"_id": 0}).to_list(50)
+        teams = await db.teams.find(
+            {"$or": [{"id": {"$in": team_ids}}, {"member_ids": user_id}]},
+            {"_id": 0},
+        ).to_list(50)
     return {
         **base,
         "badges": badges,
         "stats": stats,
+        "achievement_level": achievement_level,
         "tournaments": tournaments,
         "f1_bests": f1_bests,
         "teams": teams,
@@ -410,3 +476,31 @@ async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_su
                                      "created_at": now_utc().isoformat()})
     u = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
     return u
+
+
+@router.delete("/{user_id}")
+async def delete_user(user_id: str, me: dict = Depends(require_super())):
+    db = get_db()
+    if user_id == me["id"]:
+        raise HTTPException(status_code=400, detail="Du kannst deinen eigenen Benutzer nicht löschen")
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    await db.users.delete_one({"id": user_id})
+    await db.refresh_tokens.delete_many({"user_id": user_id})
+    await db.login_attempts.delete_many({"identifier": user.get("email")})
+    await db.memberships.delete_many({"user_id": user_id})
+    await db.user_socials.delete_many({"user_id": user_id})
+    await db.user_achievements.delete_many({"user_id": user_id})
+    await db.tournament_registrations.delete_many({"user_id": user_id})
+    await db.f1_lap_times.delete_many({"user_id": user_id})
+    await db.team_members.delete_many({"user_id": user_id})
+    await db.teams.update_many({}, {"$pull": {"member_ids": user_id, "co_leader_ids": user_id}})
+    await db.audit_logs.insert_one({
+        "action": "user.delete",
+        "target_id": user_id,
+        "actor_id": me["id"],
+        "data": {"email": user.get("email"), "username": user.get("username")},
+        "created_at": now_utc().isoformat(),
+    })
+    return {"ok": True}

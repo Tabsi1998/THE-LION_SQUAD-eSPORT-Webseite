@@ -15,9 +15,12 @@ import { toast } from "sonner";
  *   variant: "square" | "wide" (visual)
  *   endpoint: "/uploads/image" (default) or "/uploads/sponsor-logo"
  */
-export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", endpoint = "/uploads/image", maxSizeMb = 25 }) {
+export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", endpoint = "/uploads/image", maxSizeMb = 25, allowLibrary = false }) {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [library, setLibrary] = useState([]);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
 
   const handleFile = async (file) => {
     if (!file) return;
@@ -42,6 +45,19 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     } finally {
       if (fileRef.current) fileRef.current.value = "";
       setUploading(false);
+    }
+  };
+
+  const openLibrary = async () => {
+    setLibraryOpen(true);
+    setLoadingLibrary(true);
+    try {
+      const { data } = await api.get("/admin/media?type=images");
+      setLibrary(data || []);
+    } catch {
+      toast.error("Medienbibliothek konnte nicht geladen werden.");
+    } finally {
+      setLoadingLibrary(false);
     }
   };
 
@@ -85,9 +101,48 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
           >
             <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : value ? "Anderes Bild" : "Bild hochladen"}
           </button>
+          {allowLibrary && (
+            <button
+              type="button"
+              onClick={openLibrary}
+              data-testid={`${testId}-library`}
+              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 border border-white/15 text-white/70 font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-white/5"
+            >
+              Medien wählen
+            </button>
+          )}
           <p className="text-[10px] text-white/40">PNG/JPG/WebP bis {maxSizeMb} MB.</p>
         </div>
       </div>
+      {libraryOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setLibraryOpen(false)}>
+          <div className="max-w-4xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-heading text-xl font-black uppercase">Medienbibliothek</h3>
+              <button type="button" onClick={() => setLibraryOpen(false)} className="text-white/50 hover:text-white">×</button>
+            </div>
+            {loadingLibrary ? (
+              <div className="text-white/40 py-12 text-center">Lade Medien…</div>
+            ) : library.length === 0 ? (
+              <div className="text-white/40 py-12 text-center">Keine Bilder vorhanden.</div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {library.map((item) => (
+                  <button
+                    key={item.filename}
+                    type="button"
+                    onClick={() => { onChange(item.url); setLibraryOpen(false); }}
+                    className="aspect-square border border-white/10 bg-[#0A0A0A] rounded-sm overflow-hidden hover:border-[#29B6E8]/70 transition"
+                    title={item.filename}
+                  >
+                    <img src={item.url} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

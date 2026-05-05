@@ -37,6 +37,16 @@ class UserLogin(BaseModel):
     password: str
 
 
+class AdminUserCreate(BaseModel):
+    username: str = Field(min_length=3, max_length=32)
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=128)
+    display_name: Optional[str] = None
+    role: Role = "player"
+    is_active: bool = True
+    privacy_public_profile: bool = True
+
+
 class UserUpdate(BaseModel):
     """Profile update - all optional, both basic and extended fields."""
     # Basic

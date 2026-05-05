@@ -17,7 +17,7 @@ async def list_teams(q: str | None = None):
             {"name": {"$regex": q, "$options": "i"}},
             {"tag": {"$regex": q, "$options": "i"}},
         ]
-    teams = await db.teams.find(query, {"_id": 0}).to_list(500)
+    teams = await db.teams.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
     return teams
 
 
@@ -32,6 +32,10 @@ async def get_team(team_id: str):
         {"_id": 0, "password_hash": 0, "email": 0},
     ).to_list(100)
     team["members"] = members
+    team["leader"] = await db.users.find_one(
+        {"id": team.get("leader_id")},
+        {"_id": 0, "password_hash": 0, "email": 0},
+    )
     return team
 
 
@@ -58,6 +62,16 @@ async def create_team(body: TeamCreate, me: dict = Depends(get_current_user)):
         "updated_at": now_utc().isoformat(),
     }
     await db.teams.insert_one(doc)
+    await db.team_members.update_one(
+        {"team_id": team_id, "user_id": me["id"]},
+        {"$set": {
+            "team_id": team_id,
+            "user_id": me["id"],
+            "role": "leader",
+            "joined_at": now_utc().isoformat(),
+        }},
+        upsert=True,
+    )
     doc.pop("_id", None)
     try:
         from badges import on_team_created
@@ -76,6 +90,8 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
     if team["leader_id"] != me["id"] and me["id"] not in team.get("co_leader_ids", []):
         if me["role"] not in ("moderator", "tournament_admin", "club_admin", "superadmin"):
             raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    if body.tag and body.tag != team.get("tag") and await db.teams.find_one({"tag": body.tag}):
+        raise HTTPException(status_code=409, detail="Team-Tag bereits vergeben")
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     updates["updated_at"] = now_utc().isoformat()
     await db.teams.update_one({"id": team_id}, {"$set": updates})
@@ -94,6 +110,16 @@ async def join_team(team_id: str, body: dict, me: dict = Depends(get_current_use
     if me["id"] in team.get("member_ids", []):
         return {"ok": True, "already_member": True}
     await db.teams.update_one({"id": team_id}, {"$addToSet": {"member_ids": me["id"]}})
+    await db.team_members.update_one(
+        {"team_id": team_id, "user_id": me["id"]},
+        {"$set": {
+            "team_id": team_id,
+            "user_id": me["id"],
+            "role": "member",
+            "joined_at": now_utc().isoformat(),
+        }},
+        upsert=True,
+    )
     try:
         from badges import on_team_joined
         await on_team_joined(me["id"], team_id)
@@ -111,6 +137,7 @@ async def leave_team(team_id: str, me: dict = Depends(get_current_user)):
     if team["leader_id"] == me["id"]:
         raise HTTPException(status_code=400, detail="Leader kann Team nicht verlassen")
     await db.teams.update_one({"id": team_id}, {"$pull": {"member_ids": me["id"], "co_leader_ids": me["id"]}})
+    await db.team_members.delete_one({"team_id": team_id, "user_id": me["id"]})
     return {"ok": True}
 
 
@@ -123,4 +150,5 @@ async def delete_team(team_id: str, me: dict = Depends(get_current_user)):
     if team["leader_id"] != me["id"] and me["role"] not in ("club_admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
     await db.teams.delete_one({"id": team_id})
+    await db.team_members.delete_many({"team_id": team_id})
     return {"ok": True}

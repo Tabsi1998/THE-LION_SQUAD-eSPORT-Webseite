@@ -7,7 +7,7 @@ import { API_BASE, api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { toast } from "sonner";
 import {
-  Image as ImageIcon, FileText, Trash2, Copy, ExternalLink, Search, RefreshCw,
+  Image as ImageIcon, FileText, Trash2, Copy, ExternalLink, Search, RefreshCw, Upload,
 } from "lucide-react";
 
 const BACKEND = API_BASE;
@@ -25,6 +25,7 @@ export default function AdminMediaPage() {
   const [filter, setFilter] = useState("all");
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -75,6 +76,26 @@ export default function AdminMediaPage() {
     }
   };
 
+  const uploadFiles = async (files) => {
+    if (!files?.length) return;
+    setUploading(true);
+    let ok = 0;
+    let failed = 0;
+    for (const file of Array.from(files)) {
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        await api.post("/uploads/image", fd);
+        ok++;
+      } catch {
+        failed++;
+      }
+    }
+    setUploading(false);
+    toast.success(`${ok} Datei(en) hochgeladen${failed ? `, ${failed} fehlgeschlagen` : ""}.`);
+    load();
+  };
+
   return (
     <AdminLayout>
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Phase F</span>
@@ -116,6 +137,10 @@ export default function AdminMediaPage() {
         >
           <RefreshCw className="w-3.5 h-3.5" /> Neu laden
         </button>
+        <label className={`px-3 py-2 bg-[#FFD700] text-black rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer ${uploading ? "opacity-60" : ""}`} data-testid="media-upload">
+          <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Bilder hochladen"}
+          <input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={uploading} className="hidden" onChange={(e) => uploadFiles(e.target.files)} />
+        </label>
         <span className="ml-auto text-xs text-white/45">
           {filtered.length} / {items.length} · {fmtBytes(totalSize)} gesamt
         </span>
