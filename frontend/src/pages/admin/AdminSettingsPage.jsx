@@ -63,7 +63,12 @@ export default function AdminSettingsPage() {
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const saveBrand = async () => {
-    try { await api.put("/settings/branding", brand); toast.success("Branding gespeichert."); load(); }
+    try {
+      const { data } = await api.put("/settings/branding", brand);
+      if (data && !data.ok) setBrand((prev) => ({ ...prev, ...data }));
+      toast.success("Branding gespeichert.");
+      load();
+    }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const saveDiscord = async () => {

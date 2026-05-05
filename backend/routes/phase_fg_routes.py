@@ -22,7 +22,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from database import get_db
-from auth import require_admin
+from auth import require_admin, get_current_user
 from models import now_utc
 
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
@@ -47,12 +47,11 @@ IMAGE_REFERENCE_FIELDS = [
 
 
 # ============= Media Browser =============
+media_router = APIRouter(prefix="/api/media", tags=["media"])
 admin_media_router = APIRouter(prefix="/api/admin/media", tags=["cms-admin"])
 
 
-@admin_media_router.get("")
-async def admin_list_media(me: dict = Depends(require_admin())):
-    """List all files in the upload directory with metadata."""
+async def _list_media_items() -> list[dict]:
     if not UPLOAD_DIR.exists():
         return []
     items: list[dict] = []
@@ -71,6 +70,18 @@ async def admin_list_media(me: dict = Depends(require_admin())):
                 "ext": p.suffix.lower().lstrip("."),
             })
     return items[:500]
+
+
+@media_router.get("")
+async def list_media(me: dict = Depends(get_current_user)):
+    """List public uploaded images for authenticated users."""
+    return await _list_media_items()
+
+
+@admin_media_router.get("")
+async def admin_list_media(me: dict = Depends(require_admin())):
+    """List all files in the upload directory with metadata."""
+    return await _list_media_items()
 
 
 async def _clear_media_references(url: str) -> int:

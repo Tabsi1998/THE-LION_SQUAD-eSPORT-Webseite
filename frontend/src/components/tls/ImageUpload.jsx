@@ -52,7 +52,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     setLibraryOpen(true);
     setLoadingLibrary(true);
     try {
-      const { data } = await api.get("/admin/media?type=images");
+      const { data } = await api.get("/media?type=images");
       setLibrary(data || []);
     } catch {
       toast.error("Medienbibliothek konnte nicht geladen werden.");

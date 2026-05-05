@@ -165,6 +165,10 @@ function AlbumModal({ album, events, onClose, onSaved }) {
 function AlbumPhotos({ album, events, onBack }) {
   const [photos, setPhotos] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [mediaOpen, setMediaOpen] = useState(false);
+  const [media, setMedia] = useState([]);
+  const [selectedMedia, setSelectedMedia] = useState([]);
+  const [loadingMedia, setLoadingMedia] = useState(false);
 
   const load = async () => {
     const { data } = await api.get(`/admin/gallery/${album.id}`);
@@ -199,6 +203,45 @@ function AlbumPhotos({ album, events, onBack }) {
     if (!window.confirm("Foto löschen?")) return;
     try { await api.delete(`/gallery/photos/${id}`); load(); } catch { toast.error("Fehler."); }
   };
+  const openMedia = async () => {
+    setMediaOpen(true);
+    setLoadingMedia(true);
+    setSelectedMedia([]);
+    try {
+      const { data } = await api.get("/admin/media?type=images");
+      setMedia(data || []);
+    } catch {
+      toast.error("Medienbibliothek konnte nicht geladen werden.");
+    } finally {
+      setLoadingMedia(false);
+    }
+  };
+  const toggleMedia = (item) => {
+    setSelectedMedia((rows) => rows.some((x) => x.url === item.url)
+      ? rows.filter((x) => x.url !== item.url)
+      : [...rows, item]);
+  };
+  const addSelectedMedia = async () => {
+    if (!selectedMedia.length) return toast.error("Bitte mindestens ein Bild auswaehlen.");
+    let ok = 0, fail = 0;
+    for (const item of selectedMedia) {
+      try {
+        await api.post(`/gallery/${album.id}/photos`, {
+          image_url: item.url,
+          thumbnail_url: item.url,
+          caption: (item.filename || "Bild").replace(/\.[^/.]+$/, ""),
+          order_index: photos.length + ok + 1,
+        });
+        ok++;
+      } catch {
+        fail++;
+      }
+    }
+    toast.success(`${ok} Bild(er) aus Medien hinzugefuegt${fail ? `, ${fail} fehlgeschlagen` : ""}.`);
+    setMediaOpen(false);
+    setSelectedMedia([]);
+    load();
+  };
 
   return (
     <AdminLayout>
@@ -210,10 +253,15 @@ function AlbumPhotos({ album, events, onBack }) {
           <h1 className="font-heading text-3xl font-black uppercase">{album.title}</h1>
           <div className="text-xs text-white/50">{photos.length} Fotos · /{album.slug}</div>
         </div>
-        <label className={`inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm cursor-pointer ${uploading ? "opacity-50" : ""}`} data-testid="photo-bulk-upload">
-          <Plus className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Fotos hochladen"}
-          <input type="file" accept="image/*" multiple disabled={uploading} className="hidden" onChange={(e) => onPick(e.target.files)} />
-        </label>
+        <div className="flex gap-2 flex-wrap">
+          <button type="button" onClick={openMedia} data-testid="photo-media-picker" className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/75 font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-white/5">
+            <ImageIcon className="w-3.5 h-3.5" /> Aus Medien
+          </button>
+          <label className={`inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm cursor-pointer ${uploading ? "opacity-50" : ""}`} data-testid="photo-bulk-upload">
+            <Plus className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Fotos hochladen"}
+            <input type="file" accept="image/*" multiple disabled={uploading} className="hidden" onChange={(e) => onPick(e.target.files)} />
+          </label>
+        </div>
       </div>
 
       {photos.length === 0 ? (
@@ -226,6 +274,46 @@ function AlbumPhotos({ album, events, onBack }) {
               <button onClick={() => remove(p.id)} className="absolute top-1 right-1 p-1 bg-black/70 text-[#FF3B30] opacity-0 group-hover:opacity-100 transition" aria-label="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>
             </div>
           ))}
+        </div>
+      )}
+      {mediaOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setMediaOpen(false)}>
+          <div className="max-w-5xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="font-heading text-xl font-black uppercase">Bilder aus Medienbibliothek</h3>
+                <div className="text-xs text-white/45">{selectedMedia.length} ausgewaehlt</div>
+              </div>
+              <button type="button" onClick={() => setMediaOpen(false)} className="text-white/50 hover:text-white">×</button>
+            </div>
+            {loadingMedia ? (
+              <div className="text-white/40 py-12 text-center">Lade Medien...</div>
+            ) : media.length === 0 ? (
+              <div className="text-white/40 py-12 text-center">Keine Bilder vorhanden.</div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                {media.map((item) => {
+                  const active = selectedMedia.some((x) => x.url === item.url);
+                  return (
+                    <button
+                      key={item.filename}
+                      type="button"
+                      onClick={() => toggleMedia(item)}
+                      className={`aspect-square border bg-[#0A0A0A] rounded-sm overflow-hidden relative ${active ? "border-[#29B6E8] ring-2 ring-[#29B6E8]/30" : "border-white/10 hover:border-[#29B6E8]/60"}`}
+                      title={item.filename}
+                    >
+                      <img src={resolveMediaUrl(item.url)} alt="" className="w-full h-full object-cover" />
+                      {active && <span className="absolute top-1 right-1 bg-[#29B6E8] text-black text-[10px] font-black px-1.5 py-0.5 rounded-sm">OK</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div className="mt-5 flex justify-end gap-2 border-t border-white/10 pt-4">
+              <button type="button" onClick={() => setMediaOpen(false)} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
+              <button type="button" onClick={addSelectedMedia} disabled={!selectedMedia.length} data-testid="photo-media-add" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Auswahl hinzufuegen</button>
+            </div>
+          </div>
         </div>
       )}
     </AdminLayout>

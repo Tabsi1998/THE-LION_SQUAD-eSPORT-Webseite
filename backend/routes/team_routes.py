@@ -1,11 +1,69 @@
 """Team routes."""
 import secrets
+from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_current_user, require_admin
 from models import TeamCreate, TeamUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
+
+
+class TeamSquadCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=80)
+    description: Optional[str] = None
+    tournament_id: Optional[str] = None
+    season_id: Optional[str] = None
+    game_id: Optional[str] = None
+    member_ids: list[str] = Field(default_factory=list)
+    status: Literal["active", "archived"] = "active"
+
+
+class TeamSquadUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=2, max_length=80)
+    description: Optional[str] = None
+    tournament_id: Optional[str] = None
+    season_id: Optional[str] = None
+    game_id: Optional[str] = None
+    member_ids: Optional[list[str]] = None
+    status: Optional[Literal["active", "archived"]] = None
+
+
+def _can_manage(team: dict, user: dict) -> bool:
+    return (
+        team.get("leader_id") == user["id"]
+        or user["id"] in team.get("co_leader_ids", [])
+        or user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
+    )
+
+
+async def _hydrate_team(team: dict) -> dict:
+    db = get_db()
+    members = await db.users.find(
+        {"id": {"$in": team.get("member_ids", [])}},
+        {"_id": 0, "password_hash": 0, "email": 0},
+    ).to_list(100)
+    member_order = {uid: idx for idx, uid in enumerate(team.get("member_ids", []))}
+    members.sort(key=lambda u: member_order.get(u["id"], 999))
+    team["members"] = members
+    team["leader"] = await db.users.find_one(
+        {"id": team.get("leader_id")},
+        {"_id": 0, "password_hash": 0, "email": 0},
+    )
+    team["squad_count"] = await db.team_squads.count_documents({"team_id": team["id"]})
+    return team
+
+
+def _validate_squad_members(team: dict, member_ids: list[str]) -> list[str]:
+    allowed = set(team.get("member_ids", []))
+    clean = []
+    for uid in member_ids or []:
+        if uid not in allowed:
+            raise HTTPException(status_code=400, detail="Squad-Mitglieder muessen im Team sein")
+        if uid not in clean:
+            clean.append(uid)
+    return clean
 
 
 @router.get("")
@@ -21,22 +79,26 @@ async def list_teams(q: str | None = None):
     return teams
 
 
+@router.get("/my")
+async def my_teams(me: dict = Depends(get_current_user)):
+    db = get_db()
+    teams = await db.teams.find({"member_ids": me["id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    for team in teams:
+        await _hydrate_team(team)
+        team["my_role"] = "leader" if team.get("leader_id") == me["id"] else (
+            "co_leader" if me["id"] in team.get("co_leader_ids", []) else "member"
+        )
+        team["can_manage"] = _can_manage(team, me)
+    return teams
+
+
 @router.get("/{team_id}")
 async def get_team(team_id: str):
     db = get_db()
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    members = await db.users.find(
-        {"id": {"$in": team.get("member_ids", [])}},
-        {"_id": 0, "password_hash": 0, "email": 0},
-    ).to_list(100)
-    team["members"] = members
-    team["leader"] = await db.users.find_one(
-        {"id": team.get("leader_id")},
-        {"_id": 0, "password_hash": 0, "email": 0},
-    )
-    return team
+    return await _hydrate_team(team)
 
 
 @router.post("")
@@ -153,4 +215,79 @@ async def delete_team(team_id: str, me: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
     await db.teams.delete_one({"id": team_id})
     await db.team_members.delete_many({"team_id": team_id})
+    await db.team_squads.delete_many({"team_id": team_id})
+    return {"ok": True}
+
+
+@router.get("/{team_id}/squads")
+async def list_squads(team_id: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if me["id"] not in team.get("member_ids", []) and not _can_manage(team, me):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    squads = await db.team_squads.find({"team_id": team_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    member_map = {u["id"]: u for u in await db.users.find(
+        {"id": {"$in": list({uid for s in squads for uid in s.get("member_ids", [])})}},
+        {"_id": 0, "password_hash": 0, "email": 0},
+    ).to_list(500)}
+    for squad in squads:
+        squad["members"] = [member_map[uid] for uid in squad.get("member_ids", []) if uid in member_map]
+    return squads
+
+
+@router.post("/{team_id}/squads")
+async def create_squad(team_id: str, body: TeamSquadCreate, me: dict = Depends(get_current_user)):
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_manage(team, me):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    doc = body.model_dump()
+    doc["member_ids"] = _validate_squad_members(team, doc.get("member_ids") or [])
+    doc.update({
+        "id": new_id(),
+        "team_id": team_id,
+        "created_by": me["id"],
+        "created_at": now_utc().isoformat(),
+        "updated_at": now_utc().isoformat(),
+    })
+    await db.team_squads.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@router.patch("/{team_id}/squads/{squad_id}")
+async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: dict = Depends(get_current_user)):
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_manage(team, me):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    nullable_fields = {"description", "tournament_id", "season_id", "game_id", "member_ids"}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    if "member_ids" in updates:
+        updates["member_ids"] = _validate_squad_members(team, updates.get("member_ids") or [])
+    updates["updated_at"] = now_utc().isoformat()
+    res = await db.team_squads.update_one({"id": squad_id, "team_id": team_id}, {"$set": updates})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Squad nicht gefunden")
+    return await db.team_squads.find_one({"id": squad_id}, {"_id": 0})
+
+
+@router.delete("/{team_id}/squads/{squad_id}")
+async def delete_squad(team_id: str, squad_id: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_manage(team, me):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    res = await db.team_squads.delete_one({"id": squad_id, "team_id": team_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Squad nicht gefunden")
     return {"ok": True}

@@ -1,18 +1,19 @@
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MultiSelect } from "@/components/tls/MultiSelect";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
-import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal } from "lucide-react";
+import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil } from "lucide-react";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 
 const TABS = [
   { k: "basic", label: "Grunddaten", icon: User },
   { k: "gaming", label: "Gaming", icon: Gamepad2 },
   { k: "socials", label: "Socials", icon: Globe },
+  { k: "teams", label: "Teams", icon: Users },
   { k: "achievements", label: "Achievements", icon: Medal },
   { k: "privacy", label: "Privatsphäre", icon: Eye },
 ];
@@ -213,8 +214,8 @@ export default function ProfilePage() {
                 <Field label="Stadt"><Input value={form.city} onChange={(v) => set("city", v)} /></Field>
               </Row>
               <Row>
-                <Field label="Avatar"><ImageUpload value={form.avatar_url} onChange={(v) => set("avatar_url", v)} testId="profile-avatar" variant="square" /></Field>
-                <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="profile-banner" variant="wide" /></Field>
+                <Field label="Avatar"><ImageUpload value={form.avatar_url} onChange={(v) => set("avatar_url", v)} testId="profile-avatar" variant="square" allowLibrary /></Field>
+                <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="profile-banner" variant="wide" allowLibrary /></Field>
               </Row>
             </Section>
           )}
@@ -307,6 +308,8 @@ export default function ProfilePage() {
             </div>
           )}
 
+          {tab === "teams" && <TeamsPanel />}
+
           {tab === "privacy" && (
             <Section>
               <label className="flex items-start gap-3 p-4 border border-white/10 rounded-sm bg-[#0A0A0A]">
@@ -357,7 +360,7 @@ export default function ProfilePage() {
             </Section>
           )}
 
-          {tab !== "achievements" && (
+          {!["achievements", "teams"].includes(tab) && (
             <div className="pt-4 flex gap-3">
               <button type="submit" disabled={saving} data-testid="profile-save" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition text-xs">
                 <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
@@ -370,6 +373,237 @@ export default function ProfilePage() {
         </form>
       </div>
     </PublicLayout>
+  );
+}
+
+const emptySquad = {
+  name: "",
+  description: "",
+  tournament_id: "",
+  season_id: "",
+  member_ids: [],
+  status: "active",
+};
+
+function TeamsPanel() {
+  const [teams, setTeams] = useState([]);
+  const [activeId, setActiveId] = useState("");
+  const [squads, setSquads] = useState([]);
+  const [tournaments, setTournaments] = useState([]);
+  const [seasons, setSeasons] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const activeTeam = teams.find((t) => t.id === activeId);
+
+  const loadTeams = async () => {
+    const { data } = await api.get("/teams/my");
+    setTeams(data || []);
+    setActiveId((cur) => cur || data?.[0]?.id || "");
+  };
+
+  useEffect(() => {
+    loadTeams().catch(() => toast.error("Teams konnten nicht geladen werden."));
+    api.get("/tournaments").then(({ data }) => setTournaments(data || [])).catch(() => {});
+    api.get("/seasons").then(({ data }) => setSeasons(data || [])).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!activeId) {
+      setSquads([]);
+      return;
+    }
+    api.get(`/teams/${activeId}/squads`)
+      .then(({ data }) => setSquads(data || []))
+      .catch(() => setSquads([]));
+  }, [activeId]);
+
+  const saveSquad = async (e) => {
+    e.preventDefault();
+    if (!activeTeam?.can_manage) return;
+    setSaving(true);
+    try {
+      const payload = {
+        ...editing,
+        description: editing.description || null,
+        tournament_id: editing.tournament_id || null,
+        season_id: editing.season_id || null,
+        member_ids: editing.member_ids || [],
+      };
+      if (editing.id) await api.patch(`/teams/${activeTeam.id}/squads/${editing.id}`, payload);
+      else await api.post(`/teams/${activeTeam.id}/squads`, payload);
+      toast.success("Squad gespeichert.");
+      setEditing(null);
+      const { data } = await api.get(`/teams/${activeTeam.id}/squads`);
+      setSquads(data || []);
+      loadTeams();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteSquad = async (squad) => {
+    if (!window.confirm(`Squad "${squad.name}" wirklich loeschen?`)) return;
+    try {
+      await api.delete(`/teams/${activeTeam.id}/squads/${squad.id}`);
+      toast.success("Squad geloescht.");
+      setSquads((rows) => rows.filter((s) => s.id !== squad.id));
+      loadTeams();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    }
+  };
+
+  const toggleMember = (uid) => {
+    setEditing((f) => ({
+      ...f,
+      member_ids: f.member_ids?.includes(uid)
+        ? f.member_ids.filter((x) => x !== uid)
+        : [...(f.member_ids || []), uid],
+    }));
+  };
+
+  return (
+    <div className="space-y-6" data-testid="profile-teams-tab">
+      <div className="border border-white/10 bg-[#121212] rounded-sm p-5 flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Team-Verwaltung</div>
+          <h2 className="font-heading text-2xl md:text-3xl font-black uppercase mt-1">Meine Teams</h2>
+          <p className="text-sm text-white/55 mt-1">Teams sind deine Organisation, Squads sind konkrete Lineups fuer Seasons oder Turniere.</p>
+        </div>
+        <Link to="/teams" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10">
+          <Plus className="w-3.5 h-3.5" /> Team erstellen
+        </Link>
+      </div>
+
+      {teams.length === 0 ? (
+        <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/45">
+          <Users className="w-10 h-10 mx-auto opacity-40 mb-3" />
+          <div className="font-heading font-bold text-lg">Noch kein Team</div>
+          <Link to="/teams" className="mt-4 inline-flex px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs">Team erstellen oder beitreten</Link>
+        </div>
+      ) : (
+        <div className="grid lg:grid-cols-[300px_1fr] gap-5">
+          <div className="space-y-2">
+            {teams.map((team) => (
+              <button
+                key={team.id}
+                type="button"
+                onClick={() => setActiveId(team.id)}
+                className={`w-full text-left border rounded-sm p-3 bg-[#121212] flex items-center gap-3 ${activeId === team.id ? "border-[#29B6E8]" : "border-white/10 hover:border-white/25"}`}
+                data-testid={`profile-team-${team.id}`}
+              >
+                <div className="w-12 h-12 bg-[#0A0A0A] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center shrink-0">
+                  {team.logo_url ? <img src={resolveMediaUrl(team.logo_url)} alt="" className="w-full h-full object-cover" /> : <span className="font-heading font-black text-[#29B6E8]">{team.tag}</span>}
+                </div>
+                <div className="min-w-0">
+                  <div className="font-heading font-bold truncate">{team.name}</div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/45">{team.my_role} · {team.squad_count || 0} Squads</div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
+            {activeTeam && (
+              <>
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">[{activeTeam.tag}]</div>
+                    <h3 className="font-heading text-2xl font-black uppercase">{activeTeam.name}</h3>
+                    <div className="text-xs text-white/50 mt-1">{activeTeam.members?.length || 0} Mitglieder</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link to={`/teams/${activeTeam.id}`} className="px-3 py-2 border border-white/15 text-white/70 hover:text-white rounded-sm text-xs uppercase font-bold">Teamseite</Link>
+                    {activeTeam.can_manage && (
+                      <button type="button" onClick={() => setEditing({ ...emptySquad, member_ids: activeTeam.member_ids || [] })} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase font-bold inline-flex items-center gap-1">
+                        <Plus className="w-3.5 h-3.5" /> Squad
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-5 grid sm:grid-cols-2 gap-3">
+                  {squads.map((squad) => (
+                    <div key={squad.id} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-widest text-[#FFD700]">{squad.status}</div>
+                          <h4 className="font-heading font-bold text-lg">{squad.name}</h4>
+                        </div>
+                        {activeTeam.can_manage && (
+                          <div className="flex gap-1">
+                            <button type="button" onClick={() => setEditing({ ...emptySquad, ...squad })} className="p-1 text-white/45 hover:text-[#29B6E8]"><Pencil className="w-3.5 h-3.5" /></button>
+                            <button type="button" onClick={() => deleteSquad(squad)} className="p-1 text-white/45 hover:text-[#FF3B30]"><Trash2 className="w-3.5 h-3.5" /></button>
+                          </div>
+                        )}
+                      </div>
+                      {squad.description && <p className="text-sm text-white/55 mt-2">{squad.description}</p>}
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {(squad.members || []).map((m) => (
+                          <span key={m.id} className="px-2 py-1 border border-white/10 rounded-sm text-[10px] text-white/70">{m.display_name || m.username}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  {squads.length === 0 && <div className="sm:col-span-2 text-center py-10 text-white/35 border border-dashed border-white/10 rounded-sm">Noch keine Squads fuer dieses Team.</div>}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {editing && activeTeam && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
+          <form onSubmit={saveSquad} className="bg-[#121212] border border-white/10 rounded-sm w-full max-w-2xl mx-auto my-8">
+            <div className="p-5 border-b border-white/10">
+              <h3 className="font-heading text-2xl font-black uppercase">{editing.id ? "Squad bearbeiten" : "Squad erstellen"}</h3>
+            </div>
+            <div className="p-5 space-y-4">
+              <Field label="Name"><Input value={editing.name} onChange={(v) => setEditing({ ...editing, name: v })} required testId="team-squad-name" /></Field>
+              <Field label="Beschreibung"><textarea value={editing.description || ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white" /></Field>
+              <Row>
+                <Field label="Turnier">
+                  <select value={editing.tournament_id || ""} onChange={(e) => setEditing({ ...editing, tournament_id: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+                    <option value="">Kein Turnier</option>
+                    {tournaments.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+                  </select>
+                </Field>
+                <Field label="Season/Circuit">
+                  <select value={editing.season_id || ""} onChange={(e) => setEditing({ ...editing, season_id: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+                    <option value="">Keine Season</option>
+                    {seasons.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </Field>
+              </Row>
+              <Field label="Lineup / Mitspieler">
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {(activeTeam.members || []).map((m) => (
+                    <label key={m.id} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm p-2 text-sm">
+                      <input type="checkbox" checked={(editing.member_ids || []).includes(m.id)} onChange={() => toggleMember(m.id)} className="accent-[#29B6E8]" />
+                      <span>{m.display_name || m.username}</span>
+                    </label>
+                  ))}
+                </div>
+              </Field>
+              <Field label="Status">
+                <select value={editing.status || "active"} onChange={(e) => setEditing({ ...editing, status: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+                  <option value="active">Aktiv</option>
+                  <option value="archived">Archiviert</option>
+                </select>
+              </Field>
+            </div>
+            <div className="flex justify-end gap-2 p-5 border-t border-white/10">
+              <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
+              <button disabled={saving} className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere..." : "Speichern"}</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -387,7 +621,7 @@ function Field({ label, children }) {
     </label>
   );
 }
-function Input({ value, onChange, placeholder, testId, type = "text" }) {
+function Input({ value, onChange, placeholder, testId, type = "text", required = false }) {
   return (
     <input
       type={type}
@@ -395,6 +629,7 @@ function Input({ value, onChange, placeholder, testId, type = "text" }) {
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       data-testid={testId}
+      required={required}
       className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white"
     />
   );

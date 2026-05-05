@@ -35,7 +35,7 @@ from routes.phase_ef_routes import (
     seed_default_pages, seed_email_templates,
 )
 from routes.phase_fg_routes import (
-    admin_media_router, nav_router, admin_nav_router, seo_router, seo_meta_router,
+    media_router, admin_media_router, nav_router, admin_nav_router, seo_router, seo_meta_router,
     seed_default_nav,
 )
 from routes.penalty_routes import router as penalty_router, admin_router as penalty_admin_router
@@ -202,6 +202,7 @@ app.include_router(pages_router)
 app.include_router(admin_pages_router)
 app.include_router(admin_emailt_router)
 app.include_router(admin_discord_router)
+app.include_router(media_router)
 app.include_router(admin_media_router)
 app.include_router(nav_router)
 app.include_router(admin_nav_router)

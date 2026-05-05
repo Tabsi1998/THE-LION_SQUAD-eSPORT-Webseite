@@ -302,14 +302,17 @@ async def get_branding(me: dict = Depends(require_admin())):
 @settings_router.put("/branding")
 async def update_branding(body: BrandingSettings, me: dict = Depends(require_admin())):
     db = get_db()
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    nullable_fields = set(BrandingSettings.model_fields.keys())
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     updates["updated_at"] = now_utc().isoformat()
     await db.settings.update_one(
         {"id": "branding"}, {"$set": updates, "$setOnInsert": {"id": "branding"}}, upsert=True,
     )
     await db.audit_logs.insert_one({"id": new_id(), "action": "settings.branding.update",
                                      "actor_id": me["id"], "created_at": now_utc().isoformat()})
-    return {"ok": True}
+    saved = await db.settings.find_one({"id": "branding"}, {"_id": 0})
+    return saved or {"ok": True}
 
 
 @settings_router.get("/email/logs")
