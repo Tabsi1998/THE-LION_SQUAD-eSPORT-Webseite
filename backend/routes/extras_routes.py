@@ -88,6 +88,52 @@ class DiscordSettings(BaseModel):
     enabled: bool = True
 
 
+SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "webhook_url"}
+
+
+def _normalize_setting_value(value):
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, list):
+        return [_normalize_setting_value(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _normalize_setting_value(v) for k, v in sorted(value.items())}
+    return value
+
+
+def _changed_setting_fields(current: dict | None, updates: dict, unset: dict | None = None) -> list[str]:
+    current = current or {}
+    changed = set()
+    for key, value in updates.items():
+        if key in {"id", "updated_at"}:
+            continue
+        if key in SETTING_AUDIT_SECRET_FIELDS:
+            if value and _normalize_setting_value(current.get(key)) != _normalize_setting_value(value):
+                changed.add(key)
+            continue
+        if _normalize_setting_value(current.get(key)) != _normalize_setting_value(value):
+            changed.add(key)
+    for key in (unset or {}):
+        if _normalize_setting_value(current.get(key)) != "":
+            changed.add(key)
+    return sorted(changed)
+
+
+async def _audit_settings_change(db, action: str, setting_id: str, actor_id: str, changed_fields: list[str]) -> None:
+    if not changed_fields:
+        return
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": action,
+        "target_id": setting_id,
+        "actor_id": actor_id,
+        "data": {"changed_fields": changed_fields},
+        "created_at": now_utc().isoformat(),
+    })
+
+
 @settings_router.get("/public")
 async def public_settings(response: Response):
     """Public-safe settings for branding on public pages."""
@@ -169,13 +215,16 @@ async def update_email_settings(body: EmailSettings, me: dict = Depends(require_
     # Only overwrite api_key if a non-empty value given
     if "resend_api_key" in updates and not updates["resend_api_key"]:
         updates.pop("resend_api_key")
+    current = await db.settings.find_one({"id": "email"}, {"_id": 0}) or {}
+    changed_fields = _changed_setting_fields(current, updates)
+    if not changed_fields:
+        return {"ok": True, "changed": False}
     updates["updated_at"] = now_utc().isoformat()
     await db.settings.update_one(
         {"id": "email"}, {"$set": updates, "$setOnInsert": {"id": "email"}}, upsert=True,
     )
-    await db.audit_logs.insert_one({"id": new_id(), "action": "settings.email.update",
-                                     "actor_id": me["id"], "created_at": now_utc().isoformat()})
-    return {"ok": True}
+    await _audit_settings_change(db, "settings.email.update", "email", me["id"], changed_fields)
+    return {"ok": True, "changed": True}
 
 
 @settings_router.post("/email/test")
@@ -232,13 +281,16 @@ async def update_smtp_settings(body: SmtpSettings, me: dict = Depends(require_ad
     # Only overwrite password if a non-empty value given
     if "smtp_pass" in updates and not updates["smtp_pass"]:
         updates.pop("smtp_pass")
+    current = await db.settings.find_one({"id": "mail"}, {"_id": 0}) or {}
+    changed_fields = _changed_setting_fields(current, updates)
+    if not changed_fields:
+        return {"ok": True, "changed": False}
     updates["updated_at"] = now_utc().isoformat()
     await db.settings.update_one(
         {"id": "mail"}, {"$set": updates, "$setOnInsert": {"id": "mail"}}, upsert=True,
     )
-    await db.audit_logs.insert_one({"id": new_id(), "action": "settings.smtp.update",
-                                     "actor_id": me["id"], "created_at": now_utc().isoformat()})
-    return {"ok": True}
+    await _audit_settings_change(db, "settings.smtp.update", "mail", me["id"], changed_fields)
+    return {"ok": True, "changed": True}
 
 
 @settings_router.post("/smtp/test")
@@ -330,12 +382,15 @@ async def update_branding(body: BrandingSettings, me: dict = Depends(require_adm
     nullable_fields = set(BrandingSettings.model_fields.keys())
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    current = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
+    changed_fields = _changed_setting_fields(current, updates)
+    if not changed_fields:
+        return current or {"ok": True, "changed": False}
     updates["updated_at"] = now_utc().isoformat()
     await db.settings.update_one(
         {"id": "branding"}, {"$set": updates, "$setOnInsert": {"id": "branding"}}, upsert=True,
     )
-    await db.audit_logs.insert_one({"id": new_id(), "action": "settings.branding.update",
-                                     "actor_id": me["id"], "created_at": now_utc().isoformat()})
+    await _audit_settings_change(db, "settings.branding.update", "branding", me["id"], changed_fields)
     saved = await db.settings.find_one({"id": "branding"}, {"_id": 0})
     return saved or {"ok": True}
 
@@ -386,6 +441,10 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_admin
     for key in ("username", "avatar_url"):
         if key in updates and isinstance(updates[key], str):
             updates[key] = updates[key].strip()
+    current = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
+    changed_fields = _changed_setting_fields(current, updates, unset)
+    if not changed_fields:
+        return {"ok": True, "changed": False}
     updates["updated_at"] = now_utc().isoformat()
     op = {"$set": updates, "$setOnInsert": {"id": "discord"}}
     if unset:
@@ -393,9 +452,8 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_admin
     await db.settings.update_one(
         {"id": "discord"}, op, upsert=True,
     )
-    await db.audit_logs.insert_one({"id": new_id(), "action": "settings.discord.update",
-                                     "actor_id": me["id"], "created_at": now_utc().isoformat()})
-    return {"ok": True}
+    await _audit_settings_change(db, "settings.discord.update", "discord", me["id"], changed_fields)
+    return {"ok": True, "changed": True}
 
 
 @settings_router.post("/discord/test")

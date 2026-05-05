@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
-import { ImageUpload } from "@/components/tls/ImageUpload";
+import { ImageUpload, prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
 import { Plus, Save, X, Trash2, Image as ImageIcon, ArrowLeft } from "lucide-react";
 
@@ -183,8 +183,9 @@ function AlbumPhotos({ album, events, onBack }) {
     let ok = 0, fail = 0;
     for (const file of Array.from(files)) {
       try {
+        const uploadFile = await prepareImageForUpload(file);
         const fd = new FormData();
-        fd.append("file", file);
+        fd.append("file", uploadFile);
         const { data } = await api.post("/uploads/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
         await api.post(`/gallery/${album.id}/photos`, {
           image_url: data.url,
@@ -193,7 +194,10 @@ function AlbumPhotos({ album, events, onBack }) {
           order_index: photos.length + ok + 1,
         });
         ok++;
-      } catch { fail++; }
+      } catch (err) {
+        fail++;
+        toast.error(`${file.name}: ${formatApiError(err.response?.data?.detail) || err.message || "Upload fehlgeschlagen"}`);
+      }
     }
     setUploading(false);
     toast.success(`${ok} Foto(s) hinzugefügt${fail ? `, ${fail} fehlgeschlagen` : ""}.`);

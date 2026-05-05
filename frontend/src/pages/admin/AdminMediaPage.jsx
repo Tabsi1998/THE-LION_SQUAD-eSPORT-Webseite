@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_BASE, api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
 import {
   Image as ImageIcon, FileText, Trash2, Copy, ExternalLink, Search, RefreshCw, Upload,
@@ -83,12 +84,14 @@ export default function AdminMediaPage() {
     let failed = 0;
     for (const file of Array.from(files)) {
       try {
+        const uploadFile = await prepareImageForUpload(file);
         const fd = new FormData();
-        fd.append("file", file);
+        fd.append("file", uploadFile);
         await api.post("/uploads/image", fd);
         ok++;
-      } catch {
+      } catch (e) {
         failed++;
+        toast.error(`${file.name}: ${formatApiError(e.response?.data?.detail) || e.message || "Upload fehlgeschlagen"}`);
       }
     }
     setUploading(false);

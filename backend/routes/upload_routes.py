@@ -23,6 +23,11 @@ IMAGE_MIME_BY_EXT = {
     ".jpeg": "image/jpeg",
     ".webp": "image/webp",
 }
+PIL_IMAGE_FORMATS = {
+    "PNG": ("image/png", ".png"),
+    "JPEG": ("image/jpeg", ".jpg"),
+    "WEBP": ("image/webp", ".webp"),
+}
 
 
 def _upload_mb_from_env(name: str, default: int) -> int:
@@ -65,15 +70,14 @@ router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_current_user)):
     """Upload an image. Returns public URL `/uploads/{filename}`.
     Accepts PNG/JPEG/WebP and re-encodes before serving."""
-    content_type = file.content_type or ""
+    declared_content_type = file.content_type or ""
     suffix = pathlib.Path(file.filename or "").suffix.lower()
-    if content_type not in ALLOWED_IMAGE and suffix in IMAGE_MIME_BY_EXT:
-        content_type = IMAGE_MIME_BY_EXT[suffix]
-    if content_type not in ALLOWED_IMAGE:
-        raise HTTPException(status_code=400, detail=f"Nur PNG, JPG oder WebP erlaubt. Erkannt: {file.content_type or 'unbekannt'}")
-    ext = {
-        "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp",
-    }.get(content_type, "")
+    filename_hint = file.filename or "upload"
+    if declared_content_type and declared_content_type not in ALLOWED_IMAGE and suffix not in IMAGE_MIME_BY_EXT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nur PNG, JPG oder WebP erlaubt. Erkannt: {declared_content_type or 'unbekannt'}",
+        )
     # Read & size check
     data = await file.read()
     original_size = len(data)
@@ -85,9 +89,27 @@ async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_curr
         with Image.open(BytesIO(data)) as img:
             if img.width * img.height > MAX_IMAGE_PIXELS:
                 raise HTTPException(status_code=413, detail="Bild ist zu gross (max 36 Megapixel)")
-            expected = {"image/png": "PNG", "image/jpeg": "JPEG", "image/webp": "WEBP"}[content_type]
-            if img.format != expected:
-                raise HTTPException(status_code=400, detail="Dateiinhalt passt nicht zum angegebenen Bildtyp")
+            detected_format = (img.format or "").upper()
+            if detected_format not in PIL_IMAGE_FORMATS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Nur PNG, JPG oder WebP erlaubt. Erkannt: {detected_format or declared_content_type or 'unbekannt'}",
+                )
+            content_type, ext = PIL_IMAGE_FORMATS[detected_format]
+            if declared_content_type and declared_content_type not in ALLOWED_IMAGE:
+                logger.info(
+                    "[uploads] accepted image with browser content-type %s after detecting %s (%s)",
+                    declared_content_type,
+                    detected_format,
+                    filename_hint,
+                )
+            elif suffix in IMAGE_MIME_BY_EXT and IMAGE_MIME_BY_EXT[suffix] != content_type:
+                logger.info(
+                    "[uploads] accepted image with mismatched suffix %s after detecting %s (%s)",
+                    suffix,
+                    detected_format,
+                    filename_hint,
+                )
             output_format = img.format
             out = BytesIO()
             save_kwargs = {}

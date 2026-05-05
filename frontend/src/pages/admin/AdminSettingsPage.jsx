@@ -30,6 +30,10 @@ export default function AdminSettingsPage() {
   const [testEmail, setTestEmail] = useState("");
   const [logs, setLogs] = useState([]);
   const [systemStatus, setSystemStatus] = useState(null);
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [savingSmtp, setSavingSmtp] = useState(false);
+  const [savingBrand, setSavingBrand] = useState(false);
+  const [savingDiscord, setSavingDiscord] = useState(false);
   const imageUploadBusy = useImageUploadBusy();
   const brandDirtyRef = useRef(false);
   const discordDirtyRef = useRef(false);
@@ -83,13 +87,18 @@ export default function AdminSettingsPage() {
   };
 
   const saveEmail = async () => {
+    if (savingEmail) return;
     const payload = { ...email };
     if (!payload.resend_api_key) delete payload.resend_api_key;
+    setSavingEmail(true);
     try { await api.put("/settings/email", payload); toast.success("E-Mail-Einstellungen gespeichert."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setSavingEmail(false); }
   };
   const saveBrand = async () => {
+    if (savingBrand) return;
     if (imageUploadBusy) return toast.error("Bild-Upload laeuft noch. Bitte kurz warten und dann speichern.");
+    setSavingBrand(true);
     try {
       loadSeqRef.current += 1;
       const { data } = await api.put("/settings/branding", brand);
@@ -100,8 +109,10 @@ export default function AdminSettingsPage() {
       load();
     }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setSavingBrand(false); }
   };
   const saveDiscord = async () => {
+    if (savingDiscord) return;
     if (imageUploadBusy) return toast.error("Bild-Upload laeuft noch. Bitte kurz warten und dann speichern.");
     const payload = { ...discord };
     if (!payload.webhook_url) delete payload.webhook_url;
@@ -111,8 +122,10 @@ export default function AdminSettingsPage() {
     delete payload.last_error;
     delete payload.last_event_key;
     delete payload.last_checked_at;
+    setSavingDiscord(true);
     try { loadSeqRef.current += 1; await api.put("/settings/discord", payload); discordDirtyRef.current = false; toast.success("Discord gespeichert."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setSavingDiscord(false); }
   };
   const sendTest = async () => {
     if (!testEmail) return toast.error("E-Mail-Adresse eingeben");
@@ -141,14 +154,17 @@ export default function AdminSettingsPage() {
   };
 
   const saveSmtp = async () => {
+    if (savingSmtp) return;
     const payload = { ...smtp };
     if (payload.provider === "smtp" && payload.smtp_auth === "login") {
       if (!payload.smtp_user) return toast.error("SMTP User fehlt. Fuer einfachen Versand bitte office@... eintragen.");
       if (!payload.smtp_pass && !payload.smtp_pass_masked) return toast.error("SMTP Passwort fehlt.");
     }
     if (!payload.smtp_pass) delete payload.smtp_pass;
+    setSavingSmtp(true);
     try { await api.put("/settings/smtp", payload); toast.success("SMTP-Einstellungen gespeichert."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setSavingSmtp(false); }
   };
   const applySubmissionPreset = () => {
     setSmtp({
@@ -271,7 +287,7 @@ export default function AdminSettingsPage() {
               <input type="email" value={email.reply_to_email || ""} onChange={(e) => setEmail({ ...email, reply_to_email: e.target.value })} data-testid="email-reply-to" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder="office@lionsquad.at" />
               <p className="text-xs text-white/40 mt-1">Reply-To fuer Rueckfragen. Leer = sichtbare Absender-E-Mail.</p>
             </div>
-            <button onClick={saveEmail} data-testid="email-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
+            <button onClick={saveEmail} disabled={savingEmail} data-testid="email-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingEmail ? "Speichere..." : "Speichern"}</button>
           </div>
 
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
@@ -425,7 +441,7 @@ export default function AdminSettingsPage() {
               <div className="font-bold uppercase tracking-widest text-[#FFD700] mb-2">DNS Checkliste gegen Spam</div>
               <p>Gmail bewertet die oeffentliche Ausgangs-IP deines Mailservers. Wichtig sind SPF, DKIM, DMARC, PTR/rDNS und die Mailserver-Logs. Der SMTP Host in dieser App darf trotzdem eine lokale IP sein.</p>
             </div>
-            <button onClick={saveSmtp} data-testid="smtp-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
+            <button onClick={saveSmtp} disabled={savingSmtp} data-testid="smtp-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingSmtp ? "Speichere..." : "Speichern"}</button>
           </div>
 
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
@@ -608,7 +624,7 @@ export default function AdminSettingsPage() {
               <ImageUpload value={discord.avatar_url || ""} onChange={(v) => setDiscordField("avatar_url", v)} label="Avatar" testId="discord-avatar" variant="square" allowLibrary />
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
-            <button onClick={saveDiscord} disabled={imageUploadBusy} data-testid="discord-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">Speichern</button>
+            <button onClick={saveDiscord} disabled={imageUploadBusy || savingDiscord} data-testid="discord-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingDiscord ? "Speichere..." : "Speichern"}</button>
               <button onClick={sendDiscordTest} data-testid="discord-test" className="px-4 py-2 border border-[#5865F2] text-[#5865F2] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Test senden</button>
               {discord.configured && <button onClick={clearDiscordWebhook} data-testid="discord-clear" className="px-4 py-2 border border-[#FF3B30]/60 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm">Webhook entfernen</button>}
             </div>
@@ -640,7 +656,7 @@ export default function AdminSettingsPage() {
               <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Favicon / Browser Icon" testId="brand-favicon" variant="square" allowLibrary />
             </div>
             <p className="text-xs text-white/45">Impressum, Datenschutz und Vereinsdaten liegen im Tab Rechtliches.</p>
-            <button onClick={saveBrand} disabled={imageUploadBusy} data-testid="brand-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">Speichern</button>
+            <button onClick={saveBrand} disabled={imageUploadBusy || savingBrand} data-testid="brand-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingBrand ? "Speichere..." : "Speichern"}</button>
           </div>
         </div>
       )}
@@ -688,7 +704,7 @@ export default function AdminSettingsPage() {
             <LegalTextArea label="Zusaetzliche rechtliche Hinweise" value={brand.legal_extra} onChange={(v) => setBrandField("legal_extra", v)} testId="legal-extra" rows={4} />
             <LegalTextArea label="Freitext Datenschutz" value={brand.privacy_policy} onChange={(v) => setBrandField("privacy_policy", v)} testId="brand-privacy" rows={5} />
             <LegalTextArea label="Zusaetzliche Datenschutzhinweise" value={brand.privacy_extra} onChange={(v) => setBrandField("privacy_extra", v)} testId="privacy-extra" rows={5} />
-            <button onClick={saveBrand} disabled={imageUploadBusy} data-testid="legal-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">Rechtliches speichern</button>
+            <button onClick={saveBrand} disabled={imageUploadBusy || savingBrand} data-testid="legal-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingBrand ? "Speichere..." : "Rechtliches speichern"}</button>
           </div>
         </div>
       )}

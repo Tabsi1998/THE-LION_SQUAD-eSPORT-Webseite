@@ -10,6 +10,11 @@ const parseUploadMb = (value, fallback) => {
 
 const DEFAULT_IMAGE_UPLOAD_MB = parseUploadMb(process.env.REACT_APP_MAX_IMAGE_UPLOAD_MB, 50);
 const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(process.env.REACT_APP_PROXY_UPLOAD_LIMIT_MB, Math.ceil(DEFAULT_IMAGE_UPLOAD_MB * 1.2));
+const IMAGE_COMPRESS_TRIGGER_MB = parseUploadMb(process.env.REACT_APP_IMAGE_COMPRESS_TRIGGER_MB, 8);
+const IMAGE_COMPRESS_TARGET_MB = parseUploadMb(process.env.REACT_APP_IMAGE_COMPRESS_TARGET_MB, Math.min(8, DEFAULT_IMAGE_UPLOAD_MB));
+const IMAGE_MAX_DIMENSION = Number.parseInt(process.env.REACT_APP_IMAGE_MAX_DIMENSION || "4096", 10) || 4096;
+const SUPPORTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const SUPPORTED_IMAGE_EXT_RE = /\.(png|jpe?g|webp)$/i;
 let activeImageUploads = 0;
 const uploadBusyListeners = new Set();
 
@@ -33,6 +38,87 @@ export function useImageUploadBusy() {
   return busy;
 }
 
+function browserCanOptimizeImages() {
+  return typeof window !== "undefined" && typeof document !== "undefined" && typeof Image !== "undefined";
+}
+
+function fileLooksSupported(file) {
+  const type = (file.type || "").toLowerCase();
+  return SUPPORTED_IMAGE_TYPES.has(type) || SUPPORTED_IMAGE_EXT_RE.test(file.name || "");
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+}
+
+async function loadImage(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.decoding = "async";
+    img.src = url;
+    if (img.decode) {
+      await img.decode();
+    } else {
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+    }
+    return { img, url };
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+}
+
+export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB) {
+  if (!file) return file;
+  if (!fileLooksSupported(file)) {
+    throw new Error("Nur PNG, JPG oder WebP erlaubt.");
+  }
+  if (!browserCanOptimizeImages()) return file;
+
+  const maxBytes = maxSizeMb * 1024 * 1024;
+  const triggerBytes = IMAGE_COMPRESS_TRIGGER_MB * 1024 * 1024;
+  const targetBytes = Math.min(maxBytes, IMAGE_COMPRESS_TARGET_MB * 1024 * 1024);
+  let imageData = null;
+  try {
+    imageData = await loadImage(file);
+    const { img } = imageData;
+    const needsResize = img.naturalWidth > IMAGE_MAX_DIMENSION || img.naturalHeight > IMAGE_MAX_DIMENSION;
+    const needsCompression = file.size > triggerBytes || file.size > maxBytes || needsResize;
+    if (!needsCompression) return file;
+
+    const scale = Math.min(1, IMAGE_MAX_DIMENSION / img.naturalWidth, IMAGE_MAX_DIMENSION / img.naturalHeight);
+    const width = Math.max(1, Math.round(img.naturalWidth * scale));
+    const height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0, width, height);
+
+    let bestBlob = null;
+    for (const quality of [0.9, 0.82, 0.74, 0.66, 0.58]) {
+      const blob = await canvasToBlob(canvas, "image/webp", quality);
+      if (!blob) continue;
+      if (!bestBlob || blob.size < bestBlob.size) bestBlob = blob;
+      if (blob.size <= targetBytes) break;
+    }
+    if (!bestBlob) return file;
+    if (file.size <= maxBytes && bestBlob.size >= file.size) return file;
+    const baseName = (file.name || "bild").replace(/\.[^/.]+$/, "") || "bild";
+    return new File([bestBlob], `${baseName}.webp`, { type: "image/webp", lastModified: Date.now() });
+  } catch (error) {
+    console.warn("[uploads] Bildoptimierung im Browser fehlgeschlagen:", error);
+    return file;
+  } finally {
+    if (imageData?.url) URL.revokeObjectURL(imageData.url);
+  }
+}
+
 /**
  * Reusable image upload field. Renders preview + upload button.
  * Returns the public URL (e.g. /api/static/uploads/abc.png) via onChange.
@@ -54,18 +140,19 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
 
   const handleFile = async (file) => {
     if (!file) return;
-    if (file.size > maxSizeMb * 1024 * 1024) {
-      toast.error(`Datei zu groß (max ${maxSizeMb} MB)`);
-      return;
-    }
     setUploading(true);
     changeActiveUploads(1);
     try {
+      const uploadFile = await prepareImageForUpload(file, maxSizeMb);
+      if (uploadFile.size > maxSizeMb * 1024 * 1024) {
+        toast.error(`Datei zu gross (max ${maxSizeMb} MB). Bitte Bild kleiner exportieren oder Proxy-Limit erhoehen.`);
+        return;
+      }
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", uploadFile);
       const { data } = await api.post(endpoint, fd);
       onChange(data.url);
-      toast.success("Bild hochgeladen.");
+      toast.success(uploadFile !== file ? "Bild optimiert und hochgeladen." : "Bild hochgeladen.");
     } catch (e) {
       const detail = e.response?.data?.detail;
       const status = e.response?.status;
