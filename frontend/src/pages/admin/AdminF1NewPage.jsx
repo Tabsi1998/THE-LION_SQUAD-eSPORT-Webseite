@@ -40,7 +40,14 @@ export default function AdminF1NewPage() {
     setSaving(false);
   };
 
-  const autoSlug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const autoSlug = (t) => (t || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ß/g, "ss")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 80);
 
   return (
     <AdminLayout>
@@ -48,7 +55,7 @@ export default function AdminF1NewPage() {
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Neue Challenge</h1>
       <form onSubmit={submit} className="max-w-2xl space-y-4">
         <Field label="Titel" value={form.title} onChange={(v) => { set("title", v); if (!form.slug) set("slug", autoSlug(v)); }} required testId="f1-new-title" />
-        <Field label="Slug (URL)" value={form.slug} onChange={(v) => set("slug", v)} required testId="f1-new-slug" />
+        <Field label="Slug (URL)" value={form.slug} onChange={(v) => set("slug", autoSlug(v))} required testId="f1-new-slug" />
         <Textarea label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="f1-new-description" />
         <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Challenge-Banner" testId="f1-new-banner-upload" variant="wide" allowLibrary />
         <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">

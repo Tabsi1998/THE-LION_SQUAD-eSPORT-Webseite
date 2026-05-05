@@ -12,6 +12,7 @@ Endpoints:
   GET    /robots.txt                            — search-engine robots
 """
 import os
+import re
 from pathlib import Path
 from typing import Any
 from datetime import datetime, timezone
@@ -27,6 +28,22 @@ from models import now_utc
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
 PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+IMAGE_REFERENCE_FIELDS = [
+    ("settings", {"id": "branding"}, ["logo_url", "mascot_url", "favicon_url"]),
+    ("settings", {"id": "discord"}, ["avatar_url"]),
+    ("users", {}, ["avatar_url", "banner_url"]),
+    ("teams", {}, ["logo_url", "banner_url"]),
+    ("sponsors", {}, ["logo_url"]),
+    ("news_posts", {}, ["banner_url", "cover_url"]),
+    ("events", {}, ["banner_url", "cover_url"]),
+    ("games", {}, ["cover_url", "logo_url"]),
+    ("tournaments", {}, ["banner_url", "cover_url"]),
+    ("f1_challenges", {}, ["banner_url", "cover_url"]),
+    ("f1_tracks", {}, ["image_url"]),
+    ("gallery_albums", {}, ["cover_url"]),
+    ("gallery_photos", {}, ["image_url", "thumbnail_url"]),
+    ("benefits", {}, ["image_url"]),
+]
 
 
 # ============= Media Browser =============
@@ -56,6 +73,20 @@ async def admin_list_media(me: dict = Depends(require_admin())):
     return items[:500]
 
 
+async def _clear_media_references(url: str) -> int:
+    db = get_db()
+    cleared = 0
+    for collection, base_filter, fields in IMAGE_REFERENCE_FIELDS:
+        col = getattr(db, collection)
+        for field in fields:
+            res = await col.update_many(
+                {**base_filter, field: {"$regex": f"{re.escape(url)}$"}},
+                {"$set": {field: None, "updated_at": now_utc().isoformat()}},
+            )
+            cleared += res.modified_count
+    return cleared
+
+
 @admin_media_router.delete("/{filename}")
 async def admin_delete_media(filename: str, me: dict = Depends(require_admin())):
     """Delete a file from upload dir. Path-traversal protected."""
@@ -72,7 +103,8 @@ async def admin_delete_media(filename: str, me: dict = Depends(require_admin()))
         p.unlink()
     except OSError as e:
         raise HTTPException(500, f"Löschen fehlgeschlagen: {e}")
-    return {"ok": True}
+    cleared_refs = await _clear_media_references(f"/api/static/uploads/{filename}")
+    return {"ok": True, "cleared_references": cleared_refs}
 
 
 # ============= Navigation Editor =============

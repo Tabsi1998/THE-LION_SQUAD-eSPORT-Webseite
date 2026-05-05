@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
 import { Plus, Trash2, Save, Gift } from "lucide-react";
 
@@ -131,7 +132,7 @@ function BenefitModal({ benefit, meta, onClose, onSaved }) {
             <Field label="Kategorie"><input value={form.category} onChange={(e) => set("category", e.target.value)} placeholder="Rabatt, Partner, Event…" data-testid="benefit-cat" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
             <Field label="Sortierung"><input type="number" value={form.order_index} onChange={(e) => set("order_index", parseInt(e.target.value) || 0)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
           </div>
-          <Field label="Bild URL"><input value={form.image_url} onChange={(e) => set("image_url", e.target.value)} placeholder="https://…" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
+          <ImageUpload value={form.image_url} onChange={(v) => set("image_url", v)} label="Bild" testId="benefit-image" variant="wide" allowLibrary />
           <Field label="Link URL"><input value={form.link_url} onChange={(e) => set("link_url", e.target.value)} placeholder="https://…" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Gültig von"><input type="date" value={form.valid_from?.slice(0, 10) || ""} onChange={(e) => set("valid_from", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>

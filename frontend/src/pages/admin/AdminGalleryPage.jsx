@@ -77,7 +77,13 @@ export default function AdminGalleryPage() {
 
 function AlbumModal({ album, events, onClose, onSaved }) {
   const isNew = !album?.id;
-  const slugFrom = (txt) => (txt || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+  const slugFrom = (txt) => (txt || "")
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
   const [form, setForm] = useState({
     title: album.title || "",
     slug: album.slug || "",
@@ -100,6 +106,7 @@ function AlbumModal({ album, events, onClose, onSaved }) {
       Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
       if (payload.taken_at) payload.taken_at = `${payload.taken_at}T00:00:00`;
       payload.order_index = parseInt(form.order_index) || 0;
+      if (payload.slug) payload.slug = slugFrom(payload.slug);
       if (isNew) await api.post("/gallery", payload);
       else await api.patch(`/gallery/${album.id}`, payload);
       toast.success("Gespeichert.");
@@ -160,7 +167,7 @@ function AlbumPhotos({ album, events, onBack }) {
   const [uploading, setUploading] = useState(false);
 
   const load = async () => {
-    const { data } = await api.get(`/gallery/${album.slug}`);
+    const { data } = await api.get(`/admin/gallery/${album.id}`);
     setPhotos(data.photos || []);
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps

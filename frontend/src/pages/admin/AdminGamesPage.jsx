@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
+
+const slugFrom = (txt) => (txt || "")
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/ß/g, "ss")
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-|-$/g, "")
+  .slice(0, 80);
 
 export default function AdminGamesPage() {
   const [list, setList] = useState([]);
@@ -37,12 +47,12 @@ export default function AdminGamesPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         <form onSubmit={submit} className="lg:col-span-1 border border-white/10 rounded-sm bg-[#121212] p-5 space-y-3">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Neues Spiel</div>
-          <Input placeholder="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v, slug: form.slug || v.toLowerCase().replace(/\s+/g, "-") })} required testId="game-name" />
-          <Input placeholder="Slug" value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} required testId="game-slug" />
+          <Input placeholder="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v, slug: form.slug || slugFrom(v) })} required testId="game-name" />
+          <Input placeholder="Slug" value={form.slug} onChange={(v) => setForm({ ...form, slug: slugFrom(v) })} required testId="game-slug" />
           <Input placeholder="Kurzname (z.B. MK8DX)" value={form.short_name} onChange={(v) => setForm({ ...form, short_name: v })} testId="game-short" />
           <Input placeholder="Genre" value={form.genre} onChange={(v) => setForm({ ...form, genre: v })} testId="game-genre" />
           <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => setForm({ ...form, platforms: v })} testId="game-platforms" />
-          <Input placeholder="Cover-URL" value={form.cover_url} onChange={(v) => setForm({ ...form, cover_url: v })} testId="game-cover" />
+          <ImageUpload value={form.cover_url} onChange={(v) => setForm({ ...form, cover_url: v })} label="Cover" testId="game-cover" variant="wide" allowLibrary />
           <button data-testid="game-submit" className="w-full px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] inline-flex items-center justify-center gap-2">
             <Plus className="w-4 h-4" /> Anlegen
           </button>

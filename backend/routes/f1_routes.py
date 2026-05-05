@@ -110,14 +110,56 @@ async def create_challenge(body: F1ChallengeCreate, me: dict = Depends(require_a
 @router.patch("/challenges/{cid}")
 async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends(require_admin())):
     db = get_db()
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    cid = await _resolve_cid(cid)
+    existing = await db.f1_challenges.find_one({"id": cid}, {"_id": 0}) or {}
+    raw = body.model_dump(exclude_unset=True)
+    nullable_fields = {"banner_url", "twitch_channel", "stream_url", "stream_title", "max_attempts", "prize_places"}
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     for k in ["registration_open_from", "registration_open_until", "start_date", "end_date"]:
         if k in updates:
             updates[k] = _iso(updates.get(k))
     updates["updated_at"] = now_utc().isoformat()
     await db.f1_challenges.update_one({"id": cid}, {"$set": updates})
     c = await db.f1_challenges.find_one({"id": cid}, {"_id": 0})
+    if existing.get("status") != c.get("status") and c.get("status") == "results_published":
+        try:
+            await _award_f1_season_points(c)
+        except Exception:
+            pass
     return c
+
+
+async def _award_f1_season_points(challenge: dict):
+    db = get_db()
+    from services.season_service import award_points
+
+    cid = challenge["id"]
+    tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).sort("order_index", 1).to_list(100)
+    weight = float(challenge.get("season_weight") or 1.0)
+    source_type = "mini" if weight < 1.5 else ("major" if weight >= 2.5 else "tournament")
+    for track in tracks:
+        times = await db.f1_lap_times.find(
+            {"challenge_id": cid, "track_id": track["id"], "is_invalid": {"$ne": True}},
+            {"_id": 0},
+        ).to_list(5000)
+        best_per_user: dict[str, int] = {}
+        for row in times:
+            eff = row["time_ms"] + int((row.get("penalty_seconds") or 0) * 1000)
+            uid = row.get("user_id")
+            if uid and (uid not in best_per_user or eff < best_per_user[uid]):
+                best_per_user[uid] = eff
+        ranked = sorted(best_per_user.items(), key=lambda item: item[1])
+        num_participants = max(len(ranked), 1)
+        for pos, (uid, _) in enumerate(ranked):
+            await award_points(
+                user_id=uid,
+                source_type=source_type,
+                source_id=f"{cid}:{track['id']}",
+                source_name=f"{challenge.get('title') or 'Fast Lap'} - {track.get('name') or 'Strecke'}",
+                rank=pos + 1,
+                num_participants=num_participants,
+                weight=weight,
+            )
 
 
 @router.delete("/challenges/{cid}")

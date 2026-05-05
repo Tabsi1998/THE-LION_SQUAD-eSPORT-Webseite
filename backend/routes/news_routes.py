@@ -263,12 +263,24 @@ async def admin_list_albums(me: dict = Depends(require_admin())):
     return albums
 
 
+@router.get("/admin/gallery/{aid}")
+async def admin_get_album(aid: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    a = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0})
+    if not a:
+        raise HTTPException(404, "Album nicht gefunden.")
+    a["photos"] = await db.gallery_photos.find({"album_id": a["id"]}, {"_id": 0}).sort("order_index", 1).to_list(2000)
+    return a
+
+
 @router.post("/gallery")
 async def create_album(body: GalleryAlbumCreate, me: dict = Depends(require_admin())):
     db = get_db()
-    if await db.gallery_albums.find_one({"slug": body.slug}):
-        raise HTTPException(409, "Slug bereits vergeben.")
+    slug = (body.slug or "").strip().lower()
+    if await db.gallery_albums.find_one({"slug": slug}):
+        raise HTTPException(409, f"Slug bereits vergeben: {slug}")
     doc = body.model_dump()
+    doc["slug"] = slug
     if doc.get("taken_at"):
         doc["taken_at"] = doc["taken_at"].isoformat()
     doc["id"] = new_id()
@@ -284,6 +296,11 @@ async def create_album(body: GalleryAlbumCreate, me: dict = Depends(require_admi
 async def update_album(aid: str, body: GalleryAlbumUpdate, me: dict = Depends(require_admin())):
     db = get_db()
     update = body.model_dump(exclude_unset=True)
+    if "slug" in update and update["slug"]:
+        update["slug"] = update["slug"].strip().lower()
+        existing = await db.gallery_albums.find_one({"slug": update["slug"], "id": {"$ne": aid}}, {"_id": 0, "id": 1})
+        if existing:
+            raise HTTPException(409, f"Slug bereits vergeben: {update['slug']}")
     if update.get("taken_at"):
         update["taken_at"] = update["taken_at"].isoformat()
     update["updated_at"] = now_utc().isoformat()

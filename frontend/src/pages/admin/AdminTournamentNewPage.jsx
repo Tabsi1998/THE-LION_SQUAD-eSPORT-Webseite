@@ -73,7 +73,14 @@ export default function AdminTournamentNewPage() {
     } finally { setSaving(false); }
   };
 
-  const autoSlug = (title) => title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const autoSlug = (title) => (title || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ß/g, "ss")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 80);
 
   return (
     <AdminLayout>
@@ -84,7 +91,7 @@ export default function AdminTournamentNewPage() {
       <form onSubmit={submit} className="max-w-3xl space-y-5">
         <Row>
           <Field label="Titel" value={form.title} onChange={(v) => { set("title", v); if (!form.slug) set("slug", autoSlug(v)); }} required testId="new-tr-title" />
-          <Field label="Slug (URL)" value={form.slug} onChange={(v) => set("slug", v)} required testId="new-tr-slug" />
+          <Field label="Slug (URL)" value={form.slug} onChange={(v) => set("slug", autoSlug(v))} required testId="new-tr-slug" />
         </Row>
         <Textarea label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="new-tr-description" />
         <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Turnier-Banner" testId="new-tr-banner-upload" variant="wide" allowLibrary />

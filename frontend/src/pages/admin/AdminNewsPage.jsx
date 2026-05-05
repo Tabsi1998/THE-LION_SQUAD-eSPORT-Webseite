@@ -121,7 +121,14 @@ function NewsModal({ post, meta, onClose, onSaved }) {
   }, []);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const slugFrom = (txt) => (txt || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+  const slugFrom = (txt) => (txt || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ß/g, "ss")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
 
   const submit = async (ev) => {
     ev.preventDefault();
@@ -155,7 +162,7 @@ function NewsModal({ post, meta, onClose, onSaved }) {
         </div>
         <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
           <Field label="Titel"><Input value={form.title} onChange={(v) => { set("title", v); if (isNew && !form.slug) set("slug", slugFrom(v)); }} testId="news-title" required /></Field>
-          <Field label="Slug"><Input value={form.slug} onChange={(v) => set("slug", v)} placeholder="kebab-case" testId="news-slug" required /></Field>
+          <Field label="Slug"><Input value={form.slug} onChange={(v) => set("slug", slugFrom(v))} placeholder="kebab-case" testId="news-slug" required /></Field>
           <Field label="Kurzbeschreibung"><Input value={form.excerpt} onChange={(v) => set("excerpt", v)} testId="news-excerpt" /></Field>
           <Field label="Inhalt (Markdown / Plaintext)">
             <textarea value={form.content} onChange={(e) => set("content", e.target.value)} rows={10} required data-testid="news-content" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-mono text-sm" />

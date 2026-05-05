@@ -57,8 +57,8 @@ export default function AdminMediaPage() {
   const del = async (it) => {
     if (!window.confirm(`Datei "${it.filename}" wirklich endgültig löschen?`)) return;
     try {
-      await api.delete(`/admin/media/${encodeURIComponent(it.filename)}`);
-      toast.success("Datei gelöscht");
+      const { data } = await api.delete(`/admin/media/${encodeURIComponent(it.filename)}`);
+      toast.success(`Datei geloescht${data?.cleared_references ? `, ${data.cleared_references} Verknuepfung(en) bereinigt` : ""}`);
       setSelected(null);
       load();
     } catch (e) {

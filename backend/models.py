@@ -702,6 +702,7 @@ class GalleryAlbumCreate(BaseModel):
 
 class GalleryAlbumUpdate(BaseModel):
     title: Optional[str] = None
+    slug: Optional[str] = None
     description: Optional[str] = None
     cover_url: Optional[str] = None
     event_id: Optional[str] = None

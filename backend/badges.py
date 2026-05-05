@@ -235,6 +235,9 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     else:
         p["events_attended"] = 0
 
+    season_rows = await db.season_points.find({"user_id": user_id}, {"_id": 0, "total_points": 1}).to_list(2000)
+    p["season_points_total"] = int(sum(float(r.get("total_points") or 0) for r in season_rows))
+
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     plats = set()
     if user:

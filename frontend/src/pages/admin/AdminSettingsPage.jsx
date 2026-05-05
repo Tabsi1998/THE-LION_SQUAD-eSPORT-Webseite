@@ -31,7 +31,7 @@ export default function AdminSettingsPage() {
   const [systemStatus, setSystemStatus] = useState(null);
 
   const load = async () => {
-    const [e, b, d, l, sm, q, st] = await Promise.all([
+    const requests = await Promise.allSettled([
       api.get("/settings/email"),
       api.get("/settings/branding"),
       api.get("/settings/discord"),
@@ -40,13 +40,18 @@ export default function AdminSettingsPage() {
       api.get("/settings/mail-queue?limit=100"),
       api.get("/admin/system-status"),
     ]);
-    setEmail((prev) => ({ ...prev, ...e.data, resend_api_key: "" }));
-    setBrand((prev) => ({ ...prev, ...b.data }));
-    setDiscord((prev) => ({ ...prev, ...d.data, webhook_url: "" }));
-    setLogs(l.data);
-    setSmtp((prev) => ({ ...prev, ...sm.data, smtp_pass: "" }));
-    setQueue(q.data);
-    setSystemStatus(st.data);
+    const value = (i) => requests[i].status === "fulfilled" ? requests[i].value.data : null;
+    const e = value(0), b = value(1), d = value(2), l = value(3), sm = value(4), q = value(5), st = value(6);
+    if (e) setEmail((prev) => ({ ...prev, ...e, resend_api_key: "" }));
+    if (b) setBrand((prev) => ({ ...prev, ...b }));
+    if (d) setDiscord((prev) => ({ ...prev, ...d, webhook_url: "" }));
+    if (l) setLogs(l);
+    if (sm) setSmtp((prev) => ({ ...prev, ...sm, smtp_pass: "" }));
+    if (q) setQueue(q);
+    if (st) setSystemStatus(st);
+    if (requests.some((r) => r.status === "rejected")) {
+      toast.error("Ein Teil der Einstellungen konnte nicht geladen werden. Die verfuegbaren Tabs bleiben nutzbar.");
+    }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);

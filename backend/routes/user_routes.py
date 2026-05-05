@@ -490,6 +490,8 @@ async def delete_user(user_id: str, me: dict = Depends(require_super())):
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    regs = await db.tournament_registrations.find({"user_id": user_id}, {"_id": 0, "id": 1}).to_list(1000)
+    reg_ids = [r["id"] for r in regs if r.get("id")]
     await db.users.delete_one({"id": user_id})
     await db.refresh_tokens.delete_many({"user_id": user_id})
     await db.login_attempts.delete_many({"identifier": user.get("email")})
@@ -497,9 +499,16 @@ async def delete_user(user_id: str, me: dict = Depends(require_super())):
     await db.user_socials.delete_many({"user_id": user_id})
     await db.user_achievements.delete_many({"user_id": user_id})
     await db.tournament_registrations.delete_many({"user_id": user_id})
+    if reg_ids:
+        for field in ("participant_a_id", "participant_b_id", "winner_id", "loser_id"):
+            await db.matches.update_many(
+                {field: {"$in": reg_ids}},
+                {"$set": {field: None, "status": "waiting_result", "updated_at": now_utc().isoformat()}},
+            )
     await db.f1_lap_times.delete_many({"user_id": user_id})
     await db.team_members.delete_many({"user_id": user_id})
     await db.teams.update_many({}, {"$pull": {"member_ids": user_id, "co_leader_ids": user_id}})
+    await db.teams.update_many({"leader_id": user_id}, {"$set": {"leader_id": None, "updated_at": now_utc().isoformat()}})
     await db.audit_logs.insert_one({
         "action": "user.delete",
         "target_id": user_id,

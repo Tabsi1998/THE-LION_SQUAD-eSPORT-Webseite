@@ -85,7 +85,14 @@ export default function AdminEventsPage() {
 
 function EventModal({ event, meta, onClose, onSaved }) {
   const isNew = !event?.id;
-  const slugFrom = (txt) => (txt || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+  const slugFrom = (txt) => (txt || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ß/g, "ss")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
   const [form, setForm] = useState({
     name: event.name || "",
     slug: event.slug || "",
@@ -145,7 +152,7 @@ function EventModal({ event, meta, onClose, onSaved }) {
         </div>
         <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
           <Field label="Name"><Input value={form.name} onChange={(v) => { set("name", v); if (isNew && !form.slug) set("slug", slugFrom(v)); }} testId="event-name" required /></Field>
-          <Field label="Slug"><Input value={form.slug} onChange={(v) => set("slug", v)} testId="event-slug" required /></Field>
+          <Field label="Slug"><Input value={form.slug} onChange={(v) => set("slug", slugFrom(v))} testId="event-slug" required /></Field>
           <Field label="Beschreibung">
             <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
           </Field>

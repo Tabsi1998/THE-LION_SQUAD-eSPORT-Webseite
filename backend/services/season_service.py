@@ -136,6 +136,19 @@ async def award_points(
     season_id = season["id"]
     if weight is None:
         weight = DEFAULT_WEIGHT.get(source_type, 1.0)
+    if source_id:
+        existing = await db.season_points.find_one(
+            {
+                "season_id": season_id,
+                "source_type": source_type,
+                "source_id": source_id,
+                "user_id": user_id,
+                "team_id": team_id,
+            },
+            {"_id": 0},
+        )
+        if existing:
+            return existing
     base = base_points_for_rank(rank, participated=True)
     factor = participant_factor(num_participants)
     raw = base * weight * factor + bonus
