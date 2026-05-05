@@ -5,7 +5,8 @@
  * Each group is a collapsible card. The CURRENT highest-earned tier is the
  * showcase; clicking the card expands to show all tiers (earned + locked).
  *
- * Negative groups never appear here (filtered server-side for non-admins).
+ * Secret negative/fun groups appear only after a user has earned at least one
+ * tier. Locked negative tiers are never sent by the API.
  */
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,6 +27,7 @@ const CATEGORY_META = {
   fastlap:    { label: "Fast Lap",   icon: "Flag",      accent: "#A855F7" },
   club:       { label: "Verein",     icon: "Crown",     accent: "#FFD700" },
   special:    { label: "Special",    icon: "Sparkles",  accent: "#FF3B30" },
+  negative:   { label: "Fun / Negative", icon: "AlertTriangle", accent: "#FF3B30" },
 };
 
 function pascal(s) { return s.split("-").map(w => w.charAt(0).toUpperCase()+w.slice(1)).join(""); }
@@ -34,7 +36,7 @@ export function AchievementGroupsView({ groups = [], emptyText = "Noch keine Ach
   // Group by category
   const byCat = {};
   for (const g of groups) (byCat[g.category] ||= []).push(g);
-  const order = ["club", "tournament", "match", "fastlap", "special"];
+  const order = ["club", "tournament", "match", "fastlap", "special", "negative"];
 
   if (!groups.length) {
     return (
@@ -47,7 +49,7 @@ export function AchievementGroupsView({ groups = [], emptyText = "Noch keine Ach
   return (
     <div className="space-y-10" data-testid="achievement-groups">
       {order.filter(c => byCat[c]?.length).map((cat) => {
-        const meta = CATEGORY_META[cat];
+        const meta = CATEGORY_META[cat] || CATEGORY_META.special;
         const CatIcon = Icons[meta.icon] || Icons.Trophy;
         return (
           <section key={cat}>
@@ -77,12 +79,13 @@ function GroupCard({ group }) {
   const nextLocked = lockedTiers[0];
   const hasAny = earnedTiers.length > 0;
   const accent = group.accent_color || "#29B6E8";
+  const isNegative = Boolean(group.is_negative || group.category === "negative");
 
   return (
     <motion.div
       layout
       data-testid={`achievement-group-${group.code}`}
-      className={`border rounded-sm bg-[#0F0F10] transition-all ${hasAny ? "border-white/15" : "border-white/5 opacity-80"}`}
+      className={`border rounded-sm bg-[#0F0F10] transition-all ${hasAny ? "border-white/15" : "border-white/5 opacity-80"} ${isNegative ? "bg-[#120A0A]" : ""}`}
       style={hasAny ? { boxShadow: `inset 0 0 0 1px ${accent}22` } : undefined}
     >
       {/* Header — tap to expand */}
@@ -108,7 +111,7 @@ function GroupCard({ group }) {
                 className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border"
                 style={{ color: LEVEL_META[highest.level].color, borderColor: LEVEL_META[highest.level].color + "55" }}
               >
-                {LEVEL_META[highest.level].icon} {LEVEL_META[highest.level].name}
+                {isNegative ? "Geheim" : `${LEVEL_META[highest.level].icon} ${LEVEL_META[highest.level].name}`}
               </span>
             )}
             {!hasAny && nextLocked && (
@@ -119,7 +122,7 @@ function GroupCard({ group }) {
           </div>
           <div className="mt-1 text-xs text-white/55 line-clamp-1">{group.description}</div>
           {/* Compact progress hint when nothing earned yet */}
-          {!hasAny && nextLocked && nextLocked.target > 0 && (
+          {!isNegative && !hasAny && nextLocked && nextLocked.target > 0 && (
             <div className="mt-2 flex items-center gap-2">
               <div className="flex-1 h-1 bg-white/5 rounded-sm overflow-hidden max-w-[200px]">
                 <div className="h-full" style={{ width: `${nextLocked.percent}%`, backgroundColor: accent }} />
@@ -129,7 +132,9 @@ function GroupCard({ group }) {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] uppercase tracking-widest text-white/40 hidden sm:inline">{group.earned_count}/{group.tier_count}</span>
+          <span className="text-[10px] uppercase tracking-widest text-white/40 hidden sm:inline">
+            {isNegative ? `${group.earned_count} geheim` : `${group.earned_count}/${group.tier_count}`}
+          </span>
           <ChevronDown className={`w-4 h-4 text-white/40 transition-transform ${open ? "rotate-180" : ""}`} />
         </div>
       </button>
@@ -145,7 +150,7 @@ function GroupCard({ group }) {
             className="overflow-hidden"
           >
             <div className="border-t border-white/5 px-4 py-3 space-y-2" data-testid={`achievement-group-${group.code}-tiers`}>
-              {group.tiers.map(t => <TierRow key={t.code} tier={t} accent={accent} />)}
+              {group.tiers.map(t => <TierRow key={t.code} tier={t} accent={accent} isNegative={isNegative} />)}
             </div>
           </motion.div>
         )}
@@ -154,7 +159,7 @@ function GroupCard({ group }) {
   );
 }
 
-function TierRow({ tier, accent }) {
+function TierRow({ tier, accent, isNegative = false }) {
   const lvl = LEVEL_META[tier.level] || LEVEL_META[1];
   const TierIcon = Icons[pascal(tier.icon || "circle")] || Icons.Circle;
   return (
@@ -177,7 +182,7 @@ function TierRow({ tier, accent }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: lvl.color }}>
-            {lvl.icon} {lvl.name}
+            {isNegative ? "Geheim" : `${lvl.icon} ${lvl.name}`}
           </span>
           <span className={`text-sm font-semibold truncate ${tier.earned ? "text-white" : "text-white/55"}`}>{tier.name}</span>
         </div>

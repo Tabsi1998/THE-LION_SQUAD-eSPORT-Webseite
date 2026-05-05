@@ -33,7 +33,7 @@ export default function AdminAchievementsPage() {
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Achievements</h1>
       <p className="mt-2 text-white/55 text-sm max-w-2xl">
         Verwalte alle Achievement-Gruppen, Stufen, Special-Awards und Negative-Vorfälle.
-        Negative bleiben intern und sind im Profil nie öffentlich sichtbar.
+        Negative/Fun-Awards bleiben bis zur Freischaltung geheim und erscheinen danach im Profil.
       </p>
 
       <div className="mt-6 flex gap-1 border-b border-white/10 overflow-x-auto">
@@ -186,7 +186,7 @@ function GroupForm({ group, onClose, onSaved }) {
         <div className="flex flex-wrap gap-4 text-sm pt-2">
           <Check label="Öffentlich sichtbar" checked={form.public} onChange={(v) => setForm({ ...form, public: v })} testId="group-public" />
           <Check label="Special (Admin-curated)" checked={form.is_special} onChange={(v) => setForm({ ...form, is_special: v })} />
-          <Check label="Negativ (intern, niemals öffentlich)" checked={form.is_negative} onChange={(v) => setForm({ ...form, is_negative: v })} testId="group-negative" />
+          <Check label="Negativ/Fun (bis Freischaltung geheim)" checked={form.is_negative} onChange={(v) => setForm({ ...form, is_negative: v })} testId="group-negative" />
         </div>
         <div className="flex justify-end gap-2 pt-3">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-white/60 hover:text-white">Abbrechen</button>
@@ -412,7 +412,7 @@ function NegativeTab() {
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden" data-testid="negative-list">
       <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2 text-xs uppercase tracking-widest text-white/55">
-        <ShieldOff className="w-3.5 h-3.5 text-[#FF3B30]" /> {list.length} negative Vorfälle (intern, niemals öffentlich)
+        <ShieldOff className="w-3.5 h-3.5 text-[#FF3B30]" /> {list.length} negative/Fun-Awards (vor Freischaltung geheim)
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[800px]">

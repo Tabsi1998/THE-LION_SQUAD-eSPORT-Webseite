@@ -1,7 +1,7 @@
 """Achievement routes (Phase B v4) — group-aware listing, admin CRUD, manual award.
 
 Public/User endpoints (prefix /api/achievements):
-  GET  /api/achievements/groups            — full catalog (no negative for non-admin)
+  GET  /api/achievements/groups            — full public catalog (no locked negative tiers)
   GET  /api/achievements/me                — my catalog with progress + earned
   GET  /api/achievements/user/{user_id}    — public profile achievements
   POST /api/achievements/evaluate          — re-evaluate (auto-award) for self

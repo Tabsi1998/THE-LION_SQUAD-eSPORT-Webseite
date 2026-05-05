@@ -8,8 +8,8 @@ Collections:
   - user_achievements   (per-user awards keyed by tier-code)
 
 Public/profile listing rules:
-  - Negative groups (is_negative=True) NEVER appear in any user-facing list
-    (only in /admin/achievements/negative).
+  - Negative/fun groups stay hidden until a user has earned at least one tier
+    in that group. Once earned, only the earned tiers are shown publicly.
   - Special manual-only tiers appear once awarded (or in catalog when group.public=True).
   - Within a public group, all tiers are listed; locked tiers are returned with
     a `locked=True` flag plus current/target progress so the UI can grey them out.
@@ -255,7 +255,20 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     # profile_completeness — same scoring used by /api/users/me/profile-completeness
     p["profile_completeness"] = compute_profile_completeness(user) if user else 0
 
-    p["achievements_unlocked"] = await db.user_achievements.count_documents({"user_id": user_id})
+    user_awards = await db.user_achievements.find({"user_id": user_id}, {"_id": 0}).to_list(1000)
+    p["achievements_unlocked"] = len(user_awards)
+    award_codes = list({a.get("tier_code") for a in user_awards if a.get("tier_code")})
+    if award_codes:
+        award_tiers = await db.achievements.find({"code": {"$in": award_codes}}, {"_id": 0}).to_list(1000)
+        award_groups = await db.achievement_groups.find({}, {"_id": 0, "code": 1, "is_negative": 1}).to_list(500)
+        group_is_negative = {g["code"]: bool(g.get("is_negative")) for g in award_groups}
+        p["achievement_points"] = sum(
+            int(t.get("points") or 0)
+            for t in award_tiers
+            if not group_is_negative.get(t.get("group_code"), False)
+        )
+    else:
+        p["achievement_points"] = 0
 
     teams = await db.teams.find({"members.user_id": user_id}, {"_id": 0, "id": 1, "founder_id": 1}).to_list(50)
     p["teams_founded"] = sum(1 for t in teams if t.get("founder_id") == user_id)
@@ -292,15 +305,20 @@ def _level_name(level: int) -> str:
     return {1: "Bronze", 2: "Silber", 3: "Gold", 4: "Platin", 5: "Special"}.get(level, "?")
 
 
+def _safe_negative_description() -> str:
+    return "Geheimes Fun-/Negative-Achievement freigeschaltet."
+
+
+def _safe_negative_group_description() -> str:
+    return "Freigeschaltete geheime Fun-/Negative-Achievements. Nicht freigeschaltete bleiben verborgen."
+
+
 async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list[dict]:
-    """Public/profile catalog. Negative groups are NEVER returned via this path —
-    not even to admins viewing their own profile. Admin negative inventory lives
-    at /api/admin/achievements/negative/awards.
-    """
+    """Public/profile catalog with secret negative/fun awards after unlock."""
     db = get_db()
     is_admin = bool(viewer and viewer.get("role") in ("club_admin", "superadmin"))
 
-    groups = await db.achievement_groups.find({"is_negative": {"$ne": True}}, {"_id": 0}).sort("sort_order", 1).to_list(500)
+    groups = await db.achievement_groups.find({}, {"_id": 0}).sort("sort_order", 1).to_list(500)
     tiers = await db.achievements.find({}, {"_id": 0}).sort("level", 1).to_list(2000)
     awards: list = []
     progress: dict = {}
@@ -308,12 +326,19 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
         awards = await db.user_achievements.find({"user_id": user_id}, {"_id": 0}).to_list(500)
         progress = await compute_user_progress(user_id)
     awarded_codes = {a["tier_code"]: a for a in awards}
+    earned_group_codes = {a.get("group_code") for a in awards if a.get("group_code")}
 
     out = []
     for g in groups:
-        if not g.get("public") and not is_admin:
+        is_negative = bool(g.get("is_negative"))
+        if is_negative:
+            if not user_id or g["code"] not in earned_group_codes:
+                continue
+        elif not g.get("public") and not is_admin:
             continue
         gtiers = [t for t in tiers if t.get("group_code") == g["code"]]
+        if is_negative:
+            gtiers = [t for t in gtiers if t["code"] in awarded_codes]
         gtiers.sort(key=lambda x: x.get("level", 0))
         out_tiers = []
         for t in gtiers:
@@ -321,7 +346,7 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
             target = t.get("progress_target") or 0
             cur = progress.get(ck, 0) if ck else 0
             earned_doc = awarded_codes.get(t["code"])
-            out_tiers.append({
+            tier_payload = {
                 **t,
                 "level_name": _level_name(t.get("level", 1)),
                 "level_color": _color_for_level(t.get("level", 1)),
@@ -331,10 +356,24 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
                 "target": target,
                 "percent": (round(100 * min(cur, target) / target) if target else (100 if earned_doc else 0)),
                 "manual_only": bool(t.get("manual_only")),
-            })
+                "is_negative": is_negative,
+                "secret": is_negative,
+            }
+            if is_negative:
+                tier_payload.update({
+                    "description": _safe_negative_description(),
+                    "condition_key": None,
+                    "progress_target": None,
+                    "current": 0,
+                    "target": 0,
+                    "percent": 100,
+                    "manual_only": True,
+                })
+            out_tiers.append(tier_payload)
         earned_levels = [t["level"] for t in out_tiers if t["earned"]]
         out.append({
             **g,
+            "description": _safe_negative_group_description() if is_negative else g.get("description"),
             "tiers": out_tiers,
             "highest_earned_level": max(earned_levels) if earned_levels else 0,
             "tier_count": len(out_tiers),
@@ -344,9 +383,7 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
 
 
 async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
-    """Profile/public award list. NEVER includes negatives — even for admins.
-    Admin negative inventory has its own dedicated endpoint.
-    """
+    """Profile/public award list. Earned negative/fun awards are visible, but secret."""
     db = get_db()
     awards = await db.user_achievements.find({"user_id": user_id}, {"_id": 0}).sort("earned_at", -1).to_list(500)
     out = []
@@ -357,14 +394,18 @@ async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
         g = await db.achievement_groups.find_one({"code": t["group_code"]}, {"_id": 0})
         if not g:
             continue
-        if g.get("is_negative"):
-            continue  # Hard-filter — no exposure on user-facing endpoints.
+        is_negative = bool(g.get("is_negative"))
         out.append({
             **t,
+            "description": _safe_negative_description() if is_negative else t.get("description"),
+            "condition_key": None if is_negative else t.get("condition_key"),
+            "progress_target": None if is_negative else t.get("progress_target"),
             "group_name": g["name"],
             "group_category": g["category"],
             "group_icon": g["icon"],
             "group_accent": g["accent_color"],
+            "is_negative": is_negative,
+            "secret": is_negative,
             "level_name": _level_name(t.get("level", 1)),
             "level_color": _color_for_level(t.get("level", 1)),
             "earned_at": a["earned_at"],
@@ -455,6 +496,16 @@ NEGATIVE_INCIDENTS = {
     "chat_warning":     "neg_chat_warning",
     "dispute_open":     "neg_dispute",
     "team_no_show":     "neg_team_no_show",
+    "wrong_lobby":       "neg_wrong_lobby",
+    "mute_master":       "neg_mute_master",
+    "screenshot_missing": "neg_screenshot_missing",
+    "patchday_victim":   "neg_patchday_victim",
+    "cable_chaos":       "neg_cable_chaos",
+    "alt_tab_champion":  "neg_alt_tab_champion",
+    "rulebook_speedrun": "neg_rulebook_speedrun",
+    "start_sleep":       "neg_start_sleep",
+    "setup_curse":       "neg_setup_curse",
+    "capslock_captain":  "neg_capslock_captain",
 }
 
 

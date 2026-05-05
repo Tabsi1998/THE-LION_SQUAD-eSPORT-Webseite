@@ -273,7 +273,7 @@ export function PrivacyPage() {
           Nutzerprofile, Ranglisten, Turnierergebnisse und Achievements koennen oeffentlich sichtbar
           sein, soweit dies fuer Community- und Wettbewerbsfunktionen vorgesehen ist. Nutzer koennen
           die Sichtbarkeit ihres oeffentlichen Profils im Profilbereich einschraenken. Negative oder
-          rein interne Achievements werden nicht oeffentlich angezeigt.
+          geheime Fun-/Negative-Achievements werden erst nach Freischaltung im Profil angezeigt.
         </p>
       </Section>
 

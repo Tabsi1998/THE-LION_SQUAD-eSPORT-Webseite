@@ -6,7 +6,7 @@ Levels:
 Categories:
   match, tournament, fastlap, club, special, negative.
 
-Negative groups stay hidden from any public/profile listing — only admins see them.
+Negative/fun groups stay hidden until an award is earned; then only earned tiers are shown.
 Special groups are admin-curated (public flag controls visibility).
 """
 
@@ -572,6 +572,77 @@ ACHIEVEMENT_TIERS_V41 = [
        points=20, icon="graduation-cap", manual_only=True),
 ]
 ACHIEVEMENT_TIERS.extend(ACHIEVEMENT_TIERS_V41)
+
+
+# ---------- Phase B v4.2 - Level, Creator, Mentor & secret fun awards ----------
+ACHIEVEMENT_GROUPS_V42 = [
+    {"code": "level_progression", "name": "Level-Aufstieg", "category": "club", "icon": "badge-plus",
+     "accent_color": "#FFD700", "description": "Steige durch Achievement-Punkte im Spielerlevel auf.",
+     "public": True, "is_special": False, "is_negative": False, "sort_order": 410},
+    {"code": "creator_spirit", "name": "Creator-Spirit", "category": "club", "icon": "clapperboard",
+     "accent_color": "#FF3B30", "description": "Clips, Highlights und Content fuer die Community.",
+     "public": True, "is_special": True, "is_negative": False, "sort_order": 411},
+    {"code": "mentor_path", "name": "Mentorenpfad", "category": "club", "icon": "hand-heart",
+     "accent_color": "#00FF88", "description": "Hilf neuen Spielern beim Einstieg.",
+     "public": True, "is_special": True, "is_negative": False, "sort_order": 412},
+    {"code": "neg_fun", "name": "Geheime Fun-Awards", "category": "negative", "icon": "sparkles",
+     "accent_color": "#FF3B30", "description": "Geheime Fun- und Negative-Awards.",
+     "public": False, "is_special": False, "is_negative": True, "sort_order": 905},
+]
+ACHIEVEMENT_GROUPS.extend(ACHIEVEMENT_GROUPS_V42)
+
+ACHIEVEMENT_TIERS_V42 = [
+    _t("level_progression_2", "level_progression", 1, "Level 2", "Sammle 100 Achievement-Punkte.",
+       condition_key="achievement_points", progress_target=100, points=20, icon="badge-plus"),
+    _t("level_progression_3", "level_progression", 2, "Level 3", "Sammle 400 Achievement-Punkte.",
+       condition_key="achievement_points", progress_target=400, points=40, icon="badge-plus"),
+    _t("level_progression_4", "level_progression", 3, "Level 4", "Sammle 900 Achievement-Punkte.",
+       condition_key="achievement_points", progress_target=900, points=80, icon="badge-plus"),
+    _t("level_progression_5", "level_progression", 4, "Level 5", "Sammle 1600 Achievement-Punkte.",
+       condition_key="achievement_points", progress_target=1600, points=160, icon="badge-plus"),
+    _t("level_progression_6", "level_progression", 5, "Level 6", "Sammle 2500 Achievement-Punkte.",
+       condition_key="achievement_points", progress_target=2500, points=320, icon="badge-plus"),
+
+    _t("creator_clip_rookie", "creator_spirit", 1, "Clip-Rookie", "Ersten Community-Clip eingereicht.",
+       points=25, icon="clapperboard", manual_only=True),
+    _t("creator_highlight_maker", "creator_spirit", 2, "Highlight-Maker", "Mehrere starke Highlights geliefert.",
+       points=75, icon="video", manual_only=True),
+    _t("creator_storyteller", "creator_spirit", 3, "Storyteller", "Ein Event oder Turnier kreativ begleitet.",
+       points=180, icon="film", manual_only=True),
+    _t("creator_media_mvp", "creator_spirit", 4, "Media-MVP", "Praegt die Aussendarstellung des Vereins.",
+       points=450, icon="camera", manual_only=True),
+
+    _t("mentor_welcome", "mentor_path", 1, "Willkommenshelfer", "Neuen Spieler beim Einstieg begleitet.",
+       points=25, icon="hand-heart", manual_only=True),
+    _t("mentor_coach", "mentor_path", 2, "Coach", "Mehrere Trainings oder Hilfestellungen gegeben.",
+       points=80, icon="graduation-cap", manual_only=True),
+    _t("mentor_squad_anchor", "mentor_path", 3, "Squad-Anker", "Regelmaessig fuer andere da.",
+       points=220, icon="heart-handshake", manual_only=True),
+    _t("mentor_legend", "mentor_path", 4, "Mentor-Legende", "Langfristig praegender Community-Mentor.",
+       points=550, icon="crown", manual_only=True),
+
+    _t("neg_wrong_lobby", "neg_fun", 1, "Falsche Lobby, richtiger Einsatz", "Geheimer Fun-Award.",
+       points=0, icon="door-open", manual_only=True),
+    _t("neg_mute_master", "neg_fun", 1, "Mute-Meister", "Geheimer Fun-Award.",
+       points=0, icon="volume-x", manual_only=True),
+    _t("neg_screenshot_missing", "neg_fun", 1, "Screenshot verschollen", "Geheimer Fun-Award.",
+       points=0, icon="image-off", manual_only=True),
+    _t("neg_patchday_victim", "neg_fun", 1, "Patchday-Opfer", "Geheimer Fun-Award.",
+       points=0, icon="download-cloud", manual_only=True),
+    _t("neg_cable_chaos", "neg_fun", 1, "Kabelsalat", "Geheimer Fun-Award.",
+       points=0, icon="cable", manual_only=True),
+    _t("neg_alt_tab_champion", "neg_fun", 1, "Alt-Tab-Champion", "Geheimer Fun-Award.",
+       points=0, icon="monitor-x", manual_only=True),
+    _t("neg_rulebook_speedrun", "neg_fun", 1, "Regelbuch-Speedrun", "Geheimer Fun-Award.",
+       points=0, icon="book-open", manual_only=True),
+    _t("neg_start_sleep", "neg_fun", 1, "Startampel verschlafen", "Geheimer Fun-Award.",
+       points=0, icon="alarm-clock", manual_only=True),
+    _t("neg_setup_curse", "neg_fun", 1, "Setup-Fluch", "Geheimer Fun-Award.",
+       points=0, icon="wrench", manual_only=True),
+    _t("neg_capslock_captain", "neg_fun", 1, "CAPSLOCK-Captain", "Geheimer Fun-Award.",
+       points=0, icon="keyboard", manual_only=True),
+]
+ACHIEVEMENT_TIERS.extend(ACHIEVEMENT_TIERS_V42)
 
 GROUP_BY_CODE = {g["code"]: g for g in ACHIEVEMENT_GROUPS}
 TIER_BY_CODE = {t["code"]: t for t in ACHIEVEMENT_TIERS}

@@ -244,16 +244,20 @@ async def get_public_profile(username: str):
         g = group_map.get(a.get("group_code")) if a.get("group_code") else None
         if not t:
             continue
-        # Negative achievements never appear on public profiles
-        if g and g.get("is_negative"):
-            continue
+        is_negative = bool(g and g.get("is_negative"))
         badges.append({
             **t,
+            "description": "Geheimes Fun-/Negative-Achievement freigeschaltet." if is_negative else t.get("description"),
+            "condition_key": None if is_negative else t.get("condition_key"),
+            "progress_target": None if is_negative else t.get("progress_target"),
+            "is_negative": is_negative,
+            "secret": is_negative,
             "earned_at": a["earned_at"],
             "group_name": g["name"] if g else None,
+            "group_category": g.get("category") if g else None,
             "group_accent": g.get("accent_color") if g else None,
         })
-    total_points = sum(b.get("points", 0) for b in badges)
+    total_points = sum(b.get("points", 0) for b in badges if not b.get("is_negative"))
     achievement_level = _achievement_level(total_points)
     # Tournament participation (only if public)
     tournaments = []
