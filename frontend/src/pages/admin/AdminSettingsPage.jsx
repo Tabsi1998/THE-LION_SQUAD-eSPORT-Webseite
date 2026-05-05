@@ -3,7 +3,7 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
-import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2 } from "lucide-react";
+import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity } from "lucide-react";
 
 export default function AdminSettingsPage() {
   const [tab, setTab] = useState("email");
@@ -14,19 +14,31 @@ export default function AdminSettingsPage() {
   const [smtpDeliverability, setSmtpDeliverability] = useState(null);
   const [queue, setQueue] = useState([]);
   const [queueFilter, setQueueFilter] = useState("");
-  const [brand, setBrand] = useState({ club_name: "", tagline: "", site_description: "", primary_color: "#29B6E8", logo_url: "", mascot_url: "", favicon_url: "", contact_email: "", domain: "", timezone: "Europe/Vienna", imprint: "", privacy_policy: "", discord_invite_url: "", twitch_channel: "" });
+  const [brand, setBrand] = useState({
+    club_name: "", tagline: "", site_description: "", primary_color: "#29B6E8",
+    logo_url: "", mascot_url: "", favicon_url: "", contact_email: "", domain: "", timezone: "Europe/Vienna",
+    legal_name: "", legal_form: "eingetragener Verein nach oesterreichischem Vereinsrecht", zvr_number: "",
+    street_address: "", address_extra: "", postal_code: "", city: "", state: "Tirol", country: "Oesterreich",
+    registered_seat: "", register_authority: "", representative_name: "", representative_role: "",
+    content_responsible: "", phone: "", privacy_contact_email: "", hosting_provider: "", hosting_country: "Oesterreich/EU",
+    vat_number: "", tournament_terms_url: "", paid_tournaments_enabled: false,
+    imprint: "", privacy_policy: "", legal_extra: "", privacy_extra: "",
+    discord_invite_url: "", twitch_channel: "",
+  });
   const [discord, setDiscord] = useState({ webhook_url: "", username: "", avatar_url: "", enabled: true, configured: false, webhook_url_masked: "", last_status: "", last_error: "", last_event_key: "", last_checked_at: "" });
   const [testEmail, setTestEmail] = useState("");
   const [logs, setLogs] = useState([]);
+  const [systemStatus, setSystemStatus] = useState(null);
 
   const load = async () => {
-    const [e, b, d, l, sm, q] = await Promise.all([
+    const [e, b, d, l, sm, q, st] = await Promise.all([
       api.get("/settings/email"),
       api.get("/settings/branding"),
       api.get("/settings/discord"),
       api.get("/settings/email/logs"),
       api.get("/settings/smtp"),
       api.get("/settings/mail-queue?limit=100"),
+      api.get("/admin/system-status"),
     ]);
     setEmail((prev) => ({ ...prev, ...e.data, resend_api_key: "" }));
     setBrand((prev) => ({ ...prev, ...b.data }));
@@ -34,6 +46,7 @@ export default function AdminSettingsPage() {
     setLogs(l.data);
     setSmtp((prev) => ({ ...prev, ...sm.data, smtp_pass: "" }));
     setQueue(q.data);
+    setSystemStatus(st.data);
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
@@ -170,7 +183,7 @@ export default function AdminSettingsPage() {
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Einstellungen</h1>
 
       <div className="flex gap-1 mb-6 border-b border-white/10 overflow-x-auto">
-        {[["email", "Resend", Mail], ["smtp", "SMTP", Server], ["queue", "Mail-Queue", Inbox], ["discord", "Discord", MessageSquare], ["brand", "Branding", Palette], ["logs", "Versandlogs", Send]].map(([k, l, Icn]) => (
+        {[["email", "Resend", Mail], ["smtp", "SMTP", Server], ["queue", "Mail-Queue", Inbox], ["discord", "Discord", MessageSquare], ["brand", "Branding", Palette], ["legal", "Rechtliches", FileText], ["system", "Status", Activity], ["logs", "Versandlogs", Send]].map(([k, l, Icn]) => (
           <button key={k} onClick={() => setTab(k)} data-testid={`settings-tab-${k}`}
             className={`px-4 py-3 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap ${tab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
             <Icn className="w-3.5 h-3.5" />{l}
@@ -205,7 +218,7 @@ export default function AdminSettingsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Absendername</div>
-                <input value={email.sender_name || ""} onChange={(e) => setEmail({ ...email, sender_name: e.target.value })} data-testid="email-sender-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="TLS ARENA" />
+                <input value={email.sender_name || ""} onChange={(e) => setEmail({ ...email, sender_name: e.target.value })} data-testid="email-sender-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="THE LION SQUAD" />
               </div>
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Absender-E-Mail</div>
@@ -549,7 +562,7 @@ export default function AdminSettingsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Bot-Name</div>
-                <input value={discord.username || ""} onChange={(e) => setDiscord({ ...discord, username: e.target.value })} data-testid="discord-username" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="TLS ARENA" />
+                <input value={discord.username || ""} onChange={(e) => setDiscord({ ...discord, username: e.target.value })} data-testid="discord-username" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="THE LION SQUAD" />
               </div>
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Avatar URL</div>
@@ -588,16 +601,88 @@ export default function AdminSettingsPage() {
               <ImageUpload value={brand.mascot_url} onChange={(v) => setBrand({ ...brand, mascot_url: v })} label="Maskottchen" testId="brand-mascot" variant="square" />
               <ImageUpload value={brand.favicon_url} onChange={(v) => setBrand({ ...brand, favicon_url: v })} label="Favicon / Browser Icon" testId="brand-favicon" variant="square" />
             </div>
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Impressum</div>
-              <textarea value={brand.imprint || ""} onChange={(e) => setBrand({ ...brand, imprint: e.target.value })} rows={4} data-testid="brand-imprint" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-            </div>
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Datenschutz-Text</div>
-              <textarea value={brand.privacy_policy || ""} onChange={(e) => setBrand({ ...brand, privacy_policy: e.target.value })} rows={6} data-testid="brand-privacy" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-            </div>
+            <p className="text-xs text-white/45">Impressum, Datenschutz und Vereinsdaten liegen im Tab Rechtliches.</p>
             <button onClick={saveBrand} data-testid="brand-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
           </div>
+        </div>
+      )}
+
+      {tab === "legal" && (
+        <div className="max-w-4xl space-y-4">
+          <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-5">
+            <div>
+              <div className="font-heading font-bold uppercase">Vereinsdaten fuer Impressum und Datenschutz</div>
+              <p className="text-xs text-white/50 mt-1">Diese Angaben werden dynamisch auf /imprint und /privacy ausgegeben. ZVR, Adresse und vertretungsbefugte Person bitte mit den echten Vereinsdaten eintragen.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <BrandField label="Rechtlicher Vereinsname" value={brand.legal_name} onChange={(v) => setBrand({ ...brand, legal_name: v })} testId="legal-name" />
+              <BrandField label="ZVR-Zahl" value={brand.zvr_number} onChange={(v) => setBrand({ ...brand, zvr_number: v })} testId="legal-zvr" />
+              <BrandField label="Rechtsform" value={brand.legal_form} onChange={(v) => setBrand({ ...brand, legal_form: v })} testId="legal-form" />
+              <BrandField label="Vereinssitz" value={brand.registered_seat} onChange={(v) => setBrand({ ...brand, registered_seat: v })} testId="legal-seat" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <BrandField label="Strasse und Hausnummer" value={brand.street_address} onChange={(v) => setBrand({ ...brand, street_address: v })} testId="legal-street" />
+              <BrandField label="Adresszusatz" value={brand.address_extra} onChange={(v) => setBrand({ ...brand, address_extra: v })} testId="legal-address-extra" />
+              <BrandField label="PLZ" value={brand.postal_code} onChange={(v) => setBrand({ ...brand, postal_code: v })} testId="legal-postal" />
+              <BrandField label="Ort" value={brand.city} onChange={(v) => setBrand({ ...brand, city: v })} testId="legal-city" />
+              <BrandField label="Bundesland" value={brand.state} onChange={(v) => setBrand({ ...brand, state: v })} testId="legal-state" />
+              <BrandField label="Land" value={brand.country} onChange={(v) => setBrand({ ...brand, country: v })} testId="legal-country" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <BrandField label="Vereinsbehoerde" value={brand.register_authority} onChange={(v) => setBrand({ ...brand, register_authority: v })} testId="legal-authority" />
+              <BrandField label="Telefon" value={brand.phone} onChange={(v) => setBrand({ ...brand, phone: v })} testId="legal-phone" />
+              <BrandField label="Vertretungsbefugte Person" value={brand.representative_name} onChange={(v) => setBrand({ ...brand, representative_name: v })} testId="legal-representative" />
+              <BrandField label="Funktion" value={brand.representative_role} onChange={(v) => setBrand({ ...brand, representative_role: v })} testId="legal-role" />
+              <BrandField label="Inhaltlich verantwortlich" value={brand.content_responsible} onChange={(v) => setBrand({ ...brand, content_responsible: v })} testId="legal-content-responsible" />
+              <BrandField label="Datenschutz E-Mail" value={brand.privacy_contact_email} onChange={(v) => setBrand({ ...brand, privacy_contact_email: v })} testId="legal-privacy-email" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <BrandField label="Hosting / Betreiber" value={brand.hosting_provider} onChange={(v) => setBrand({ ...brand, hosting_provider: v })} testId="legal-hosting" />
+              <BrandField label="Hosting-Region" value={brand.hosting_country} onChange={(v) => setBrand({ ...brand, hosting_country: v })} testId="legal-hosting-country" />
+              <BrandField label="UID-Nummer falls vorhanden" value={brand.vat_number} onChange={(v) => setBrand({ ...brand, vat_number: v })} testId="legal-vat" />
+              <BrandField label="Turnierbedingungen URL" value={brand.tournament_terms_url} onChange={(v) => setBrand({ ...brand, tournament_terms_url: v })} testId="legal-terms-url" />
+            </div>
+            <label className="flex items-start gap-2 text-sm text-white/75">
+              <input type="checkbox" checked={!!brand.paid_tournaments_enabled} onChange={(e) => setBrand({ ...brand, paid_tournaments_enabled: e.target.checked })} data-testid="legal-paid-tournaments" className="accent-[#29B6E8] mt-1" />
+              <span>Preisturniere oder Turniere mit Startgeld koennen stattfinden.</span>
+            </label>
+            <LegalTextArea label="Freitext Impressum" value={brand.imprint} onChange={(v) => setBrand({ ...brand, imprint: v })} testId="brand-imprint" rows={4} />
+            <LegalTextArea label="Zusaetzliche rechtliche Hinweise" value={brand.legal_extra} onChange={(v) => setBrand({ ...brand, legal_extra: v })} testId="legal-extra" rows={4} />
+            <LegalTextArea label="Freitext Datenschutz" value={brand.privacy_policy} onChange={(v) => setBrand({ ...brand, privacy_policy: v })} testId="brand-privacy" rows={5} />
+            <LegalTextArea label="Zusaetzliche Datenschutzhinweise" value={brand.privacy_extra} onChange={(v) => setBrand({ ...brand, privacy_extra: v })} testId="privacy-extra" rows={5} />
+            <button onClick={saveBrand} data-testid="legal-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Rechtliches speichern</button>
+          </div>
+        </div>
+      )}
+
+      {tab === "system" && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2 items-center">
+            <button onClick={load} data-testid="system-refresh" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5" /> Aktualisieren</button>
+            <span className="text-xs text-white/50">Live-Status fuer Versand, Uploads, Scheduler und Queue.</span>
+          </div>
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <SystemCard title="Datenbank" ok={systemStatus?.database?.ok} detail={systemStatus?.database?.error || "MongoDB Ping"} />
+            <SystemCard title="SMTP / Mail" ok={systemStatus?.smtp?.ok} detail={`${systemStatus?.smtp?.provider || "-"} ${systemStatus?.smtp?.host || ""}`} problem={systemStatus?.smtp?.latest_problem?.error} />
+            <SystemCard title="Discord" ok={systemStatus?.discord?.ok} detail={systemStatus?.discord?.configured ? "Webhook konfiguriert" : "Kein Webhook"} problem={systemStatus?.discord?.latest?.error} />
+            <SystemCard title="Uploads" ok={systemStatus?.uploads?.ok} detail={(systemStatus?.uploads?.checks || []).map((c) => `${c.label}: ${c.exists && c.writable ? "OK" : "NO"}`).join(" · ")} />
+            <SystemCard title="Scheduler" ok={systemStatus?.scheduler?.running} detail={(systemStatus?.scheduler?.jobs || []).map((j) => `${j.id}: ${j.next_run_time ? new Date(j.next_run_time).toLocaleString("de-DE") : "-"}`).join(" · ")} />
+            <SystemCard title="Mail-Queue" ok={(systemStatus?.mail_queue?.failed || 0) === 0} detail={systemStatus?.mail_queue ? `pending ${systemStatus.mail_queue.pending || 0} · failed ${systemStatus.mail_queue.failed || 0} · sent ${systemStatus.mail_queue.sent || 0}` : "-"} />
+          </div>
+          {systemStatus?.uploads?.checks?.length > 0 && (
+            <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
+              <div className="font-heading font-bold uppercase mb-3">Upload-Pfade</div>
+              <div className="space-y-2 text-xs">
+                {systemStatus.uploads.checks.map((c) => (
+                  <div key={c.label} className="grid md:grid-cols-[120px_1fr_120px] gap-2 border-b border-white/5 pb-2">
+                    <span className="text-white/70">{c.label}</span>
+                    <span className="font-mono text-white/50 break-all">{c.path}</span>
+                    <span className={c.exists && c.writable ? "text-[#00FF88]" : "text-[#FF3B30]"}>{c.exists && c.writable ? "beschreibbar" : "pruefen"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -638,5 +723,30 @@ function BrandField({ label, value, onChange, testId }) {
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
       <input value={value || ""} onChange={(e) => onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
     </label>
+  );
+}
+
+function LegalTextArea({ label, value, onChange, testId, rows = 4 }) {
+  return (
+    <label className="block">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <textarea value={value || ""} onChange={(e) => onChange(e.target.value)} rows={rows} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+    </label>
+  );
+}
+
+function SystemCard({ title, ok, detail, problem }) {
+  const ready = !!ok;
+  return (
+    <div className={`border rounded-sm bg-[#121212] p-5 ${ready ? "border-[#00FF88]/25" : "border-[#FFD700]/30"}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="font-heading font-bold uppercase">{title}</div>
+        <span className={`text-[10px] font-black uppercase tracking-widest ${ready ? "text-[#00FF88]" : "text-[#FFD700]"}`}>
+          {ready ? "OK" : "Pruefen"}
+        </span>
+      </div>
+      <div className="mt-3 text-xs text-white/55 break-words">{detail || "-"}</div>
+      {problem && <div className="mt-2 text-xs text-[#FF3B30] break-words">{problem}</div>}
+    </div>
   );
 }

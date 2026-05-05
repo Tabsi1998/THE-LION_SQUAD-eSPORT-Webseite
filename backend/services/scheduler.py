@@ -82,3 +82,16 @@ def stop_scheduler():
         with suppress(Exception):
             _scheduler.shutdown(wait=False)
         _scheduler = None
+
+
+def get_scheduler_status() -> dict:
+    if not _scheduler:
+        return {"running": False, "jobs": []}
+    jobs = []
+    for job in _scheduler.get_jobs():
+        jobs.append({
+            "id": job.id,
+            "name": job.name,
+            "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
+        })
+    return {"running": _scheduler.running, "jobs": jobs}

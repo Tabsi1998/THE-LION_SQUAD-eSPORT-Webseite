@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 
-const UPDATED_AT = "04.05.2026";
+const UPDATED_AT = "05.05.2026";
 
 function useBranding() {
   const [branding, setBranding] = useState({});
@@ -12,6 +12,19 @@ function useBranding() {
     api.get("/settings/public").then(({ data }) => setBranding(data || {})).catch(() => {});
   }, []);
   return branding;
+}
+
+function valueOrOpen(value) {
+  return value && String(value).trim() ? value : "Noch im Adminbereich zu hinterlegen";
+}
+
+function addressLines(branding) {
+  return [
+    branding.street_address,
+    branding.address_extra,
+    [branding.postal_code, branding.city].filter(Boolean).join(" "),
+    [branding.state, branding.country].filter(Boolean).join(", "),
+  ].filter(Boolean);
 }
 
 function LegalArticle({ title, intro, children }) {
@@ -40,134 +53,204 @@ function Section({ title, children }) {
 
 function InfoList({ items }) {
   return (
-    <dl className="grid sm:grid-cols-[180px_1fr] gap-x-5 gap-y-2">
+    <dl className="grid sm:grid-cols-[210px_1fr] gap-x-5 gap-y-2">
       {items.map(([label, value]) => (
         <div key={label} className="contents">
           <dt className="text-white/45">{label}</dt>
-          <dd className="text-white">{value}</dd>
+          <dd className="text-white break-words">{value}</dd>
         </div>
       ))}
     </dl>
   );
 }
 
+function TextBlock({ children }) {
+  if (!children) return null;
+  return (
+    <div className="rounded-sm border border-white/10 bg-[#121212] p-4 whitespace-pre-line text-white/80">
+      {children}
+    </div>
+  );
+}
+
 export function ImprintPage() {
   const branding = useBranding();
-  const clubName = branding.club_name || "THE LION SQUAD eSports";
+  const clubName = branding.club_name || "THE LION SQUAD";
+  const legalName = branding.legal_name || clubName;
   const domain = branding.domain || "https://lionsquad.at";
   const contactEmail = branding.contact_email || "office@lionsquad.at";
-  const imprint = branding.imprint;
+  const privacyEmail = branding.privacy_contact_email || contactEmail;
+  const lines = addressLines(branding);
 
   return (
     <LegalArticle
       title="Impressum"
-      intro="Anbieterkennzeichnung und Kontaktinformationen des Vereins."
+      intro="Anbieterkennzeichnung, Offenlegung und Kontaktinformationen des Vereins."
     >
       <Section title="Medieninhaber und Betreiber">
         <InfoList
           items={[
-            ["Verein", clubName],
-            ["Rechtsform", "eingetragener Verein nach österreichischem Vereinsrecht"],
-            ["Sitz", "Österreich"],
+            ["Verein", legalName],
+            ["Rechtsform", branding.legal_form || "eingetragener Verein nach oesterreichischem Vereinsrecht"],
+            ["ZVR-Zahl", valueOrOpen(branding.zvr_number)],
+            ["Vereinssitz", branding.registered_seat || branding.city || "Tirol, Oesterreich"],
+            ["Adresse", lines.length ? lines.map((line) => <div key={line}>{line}</div>) : valueOrOpen("")],
             ["Website", <a href={domain} className="text-[#29B6E8] hover:underline">{domain}</a>],
             ["E-Mail", <a href={`mailto:${contactEmail}`} className="text-[#29B6E8] hover:underline">{contactEmail}</a>],
+            ["Telefon", valueOrOpen(branding.phone)],
           ]}
         />
-        {imprint && (
-          <div className="mt-4 rounded-sm border border-white/10 bg-[#121212] p-4 whitespace-pre-line text-white/80">
-            {imprint}
-          </div>
+      </Section>
+
+      <Section title="Vertretung und Verantwortung">
+        <InfoList
+          items={[
+            ["Vertretungsbefugt", valueOrOpen(branding.representative_name)],
+            ["Funktion", branding.representative_role || "Obmann/Obfrau bzw. vertretungsbefugtes Vereinsorgan"],
+            ["Inhaltlich verantwortlich", valueOrOpen(branding.content_responsible || branding.representative_name)],
+            ["Vereinsbehoerde", branding.register_authority || "Vereinsbehoerde am Vereinssitz in Tirol"],
+          ]}
+        />
+      </Section>
+
+      <Section title="Grundlegende Richtung">
+        <p>
+          Diese Website ist das offizielle Informations- und Serviceangebot von {legalName}. Sie
+          informiert ueber den Verein, Mitgliedschaft, Vorstand, Veranstaltungen, Community,
+          eSports-Turniere, Fast-Lap-Challenges, Ranglisten, News, Sponsoren und Kontaktmoeglichkeiten.
+        </p>
+        <p>
+          Der Vereinssitz liegt in Tirol. Die Vereinstaetigkeit ist nicht auf Gewinn gerichtet,
+          soweit sich aus den Statuten nichts anderes ergibt.
+        </p>
+      </Section>
+
+      <Section title="Turniere, Startgeld und Preise">
+        <p>
+          Auf der Plattform koennen auch Turniere oder Veranstaltungen mit Startgeld, Sachpreisen
+          oder sonstigen Gewinnen angekuendigt werden. Die konkreten Teilnahmebedingungen,
+          Altersgrenzen, Regeln, Kosten, Zahlungsmodalitaeten, Fristen und Preisbedingungen ergeben
+          sich jeweils aus der Turnier- oder Eventbeschreibung und den dort verlinkten Regeln.
+        </p>
+        {branding.paid_tournaments_enabled ? (
+          <p>
+            Bezahlte Turniere koennen stattfinden. Die Website stellt dafuer organisatorische
+            Informationen bereit; die jeweilige Ausschreibung ist fuer Details massgeblich.
+          </p>
+        ) : (
+          <p>
+            Sofern kein Startgeld ausgewiesen ist, ist die Teilnahme kostenlos. Bezahlte Formate
+            werden gesondert und transparent in der jeweiligen Ausschreibung gekennzeichnet.
+          </p>
+        )}
+        {branding.tournament_terms_url && (
+          <p>
+            Aktuelle Teilnahmebedingungen:{" "}
+            <a href={branding.tournament_terms_url} className="text-[#29B6E8] hover:underline">
+              {branding.tournament_terms_url}
+            </a>
+          </p>
         )}
       </Section>
 
-      <Section title="Vertretung und Vereinsdaten">
-        <p>
-          Vertretungsbefugte Organe, vollständige Zustelladresse und ZVR-Zahl sind in den
-          Vereinsdaten zu führen und können im Admin-Bereich unter Branding/Impressum ergänzt
-          werden. Diese Angaben sind im Rechtsverkehr aktuell zu halten.
-        </p>
+      <Section title="UID und wirtschaftliche Angaben">
+        <InfoList
+          items={[
+            ["UID-Nummer", branding.vat_number || "Nicht hinterlegt bzw. nicht anwendbar"],
+          ]}
+        />
       </Section>
 
-      <Section title="Vereinszweck und Inhalt">
+      <Section title="Haftung und externe Links">
         <p>
-          Diese Website informiert über Aktivitäten, Turniere, Fast-Lap-Challenges, Events,
-          Community-Angebote, Mitgliedschaft und organisatorische Themen von {clubName}.
+          Die Inhalte dieser Website werden mit Sorgfalt erstellt und gepflegt. Fuer Aktualitaet,
+          Richtigkeit und Vollstaendigkeit wird, soweit gesetzlich zulaessig, keine Gewaehr
+          uebernommen. Inhalte koennen sich kurzfristig aendern, insbesondere bei Turnieren,
+          Events, Ranglisten und organisatorischen Hinweisen.
         </p>
         <p>
-          Inhalte werden mit größtmöglicher Sorgfalt erstellt. Für Aktualität, Richtigkeit und
-          Vollständigkeit der Informationen wird keine Gewähr übernommen, soweit gesetzlich zulässig.
-        </p>
-      </Section>
-
-      <Section title="Links">
-        <p>
-          Diese Website kann Links zu externen Angeboten enthalten. Für Inhalte externer Websites
-          sind ausschließlich deren Betreiber verantwortlich. Bei Bekanntwerden rechtswidriger
-          Inhalte werden entsprechende Links entfernt.
+          Diese Website kann Links zu externen Angeboten enthalten. Fuer externe Inhalte sind
+          ausschliesslich deren Betreiber verantwortlich. Bei Bekanntwerden rechtswidriger Inhalte
+          werden entsprechende Links entfernt.
         </p>
       </Section>
 
       <Section title="Urheberrecht">
         <p>
-          Texte, Bilder, Grafiken, Logos, Videos und sonstige Inhalte dieser Website unterliegen,
-          soweit nicht anders angegeben, dem Urheberrecht bzw. den Nutzungsrechten des Vereins oder
-          der jeweiligen Rechteinhaber. Eine Verwendung außerhalb der gesetzlich erlaubten Fälle
-          bedarf der vorherigen Zustimmung.
+          Texte, Bilder, Grafiken, Logos, Videos, Turnierdaten und sonstige Inhalte dieser Website
+          unterliegen, soweit nicht anders angegeben, dem Urheberrecht bzw. den Nutzungsrechten des
+          Vereins oder der jeweiligen Rechteinhaber. Eine Verwendung ausserhalb der gesetzlich
+          erlaubten Faelle bedarf der vorherigen Zustimmung.
         </p>
       </Section>
 
-      <Section title="Datenschutz">
+      <Section title="Datenschutzkontakt">
         <p>
-          Informationen zur Verarbeitung personenbezogener Daten stehen in der{" "}
-          <Link to="/privacy" className="text-[#29B6E8] hover:underline">Datenschutzerklärung</Link>.
+          Datenschutzanfragen koennen an{" "}
+          <a href={`mailto:${privacyEmail}`} className="text-[#29B6E8] hover:underline">{privacyEmail}</a>{" "}
+          gerichtet werden. Weitere Informationen stehen in der{" "}
+          <Link to="/privacy" className="text-[#29B6E8] hover:underline">Datenschutzerklaerung</Link>.
         </p>
       </Section>
+
+      {(branding.imprint || branding.legal_extra) && (
+        <Section title="Ergaenzende Angaben">
+          <TextBlock>{[branding.imprint, branding.legal_extra].filter(Boolean).join("\n\n")}</TextBlock>
+        </Section>
+      )}
     </LegalArticle>
   );
 }
 
 export function PrivacyPage() {
   const branding = useBranding();
-  const clubName = branding.club_name || "THE LION SQUAD eSports";
+  const clubName = branding.legal_name || branding.club_name || "THE LION SQUAD";
   const domain = branding.domain || "https://lionsquad.at";
   const contactEmail = branding.contact_email || "office@lionsquad.at";
+  const privacyEmail = branding.privacy_contact_email || contactEmail;
+  const lines = addressLines(branding);
 
   return (
     <LegalArticle
-      title="Datenschutzerklärung"
+      title="Datenschutzerklaerung"
       intro="Informationen zur Verarbeitung personenbezogener Daten auf dieser Vereinsplattform."
     >
       <Section title="Verantwortlicher">
         <InfoList
           items={[
             ["Verantwortlicher", clubName],
-            ["Sitz", "Österreich"],
+            ["Adresse", lines.length ? lines.map((line) => <div key={line}>{line}</div>) : valueOrOpen("")],
             ["Website", <a href={domain} className="text-[#29B6E8] hover:underline">{domain}</a>],
             ["Kontakt", <a href={`mailto:${contactEmail}`} className="text-[#29B6E8] hover:underline">{contactEmail}</a>],
-            ["Datenschutz", <a href={`mailto:${contactEmail}`} className="text-[#29B6E8] hover:underline">{contactEmail}</a>],
+            ["Datenschutz", <a href={`mailto:${privacyEmail}`} className="text-[#29B6E8] hover:underline">{privacyEmail}</a>],
           ]}
         />
       </Section>
 
-      <Section title="Grundsätze">
+      <Section title="Grundsaetze und Rechtsgrundlagen">
         <p>
-          Wir verarbeiten personenbezogene Daten nur, soweit dies für Betrieb, Sicherheit,
-          Vereinsverwaltung, Community-Funktionen, Turniere, Veranstaltungen, Kommunikation oder
-          gesetzliche Pflichten erforderlich ist.
+          Wir verarbeiten personenbezogene Daten ausschliesslich auf Grundlage der DSGVO, des
+          oesterreichischen Datenschutzgesetzes und sonstiger anwendbarer Vorschriften. Massgebliche
+          Rechtsgrundlagen sind insbesondere Art. 6 Abs. 1 lit. b DSGVO fuer Vertrag,
+          Mitgliedschaft und vorvertragliche Massnahmen, Art. 6 Abs. 1 lit. c DSGVO fuer rechtliche
+          Pflichten, Art. 6 Abs. 1 lit. f DSGVO fuer berechtigte Interessen sowie Art. 6 Abs. 1
+          lit. a DSGVO fuer Einwilligungen.
         </p>
         <p>
-          Rechtsgrundlagen sind insbesondere Vertragserfüllung bzw. vorvertragliche Maßnahmen,
-          berechtigte Interessen, Einwilligung und gesetzliche Verpflichtungen nach Art. 6 DSGVO.
+          Berechtigte Interessen sind insbesondere sicherer Websitebetrieb, Missbrauchsschutz,
+          Vereinsorganisation, nachvollziehbare Turnierverwaltung, Kommunikation und technische
+          Fehleranalyse.
         </p>
       </Section>
 
       <Section title="Kategorien personenbezogener Daten">
         <ul className="list-disc pl-5 space-y-1">
-          <li>Accountdaten: Benutzername, E-Mail-Adresse, Rollen, Login-Status.</li>
-          <li>Profildaten: Anzeigename, Avatar, Banner, Bio, Land/Stadt, Social- und Gaming-Handles.</li>
-          <li>Mitgliedschaftsdaten: Status, Mitgliedsart, Mitgliedsnummer, Eintrittsdatum, interne Rollen, Verlauf.</li>
-          <li>Turnier- und Eventdaten: Anmeldungen, Check-ins, Teams, Matches, Ergebnisse, F1-Zeiten, Strafen.</li>
-          <li>Kommunikationsdaten: Kontaktformular, Mitgliedsanträge, E-Mail-Logs, Benachrichtigungen.</li>
+          <li>Accountdaten: Benutzername, Anzeigename, E-Mail-Adresse, Passwort-Hash, Rollen, Login-Status.</li>
+          <li>Profildaten: Avatar, Banner, Bio, Geburtsdatum, Ort, Land, Social- und Gaming-Handles.</li>
+          <li>Mitgliedschaftsdaten: Antrag, Status, Mitgliedsnummer, Eintrittsdatum, Funktion, Verlauf.</li>
+          <li>Turnier- und Eventdaten: Anmeldungen, Check-ins, Teams, Matches, Ergebnisse, F1-Zeiten, Preise, Strafen.</li>
+          <li>Zahlungs- und Nachweisdaten, sofern bei kostenpflichtigen Turnieren oder Mitgliedschaft erforderlich.</li>
+          <li>Kommunikationsdaten: Kontaktformular, E-Mails, Systemnachrichten, Discord-Benachrichtigungen.</li>
           <li>Technische Daten: IP-Adresse, Zeitpunkte, Browser-/Request-Daten, Sicherheits- und Fehlerlogs.</li>
           <li>Uploads: Bilder, Dokumente und Nachweise, soweit Nutzer oder Admins sie bereitstellen.</li>
         </ul>
@@ -175,98 +258,124 @@ export function PrivacyPage() {
 
       <Section title="Zwecke der Verarbeitung">
         <ul className="list-disc pl-5 space-y-1">
-          <li>Bereitstellung und Absicherung der Website und API.</li>
+          <li>Bereitstellung, Absicherung und Wartung der Website und API.</li>
           <li>Registrierung, Login, Rollen- und Rechteverwaltung.</li>
-          <li>Organisation von Turnieren, Challenges, Teams, Events und Preisen.</li>
-          <li>Bearbeitung von Mitgliedsanträgen und Verwaltung der Vereinsmitgliedschaft.</li>
-          <li>Anzeige öffentlicher Profile, Ranglisten, Achievements und Community-Statistiken.</li>
-          <li>Bearbeitung von Kontaktanfragen und Versand von System- oder Vereins-E-Mails.</li>
-          <li>Erfüllung gesetzlicher Aufbewahrungs-, Nachweis- und Sicherheitsverpflichtungen.</li>
+          <li>Organisation von Verein, Mitgliedschaft, Vorstand, Dokumenten und Mitgliederbereich.</li>
+          <li>Organisation von Turnieren, Challenges, Teams, Events, Preisen und Ranglisten.</li>
+          <li>Bearbeitung von Kontaktanfragen, Mitgliedsantraegen und Supportfaellen.</li>
+          <li>Versand von Systemmails, Passwort-Reset, Turnier- und Vereinsbenachrichtigungen.</li>
+          <li>Erfuellung gesetzlicher Aufbewahrungs-, Nachweis- und Sicherheitsverpflichtungen.</li>
         </ul>
       </Section>
 
-      <Section title="Öffentliche Profile und Achievements">
+      <Section title="Oeffentliche Profile, Ranglisten und Achievements">
         <p>
-          Spielerprofile können öffentlich sichtbar sein. Nutzer können die Sichtbarkeit ihres
-          öffentlichen Profils im Profilbereich einschränken. Negative oder interne Achievements
-          werden nicht öffentlich angezeigt.
+          Nutzerprofile, Ranglisten, Turnierergebnisse und Achievements koennen oeffentlich sichtbar
+          sein, soweit dies fuer Community- und Wettbewerbsfunktionen vorgesehen ist. Nutzer koennen
+          die Sichtbarkeit ihres oeffentlichen Profils im Profilbereich einschraenken. Negative oder
+          rein interne Achievements werden nicht oeffentlich angezeigt.
         </p>
       </Section>
 
       <Section title="Kontaktformular und Mitgliedsantrag">
         <p>
           Angaben aus Formularen werden zur Bearbeitung der Anfrage, zur Kommunikation und zur
-          Dokumentation verarbeitet. Bei Mitgliedsanträgen werden die Daten zusätzlich zur Prüfung,
+          Dokumentation verarbeitet. Bei Mitgliedsantraegen werden die Daten zusaetzlich zur Pruefung,
           Aufnahme und Verwaltung der Mitgliedschaft genutzt.
         </p>
       </Section>
 
-      <Section title="E-Mail und Benachrichtigungen">
+      <Section title="E-Mail, SMTP und Discord">
         <p>
-          Für Systemmails, Passwort-Reset, Mitgliedschaftsinformationen, Kontaktantworten und
-          Benachrichtigungen können SMTP-Server oder E-Mail-Dienstleister eingesetzt werden.
-          Dabei werden Empfängeradresse, Betreff, Inhalt, Versandstatus und technische Versanddaten
+          Fuer Systemmails, Passwort-Reset, Mitgliedschaftsinformationen, Kontaktantworten und
+          Benachrichtigungen koennen eigene SMTP-Server oder E-Mail-Dienstleister eingesetzt werden.
+          Dabei werden Empfaengeradresse, Betreff, Inhalt, Versandstatus und technische Versanddaten
           verarbeitet.
         </p>
+        <p>
+          Wenn Discord-Webhooks aktiviert sind, koennen Ereignisse wie Turniere, Matches,
+          Achievements oder Tests in einen konfigurierten Discord-Kanal uebermittelt werden.
+        </p>
+      </Section>
+
+      <Section title="Hosting, Logs und Backups">
+        <p>
+          Die Plattform verarbeitet Daten auf den eingesetzten Servern, Datenbanken und
+          Backup-Speichern. Technische Logs dienen Sicherheit, Fehleranalyse und Betrieb.
+        </p>
+        <InfoList
+          items={[
+            ["Hosting / Betrieb", branding.hosting_provider || "Vom Verein bzw. beauftragten Dienstleistern betrieben"],
+            ["Hosting-Region", branding.hosting_country || "Oesterreich/EU"],
+          ]}
+        />
       </Section>
 
       <Section title="Cookies und lokale Speicherung">
         <p>
-          Die Plattform verwendet technisch notwendige Cookies für Login, Session, Refresh-Token
-          und CSRF-Schutz. Ohne diese Cookies sind geschützte Bereiche nicht nutzbar. Tracking- oder
-          Marketing-Cookies sind nicht erforderlich für den Betrieb dieser Plattform.
+          Die Plattform verwendet technisch notwendige Cookies und lokale Speichermechanismen fuer
+          Login, Session, Refresh-Token, CSRF-Schutz und grundlegende Bedienfunktionen. Ohne diese
+          Funktionen sind geschuetzte Bereiche nicht nutzbar. Tracking- oder Marketing-Cookies sind
+          fuer den Betrieb dieser Plattform nicht erforderlich.
         </p>
       </Section>
 
-      <Section title="Empfänger und Auftragsverarbeiter">
+      <Section title="Empfaenger und Auftragsverarbeiter">
         <p>
-          Daten können an technische Dienstleister weitergegeben werden, soweit dies für Hosting,
-          Datenbankbetrieb, E-Mail-Versand, Backups, Sicherheit oder Wartung erforderlich ist.
-          Eine Weitergabe erfolgt nur im erforderlichen Umfang.
+          Daten koennen an technische Dienstleister weitergegeben werden, soweit dies fuer Hosting,
+          Datenbankbetrieb, E-Mail-Versand, Backups, Sicherheit, Wartung oder Support erforderlich
+          ist. Eine Weitergabe erfolgt nur im erforderlichen Umfang.
         </p>
         <p>
-          Bei extern eingebundenen Diensten wie Discord, Twitch, YouTube oder ähnlichen Plattformen
-          gelten zusätzlich die Datenschutzbedingungen der jeweiligen Anbieter, sobald deren Inhalte
-          geöffnet oder eingebunden werden.
+          Bei extern eingebundenen Diensten wie Discord, Twitch, YouTube oder aehnlichen Plattformen
+          gelten zusaetzlich die Datenschutzbedingungen der jeweiligen Anbieter, sobald deren Inhalte
+          geoeffnet oder eingebunden werden.
         </p>
       </Section>
 
       <Section title="Speicherdauer">
         <p>
-          Daten werden nur so lange gespeichert, wie es für die jeweiligen Zwecke erforderlich ist.
-          Account- und Profildaten bestehen grundsätzlich bis zur Löschung des Accounts. Turnier-,
-          Vereins- und Nachweisdaten können länger gespeichert werden, soweit berechtigte Interessen,
-          Dokumentationspflichten oder gesetzliche Aufbewahrungspflichten bestehen. Technische Logs
-          werden regelmäßig begrenzt aufbewahrt.
+          Daten werden nur so lange gespeichert, wie es fuer die jeweiligen Zwecke erforderlich ist.
+          Account- und Profildaten bestehen grundsaetzlich bis zur Loeschung des Accounts. Turnier-,
+          Vereins-, Zahlungs- und Nachweisdaten koennen laenger gespeichert werden, soweit berechtigte
+          Interessen, Dokumentationspflichten oder gesetzliche Aufbewahrungspflichten bestehen.
+          Technische Logs werden regelmaessig begrenzt aufbewahrt.
         </p>
       </Section>
 
       <Section title="Sicherheit">
         <p>
-          Passwörter werden nicht im Klartext gespeichert, sondern gehasht. Zugriffe auf geschützte
-          Bereiche erfolgen rollenbasiert. Zusätzlich kommen Schutzmaßnahmen wie CSRF-Schutz,
-          Zugriffsbeschränkungen und getrennte private Dokumentdownloads zum Einsatz.
+          Passwoerter werden nicht im Klartext gespeichert, sondern gehasht. Zugriffe auf geschuetzte
+          Bereiche erfolgen rollenbasiert. Zusaetzlich kommen Schutzmassnahmen wie CSRF-Schutz,
+          Zugriffsbeschraenkungen, private Dokumentdownloads, SMTP-Diagnose und Audit-Logs zum Einsatz.
         </p>
       </Section>
 
       <Section title="Betroffenenrechte">
         <p>
-          Betroffene Personen haben nach Maßgabe der DSGVO Rechte auf Auskunft, Berichtigung,
-          Löschung, Einschränkung, Datenübertragbarkeit, Widerspruch sowie Widerruf erteilter
-          Einwilligungen. Zur Ausübung genügt eine Nachricht an{" "}
-          <a href={`mailto:${contactEmail}`} className="text-[#29B6E8] hover:underline">{contactEmail}</a>.
+          Betroffene Personen haben nach Massgabe der DSGVO Rechte auf Information, Auskunft,
+          Berichtigung, Loeschung, Einschraenkung, Datenuebertragbarkeit, Widerspruch sowie Widerruf
+          erteilter Einwilligungen. Zur Ausuebung genuegt eine Nachricht an{" "}
+          <a href={`mailto:${privacyEmail}`} className="text-[#29B6E8] hover:underline">{privacyEmail}</a>.
         </p>
         <p>
-          Außerdem besteht das Recht auf Beschwerde bei der Österreichischen Datenschutzbehörde,
+          Ausserdem besteht das Recht auf Beschwerde bei der Oesterreichischen Datenschutzbehoerde,
           Barichgasse 40-42, 1030 Wien,{" "}
           <a href="https://www.dsb.gv.at/" target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">www.dsb.gv.at</a>.
         </p>
       </Section>
 
-      <Section title="Änderungen">
+      {(branding.privacy_policy || branding.privacy_extra) && (
+        <Section title="Ergaenzende Datenschutzhinweise">
+          <TextBlock>{[branding.privacy_policy, branding.privacy_extra].filter(Boolean).join("\n\n")}</TextBlock>
+        </Section>
+      )}
+
+      <Section title="Aenderungen">
         <p>
-          Diese Datenschutzerklärung kann angepasst werden, wenn sich Funktionen, Dienstleister oder
-          rechtliche Anforderungen ändern. Die jeweils aktuelle Fassung ist auf dieser Seite abrufbar.
+          Diese Datenschutzerklaerung kann angepasst werden, wenn sich Funktionen, Dienstleister,
+          Turnierformate oder rechtliche Anforderungen aendern. Die jeweils aktuelle Fassung ist auf
+          dieser Seite abrufbar.
         </p>
       </Section>
     </LegalArticle>

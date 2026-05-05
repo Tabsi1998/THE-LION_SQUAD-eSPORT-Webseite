@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interactive First-Run Setup Wizard for TLS ARENA.
+"""Interactive First-Run Setup Wizard for THE LION SQUAD eSports.
 
 Usage:
     docker exec -it tls-backend python setup_cli.py
@@ -66,7 +66,7 @@ def ask_yes_no(prompt: str, default=True) -> bool:
 
 async def main():
     banner()
-    print(f"{BOLD}Willkommen beim TLS ARENA Setup-Assistenten.{RESET}")
+    print(f"{BOLD}Willkommen beim THE LION SQUAD Setup-Assistenten.{RESET}")
     print(f"{DIM}Dieser Assistent führt dich durch die Erstkonfiguration.{RESET}\n")
 
     mongo_url = os.environ.get("MONGO_URL", "")
@@ -87,7 +87,7 @@ async def main():
 
     print(f"\n{BOLD}[1/6]{RESET} Vereins-Branding")
     club_name = ask("Vereinsname", "THE LION SQUAD")
-    tagline = ask("Tagline / Untertitel", "eSports Arena")
+    tagline = ask("Tagline / Untertitel", "eSports Verein")
     domain = ask("Öffentliche Domain", "lionsquad.at")
     timezone_str = ask("Zeitzone", "Europe/Vienna")
     primary_color = ask("Akzentfarbe (HEX)", "#29B6E8")

@@ -26,7 +26,7 @@ async def _get_discord_config() -> dict:
     return {
         "webhook_url": webhook_url,
         "enabled": bool(s.get("enabled", True) and webhook_url),
-        "username": s.get("username") or "TLS ARENA",
+        "username": s.get("username") or "THE LION SQUAD",
         "avatar_url": s.get("avatar_url") or None,
     }
 

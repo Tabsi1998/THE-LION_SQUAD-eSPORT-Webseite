@@ -1,4 +1,4 @@
-"""PDF export service using reportlab. Brand-consistent dark TLS Arena PDFs."""
+"""PDF export service using reportlab. Brand-consistent THE LION SQUAD PDFs."""
 import io
 from datetime import datetime
 from reportlab.lib import colors
@@ -32,7 +32,7 @@ def _base_styles():
 
 
 def _header(story, styles, subtitle: str, title: str):
-    story.append(Paragraph(f"THE LION SQUAD · TLS ARENA · {subtitle}", styles["TLSSubtitle"]))
+    story.append(Paragraph(f"THE LION SQUAD eSports · {subtitle}", styles["TLSSubtitle"]))
     story.append(Paragraph(title, styles["TLSTitle"]))
     story.append(Spacer(1, 12))
 
@@ -47,7 +47,7 @@ def _page_bg(canvas, doc):
     # Footer
     canvas.setFillColor(MUTED)
     canvas.setFont("Helvetica", 7)
-    canvas.drawString(2 * cm, 1 * cm, "TLS ARENA · Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
+    canvas.drawString(2 * cm, 1 * cm, "THE LION SQUAD eSports · Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
     canvas.drawRightString(doc.pagesize[0] - 2 * cm, 1 * cm, f"Page {doc.page}")
     canvas.restoreState()
 

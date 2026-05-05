@@ -1,4 +1,4 @@
-"""TLS ARENA - FastAPI main entry."""
+"""THE LION SQUAD eSports - FastAPI main entry."""
 from dotenv import load_dotenv
 from pathlib import Path
 ROOT = Path(__file__).parent
@@ -69,7 +69,7 @@ def validate_runtime_env():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_runtime_env()
-    logger.info("[TLS ARENA] Initializing indexes...")
+    logger.info("[THE LION SQUAD] Initializing indexes...")
     await init_indexes()
     # One-time wipe for the new club platform launch (set TLS_RESET=true once, then unset)
     if os.environ.get("TLS_RESET", "").lower() == "true":
@@ -91,16 +91,16 @@ async def lifespan(app: FastAPI):
                 logger.info(f"[TLS RESET] Cleared collection: {coll}")
             except Exception as e:
                 logger.warning(f"[TLS RESET] {coll}: {e}")
-    logger.info("[TLS ARENA] Seeding admin...")
+    logger.info("[THE LION SQUAD] Seeding admin...")
     await seed_admin()
-    logger.info("[TLS ARENA] Seeding badge catalog...")
+    logger.info("[THE LION SQUAD] Seeding badge catalog...")
     await seed_badges()
-    logger.info("[TLS ARENA] Seeding CMS pages + email templates...")
+    logger.info("[THE LION SQUAD] Seeding CMS pages + email templates...")
     await seed_default_pages()
     await seed_email_templates()
     await seed_default_nav()
     if os.environ.get("SEED_DEMO", "false").lower() == "true":
-        logger.info("[TLS ARENA] Seeding demo data...")
+        logger.info("[THE LION SQUAD] Seeding demo data...")
         await seed_demo_data()
     # Phase 8: start background scheduler (mail queue + reminders + prize expiry)
     if os.environ.get("DISABLE_SCHEDULER", "").lower() != "true":
@@ -109,7 +109,7 @@ async def lifespan(app: FastAPI):
             start_scheduler()
         except Exception as exc:
             logger.warning(f"[scheduler] failed to start: {exc}")
-    logger.info("[TLS ARENA] Startup complete.")
+    logger.info("[THE LION SQUAD] Startup complete.")
     yield
     try:
         from services.scheduler import stop_scheduler
@@ -119,7 +119,7 @@ async def lifespan(app: FastAPI):
     await close_client()
 
 
-app = FastAPI(title="TLS ARENA - THE LION SQUAD eSports", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="THE LION SQUAD eSports", version="1.0.0", lifespan=lifespan)
 
 # CORS: credentials require explicit trusted origins. Open wildcard CORS can be
 # enabled only for short-lived local debugging via ALLOW_INSECURE_CORS=true.
@@ -270,7 +270,7 @@ async def security_headers(request, call_next):
 
 @app.get("/api/")
 async def root():
-    return {"name": "TLS ARENA", "version": "1.0.0", "status": "running"}
+    return {"name": "THE LION SQUAD eSports", "version": "1.0.0", "status": "running"}
 
 
 @app.get("/api/health")

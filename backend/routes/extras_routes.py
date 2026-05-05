@@ -40,6 +40,29 @@ class BrandingSettings(BaseModel):
     contact_email: Optional[str] = None
     imprint: Optional[str] = None
     privacy_policy: Optional[str] = None
+    legal_name: Optional[str] = None
+    legal_form: Optional[str] = None
+    zvr_number: Optional[str] = None
+    street_address: Optional[str] = None
+    address_extra: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
+    registered_seat: Optional[str] = None
+    register_authority: Optional[str] = None
+    representative_name: Optional[str] = None
+    representative_role: Optional[str] = None
+    content_responsible: Optional[str] = None
+    phone: Optional[str] = None
+    privacy_contact_email: Optional[str] = None
+    hosting_provider: Optional[str] = None
+    hosting_country: Optional[str] = None
+    vat_number: Optional[str] = None
+    tournament_terms_url: Optional[str] = None
+    paid_tournaments_enabled: Optional[bool] = None
+    legal_extra: Optional[str] = None
+    privacy_extra: Optional[str] = None
     discord_invite_url: Optional[str] = None
     twitch_channel: Optional[str] = None
     # Phase E — Twitch Helix credentials
@@ -72,6 +95,10 @@ async def public_settings():
     tagline = b.get("tagline", "eSports Verein")
     if str(tagline).strip().lower() == "esports arena":
         tagline = "eSports Verein"
+    city = b.get("city") or ""
+    state = b.get("state") or "Tirol"
+    country = b.get("country") or "Österreich"
+    contact_email = b.get("contact_email") or "office@lionsquad.at"
     return {
         "club_name": b.get("club_name", "THE LION SQUAD"),
         "tagline": tagline,
@@ -82,9 +109,32 @@ async def public_settings():
         "favicon_url": b.get("favicon_url"),
         "domain": domain,
         "timezone": b.get("timezone") or "Europe/Vienna",
-        "contact_email": b.get("contact_email") or "office@lionsquad.at",
+        "contact_email": contact_email,
         "imprint": b.get("imprint"),
         "privacy_policy": b.get("privacy_policy"),
+        "legal_name": b.get("legal_name") or b.get("club_name") or "THE LION SQUAD eSports",
+        "legal_form": b.get("legal_form") or "eingetragener Verein nach österreichischem Vereinsrecht",
+        "zvr_number": b.get("zvr_number") or "",
+        "street_address": b.get("street_address") or "",
+        "address_extra": b.get("address_extra") or "",
+        "postal_code": b.get("postal_code") or "",
+        "city": city,
+        "state": state,
+        "country": country,
+        "registered_seat": b.get("registered_seat") or city or state,
+        "register_authority": b.get("register_authority") or "Vereinsbehörde am Vereinssitz in Tirol",
+        "representative_name": b.get("representative_name") or "",
+        "representative_role": b.get("representative_role") or "Obmann/Obfrau bzw. vertretungsbefugtes Vereinsorgan",
+        "content_responsible": b.get("content_responsible") or b.get("representative_name") or "",
+        "phone": b.get("phone") or "",
+        "privacy_contact_email": b.get("privacy_contact_email") or contact_email,
+        "hosting_provider": b.get("hosting_provider") or "",
+        "hosting_country": b.get("hosting_country") or "Österreich/EU",
+        "vat_number": b.get("vat_number") or "",
+        "tournament_terms_url": b.get("tournament_terms_url") or "",
+        "paid_tournaments_enabled": bool(b.get("paid_tournaments_enabled", False)),
+        "legal_extra": b.get("legal_extra") or "",
+        "privacy_extra": b.get("privacy_extra") or "",
         "discord_invite_url": b.get("discord_invite_url") or "https://discord.com/invite/thelionsquadesports",
         "twitch_channel": b.get("twitch_channel") or "the_lion_squad_esports",
     }

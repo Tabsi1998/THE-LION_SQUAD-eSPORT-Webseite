@@ -27,7 +27,9 @@ Dokumenten, Achievements, Kontaktformular, Mailversand und Discord-Integrationen
 - F1/Fast-Lap-Challenges mit Strecken, Zeiten, Strafen, Ranglisten und Display-Modus.
 - Mail-Queue mit SMTP oder Resend, Testmail, Diagnose und Versandlogs.
 - Discord Webhook fuer automatische Benachrichtigungen.
-- Branding-Hauptsettings fuer Vereinsname, Logo, Maskottchen, Favicon, Farben, Domain, Kontaktmail, Impressum und Datenschutz.
+- Branding-Hauptsettings fuer Vereinsname, Logo, Maskottchen, Favicon, Farben, Domain und Kontaktmail.
+- Rechtliche Vereinsdaten fuer Tirol/Oesterreich: Adresse, ZVR-Zahl, Vertretung, Vereinsbehoerde, Impressum, Datenschutz und optionale Preisturnier-Hinweise.
+- Systemstatus fuer SMTP, Discord, Uploads, Scheduler, Mailqueue und letzte Fehler.
 
 ## Repository-Struktur
 
@@ -41,6 +43,7 @@ docker-compose.yml
 INSTALL.md
 UPDATE.md
 BACKUP_RESTORE.md
+ROLE_AUDIT.md
 ```
 
 ## Schnellstart Produktion
@@ -101,6 +104,22 @@ curl https://lionsquad.at/api/health
 docker compose ps
 ```
 
+## Deployment-Checkliste
+
+Vor Livegang oder nach groesseren Updates:
+
+- `.env` pruefen: `APP_ENV=production`, `FRONTEND_URL`, `PUBLIC_BACKEND_URL`, `CORS_ORIGINS`, `JWT_SECRET`, `ADMIN_PASSWORD`.
+- `docker compose ps` muss `backend`, `frontend` und `mongodb` als laufend zeigen.
+- `docker compose logs --tail=100 backend` auf Fehler pruefen.
+- `curl https://lionsquad.at/api/health` muss `{"status":"ok"}` liefern.
+- Adminbereich oeffnen und `Einstellungen -> Status` pruefen.
+- SMTP Diagnose, SMTP Testmail und Zustellbarkeit pruefen.
+- Discord Test senden, falls Webhook genutzt wird.
+- Upload-Test im Branding oder Medienbereich durchfuehren.
+- `/imprint` und `/privacy` mit echten Vereinsdaten kontrollieren.
+- Backup ausloesen und mindestens Archivtests aus `BACKUP_RESTORE.md` ausfuehren.
+- Rollen-/Rechte-Audit in `ROLE_AUDIT.md` gegen neue Features pruefen.
+
 ## Reverse Proxy
 
 Empfohlene Variante:
@@ -123,7 +142,7 @@ Backend/API:   127.0.0.1:8001
 1. Webseite oeffnen.
 2. Login mit `ADMIN_EMAIL` und `ADMIN_PASSWORD` aus `.env`.
 3. Admin-Passwort direkt aendern.
-4. Unter `Admin -> Einstellungen` Branding, SMTP, Discord, Impressum und Datenschutz pruefen.
+4. Unter `Admin -> Einstellungen` Branding, SMTP, Discord, Rechtliches und Systemstatus pruefen.
 5. Unter `Admin -> Navigation` nicht benoetigte Menuepunkte deaktivieren.
 
 ## Branding, Favicon und Hauptsettings
@@ -142,11 +161,46 @@ Im Adminbereich unter `Einstellungen -> Branding` pflegen:
 - Vereinslogo
 - Maskottchen
 - Favicon / Browser Icon
-- Impressum
-- Datenschutz
 
 Diese Werte werden oeffentlich genutzt, unter anderem fuer Header/Footer, Kontaktseite,
-Impressum, Datenschutz, Browser-Favicon, Apple Icon, Manifest, Theme-Color und SEO-Meta.
+Browser-Favicon, Apple Icon, Manifest, Theme-Color und SEO-Meta.
+
+## Impressum und Datenschutz
+
+Im Adminbereich unter `Einstellungen -> Rechtliches` pflegen:
+
+- rechtlicher Vereinsname
+- ZVR-Zahl
+- Vereinsadresse
+- Vereinssitz in Tirol
+- Vereinsbehoerde
+- vertretungsbefugte Person und Funktion
+- inhaltlich verantwortliche Person
+- Datenschutzkontakt
+- Hosting-/Betreiberhinweis
+- UID, falls vorhanden
+- Turnierbedingungen-URL, falls vorhanden
+- Kennzeichnung, ob Preisturniere oder Turniere mit Startgeld moeglich sind
+- Freitexte fuer Impressum und Datenschutz
+
+Die Seiten `/imprint` und `/privacy` ziehen diese Werte dynamisch. Wenn einzelne Angaben
+noch fehlen, zeigt die Seite bewusst einen Hinweis an, damit fehlende Pflichtdaten auffallen.
+Die Texte sind fuer einen nicht gewinnorientierten Verein mit Standort Tirol vorbereitet.
+Bei Startgeld, Zahlungsabwicklung, Sponsoring, Webshop oder regelmaessiger wirtschaftlicher
+Taetigkeit sollten die Angaben rechtlich final gegengeprueft werden.
+
+## Systemstatus
+
+Unter `Admin -> Einstellungen -> Status` prueft die App:
+
+- MongoDB Ping
+- SMTP/Mail-Konfiguration und letzter Versandfehler
+- Discord Webhook und letzter Discord-Status
+- Upload-Verzeichnisse und Schreibrechte
+- Scheduler-Jobs
+- Mailqueue-Zahlen
+
+Das ersetzt keine Serverlogs, gibt aber direkt im Adminbereich eine schnelle Ampel.
 
 ## SMTP richtig konfigurieren
 
