@@ -102,7 +102,7 @@ async def complete_setup(body: SetupWizardBody, me: dict = Depends(require_super
             {"id": "email"},
             {"$set": {
                 "resend_api_key": body.resend_api_key,
-                "sender_name": body.sender_name or "TLS ARENA",
+                "sender_name": body.sender_name or "THE LION SQUAD",
                 "sender_email": body.sender_email or "noreply@lionsquad.at",
                 "reply_to_email": body.reply_to_email or body.sender_email or "noreply@lionsquad.at",
                 "enabled": True,

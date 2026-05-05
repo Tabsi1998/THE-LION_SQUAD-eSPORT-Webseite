@@ -71,7 +71,7 @@ async def public_settings():
         domain = "https://" + domain
     return {
         "club_name": b.get("club_name", "THE LION SQUAD"),
-        "tagline": b.get("tagline", "eSports Arena"),
+        "tagline": b.get("tagline", "eSports Verein"),
         "site_description": b.get("site_description") or "THE LION SQUAD eSports - Vereinsplattform fuer Turniere, Fast Lap Challenges, News und Mitgliederbereich.",
         "primary_color": b.get("primary_color", "#29B6E8"),
         "logo_url": b.get("logo_url"),
@@ -117,7 +117,7 @@ async def update_email_settings(body: EmailSettings, me: dict = Depends(require_
 
 @settings_router.post("/email/test")
 async def send_test(body: TestEmailBody, me: dict = Depends(require_admin())):
-    res = await send_template("test", body.to, branding="TLS ARENA", queue=False)
+    res = await send_template("test", body.to, branding="THE LION SQUAD", queue=False)
     return res
 
 
@@ -321,7 +321,7 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_admin
 async def discord_test(me: dict = Depends(require_admin())):
     from discord_service import send_discord
     res = await send_discord(
-        "TLS ARENA · Testnachricht",
+        "THE LION SQUAD · Testnachricht",
         "Diese Nachricht bestätigt, dass dein Discord-Webhook korrekt funktioniert. 🦁",
         event_key="test",
     )

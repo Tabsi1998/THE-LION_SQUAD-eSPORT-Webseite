@@ -409,7 +409,7 @@ async def get_mail_settings() -> dict:
         "smtp_tls_verify": s.get("smtp_tls_verify", False),
         "smtp_envelope_from": s.get("smtp_envelope_from", ""),
         "smtp_helo_name": s.get("smtp_helo_name", ""),
-        "sender_name": s.get("sender_name") or legacy.get("sender_name") or "TLS ARENA",
+        "sender_name": s.get("sender_name") or legacy.get("sender_name") or "THE LION SQUAD",
         "sender_email": s.get("sender_email") or legacy.get("sender_email") or os.environ.get("SENDER_EMAIL", "noreply@lionsquad.at"),
         "reply_to_email": s.get("reply_to_email") or legacy.get("reply_to_email") or s.get("sender_email") or legacy.get("sender_email") or os.environ.get("SENDER_EMAIL", "noreply@lionsquad.at"),
         "message_id_domain": s.get("message_id_domain") or legacy.get("message_id_domain") or "",
@@ -659,7 +659,7 @@ async def smtp_test(to: str) -> dict:
         return {"ok": False, "reason": "SMTP Host fehlt."}
     try:
         from email_service import tpl_test
-        subject, html = tpl_test(branding="TLS ARENA")
+        subject, html = tpl_test(branding="THE LION SQUAD")
         msg_id = await _smtp_send(cfg, to, subject, html)
         return {"ok": True, "id": msg_id}
     except Exception as exc:

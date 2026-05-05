@@ -20,7 +20,7 @@ async def _get_email_config() -> dict:
     mail = await db.settings.find_one({"id": "mail"}) or {}
     api_key = s.get("resend_api_key") or os.environ.get("RESEND_API_KEY", "")
     sender_email = s.get("sender_email") or mail.get("sender_email") or os.environ.get("SENDER_EMAIL", "noreply@lionsquad.at")
-    sender_name = s.get("sender_name") or mail.get("sender_name") or "TLS ARENA"
+    sender_name = s.get("sender_name") or mail.get("sender_name") or "THE LION SQUAD"
     reply_to_email = s.get("reply_to_email") or mail.get("reply_to_email") or sender_email
     enabled = s.get("enabled", True) and bool(api_key)
     return {
@@ -79,37 +79,14 @@ async def send_mail(to: str, subject: str, html: str, template_key: str = "custo
         return {"ok": False, "reason": str(e)}
 
 
-# ---------- HTML Templates (dark eSports theme, inline CSS) ----------
+# ---------- HTML Templates ----------
 BRAND_CYAN = "#29B6E8"
-BRAND_BLACK = "#0A0A0A"
-
-
-def _wrap(title: str, body_html: str, cta_label: Optional[str] = None, cta_url: Optional[str] = None) -> str:
-    cta = ""
-    if cta_label and cta_url:
-        cta = f'<a href="{cta_url}" style="display:inline-block;padding:14px 28px;background:{BRAND_CYAN};color:#000;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;text-decoration:none;font-family:Arial,sans-serif;font-size:13px;margin-top:16px">{cta_label}</a>'
-    return f"""<!DOCTYPE html>
-<html><body style="margin:0;padding:0;background:{BRAND_BLACK};font-family:Arial,Helvetica,sans-serif;color:#fff">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:{BRAND_BLACK};padding:40px 0">
-<tr><td align="center">
-  <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#121212;border:1px solid rgba(255,255,255,0.1)">
-    <tr><td style="padding:32px 32px 16px;border-bottom:1px solid rgba(255,255,255,0.06)">
-      <div style="font-size:11px;font-weight:700;letter-spacing:0.3em;color:{BRAND_CYAN};text-transform:uppercase">THE LION SQUAD · TLS ARENA</div>
-      <div style="margin-top:10px;font-size:26px;font-weight:900;text-transform:uppercase;color:#fff;line-height:1.1">{title}</div>
-    </td></tr>
-    <tr><td style="padding:28px 32px 32px;color:rgba(255,255,255,0.8);font-size:15px;line-height:1.6">
-      {body_html}
-      {cta}
-    </td></tr>
-    <tr><td style="padding:18px 32px;border-top:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.18em;text-transform:uppercase">TLS ARENA · The Lion Squad eSports</td></tr>
-  </table>
-</td></tr></table></body></html>"""
 
 
 def tpl_registration(display_name: str) -> tuple[str, str]:
     return "Willkommen im Rudel", _wrap(
         "Willkommen, " + (display_name or "Löwe"),
-        "<p>Dein Account in der TLS ARENA ist bereit. Ab jetzt kannst du dich für Turniere anmelden, Teams gründen und die F1 Fast Lap Challenge mitfahren.</p>"
+        "<p>Dein Account auf der Website von THE LION SQUAD eSports ist bereit. Ab jetzt kannst du dich fuer Turniere anmelden, Teams gruenden und die F1 Fast Lap Challenge mitfahren.</p>"
         "<p>Viel Erfolg!</p>",
     )
 
@@ -192,13 +169,6 @@ def tpl_tournament_finished(tournament_title: str, url: str) -> tuple[str, str]:
         "Das Turnier ist zu Ende",
         f"<p>Herzlichen Glückwunsch an alle Teilnehmer. Das Turnier <strong>{tournament_title}</strong> ist offiziell beendet. Die finalen Ergebnisse sind jetzt online.</p>",
         "Ergebnisse ansehen", url,
-    )
-
-
-def tpl_test(branding: str = "TLS ARENA") -> tuple[str, str]:
-    return f"[Test] {branding} E-Mail-Versand funktioniert", _wrap(
-        "Testmail erfolgreich",
-        "<p>Diese E-Mail bestätigt, dass dein E-Mail-Setup korrekt funktioniert. THE LION SQUAD kann jetzt Nachrichten an deine Spieler und Mitglieder senden.</p>",
     )
 
 
@@ -332,7 +302,7 @@ def _wrap(title: str, body_html: str, cta_label: Optional[str] = None, cta_url: 
 </td></tr></table></body></html>"""
 
 
-def tpl_test(branding: str = "TLS ARENA") -> tuple[str, str]:
+def tpl_test(branding: str = "THE LION SQUAD") -> tuple[str, str]:
     return "Testmail von THE LION SQUAD", _wrap(
         "E-Mail-Test",
         "<p>Diese Nachricht wurde ueber die Website von THE LION SQUAD eSports versendet.</p>"
