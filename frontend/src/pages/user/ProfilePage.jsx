@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, formatApiError, formatRequestError, resolveMediaUrl } from "@/lib/api";
+import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -438,7 +438,7 @@ function TeamsPanel() {
       setSquads(data || []);
       loadTeams();
     } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
+      toast.error(formatRequestError(err, "Squad konnte nicht gespeichert werden.", { name: editing.name }));
     } finally {
       setSaving(false);
     }
@@ -452,7 +452,7 @@ function TeamsPanel() {
       setSquads((rows) => rows.filter((s) => s.id !== squad.id));
       loadTeams();
     } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
+      toast.error(formatRequestError(err, "Squad konnte nicht geloescht werden."));
     }
   };
 

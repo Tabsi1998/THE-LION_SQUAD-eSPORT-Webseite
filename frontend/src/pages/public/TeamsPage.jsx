@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
+import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -99,7 +99,7 @@ function TeamDetail({ id }) {
       toast.success("Du bist dem Team beigetreten.");
       setJoinCode("");
       load();
-    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    } catch (err) { toast.error(formatRequestError(err, "Team-Beitritt fehlgeschlagen.")); }
   };
 
   const leave = async () => {
@@ -107,7 +107,7 @@ function TeamDetail({ id }) {
       await api.post(`/teams/${team.id}/leave`);
       toast.success("Team verlassen.");
       load();
-    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    } catch (err) { toast.error(formatRequestError(err, "Team konnte nicht verlassen werden.")); }
   };
 
   const remove = async () => {
@@ -116,7 +116,7 @@ function TeamDetail({ id }) {
       await api.delete(`/teams/${team.id}`);
       toast.success("Team gelöscht.");
       nav("/teams");
-    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    } catch (err) { toast.error(formatRequestError(err, "Team konnte nicht geloescht werden.")); }
   };
 
   const kickMember = async (m) => {
@@ -125,7 +125,7 @@ function TeamDetail({ id }) {
       await api.delete(`/teams/${team.id}/members/${m.id}`);
       toast.success(`${m.display_name || m.username} entfernt.`);
       load();
-    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    } catch (err) { toast.error(formatRequestError(err, "Mitglied konnte nicht entfernt werden.")); }
   };
 
   const setRole = async (m, role) => {
@@ -133,7 +133,7 @@ function TeamDetail({ id }) {
       await api.post(`/teams/${team.id}/members/${m.id}/role`, { role });
       toast.success(role === "co_leader" ? "Zum Co-Leader befördert." : "Co-Leader-Rolle entzogen.");
       load();
-    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    } catch (err) { toast.error(formatRequestError(err, "Rolle konnte nicht geaendert werden.")); }
   };
 
   const transferLead = async (m) => {
@@ -142,7 +142,7 @@ function TeamDetail({ id }) {
       await api.post(`/teams/${team.id}/transfer-leader`, { new_leader_id: m.id });
       toast.success("Leadership übertragen.");
       load();
-    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    } catch (err) { toast.error(formatRequestError(err, "Leadership konnte nicht uebertragen werden.")); }
   };
 
   const copyJoin = async () => {
@@ -282,7 +282,7 @@ function TeamModal({ team, onClose, onSaved }) {
       else await api.patch(`/teams/${team.id}`, payload);
       toast.success(isNew ? "Team erstellt." : "Team gespeichert.");
       onSaved();
-    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    } catch (err) { toast.error(formatRequestError(err, isNew ? "Team konnte nicht erstellt werden." : "Team konnte nicht gespeichert werden.", { name: form.name })); }
     setSaving(false);
   };
 
