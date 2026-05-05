@@ -1,7 +1,11 @@
 """User profile + admin user management routes."""
+import os
+import secrets
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
-from auth import get_current_user, require_admin, require_super, hash_password
+from auth import get_current_user, require_admin, require_super, hash_password, hash_token
+from email_service import send_template
 from services.membership_service import get_membership, derived_user_type, is_active_member
 from models import AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate, now_utc, new_id
 
@@ -45,6 +49,49 @@ async def _attach_membership(user: dict) -> dict:
     return user
 
 
+async def _frontend_base_url() -> str:
+    db = get_db()
+    frontend = os.environ.get("FRONTEND_URL", "").strip().rstrip("/")
+    if frontend:
+        return frontend
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "domain": 1}) or {}
+    domain = (branding.get("domain") or "").strip().rstrip("/")
+    if not domain:
+        return ""
+    if not domain.startswith(("http://", "https://")):
+        domain = "https://" + domain
+    return domain
+
+
+async def _create_invite_token(user_id: str) -> tuple[str, str]:
+    db = get_db()
+    token = secrets.token_urlsafe(32)
+    await db.password_reset_tokens.insert_one({
+        "id": new_id(),
+        "token_hash": hash_token(token),
+        "user_id": user_id,
+        "purpose": "admin_invite",
+        "used": False,
+        "created_at": now_utc().isoformat(),
+        "expires_at": datetime.now(timezone.utc) + timedelta(days=7),
+    })
+    base = await _frontend_base_url()
+    return token, f"{base}/reset-password?token={token}&invite=1" if base else f"/reset-password?token={token}&invite=1"
+
+
+async def _send_user_invite(user: dict, actor: dict) -> dict:
+    token, invite_url = await _create_invite_token(user["id"])
+    result = await send_template(
+        "user_invite",
+        user["email"],
+        display_name=user.get("display_name") or user.get("username"),
+        invite_url=invite_url,
+        invited_by=actor.get("display_name") or actor.get("username") or actor.get("email") or "",
+        dedupe_key=f"user_invite:{user['id']}:{token[:10]}",
+    )
+    return {"invite_url": invite_url, "invite_email": result}
+
+
 @router.get("")
 async def list_users(q: str | None = None, role: str | None = None,
                      user_type: str | None = None,
@@ -85,17 +132,23 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
     if await db.users.find_one({"$or": [{"username": username}, {"email": email}]}):
         raise HTTPException(status_code=409, detail="Username oder E-Mail bereits vergeben")
     user_id = new_id()
+    manual_password = (body.password or "").strip()
+    if not body.send_invite and len(manual_password) < 6:
+        raise HTTPException(status_code=422, detail="Passwort muss mindestens 6 Zeichen haben, wenn keine Einladung gesendet wird.")
+    password_setup_required = bool(body.send_invite)
     doc = {
         "id": user_id,
         "username": username,
         "email": email,
-        "password_hash": hash_password(body.password),
+        "password_hash": "!pending_invite" if password_setup_required else hash_password(manual_password),
         "display_name": body.display_name or username,
         "role": body.role,
         "roles": [body.role],
         "user_type": "community_user",
         "is_active": body.is_active,
         "is_banned": False,
+        "password_setup_required": password_setup_required,
+        "invited_at": now_utc().isoformat() if password_setup_required else None,
         "privacy_public_profile": body.privacy_public_profile,
         "accepted_privacy": True,
         "accepted_terms": True,
@@ -112,7 +165,37 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
         "actor_id": me["id"],
         "created_at": now_utc().isoformat(),
     })
-    return _clean(doc)
+    response = _clean(doc)
+    if password_setup_required:
+        invite = await _send_user_invite(doc, me)
+        response.update(invite)
+        await db.audit_logs.insert_one({
+            "action": "user.invite",
+            "target_id": user_id,
+            "actor_id": me["id"],
+            "created_at": now_utc().isoformat(),
+        })
+    return response
+
+
+@router.post("/{user_id}/invite")
+async def resend_user_invite(user_id: str, me: dict = Depends(require_super())):
+    db = get_db()
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    invite = await _send_user_invite(user, me)
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"password_setup_required": True, "invited_at": now_utc().isoformat(), "updated_at": now_utc().isoformat()}},
+    )
+    await db.audit_logs.insert_one({
+        "action": "user.invite",
+        "target_id": user_id,
+        "actor_id": me["id"],
+        "created_at": now_utc().isoformat(),
+    })
+    return {"ok": True, **invite}
 
 
 @router.get("/public-list")

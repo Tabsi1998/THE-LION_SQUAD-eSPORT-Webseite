@@ -102,6 +102,18 @@ def tpl_password_reset(reset_url: str) -> tuple[str, str]:
     )
 
 
+def tpl_user_invite(display_name: str, invite_url: str, invited_by: str = "") -> tuple[str, str]:
+    byline = f"<p>Die Einladung wurde von <strong>{invited_by}</strong> erstellt.</p>" if invited_by else ""
+    return "Einladung zu THE LION SQUAD", _wrap(
+        "Account aktivieren",
+        f"<p>Hallo {display_name or 'Lion'},</p>"
+        "<p>fuer dich wurde ein Account auf der Website von <strong>THE LION SQUAD eSports</strong> angelegt.</p>"
+        f"{byline}"
+        "<p>Klicke auf den Button, vergib dein eigenes Passwort und schliesse die Einrichtung ab. Der Link ist 7 Tage gueltig.</p>",
+        "Passwort erstellen", invite_url,
+    )
+
+
 def tpl_registration_received(tournament_title: str, url: str) -> tuple[str, str]:
     return f"Anmeldung eingegangen: {tournament_title}", _wrap(
         "Anmeldung eingegangen",
@@ -319,6 +331,7 @@ async def send_template(template_key: str, to: str, queue: bool = True, schedule
     templates = {
         "registration": tpl_registration,
         "password_reset": tpl_password_reset,
+        "user_invite": tpl_user_invite,
         "registration_received": tpl_registration_received,
         "registration_approved": tpl_registration_approved,
         "registration_rejected": tpl_registration_rejected,

@@ -24,6 +24,7 @@ import TeamsPage from "@/pages/public/TeamsPage";
 import NewsPage from "@/pages/public/NewsPage";
 import LoginPage from "@/pages/public/LoginPage";
 import RegisterPage from "@/pages/public/RegisterPage";
+import { ForgotPasswordPage, ResetPasswordPage } from "@/pages/public/PasswordRecoveryPage";
 import { PrivacyPage, ImprintPage } from "@/pages/public/LegalPages";
 
 import DashboardPage from "@/pages/user/DashboardPage";
@@ -127,6 +128,8 @@ function App() {
           <Route path="/imprint" element={<ImprintPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* User */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />

@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { toast } from "sonner";
-import { Plus, Trash2, X } from "lucide-react";
+import { Link as LinkIcon, Plus, Trash2, X } from "lucide-react";
 
 export default function AdminUsersPage() {
   const { isSuperAdmin } = useAuth();
@@ -33,6 +33,18 @@ export default function AdminUsersPage() {
       toast.success("Benutzer gelöscht.");
       load();
     } catch (e) { toast.error(e.response?.data?.detail || "Löschen fehlgeschlagen."); }
+  };
+  const resendInvite = async (u) => {
+    try {
+      const { data } = await api.post(`/users/${u.id}/invite`);
+      if (data.invite_url && navigator.clipboard) {
+        await navigator.clipboard.writeText(data.invite_url).catch(() => null);
+        toast.success("Einladung gesendet und Link kopiert.");
+      } else {
+        toast.success("Einladung gesendet.");
+      }
+      load();
+    } catch (e) { toast.error(e.response?.data?.detail || "Einladung konnte nicht gesendet werden."); }
   };
 
   return (
@@ -65,7 +77,10 @@ export default function AdminUsersPage() {
             {list.map((u) => (
               <tr key={u.id} className={u.is_banned ? "opacity-50" : ""}>
                 <td className="px-4 py-3 text-white/80">{u.username}</td>
-                <td className="px-4 py-3">{u.display_name}</td>
+                <td className="px-4 py-3">
+                  <div>{u.display_name}</div>
+                  {u.password_setup_required && <div className="text-[10px] uppercase tracking-widest text-[#FFD700]">Einladung offen</div>}
+                </td>
                 <td className="px-4 py-3 text-white/60 text-xs">{u.email}</td>
                 <td className="px-4 py-3">
                   <select value={u.role} onChange={(e) => setRole(u.id, e.target.value)} data-testid={`user-role-${u.username}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs">
@@ -78,9 +93,14 @@ export default function AdminUsersPage() {
                       {u.is_banned ? "Entbannen" : "Bannen"}
                     </button>
                     {isSuperAdmin && (
-                      <button onClick={() => deleteUser(u)} data-testid={`user-delete-${u.username}`} className="p-1.5 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm hover:bg-[#FF3B30]/10" title="Benutzer löschen">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <>
+                        <button onClick={() => resendInvite(u)} data-testid={`user-invite-${u.username}`} className="p-1.5 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm hover:bg-[#29B6E8]/10" title="Einladung senden">
+                          <LinkIcon className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => deleteUser(u)} data-testid={`user-delete-${u.username}`} className="p-1.5 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm hover:bg-[#FF3B30]/10" title="Benutzer loeschen">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
                     )}
                   </div>
                 </td>
@@ -96,17 +116,24 @@ export default function AdminUsersPage() {
 }
 
 function CreateUserModal({ onClose, onSaved }) {
-  const [form, setForm] = useState({ username: "", display_name: "", email: "", password: "", role: "player", is_active: true, privacy_public_profile: true });
+  const [form, setForm] = useState({ username: "", display_name: "", email: "", role: "player", is_active: true, privacy_public_profile: true, send_invite: true });
   const [saving, setSaving] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState("");
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.post("/users", form);
-      toast.success("Benutzer angelegt.");
-      onSaved();
+      const { data } = await api.post("/users", form);
+      if (data.invite_url) {
+        setInviteUrl(data.invite_url);
+        if (navigator.clipboard) await navigator.clipboard.writeText(data.invite_url).catch(() => null);
+        toast.success("Benutzer angelegt, Einladung gesendet und Link kopiert.");
+      } else {
+        toast.success("Benutzer angelegt.");
+        onSaved();
+      }
     } catch (err) {
       toast.error(err.response?.data?.detail || "Benutzer konnte nicht angelegt werden.");
     }
@@ -124,7 +151,9 @@ function CreateUserModal({ onClose, onSaved }) {
           <Field label="Username"><Input value={form.username} onChange={(v) => set("username", v)} required testId="create-user-username" /></Field>
           <Field label="Display Name"><Input value={form.display_name} onChange={(v) => set("display_name", v)} testId="create-user-display" /></Field>
           <Field label="E-Mail"><Input type="email" value={form.email} onChange={(v) => set("email", v)} required testId="create-user-email" /></Field>
-          <Field label="Passwort"><Input type="password" value={form.password} onChange={(v) => set("password", v)} required testId="create-user-password" /></Field>
+          <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 p-3 rounded-sm text-sm text-white/70">
+            Der Benutzer bekommt per E-Mail einen einmaligen Link und erstellt sein Passwort selbst.
+          </div>
           <Field label="Rolle">
             <select value={form.role} onChange={(e) => set("role", e.target.value)} data-testid="create-user-role" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
               {["player", "team_leader", "moderator", "tournament_admin", "club_admin", "superadmin"].map((r) => <option key={r} value={r}>{r}</option>)}
@@ -132,10 +161,16 @@ function CreateUserModal({ onClose, onSaved }) {
           </Field>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_active} onChange={(e) => set("is_active", e.target.checked)} className="accent-[#29B6E8]" /> Aktiv</label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.privacy_public_profile} onChange={(e) => set("privacy_public_profile", e.target.checked)} className="accent-[#29B6E8]" /> Öffentliches Profil</label>
+          {inviteUrl && (
+            <div className="border border-[#FFD700]/30 bg-[#FFD700]/10 p-3 rounded-sm">
+              <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Einladungslink</div>
+              <div className="mt-1 text-xs break-all text-white/80">{inviteUrl}</div>
+            </div>
+          )}
         </div>
         <div className="flex justify-end gap-2 p-5 border-t border-white/10">
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
-          <button disabled={saving} data-testid="create-user-submit" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Anlegen"}</button>
+          <button type="button" onClick={inviteUrl ? onSaved : onClose} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">{inviteUrl ? "Schliessen" : "Abbrechen"}</button>
+          {!inviteUrl && <button disabled={saving} data-testid="create-user-submit" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere..." : "Anlegen & einladen"}</button>}
         </div>
       </form>
     </div>

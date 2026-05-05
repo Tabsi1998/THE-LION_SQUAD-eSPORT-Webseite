@@ -40,11 +40,12 @@ class UserLogin(BaseModel):
 class AdminUserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=32)
     email: EmailStr
-    password: str = Field(min_length=6, max_length=128)
+    password: Optional[str] = Field(default=None, min_length=6, max_length=128)
     display_name: Optional[str] = None
     role: Role = "player"
     is_active: bool = True
     privacy_public_profile: bool = True
+    send_invite: bool = True
 
 
 class UserUpdate(BaseModel):
@@ -235,6 +236,7 @@ class GameCreate(BaseModel):
 
 class GameUpdate(BaseModel):
     name: Optional[str] = None
+    slug: Optional[str] = None
     short_name: Optional[str] = None
     logo_url: Optional[str] = None
     cover_url: Optional[str] = None

@@ -149,6 +149,9 @@ async def login(body: UserLogin, request: Request, response: Response):
     await _check_brute_force(db, identifier)
 
     user = await db.users.find_one({"email": email})
+    if user and user.get("password_setup_required"):
+        await _record_failed(db, identifier)
+        raise HTTPException(status_code=403, detail="Bitte zuerst den Einladungslink verwenden und ein Passwort erstellen.")
     if not user or not verify_password(body.password, user["password_hash"]):
         await _record_failed(db, identifier)
         raise HTTPException(status_code=401, detail="Ungültige Zugangsdaten")
@@ -257,6 +260,8 @@ async def reset_password(body: ResetPasswordBody):
     await db.users.update_one(
         {"id": doc["user_id"]},
         {"$set": {"password_hash": hash_password(body.new_password),
+                  "password_setup_required": False,
+                  "email_verified": True,
                   "updated_at": now_utc().isoformat()}},
     )
     await db.password_reset_tokens.update_one({"id": doc["id"]}, {"$set": {"used": True}})
