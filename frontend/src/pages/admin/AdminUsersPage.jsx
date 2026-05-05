@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { toast } from "sonner";
@@ -19,12 +19,16 @@ export default function AdminUsersPage() {
 
   const setRole = async (id, role) => {
     try { await api.post(`/users/${id}/role`, { role }); toast.success("Rolle aktualisiert."); load(); }
-    catch { toast.error("Fehler (nur Superadmin)."); }
+    catch (e) { toast.error(formatRequestError(e, "Rolle konnte nicht aktualisiert werden.")); }
   };
   const toggleBan = async (u) => {
-    await api.post(`/users/${u.id}/${u.is_banned ? "unban" : "ban"}`);
-    toast.success(u.is_banned ? "Entbannt." : "Gebannt.");
-    load();
+    try {
+      await api.post(`/users/${u.id}/${u.is_banned ? "unban" : "ban"}`);
+      toast.success(u.is_banned ? "Entbannt." : "Gebannt.");
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, u.is_banned ? "Entbannen fehlgeschlagen." : "Bannen fehlgeschlagen."));
+    }
   };
   const deleteUser = async (u) => {
     if (!window.confirm(`Benutzer "${u.username}" wirklich endgültig löschen? Das entfernt auch Login, Mitgliedschaft, Registrierungen, Achievements und Zeiten.`)) return;
@@ -32,7 +36,7 @@ export default function AdminUsersPage() {
       await api.delete(`/users/${u.id}`);
       toast.success("Benutzer gelöscht.");
       load();
-    } catch (e) { toast.error(e.response?.data?.detail || "Löschen fehlgeschlagen."); }
+    } catch (e) { toast.error(formatRequestError(e, "Loeschen fehlgeschlagen.")); }
   };
   const resendInvite = async (u) => {
     try {
@@ -44,7 +48,7 @@ export default function AdminUsersPage() {
         toast.success("Einladung gesendet.");
       }
       load();
-    } catch (e) { toast.error(e.response?.data?.detail || "Einladung konnte nicht gesendet werden."); }
+    } catch (e) { toast.error(formatRequestError(e, "Einladung konnte nicht gesendet werden.")); }
   };
 
   return (
@@ -135,7 +139,7 @@ function CreateUserModal({ onClose, onSaved }) {
         onSaved();
       }
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Benutzer konnte nicht angelegt werden.");
+      toast.error(formatRequestError(err, "Benutzer konnte nicht angelegt werden.", { name: form.username }));
     }
     setSaving(false);
   };

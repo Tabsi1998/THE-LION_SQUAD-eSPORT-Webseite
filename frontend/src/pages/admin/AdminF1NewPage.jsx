@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { normalizeDateTimeFields } from "@/lib/datetime";
@@ -36,7 +36,7 @@ export default function AdminF1NewPage() {
       const { data } = await api.post("/f1/challenges", payload);
       toast.success("Challenge erstellt.");
       nav(`/admin/f1/${data.id}`);
-    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    } catch (err) { toast.error(formatRequestError(err, "Challenge konnte nicht erstellt werden.", { slug: form.slug, title: form.title })); }
     setSaving(false);
   };
 

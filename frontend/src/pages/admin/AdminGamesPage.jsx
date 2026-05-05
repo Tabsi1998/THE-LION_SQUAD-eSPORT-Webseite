@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
@@ -32,13 +32,18 @@ export default function AdminGamesPage() {
       toast.success("Spiel erstellt.");
       setForm({ name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "" });
       load();
-    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    } catch (err) { toast.error(formatRequestError(err, "Spiel konnte nicht erstellt werden.", { slug: form.slug, name: form.name })); }
   };
 
   const del = async (id) => {
     if (!confirm("Spiel löschen?")) return;
-    await api.delete(`/games/${id}`);
-    load();
+    try {
+      await api.delete(`/games/${id}`);
+      toast.success("Spiel geloescht.");
+      load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Spiel konnte nicht geloescht werden."));
+    }
   };
 
   return (
@@ -138,7 +143,7 @@ function EditGameModal({ game, onClose, onSaved }) {
       toast.success("Spiel gespeichert.");
       onSaved();
     } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail) || "Spiel konnte nicht gespeichert werden.");
+      toast.error(formatRequestError(err, "Spiel konnte nicht gespeichert werden.", { slug: form.slug, name: form.name }));
     }
     setSaving(false);
   };

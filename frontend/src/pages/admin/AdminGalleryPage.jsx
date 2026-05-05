@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
+import { api, formatApiError, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload, prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
@@ -113,7 +113,7 @@ function AlbumModal({ album, events, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
+      toast.error(formatRequestError(err, "Album konnte nicht gespeichert werden.", { slug: form.slug, title: form.title }));
     }
     setSaving(false);
   };
@@ -237,8 +237,9 @@ function AlbumPhotos({ album, events, onBack }) {
           order_index: photos.length + ok + 1,
         });
         ok++;
-      } catch {
+      } catch (err) {
         fail++;
+        toast.error(`${item.filename || "Bild"}: ${formatRequestError(err, "Bild konnte nicht hinzugefuegt werden.")}`);
       }
     }
     toast.success(`${ok} Bild(er) aus Medien hinzugefuegt${fail ? `, ${fail} fehlgeschlagen` : ""}.`);

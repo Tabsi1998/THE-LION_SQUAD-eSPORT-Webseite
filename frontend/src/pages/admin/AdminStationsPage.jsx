@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { Plus, Trash2, Link as LinkIcon, X as XIcon } from "lucide-react";
@@ -47,16 +47,27 @@ export default function AdminStationsPage() {
       toast.success("Station angelegt.");
       setForm({ name: "", device_type: "switch", notes: "" });
       load();
-    } catch { toast.error("Fehler beim Anlegen."); }
+    } catch (e) {
+      toast.error(formatRequestError(e, "Station konnte nicht angelegt werden.", { name: form.name }));
+    }
   };
   const updateStatus = async (id, status) => {
-    await api.patch(`/stations/${id}`, { status });
-    load();
+    try {
+      await api.patch(`/stations/${id}`, { status });
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Stationsstatus konnte nicht gespeichert werden."));
+    }
   };
   const del = async (id) => {
     if (!confirm("Station löschen?")) return;
-    await api.delete(`/stations/${id}`);
-    load();
+    try {
+      await api.delete(`/stations/${id}`);
+      toast.success("Station geloescht.");
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Station konnte nicht geloescht werden."));
+    }
   };
   const assign = async (sid, mid) => {
     try {
@@ -64,12 +75,18 @@ export default function AdminStationsPage() {
       toast.success("Match zugewiesen.");
       setAssignFor(null);
       load(); loadMatches();
-    } catch (e) { toast.error(e.response?.data?.detail || "Fehler"); }
+    } catch (e) {
+      toast.error(formatRequestError(e, "Match konnte nicht zugewiesen werden."));
+    }
   };
   const clearStation = async (sid) => {
-    await api.post(`/stations/${sid}/clear`);
-    toast.success("Station freigegeben.");
-    load(); loadMatches();
+    try {
+      await api.post(`/stations/${sid}/clear`);
+      toast.success("Station freigegeben.");
+      load(); loadMatches();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Station konnte nicht freigegeben werden."));
+    }
   };
 
   const regById = Object.fromEntries(regs.map((r) => [r.id, r]));

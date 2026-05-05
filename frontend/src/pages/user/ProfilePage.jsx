@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
+import { api, formatApiError, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -149,7 +149,7 @@ export default function ProfilePage() {
       await refresh();
       toast.success("Profil gespeichert.");
     } catch (err) {
-      toast.error("Fehler beim Speichern.");
+      toast.error(formatRequestError(err, "Profil konnte nicht gespeichert werden."));
     } finally {
       setSaving(false);
     }

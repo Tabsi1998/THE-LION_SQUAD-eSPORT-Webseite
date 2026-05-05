@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, formatMemberSince } from "@/lib/api";
+import { api, formatMemberSince, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { toast } from "sonner";
 import { Crown, Search, X, Save } from "lucide-react";
@@ -80,7 +80,7 @@ export default function AdminMembersPage() {
       load();
       return data;
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Fehler beim Speichern.");
+      toast.error(formatRequestError(e, "Mitgliedschaft konnte nicht gespeichert werden."));
       return null;
     }
   };

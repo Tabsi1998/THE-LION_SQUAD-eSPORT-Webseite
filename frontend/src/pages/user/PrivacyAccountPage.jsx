@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { toast } from "sonner";
@@ -22,7 +22,7 @@ export default function PrivacyAccountPage() {
       a.click();
       URL.revokeObjectURL(a.href);
       toast.success("Datenexport heruntergeladen.");
-    } catch { toast.error("Export fehlgeschlagen."); }
+    } catch (err) { toast.error(formatRequestError(err, "Export fehlgeschlagen.")); }
     setBusy(false);
   };
 
@@ -35,7 +35,7 @@ export default function PrivacyAccountPage() {
       toast.success("Dein Account wurde anonymisiert.");
       await logout();
       nav("/");
-    } catch { toast.error("Anonymisierung fehlgeschlagen."); }
+    } catch (err) { toast.error(formatRequestError(err, "Anonymisierung fehlgeschlagen.")); }
     setBusy(false);
   };
 

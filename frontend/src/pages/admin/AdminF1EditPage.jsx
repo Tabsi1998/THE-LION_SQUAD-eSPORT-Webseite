@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { API, api, formatApiError, formatMs, parseTimeStr, resolveMediaUrl } from "@/lib/api";
+import { API, api, formatRequestError, parseTimeStr, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -51,13 +51,18 @@ export default function AdminF1EditPage() {
       setNewTrack({ name: "", image_url: "", country: "" });
       toast.success("Strecke hinzugefügt.");
       load();
-    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    } catch (err) { toast.error(formatRequestError(err, "Strecke konnte nicht hinzugefuegt werden.", { name: newTrack.name })); }
   };
 
   const delTrack = async (tid) => {
     if (!confirm("Strecke und Zeiten löschen?")) return;
-    await api.delete(`/f1/tracks/${tid}`);
-    load();
+    try {
+      await api.delete(`/f1/tracks/${tid}`);
+      toast.success("Strecke geloescht.");
+      load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Strecke konnte nicht geloescht werden."));
+    }
   };
 
   const saveTrack = async (e) => {
@@ -73,7 +78,7 @@ export default function AdminF1EditPage() {
       toast.success("Strecke gespeichert.");
       setEditTrack(null);
       load();
-    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    } catch (err) { toast.error(formatRequestError(err, "Strecke konnte nicht gespeichert werden.", { name: editTrack.name })); }
   };
 
   const addTime = async (e) => {
@@ -95,12 +100,17 @@ export default function AdminF1EditPage() {
       setNewTime({ ...newTime, time_str: "", proof_url: "", admin_note: "", penalty_seconds: 0 });
       toast.success("Zeit eingetragen.");
       loadTimes();
-    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    } catch (err) { toast.error(formatRequestError(err, "Zeit konnte nicht eingetragen werden.")); }
   };
 
   const delTime = async (tid) => {
-    await api.delete(`/f1/times/${tid}`);
-    loadTimes();
+    try {
+      await api.delete(`/f1/times/${tid}`);
+      toast.success("Zeit geloescht.");
+      loadTimes();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Zeit konnte nicht geloescht werden."));
+    }
   };
 
   const saveEdit = async () => {
@@ -125,13 +135,17 @@ export default function AdminF1EditPage() {
       toast.success("Zeit aktualisiert.");
       setEditTime(null);
       loadTimes();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    } catch (e) { toast.error(formatRequestError(e, "Zeit konnte nicht gespeichert werden.")); }
   };
 
   const setStatus = async (status) => {
-    await api.patch(`/f1/challenges/${id}`, { status });
-    toast.success(`Status: ${status}`);
-    load();
+    try {
+      await api.patch(`/f1/challenges/${id}`, { status });
+      toast.success(`Status: ${status}`);
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Challenge-Status konnte nicht gespeichert werden."));
+    }
   };
 
   if (!challenge) return <AdminLayout><div className="p-10 text-white/40">Lade…</div></AdminLayout>;
@@ -351,7 +365,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
       await api.patch(`/f1/challenges/${challenge.id}`, payload);
       toast.success("Challenge gespeichert.");
       onSaved();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    } catch (e) { toast.error(formatRequestError(e, "Challenge konnte nicht gespeichert werden.", { title: form.title })); }
   };
   return (
     <div className="mb-6 border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">

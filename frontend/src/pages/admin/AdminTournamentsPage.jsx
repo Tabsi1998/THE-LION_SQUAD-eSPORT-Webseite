@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { Plus, Trash2, Play, Pause } from "lucide-react";
@@ -21,13 +21,20 @@ export default function AdminTournamentsPage() {
       await api.post(`/tournaments/${id}/status`, { status });
       toast.success(`Status: ${status}`);
       load();
-    } catch { toast.error("Fehler"); }
+    } catch (e) {
+      toast.error(formatRequestError(e, "Status konnte nicht geaendert werden."));
+    }
   };
 
   const del = async (id) => {
     if (!confirm("Turnier wirklich löschen?")) return;
-    await api.delete(`/tournaments/${id}`);
-    load();
+    try {
+      await api.delete(`/tournaments/${id}`);
+      toast.success("Turnier geloescht.");
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Turnier konnte nicht geloescht werden."));
+    }
   };
 
   return (

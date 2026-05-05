@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { API, api, formatApiError } from "@/lib/api";
+import { API, api, formatApiError, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
@@ -44,18 +44,30 @@ export default function AdminTournamentEditPage() {
   };
   const reset = async () => {
     if (!confirm("Bracket wirklich zurücksetzen?")) return;
-    await api.post(`/tournaments/${id}/reset-bracket`);
-    toast.success("Bracket zurückgesetzt.");
-    load();
+    try {
+      await api.post(`/tournaments/${id}/reset-bracket`);
+      toast.success("Bracket zurückgesetzt.");
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Bracket konnte nicht zurueckgesetzt werden."));
+    }
   };
   const setRegStatus = async (rid, status) => {
-    await api.patch(`/tournaments/${id}/registrations/${rid}`, { status });
-    load();
+    try {
+      await api.patch(`/tournaments/${id}/registrations/${rid}`, { status });
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Teilnehmerstatus konnte nicht gespeichert werden."));
+    }
   };
   const setTournStatus = async (status) => {
-    await api.post(`/tournaments/${id}/status`, { status });
-    toast.success(`Status: ${status}`);
-    load();
+    try {
+      await api.post(`/tournaments/${id}/status`, { status });
+      toast.success(`Status: ${status}`);
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Turnierstatus konnte nicht gespeichert werden."));
+    }
   };
   const updateMatchResult = async (m, scoreA, scoreB, winnerId) => {
     try {
@@ -99,10 +111,10 @@ export default function AdminTournamentEditPage() {
             <RefreshCw className="w-3.5 h-3.5" /> Reset
           </button>}
           {isAdmin && t.format === "swiss" && (
-            <button onClick={async()=>{ try{ const {data} = await api.post(`/tournaments/${id}/swiss/next-round`); toast.success(`Runde ${data.round} mit ${data.match_count} Matches generiert`); load(); }catch(e){ toast.error(e.response?.data?.detail||"Fehler"); } }} data-testid="admin-tr-swiss-next" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Swiss Runde</button>
+            <button onClick={async()=>{ try{ const {data} = await api.post(`/tournaments/${id}/swiss/next-round`); toast.success(`Runde ${data.round} mit ${data.match_count} Matches generiert`); load(); }catch(e){ toast.error(formatRequestError(e, "Swiss-Runde konnte nicht generiert werden.")); } }} data-testid="admin-tr-swiss-next" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Swiss Runde</button>
           )}
           {isAdmin && t.format === "groups" && (
-            <button onClick={async()=>{ const gc = prompt("Wie viele Gruppen?", "4"); if(!gc) return; try{ const {data} = await api.post(`/tournaments/${id}/groups/generate`,{group_count: parseInt(gc)}); toast.success(`${data.group_count} Gruppen mit ${data.match_count} Matches`); load(); }catch(e){ toast.error(e.response?.data?.detail||"Fehler"); } }} data-testid="admin-tr-groups" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Gruppen generieren</button>
+            <button onClick={async()=>{ const gc = prompt("Wie viele Gruppen?", "4"); if(!gc) return; try{ const {data} = await api.post(`/tournaments/${id}/groups/generate`,{group_count: parseInt(gc)}); toast.success(`${data.group_count} Gruppen mit ${data.match_count} Matches`); load(); }catch(e){ toast.error(formatRequestError(e, "Gruppen konnten nicht generiert werden.")); } }} data-testid="admin-tr-groups" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Gruppen generieren</button>
           )}
           <div className="flex gap-1">
             <a href={`${API}/exports/tournaments/${t.id}/participants.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF Teilnehmer</a>
@@ -271,7 +283,7 @@ function TournamentEditForm({ tournament, onSaved }) {
       await api.patch(`/tournaments/${tournament.id}`, payload);
       toast.success("Gespeichert.");
       onSaved();
-    } catch (e) { toast.error(e.response?.data?.detail || "Fehler"); }
+    } catch (e) { toast.error(formatRequestError(e, "Turnier konnte nicht gespeichert werden.", { title: f.title })); }
   };
   return (
     <div className="max-w-2xl space-y-3 border border-white/10 bg-[#121212] rounded-sm p-5">

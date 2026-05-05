@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
@@ -21,7 +21,7 @@ export default function AdminEventsPage() {
 
   const remove = async (id) => {
     if (!window.confirm("Event löschen?")) return;
-    try { await api.delete(`/events/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    try { await api.delete(`/events/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Event konnte nicht geloescht werden.")); }
   };
 
   return (
@@ -138,7 +138,7 @@ function EventModal({ event, meta, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
+      toast.error(formatRequestError(err, "Event konnte nicht gespeichert werden.", { slug: form.slug, name: form.name }));
     }
     setSaving(false);
   };

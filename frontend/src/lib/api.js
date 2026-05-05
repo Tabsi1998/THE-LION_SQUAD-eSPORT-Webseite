@@ -78,6 +78,29 @@ export function formatApiError(detail) {
   return String(detail);
 }
 
+export function suggestSlug(value) {
+  const base = String(value || "eintrag")
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 70) || "eintrag";
+  return `${base}-${new Date().getFullYear()}`;
+}
+
+export function formatRequestError(error, fallback = "Ein Fehler ist aufgetreten.", context = {}) {
+  const detail = error?.response?.data?.detail;
+  const message = formatApiError(detail);
+  if (/slug bereits vergeben/i.test(message)) {
+    const suggestion = suggestSlug(context.slug || context.title || context.name);
+    return `${message} Vorschlag: ${suggestion}`;
+  }
+  if (message && message !== "Ein Fehler ist aufgetreten.") return message;
+  if (error?.message) return error.message;
+  return fallback;
+}
+
 export function formatMs(ms) {
   if (ms == null) return "-";
   const m = Math.floor(ms / 60000);

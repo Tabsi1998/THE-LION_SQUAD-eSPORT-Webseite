@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
+import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { Link } from "react-router-dom";
@@ -101,7 +101,7 @@ export default function AdminSeasonsPage() {
       toast.success("Saison geloescht.");
       load();
     } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
+      toast.error(formatRequestError(err, "Saison konnte nicht geloescht werden."));
     }
   };
 
@@ -193,7 +193,7 @@ function SeasonModal({ season, tournaments, challenges, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
+      toast.error(formatRequestError(err, "Saison konnte nicht gespeichert werden.", { slug: form.slug, name: form.name }));
     }
     setSaving(false);
   };

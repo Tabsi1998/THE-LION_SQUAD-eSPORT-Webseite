@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { API, api, formatApiError } from "@/lib/api";
+import { API, api, formatApiError, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { toast } from "sonner";
 import { Plus, Save, X, Trash2, FileText, Pin, UploadCloud } from "lucide-react";
@@ -42,7 +42,7 @@ export default function AdminDocumentsPage() {
 
   const remove = async (id) => {
     if (!window.confirm("Dokument löschen?")) return;
-    try { await api.delete(`/documents/${id}`); toast.success("Gelöscht."); load(); } catch { toast.error("Fehler."); }
+    try { await api.delete(`/documents/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Dokument konnte nicht geloescht werden.")); }
   };
 
   return (
@@ -182,7 +182,7 @@ function DocModal({ doc, meta, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
+      toast.error(formatRequestError(err, "Dokument konnte nicht gespeichert werden.", { title: form.title }));
     }
     setSaving(false);
   };
