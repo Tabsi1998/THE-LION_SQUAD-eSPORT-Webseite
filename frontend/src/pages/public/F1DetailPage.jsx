@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { Tv, Trophy, Flag, Download, Twitch, FileDown } from "lucide-react";
+import { formatDateTime, getRegistrationState } from "@/lib/datetime";
 
 export default function F1DetailPage() {
   const { slug } = useParams();
@@ -43,6 +44,8 @@ export default function F1DetailPage() {
 
   if (!challenge) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE …</div></PublicLayout>;
 
+  const registration = getRegistrationState(challenge, "Einreichung");
+
   return (
     <PublicLayout>
       <div className="relative border-b border-white/10 overflow-hidden bg-grid-dense">
@@ -57,6 +60,21 @@ export default function F1DetailPage() {
           </div>
           <h1 data-testid="f1-challenge-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{challenge.title}</h1>
           {challenge.description && <p className="mt-3 text-white/70 max-w-2xl">{challenge.description}</p>}
+          <div className={`mt-5 border rounded-sm px-4 py-3 text-sm max-w-3xl ${
+            registration.canRegister
+              ? "border-[#00FF88]/30 bg-[#00FF88]/5 text-[#00FF88]"
+              : registration.state === "scheduled"
+                ? "border-[#29B6E8]/30 bg-[#29B6E8]/5 text-[#29B6E8]"
+                : "border-white/10 bg-[#121212] text-white/60"
+          }`}>
+            <div className="font-bold uppercase tracking-wider text-xs">{registration.label}</div>
+            <div className="mt-1 text-white/55">
+              {challenge.registration_open_from && <span>Öffnet: {formatDateTime(challenge.registration_open_from)}</span>}
+              {challenge.registration_open_from && challenge.registration_open_until && <span className="mx-2 text-white/20">·</span>}
+              {challenge.registration_open_until && <span>Endet: {formatDateTime(challenge.registration_open_until)}</span>}
+              {!challenge.registration_open_from && !challenge.registration_open_until && <span>Zeiten werden durch Admins oder Moderatoren eingetragen.</span>}
+            </div>
+          </div>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link to={`/display/f1/${challenge.id}${activeTrack ? `?track=${activeTrack}` : ""}`} target="_blank" data-testid="f1-tv-link" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
               <Tv className="w-4 h-4" /> TV / Beamer Modus

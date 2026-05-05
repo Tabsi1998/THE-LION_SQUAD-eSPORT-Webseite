@@ -15,7 +15,7 @@ import { toast } from "sonner";
  *   variant: "square" | "wide" (visual)
  *   endpoint: "/uploads/image" (default) or "/uploads/sponsor-logo"
  */
-export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", endpoint = "/uploads/image", maxSizeMb = 15 }) {
+export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", endpoint = "/uploads/image", maxSizeMb = 25 }) {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
@@ -35,7 +35,9 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     } catch (e) {
       const detail = e.response?.data?.detail;
       const status = e.response?.status;
-      const message = detail ? formatApiError(detail) : e.message || "Upload fehlgeschlagen";
+      const message = status === 413
+        ? `Datei zu groß oder Reverse Proxy blockiert den Upload. App-Limit: ${maxSizeMb} MB, externer Proxy bitte auf mindestens 35 MB setzen.`
+        : detail ? formatApiError(detail) : e.message || "Upload fehlgeschlagen";
       toast.error(status ? `Upload fehlgeschlagen (${status}): ${message}` : `Upload fehlgeschlagen: ${message}`);
     } finally {
       if (fileRef.current) fileRef.current.value = "";

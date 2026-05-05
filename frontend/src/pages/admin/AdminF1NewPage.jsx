@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { normalizeDateTimeFields } from "@/lib/datetime";
 import { toast } from "sonner";
 
 export default function AdminF1NewPage() {
@@ -27,9 +28,7 @@ export default function AdminF1NewPage() {
     try {
       const payload = { ...form };
       if (payload.unlimited_attempts) payload.max_attempts = null;
-      ["registration_open_from", "registration_open_until", "start_date", "end_date"].forEach((k) => {
-        if (!payload[k]) delete payload[k];
-      });
+      normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
       payload.prize_places = (payload.prize_places || [])
         .filter((p) => p.value && p.value.trim())
         .map((p) => ({ place: Number(p.place) || 0, label: p.label || `Platz ${p.place}`, value: p.value }));

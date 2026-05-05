@@ -4,6 +4,7 @@ import { API, api, formatApiError, formatMs, parseTimeStr } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { normalizeDateTimeFields } from "@/lib/datetime";
 import { toast } from "sonner";
 import { Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -17,6 +18,7 @@ export default function AdminF1EditPage() {
   const [times, setTimes] = useState([]);
   const [activeTrack, setActiveTrack] = useState(null);
   const [newTrack, setNewTrack] = useState({ name: "", image_url: "", country: "" });
+  const [editTrack, setEditTrack] = useState(null);
   const [newTime, setNewTime] = useState({ user_id: "", time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "" });
   const [editTime, setEditTime] = useState(null);
 
@@ -54,6 +56,22 @@ export default function AdminF1EditPage() {
     if (!confirm("Strecke und Zeiten löschen?")) return;
     await api.delete(`/f1/tracks/${tid}`);
     load();
+  };
+
+  const saveTrack = async (e) => {
+    e.preventDefault();
+    if (!editTrack) return;
+    try {
+      await api.patch(`/f1/tracks/${editTrack.id}`, {
+        name: editTrack.name,
+        image_url: editTrack.image_url || "",
+        country: editTrack.country || "",
+        order_index: Number(editTrack.order_index) || 0,
+      });
+      toast.success("Strecke gespeichert.");
+      setEditTrack(null);
+      load();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
   };
 
   const addTime = async (e) => {
@@ -152,10 +170,26 @@ export default function AdminF1EditPage() {
                   {tr.image_url && <img src={tr.image_url} className="w-10 h-7 object-cover rounded-sm" alt="" />}
                   <div className="min-w-0"><div className="text-sm font-bold truncate">{tr.name}</div><div className="text-[10px] text-white/50">{tr.country}</div></div>
                 </button>
-                {isAdmin && <button onClick={() => delTrack(tr.id)} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-3.5 h-3.5" /></button>}
+                {isAdmin && <button onClick={() => setEditTrack({ ...tr })} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Strecke bearbeiten"><Pencil className="w-3.5 h-3.5" /></button>}
+                {isAdmin && <button onClick={() => delTrack(tr.id)} className="p-1 text-white/40 hover:text-[#FF3B30]" title="Strecke löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
               </div>
             ))}
           </div>
+          {isAdmin && editTrack && (
+            <form onSubmit={saveTrack} className="mt-4 space-y-2 border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-3">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Strecke bearbeiten</div>
+                <button type="button" onClick={() => setEditTrack(null)} className="text-white/40 hover:text-white"><XIcon className="w-3.5 h-3.5" /></button>
+              </div>
+              <input placeholder="Name" value={editTrack.name || ""} onChange={(e) => setEditTrack({ ...editTrack, name: e.target.value })} required data-testid="f1-edit-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <ImageUpload value={editTrack.image_url || ""} onChange={(v) => setEditTrack({ ...editTrack, image_url: v })} label="Streckenbild" testId="f1-edit-track-image-upload" variant="wide" />
+              <input placeholder="Land" value={editTrack.country || ""} onChange={(e) => setEditTrack({ ...editTrack, country: e.target.value })} data-testid="f1-edit-track-country" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <input type="number" placeholder="Reihenfolge" value={editTrack.order_index ?? 0} onChange={(e) => setEditTrack({ ...editTrack, order_index: e.target.value })} data-testid="f1-edit-track-order" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <button data-testid="f1-edit-track-save" className="w-full px-3 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#1E95C2]">
+                Strecke speichern
+              </button>
+            </form>
+          )}
           {isAdmin && <form onSubmit={addTrack} className="mt-4 space-y-2 border-t border-white/5 pt-4">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Neue Strecke</div>
             <input placeholder="Name" value={newTrack.name} onChange={(e) => setNewTrack({ ...newTrack, name: e.target.value })} required data-testid="f1-new-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
@@ -311,9 +345,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
     try {
       const payload = { ...form };
       if (payload.unlimited_attempts) payload.max_attempts = null;
-      ["registration_open_from", "registration_open_until", "start_date", "end_date"].forEach((k) => {
-        if (!payload[k]) delete payload[k];
-      });
+      normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
       await api.patch(`/f1/challenges/${challenge.id}`, payload);
       toast.success("Challenge gespeichert.");
       onSaved();

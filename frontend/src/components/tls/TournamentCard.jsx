@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
 import { StatusBadge } from "./StatusBadge";
 import { Calendar, Users, Trophy } from "lucide-react";
+import { formatDate, getRegistrationState } from "@/lib/datetime";
 
 export function TournamentCard({ tournament, index = 0 }) {
   const t = tournament;
-  const start = t.start_date ? new Date(t.start_date) : null;
+  const registration = getRegistrationState(t, "Anmeldung");
   const bg = t.banner_url || t.game?.cover_url ||
     "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200";
 
@@ -43,10 +44,10 @@ export function TournamentCard({ tournament, index = 0 }) {
           {t.title}
         </h3>
         <div className="mt-3 flex items-center gap-4 text-xs text-white/60">
-          {start && (
+          {t.start_date && (
             <span className="inline-flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
-              {start.toLocaleDateString("de-DE", { day: "2-digit", month: "short", year: "numeric" })}
+              {formatDate(t.start_date)}
             </span>
           )}
           <span className="inline-flex items-center gap-1">
@@ -59,6 +60,11 @@ export function TournamentCard({ tournament, index = 0 }) {
               Preise
             </span>
           )}
+        </div>
+        <div className={`mt-3 text-[11px] uppercase tracking-widest font-bold ${
+          registration.canRegister ? "text-[#00FF88]" : registration.state === "scheduled" ? "text-[#29B6E8]" : "text-white/45"
+        }`}>
+          {registration.label}
         </div>
       </div>
     </Link>

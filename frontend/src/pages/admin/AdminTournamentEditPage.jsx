@@ -5,6 +5,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { normalizeDateTimeFields } from "@/lib/datetime";
 import { toast } from "sonner";
 import { Zap, RefreshCw, Eye } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -261,9 +262,7 @@ function TournamentEditForm({ tournament, onSaved }) {
   const save = async () => {
     try {
       const payload = { ...f };
-      ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"].forEach((k) => {
-        if (!payload[k]) delete payload[k];
-      });
+      normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
       await api.patch(`/tournaments/${tournament.id}`, payload);
       toast.success("Gespeichert.");
       onSaved();

@@ -38,7 +38,7 @@ ALLOWED_DOC = {
     "text/markdown",
     "image/png", "image/jpeg",
 }
-MAX_BYTES = 15 * 1024 * 1024  # 15 MB images before re-encoding
+MAX_BYTES = 25 * 1024 * 1024  # 25 MB images before re-encoding
 MAX_DOC_BYTES = 25 * 1024 * 1024  # 25 MB docs
 MAX_IMAGE_PIXELS = 36_000_000
 
@@ -48,7 +48,7 @@ router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 @router.post("/image")
 async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_current_user)):
     """Upload an image. Returns public URL `/uploads/{filename}`.
-    Accepts PNG/JPEG/WebP up to 15 MB and re-encodes before serving."""
+    Accepts PNG/JPEG/WebP up to 25 MB and re-encodes before serving."""
     content_type = file.content_type or ""
     suffix = pathlib.Path(file.filename or "").suffix.lower()
     if content_type not in ALLOWED_IMAGE and suffix in IMAGE_MIME_BY_EXT:
@@ -62,7 +62,7 @@ async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_curr
     data = await file.read()
     original_size = len(data)
     if len(data) > MAX_BYTES:
-        raise HTTPException(status_code=413, detail="Datei zu groß (max 15 MB)")
+        raise HTTPException(status_code=413, detail="Datei zu groß (max 25 MB)")
     try:
         with Image.open(BytesIO(data)) as img:
             img.verify()

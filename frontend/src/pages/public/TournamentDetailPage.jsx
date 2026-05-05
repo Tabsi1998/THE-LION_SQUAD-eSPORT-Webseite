@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, Twitch } from "lucide-react";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
+import { formatDateTime, getRegistrationState } from "@/lib/datetime";
 
 export default function TournamentDetailPage() {
   const { slug } = useParams();
@@ -56,7 +57,7 @@ export default function TournamentDetailPage() {
 
   if (!t) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE …</div></PublicLayout>;
 
-  const start = t.start_date ? new Date(t.start_date) : null;
+  const registration = getRegistrationState(t, "Anmeldung");
 
   return (
     <PublicLayout>
@@ -78,14 +79,30 @@ export default function TournamentDetailPage() {
           {t.description && <p className="mt-4 text-white/70 max-w-2xl">{t.description}</p>}
 
           <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
-            <InfoTile icon={Calendar} label="Start" value={start ? start.toLocaleDateString("de-DE") : "TBD"} />
+            <InfoTile icon={Calendar} label="Start" value={formatDateTime(t.start_date)} />
             <InfoTile icon={Users} label="Teilnehmer" value={`${t.participant_count}/${t.max_participants}`} />
             <InfoTile icon={Gamepad2} label="Plattform" value={t.platform || "—"} />
             <InfoTile icon={Trophy} label="Format" value={t.format?.replace("_", " ")} />
           </div>
 
+          <div className={`mt-5 border rounded-sm px-4 py-3 text-sm max-w-3xl ${
+            registration.canRegister
+              ? "border-[#00FF88]/30 bg-[#00FF88]/5 text-[#00FF88]"
+              : registration.state === "scheduled"
+                ? "border-[#29B6E8]/30 bg-[#29B6E8]/5 text-[#29B6E8]"
+                : "border-white/10 bg-[#121212] text-white/60"
+          }`}>
+            <div className="font-bold uppercase tracking-wider text-xs">{registration.label}</div>
+            <div className="mt-1 text-white/55">
+              {t.registration_open_from && <span>Öffnet: {formatDateTime(t.registration_open_from)}</span>}
+              {t.registration_open_from && t.registration_open_until && <span className="mx-2 text-white/20">·</span>}
+              {t.registration_open_until && <span>Endet: {formatDateTime(t.registration_open_until)}</span>}
+              {!t.registration_open_from && !t.registration_open_until && <span>Status wird vom Admin gesteuert.</span>}
+            </div>
+          </div>
+
           <div className="mt-8 flex flex-wrap gap-3">
-            {t.status === "registration_open" && !myReg && (
+            {registration.canRegister && !myReg && (
               <button
                 data-testid="tournament-register-btn"
                 onClick={handleRegister}
@@ -93,6 +110,15 @@ export default function TournamentDetailPage() {
                 className="px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition"
               >
                 {loading ? "Wird gesendet…" : "Jetzt anmelden"}
+              </button>
+            )}
+            {!registration.canRegister && !myReg && (
+              <button
+                type="button"
+                disabled
+                className="px-6 py-3 border border-white/10 text-white/35 font-bold uppercase tracking-wider rounded-sm cursor-not-allowed"
+              >
+                {registration.label}
               </button>
             )}
             {myReg && myReg.status === "approved" && t.status === "check_in" && (
@@ -152,6 +178,10 @@ export default function TournamentDetailPage() {
         </div>
         <aside className="space-y-4">
           {t.location && <InfoRow icon={MapPin} label="Location" value={t.location} />}
+          {t.registration_open_from && <InfoRow icon={Calendar} label="Anmeldung öffnet" value={formatDateTime(t.registration_open_from)} />}
+          {t.registration_open_until && <InfoRow icon={Calendar} label="Anmeldung endet" value={formatDateTime(t.registration_open_until)} />}
+          {t.check_in_from && <InfoRow icon={Calendar} label="Check-in öffnet" value={formatDateTime(t.check_in_from)} />}
+          {t.check_in_until && <InfoRow icon={Calendar} label="Check-in endet" value={formatDateTime(t.check_in_until)} />}
           {t.best_of > 1 && <InfoRow icon={Trophy} label="Best of" value={t.best_of} />}
           <InfoRow icon={Users} label="Modus" value={t.team_mode} />
           {t.discord_link && <a href={t.discord_link} target="_blank" rel="noreferrer" className="block px-4 py-3 border border-white/10 rounded-sm text-center text-sm font-bold uppercase tracking-wider hover:border-[#29B6E8]/60 hover:text-[#29B6E8]">Discord</a>}

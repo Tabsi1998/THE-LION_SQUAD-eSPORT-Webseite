@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { normalizeDateTimeFields } from "@/lib/datetime";
 import { toast } from "sonner";
 
 const FORMATS = [
@@ -58,9 +59,7 @@ export default function AdminTournamentNewPage() {
     try {
       const payload = { ...form };
       if (!payload.event_id) delete payload.event_id;
-      ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"].forEach((k) => {
-        if (!payload[k]) delete payload[k];
-      });
+      normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
       // Filter empty prize places
       payload.prize_places = (payload.prize_places || [])
         .filter((p) => p.value && p.value.trim())
