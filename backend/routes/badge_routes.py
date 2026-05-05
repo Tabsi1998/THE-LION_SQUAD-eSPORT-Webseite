@@ -114,7 +114,9 @@ async def admin_create_group(body: GroupCreate, me: dict = Depends(require_admin
 @admin_router.patch("/groups/{code}")
 async def admin_patch_group(code: str, body: GroupPatch, me: dict = Depends(require_admin())):
     db = get_db()
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    nullable_fields = {"description", "accent_color"}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if not updates:
         raise HTTPException(400, "Keine Änderungen.")
     res = await db.achievement_groups.update_one({"code": code}, {"$set": updates})
@@ -188,7 +190,9 @@ async def admin_create_tier(body: TierCreate, me: dict = Depends(require_admin()
 @admin_router.patch("/tiers/{code}")
 async def admin_patch_tier(code: str, body: TierPatch, me: dict = Depends(require_admin())):
     db = get_db()
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    nullable_fields = {"description", "condition_key", "progress_target", "icon"}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if not updates:
         raise HTTPException(400, "Keine Änderungen.")
     res = await db.achievements.update_one({"code": code}, {"$set": updates})

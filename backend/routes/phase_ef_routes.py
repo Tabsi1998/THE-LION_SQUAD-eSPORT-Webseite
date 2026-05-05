@@ -119,7 +119,9 @@ async def admin_create_page(body: PageCreate, me: dict = Depends(require_admin()
 @admin_pages_router.patch("/{slug}")
 async def admin_update_page(slug: str, body: PagePatch, me: dict = Depends(require_admin())):
     db = get_db()
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    nullable_fields = {"body_md", "meta_description"}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if not updates:
         raise HTTPException(400, "Keine Änderungen.")
     updates["updated_at"] = now_utc().isoformat()
@@ -190,7 +192,9 @@ async def admin_list_templates(me: dict = Depends(require_admin())):
 @admin_emailt_router.patch("/{key}")
 async def admin_patch_template(key: str, body: TemplatePatch, me: dict = Depends(require_admin())):
     db = get_db()
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    nullable_fields = {"subject", "html", "name"}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if not updates:
         raise HTTPException(400, "Keine Änderungen.")
     updates["updated_at"] = now_utc().isoformat()

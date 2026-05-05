@@ -402,12 +402,16 @@ class SeasonCreate(BaseModel):
 
 class SeasonUpdate(BaseModel):
     name: Optional[str] = None
+    slug: Optional[str] = None
     description: Optional[str] = None
+    kind: Optional[Literal["season", "circuit"]] = None
     status: Optional[Literal["draft", "active", "completed", "archived"]] = None
     tournament_ids: Optional[List[str]] = None
     f1_challenge_ids: Optional[List[str]] = None
     points_per_position: Optional[List[int]] = None
     drop_worst: Optional[int] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
     banner_url: Optional[str] = None
 
 
@@ -467,16 +471,32 @@ async def create_season(body: SeasonCreate, me: dict = Depends(require_admin()))
 @season_router.patch("/{sid}")
 async def update_season(sid: str, body: SeasonUpdate, me: dict = Depends(require_admin())):
     db = get_db()
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    current = await db.seasons.find_one({"$or": [{"id": sid}, {"slug": sid}]}, {"_id": 0})
+    if not current:
+        raise HTTPException(404, "Saison nicht gefunden")
+    nullable_fields = {"description", "banner_url", "start_date", "end_date"}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    if "slug" in updates and updates["slug"]:
+        updates["slug"] = updates["slug"].strip().lower()
+        existing = await db.seasons.find_one(
+            {"slug": updates["slug"], "id": {"$ne": current["id"]}},
+            {"_id": 0, "id": 1},
+        )
+        if existing:
+            raise HTTPException(409, "Slug bereits vergeben")
+    for k in ["start_date", "end_date"]:
+        if k in updates:
+            updates[k] = updates[k].isoformat() if updates[k] else None
     updates["updated_at"] = now_utc().isoformat()
-    await db.seasons.update_one({"id": sid}, {"$set": updates})
-    return await db.seasons.find_one({"id": sid}, {"_id": 0})
+    await db.seasons.update_one({"id": current["id"]}, {"$set": updates})
+    return await db.seasons.find_one({"id": current["id"]}, {"_id": 0})
 
 
 @season_router.delete("/{sid}")
 async def delete_season(sid: str, me: dict = Depends(require_admin())):
     db = get_db()
-    await db.seasons.delete_one({"id": sid})
+    await db.seasons.delete_one({"$or": [{"id": sid}, {"slug": sid}]})
     return {"ok": True}
 
 

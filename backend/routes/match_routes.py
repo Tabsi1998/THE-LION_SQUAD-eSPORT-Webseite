@@ -47,9 +47,11 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(requ
     m = await db.matches.find_one({"id": match_id})
     if not m:
         raise HTTPException(status_code=404)
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
-    if updates.get("scheduled_at"):
-        updates["scheduled_at"] = updates["scheduled_at"].isoformat()
+    nullable_fields = {"winner_id", "scheduled_at", "station_id", "admin_note", "map", "best_of"}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    if "scheduled_at" in updates:
+        updates["scheduled_at"] = updates["scheduled_at"].isoformat() if updates["scheduled_at"] else None
     # If winner_id changed, determine loser + status
     if "winner_id" in updates and updates["winner_id"]:
         w = updates["winner_id"]
