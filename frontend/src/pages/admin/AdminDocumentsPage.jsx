@@ -4,6 +4,17 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { toast } from "sonner";
 import { Plus, Save, X, Trash2, FileText, Pin, UploadCloud } from "lucide-react";
 
+const parseUploadMb = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const DOCUMENT_UPLOAD_LIMIT_MB = parseUploadMb(
+  process.env.REACT_APP_MAX_DOCUMENT_UPLOAD_MB || process.env.REACT_APP_MAX_IMAGE_UPLOAD_MB,
+  50,
+);
+const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(process.env.REACT_APP_PROXY_UPLOAD_LIMIT_MB, Math.ceil(DOCUMENT_UPLOAD_LIMIT_MB * 1.2));
+
 const CATEGORY_LABELS = {
   statutes: "Statuten", minutes: "Protokolle", form: "Formular",
   regulations: "Regelwerk", guideline: "Leitlinie", download: "Download",
@@ -121,6 +132,11 @@ function DocModal({ doc, meta, onClose, onSaved }) {
   const upload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > DOCUMENT_UPLOAD_LIMIT_MB * 1024 * 1024) {
+      toast.error(`Datei zu gross (max ${DOCUMENT_UPLOAD_LIMIT_MB} MB)`);
+      e.target.value = "";
+      return;
+    }
     setUploading(true);
     try {
       const fd = new FormData();
@@ -137,9 +153,16 @@ function DocModal({ doc, meta, onClose, onSaved }) {
       }));
       toast.success("Datei hochgeladen.");
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Upload fehlgeschlagen.");
+      const status = err.response?.status;
+      const detail = err.response?.data?.detail;
+      const message = status === 413
+        ? `Datei zu gross oder Reverse Proxy blockiert den Upload. App-Limit: ${DOCUMENT_UPLOAD_LIMIT_MB} MB, externer Proxy bitte auf mindestens ${PROXY_UPLOAD_LIMIT_MB} MB setzen.`
+        : detail || "Upload fehlgeschlagen.";
+      toast.error(status ? `Upload fehlgeschlagen (${status}): ${message}` : message);
+    } finally {
+      e.target.value = "";
+      setUploading(false);
     }
-    setUploading(false);
   };
 
   const submit = async (e) => {
@@ -185,7 +208,7 @@ function DocModal({ doc, meta, onClose, onSaved }) {
               </div>
             ) : (
               <button type="button" onClick={() => fileRef.current.click()} disabled={uploading} data-testid="doc-upload-btn" className="inline-flex items-center gap-2 text-sm text-[#FFD700] font-bold uppercase tracking-wider">
-                <UploadCloud className="w-4 h-4" /> {uploading ? "Lade hoch…" : "Datei auswählen (max 25 MB)"}
+                <UploadCloud className="w-4 h-4" /> {uploading ? "Lade hoch…" : `Datei auswählen (max ${DOCUMENT_UPLOAD_LIMIT_MB} MB)`}
               </button>
             )}
           </div>

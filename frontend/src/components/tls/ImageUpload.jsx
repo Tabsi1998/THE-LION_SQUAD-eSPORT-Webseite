@@ -3,6 +3,14 @@ import { Upload, X, Image as ImageIcon } from "lucide-react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { toast } from "sonner";
 
+const parseUploadMb = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const DEFAULT_IMAGE_UPLOAD_MB = parseUploadMb(process.env.REACT_APP_MAX_IMAGE_UPLOAD_MB, 50);
+const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(process.env.REACT_APP_PROXY_UPLOAD_LIMIT_MB, Math.ceil(DEFAULT_IMAGE_UPLOAD_MB * 1.2));
+
 /**
  * Reusable image upload field. Renders preview + upload button.
  * Returns the public URL (e.g. /api/static/uploads/abc.png) via onChange.
@@ -15,7 +23,7 @@ import { toast } from "sonner";
  *   variant: "square" | "wide" (visual)
  *   endpoint: "/uploads/image" (default) or "/uploads/sponsor-logo"
  */
-export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", endpoint = "/uploads/image", maxSizeMb = 25, allowLibrary = false }) {
+export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", endpoint = "/uploads/image", maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB, allowLibrary = false }) {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -39,7 +47,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
       const detail = e.response?.data?.detail;
       const status = e.response?.status;
       const message = status === 413
-        ? `Datei zu groß oder Reverse Proxy blockiert den Upload. App-Limit: ${maxSizeMb} MB, externer Proxy bitte auf mindestens 35 MB setzen.`
+        ? `Datei zu gross oder Reverse Proxy blockiert den Upload. App-Limit: ${maxSizeMb} MB, externer Proxy bitte auf mindestens ${PROXY_UPLOAD_LIMIT_MB} MB setzen.`
         : detail ? formatApiError(detail) : e.message || "Upload fehlgeschlagen";
       toast.error(status ? `Upload fehlgeschlagen (${status}): ${message}` : `Upload fehlgeschlagen: ${message}`);
     } finally {

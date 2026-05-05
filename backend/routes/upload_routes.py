@@ -23,6 +23,20 @@ IMAGE_MIME_BY_EXT = {
     ".jpeg": "image/jpeg",
     ".webp": "image/webp",
 }
+
+
+def _upload_mb_from_env(name: str, default: int) -> int:
+    try:
+        value = int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        logger.warning("[uploads] invalid %s, falling back to %s MB", name, default)
+        return default
+    if value < 1:
+        logger.warning("[uploads] invalid %s=%s, falling back to %s MB", name, value, default)
+        return default
+    return value
+
+
 ALLOWED_DOC = {
     "application/pdf",
     "application/zip",
@@ -38,8 +52,10 @@ ALLOWED_DOC = {
     "text/markdown",
     "image/png", "image/jpeg",
 }
-MAX_BYTES = 25 * 1024 * 1024  # 25 MB images before re-encoding
-MAX_DOC_BYTES = 25 * 1024 * 1024  # 25 MB docs
+MAX_IMAGE_UPLOAD_MB = _upload_mb_from_env("MAX_IMAGE_UPLOAD_MB", 50)
+MAX_DOCUMENT_UPLOAD_MB = _upload_mb_from_env("MAX_DOCUMENT_UPLOAD_MB", 50)
+MAX_BYTES = MAX_IMAGE_UPLOAD_MB * 1024 * 1024  # images before re-encoding
+MAX_DOC_BYTES = MAX_DOCUMENT_UPLOAD_MB * 1024 * 1024  # docs
 MAX_IMAGE_PIXELS = 36_000_000
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
@@ -48,7 +64,7 @@ router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 @router.post("/image")
 async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_current_user)):
     """Upload an image. Returns public URL `/uploads/{filename}`.
-    Accepts PNG/JPEG/WebP up to 25 MB and re-encodes before serving."""
+    Accepts PNG/JPEG/WebP and re-encodes before serving."""
     content_type = file.content_type or ""
     suffix = pathlib.Path(file.filename or "").suffix.lower()
     if content_type not in ALLOWED_IMAGE and suffix in IMAGE_MIME_BY_EXT:
@@ -62,7 +78,7 @@ async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_curr
     data = await file.read()
     original_size = len(data)
     if len(data) > MAX_BYTES:
-        raise HTTPException(status_code=413, detail="Datei zu groß (max 25 MB)")
+        raise HTTPException(status_code=413, detail=f"Datei zu gross (max {MAX_IMAGE_UPLOAD_MB} MB)")
     try:
         with Image.open(BytesIO(data)) as img:
             img.verify()
@@ -134,13 +150,13 @@ _EXT_BY_MIME = {
 
 @router.post("/document")
 async def upload_document(file: UploadFile = File(...), me: dict = Depends(require_admin())):
-    """Upload an arbitrary document (PDF, DOCX, XLSX, ZIP, …) up to 25 MB.
+    """Upload an arbitrary document (PDF, DOCX, XLSX, ZIP, ...).
     Stores it outside the public static tree and returns a storage key."""
     if file.content_type not in ALLOWED_DOC:
         raise HTTPException(status_code=400, detail=f"Dateityp nicht erlaubt: {file.content_type}")
     data = await file.read()
     if len(data) > MAX_DOC_BYTES:
-        raise HTTPException(status_code=413, detail="Datei zu groß (max 25 MB)")
+        raise HTTPException(status_code=413, detail=f"Datei zu gross (max {MAX_DOCUMENT_UPLOAD_MB} MB)")
     if file.content_type == "application/pdf" and not data.startswith(b"%PDF-"):
         raise HTTPException(status_code=400, detail="Dateiinhalt ist kein gueltiges PDF")
     if file.content_type in {

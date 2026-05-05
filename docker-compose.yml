@@ -27,6 +27,7 @@ services:
       CORS_ORIGINS: "${CORS_ORIGINS:?Set CORS_ORIGINS in .env before deploying}"
       FRONTEND_URL: "${FRONTEND_URL:?Set FRONTEND_URL in .env before deploying}"
       JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env before deploying}"
+      AUTH_COOKIE_DOMAIN: "${AUTH_COOKIE_DOMAIN:-}"
       ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@lionsquad.at}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env before deploying}"
       SENDER_EMAIL: "${SENDER_EMAIL:-noreply@lionsquad.at}"
@@ -34,6 +35,8 @@ services:
       SEED_DEMO: "${SEED_DEMO:-false}"
       DISABLE_SCHEDULER: "${DISABLE_SCHEDULER:-false}"
       UPLOAD_DIR: "${UPLOAD_DIR:-/app/backend/uploads}"
+      MAX_IMAGE_UPLOAD_MB: "${MAX_IMAGE_UPLOAD_MB:-50}"
+      MAX_DOCUMENT_UPLOAD_MB: "${MAX_DOCUMENT_UPLOAD_MB:-50}"
       ALLOW_INSECURE_CORS: "${ALLOW_INSECURE_CORS:-false}"
     ports:
       - "${BACKEND_PORT:-8001}:8001"
@@ -55,6 +58,9 @@ services:
       context: ./frontend
       args:
         REACT_APP_BACKEND_URL: "${PUBLIC_BACKEND_URL:?Set PUBLIC_BACKEND_URL in .env before deploying}"
+        REACT_APP_MAX_IMAGE_UPLOAD_MB: "${MAX_IMAGE_UPLOAD_MB:-50}"
+        REACT_APP_MAX_DOCUMENT_UPLOAD_MB: "${MAX_DOCUMENT_UPLOAD_MB:-50}"
+        REACT_APP_PROXY_UPLOAD_LIMIT_MB: "${PROXY_UPLOAD_LIMIT_MB:-60}"
     container_name: tls-frontend
     restart: unless-stopped
     depends_on:

@@ -77,7 +77,7 @@ Hinter einem Reverse Proxy sollte die Webseite ueber `https://lionsquad.at` lauf
 APP_ENV=production
 FRONTEND_URL=https://lionsquad.at
 PUBLIC_BACKEND_URL=https://lionsquad.at
-CORS_ORIGINS=https://lionsquad.at
+CORS_ORIGINS=https://lionsquad.at,https://www.lionsquad.at
 
 DB_NAME=tls_arena
 JWT_SECRET=sehr-langer-zufaelliger-secret
@@ -87,6 +87,9 @@ ADMIN_PASSWORD=sehr-langes-admin-passwort
 SEED_DEMO=false
 DISABLE_SCHEDULER=false
 UPLOAD_DIR=/app/backend/uploads
+MAX_IMAGE_UPLOAD_MB=50
+MAX_DOCUMENT_UPLOAD_MB=50
+PROXY_UPLOAD_LIMIT_MB=60
 AUTH_COOKIE_DOMAIN=.lionsquad.at
 ```
 
@@ -118,7 +121,7 @@ docker compose ps
 
 Vor Livegang oder nach groesseren Updates:
 
-- `.env` pruefen: `APP_ENV=production`, `FRONTEND_URL`, `PUBLIC_BACKEND_URL`, `CORS_ORIGINS`, `JWT_SECRET`, `ADMIN_PASSWORD`.
+- `.env` pruefen: `APP_ENV=production`, `FRONTEND_URL`, `PUBLIC_BACKEND_URL`, `CORS_ORIGINS`, `JWT_SECRET`, `ADMIN_PASSWORD`, `AUTH_COOKIE_DOMAIN`.
 - `docker compose ps` muss `backend`, `frontend` und `mongodb` als laufend zeigen.
 - `docker compose logs --tail=100 backend` auf Fehler pruefen.
 - `curl https://lionsquad.at/api/health` muss `{"status":"ok"}` liefern.
@@ -283,11 +286,19 @@ Damit Mails nicht im Spam landen:
 Uploads werden im Docker-Volume `uploads_data` gespeichert und ueber
 `/api/static/uploads/...` ausgeliefert.
 
-Bild-Uploads erlauben PNG/JPG/WebP bis 25 MB. Der Frontend-Nginx im Container erlaubt
-Requests bis 35 MB. Wenn vor Docker noch ein externer Reverse Proxy wie Nginx Proxy Manager,
+Bild-Uploads erlauben PNG/JPG/WebP standardmaessig bis 50 MB. Der Frontend-Nginx im Container erlaubt
+Requests bis 60 MB. Wenn vor Docker noch ein externer Reverse Proxy wie Nginx Proxy Manager,
 Apache, Cloudflare oder ein Hosting-Panel sitzt, muss dort ebenfalls ein Body-Limit von
-mindestens 35 MB gesetzt werden, sonst kommt weiterhin `413 Request Entity Too Large`, bevor
+mindestens 60 MB gesetzt werden, sonst kommt weiterhin `413 Request Entity Too Large`, bevor
 die App den Upload ueberhaupt sieht.
+
+Die Limits koennen in `.env` angepasst werden:
+
+```env
+MAX_IMAGE_UPLOAD_MB=50
+MAX_DOCUMENT_UPLOAD_MB=50
+PROXY_UPLOAD_LIMIT_MB=60
+```
 
 Bilduploads gibt es fuer Profile, Branding, News, Events, Galerie, Sponsoren, Turniere,
 Fast-Lap-Challenges und Fast-Lap-Strecken.
@@ -419,7 +430,12 @@ docker compose logs backend
 docker volume ls
 ```
 
-Nur PNG/JPG/WebP verwenden und Dateigroesse beachten.
+Nur PNG/JPG/WebP verwenden und Dateigroesse beachten. Bei `413` muss neben der App auch jeder
+externe Reverse Proxy groesser als das App-Limit eingestellt sein, z.B. Nginx Proxy Manager:
+
+```nginx
+client_max_body_size 60m;
+```
 
 ## Entwicklung lokal
 

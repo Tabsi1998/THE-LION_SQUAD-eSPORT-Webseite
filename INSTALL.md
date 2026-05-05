@@ -55,6 +55,8 @@ Create two proxy hosts:
 2. `lionsquad.at/api/*` → `tls-backend:8001` (or run under a separate `api.` subdomain)
 
 Enable HTTPS (Let's Encrypt) inside NPM.
+Set the proxy body size to at least 60 MB, otherwise image/document uploads can fail with
+`413 Request Entity Too Large` before the app receives the request.
 
 ## 5. First Login
 

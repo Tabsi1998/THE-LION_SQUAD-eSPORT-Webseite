@@ -401,7 +401,7 @@ NIE einen registrierten Nutzer als „Mitglied" bezeichnen. Stattdessen „Commu
 
 ### Backend
 - [x] **Document-Model** + CRUD: 10 Kategorien (statutes/minutes/form/regulations/guideline/download/media_kit/presentation/template/other), 4 Visibilities (public/community/members/internal), pinned, tags, order_index, download_count, uploader_name
-- [x] **Datei-Upload für Dokumente** (`POST /api/uploads/document`): PDF/DOCX/XLSX/PPTX/ZIP/TXT/CSV/MD/Images, max 25 MB. Returnt URL + original_filename + size + mime
+- [x] **Datei-Upload für Dokumente** (`POST /api/uploads/document`): PDF/DOCX/XLSX/PPTX/ZIP/TXT/CSV/MD/Images, max 50 MB per Default. Returnt URL + original_filename + size + mime
 - [x] **Track-Download-Endpoint** (`POST /api/documents/{id}/track-download`) — Counter pro Download
 - [x] **DRY: `services/visibility.py`** zentralisiert die Visibility-Logik (vorher 4× kopiert in news/events/gallery/document)
 - [x] **History-Spam-Fix** in `upsert_membership`: History wächst nur, wenn `member_status` sich tatsächlich ändert (nicht bei reinen role/notes-Updates)
