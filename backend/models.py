@@ -1,4 +1,4 @@
-"""Pydantic v2 models for TLS Arena."""
+"""Pydantic v2 models for THE LION SQUAD eSports."""
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime, timezone, date
@@ -620,7 +620,7 @@ class NewsUpdate(BaseModel):
     linked_team_ids: Optional[List[str]] = None
 
 
-SponsorTier = Literal["main", "gold", "silver", "bronze", "supporter", "partner"]
+SponsorTier = Literal["main", "platinum", "gold", "silver", "bronze"]
 
 
 class SponsorCreate(BaseModel):
@@ -628,7 +628,7 @@ class SponsorCreate(BaseModel):
     logo_url: Optional[str] = None
     link: Optional[str] = None
     description: Optional[str] = None
-    tier: SponsorTier = "supporter"
+    tier: SponsorTier = "bronze"
     is_active: bool = True
     show_on_home: Optional[bool] = None  # auto-derived when None: gold/main yes, others no
     show_on_footer: Optional[bool] = None

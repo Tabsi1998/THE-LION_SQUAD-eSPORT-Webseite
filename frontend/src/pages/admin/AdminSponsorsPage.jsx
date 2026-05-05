@@ -5,9 +5,9 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
 import { Plus, Trash2, Upload, Pencil, X as XIcon } from "lucide-react";
 
-const TIERS = ["main", "gold", "silver", "bronze", "supporter", "partner"];
-const TIER_LABELS = { main: "Hauptsponsor", gold: "Gold", silver: "Silber", bronze: "Bronze", supporter: "Supporter", partner: "Partner" };
-const TIER_COLORS = { main: "text-[#29B6E8]", gold: "text-[#FFD700]", silver: "text-white/80", bronze: "text-[#CD7F32]", supporter: "text-white/60", partner: "text-purple-400" };
+const TIERS = ["main", "platinum", "gold", "silver", "bronze"];
+const TIER_LABELS = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
+const TIER_COLORS = { main: "text-[#29B6E8]", platinum: "text-[#E5E4E2]", gold: "text-[#FFD700]", silver: "text-white/80", bronze: "text-[#CD7F32]" };
 
 export default function AdminSponsorsPage() {
   const [list, setList] = useState([]);
@@ -48,7 +48,7 @@ export default function AdminSponsorsPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Partner</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Sponsoren</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">
-            <strong className="text-[#FFD700]">Main/Gold</strong> erscheinen auf der Startseite + Footer, <strong>Silber</strong> nur im Footer, <strong>Bronze/Supporter/Partner</strong> nur auf der Sponsorenseite.
+            <strong className="text-[#29B6E8]">Hauptsponsor</strong>, <strong className="text-[#E5E4E2]">Platin</strong> und <strong className="text-[#FFD700]">Gold</strong> erscheinen Startseite + Footer · <strong>Silber</strong> nur im Footer · <strong>Bronze</strong> nur auf der Sponsorenseite.
           </p>
         </div>
         <div className="flex gap-2">
@@ -108,7 +108,7 @@ function SponsorForm({ sponsor, onClose, onSaved }) {
   const [form, setForm] = useState({
     name: sponsor?.name || "", logo_url: sponsor?.logo_url || "",
     link: sponsor?.link || "", description: sponsor?.description || "",
-    tier: sponsor?.tier || "supporter",
+    tier: sponsor?.tier && ["main","platinum","gold","silver","bronze"].includes(sponsor.tier) ? sponsor.tier : "bronze",
     is_active: sponsor?.is_active !== false,
     show_on_home: sponsor?.show_on_home,
     show_on_footer: sponsor?.show_on_footer,
@@ -156,11 +156,11 @@ function SponsorForm({ sponsor, onClose, onSaved }) {
             Aktiv
           </label>
           <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_home === true || (form.show_on_home === undefined && ["main", "gold"].includes(form.tier))} onChange={(e) => setForm({ ...form, show_on_home: e.target.checked })} data-testid="sponsor-show-home" className="accent-[#29B6E8]" />
+            <input type="checkbox" checked={form.show_on_home === true || (form.show_on_home === undefined && ["main", "platinum", "gold"].includes(form.tier))} onChange={(e) => setForm({ ...form, show_on_home: e.target.checked })} data-testid="sponsor-show-home" className="accent-[#29B6E8]" />
             Auf Home
           </label>
           <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_footer === true || (form.show_on_footer === undefined && ["main", "gold", "silver"].includes(form.tier))} onChange={(e) => setForm({ ...form, show_on_footer: e.target.checked })} data-testid="sponsor-show-footer" className="accent-[#29B6E8]" />
+            <input type="checkbox" checked={form.show_on_footer === true || (form.show_on_footer === undefined && ["main", "platinum", "gold", "silver"].includes(form.tier))} onChange={(e) => setForm({ ...form, show_on_footer: e.target.checked })} data-testid="sponsor-show-footer" className="accent-[#29B6E8]" />
             Im Footer
           </label>
         </div>

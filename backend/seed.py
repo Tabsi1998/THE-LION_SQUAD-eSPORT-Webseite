@@ -375,9 +375,10 @@ async def seed_demo_data():
 
     # News
     await db.news_posts.insert_many([
-        {"id": new_id(), "slug": "welcome-tls-arena", "title": "Willkommen in der TLS ARENA",
+        {"id": new_id(), "slug": "welcome-tls-arena", "title": "Willkommen bei THE LION SQUAD",
+         "summary": "Die offizielle Vereinsplattform ist live.",
          "excerpt": "Das neue Home der The Lion Squad eSports Turniere ist da.",
-         "content": "Die TLS ARENA ist unsere neue zentrale Plattform für alle Turniere, F1 Fast Lap Challenges, Ligen und Events. Registriert euch, erstellt Teams und sichert euch eure Plätze für das Winter Clash 2026!",
+         "content": "THE LION SQUAD ist unsere neue zentrale Plattform für alle Turniere, Fast Lap Challenges, Ligen und Events. Registriert euch, erstellt Teams und sichert euch eure Plätze für das Winter Clash 2026!",
          "banner_url": None, "published": True,
          "created_at": now_utc().isoformat(), "updated_at": now_utc().isoformat()},
         {"id": new_id(), "slug": "winter-clash-2026", "title": "Winter Clash 2026 - Anmeldung offen",
@@ -396,7 +397,7 @@ async def seed_demo_data():
          "description": "Gaming Peripherie", "tier": "silver",
          "created_at": now_utc().isoformat()},
         {"id": new_id(), "name": "Vienna eSports Hub", "logo_url": None, "link": "https://example.com",
-         "description": "Community Partner", "tier": "standard",
+         "description": "Community Partner", "tier": "bronze",
          "created_at": now_utc().isoformat()},
     ])
 
@@ -405,7 +406,7 @@ async def seed_demo_data():
     await db.seasons.insert_one({
         "id": season_id, "slug": "season-2026",
         "name": "TLS Season 2026",
-        "description": "Die große TLS Arena Meisterschaft: alle Turniere und F1-Rennen der Saison zählen für den Champion-Titel.",
+        "description": "Die große THE LION SQUAD Meisterschaft: alle Turniere und Fast-Lap-Rennen der Saison zählen für den Champion-Titel.",
         "kind": "season", "status": "active",
         "tournament_ids": [mk_tid, smash_tid],
         "f1_challenge_ids": [f1_cid],

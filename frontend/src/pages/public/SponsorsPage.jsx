@@ -3,19 +3,19 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Star, ExternalLink } from "lucide-react";
 
-const tierLabel = { main: "Hauptsponsor", gold: "Gold", silver: "Silber", bronze: "Bronze", supporter: "Supporter", partner: "Partner" };
-const tierColor = { main: "#29B6E8", gold: "#FFD700", silver: "#C0C0C0", bronze: "#CD7F32", supporter: "#9CA3AF", partner: "#A855F7" };
+const tierLabel = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
+const tierColor = { main: "#29B6E8", platinum: "#E5E4E2", gold: "#FFD700", silver: "#C0C0C0", bronze: "#CD7F32" };
 
 export default function SponsorsPage() {
   const [list, setList] = useState([]);
   useEffect(() => { api.get("/sponsors").then(({ data }) => setList(data)).catch(() => {}); }, []);
 
   const grouped = list.reduce((acc, s) => {
-    const t = s.tier || "supporter";
+    const t = ["main", "platinum", "gold", "silver", "bronze"].includes(s.tier) ? s.tier : "bronze";
     (acc[t] = acc[t] || []).push(s);
     return acc;
   }, {});
-  const order = ["main", "gold", "silver", "bronze", "supporter", "partner"];
+  const order = ["main", "platinum", "gold", "silver", "bronze"];
 
   return (
     <PublicLayout>

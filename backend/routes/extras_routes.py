@@ -65,6 +65,11 @@ class BrandingSettings(BaseModel):
     privacy_extra: Optional[str] = None
     discord_invite_url: Optional[str] = None
     twitch_channel: Optional[str] = None
+    # Social channels (Phase X — full social presence)
+    facebook_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    tiktok_url: Optional[str] = None
+    youtube_url: Optional[str] = None
     # Phase E — Twitch Helix credentials
     twitch_client_id: Optional[str] = None
     twitch_client_secret: Optional[str] = None
@@ -137,6 +142,10 @@ async def public_settings():
         "privacy_extra": b.get("privacy_extra") or "",
         "discord_invite_url": b.get("discord_invite_url") or "https://discord.com/invite/thelionsquadesports",
         "twitch_channel": b.get("twitch_channel") or "the_lion_squad_esports",
+        "facebook_url": b.get("facebook_url") or "https://www.facebook.com/thelionsquadesports",
+        "instagram_url": b.get("instagram_url") or "https://instagram.com/thelionsquadesports",
+        "tiktok_url": b.get("tiktok_url") or "https://www.tiktok.com/@thelionsquadesports",
+        "youtube_url": b.get("youtube_url") or "https://www.youtube.com/@TheLionSquadeSports",
     }
 
 

@@ -67,3 +67,5 @@ memory/test_credentials.md
 .chainlit/
 chainlit.md
 .ipynb_checkpoints/
+frontend/node_modules/.cache/default-development/1.pack
+frontend/node_modules/.cache/default-development/31.pack

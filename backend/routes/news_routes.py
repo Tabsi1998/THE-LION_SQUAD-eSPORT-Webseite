@@ -140,17 +140,29 @@ async def news_meta():
 
 # ---------- Sponsors ----------
 
-# Tier hierarchy used for default placement & auto-flags
-_TIER_ORDER = {"main": 0, "gold": 1, "silver": 2, "bronze": 3, "supporter": 4, "partner": 5}
+# Tier hierarchy used for default placement & auto-flags.
+# 5 tiers: Hauptsponsor (main) → Platin → Gold → Silber → Bronze.
+_TIER_ORDER = {"main": 0, "platinum": 1, "gold": 2, "silver": 3, "bronze": 4}
+_LEGACY_TIER_MAP = {"supporter": "bronze", "partner": "bronze"}
+
+
+def _normalize_tier(t: str | None) -> str:
+    """Map legacy tiers to new 5-tier system. Default = bronze."""
+    if not t:
+        return "bronze"
+    return _LEGACY_TIER_MAP.get(t, t if t in _TIER_ORDER else "bronze")
 
 
 def _sponsor_defaults(doc: dict) -> dict:
     """Resolve auto-derived placement flags based on tier when not explicitly set."""
-    tier = doc.get("tier") or "supporter"
+    tier = _normalize_tier(doc.get("tier"))
+    doc["tier"] = tier
     if doc.get("show_on_home") is None:
-        doc["show_on_home"] = tier in ("main", "gold")
+        # Hauptsponsor + Platin + Gold auf Startseite
+        doc["show_on_home"] = tier in ("main", "platinum", "gold")
     if doc.get("show_on_footer") is None:
-        doc["show_on_footer"] = tier in ("main", "gold", "silver")
+        # Hauptsponsor + Platin + Gold + Silber im Footer
+        doc["show_on_footer"] = tier in ("main", "platinum", "gold", "silver")
     if doc.get("is_active") is None:
         doc["is_active"] = True
     return doc
@@ -163,13 +175,16 @@ async def list_sponsors(placement: Optional[str] = None):
     db = get_db()
     q = {"is_active": {"$ne": False}}
     sp = await db.sponsors.find(q, {"_id": 0}).to_list(500)
+    # Normalize legacy tiers in-flight
+    for s in sp:
+        s["tier"] = _normalize_tier(s.get("tier"))
     # Apply placement filter
     if placement == "home":
-        sp = [s for s in sp if s.get("show_on_home", s.get("tier") in ("main", "gold"))]
+        sp = [s for s in sp if s.get("show_on_home", s["tier"] in ("main", "platinum", "gold"))]
     elif placement == "footer":
-        sp = [s for s in sp if s.get("show_on_footer", s.get("tier") in ("main", "gold", "silver"))]
+        sp = [s for s in sp if s.get("show_on_footer", s["tier"] in ("main", "platinum", "gold", "silver"))]
     # Sort by tier then order_index
-    sp.sort(key=lambda s: (_TIER_ORDER.get(s.get("tier", "supporter"), 99), s.get("order_index") or 0, s.get("name") or ""))
+    sp.sort(key=lambda s: (_TIER_ORDER.get(s["tier"], 99), s.get("order_index") or 0, s.get("name") or ""))
     return sp
 
 
@@ -177,7 +192,9 @@ async def list_sponsors(placement: Optional[str] = None):
 async def admin_list_sponsors(me: dict = Depends(require_admin())):
     db = get_db()
     sp = await db.sponsors.find({}, {"_id": 0}).to_list(500)
-    sp.sort(key=lambda s: (_TIER_ORDER.get(s.get("tier", "supporter"), 99), s.get("order_index") or 0, s.get("name") or ""))
+    for s in sp:
+        s["tier"] = _normalize_tier(s.get("tier"))
+    sp.sort(key=lambda s: (_TIER_ORDER.get(s["tier"], 99), s.get("order_index") or 0, s.get("name") or ""))
     return sp
 
 
