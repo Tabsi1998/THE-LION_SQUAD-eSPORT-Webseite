@@ -144,12 +144,12 @@ function App() {
           <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboardPage /></ProtectedRoute>} />
           <Route path="/admin/members" element={<ProtectedRoute requireAdmin><AdminMembersPage /></ProtectedRoute>} />
           <Route path="/admin/benefits" element={<ProtectedRoute requireAdmin><AdminBenefitsPage /></ProtectedRoute>} />
-          <Route path="/admin/tournaments" element={<ProtectedRoute requireAdmin><AdminTournamentsPage /></ProtectedRoute>} />
+          <Route path="/admin/tournaments" element={<ProtectedRoute requireModerator><AdminTournamentsPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments/new" element={<ProtectedRoute requireAdmin><AdminTournamentNewPage /></ProtectedRoute>} />
-          <Route path="/admin/tournaments/:id" element={<ProtectedRoute requireAdmin><AdminTournamentEditPage /></ProtectedRoute>} />
-          <Route path="/admin/f1" element={<ProtectedRoute requireAdmin><AdminF1Page /></ProtectedRoute>} />
+          <Route path="/admin/tournaments/:id" element={<ProtectedRoute requireModerator><AdminTournamentEditPage /></ProtectedRoute>} />
+          <Route path="/admin/f1" element={<ProtectedRoute requireModerator><AdminF1Page /></ProtectedRoute>} />
           <Route path="/admin/f1/new" element={<ProtectedRoute requireAdmin><AdminF1NewPage /></ProtectedRoute>} />
-          <Route path="/admin/f1/:id" element={<ProtectedRoute requireAdmin><AdminF1EditPage /></ProtectedRoute>} />
+          <Route path="/admin/f1/:id" element={<ProtectedRoute requireModerator><AdminF1EditPage /></ProtectedRoute>} />
           <Route path="/admin/games" element={<ProtectedRoute requireAdmin><AdminGamesPage /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute requireAdmin><AdminUsersPage /></ProtectedRoute>} />
           <Route path="/admin/stations" element={<ProtectedRoute requireAdmin><AdminStationsPage /></ProtectedRoute>} />

@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Response
 from fastapi.responses import StreamingResponse
 from database import get_db
-from auth import get_current_user, require_admin, get_optional_user
+from auth import get_current_user, require_admin, require_role, get_optional_user
 from models import (
     F1ChallengeCreate, F1ChallengeUpdate, F1TrackCreate, F1TrackUpdate,
     F1LapTimeCreate, F1LapTimeUpdate,
@@ -31,6 +31,14 @@ def _validate_penalty_note(penalty_seconds: float, is_invalid: bool, admin_note:
 router = APIRouter(prefix="/api/f1", tags=["f1"])
 
 
+def _iso(dt):
+    if dt is None:
+        return None
+    if hasattr(dt, "isoformat"):
+        return dt.isoformat()
+    return dt
+
+
 async def _resolve_cid(slug_or_id: str) -> str:
     db = get_db()
     c = await db.f1_challenges.find_one(
@@ -51,11 +59,14 @@ def _ms_to_time_str(ms: int) -> str:
 
 
 @router.get("/challenges")
-async def list_challenges(status: str | None = None, limit: int = 100):
+async def list_challenges(status: str | None = None, limit: int = 100, user=Depends(get_optional_user)):
     db = get_db()
+    is_staff = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
     q = {}
     if status:
         q["status"] = status
+    elif not is_staff:
+        q["status"] = {"$ne": "draft"}
     challenges = await db.f1_challenges.find(q, {"_id": 0}).sort("created_at", -1).to_list(limit)
     for c in challenges:
         c["track_count"] = await db.f1_tracks.count_documents({"challenge_id": c["id"]})
@@ -64,10 +75,13 @@ async def list_challenges(status: str | None = None, limit: int = 100):
 
 
 @router.get("/challenges/{slug_or_id}")
-async def get_challenge(slug_or_id: str):
+async def get_challenge(slug_or_id: str, user=Depends(get_optional_user)):
     db = get_db()
     c = await db.f1_challenges.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not c:
+        raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
+    is_staff = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
+    if c.get("status") == "draft" and not is_staff:
         raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
     tracks = await db.f1_tracks.find({"challenge_id": c["id"]}, {"_id": 0}).sort("order_index", 1).to_list(100)
     c["tracks"] = tracks
@@ -82,10 +96,9 @@ async def create_challenge(body: F1ChallengeCreate, me: dict = Depends(require_a
         raise HTTPException(status_code=409, detail="Slug bereits vergeben")
     doc = body.model_dump()
     doc["id"] = new_id()
-    doc["status"] = "draft"
-    for k in ["start_date", "end_date"]:
-        if doc.get(k):
-            doc[k] = doc[k].isoformat()
+    doc["status"] = doc.get("status") or "draft"
+    for k in ["registration_open_from", "registration_open_until", "start_date", "end_date"]:
+        doc[k] = _iso(doc.get(k))
     doc["created_at"] = now_utc().isoformat()
     doc["updated_at"] = now_utc().isoformat()
     doc["created_by"] = me["id"]
@@ -98,9 +111,9 @@ async def create_challenge(body: F1ChallengeCreate, me: dict = Depends(require_a
 async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends(require_admin())):
     db = get_db()
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
-    for k in ["start_date", "end_date"]:
-        if updates.get(k):
-            updates[k] = updates[k].isoformat()
+    for k in ["registration_open_from", "registration_open_until", "start_date", "end_date"]:
+        if k in updates:
+            updates[k] = _iso(updates.get(k))
     updates["updated_at"] = now_utc().isoformat()
     await db.f1_challenges.update_one({"id": cid}, {"$set": updates})
     c = await db.f1_challenges.find_one({"id": cid}, {"_id": 0})
@@ -261,7 +274,7 @@ async def championship_standings(cid: str):
 
 
 @router.post("/challenges/{cid}/times")
-async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_admin())):
+async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_role("moderator"))):
     db = get_db()
     cid = await _resolve_cid(cid)
     # Verify
@@ -360,7 +373,7 @@ async def list_times(cid: str, track_id: str | None = None, user_id: str | None 
 
 
 @router.patch("/times/{time_id}")
-async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(require_admin())):
+async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(require_role("moderator"))):
     db = get_db()
     existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
     if not existing:
@@ -380,7 +393,7 @@ async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(re
 
 
 @router.delete("/times/{time_id}")
-async def delete_time(time_id: str, me: dict = Depends(require_admin())):
+async def delete_time(time_id: str, me: dict = Depends(require_role("moderator"))):
     db = get_db()
     await db.f1_lap_times.delete_one({"id": time_id})
     return {"ok": True}

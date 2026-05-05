@@ -12,7 +12,7 @@ import {
 import { useState } from "react";
 
 export function AdminLayout({ children }) {
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const nav = useNavigate();
   const [openMobile, setOpenMobile] = useState(false);
 
@@ -43,6 +43,9 @@ export function AdminLayout({ children }) {
     { to: "/admin/audit", label: "Audit Logs", icon: ShieldCheck },
     { to: "/admin/settings", label: "Einstellungen", icon: SettingsIcon },
   ];
+  const visibleItems = isAdmin
+    ? items
+    : items.filter((it) => ["/admin/tournaments", "/admin/f1"].includes(it.to));
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex">
@@ -55,7 +58,7 @@ export function AdminLayout({ children }) {
           </button>
         </div>
         <nav className="flex-1 overflow-y-auto p-3 space-y-1 admin-scroll">
-          {items.map((it) => (
+          {visibleItems.map((it) => (
             <NavLink
               key={it.to}
               to={it.to}

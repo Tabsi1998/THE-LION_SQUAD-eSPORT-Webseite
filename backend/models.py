@@ -333,6 +333,7 @@ class TournamentCreate(BaseModel):
     substitutes_allowed: bool = False
     max_participants: int = 32
     min_participants: int = 2
+    registration_enabled: bool = True
     registration_open_from: Optional[datetime] = None
     registration_open_until: Optional[datetime] = None
     check_in_from: Optional[datetime] = None
@@ -375,6 +376,8 @@ class TournamentUpdate(BaseModel):
     team_size: Optional[int] = None
     max_participants: Optional[int] = None
     min_participants: Optional[int] = None
+    registration_enabled: Optional[bool] = None
+    is_invite_only: Optional[bool] = None
     registration_open_from: Optional[datetime] = None
     registration_open_until: Optional[datetime] = None
     check_in_from: Optional[datetime] = None
@@ -477,6 +480,9 @@ class F1ChallengeCreate(BaseModel):
     platform: Optional[str] = None
     max_attempts: Optional[int] = None
     unlimited_attempts: bool = True
+    registration_enabled: bool = True
+    registration_open_from: Optional[datetime] = None
+    registration_open_until: Optional[datetime] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     is_championship: bool = False
@@ -494,6 +500,7 @@ class F1ChallengeCreate(BaseModel):
     # Phase 7 weighting
     season_weight: float = 1.0  # default = "Fast-Lap-Challenge"
     visibility: Literal["public", "community", "members", "internal"] = "public"
+    status: Optional[TournamentStatus] = None
 
 
 class F1ChallengeUpdate(BaseModel):
@@ -507,6 +514,9 @@ class F1ChallengeUpdate(BaseModel):
     platform: Optional[str] = None
     max_attempts: Optional[int] = None
     unlimited_attempts: Optional[bool] = None
+    registration_enabled: Optional[bool] = None
+    registration_open_from: Optional[datetime] = None
+    registration_open_until: Optional[datetime] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     is_championship: Optional[bool] = None

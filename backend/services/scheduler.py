@@ -10,6 +10,7 @@ scheduler never crashes the app.
 """
 import logging
 from contextlib import suppress
+from datetime import datetime, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -57,6 +58,63 @@ async def _safe_twitch_poll():
         logger.exception(f"[scheduler] twitch_poll crash: {exc}")
 
 
+def _parse_dt(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+    except ValueError:
+        return None
+
+
+def _next_status(doc: dict, now: datetime) -> str | None:
+    status = doc.get("status")
+    reg_enabled = doc.get("registration_enabled") is not False and not doc.get("is_invite_only")
+    reg_from = _parse_dt(doc.get("registration_open_from"))
+    reg_until = _parse_dt(doc.get("registration_open_until"))
+    start = _parse_dt(doc.get("start_date"))
+
+    if status in ("draft", "live", "paused", "completed", "results_published", "archived", "cancelled"):
+        return None
+    if status == "scheduled" and reg_enabled and reg_from and now >= reg_from and (not reg_until or now <= reg_until):
+        return "registration_open"
+    if status == "registration_open" and reg_until and now > reg_until:
+        return "registration_closed"
+    if status in ("scheduled", "registration_open", "registration_closed", "check_in") and start and now >= start:
+        return "live"
+    return None
+
+
+async def _safe_status_transitions():
+    try:
+        from database import get_db
+        from models import now_utc
+        db = get_db()
+        now = datetime.now(timezone.utc)
+        now_iso = now_utc().isoformat()
+        changed = 0
+        for collection_name in ("tournaments", "f1_challenges"):
+            cursor = db[collection_name].find(
+                {"status": {"$in": ["scheduled", "registration_open", "registration_closed", "check_in"]}},
+                {"_id": 0},
+            )
+            async for doc in cursor:
+                nxt = _next_status(doc, now)
+                if nxt and nxt != doc.get("status"):
+                    await db[collection_name].update_one(
+                        {"id": doc["id"]},
+                        {"$set": {"status": nxt, "updated_at": now_iso}},
+                    )
+                    changed += 1
+        if changed:
+            logger.info(f"[scheduler] status_transitions changed={changed}")
+    except Exception as exc:
+        logger.exception(f"[scheduler] status_transitions crash: {exc}")
+
+
 def start_scheduler() -> AsyncIOScheduler:
     global _scheduler
     if _scheduler:
@@ -69,6 +127,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_safe_prize_expiry, IntervalTrigger(minutes=60), id="prize_expiry",
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_twitch_poll, IntervalTrigger(seconds=90), id="twitch_poll",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_safe_status_transitions, IntervalTrigger(seconds=60), id="status_transitions",
                   max_instances=1, coalesce=True)
     sched.start()
     _scheduler = sched

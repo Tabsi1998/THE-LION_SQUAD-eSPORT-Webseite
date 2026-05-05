@@ -6,7 +6,7 @@ Stand: 05.05.2026
 
 - `player`: normaler Community-Account.
 - `team_leader`: erweiterte Teamverwaltung im eigenen Teamkontext.
-- `moderator`: Moderationsrechte, aber kein voller Adminbereich.
+- `moderator`: operative Moderationsrechte fuer Turnier-/Fast-Lap-Ergebnisse, aber kein voller Adminbereich.
 - `tournament_admin`: Adminrechte fuer Turniere, Events, Inhalte und operative Verwaltung.
 - `club_admin`: Vereinsadmin mit erweiterter Vereinsverwaltung.
 - `superadmin`: hoechste Rolle, darf Rollen aendern und Setup abschliessen.
@@ -34,6 +34,8 @@ betreten.
 
 - Rollenwechsel: `POST /api/users/{id}/role` ist `superadmin` only.
 - Admin-Systemstatus: `GET /api/admin/system-status` ist admin-only.
+- Match-Ergebnisse und Forfeit-Entscheidungen: `moderator` oder hoeher.
+- Fast-Lap-Zeiten eintragen/bearbeiten/loeschen: `moderator` oder hoeher.
 - Mail/SMTP/Discord/Branding/Rechtliches: admin-only.
 - Private Dokumente: admin-only Verwaltung, geschuetzter Abruf ueber Dokumentroutes.
 - Eigene Daten/DSGVO Export: loginpflichtig und nutzerbezogen.
@@ -42,8 +44,8 @@ betreten.
 ## Offene Wachsamkeit
 
 - Neue Adminseiten immer zusaetzlich im Backend schuetzen, nicht nur im Frontend.
-- `moderator` ist bewusst nicht Teil von `require_admin()`. Falls Moderatoren eigene Adminseiten
-  bekommen sollen, separate `require_role("moderator")`-Routen verwenden.
+- `moderator` ist bewusst nicht Teil von `require_admin()`. Operative Ergebnisrouten verwenden
+  gezielt `require_role("moderator")`, damit Moderatoren keine System-/Branding-/Userverwaltung erhalten.
 - Bilduploads sind fuer eingeloggte Nutzer erlaubt, weil Profile Avatare/Banner brauchen. Admin-
   Dokumentuploads und Sponsorlogos bleiben admin-only.
 - Bei bezahlten Turnieren Zahlungsdaten, Belege und Preisabwicklung separat pruefen.

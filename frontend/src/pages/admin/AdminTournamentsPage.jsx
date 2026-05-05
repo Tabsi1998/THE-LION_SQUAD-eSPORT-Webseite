@@ -5,8 +5,10 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { Plus, Trash2, Play, Pause } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AdminTournamentsPage() {
+  const { isAdmin } = useAuth();
   const [list, setList] = useState([]);
   const load = async () => {
     const { data } = await api.get("/tournaments");
@@ -35,9 +37,11 @@ export default function AdminTournamentsPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Turniere</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">Turniere verwalten</h1>
         </div>
-        <Link to="/admin/tournaments/new" data-testid="admin-new-tournament" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
-          <Plus className="w-4 h-4" /> Neues Turnier
-        </Link>
+        {isAdmin && (
+          <Link to="/admin/tournaments/new" data-testid="admin-new-tournament" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
+            <Plus className="w-4 h-4" /> Neues Turnier
+          </Link>
+        )}
       </div>
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
         <div className="overflow-x-auto">
@@ -64,9 +68,9 @@ export default function AdminTournamentsPage() {
                 <td className="px-4 py-3 text-right">{t.participant_count}/{t.max_participants}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
-                    {t.status === "draft" && <button onClick={() => setStatus(t.id, "registration_open")} title="Anmeldung öffnen" className="p-2 hover:text-[#00FF88]"><Play className="w-3.5 h-3.5" /></button>}
-                    {t.status === "live" && <button onClick={() => setStatus(t.id, "paused")} title="Pause" className="p-2 hover:text-[#FFD700]"><Pause className="w-3.5 h-3.5" /></button>}
-                    <button onClick={() => del(t.id)} className="p-2 hover:text-[#FF3B30]" title="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>
+                    {isAdmin && t.status === "draft" && <button onClick={() => setStatus(t.id, "registration_open")} title="Anmeldung öffnen" className="p-2 hover:text-[#00FF88]"><Play className="w-3.5 h-3.5" /></button>}
+                    {isAdmin && t.status === "live" && <button onClick={() => setStatus(t.id, "paused")} title="Pause" className="p-2 hover:text-[#FFD700]"><Pause className="w-3.5 h-3.5" /></button>}
+                    {isAdmin && <button onClick={() => del(t.id)} className="p-2 hover:text-[#FF3B30]" title="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
                   </div>
                 </td>
               </tr>

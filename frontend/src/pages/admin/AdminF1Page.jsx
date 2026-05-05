@@ -4,8 +4,10 @@ import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { Plus, Flag } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AdminF1Page() {
+  const { isAdmin } = useAuth();
   const [list, setList] = useState([]);
   useEffect(() => { api.get("/f1/challenges").then(({ data }) => setList(data)); }, []);
   return (
@@ -15,9 +17,11 @@ export default function AdminF1Page() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Fast Lap</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">Challenges</h1>
         </div>
-        <Link to="/admin/f1/new" data-testid="admin-f1-new-btn" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2]">
-          <Plus className="w-4 h-4" /> Neue Challenge
-        </Link>
+        {isAdmin && (
+          <Link to="/admin/f1/new" data-testid="admin-f1-new-btn" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2]">
+            <Plus className="w-4 h-4" /> Neue Challenge
+          </Link>
+        )}
       </div>
       <div className="space-y-3">
         {list.map((c) => (

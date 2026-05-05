@@ -15,7 +15,7 @@ import { toast } from "sonner";
  *   variant: "square" | "wide" (visual)
  *   endpoint: "/uploads/image" (default) or "/uploads/sponsor-logo"
  */
-export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", endpoint = "/uploads/image", maxSizeMb = 5 }) {
+export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", endpoint = "/uploads/image", maxSizeMb = 15 }) {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 

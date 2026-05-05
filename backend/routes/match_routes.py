@@ -1,7 +1,7 @@
 """Match/Score/Dispute routes."""
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
-from auth import get_current_user, require_admin, get_optional_user
+from auth import get_current_user, require_admin, require_role, get_optional_user
 from models import MatchUpdate, MatchScoreReport, MatchDispute, now_utc, new_id
 from bracket_engine import advance_match_winner
 
@@ -42,7 +42,7 @@ async def get_match(match_id: str):
 
 
 @router.patch("/{match_id}")
-async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(require_admin())):
+async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(require_role("moderator"))):
     db = get_db()
     m = await db.matches.find_one({"id": match_id})
     if not m:
@@ -172,7 +172,7 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
 
 
 @router.post("/{match_id}/forfeit")
-async def forfeit(match_id: str, body: dict, me: dict = Depends(require_admin())):
+async def forfeit(match_id: str, body: dict, me: dict = Depends(require_role("moderator"))):
     """Admin forfeit - winner_id is the surviving participant.
 
     P0 — Penalty Transparency: a justification note (≥5 chars) is mandatory and

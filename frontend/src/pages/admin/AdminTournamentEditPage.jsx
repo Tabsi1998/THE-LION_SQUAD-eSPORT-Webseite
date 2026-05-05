@@ -4,10 +4,13 @@ import { API, api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
+import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
 import { Zap, RefreshCw, Eye } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AdminTournamentEditPage() {
+  const { isAdmin, isModerator } = useAuth();
   const { id } = useParams();
   const [t, setT] = useState(null);
   const [regs, setRegs] = useState([]);
@@ -53,6 +56,18 @@ export default function AdminTournamentEditPage() {
     toast.success(`Status: ${status}`);
     load();
   };
+  const updateMatchResult = async (m, scoreA, scoreB, winnerId) => {
+    try {
+      await api.patch(`/matches/${m.id}`, {
+        score_a: Number(scoreA) || 0,
+        score_b: Number(scoreB) || 0,
+        winner_id: winnerId || null,
+        status: winnerId ? "completed" : "waiting_result",
+      });
+      toast.success("Ergebnis gespeichert.");
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
 
   if (!t) return <AdminLayout><div className="p-10 text-white/40">Lade…</div></AdminLayout>;
 
@@ -69,21 +84,23 @@ export default function AdminTournamentEditPage() {
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <select value={t.status} onChange={(e) => setTournStatus(e.target.value)} data-testid="admin-tr-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
-            {["draft", "registration_open", "check_in", "live", "paused", "completed", "archived"].map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-          <button onClick={generate} data-testid="admin-tr-generate" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2">
+          {isAdmin && (
+            <select value={t.status} onChange={(e) => setTournStatus(e.target.value)} data-testid="admin-tr-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
+              {["draft", "scheduled", "registration_open", "registration_closed", "check_in", "live", "paused", "completed", "results_published", "archived", "cancelled"].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          )}
+          {isAdmin && <button onClick={generate} data-testid="admin-tr-generate" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2">
             <Zap className="w-3.5 h-3.5" /> Bracket generieren
-          </button>
-          <button onClick={reset} data-testid="admin-tr-reset" className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-sm hover:border-[#FF3B30]/60 hover:text-[#FF3B30] inline-flex items-center gap-2">
+          </button>}
+          {isAdmin && <button onClick={reset} data-testid="admin-tr-reset" className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-sm hover:border-[#FF3B30]/60 hover:text-[#FF3B30] inline-flex items-center gap-2">
             <RefreshCw className="w-3.5 h-3.5" /> Reset
-          </button>
-          {t.format === "swiss" && (
+          </button>}
+          {isAdmin && t.format === "swiss" && (
             <button onClick={async()=>{ try{ const {data} = await api.post(`/tournaments/${id}/swiss/next-round`); toast.success(`Runde ${data.round} mit ${data.match_count} Matches generiert`); load(); }catch(e){ toast.error(e.response?.data?.detail||"Fehler"); } }} data-testid="admin-tr-swiss-next" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Swiss Runde</button>
           )}
-          {t.format === "groups" && (
+          {isAdmin && t.format === "groups" && (
             <button onClick={async()=>{ const gc = prompt("Wie viele Gruppen?", "4"); if(!gc) return; try{ const {data} = await api.post(`/tournaments/${id}/groups/generate`,{group_count: parseInt(gc)}); toast.success(`${data.group_count} Gruppen mit ${data.match_count} Matches`); load(); }catch(e){ toast.error(e.response?.data?.detail||"Fehler"); } }} data-testid="admin-tr-groups" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Gruppen generieren</button>
           )}
           <div className="flex gap-1">
@@ -177,7 +194,12 @@ export default function AdminTournamentEditPage() {
                     <td className="px-4 py-3 text-center font-display font-bold">{m.score_a} : {m.score_b}</td>
                     <td className="px-4 py-3"><StatusBadge status={m.status} /></td>
                     <td className="px-4 py-3 text-right">
-                      <Link to={`/matches/${m.id}`} className="text-[#29B6E8] text-xs font-bold uppercase hover:text-white">Öffnen →</Link>
+                      <div className="flex flex-col items-end gap-2">
+                        {isModerator && a && b && (
+                          <MatchResultControls match={m} a={a} b={b} onSave={updateMatchResult} />
+                        )}
+                        <Link to={`/matches/${m.id}`} className="text-[#29B6E8] text-xs font-bold uppercase hover:text-white">Öffnen →</Link>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -188,7 +210,7 @@ export default function AdminTournamentEditPage() {
         </div>
       )}
       {tab === "edit" && (
-        <TournamentEditForm tournament={t} onSaved={load} />
+        <TournamentEditForm key={t.updated_at || t.id} tournament={t} onSaved={load} />
       )}
       {tab === "groups" && (
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -212,6 +234,7 @@ export default function AdminTournamentEditPage() {
 }
 
 function TournamentEditForm({ tournament, onSaved }) {
+  const dt = (v) => v ? String(v).slice(0, 16) : "";
   const [f, setF] = useState({
     title: tournament.title || "",
     description: tournament.description || "",
@@ -221,6 +244,14 @@ function TournamentEditForm({ tournament, onSaved }) {
     stream_link: tournament.stream_link || "",
     discord_link: tournament.discord_link || "",
     location: tournament.location || "",
+    registration_enabled: tournament.registration_enabled !== false,
+    is_invite_only: !!tournament.is_invite_only,
+    registration_open_from: dt(tournament.registration_open_from),
+    registration_open_until: dt(tournament.registration_open_until),
+    check_in_from: dt(tournament.check_in_from),
+    check_in_until: dt(tournament.check_in_until),
+    start_date: dt(tournament.start_date),
+    end_date: dt(tournament.end_date),
     max_participants: tournament.max_participants || 16,
     best_of: tournament.best_of || 1,
     bronze_match: !!tournament.bronze_match,
@@ -229,7 +260,11 @@ function TournamentEditForm({ tournament, onSaved }) {
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const save = async () => {
     try {
-      await api.patch(`/tournaments/${tournament.id}`, f);
+      const payload = { ...f };
+      ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"].forEach((k) => {
+        if (!payload[k]) delete payload[k];
+      });
+      await api.patch(`/tournaments/${tournament.id}`, payload);
       toast.success("Gespeichert.");
       onSaved();
     } catch (e) { toast.error(e.response?.data?.detail || "Fehler"); }
@@ -237,8 +272,23 @@ function TournamentEditForm({ tournament, onSaved }) {
   return (
     <div className="max-w-2xl space-y-3 border border-white/10 bg-[#121212] rounded-sm p-5">
       <Fld label="Titel" value={f.title} onChange={(v)=>set("title",v)} testId="tr-edit-title"/>
-      <Fld label="Banner URL" value={f.banner_url} onChange={(v)=>set("banner_url",v)} testId="tr-edit-banner"/>
+      <ImageUpload value={f.banner_url} onChange={(v)=>set("banner_url",v)} label="Turnier-Banner" testId="tr-edit-banner-upload" variant="wide" />
       <Fld label="Location" value={f.location} onChange={(v)=>set("location",v)} testId="tr-edit-location"/>
+      <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
+        <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeitplan & Anmeldung</div>
+        <div className="grid md:grid-cols-2 gap-3">
+          <Fld label="Start Event/Turnier" type="datetime-local" value={f.start_date} onChange={(v)=>set("start_date",v)} testId="tr-edit-start"/>
+          <Fld label="Ende Event/Turnier" type="datetime-local" value={f.end_date} onChange={(v)=>set("end_date",v)} testId="tr-edit-end"/>
+          <Fld label="Anmeldung öffnet" type="datetime-local" value={f.registration_open_from} onChange={(v)=>set("registration_open_from",v)} testId="tr-edit-reg-from"/>
+          <Fld label="Anmeldung endet" type="datetime-local" value={f.registration_open_until} onChange={(v)=>set("registration_open_until",v)} testId="tr-edit-reg-until"/>
+          <Fld label="Check-in öffnet" type="datetime-local" value={f.check_in_from} onChange={(v)=>set("check_in_from",v)} testId="tr-edit-checkin-from"/>
+          <Fld label="Check-in endet" type="datetime-local" value={f.check_in_until} onChange={(v)=>set("check_in_until",v)} testId="tr-edit-checkin-until"/>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.registration_enabled} onChange={(e)=>set("registration_enabled",e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Öffentliche Anmeldung erlauben</span></label>
+          <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.is_invite_only} onChange={(e)=>set("is_invite_only",e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Nur Einladung/manuelle Teilnehmer</span></label>
+        </div>
+      </div>
       <Fld label="Stream Link" value={f.stream_link} onChange={(v)=>set("stream_link",v)} testId="tr-edit-stream"/>
       <Fld label="Discord Link" value={f.discord_link} onChange={(v)=>set("discord_link",v)} testId="tr-edit-discord"/>
       <div className="grid grid-cols-2 gap-3">
@@ -254,6 +304,30 @@ function TournamentEditForm({ tournament, onSaved }) {
     </div>
   );
 }
+
+function MatchResultControls({ match, a, b, onSave }) {
+  const [scoreA, setScoreA] = useState(match.score_a ?? 0);
+  const [scoreB, setScoreB] = useState(match.score_b ?? 0);
+  const winnerId = Number(scoreA) > Number(scoreB)
+    ? a.id
+    : Number(scoreB) > Number(scoreA)
+      ? b.id
+      : "";
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-1">
+      <input type="number" min="0" value={scoreA} onChange={(e)=>setScoreA(e.target.value)} className="w-14 bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Score A" />
+      <span className="text-white/40">:</span>
+      <input type="number" min="0" value={scoreB} onChange={(e)=>setScoreB(e.target.value)} className="w-14 bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Score B" />
+      <select value={winnerId} onChange={(e)=>onSave(match, scoreA, scoreB, e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs max-w-[150px]" aria-label="Gewinner">
+        <option value="">Gewinner wählen</option>
+        <option value={a.id}>{a.display_name || "A"}</option>
+        <option value={b.id}>{b.display_name || "B"}</option>
+      </select>
+      <button type="button" onClick={()=>onSave(match, scoreA, scoreB, winnerId)} className="px-2 py-1 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase">Speichern</button>
+    </div>
+  );
+}
+
 function Fld({ label, value, onChange, type="text", testId }) {
   return (<label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><input type={type} value={value ?? ""} onChange={(e)=>onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"/></label>);
 }

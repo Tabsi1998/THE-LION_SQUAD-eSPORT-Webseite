@@ -3,10 +3,13 @@ import { useParams, Link } from "react-router-dom";
 import { API, api, formatApiError, formatMs, parseTimeStr } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
 import { Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AdminF1EditPage() {
+  const { isAdmin } = useAuth();
   const { id } = useParams();
   const [challenge, setChallenge] = useState(null);
   const [tracks, setTracks] = useState([]);
@@ -122,9 +125,11 @@ export default function AdminF1EditPage() {
           <div className="mt-2 flex items-center gap-3"><StatusBadge status={challenge.status} /></div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <select value={challenge.status} onChange={(e) => setStatus(e.target.value)} data-testid="f1-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
-            {["draft", "registration_open", "live", "paused", "completed"].map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          {isAdmin && (
+            <select value={challenge.status} onChange={(e) => setStatus(e.target.value)} data-testid="f1-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
+              {["draft", "scheduled", "registration_open", "registration_closed", "live", "paused", "completed", "results_published", "archived", "cancelled"].map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
           <Link target="_blank" to={`/display/f1/${challenge.id}`} data-testid="f1-tv-admin-link" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8] text-[#29B6E8] rounded-sm uppercase tracking-wider text-sm font-bold hover:bg-[#29B6E8]/10">
             <Tv className="w-4 h-4" /> TV Modus
           </Link>
@@ -133,6 +138,8 @@ export default function AdminF1EditPage() {
           <a href={`${API}/exports/f1/${challenge.id}/leaderboard.pdf${activeTrack ? `?track_id=${activeTrack}` : ""}`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF</a>
         </div>
       </div>
+
+      {isAdmin && <ChallengeSettingsForm key={challenge.updated_at || challenge.id} challenge={challenge} onSaved={load} />}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Tracks */}
@@ -145,19 +152,19 @@ export default function AdminF1EditPage() {
                   {tr.image_url && <img src={tr.image_url} className="w-10 h-7 object-cover rounded-sm" alt="" />}
                   <div className="min-w-0"><div className="text-sm font-bold truncate">{tr.name}</div><div className="text-[10px] text-white/50">{tr.country}</div></div>
                 </button>
-                <button onClick={() => delTrack(tr.id)} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-3.5 h-3.5" /></button>
+                {isAdmin && <button onClick={() => delTrack(tr.id)} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-3.5 h-3.5" /></button>}
               </div>
             ))}
           </div>
-          <form onSubmit={addTrack} className="mt-4 space-y-2 border-t border-white/5 pt-4">
+          {isAdmin && <form onSubmit={addTrack} className="mt-4 space-y-2 border-t border-white/5 pt-4">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Neue Strecke</div>
             <input placeholder="Name" value={newTrack.name} onChange={(e) => setNewTrack({ ...newTrack, name: e.target.value })} required data-testid="f1-new-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-            <input placeholder="Bild URL" value={newTrack.image_url} onChange={(e) => setNewTrack({ ...newTrack, image_url: e.target.value })} data-testid="f1-new-track-image" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            <ImageUpload value={newTrack.image_url} onChange={(v) => setNewTrack({ ...newTrack, image_url: v })} label="Streckenbild" testId="f1-new-track-image-upload" variant="wide" />
             <input placeholder="Land" value={newTrack.country} onChange={(e) => setNewTrack({ ...newTrack, country: e.target.value })} data-testid="f1-new-track-country" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             <button data-testid="f1-add-track-btn" className="w-full px-3 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#1E95C2] inline-flex items-center justify-center gap-2">
               <Plus className="w-3.5 h-3.5" /> Hinzufügen
             </button>
-          </form>
+          </form>}
         </div>
 
         {/* Time input + list */}
@@ -277,5 +284,77 @@ export default function AdminF1EditPage() {
         </div>
       )}
     </AdminLayout>
+  );
+}
+
+function ChallengeSettingsForm({ challenge, onSaved }) {
+  const dt = (v) => v ? String(v).slice(0, 16) : "";
+  const [form, setForm] = useState({
+    title: challenge.title || "",
+    description: challenge.description || "",
+    banner_url: challenge.banner_url || "",
+    vehicle: challenge.vehicle || "",
+    weather: challenge.weather || "",
+    assists_allowed: challenge.assists_allowed || "",
+    controller_type: challenge.controller_type || "",
+    platform: challenge.platform || "",
+    registration_enabled: challenge.registration_enabled !== false,
+    registration_open_from: dt(challenge.registration_open_from),
+    registration_open_until: dt(challenge.registration_open_until),
+    start_date: dt(challenge.start_date),
+    end_date: dt(challenge.end_date),
+    unlimited_attempts: challenge.unlimited_attempts !== false,
+    max_attempts: challenge.max_attempts || 0,
+  });
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const save = async () => {
+    try {
+      const payload = { ...form };
+      if (payload.unlimited_attempts) payload.max_attempts = null;
+      ["registration_open_from", "registration_open_until", "start_date", "end_date"].forEach((k) => {
+        if (!payload[k]) delete payload[k];
+      });
+      await api.patch(`/f1/challenges/${challenge.id}`, payload);
+      toast.success("Challenge gespeichert.");
+      onSaved();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+  return (
+    <div className="mb-6 border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
+      <div className="font-heading font-bold uppercase">Challenge Einstellungen</div>
+      <div className="grid md:grid-cols-2 gap-4">
+        <SmallField label="Titel" value={form.title} onChange={(v)=>set("title", v)} />
+        <SmallField label="Plattform" value={form.platform} onChange={(v)=>set("platform", v)} />
+      </div>
+      <ImageUpload value={form.banner_url} onChange={(v)=>set("banner_url", v)} label="Challenge-Banner" testId="f1-edit-banner-upload" variant="wide" />
+      <div className="grid md:grid-cols-2 gap-4">
+        <SmallField label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v)=>set("start_date", v)} />
+        <SmallField label="Ende Challenge/Event" type="datetime-local" value={form.end_date} onChange={(v)=>set("end_date", v)} />
+        <SmallField label="Einreichung öffnet" type="datetime-local" value={form.registration_open_from} onChange={(v)=>set("registration_open_from", v)} />
+        <SmallField label="Einreichung endet" type="datetime-local" value={form.registration_open_until} onChange={(v)=>set("registration_open_until", v)} />
+      </div>
+      <div className="grid md:grid-cols-2 gap-4">
+        <SmallField label="Fahrzeug" value={form.vehicle} onChange={(v)=>set("vehicle", v)} />
+        <SmallField label="Wetter" value={form.weather} onChange={(v)=>set("weather", v)} />
+        <SmallField label="Fahrhilfen" value={form.assists_allowed} onChange={(v)=>set("assists_allowed", v)} />
+        <SmallField label="Controller-Typ" value={form.controller_type} onChange={(v)=>set("controller_type", v)} />
+      </div>
+      <textarea rows={3} value={form.description} onChange={(e)=>set("description", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="Beschreibung" />
+      <div className="grid sm:grid-cols-2 gap-3">
+        <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.registration_enabled} onChange={(e)=>set("registration_enabled", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Zeiten/Einreichungen erlauben</span></label>
+        <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.unlimited_attempts} onChange={(e)=>set("unlimited_attempts", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Unbegrenzte Versuche</span></label>
+      </div>
+      {!form.unlimited_attempts && <SmallField label="Max Versuche" type="number" value={form.max_attempts} onChange={(v)=>set("max_attempts", Number(v))} />}
+      <button type="button" onClick={save} className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
+    </div>
+  );
+}
+
+function SmallField({ label, value, onChange, type = "text" }) {
+  return (
+    <label className="block">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <input type={type} value={value ?? ""} onChange={(e)=>onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+    </label>
   );
 }

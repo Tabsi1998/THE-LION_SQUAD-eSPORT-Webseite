@@ -1,6 +1,7 @@
 """Tournament + bracket routes."""
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
+from datetime import datetime, timezone
 from database import get_db
 from auth import get_current_user, require_admin, get_optional_user
 from models import (
@@ -21,6 +22,33 @@ def _iso(dt):
     if hasattr(dt, "isoformat"):
         return dt.isoformat()
     return dt
+
+
+def _parse_dt(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+    except ValueError:
+        return None
+
+
+def _registration_error(t: dict) -> str | None:
+    if t.get("registration_enabled") is False or t.get("is_invite_only"):
+        return "Anmeldung fuer dieses Turnier ist deaktiviert"
+    if t.get("status") != "registration_open":
+        return "Anmeldung fuer dieses Turnier geschlossen"
+    now = datetime.now(timezone.utc)
+    open_from = _parse_dt(t.get("registration_open_from"))
+    open_until = _parse_dt(t.get("registration_open_until"))
+    if open_from and now < open_from:
+        return "Anmeldung ist noch nicht geoeffnet"
+    if open_until and now > open_until:
+        return "Anmeldung ist bereits beendet"
+    return None
 
 
 async def _enrich_tournament(t: dict) -> dict:
@@ -164,8 +192,9 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
     t = await db.tournaments.find_one({"id": tid})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if t.get("status") not in ("registration_open", "check_in", "draft"):
-        raise HTTPException(status_code=400, detail="Anmeldung für dieses Turnier geschlossen")
+    registration_error = _registration_error(t)
+    if registration_error:
+        raise HTTPException(status_code=400, detail=registration_error)
     existing = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": me["id"]})
     if existing:
         raise HTTPException(status_code=409, detail="Bereits angemeldet")

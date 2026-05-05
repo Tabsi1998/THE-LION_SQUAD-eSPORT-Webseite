@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
 
 const FORMATS = [
@@ -26,8 +27,14 @@ export default function AdminTournamentNewPage() {
     platform: "", event_id: "", format: "single_elim",
     team_mode: "solo", team_size: 1,
     max_participants: 16, min_participants: 2,
+    registration_enabled: true, is_invite_only: false,
+    registration_open_from: "", registration_open_until: "",
+    check_in_from: "", check_in_until: "",
+    start_date: "", end_date: "",
+    status: "draft",
     best_of: 1, bronze_match: false, seeding_mode: "random",
     is_public: true, rules: "", prize_pool: "",
+    banner_url: "",
     prize_places: [
       { place: 1, label: "1. Platz", value: "" },
       { place: 2, label: "2. Platz", value: "" },
@@ -51,6 +58,9 @@ export default function AdminTournamentNewPage() {
     try {
       const payload = { ...form };
       if (!payload.event_id) delete payload.event_id;
+      ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"].forEach((k) => {
+        if (!payload[k]) delete payload[k];
+      });
       // Filter empty prize places
       payload.prize_places = (payload.prize_places || [])
         .filter((p) => p.value && p.value.trim())
@@ -78,6 +88,35 @@ export default function AdminTournamentNewPage() {
           <Field label="Slug (URL)" value={form.slug} onChange={(v) => set("slug", v)} required testId="new-tr-slug" />
         </Row>
         <Textarea label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="new-tr-description" />
+        <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Turnier-Banner" testId="new-tr-banner-upload" variant="wide" />
+        <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
+          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeitplan & Anmeldung</div>
+          <Row>
+            <Select label="Initialer Status" value={form.status} onChange={(v) => set("status", v)} options={[
+              ["draft", "Entwurf"],
+              ["scheduled", "Warten auf Registrierung/Event"],
+              ["registration_open", "Anmeldung offen"],
+              ["registration_closed", "Anmeldung geschlossen"],
+              ["live", "Live"],
+            ]} testId="new-tr-status" />
+            <Field label="Start Event/Turnier" type="datetime-local" value={form.start_date} onChange={(v) => set("start_date", v)} testId="new-tr-start" />
+            <Field label="Ende Event/Turnier" type="datetime-local" value={form.end_date} onChange={(v) => set("end_date", v)} testId="new-tr-end" />
+            <Field label="Anmeldung öffnet" type="datetime-local" value={form.registration_open_from} onChange={(v) => set("registration_open_from", v)} testId="new-tr-reg-from" />
+            <Field label="Anmeldung endet" type="datetime-local" value={form.registration_open_until} onChange={(v) => set("registration_open_until", v)} testId="new-tr-reg-until" />
+            <Field label="Check-in öffnet" type="datetime-local" value={form.check_in_from} onChange={(v) => set("check_in_from", v)} testId="new-tr-checkin-from" />
+            <Field label="Check-in endet" type="datetime-local" value={form.check_in_until} onChange={(v) => set("check_in_until", v)} testId="new-tr-checkin-until" />
+          </Row>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="flex items-start gap-2 text-sm text-white/75">
+              <input type="checkbox" checked={form.registration_enabled} onChange={(e) => set("registration_enabled", e.target.checked)} data-testid="new-tr-reg-enabled" className="accent-[#29B6E8] mt-1" />
+              <span>Öffentliche Anmeldung grundsätzlich erlauben</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-white/75">
+              <input type="checkbox" checked={form.is_invite_only} onChange={(e) => set("is_invite_only", e.target.checked)} data-testid="new-tr-invite-only" className="accent-[#29B6E8] mt-1" />
+              <span>Nur Einladung/manuelle Teilnehmer, keine öffentliche Anmeldung</span>
+            </label>
+          </div>
+        </div>
         <Row>
           <Select label="Spiel *" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, g.name])]} required testId="new-tr-game" />
           <Select label="Format" value={form.format} onChange={(v) => set("format", v)} options={FORMATS} testId="new-tr-format" />

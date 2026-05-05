@@ -25,6 +25,11 @@ Dokumenten, Achievements, Kontaktformular, Mailversand und Discord-Integrationen
 - Adminbereich fuer Benutzer, Mitglieder, Mitgliedsantraege, Turniere, Fast Lap, Events, News, Sponsoren, Galerie, Dokumente, Board, Navigation, CMS und Systemeinstellungen.
 - Turnier- und Matchverwaltung mit Registrierungen, Check-in, Brackets, Ergebnissen und TV-Anzeigen.
 - F1/Fast-Lap-Challenges mit Strecken, Zeiten, Strafen, Ranglisten und Display-Modus.
+- Zeitplanung fuer Turniere und Fast-Lap-Challenges: Registrierung/Einreichung oeffnet,
+  Registrierung/Einreichung endet, Start/Ende, Status `scheduled`, `registration_open`,
+  `registration_closed` und `live`.
+- Scheduler wechselt geplante Turniere/Challenges automatisch anhand der eingetragenen Zeiten
+  von `scheduled` zu `registration_open`, danach zu `registration_closed` und ab Start zu `live`.
 - Mail-Queue mit SMTP oder Resend, Testmail, Diagnose und Versandlogs.
 - Discord Webhook fuer automatische Benachrichtigungen.
 - Branding-Hauptsettings fuer Vereinsname, Logo, Maskottchen, Favicon, Farben, Domain und Kontaktmail.
@@ -272,6 +277,27 @@ Damit Mails nicht im Spam landen:
 
 Uploads werden im Docker-Volume `uploads_data` gespeichert und ueber
 `/api/static/uploads/...` ausgeliefert.
+
+Bild-Uploads erlauben PNG/JPG/WebP bis 15 MB. Der Frontend-Nginx im Container erlaubt
+Requests bis 25 MB. Wenn vor Docker noch ein externer Reverse Proxy wie Nginx Proxy Manager,
+Apache, Cloudflare oder ein Hosting-Panel sitzt, muss dort ebenfalls ein Body-Limit von
+mindestens 25 MB gesetzt werden, sonst kommt weiterhin `413 Request Entity Too Large`, bevor
+die App den Upload ueberhaupt sieht.
+
+Bilduploads gibt es fuer Profile, Branding, News, Events, Galerie, Sponsoren, Turniere,
+Fast-Lap-Challenges und Fast-Lap-Strecken.
+
+## Moderatoren und Ergebnisverwaltung
+
+Moderatoren haben keinen vollen Adminbereich. Sie duerfen aber operative Ergebnisse pflegen:
+
+- Turnierliste und Turnierdetail im Adminbereich oeffnen.
+- Matchscores im Turnierdetail direkt eintragen.
+- Fast-Lap-Challenges oeffnen.
+- Fast-Lap-Zeiten eintragen, bearbeiten und loeschen.
+
+System-, Branding-, Benutzer-, Rollen-, Mail- und Rechtseinstellungen bleiben Adminrollen
+vorbehalten.
 
 Unterstuetzt fuer Bilder:
 
