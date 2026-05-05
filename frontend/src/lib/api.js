@@ -14,12 +14,44 @@ export function resolveMediaUrl(url) {
 }
 
 function getCookie(name) {
+  if (typeof document === "undefined") return "";
   const prefix = `${name}=`;
   return document.cookie
     .split(";")
     .map((part) => part.trim())
     .find((part) => part.startsWith(prefix))
     ?.slice(prefix.length);
+}
+
+function decodeCookieValue(value) {
+  if (!value) return "";
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function ensureHeaders(config) {
+  if (!config.headers) config.headers = {};
+  return config.headers;
+}
+
+function setHeader(headers, name, value) {
+  if (!headers || !value) return;
+  if (typeof headers.set === "function") headers.set(name, value);
+  else headers[name] = value;
+}
+
+function deleteHeader(headers, name) {
+  if (!headers) return;
+  if (typeof headers.delete === "function") headers.delete(name);
+  else delete headers[name];
+}
+
+function applyCsrfHeader(config) {
+  const csrf = decodeCookieValue(getCookie("csrf_token"));
+  if (csrf) setHeader(ensureHeaders(config), "X-CSRF-Token", csrf);
 }
 
 export const api = axios.create({
@@ -32,18 +64,13 @@ const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 api.interceptors.request.use((config) => {
   const method = (config.method || "get").toUpperCase();
+  const headers = ensureHeaders(config);
   if (config.data instanceof FormData) {
-    if (typeof config.headers?.delete === "function") {
-      config.headers.delete("Content-Type");
-      config.headers.delete("content-type");
-    } else if (config.headers) {
-      delete config.headers["Content-Type"];
-      delete config.headers["content-type"];
-    }
+    deleteHeader(headers, "Content-Type");
+    deleteHeader(headers, "content-type");
   }
   if (UNSAFE_METHODS.has(method)) {
-    const csrf = getCookie("csrf_token");
-    if (csrf) config.headers["X-CSRF-Token"] = decodeURIComponent(csrf);
+    applyCsrfHeader(config);
   }
   return config;
 });
@@ -56,10 +83,19 @@ api.interceptors.response.use(
     const original = error.config;
     const url = original?.url || "";
     const authRequest = url.includes("/auth/login") || url.includes("/auth/register") || url.includes("/auth/refresh");
+    const detail = formatApiError(error.response?.data?.detail);
+    const csrfError = error.response?.status === 403 && /csrf token missing or invalid/i.test(detail);
     if (error.response?.status === 401 && original && !original._retry && !authRequest) {
       original._retry = true;
       refreshPromise = refreshPromise || api.post("/auth/refresh").finally(() => { refreshPromise = null; });
       await refreshPromise;
+      return api(original);
+    }
+    if (csrfError && original && !original._csrfRetry && !authRequest) {
+      original._csrfRetry = true;
+      refreshPromise = refreshPromise || api.post("/auth/refresh").finally(() => { refreshPromise = null; });
+      await refreshPromise;
+      applyCsrfHeader(original);
       return api(original);
     }
     return Promise.reject(error);
