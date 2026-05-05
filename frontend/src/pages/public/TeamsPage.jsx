@@ -119,6 +119,32 @@ function TeamDetail({ id }) {
     } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
   };
 
+  const kickMember = async (m) => {
+    if (!window.confirm(`${m.display_name || m.username} wirklich aus dem Team entfernen?`)) return;
+    try {
+      await api.delete(`/teams/${team.id}/members/${m.id}`);
+      toast.success(`${m.display_name || m.username} entfernt.`);
+      load();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+  };
+
+  const setRole = async (m, role) => {
+    try {
+      await api.post(`/teams/${team.id}/members/${m.id}/role`, { role });
+      toast.success(role === "co_leader" ? "Zum Co-Leader befördert." : "Co-Leader-Rolle entzogen.");
+      load();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+  };
+
+  const transferLead = async (m) => {
+    if (!window.confirm(`Leadership an ${m.display_name || m.username} übergeben? Du wirst automatisch Co-Leader.`)) return;
+    try {
+      await api.post(`/teams/${team.id}/transfer-leader`, { new_leader_id: m.id });
+      toast.success("Leadership übertragen.");
+      load();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+  };
+
   const copyJoin = async () => {
     try {
       await navigator.clipboard.writeText(team.join_code || "");
@@ -156,12 +182,55 @@ function TeamDetail({ id }) {
         <div className="lg:col-span-2">
           <h2 className="font-heading text-2xl font-bold uppercase mb-4">Mitglieder</h2>
           <div className="grid sm:grid-cols-2 gap-3">
-            {team.members?.map((m) => (
-              <Link key={m.id} to={`/u/${m.username}`} className="border border-white/10 bg-[#121212] rounded-sm p-4 hover:border-[#29B6E8]/60 transition">
-                <div className="font-heading text-lg font-bold">{m.display_name || m.username}</div>
-                <div className="text-xs text-white/45">@{m.username}</div>
-              </Link>
-            ))}
+            {team.members?.map((m) => {
+              const isLead = team.leader_id === m.id;
+              const isCo = (team.co_leader_ids || []).includes(m.id);
+              const isMe = user && user.id === m.id;
+              const showKick = canEdit && !isLead && !isMe;
+              const showRole = !!user && team.leader_id === user.id && !isLead;
+              const showTransfer = !!user && team.leader_id === user.id && !isLead;
+              const role = isLead ? "leader" : (isCo ? "co_leader" : "member");
+              const roleLabel = isLead ? "Leader" : (isCo ? "Co-Leader" : "Mitglied");
+              const roleColor = isLead ? "text-[#FFD700] border-[#FFD700]/40 bg-[#FFD700]/5" :
+                                isCo ? "text-[#29B6E8] border-[#29B6E8]/40 bg-[#29B6E8]/5" :
+                                "text-white/60 border-white/10 bg-white/5";
+              return (
+                <div key={m.id} data-testid={`team-member-row-${m.id}`}
+                  className="border border-white/10 bg-[#121212] rounded-sm p-4 hover:border-[#29B6E8]/40 transition flex flex-col gap-2">
+                  <Link to={`/u/${m.username}`} className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-heading text-lg font-bold truncate">{m.display_name || m.username}</div>
+                      <div className="text-xs text-white/45">@{m.username}</div>
+                    </div>
+                    <span className={`shrink-0 px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-wider ${roleColor}`}>{roleLabel}</span>
+                  </Link>
+                  {(showKick || showRole || showTransfer) && (
+                    <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
+                      {showRole && !isCo && (
+                        <button onClick={(e) => { e.preventDefault(); setRole(m, "co_leader"); }}
+                          data-testid={`team-promote-${m.id}`}
+                          className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10 rounded-sm">↑ Co-Leader</button>
+                      )}
+                      {showRole && isCo && (
+                        <button onClick={(e) => { e.preventDefault(); setRole(m, "member"); }}
+                          data-testid={`team-demote-${m.id}`}
+                          className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider border border-white/15 text-white/60 hover:bg-white/5 rounded-sm">↓ Mitglied</button>
+                      )}
+                      {showTransfer && (
+                        <button onClick={(e) => { e.preventDefault(); transferLead(m); }}
+                          data-testid={`team-transfer-${m.id}`}
+                          className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 rounded-sm">★ Leader machen</button>
+                      )}
+                      {showKick && (
+                        <button onClick={(e) => { e.preventDefault(); kickMember(m); }}
+                          data-testid={`team-kick-${m.id}`}
+                          className="ml-auto px-2 py-1 text-[10px] font-bold uppercase tracking-wider border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 rounded-sm">Entfernen</button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
         <aside className="space-y-4">

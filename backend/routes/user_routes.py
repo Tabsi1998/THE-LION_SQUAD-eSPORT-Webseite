@@ -172,6 +172,7 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
     }
     await db.users.insert_one(doc)
     await db.audit_logs.insert_one({
+        "id": new_id(),
         "action": "user.create",
         "target_id": user_id,
         "actor_id": me["id"],
@@ -182,6 +183,7 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
         invite = await _send_user_invite(doc, me)
         response.update(invite)
         await db.audit_logs.insert_one({
+            "id": new_id(),
             "action": "user.invite",
             "target_id": user_id,
             "actor_id": me["id"],
@@ -202,6 +204,7 @@ async def resend_user_invite(user_id: str, me: dict = Depends(require_super())):
         {"$set": {"password_setup_required": True, "invited_at": now_utc().isoformat(), "updated_at": now_utc().isoformat()}},
     )
     await db.audit_logs.insert_one({
+        "id": new_id(),
         "action": "user.invite",
         "target_id": user_id,
         "actor_id": me["id"],
@@ -554,7 +557,7 @@ async def admin_update_user(user_id: str, body: UserUpdate,
 async def ban_user(user_id: str, me: dict = Depends(require_admin())):
     db = get_db()
     await db.users.update_one({"id": user_id}, {"$set": {"is_banned": True, "updated_at": now_utc().isoformat()}})
-    await db.audit_logs.insert_one({"action": "user.ban", "target_id": user_id,
+    await db.audit_logs.insert_one({"id": new_id(), "action": "user.ban", "target_id": user_id,
                                      "actor_id": me["id"], "created_at": now_utc().isoformat()})
     return {"ok": True}
 
@@ -563,7 +566,7 @@ async def ban_user(user_id: str, me: dict = Depends(require_admin())):
 async def unban_user(user_id: str, me: dict = Depends(require_admin())):
     db = get_db()
     await db.users.update_one({"id": user_id}, {"$set": {"is_banned": False, "updated_at": now_utc().isoformat()}})
-    await db.audit_logs.insert_one({"action": "user.unban", "target_id": user_id,
+    await db.audit_logs.insert_one({"id": new_id(), "action": "user.unban", "target_id": user_id,
                                      "actor_id": me["id"], "created_at": now_utc().isoformat()})
     return {"ok": True}
 
@@ -572,7 +575,7 @@ async def unban_user(user_id: str, me: dict = Depends(require_admin())):
 async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_super())):
     db = get_db()
     await db.users.update_one({"id": user_id}, {"$set": {"role": body.role, "updated_at": now_utc().isoformat()}})
-    await db.audit_logs.insert_one({"action": "user.role_change", "target_id": user_id,
+    await db.audit_logs.insert_one({"id": new_id(), "action": "user.role_change", "target_id": user_id,
                                      "actor_id": me["id"], "data": {"role": body.role},
                                      "created_at": now_utc().isoformat()})
     u = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
@@ -607,6 +610,7 @@ async def delete_user(user_id: str, me: dict = Depends(require_super())):
     await db.teams.update_many({}, {"$pull": {"member_ids": user_id, "co_leader_ids": user_id}})
     await db.teams.update_many({"leader_id": user_id}, {"$set": {"leader_id": None, "updated_at": now_utc().isoformat()}})
     await db.audit_logs.insert_one({
+        "id": new_id(),
         "action": "user.delete",
         "target_id": user_id,
         "actor_id": me["id"],

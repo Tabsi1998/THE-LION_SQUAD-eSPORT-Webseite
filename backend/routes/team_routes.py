@@ -205,6 +205,112 @@ async def leave_team(team_id: str, me: dict = Depends(get_current_user)):
     return {"ok": True}
 
 
+def _is_team_leader(team: dict, user_id: str) -> bool:
+    return team.get("leader_id") == user_id
+
+
+def _can_manage_team(team: dict, user: dict) -> bool:
+    return (
+        _is_team_leader(team, user["id"])
+        or user["id"] in (team.get("co_leader_ids") or [])
+        or user.get("role") in ("club_admin", "superadmin")
+    )
+
+
+@router.delete("/{team_id}/members/{user_id}")
+async def kick_member(team_id: str, user_id: str, me: dict = Depends(get_current_user)):
+    """Leader/co-leader/admin can kick a member from a team. Leaders cannot be kicked."""
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_manage_team(team, me):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung das Team zu verwalten")
+    if team.get("leader_id") == user_id:
+        raise HTTPException(status_code=400, detail="Leader kann nicht gekickt werden — bitte Leader-Übergabe zuerst durchführen")
+    if user_id == me["id"]:
+        raise HTTPException(status_code=400, detail="Du kannst dich nicht selbst kicken — nutze 'Verlassen'")
+    if user_id not in (team.get("member_ids") or []):
+        raise HTTPException(status_code=404, detail="Mitglied nicht im Team")
+    await db.teams.update_one(
+        {"id": team_id},
+        {"$pull": {"member_ids": user_id, "co_leader_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}},
+    )
+    await db.team_members.delete_many({"team_id": team_id, "user_id": user_id})
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "team.kick", "target_id": team_id,
+        "actor_id": me["id"], "data": {"kicked_user_id": user_id},
+        "created_at": now_utc().isoformat(),
+    })
+    return {"ok": True}
+
+
+@router.post("/{team_id}/members/{user_id}/role")
+async def set_member_role(team_id: str, user_id: str, body: dict, me: dict = Depends(get_current_user)):
+    """Set member role: 'member' (demote co-leader) or 'co_leader' (promote member).
+    Only the team leader or admin can change roles."""
+    role = (body.get("role") or "").strip().lower()
+    if role not in ("member", "co_leader"):
+        raise HTTPException(status_code=400, detail="Ungültige Rolle. Erlaubt: member, co_leader")
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not (_is_team_leader(team, me["id"]) or me.get("role") in ("club_admin", "superadmin")):
+        raise HTTPException(status_code=403, detail="Nur der Leader kann Rollen ändern")
+    if user_id not in (team.get("member_ids") or []):
+        raise HTTPException(status_code=404, detail="Mitglied nicht im Team")
+    if team.get("leader_id") == user_id:
+        raise HTTPException(status_code=400, detail="Leader hat bereits die höchste Rolle")
+    if role == "co_leader":
+        await db.teams.update_one(
+            {"id": team_id}, {"$addToSet": {"co_leader_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}},
+        )
+    else:
+        await db.teams.update_one(
+            {"id": team_id}, {"$pull": {"co_leader_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}},
+        )
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "team.role_change", "target_id": team_id,
+        "actor_id": me["id"], "data": {"user_id": user_id, "role": role},
+        "created_at": now_utc().isoformat(),
+    })
+    return {"ok": True, "role": role}
+
+
+@router.post("/{team_id}/transfer-leader")
+async def transfer_leader(team_id: str, body: dict, me: dict = Depends(get_current_user)):
+    """Hand over leadership to another team member. Old leader becomes co_leader by default."""
+    new_leader_id = body.get("new_leader_id") or body.get("user_id")
+    if not new_leader_id:
+        raise HTTPException(status_code=400, detail="new_leader_id ist erforderlich")
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not (_is_team_leader(team, me["id"]) or me.get("role") in ("club_admin", "superadmin")):
+        raise HTTPException(status_code=403, detail="Nur der Leader (oder Admin) kann übertragen")
+    if new_leader_id not in (team.get("member_ids") or []):
+        raise HTTPException(status_code=404, detail="Empfänger ist kein Team-Mitglied")
+    if new_leader_id == team.get("leader_id"):
+        raise HTTPException(status_code=400, detail="Empfänger ist bereits Leader")
+    old_leader = team.get("leader_id")
+    await db.teams.update_one({"id": team_id}, {
+        "$set": {"leader_id": new_leader_id, "updated_at": now_utc().isoformat()},
+        # New leader cannot be a co-leader of themselves; old leader becomes co-leader
+        "$pull": {"co_leader_ids": new_leader_id},
+    })
+    if old_leader:
+        await db.teams.update_one({"id": team_id}, {"$addToSet": {"co_leader_ids": old_leader}})
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "team.transfer_leader", "target_id": team_id,
+        "actor_id": me["id"], "data": {"old_leader": old_leader, "new_leader": new_leader_id},
+        "created_at": now_utc().isoformat(),
+    })
+    fresh = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    return fresh
+
+
 @router.delete("/{team_id}")
 async def delete_team(team_id: str, me: dict = Depends(get_current_user)):
     db = get_db()

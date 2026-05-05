@@ -304,8 +304,22 @@ async def delete_mail_job(job_id: str, me: dict = Depends(require_admin())):
 
 @settings_router.get("/branding")
 async def get_branding(me: dict = Depends(require_admin())):
+    """Returns the branding doc, merging in social-default URLs so the admin form
+    pre-fills with sensible defaults instead of empty fields."""
     db = get_db()
-    return (await db.settings.find_one({"id": "branding"}, {"_id": 0})) or {}
+    saved = (await db.settings.find_one({"id": "branding"}, {"_id": 0})) or {}
+    defaults = {
+        "discord_invite_url": "https://discord.com/invite/thelionsquadesports",
+        "twitch_channel": "the_lion_squad_esports",
+        "facebook_url": "https://www.facebook.com/thelionsquadesports",
+        "instagram_url": "https://instagram.com/thelionsquadesports",
+        "tiktok_url": "https://www.tiktok.com/@thelionsquadesports",
+        "youtube_url": "https://www.youtube.com/@TheLionSquadeSports",
+    }
+    for k, v in defaults.items():
+        if not saved.get(k):
+            saved[k] = v
+    return saved
 
 
 @settings_router.put("/branding")
