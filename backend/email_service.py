@@ -21,6 +21,8 @@ async def _get_email_config() -> dict:
     api_key = s.get("resend_api_key") or os.environ.get("RESEND_API_KEY", "")
     sender_email = s.get("sender_email") or mail.get("sender_email") or os.environ.get("SENDER_EMAIL", "noreply@lionsquad.at")
     sender_name = s.get("sender_name") or mail.get("sender_name") or "THE LION SQUAD"
+    if str(sender_name).strip().lower() == "tls arena":
+        sender_name = "THE LION SQUAD"
     reply_to_email = s.get("reply_to_email") or mail.get("reply_to_email") or sender_email
     enabled = s.get("enabled", True) and bool(api_key)
     return {

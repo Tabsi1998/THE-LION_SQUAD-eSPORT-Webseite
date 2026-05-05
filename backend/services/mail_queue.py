@@ -398,6 +398,9 @@ async def get_mail_settings() -> dict:
     provider = s.get("provider")
     if not provider:
         provider = "smtp" if s.get("smtp_host") else "resend"
+    sender_name = s.get("sender_name") or legacy.get("sender_name") or "THE LION SQUAD"
+    if str(sender_name).strip().lower() == "tls arena":
+        sender_name = "THE LION SQUAD"
     return {
         "provider": provider,
         "smtp_host": s.get("smtp_host", ""),
@@ -409,7 +412,7 @@ async def get_mail_settings() -> dict:
         "smtp_tls_verify": s.get("smtp_tls_verify", False),
         "smtp_envelope_from": s.get("smtp_envelope_from", ""),
         "smtp_helo_name": s.get("smtp_helo_name", ""),
-        "sender_name": s.get("sender_name") or legacy.get("sender_name") or "THE LION SQUAD",
+        "sender_name": sender_name,
         "sender_email": s.get("sender_email") or legacy.get("sender_email") or os.environ.get("SENDER_EMAIL", "noreply@lionsquad.at"),
         "reply_to_email": s.get("reply_to_email") or legacy.get("reply_to_email") or s.get("sender_email") or legacy.get("sender_email") or os.environ.get("SENDER_EMAIL", "noreply@lionsquad.at"),
         "message_id_domain": s.get("message_id_domain") or legacy.get("message_id_domain") or "",

@@ -69,9 +69,12 @@ async def public_settings():
     domain = (b.get("domain") or "https://lionsquad.at").strip()
     if domain and not domain.startswith(("http://", "https://")):
         domain = "https://" + domain
+    tagline = b.get("tagline", "eSports Verein")
+    if str(tagline).strip().lower() == "esports arena":
+        tagline = "eSports Verein"
     return {
         "club_name": b.get("club_name", "THE LION SQUAD"),
-        "tagline": b.get("tagline", "eSports Verein"),
+        "tagline": tagline,
         "site_description": b.get("site_description") or "THE LION SQUAD eSports - Vereinsplattform fuer Turniere, Fast Lap Challenges, News und Mitgliederbereich.",
         "primary_color": b.get("primary_color", "#29B6E8"),
         "logo_url": b.get("logo_url"),
