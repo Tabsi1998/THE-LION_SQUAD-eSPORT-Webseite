@@ -61,6 +61,22 @@ def _is_staff(user: dict | None) -> bool:
     return bool(user and user.get("role") in STAFF_ROLES)
 
 
+async def _visible_event_summary(event_id: str, user: dict | None) -> dict | None:
+    db = get_db()
+    user = _auth_user(user)
+    event = await db.events.find_one(
+        {"id": event_id},
+        {"_id": 0, "id": 1, "slug": 1, "name": 1, "start_date": 1, "status": 1, "location": 1, "visibility": 1},
+    )
+    if not event:
+        return None
+    if event.get("status") == "draft" and not _is_staff(user):
+        return None
+    if not await user_can_see(user, event.get("visibility") or "public"):
+        return None
+    return event
+
+
 async def _get_visible_challenge(slug_or_id: str, user: dict | None = None) -> dict:
     db = get_db()
     user = _auth_user(user)
@@ -113,10 +129,9 @@ async def get_challenge(slug_or_id: str, user=Depends(get_optional_user)):
     c["tracks"] = tracks
     c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", {"challenge_id": c["id"]}))
     if c.get("event_id"):
-        c["event"] = await db.events.find_one(
-            {"id": c["event_id"]},
-            {"_id": 0, "id": 1, "slug": 1, "name": 1, "start_date": 1, "status": 1, "location": 1},
-        )
+        event = await _visible_event_summary(c["event_id"], user)
+        if event:
+            c["event"] = event
     return c
 
 

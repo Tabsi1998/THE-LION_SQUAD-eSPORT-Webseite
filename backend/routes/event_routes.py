@@ -65,6 +65,11 @@ def _event_phase(event: dict) -> dict:
     return derive_public_phase(event, "event")
 
 
+def _published_now(post: dict) -> bool:
+    published_at = _parse_dt(post.get("published_at"))
+    return not published_at or published_at <= now_utc()
+
+
 async def _attach_event_sponsors(event: dict) -> None:
     if event.get("owned_by_club") is False or event.get("show_sponsors") is False:
         event["sponsors"] = []
@@ -200,14 +205,22 @@ async def get_event(slug_or_id: str, user: dict | None = Depends(get_optional_us
         "fastlap",
     )
     # Albums linked to this event
-    event["albums"] = await db.gallery_albums.find(
+    albums = await db.gallery_albums.find(
         {"event_id": event["id"], "published": True}, {"_id": 0},
     ).sort("order_index", 1).to_list(50)
+    event["albums"] = [
+        album for album in albums
+        if await _user_can_see(user, album.get("visibility") or "public")
+    ]
     # Linked news
-    event["news"] = await db.news_posts.find(
+    news = await db.news_posts.find(
         {"linked_event_ids": event["id"], "published": True},
-        {"_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1, "created_at": 1, "published_at": 1},
+        {"_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1, "created_at": 1, "published_at": 1, "visibility": 1},
     ).sort([("published_at", -1), ("created_at", -1)]).to_list(20)
+    event["news"] = [
+        post for post in news
+        if _published_now(post) and await _user_can_see(user, post.get("visibility") or "public")
+    ]
     event["content_embeds"] = await resolve_content_embeds(db, event.get("program"), user)
     await _decorate_event(event, include_sponsors=True)
     return event

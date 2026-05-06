@@ -100,15 +100,17 @@ def _required_game_fields(game: dict | None) -> list[dict]:
     return fields
 
 
-async def _enrich_tournament(t: dict) -> dict:
+async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
     db = get_db()
+    is_staff = _is_staff(user)
     t["public_phase"] = derive_public_phase(t, "tournament")
     if t.get("game_id"):
         g = await db.games.find_one({"id": t["game_id"]}, {"_id": 0})
         t["game"] = g
     if t.get("event_id"):
         e = await db.events.find_one({"id": t["event_id"]}, {"_id": 0, "tournaments": 0, "f1_challenges": 0})
-        t["event"] = e
+        if e and (is_staff or e.get("status") != "draft") and await user_can_see(user, e.get("visibility") or "public"):
+            t["event"] = e
     t["participant_count"] = await db.tournament_registrations.count_documents(
         {"tournament_id": t["id"], "status": {"$in": ["approved", "checked_in"]}})
     return t
@@ -148,7 +150,7 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
                 visible.append(t)
         tournaments = visible
     for t in tournaments:
-        await _enrich_tournament(t)
+        await _enrich_tournament(t, user)
     return tournaments
 
 
@@ -165,7 +167,7 @@ async def get_tournament(slug_or_id: str, user=Depends(get_optional_user)):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if not await user_can_see(user, t.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Turnier ist nicht sichtbar")
-    await _enrich_tournament(t)
+    await _enrich_tournament(t, user)
     if t.get("event_id"):
         t["related_f1_challenges"] = await db.f1_challenges.find(
             {"event_id": t["event_id"], "status": {"$ne": "draft"}},

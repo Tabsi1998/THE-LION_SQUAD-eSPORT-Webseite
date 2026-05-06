@@ -39,6 +39,22 @@ async def _filter_linked_items(items: list[dict], user: dict | None, is_staff: b
     return out
 
 
+async def _visible_event_summary(event_id: str, user: dict | None) -> dict | None:
+    db = get_db()
+    event = await db.events.find_one(
+        {"id": event_id},
+        {"_id": 0, "id": 1, "name": 1, "slug": 1, "status": 1, "visibility": 1},
+    )
+    if not event:
+        return None
+    is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    if event.get("status") == "draft" and not is_staff:
+        return None
+    if not await _user_can_see(user, event.get("visibility") or "public"):
+        return None
+    return event
+
+
 def _parse_dt(value):
     if not value:
         return None
@@ -414,9 +430,9 @@ async def get_album(slug_or_id: str, user: dict | None = Depends(get_optional_us
         raise HTTPException(403, "Nicht sichtbar.")
     a["photos"] = await db.gallery_photos.find({"album_id": a["id"]}, {"_id": 0}).sort("order_index", 1).to_list(2000)
     if a.get("event_id"):
-        a["event"] = await db.events.find_one(
-            {"id": a["event_id"]}, {"_id": 0, "id": 1, "name": 1, "slug": 1},
-        )
+        event = await _visible_event_summary(a["event_id"], user)
+        if event:
+            a["event"] = event
     return a
 
 
