@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/tls/ProtectedRoute";
 import { BrandingHead } from "@/components/tls/BrandingHead";
+import { ApiInvalidationBridge } from "@/components/tls/ApiInvalidationBridge";
 
 function MeRedirect() {
   const { user } = useAuth();
@@ -96,6 +97,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <BrandingHead />
+        <ApiInvalidationBridge />
         <Toaster theme="dark" position="top-right" richColors />
         <Routes>
           {/* Public — Verein */}

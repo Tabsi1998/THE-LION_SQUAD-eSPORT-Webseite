@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { TournamentCard } from "@/components/tls/TournamentCard";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users } from "lucide-react";
 
 const TYPE_LABELS = {
@@ -19,11 +20,21 @@ export default function EventDetailPage() {
   const { slug } = useParams();
   const [e, setE] = useState(null);
   const [error, setError] = useState(null);
-  useEffect(() => {
-    api.get(`/events/${slug}`).then(({ data }) => setE(data)).catch((err) => {
+
+  const load = useCallback(() => {
+    api.get(`/events/${slug}`).then(({ data }) => {
+      setE(data);
+      setError(null);
+    }).catch((err) => {
       setError(err.response?.status === 403 ? "Dieses Event ist nicht öffentlich zugänglich." : "Event nicht gefunden.");
     });
   }, [slug]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useApiInvalidation(load, ["events", "tournaments", "f1", "gallery", "news"]);
 
   if (error) return (
     <PublicLayout>

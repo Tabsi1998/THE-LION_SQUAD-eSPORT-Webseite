@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, Twitch } from "lucide-react";
 import { PrizeList } from "@/components/tls/PrizeList";
@@ -33,6 +34,8 @@ export default function TournamentDetailPage() {
     const iv = setInterval(load, 10000);
     return () => clearInterval(iv);
   }, [load]);
+
+  useApiInvalidation(load, ["tournaments"]);
 
   const handleRegister = async () => {
     if (!user) { nav(`/login?next=/tournaments/${slug}`); return; }

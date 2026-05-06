@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -8,15 +8,22 @@ import { MascotBadge } from "@/components/tls/Logo";
 import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { motion } from "framer-motion";
 import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Crown, Pin, Radio, Users as UsersIcon } from "lucide-react";
 
 export default function HomePage() {
   const [state, setState] = useState(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api.get("/home/state").then(({ data }) => setState(data)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useApiInvalidation(load, ["home", "tournaments", "events", "news", "f1", "sponsors", "settings"]);
 
   return (
     <PublicLayout>

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Trash2, Save, Gift } from "lucide-react";
 
@@ -19,11 +20,12 @@ export default function AdminBenefitsPage() {
   const [editing, setEditing] = useState(null); // null | {} | object
   const [meta, setMeta] = useState({ types: [] });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get("/membership/benefits/all");
     setList(data);
-  };
-  useEffect(() => { load(); api.get("/membership/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, []);
+  }, []);
+  useEffect(() => { load(); api.get("/membership/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, [load]);
+  useApiInvalidation(load, ["membership"]);
 
   const remove = async (id) => {
     if (!window.confirm("Mitgliedervorteil löschen?")) return;

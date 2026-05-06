@@ -1,4 +1,5 @@
 import axios from "axios";
+import { emitApiInvalidation } from "./apiInvalidation";
 
 const configuredBackendUrl = (process.env.REACT_APP_BACKEND_URL || "").trim().replace(/\/+$/, "");
 
@@ -82,7 +83,18 @@ api.interceptors.request.use((config) => {
 let refreshPromise = null;
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const method = (response.config?.method || "get").toUpperCase();
+    if (UNSAFE_METHODS.has(method) && response.status < 400) {
+      emitApiInvalidation({
+        source: "client",
+        method,
+        path: response.config?.url || "",
+        status: response.status,
+      });
+    }
+    return response;
+  },
   async (error) => {
     const original = error.config;
     const url = original?.url || "";

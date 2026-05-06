@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Trash2, Upload, Pencil, X as XIcon } from "lucide-react";
 
@@ -15,12 +16,12 @@ export default function AdminSponsorsPage() {
   const [creating, setCreating] = useState(false);
   const [migrating, setMigrating] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get("/sponsors/admin");
     setList(data);
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["sponsors", "uploads"]);
 
   const del = async (id) => {
     if (!window.confirm("Sponsor wirklich löschen?")) return;

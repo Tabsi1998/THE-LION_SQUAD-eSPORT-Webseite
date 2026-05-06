@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Pin, Trash2, Save, X, Newspaper } from "lucide-react";
 
@@ -10,14 +11,15 @@ export default function AdminNewsPage() {
   const [meta, setMeta] = useState({ categories: [], visibilities: [] });
   const [editing, setEditing] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get("/admin/news");
     setList(data);
-  };
+  }, []);
   useEffect(() => {
     load();
     api.get("/news-meta").then(({ data }) => setMeta(data)).catch(() => {});
-  }, []);
+  }, [load]);
+  useApiInvalidation(load, ["news"]);
 
   const remove = async (id) => {
     if (!window.confirm("Beitrag löschen?")) return;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { MascotBadge } from "@/components/tls/Logo";
@@ -6,6 +6,7 @@ import { SponsorGrid } from "@/components/tls/SponsorTicker";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 const medalColors = ["#FFD700", "#C0C0C0", "#CD7F32"];
 
@@ -15,20 +16,22 @@ export default function F1TVPage() {
   const [challenge, setChallenge] = useState(null);
   const [activeTrackIdx, setActiveTrackIdx] = useState(0);
   const [board, setBoard] = useState(null);
+  const trackParam = searchParams.get("track");
+
+  const loadChallenge = useCallback(async () => {
+    const { data } = await api.get(`/f1/challenges/${id}`);
+    setChallenge(data);
+    if (trackParam && data.tracks) {
+      const idx = data.tracks.findIndex((t) => t.id === trackParam || t.slug === trackParam);
+      if (idx >= 0) setActiveTrackIdx(idx);
+    }
+  }, [id, trackParam]);
 
   useEffect(() => {
-    (async () => {
-      const { data } = await api.get(`/f1/challenges/${id}`);
-      setChallenge(data);
-      // Apply ?track= query param if present
-      const qs = searchParams.get("track");
-      if (qs && data.tracks) {
-        const idx = data.tracks.findIndex((t) => t.id === qs || t.slug === qs);
-        if (idx >= 0) setActiveTrackIdx(idx);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+    loadChallenge();
+  }, [loadChallenge]);
+
+  useApiInvalidation(loadChallenge, ["f1"]);
 
   useEffect(() => {
     if (!challenge?.tracks?.length) return;

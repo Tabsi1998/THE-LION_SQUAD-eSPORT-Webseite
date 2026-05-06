@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 export default function TournamentStandingsPage() {
   const { slug } = useParams();
@@ -20,6 +21,8 @@ export default function TournamentStandingsPage() {
     const iv = setInterval(load, 7000);
     return () => clearInterval(iv);
   }, [load]);
+
+  useApiInvalidation(load, ["tournaments", "matches"]);
 
   if (!t) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
 

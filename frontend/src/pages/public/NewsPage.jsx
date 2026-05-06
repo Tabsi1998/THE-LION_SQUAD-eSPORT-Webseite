@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Pin, Newspaper, Crown, Lock } from "lucide-react";
 
 const CATEGORY_COLORS = {
@@ -28,11 +29,18 @@ export default function NewsPage() {
   useEffect(() => {
     api.get("/news-meta").then(({ data }) => setMeta(data)).catch(() => {});
   }, []);
-  useEffect(() => {
+
+  const load = useCallback(() => {
     setLoading(true);
     const url = activeCat ? `/news?category=${activeCat}` : "/news";
     api.get(url).then(({ data }) => setList(data)).catch(() => {}).finally(() => setLoading(false));
   }, [activeCat]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useApiInvalidation(load, ["news"]);
 
   const pinned = list.filter((n) => n.pinned);
   const rest = list.filter((n) => !n.pinned);

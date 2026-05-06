@@ -7,8 +7,8 @@ load_dotenv(ROOT / ".env")
 import os
 import logging
 from urllib.parse import urlparse
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
@@ -48,6 +48,7 @@ from routes.contact_board_routes import contact_router, board_router
 from routes.extras_routes import (
     settings_router, season_router, widget_router, dsgvo_router, pdf_router, audit_router,
 )
+from services.change_events import change_event_stream, publish_api_change
 
 
 logging.basicConfig(level=logging.INFO,
@@ -85,7 +86,7 @@ async def lifespan(app: FastAPI):
             "gallery_albums", "gallery_photos", "documents", "season_points",
             "audit_logs", "email_logs", "notifications", "password_reset_tokens",
             "login_attempts", "user_achievements", "achievements", "achievement_groups",
-            "mail_jobs", "prize_pickups",
+            "mail_jobs", "media_uploads", "prize_pickups",
         ]:
             try:
                 await db[coll].delete_many({})
@@ -287,6 +288,18 @@ async def security_headers(request, call_next):
     return response
 
 
+@app.middleware("http")
+async def api_change_notifications(request, call_next):
+    response = await call_next(request)
+    if (
+        request.method.upper() in UNSAFE_METHODS
+        and request.url.path.startswith("/api/")
+        and response.status_code < 400
+    ):
+        await publish_api_change(request.method, request.url.path, response.status_code)
+    return response
+
+
 @app.get("/api/")
 async def root():
     return {"name": "THE LION SQUAD eSports", "version": "1.0.0", "status": "running"}
@@ -295,3 +308,16 @@ async def root():
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/changes/stream")
+async def changes_stream(request: Request):
+    return StreamingResponse(
+        change_event_stream(request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-store",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Copy, Edit, Plus, Shield, Trash2, Users, UserPlus } from "lucide-react";
 
@@ -19,12 +20,13 @@ function TeamList() {
   const [list, setList] = useState([]);
   const [editing, setEditing] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get("/teams");
     setList(data);
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["teams"]);
 
   return (
     <PublicLayout>
@@ -79,13 +81,14 @@ function TeamDetail({ id }) {
   const [editing, setEditing] = useState(null);
   const [joinCode, setJoinCode] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get(`/teams/${id}`);
     setTeam(data);
-  };
+  }, [id]);
+  const refresh = useCallback(() => load().catch(() => setTeam(null)), [load]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load().catch(() => setTeam(null)); }, [id]);
+  useEffect(() => { refresh(); }, [refresh]);
+  useApiInvalidation(refresh, ["teams"]);
 
   if (!team) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE TEAM …</div></PublicLayout>;
 

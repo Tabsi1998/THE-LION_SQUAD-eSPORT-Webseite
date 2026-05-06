@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { Flag, Users, Clock, ChevronRight } from "lucide-react";
 import { formatDate, getRegistrationState } from "@/lib/datetime";
@@ -9,12 +10,16 @@ import { formatDate, getRegistrationState } from "@/lib/datetime";
 export default function F1ListPage() {
   const [list, setList] = useState([]);
 
-  useEffect(() => {
-    (async () => {
-      const { data } = await api.get("/f1/challenges");
-      setList(data);
-    })();
+  const load = useCallback(async () => {
+    const { data } = await api.get("/f1/challenges");
+    setList(data);
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useApiInvalidation(load, ["f1"]);
 
   return (
     <PublicLayout>

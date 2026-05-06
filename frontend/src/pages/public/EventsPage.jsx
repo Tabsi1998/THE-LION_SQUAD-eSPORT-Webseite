@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Calendar, MapPin, Users as UsersIcon, Crown, Lock } from "lucide-react";
 
 const STATUS_LABELS = {
@@ -25,10 +26,17 @@ export default function EventsPage() {
   const [tab, setTab] = useState("upcoming"); // upcoming | past
 
   useEffect(() => { api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, []);
-  useEffect(() => {
+
+  const load = useCallback(() => {
     const url = tab === "upcoming" ? "/events?upcoming=true" : "/events";
     api.get(url).then(({ data }) => setList(data)).catch(() => {});
   }, [tab]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useApiInvalidation(load, ["events"]);
 
   const filtered = list.filter((e) => {
     if (typeFilter && e.event_type !== typeFilter) return false;

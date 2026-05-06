@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { API, api, formatMs, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -6,6 +6,7 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Tv, Trophy, Flag, Download, Twitch, FileDown } from "lucide-react";
 import { formatDateTime, getRegistrationState } from "@/lib/datetime";
 
@@ -17,30 +18,40 @@ export default function F1DetailPage() {
   const [championship, setChampionship] = useState(null);
   const [tab, setTab] = useState("track"); // track | championship
 
-  useEffect(() => {
-    (async () => {
-      const { data } = await api.get(`/f1/challenges/${slug}`);
-      setChallenge(data);
-      if (data.tracks?.length) setActiveTrack(data.tracks[0].id);
-      if (data.is_championship) {
-        const { data: cs } = await api.get(`/f1/challenges/${data.id}/championship`);
-        setChampionship(cs);
-      }
-    })();
+  const loadChallenge = useCallback(async () => {
+    const { data } = await api.get(`/f1/challenges/${slug}`);
+    setChallenge(data);
+    setActiveTrack((current) => {
+      if (current && data.tracks?.some((tr) => tr.id === current)) return current;
+      return data.tracks?.[0]?.id || null;
+    });
+    if (data.is_championship) {
+      const { data: cs } = await api.get(`/f1/challenges/${data.id}/championship`);
+      setChampionship(cs);
+    } else {
+      setChampionship(null);
+    }
   }, [slug]);
 
   useEffect(() => {
-    if (!challenge || !activeTrack) return;
-    (async () => {
-      const { data } = await api.get(`/f1/challenges/${challenge.id}/leaderboard?track_id=${activeTrack}`);
-      setBoard(data);
-    })();
-    const iv = setInterval(async () => {
-      const { data } = await api.get(`/f1/challenges/${challenge.id}/leaderboard?track_id=${activeTrack}`);
-      setBoard(data);
-    }, 10000);
+    loadChallenge();
+  }, [loadChallenge]);
+
+  useApiInvalidation(loadChallenge, ["f1"]);
+
+  const loadBoard = useCallback(async () => {
+    if (!challenge?.id || !activeTrack) return;
+    const { data } = await api.get(`/f1/challenges/${challenge.id}/leaderboard?track_id=${activeTrack}`);
+    setBoard(data);
+  }, [challenge?.id, activeTrack]);
+
+  useEffect(() => {
+    loadBoard();
+    const iv = setInterval(loadBoard, 10000);
     return () => clearInterval(iv);
-  }, [challenge, activeTrack]);
+  }, [loadBoard]);
+
+  useApiInvalidation(loadBoard, ["f1"]);
 
   if (!challenge) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE …</div></PublicLayout>;
 

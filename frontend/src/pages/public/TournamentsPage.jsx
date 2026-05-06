@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentCard } from "@/components/tls/TournamentCard";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 export default function TournamentsPage() {
   const [list, setList] = useState([]);
@@ -18,6 +19,8 @@ export default function TournamentsPage() {
     const iv = setInterval(load, 15000);
     return () => clearInterval(iv);
   }, [load]);
+
+  useApiInvalidation(load, ["tournaments"]);
 
   const filters = [
     { v: "all", label: "Alle" },

@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Pin, ArrowLeft, Calendar, Trophy, Users } from "lucide-react";
 
 export default function NewsDetailPage() {
@@ -10,11 +11,20 @@ export default function NewsDetailPage() {
   const [post, setPost] = useState(null);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    api.get(`/news/${slug}`).then(({ data }) => setPost(data)).catch((e) => {
+  const load = useCallback(() => {
+    api.get(`/news/${slug}`).then(({ data }) => {
+      setPost(data);
+      setError(null);
+    }).catch((e) => {
       setError(e.response?.status === 403 ? "Dieser Beitrag ist nicht öffentlich." : "Nicht gefunden.");
     });
   }, [slug]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useApiInvalidation(load, ["news", "events", "tournaments", "teams"]);
 
   if (error) return (
     <PublicLayout>

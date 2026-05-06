@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
@@ -18,8 +19,9 @@ export default function AdminGamesPage() {
   const [list, setList] = useState([]);
   const [form, setForm] = useState({ name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "" });
   const [editing, setEditing] = useState(null);
-  const load = async () => { const { data } = await api.get("/games"); setList(data); };
-  useEffect(() => { load(); }, []);
+  const load = useCallback(async () => { const { data } = await api.get("/games"); setList(data); }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["games"]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const submit = async (e) => {

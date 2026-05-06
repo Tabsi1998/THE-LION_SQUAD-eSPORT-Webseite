@@ -1,6 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { API, api, formatApiError, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Save, X, Trash2, FileText, Pin, UploadCloud } from "lucide-react";
 
@@ -34,11 +35,12 @@ export default function AdminDocumentsPage() {
   const [meta, setMeta] = useState({ categories: [], visibilities: [] });
   const [editing, setEditing] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get("/documents/admin");
     setList(data);
-  };
-  useEffect(() => { load(); api.get("/documents/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, []);
+  }, []);
+  useEffect(() => { load(); api.get("/documents/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, [load]);
+  useApiInvalidation(load, ["documents", "uploads"]);
 
   const remove = async (id) => {
     if (!window.confirm("Dokument löschen?")) return;

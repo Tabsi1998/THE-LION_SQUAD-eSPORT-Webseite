@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Tv } from "lucide-react";
 
 export default function TournamentBracketPage() {
@@ -21,6 +22,8 @@ export default function TournamentBracketPage() {
     const iv = setInterval(load, 7000);
     return () => clearInterval(iv);
   }, [load]);
+
+  useApiInvalidation(load, ["tournaments", "matches"]);
 
   if (!data) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE BRACKET …</div></PublicLayout>;
   const t = data.tournament;

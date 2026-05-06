@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Save, X, Trash2, Calendar } from "lucide-react";
 
@@ -10,14 +11,15 @@ export default function AdminEventsPage() {
   const [meta, setMeta] = useState({ types: [], statuses: [], visibilities: [] });
   const [editing, setEditing] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get("/events");
     setList(data);
-  };
+  }, []);
   useEffect(() => {
     load();
     api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {});
-  }, []);
+  }, [load]);
+  useApiInvalidation(load, ["events"]);
 
   const remove = async (id) => {
     if (!window.confirm("Event löschen?")) return;

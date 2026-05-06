@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ArrowLeft, X, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 
 export default function GalleryAlbumPage() {
@@ -10,11 +11,20 @@ export default function GalleryAlbumPage() {
   const [error, setError] = useState(null);
   const [active, setActive] = useState(null); // index of active photo
 
-  useEffect(() => {
-    api.get(`/gallery/${slug}`).then(({ data }) => setA(data)).catch((e) => {
+  const load = useCallback(() => {
+    api.get(`/gallery/${slug}`).then(({ data }) => {
+      setA(data);
+      setError(null);
+    }).catch((e) => {
       setError(e.response?.status === 403 ? "Album nicht öffentlich zugänglich." : "Album nicht gefunden.");
     });
   }, [slug]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useApiInvalidation(load, ["gallery"]);
 
   if (error) return (
     <PublicLayout>

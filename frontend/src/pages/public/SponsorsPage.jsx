@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Star, ExternalLink } from "lucide-react";
 
 const tierLabel = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
@@ -8,7 +9,15 @@ const tierColor = { main: "#29B6E8", platinum: "#E5E4E2", gold: "#FFD700", silve
 
 export default function SponsorsPage() {
   const [list, setList] = useState([]);
-  useEffect(() => { api.get("/sponsors").then(({ data }) => setList(data)).catch(() => {}); }, []);
+  const load = useCallback(() => {
+    api.get("/sponsors").then(({ data }) => setList(data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useApiInvalidation(load, ["sponsors"]);
 
   const grouped = list.reduce((acc, s) => {
     const t = ["main", "platinum", "gold", "silver", "bronze"].includes(s.tier) ? s.tier : "bronze";

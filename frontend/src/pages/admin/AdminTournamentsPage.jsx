@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -6,15 +6,17 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { Plus, Trash2, Play, Pause } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 export default function AdminTournamentsPage() {
   const { isAdmin } = useAuth();
   const [list, setList] = useState([]);
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get("/tournaments");
     setList(data);
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["tournaments"]);
 
   const setStatus = async (id, status) => {
     try {

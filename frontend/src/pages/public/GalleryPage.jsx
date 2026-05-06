@@ -1,16 +1,24 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Image as ImageIcon, Crown } from "lucide-react";
 
 export default function GalleryPage() {
   const [albums, setAlbums] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     api.get("/gallery").then(({ data }) => setAlbums(data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useApiInvalidation(load, ["gallery"]);
 
   return (
     <PublicLayout>
