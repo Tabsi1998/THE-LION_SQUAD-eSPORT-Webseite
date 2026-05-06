@@ -4,7 +4,7 @@ from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from database import get_db
-from auth import get_current_user, require_admin
+from auth import get_current_user, get_optional_user, require_admin
 from models import TeamCreate, TeamUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
@@ -38,6 +38,25 @@ def _can_manage(team: dict, user: dict) -> bool:
     )
 
 
+def _is_staff(user: dict | None) -> bool:
+    return bool(user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin"))
+
+
+def _is_member(team: dict, user: dict | None) -> bool:
+    return bool(user and user.get("id") in team.get("member_ids", []))
+
+
+def _public_user(user: dict | None) -> dict | None:
+    if not user:
+        return None
+    return {
+        "id": user.get("id"),
+        "username": user.get("username"),
+        "display_name": user.get("display_name"),
+        "avatar_url": user.get("avatar_url"),
+    }
+
+
 async def _hydrate_team(team: dict) -> dict:
     db = get_db()
     members = await db.users.find(
@@ -52,6 +71,44 @@ async def _hydrate_team(team: dict) -> dict:
         {"_id": 0, "password_hash": 0, "email": 0},
     )
     team["squad_count"] = await db.team_squads.count_documents({"team_id": team["id"]})
+    return team
+
+
+def _team_summary(team: dict) -> dict:
+    return {
+        "id": team.get("id"),
+        "name": team.get("name"),
+        "tag": team.get("tag"),
+        "description": team.get("description"),
+        "logo_url": team.get("logo_url"),
+        "discord_link": team.get("discord_link"),
+        "is_public": team.get("is_public", True),
+        "member_count": len(team.get("member_ids") or []),
+        "squad_count": team.get("squad_count", 0),
+        "created_at": team.get("created_at"),
+        "updated_at": team.get("updated_at"),
+    }
+
+
+def _team_response(team: dict, user: dict | None = None) -> dict:
+    can_manage = bool(user and _can_manage(team, user))
+    is_member = _is_member(team, user)
+    if not is_member and not can_manage:
+        out = _team_summary(team)
+        out["members"] = [_public_user(m) for m in team.get("members", [])]
+        out["leader"] = _public_user(team.get("leader"))
+        out["leader_id"] = team.get("leader_id")
+        out["co_leader_ids"] = team.get("co_leader_ids", [])
+        out["member_ids"] = team.get("member_ids", [])
+        out["is_member"] = False
+        out["can_manage"] = False
+        return out
+
+    team["member_count"] = len(team.get("member_ids") or [])
+    team["is_member"] = is_member
+    team["can_manage"] = can_manage
+    if not can_manage:
+        team.pop("join_code", None)
     return team
 
 
@@ -75,8 +132,9 @@ async def list_teams(q: str | None = None):
             {"name": {"$regex": q, "$options": "i"}},
             {"tag": {"$regex": q, "$options": "i"}},
         ]
+    query["is_public"] = {"$ne": False}
     teams = await db.teams.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
-    return teams
+    return [_team_summary(team) for team in teams]
 
 
 @router.get("/my")
@@ -93,12 +151,15 @@ async def my_teams(me: dict = Depends(get_current_user)):
 
 
 @router.get("/{team_id}")
-async def get_team(team_id: str):
+async def get_team(team_id: str, user: dict | None = Depends(get_optional_user)):
     db = get_db()
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    return await _hydrate_team(team)
+    if team.get("is_public") is False and not (_is_member(team, user) or _is_staff(user)):
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    await _hydrate_team(team)
+    return _team_response(team, user)
 
 
 @router.post("")

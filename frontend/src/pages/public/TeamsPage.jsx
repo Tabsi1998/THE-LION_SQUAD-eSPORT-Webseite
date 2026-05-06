@@ -65,7 +65,7 @@ function TeamCard({ team: t }) {
           <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">[{t.tag}]</div>
           <h3 className="font-heading text-xl font-bold group-hover:text-[#29B6E8] transition truncate">{t.name}</h3>
           <div className="text-xs text-white/50 inline-flex items-center gap-1 mt-0.5">
-            <Users className="w-3.5 h-3.5" /> {t.member_ids?.length || 0} Mitglieder
+            <Users className="w-3.5 h-3.5" /> {t.member_count ?? t.member_ids?.length ?? 0} Mitglieder
           </div>
         </div>
       </div>
@@ -92,8 +92,8 @@ function TeamDetail({ id }) {
 
   if (!team) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE TEAM …</div></PublicLayout>;
 
-  const isMember = !!user && team.member_ids?.includes(user.id);
-  const canEdit = !!user && (team.leader_id === user.id || team.co_leader_ids?.includes(user.id) || isAdmin);
+  const isMember = !!user && (team.is_member || team.member_ids?.includes(user.id));
+  const canEdit = !!user && (team.can_manage || team.leader_id === user.id || team.co_leader_ids?.includes(user.id) || isAdmin);
 
   const join = async (e) => {
     e.preventDefault();
@@ -167,7 +167,7 @@ function TeamDetail({ id }) {
               <h1 className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{team.name}</h1>
               {team.description && <p className="mt-3 text-white/70 max-w-2xl">{team.description}</p>}
               <div className="mt-4 flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 border border-white/10 rounded-sm text-xs text-white/60"><Users className="w-3.5 h-3.5" /> {team.member_ids?.length || 0} Mitglieder</span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 border border-white/10 rounded-sm text-xs text-white/60"><Users className="w-3.5 h-3.5" /> {team.member_count ?? team.member_ids?.length ?? 0} Mitglieder</span>
                 {team.leader && <span className="inline-flex items-center gap-1.5 px-3 py-1 border border-[#FFD700]/30 text-[#FFD700] rounded-sm text-xs"><Shield className="w-3.5 h-3.5" /> Leader: {team.leader.display_name || team.leader.username}</span>}
               </div>
             </div>
