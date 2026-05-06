@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Pin, Newspaper, Crown, Lock } from "lucide-react";
 
 const CATEGORY_COLORS = {
@@ -21,6 +22,7 @@ const CATEGORY_COLORS = {
 const VIS_ICON = { members: Crown, internal: Lock, community: null, public: null };
 
 export default function NewsPage() {
+  useDocumentTitle("News", "Neueste News, Ankündigungen, Events und Turnier-Updates von THE LION SQUAD eSports.");
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ categories: [], visibilities: [] });
   const [activeCat, setActiveCat] = useState("");

@@ -5,7 +5,9 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { TournamentCard } from "@/components/tls/TournamentCard";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Clock } from "lucide-react";
 
 const TYPE_LABELS = {
@@ -30,6 +32,8 @@ export default function EventDetailPage() {
   const { slug } = useParams();
   const [e, setE] = useState(null);
   const [error, setError] = useState(null);
+  const { hasConsent, openSettings } = useCookieConsent();
+  useDocumentTitle(e?.name || "Event", e?.description || "Event von THE LION SQUAD eSports.");
 
   const load = useCallback(() => {
     api.get(`/events/${slug}`).then(({ data }) => {
@@ -107,9 +111,16 @@ export default function EventDetailPage() {
                 )}
               </div>
             )}
-            {e.show_map && mapEmbedUrl(e) && (
+            {e.show_map && mapEmbedUrl(e) && hasConsent("external_media") && (
               <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
                 <iframe title={`Karte ${e.name}`} src={mapEmbedUrl(e)} className="w-full h-72 border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+              </div>
+            )}
+            {e.show_map && mapEmbedUrl(e) && !hasConsent("external_media") && (
+              <div className="border border-white/10 bg-[#121212] rounded-sm p-6 flex flex-col justify-center min-h-72">
+                <div className="text-[11px] uppercase tracking-widest text-[#9F7AEA] font-bold">Karte blockiert</div>
+                <p className="mt-2 text-sm text-white/60">Für Google Maps brauchen wir deine Zustimmung zu externen Medien.</p>
+                <button type="button" onClick={openSettings} className="mt-4 self-start px-4 py-2 border border-[#9F7AEA]/50 text-[#9F7AEA] text-xs uppercase tracking-wider font-bold rounded-sm">Cookie-Einstellungen</button>
               </div>
             )}
           </div>

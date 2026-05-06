@@ -1,5 +1,6 @@
 """Phase 10: Setup status + sitemap + simple setup-wizard helpers."""
 import json
+from xml.sax.saxutils import escape
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from typing import Optional
@@ -150,6 +151,7 @@ sitemap_router = APIRouter(tags=["seo"])
 
 
 @sitemap_router.get("/api/sitemap.xml")
+@sitemap_router.get("/sitemap.xml")
 async def sitemap():
     db = get_db()
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
@@ -161,41 +163,91 @@ async def sitemap():
         "/", "/about", "/news", "/events", "/tournaments", "/fastlap", "/f1",
         "/teams", "/players", "/members", "/membership/join",
         "/sponsors", "/partners", "/contact", "/badges", "/galerie",
-        "/login", "/register", "/privacy", "/imprint",
+        "/privacy", "/imprint",
     ]
-    urls: list[tuple[str, Optional[str]]] = [(base + p, None) for p in static_paths]
+    urls: list[dict] = [
+        {
+            "loc": base + p,
+            "lastmod": None,
+            "changefreq": "daily" if p in ("/", "/news", "/events") else "weekly",
+            "priority": "1.0" if p == "/" else "0.8" if p in ("/news", "/events", "/tournaments", "/fastlap") else "0.6",
+        }
+        for p in static_paths
+    ]
 
     # tournaments
     async for t in db.tournaments.find({"status": {"$ne": "draft"}}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if t.get("slug"):
-            urls.append((f"{base}/tournaments/{t['slug']}", t.get("updated_at")))
+            urls.append({"loc": f"{base}/tournaments/{t['slug']}", "lastmod": t.get("updated_at"), "changefreq": "weekly", "priority": "0.7"})
     # f1 challenges
     async for f in db.f1_challenges.find({"status": {"$ne": "draft"}}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if f.get("slug"):
-            urls.append((f"{base}/fastlap/{f['slug']}", f.get("updated_at")))
-            urls.append((f"{base}/f1/{f['slug']}", f.get("updated_at")))
+            urls.append({"loc": f"{base}/fastlap/{f['slug']}", "lastmod": f.get("updated_at"), "changefreq": "weekly", "priority": "0.7"})
+            urls.append({"loc": f"{base}/f1/{f['slug']}", "lastmod": f.get("updated_at"), "changefreq": "weekly", "priority": "0.5"})
     # events
     async for e in db.events.find({"status": {"$ne": "draft"}}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if e.get("slug"):
-            urls.append((f"{base}/events/{e['slug']}", e.get("updated_at")))
+            urls.append({"loc": f"{base}/events/{e['slug']}", "lastmod": e.get("updated_at"), "changefreq": "weekly", "priority": "0.8"})
     # news
-    async for n in db.news_posts.find({"published": True}, {"slug": 1, "id": 1, "updated_at": 1, "_id": 0}):
+    async for n in db.news_posts.find(
+        {"published": True},
+        {"slug": 1, "id": 1, "updated_at": 1, "published_at": 1, "created_at": 1, "_id": 0},
+    ).sort([("published_at", -1), ("created_at", -1)]):
         slug = n.get("slug") or n.get("id")
         if slug:
-            urls.append((f"{base}/news/{slug}", n.get("updated_at")))
+            urls.append({"loc": f"{base}/news/{slug}", "lastmod": n.get("updated_at") or n.get("published_at") or n.get("created_at"), "changefreq": "monthly", "priority": "0.85"})
     # public profiles
     async for u in db.users.find({"privacy_public_profile": True}, {"username": 1, "updated_at": 1, "_id": 0}):
         if u.get("username"):
-            urls.append((f"{base}/u/{u['username']}", u.get("updated_at")))
+            urls.append({"loc": f"{base}/u/{u['username']}", "lastmod": u.get("updated_at"), "changefreq": "monthly", "priority": "0.4"})
 
     xml_lines = ['<?xml version="1.0" encoding="UTF-8"?>',
                  '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-    for u, lastmod in urls:
+    for entry in urls:
         xml_lines.append("<url>")
-        xml_lines.append(f"<loc>{u}</loc>")
+        xml_lines.append(f"<loc>{escape(entry['loc'])}</loc>")
+        lastmod = entry.get("lastmod")
         if lastmod:
             xml_lines.append(f"<lastmod>{lastmod[:10]}</lastmod>")
+        xml_lines.append(f"<changefreq>{entry['changefreq']}</changefreq>")
+        xml_lines.append(f"<priority>{entry['priority']}</priority>")
         xml_lines.append("</url>")
+    xml_lines.append("</urlset>")
+    return Response(content="\n".join(xml_lines), media_type="application/xml")
+
+
+@sitemap_router.get("/api/sitemap-news.xml")
+@sitemap_router.get("/sitemap-news.xml")
+async def news_sitemap():
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
+    base = (branding.get("domain") or "https://lionsquad.at").rstrip("/")
+    if not base.startswith("http"):
+        base = "https://" + base
+    name = branding.get("club_name") or "THE LION SQUAD"
+    rows = await db.news_posts.find(
+        {"published": True},
+        {"slug": 1, "id": 1, "title": 1, "published_at": 1, "created_at": 1, "_id": 0},
+    ).sort([("published_at", -1), ("created_at", -1)]).limit(1000).to_list(1000)
+    xml_lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">',
+    ]
+    for n in rows:
+        slug = n.get("slug") or n.get("id")
+        published = n.get("published_at") or n.get("created_at")
+        if not slug or not published:
+            continue
+        xml_lines.extend([
+            "<url>",
+            f"<loc>{escape(f'{base}/news/{slug}')}</loc>",
+            "<news:news>",
+            f"<news:publication><news:name>{escape(name)}</news:name><news:language>de</news:language></news:publication>",
+            f"<news:publication_date>{escape(str(published))}</news:publication_date>",
+            f"<news:title>{escape(n.get('title') or slug)}</news:title>",
+            "</news:news>",
+            "</url>",
+        ])
     xml_lines.append("</urlset>")
     return Response(content="\n".join(xml_lines), media_type="application/xml")
 

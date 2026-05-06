@@ -5,6 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import {
   Trophy, Flag, Users as UsersIcon, Medal, Shield, Calendar,
@@ -17,6 +18,7 @@ export default function PublicProfilePage() {
   const [achievementsData, setAchievementsData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("overview");
+  const { hasConsent, openSettings } = useCookieConsent();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -191,16 +193,24 @@ export default function PublicProfilePage() {
                   <svg className="w-5 h-5 text-[#9146FF]" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
                   Live auf Twitch
                 </h2>
-                <div className="border border-[#9146FF]/30 bg-black rounded-sm overflow-hidden aspect-video">
-                  <iframe
-                    title={`Twitch Stream ${profile.twitch_handle}`}
-                    src={`https://player.twitch.tv/?channel=${profile.twitch_handle}&parent=${window.location.hostname}&muted=true`}
-                    width="100%"
-                    height="100%"
-                    allowFullScreen
-                    frameBorder="0"
-                  />
-                </div>
+                {hasConsent("external_media") ? (
+                  <div className="border border-[#9146FF]/30 bg-black rounded-sm overflow-hidden aspect-video">
+                    <iframe
+                      title={`Twitch Stream ${profile.twitch_handle}`}
+                      src={`https://player.twitch.tv/?channel=${profile.twitch_handle}&parent=${window.location.hostname}&muted=true`}
+                      width="100%"
+                      height="100%"
+                      allowFullScreen
+                      frameBorder="0"
+                    />
+                  </div>
+                ) : (
+                  <div className="border border-[#9146FF]/30 bg-[#121212] rounded-sm p-6">
+                    <div className="font-heading font-black uppercase">Twitch blockiert</div>
+                    <p className="mt-2 text-sm text-white/60">Für Twitch-Einbettungen brauchen wir deine Zustimmung zu externen Medien.</p>
+                    <button type="button" onClick={openSettings} className="mt-4 px-4 py-2 border border-[#9146FF]/50 text-[#b88cff] text-xs uppercase tracking-wider font-bold rounded-sm">Cookie-Einstellungen</button>
+                  </div>
+                )}
                 <a href={`https://twitch.tv/${profile.twitch_handle}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-[#9146FF] hover:text-[#a86bff]">
                   <ExternalLink className="w-3 h-3" /> twitch.tv/{profile.twitch_handle}
                 </a>

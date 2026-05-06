@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Star, ExternalLink } from "lucide-react";
 
 const tierLabel = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const tierColor = { main: "#29B6E8", platinum: "#E5E4E2", gold: "#FFD700", silver: "#C0C0C0", bronze: "#CD7F32" };
 
 export default function SponsorsPage() {
+  useDocumentTitle("Sponsoren", "Sponsoren und Unterstützer von THE LION SQUAD eSports.");
   const [list, setList] = useState([]);
   const load = useCallback(() => {
     api.get("/sponsors").then(({ data }) => setList(data)).catch(() => {});
@@ -51,7 +53,7 @@ export default function SponsorsPage() {
                 <h2 className="font-heading text-xl font-black uppercase tracking-wider">{tierLabel[t] || t}</h2>
                 <div className="flex-1 border-t border-white/10" />
               </div>
-              <div className={`grid gap-5 ${(t === "main" || t === "platinum") ? "md:grid-cols-2" : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
+              <div className={`grid gap-4 ${(t === "main" || t === "platinum") ? "md:grid-cols-2" : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
                 {grouped[t].map((s) => (
                   <a
                     key={s.id}
@@ -59,16 +61,16 @@ export default function SponsorsPage() {
                     target={s.link ? "_blank" : undefined}
                     rel="noreferrer"
                     data-testid={`sponsor-${s.id}`}
-                    className="border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#101010] p-6 transition group flex flex-col"
+                    className="border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#101010] p-5 transition group flex flex-col min-h-56"
                   >
-                    <div className="h-28 mb-4 flex items-center justify-center overflow-hidden">
+                    <div className={`${t === "main" || t === "platinum" ? "h-36" : "h-28"} mb-4 flex items-center justify-center overflow-hidden rounded-sm bg-black/20`}>
                       {s.logo_url ? (
-                        <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-w-full max-h-full object-contain" />
+                        <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-w-[86%] max-h-[78%] object-contain" />
                       ) : (
                         <span className="font-heading font-black text-2xl text-white/30">{s.name[0]}</span>
                       )}
                     </div>
-                    <div className="font-heading font-black uppercase">{s.name}</div>
+                    <div className="font-heading font-black uppercase leading-tight">{s.name}</div>
                     {s.description && <div className="mt-1 text-xs text-white/55 line-clamp-2">{s.description}</div>}
                     {s.link && (
                       <div className="mt-3 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-[#FFD700] group-hover:underline">

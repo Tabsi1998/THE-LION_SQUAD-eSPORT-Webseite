@@ -27,7 +27,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
   const items = [...sponsors, ...sponsors]; // duplicate for seamless loop
   const speed = compact ? 34 : 48;
   return (
-    <section className={`relative overflow-hidden border-y border-white/5 bg-[#070707] ${className}`} data-testid="sponsor-ticker">
+    <section className={`relative overflow-hidden ${compact ? "bg-transparent" : "border-y border-white/5 bg-[#070707]"} ${className}`} data-testid="sponsor-ticker">
       {!compact && (
         <div className="max-w-7xl mx-auto px-4 pt-4 pb-1 text-right">
           <span className="text-[9px] uppercase tracking-[0.35em] font-bold text-white/35">Presented by our Partners</span>
@@ -35,7 +35,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
       )}
       <div className="relative overflow-hidden group">
         <div
-          className="flex items-center gap-16 whitespace-nowrap py-5"
+          className={`flex items-center whitespace-nowrap ${compact ? "gap-10 py-2" : "gap-16 py-5"}`}
           style={{ animation: `tls-marquee ${speed}s linear infinite`, width: "max-content" }}
         >
           {items.map((s, i) => (
@@ -48,7 +48,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
               title={s.name}
             >
               {s.logo_url ? (
-                <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className={`${compact ? "h-8" : tierSize[s.tier] || "h-10"} max-w-56 object-contain`} />
+                <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className={`${compact ? "h-7" : tierSize[s.tier] || "h-10"} ${compact ? "max-w-28" : "max-w-56"} object-contain`} />
               ) : (
                 <span className="font-heading font-black uppercase text-white/80">{s.name}</span>
               )}

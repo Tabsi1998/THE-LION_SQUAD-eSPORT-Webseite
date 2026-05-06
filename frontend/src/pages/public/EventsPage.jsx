@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Calendar, MapPin, Users as UsersIcon, Crown, Lock } from "lucide-react";
 
 const STATUS_LABELS = {
@@ -20,6 +21,7 @@ const STATUS_COLORS = {
 const VIS_ICON = { members: Crown, internal: Lock };
 
 export default function EventsPage() {
+  useDocumentTitle("Events", "Aktuelle und kommende Events von THE LION SQUAD eSports.");
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ types: [], statuses: [] });
   const [typeFilter, setTypeFilter] = useState("");

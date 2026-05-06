@@ -151,18 +151,8 @@ DEFAULT_NAV = {
     "id": NAV_DOC_ID,
     "items": [
         {"key": "home", "to": "/", "label": "Home", "visible": True, "order": 0},
-        {"key": "news", "to": "/news", "label": "News", "visible": True, "order": 1, "children": [
-            {"key": "news-overview", "to": "/news", "label": "Alle News", "visible": True},
-            {"key": "news-events", "to": "/events", "label": "Events", "visible": True},
-            {"key": "news-tournaments", "to": "/tournaments", "label": "Turniere", "visible": True},
-            {"key": "news-fastlap", "to": "/fastlap", "label": "Fast Lap", "visible": True},
-        ]},
-        {"key": "events", "to": "/events", "label": "Events", "visible": True, "order": 2, "children": [
-            {"key": "events-overview", "to": "/events", "label": "Alle Events", "visible": True},
-            {"key": "events-tournaments", "to": "/tournaments", "label": "Turniere", "visible": True},
-            {"key": "events-fastlap", "to": "/fastlap", "label": "Fast Lap", "visible": True},
-            {"key": "events-gallery", "to": "/galerie", "label": "Galerie", "visible": True},
-        ]},
+        {"key": "news", "to": "/news", "label": "News", "visible": True, "order": 1},
+        {"key": "events", "to": "/events", "label": "Events", "visible": True, "order": 2},
         {"key": "club", "to": "/about", "label": "Verein", "visible": True, "order": 3, "children": [
             {"key": "about", "to": "/about", "label": "Über uns", "visible": True},
             {"key": "board", "to": "/board", "label": "Vorstand", "visible": True},
@@ -228,6 +218,8 @@ def _merge_nav_item(current: dict, default: dict) -> dict:
             merged_children.append(_merge_nav_item(current_by_key.pop(key, {}), child_default))
         merged_children.extend(current_by_key.values())
         merged["children"] = merged_children
+    else:
+        merged.pop("children", None)
     return merged
 
 
@@ -281,6 +273,7 @@ seo_router = APIRouter(tags=["seo"])
 
 
 @seo_router.get("/api/robots.txt")
+@seo_router.get("/robots.txt")
 async def robots():
     db = get_db()
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
@@ -290,7 +283,10 @@ async def robots():
         "Allow: /",
         "Disallow: /admin/",
         "Disallow: /api/",
-        f"Sitemap: {base}/sitemap.xml" if base else "Sitemap: /api/sitemap.xml",
+        "Disallow: /login",
+        "Disallow: /register",
+        f"Sitemap: {base}/sitemap.xml" if base else "Sitemap: /sitemap.xml",
+        f"Sitemap: {base}/sitemap-news.xml" if base else "Sitemap: /sitemap-news.xml",
     ]
     return Response(content="\n".join(filter(None, body)), media_type="text/plain")
 

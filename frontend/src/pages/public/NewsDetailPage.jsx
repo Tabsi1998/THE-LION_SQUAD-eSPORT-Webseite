@@ -4,12 +4,14 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Pin, ArrowLeft, Calendar, Trophy, Users } from "lucide-react";
 
 export default function NewsDetailPage() {
   const { slug } = useParams();
   const [post, setPost] = useState(null);
   const [error, setError] = useState(null);
+  useDocumentTitle(post?.title || "News", post?.excerpt || "News von THE LION SQUAD eSports.");
 
   const load = useCallback(() => {
     api.get(`/news/${slug}`).then(({ data }) => {

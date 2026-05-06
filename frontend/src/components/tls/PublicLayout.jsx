@@ -2,6 +2,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
 import { MainNav, MobileNav } from "@/components/tls/MainNav";
+import { SponsorTicker } from "@/components/tls/SponsorTicker";
+import { openCookieSettings } from "@/components/tls/CookieConsent";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -126,6 +128,9 @@ export function PublicLayout({ children }) {
                   </>
                 )}
               </div>
+              <div className="mt-8">
+                <SponsorTicker compact placement="footer" />
+              </div>
             </div>
           </div>
         )}
@@ -212,6 +217,7 @@ export function PublicLayout({ children }) {
             <div className="flex items-center gap-4">
               <Link to="/imprint" className="hover:text-[#29B6E8] transition" data-testid="footer-imprint">Impressum</Link>
               <Link to="/privacy" className="hover:text-[#29B6E8] transition" data-testid="footer-privacy">Datenschutz</Link>
+              <button type="button" onClick={openCookieSettings} className="hover:text-[#29B6E8] transition">Cookies</button>
               <span className="font-display tracking-widest hidden md:inline">v2.2</span>
             </div>
           </div>

@@ -15,26 +15,8 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 export const NAV_STRUCTURE = [
   { to: "/", label: "Home", end: true },
-  {
-    to: "/news",
-    label: "News",
-    children: [
-      { to: "/news", label: "Alle News" },
-      { to: "/events", label: "Events" },
-      { to: "/tournaments", label: "Turniere" },
-      { to: "/fastlap", label: "Fast Lap" },
-    ],
-  },
-  {
-    to: "/events",
-    label: "Events",
-    children: [
-      { to: "/events", label: "Alle Events" },
-      { to: "/tournaments", label: "Turniere" },
-      { to: "/fastlap", label: "Fast Lap" },
-      { to: "/galerie", label: "Galerie" },
-    ],
-  },
+  { to: "/news", label: "News" },
+  { to: "/events", label: "Events" },
   {
     label: "Verein",
     children: [

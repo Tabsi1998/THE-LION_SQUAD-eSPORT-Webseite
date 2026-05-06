@@ -38,7 +38,7 @@ async def list_news(
         q["category"] = category
     if pinned_only:
         q["pinned"] = True
-    posts = await db.news_posts.find(q, {"_id": 0}).sort([("pinned", -1), ("created_at", -1)]).to_list(200)
+    posts = await db.news_posts.find(q, {"_id": 0}).sort([("pinned", -1), ("published_at", -1), ("created_at", -1)]).to_list(200)
     return await _filter_visible(posts, user)
 
 
@@ -70,7 +70,7 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
 @router.get("/admin/news")
 async def admin_list_news(me: dict = Depends(require_admin())):
     db = get_db()
-    posts = await db.news_posts.find({}, {"_id": 0}).sort([("pinned", -1), ("created_at", -1)]).to_list(500)
+    posts = await db.news_posts.find({}, {"_id": 0}).sort([("pinned", -1), ("published_at", -1), ("created_at", -1)]).to_list(500)
     return posts
 
 

@@ -7,10 +7,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { Tv, Eye } from "lucide-react";
 
 export function LiveStreamSlider() {
   const [streams, setStreams] = useState([]);
+  const { hasConsent } = useCookieConsent();
 
   const load = useCallback(() => api.get("/streams/live").then(({ data }) => setStreams(data || [])).catch(() => setStreams([])), []);
 
@@ -48,7 +50,7 @@ export function LiveStreamSlider() {
               className="snap-start shrink-0 w-72 border border-white/10 hover:border-[#9146FF]/50 rounded-sm bg-[#121212] overflow-hidden transition group"
             >
               <div className="relative aspect-video bg-[#0A0A0A]">
-                {s.thumbnail_url && (
+                {s.thumbnail_url && hasConsent("external_media") && (
                   <img src={s.thumbnail_url} alt={s.title} loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform" />
                 )}
                 <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-[#FF3B30] text-white text-[9px] font-bold uppercase tracking-widest rounded-sm flex items-center gap-1">

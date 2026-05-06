@@ -5,8 +5,10 @@
  * backwards compatibility.
  */
 import { Radio, ExternalLink } from "lucide-react";
+import { useCookieConsent } from "@/components/tls/CookieConsent";
 
 export function StreamEmbed({ source }) {
+  const { hasConsent, openSettings } = useCookieConsent();
   if (!source) return null;
   const enabled = source.has_live_stream === true || (source.twitch_enabled && source.twitch_channel);
   if (!enabled) return null;
@@ -41,9 +43,16 @@ export function StreamEmbed({ source }) {
         <span className="ml-auto text-[10px] uppercase tracking-widest text-white/50">{platform.toUpperCase()}</span>
         {url && <a href={url} target="_blank" rel="noreferrer" data-testid="stream-open-external" className="text-[10px] uppercase tracking-widest text-white/70 hover:text-white inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Öffnen</a>}
       </div>
-      {embedSrc ? (
+      {embedSrc && hasConsent("external_media") ? (
         <div className="aspect-video">
           <iframe src={embedSrc} className="w-full h-full" allowFullScreen frameBorder={0} title="Live Stream" />
+        </div>
+      ) : embedSrc ? (
+        <div className="p-8 text-center">
+          <Radio className="w-10 h-10 mx-auto text-[#FF3B30] mb-3" />
+          <div className="font-heading font-black uppercase">Stream-Einbettung blockiert</div>
+          <div className="text-xs text-white/50 mt-1">Für externe Medien brauchen wir deine Zustimmung.</div>
+          <button type="button" onClick={openSettings} className="mt-4 px-4 py-2 border border-[#FF3B30]/50 text-[#FF3B30] text-xs uppercase tracking-wider font-bold rounded-sm">Cookie-Einstellungen</button>
         </div>
       ) : url ? (
         <a href={url} target="_blank" rel="noreferrer" data-testid="stream-fallback-link" className="block p-8 text-center">

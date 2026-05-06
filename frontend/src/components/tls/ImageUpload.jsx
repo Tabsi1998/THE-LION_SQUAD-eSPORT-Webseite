@@ -57,6 +57,10 @@ function normalizeRotation(value) {
   return ((rounded % 360) + 360) % 360;
 }
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
 async function loadImage(file) {
   const url = URL.createObjectURL(file);
   try {
@@ -95,6 +99,7 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
     const rotation = normalizeRotation(editOptions?.rotation || 0);
     const cropMode = editOptions?.cropMode || "original";
     const cropAspect = cropMode === "square" ? 1 : cropMode === "wide" ? 16 / 9 : null;
+    const zoom = clamp(Number(editOptions?.zoom || 1), 1, 3);
     let sourceX = 0;
     let sourceY = 0;
     let sourceW = img.naturalWidth;
@@ -108,8 +113,14 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
         sourceH = Math.round(sourceW / cropAspect);
         sourceY = Math.round((img.naturalHeight - sourceH) / 2);
       }
+      sourceW = Math.max(1, Math.round(sourceW / zoom));
+      sourceH = Math.max(1, Math.round(sourceH / zoom));
+      const maxX = Math.max(0, Math.round((img.naturalWidth - sourceW) / 2));
+      const maxY = Math.max(0, Math.round((img.naturalHeight - sourceH) / 2));
+      sourceX = Math.round(maxX + clamp(Number(editOptions?.cropX || 0), -1, 1) * maxX);
+      sourceY = Math.round(maxY + clamp(Number(editOptions?.cropY || 0), -1, 1) * maxY);
     }
-    const needsEdit = rotation !== 0 || cropMode !== "original";
+    const needsEdit = rotation !== 0 || cropMode !== "original" || zoom !== 1;
     const needsResize = sourceW > IMAGE_MAX_DIMENSION || sourceH > IMAGE_MAX_DIMENSION;
     const needsCompression = needsEdit || file.size > triggerBytes || file.size > maxBytes || needsResize;
     if (!needsCompression) return file;
@@ -167,6 +178,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
   const [library, setLibrary] = useState([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [editor, setEditor] = useState(null);
+  const [drag, setDrag] = useState(null);
 
   const closeEditor = useCallback(() => {
     setEditor((cur) => {
@@ -184,13 +196,14 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
       const uploadFile = await prepareImageForUpload(file, maxSizeMb, editOptions);
       if (uploadFile.size > maxSizeMb * 1024 * 1024) {
         toast.error(`Datei zu gross (max ${maxSizeMb} MB). Bitte Bild kleiner exportieren oder Proxy-Limit erhoehen.`);
-        return;
+        return false;
       }
       const fd = new FormData();
       fd.append("file", uploadFile);
       const { data } = await api.post(endpoint, fd);
       onChange(data.url);
       toast.success(uploadFile !== file ? "Bild optimiert und hochgeladen." : "Bild hochgeladen.");
+      return true;
     } catch (e) {
       const detail = e.response?.data?.detail;
       const status = e.response?.status;
@@ -198,6 +211,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
         ? `Datei zu gross oder Reverse Proxy blockiert den Upload. App-Limit: ${maxSizeMb} MB, externer Proxy bitte auf mindestens ${PROXY_UPLOAD_LIMIT_MB} MB setzen.`
         : detail ? formatApiError(detail) : e.message || "Upload fehlgeschlagen";
       toast.error(status ? `Upload fehlgeschlagen (${status}): ${message}` : `Upload fehlgeschlagen: ${message}`);
+      return false;
     } finally {
       if (fileRef.current) fileRef.current.value = "";
       setUploading(false);
@@ -214,7 +228,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     }
     if (browserCanOptimizeImages()) {
       const url = URL.createObjectURL(file);
-      setEditor({ file, url, rotation: 0, cropMode: variant === "square" ? "square" : "original" });
+      setEditor({ file, url, rotation: 0, cropMode: variant === "square" ? "square" : "original", cropX: 0, cropY: 0, zoom: 1 });
       return;
     }
     await uploadFile(file);
@@ -325,12 +339,36 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
               <h3 className="font-heading text-xl font-black uppercase">Bild bearbeiten</h3>
               <button type="button" onClick={closeEditor} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
-            <div className={`mx-auto bg-[#050505] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center ${editor.cropMode === "wide" ? "aspect-video" : editor.cropMode === "square" ? "aspect-square max-h-[55vh]" : "min-h-[280px] max-h-[55vh]"}`}>
+            <div
+              className={`mx-auto bg-[#050505] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center touch-none select-none ${editor.cropMode === "wide" ? "aspect-video" : editor.cropMode === "square" ? "aspect-square max-h-[55vh]" : "min-h-[280px] max-h-[55vh]"}`}
+              onPointerDown={(e) => {
+                if (editor.cropMode === "original") return;
+                e.currentTarget.setPointerCapture?.(e.pointerId);
+                setDrag({ x: e.clientX, y: e.clientY, cropX: editor.cropX || 0, cropY: editor.cropY || 0 });
+              }}
+              onPointerMove={(e) => {
+                if (!drag || editor.cropMode === "original") return;
+                const dx = (e.clientX - drag.x) / 180;
+                const dy = (e.clientY - drag.y) / 180;
+                setEditor((cur) => ({
+                  ...cur,
+                  cropX: clamp(drag.cropX - dx, -1, 1),
+                  cropY: clamp(drag.cropY - dy, -1, 1),
+                }));
+              }}
+              onPointerUp={() => setDrag(null)}
+              onPointerCancel={() => setDrag(null)}
+            >
               <img
                 src={editor.url}
                 alt=""
-                className={`${editor.cropMode === "original" ? "max-w-full max-h-[55vh] object-contain" : "w-full h-full object-cover"} transition-transform`}
-                style={{ transform: `rotate(${editor.rotation}deg)` }}
+                draggable={false}
+                className={`${editor.cropMode === "original" ? "max-w-full max-h-[55vh] object-contain" : "w-full h-full object-cover cursor-grab active:cursor-grabbing"} transition-transform`}
+                style={{
+                  transform: editor.cropMode === "original"
+                    ? `rotate(${editor.rotation}deg)`
+                    : `translate(${-(editor.cropX || 0) * 28}%, ${-(editor.cropY || 0) * 28}%) rotate(${editor.rotation}deg) scale(${editor.zoom || 1})`,
+                }}
               />
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
@@ -343,7 +381,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                   <button
                     key={mode}
                     type="button"
-                    onClick={() => setEditor((cur) => ({ ...cur, cropMode: mode }))}
+                    onClick={() => setEditor((cur) => ({ ...cur, cropMode: mode, cropX: 0, cropY: 0, zoom: 1 }))}
                     className={`inline-flex items-center gap-2 px-3 py-2 border rounded-sm text-xs font-bold uppercase tracking-wider ${editor.cropMode === mode ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/60 hover:text-white"}`}
                   >
                     <Crop className="w-3.5 h-3.5" /> {text}
@@ -355,14 +393,28 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                 <button type="button" onClick={() => setEditor((cur) => ({ ...cur, rotation: normalizeRotation(cur.rotation + 90) }))} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm text-xs font-bold uppercase tracking-wider">
                   <RotateCw className="w-3.5 h-3.5" /> Rechts
                 </button>
+                {editor.cropMode !== "original" && (
+                  <label className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 rounded-sm text-xs text-white/70">
+                    Zoom
+                    <input
+                      type="range"
+                      min="1"
+                      max="3"
+                      step="0.05"
+                      value={editor.zoom || 1}
+                      onChange={(e) => setEditor((cur) => ({ ...cur, zoom: Number(e.target.value), cropX: clamp(cur.cropX || 0, -1, 1), cropY: clamp(cur.cropY || 0, -1, 1) }))}
+                      className="w-28 accent-[#29B6E8]"
+                    />
+                  </label>
+                )}
               </div>
               <button
                 type="button"
                 disabled={uploading}
                 onClick={async () => {
                   const current = editor;
-                  await uploadFile(current.file, { rotation: current.rotation, cropMode: current.cropMode });
-                  closeEditor();
+                  const ok = await uploadFile(current.file, { rotation: current.rotation, cropMode: current.cropMode, cropX: current.cropX, cropY: current.cropY, zoom: current.zoom });
+                  if (ok) closeEditor();
                 }}
                 className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50"
               >
