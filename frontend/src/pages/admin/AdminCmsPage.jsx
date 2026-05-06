@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { renderMarkdownLite } from "@/lib/markdownLite";
 import { toast } from "sonner";
 import { FileText, Mail, Save, Plus, Trash2, X, Eye, EyeOff } from "lucide-react";
 
@@ -221,28 +222,4 @@ function TemplateEditor({ template, onClose, onSaved }) {
 
 function Field({ label, children }) {
   return <label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>{children}</label>;
-}
-
-// Re-implement minimal renderer here to avoid coupling with public CmsPage
-function renderMarkdownLite(md) {
-  if (!md) return "";
-  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const lines = md.split(/\r?\n/);
-  let html = ""; let inList = null;
-  const close = () => { if (inList) { html += inList === "ul" ? "</ul>" : "</ol>"; inList = null; } };
-  for (let raw of lines) {
-    let line = esc(raw)
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.+?)\*/g, "<em>$1</em>")
-      .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
-    if (/^###\s+/.test(raw)) { close(); html += `<h3>${line.replace(/^###\s+/, "")}</h3>`; continue; }
-    if (/^##\s+/.test(raw))  { close(); html += `<h2>${line.replace(/^##\s+/, "")}</h2>`; continue; }
-    if (/^#\s+/.test(raw))   { close(); html += `<h1>${line.replace(/^#\s+/, "")}</h1>`; continue; }
-    if (/^\s*[-*]\s+/.test(raw)) { if (inList !== "ul") { close(); html += "<ul>"; inList = "ul"; } html += `<li>${line.replace(/^\s*[-*]\s+/, "")}</li>`; continue; }
-    if (/^\s*\d+\.\s+/.test(raw)) { if (inList !== "ol") { close(); html += "<ol>"; inList = "ol"; } html += `<li>${line.replace(/^\s*\d+\.\s+/, "")}</li>`; continue; }
-    if (raw.trim() === "") { close(); continue; }
-    close(); html += `<p>${line}</p>`;
-  }
-  close();
-  return html;
 }

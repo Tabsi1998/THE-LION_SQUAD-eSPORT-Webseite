@@ -13,6 +13,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useSeoPage } from "@/hooks/useSeoPage";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { renderMarkdownLite } from "@/lib/markdownLite";
 
 export default function CmsPage({ slug: forced }) {
   const params = useParams();
@@ -63,38 +64,4 @@ function Empty({ title }) {
       <p className="mt-4 text-white/55">Die gewünschte Seite ist nicht verfügbar.</p>
     </div>
   );
-}
-
-function renderMarkdownLite(md) {
-  if (!md) return "";
-  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const lines = md.split(/\r?\n/);
-  let html = "";
-  let inList = null; // 'ul' | 'ol' | null
-  for (let raw of lines) {
-    let line = esc(raw);
-    // bold/italic/links inline
-    line = line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    line = line.replace(/\*(.+?)\*/g, "<em>$1</em>");
-    line = line.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
-
-    if (/^###\s+/.test(raw)) { close(); html += `<h3>${line.replace(/^###\s+/, "")}</h3>`; continue; }
-    if (/^##\s+/.test(raw)) { close(); html += `<h2>${line.replace(/^##\s+/, "")}</h2>`; continue; }
-    if (/^#\s+/.test(raw))  { close(); html += `<h1>${line.replace(/^#\s+/, "")}</h1>`; continue; }
-    if (/^\s*[-*]\s+/.test(raw)) {
-      if (inList !== "ul") { close(); html += "<ul>"; inList = "ul"; }
-      html += `<li>${line.replace(/^\s*[-*]\s+/, "")}</li>`; continue;
-    }
-    if (/^\s*\d+\.\s+/.test(raw)) {
-      if (inList !== "ol") { close(); html += "<ol>"; inList = "ol"; }
-      html += `<li>${line.replace(/^\s*\d+\.\s+/, "")}</li>`; continue;
-    }
-    if (/^---+$/.test(raw)) { close(); html += "<hr/>"; continue; }
-    if (raw.trim() === "") { close(); continue; }
-    close();
-    html += `<p>${line}</p>`;
-  }
-  function close() { if (inList) { html += inList === "ul" ? "</ul>" : "</ol>"; inList = null; } }
-  close();
-  return html;
 }
