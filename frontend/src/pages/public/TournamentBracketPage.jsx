@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -10,13 +10,17 @@ export default function TournamentBracketPage() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
 
-  useEffect(() => {
-    (async () => {
-      const { data: t } = await api.get(`/tournaments/${slug}`);
-      const { data: br } = await api.get(`/tournaments/${t.id}/bracket`);
-      setData(br);
-    })();
+  const load = useCallback(async () => {
+    const { data: t } = await api.get(`/tournaments/${slug}`);
+    const { data: br } = await api.get(`/tournaments/${t.id}/bracket`);
+    setData(br);
   }, [slug]);
+
+  useEffect(() => {
+    load();
+    const iv = setInterval(load, 7000);
+    return () => clearInterval(iv);
+  }, [load]);
 
   if (!data) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE BRACKET …</div></PublicLayout>;
   const t = data.tournament;

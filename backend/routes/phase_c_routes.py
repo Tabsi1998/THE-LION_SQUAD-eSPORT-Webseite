@@ -139,6 +139,7 @@ class DecisionBody(BaseModel):
     note: Optional[str] = None
 
 
+@router.put("/membership/applications/{app_id}")
 @router.patch("/membership/applications/{app_id}")
 async def admin_decide_application(app_id: str, body: DecisionBody,
                                     me: dict = Depends(require_admin())):

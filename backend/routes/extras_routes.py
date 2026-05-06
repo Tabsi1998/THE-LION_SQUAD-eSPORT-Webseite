@@ -554,6 +554,7 @@ async def create_season(body: SeasonCreate, me: dict = Depends(require_admin()))
     return doc
 
 
+@season_router.put("/{sid}")
 @season_router.patch("/{sid}")
 async def update_season(sid: str, body: SeasonUpdate, me: dict = Depends(require_admin())):
     db = get_db()

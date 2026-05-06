@@ -481,6 +481,7 @@ async def get_user(user_id: str, me: dict = Depends(get_current_user)):
     return u
 
 
+@router.put("/me")
 @router.patch("/me")
 async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
     db = get_db()
@@ -521,6 +522,7 @@ async def add_my_social(body: UserSocialCreate, me: dict = Depends(get_current_u
     return doc
 
 
+@router.put("/me/socials/{social_id}")
 @router.patch("/me/socials/{social_id}")
 async def update_my_social(social_id: str, body: UserSocialUpdate, me: dict = Depends(get_current_user)):
     db = get_db()
@@ -541,6 +543,7 @@ async def delete_my_social(social_id: str, me: dict = Depends(get_current_user))
     return {"ok": True}
 
 
+@router.put("/{user_id}")
 @router.patch("/{user_id}")
 async def admin_update_user(user_id: str, body: UserUpdate,
                              me: dict = Depends(require_admin())):
@@ -571,6 +574,7 @@ async def unban_user(user_id: str, me: dict = Depends(require_admin())):
     return {"ok": True}
 
 
+@router.put("/{user_id}/role")
 @router.post("/{user_id}/role")
 async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_super())):
     db = get_db()

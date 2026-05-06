@@ -101,6 +101,7 @@ async def create_document(body: DocumentCreate, me: dict = Depends(require_admin
     return doc
 
 
+@router.put("/{doc_id}")
 @router.patch("/{doc_id}")
 async def update_document(doc_id: str, body: DocumentUpdate, me: dict = Depends(require_admin())):
     db = get_db()

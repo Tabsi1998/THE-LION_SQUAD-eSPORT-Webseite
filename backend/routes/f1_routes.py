@@ -107,6 +107,7 @@ async def create_challenge(body: F1ChallengeCreate, me: dict = Depends(require_a
     return doc
 
 
+@router.put("/challenges/{cid}")
 @router.patch("/challenges/{cid}")
 async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends(require_admin())):
     db = get_db()
@@ -194,6 +195,7 @@ async def add_track(cid: str, body: F1TrackCreate, me: dict = Depends(require_ad
     return doc
 
 
+@router.put("/tracks/{tid}")
 @router.patch("/tracks/{tid}")
 async def update_track(tid: str, body: F1TrackUpdate, me: dict = Depends(require_admin())):
     db = get_db()
@@ -421,6 +423,7 @@ async def list_times(cid: str, track_id: str | None = None, user_id: str | None 
     return times
 
 
+@router.put("/times/{time_id}")
 @router.patch("/times/{time_id}")
 async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(require_role("moderator"))):
     db = get_db()

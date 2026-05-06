@@ -134,6 +134,7 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
     return doc
 
 
+@router.put("/{tid}")
 @router.patch("/{tid}")
 async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends(require_admin())):
     db = get_db()
@@ -242,6 +243,7 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
     return reg
 
 
+@router.put("/{tid}/registrations/{reg_id}")
 @router.patch("/{tid}/registrations/{reg_id}")
 async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
                                me: dict = Depends(require_admin())):

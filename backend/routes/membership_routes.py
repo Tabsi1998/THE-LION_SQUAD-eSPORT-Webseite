@@ -196,6 +196,7 @@ async def create_benefit(body: MemberBenefitCreate, me: dict = Depends(require_a
     return doc
 
 
+@router.put("/benefits/{benefit_id}")
 @router.patch("/benefits/{benefit_id}")
 async def update_benefit(
     benefit_id: str, body: MemberBenefitUpdate, me: dict = Depends(require_admin()),

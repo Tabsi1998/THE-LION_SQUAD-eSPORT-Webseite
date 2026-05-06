@@ -39,6 +39,7 @@ async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
     return doc
 
 
+@router.put("/{game_id}")
 @router.patch("/{game_id}")
 async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require_admin())):
     db = get_db()

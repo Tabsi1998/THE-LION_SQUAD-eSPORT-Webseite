@@ -41,6 +41,7 @@ async def get_match(match_id: str):
     return m
 
 
+@router.put("/{match_id}")
 @router.patch("/{match_id}")
 async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(require_role("moderator"))):
     db = get_db()

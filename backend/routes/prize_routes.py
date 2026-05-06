@@ -65,6 +65,7 @@ async def my_open_prize_count(me: dict = Depends(get_current_user)):
     return {"count": count}
 
 
+@router.put("/{pickup_id}")
 @router.patch("/{pickup_id}")
 async def update_prize(pickup_id: str, body: PrizeUpdate, me: dict = Depends(require_admin())):
     db = get_db()

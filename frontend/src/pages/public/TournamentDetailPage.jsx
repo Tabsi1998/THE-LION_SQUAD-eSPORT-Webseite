@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -20,16 +20,19 @@ export default function TournamentDetailPage() {
   const [myReg, setMyReg] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get(`/tournaments/${slug}`);
     setT(data);
     const { data: r } = await api.get(`/tournaments/${data.id}/registrations`);
     setRegs(r);
-    if (user) setMyReg(r.find((x) => x.user_id === user.id) || null);
-  };
+    setMyReg(user ? r.find((x) => x.user_id === user.id) || null : null);
+  }, [slug, user]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [slug, user?.id]);
+  useEffect(() => {
+    load();
+    const iv = setInterval(load, 10000);
+    return () => clearInterval(iv);
+  }, [load]);
 
   const handleRegister = async () => {
     if (!user) { nav(`/login?next=/tournaments/${slug}`); return; }

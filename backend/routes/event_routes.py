@@ -128,6 +128,7 @@ async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
     return doc
 
 
+@router.put("/{event_id}")
 @router.patch("/{event_id}")
 async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(require_admin())):
     db = get_db()

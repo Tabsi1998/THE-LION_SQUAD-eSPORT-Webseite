@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -8,14 +8,18 @@ export default function TournamentStandingsPage() {
   const [t, setT] = useState(null);
   const [rows, setRows] = useState([]);
 
-  useEffect(() => {
-    (async () => {
-      const { data: tr } = await api.get(`/tournaments/${slug}`);
-      setT(tr);
-      const { data } = await api.get(`/tournaments/${tr.id}/standings`);
-      setRows(data);
-    })();
+  const load = useCallback(async () => {
+    const { data: tr } = await api.get(`/tournaments/${slug}`);
+    setT(tr);
+    const { data } = await api.get(`/tournaments/${tr.id}/standings`);
+    setRows(data);
   }, [slug]);
+
+  useEffect(() => {
+    load();
+    const iv = setInterval(load, 7000);
+    return () => clearInterval(iv);
+  }, [load]);
 
   if (!t) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
 

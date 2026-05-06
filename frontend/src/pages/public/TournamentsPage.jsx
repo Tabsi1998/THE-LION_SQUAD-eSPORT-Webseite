@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentCard } from "@/components/tls/TournamentCard";
@@ -7,13 +7,17 @@ export default function TournamentsPage() {
   const [list, setList] = useState([]);
   const [statusFilter, setStatusFilter] = useState("all");
 
-  useEffect(() => {
-    (async () => {
-      const q = statusFilter !== "all" ? `?status=${statusFilter}` : "";
-      const { data } = await api.get(`/tournaments${q}`);
-      setList(data);
-    })();
+  const load = useCallback(async () => {
+    const q = statusFilter !== "all" ? `?status=${statusFilter}` : "";
+    const { data } = await api.get(`/tournaments${q}`);
+    setList(data);
   }, [statusFilter]);
+
+  useEffect(() => {
+    load();
+    const iv = setInterval(load, 15000);
+    return () => clearInterval(iv);
+  }, [load]);
 
   const filters = [
     { v: "all", label: "Alle" },

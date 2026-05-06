@@ -32,6 +32,7 @@ async def create_station(body: StationCreate, me: dict = Depends(require_admin()
     return doc
 
 
+@router.put("/{sid}")
 @router.patch("/{sid}")
 async def update_station(sid: str, body: StationUpdate, me: dict = Depends(require_admin())):
     db = get_db()

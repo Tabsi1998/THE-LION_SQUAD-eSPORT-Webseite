@@ -143,6 +143,7 @@ async def create_team(body: TeamCreate, me: dict = Depends(get_current_user)):
     return doc
 
 
+@router.put("/{team_id}")
 @router.patch("/{team_id}")
 async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_current_user)):
     db = get_db()
@@ -365,6 +366,7 @@ async def create_squad(team_id: str, body: TeamSquadCreate, me: dict = Depends(g
     return doc
 
 
+@router.put("/{team_id}/squads/{squad_id}")
 @router.patch("/{team_id}/squads/{squad_id}")
 async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: dict = Depends(get_current_user)):
     db = get_db()

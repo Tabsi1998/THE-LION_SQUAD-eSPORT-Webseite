@@ -140,6 +140,7 @@ class ContactPatch(BaseModel):
     internal_note: Optional[str] = None
 
 
+@contact_router.put("/{cid}")
 @contact_router.patch("/{cid}")
 async def patch_contact_message(cid: str, body: ContactPatch, me: dict = Depends(require_admin())):
     db = get_db()
@@ -256,6 +257,7 @@ async def create_position(body: BoardPositionCreate, me: dict = Depends(require_
     return doc
 
 
+@board_router.put("/{pid}")
 @board_router.patch("/{pid}")
 async def update_position(pid: str, body: BoardPositionUpdate, me: dict = Depends(require_admin())):
     db = get_db()

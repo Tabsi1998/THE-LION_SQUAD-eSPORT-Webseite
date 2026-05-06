@@ -69,6 +69,10 @@ api.interceptors.request.use((config) => {
     deleteHeader(headers, "Content-Type");
     deleteHeader(headers, "content-type");
   }
+  if (method === "GET") {
+    setHeader(headers, "Cache-Control", "no-cache");
+    setHeader(headers, "Pragma", "no-cache");
+  }
   if (UNSAFE_METHODS.has(method)) {
     applyCsrfHeader(config);
   }

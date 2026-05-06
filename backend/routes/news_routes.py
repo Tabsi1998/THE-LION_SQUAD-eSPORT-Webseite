@@ -91,6 +91,7 @@ async def create_news(body: NewsCreate, me: dict = Depends(require_admin())):
     return doc
 
 
+@router.put("/news/{nid}")
 @router.patch("/news/{nid}")
 async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_admin())):
     db = get_db()
@@ -210,6 +211,7 @@ async def create_sponsor(body: SponsorCreate, me: dict = Depends(require_admin()
     return doc
 
 
+@router.put("/sponsors/{sid}")
 @router.patch("/sponsors/{sid}")
 async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(require_admin())):
     db = get_db()
@@ -311,6 +313,7 @@ async def create_album(body: GalleryAlbumCreate, me: dict = Depends(require_admi
     return doc
 
 
+@router.put("/gallery/{aid}")
 @router.patch("/gallery/{aid}")
 async def update_album(aid: str, body: GalleryAlbumUpdate, me: dict = Depends(require_admin())):
     db = get_db()
@@ -353,6 +356,7 @@ async def add_photo(aid: str, body: GalleryPhotoCreate, me: dict = Depends(requi
     return doc
 
 
+@router.put("/gallery/photos/{pid}")
 @router.patch("/gallery/photos/{pid}")
 async def update_photo(pid: str, body: GalleryPhotoUpdate, me: dict = Depends(require_admin())):
     db = get_db()

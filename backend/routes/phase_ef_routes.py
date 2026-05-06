@@ -116,6 +116,7 @@ async def admin_create_page(body: PageCreate, me: dict = Depends(require_admin()
     return doc
 
 
+@admin_pages_router.put("/{slug}")
 @admin_pages_router.patch("/{slug}")
 async def admin_update_page(slug: str, body: PagePatch, me: dict = Depends(require_admin())):
     db = get_db()
@@ -189,6 +190,7 @@ async def admin_list_templates(me: dict = Depends(require_admin())):
     return await db.email_templates.find({}, {"_id": 0}).sort("key", 1).to_list(50)
 
 
+@admin_emailt_router.put("/{key}")
 @admin_emailt_router.patch("/{key}")
 async def admin_patch_template(key: str, body: TemplatePatch, me: dict = Depends(require_admin())):
     db = get_db()

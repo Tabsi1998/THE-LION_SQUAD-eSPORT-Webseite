@@ -111,6 +111,7 @@ async def admin_create_group(body: GroupCreate, me: dict = Depends(require_admin
     return doc
 
 
+@admin_router.put("/groups/{code}")
 @admin_router.patch("/groups/{code}")
 async def admin_patch_group(code: str, body: GroupPatch, me: dict = Depends(require_admin())):
     db = get_db()
@@ -187,6 +188,7 @@ async def admin_create_tier(body: TierCreate, me: dict = Depends(require_admin()
     return doc
 
 
+@admin_router.put("/tiers/{code}")
 @admin_router.patch("/tiers/{code}")
 async def admin_patch_tier(code: str, body: TierPatch, me: dict = Depends(require_admin())):
     db = get_db()
