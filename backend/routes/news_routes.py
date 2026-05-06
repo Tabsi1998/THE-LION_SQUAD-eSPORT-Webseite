@@ -263,7 +263,7 @@ async def list_albums(
 async def get_album(slug_or_id: str, user: dict | None = Depends(get_optional_user)):
     db = get_db()
     a = await db.gallery_albums.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
-    if not a:
+    if not a or not a.get("published", True):
         raise HTTPException(404, "Album nicht gefunden.")
     if not await _user_can_see(user, a.get("visibility") or "public"):
         raise HTTPException(403, "Nicht sichtbar.")
@@ -317,26 +317,32 @@ async def create_album(body: GalleryAlbumCreate, me: dict = Depends(require_admi
 @router.patch("/gallery/{aid}")
 async def update_album(aid: str, body: GalleryAlbumUpdate, me: dict = Depends(require_admin())):
     db = get_db()
+    album = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0, "id": 1})
+    if not album:
+        raise HTTPException(404, "Album nicht gefunden.")
     update = body.model_dump(exclude_unset=True)
     if "slug" in update and update["slug"]:
         update["slug"] = update["slug"].strip().lower()
-        existing = await db.gallery_albums.find_one({"slug": update["slug"], "id": {"$ne": aid}}, {"_id": 0, "id": 1})
+        existing = await db.gallery_albums.find_one({"slug": update["slug"], "id": {"$ne": album["id"]}}, {"_id": 0, "id": 1})
         if existing:
             raise HTTPException(409, f"Slug bereits vergeben: {update['slug']}")
     if update.get("taken_at"):
         update["taken_at"] = update["taken_at"].isoformat()
     update["updated_at"] = now_utc().isoformat()
-    res = await db.gallery_albums.update_one({"id": aid}, {"$set": update})
+    res = await db.gallery_albums.update_one({"id": album["id"]}, {"$set": update})
     if res.matched_count == 0:
         raise HTTPException(404, "Album nicht gefunden.")
-    return await db.gallery_albums.find_one({"id": aid}, {"_id": 0})
+    return await db.gallery_albums.find_one({"id": album["id"]}, {"_id": 0})
 
 
 @router.delete("/gallery/{aid}")
 async def delete_album(aid: str, me: dict = Depends(require_admin())):
     db = get_db()
-    await db.gallery_photos.delete_many({"album_id": aid})
-    await db.gallery_albums.delete_one({"id": aid})
+    album = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0, "id": 1})
+    if not album:
+        raise HTTPException(404, "Album nicht gefunden.")
+    await db.gallery_photos.delete_many({"album_id": album["id"]})
+    await db.gallery_albums.delete_one({"id": album["id"]})
     return {"ok": True}
 
 
@@ -370,5 +376,7 @@ async def update_photo(pid: str, body: GalleryPhotoUpdate, me: dict = Depends(re
 @router.delete("/gallery/photos/{pid}")
 async def delete_photo(pid: str, me: dict = Depends(require_admin())):
     db = get_db()
-    await db.gallery_photos.delete_one({"id": pid})
+    res = await db.gallery_photos.delete_one({"id": pid})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Foto nicht gefunden.")
     return {"ok": True}

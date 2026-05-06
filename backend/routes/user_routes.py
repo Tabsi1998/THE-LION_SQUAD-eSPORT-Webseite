@@ -100,6 +100,13 @@ async def _send_user_invite(user: dict, actor: dict) -> dict:
         invite_url=invite_url,
         invited_by=actor.get("display_name") or actor.get("username") or actor.get("email") or "",
         dedupe_key=f"user_invite:{user['id']}:{token[:10]}",
+        mail_meta={
+            "kind": "user_invite",
+            "user_id": user["id"],
+            "username": user.get("username"),
+            "display_name": user.get("display_name"),
+            "invited_by": actor.get("id"),
+        },
     )
     return {"invite_url": invite_url, "invite_email": result}
 

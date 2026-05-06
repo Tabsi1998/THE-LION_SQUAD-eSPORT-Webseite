@@ -324,7 +324,15 @@ def tpl_test(branding: str = "THE LION SQUAD") -> tuple[str, str]:
     )
 
 
-async def send_template(template_key: str, to: str, queue: bool = True, scheduled_at=None, dedupe_key: Optional[str] = None, **kwargs) -> dict:
+async def send_template(
+    template_key: str,
+    to: str,
+    queue: bool = True,
+    scheduled_at=None,
+    dedupe_key: Optional[str] = None,
+    mail_meta: Optional[dict] = None,
+    **kwargs,
+) -> dict:
     """Shortcut for named templates. By default the mail is queued via the new mail-queue.
     Set queue=False to use the old immediate-Resend path (e.g. test buttons).
     """
@@ -365,6 +373,6 @@ async def send_template(template_key: str, to: str, queue: bool = True, schedule
         return await enqueue_mail(
             to=to, subject=subject, html=html,
             template_key=template_key, scheduled_at=scheduled_at,
-            dedupe_key=dedupe_key,
+            dedupe_key=dedupe_key, meta=mail_meta,
         )
     return await send_mail(to, subject, html, template_key=template_key)

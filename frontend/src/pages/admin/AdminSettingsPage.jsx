@@ -1,10 +1,44 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { setCachedBranding } from "@/lib/brandingEvents";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload, useImageUploadBusy } from "@/components/tls/ImageUpload";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity } from "lucide-react";
+
+const MAIL_TEMPLATE_LABELS = {
+  user_invite: "Einladungsmail",
+  registration: "Registrierung",
+  password_reset: "Passwort zurücksetzen",
+  registration_received: "Turnier-Anmeldung",
+  registration_approved: "Anmeldung bestätigt",
+  registration_rejected: "Anmeldung abgelehnt",
+  checkin_reminder: "Check-in-Erinnerung",
+  match_reminder: "Match-Erinnerung",
+  score_reported: "Ergebnis gemeldet",
+  dispute_opened: "Dispute eröffnet",
+  dispute_resolved: "Dispute entschieden",
+  tournament_finished: "Turnier beendet",
+  membership_activated: "Mitgliedschaft aktiviert",
+  membership_deactivated: "Mitgliedschaft deaktiviert",
+  membership_blocked: "Mitgliedschaft gesperrt",
+  contact_autoreply: "Kontakt-Antwort",
+  contact_admin_notify: "Kontaktmeldung",
+  test: "Testmail",
+};
+
+const STATUS_LABELS = {
+  pending: "wartet auf Versand",
+  sending: "wird versendet",
+  sent: "gesendet",
+  failed: "fehlgeschlagen",
+  skipped: "übersprungen",
+};
+
+function mailTemplateLabel(job) {
+  return MAIL_TEMPLATE_LABELS[job?.template_key] || job?.template_key || "Mail";
+}
 
 export default function AdminSettingsPage() {
   const [tab, setTab] = useState("email");
@@ -39,7 +73,7 @@ export default function AdminSettingsPage() {
   const discordDirtyRef = useRef(false);
   const loadSeqRef = useRef(0);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const seq = ++loadSeqRef.current;
     const requests = await Promise.allSettled([
       api.get("/settings/email"),
@@ -63,9 +97,16 @@ export default function AdminSettingsPage() {
     if (requests.some((r) => r.status === "rejected")) {
       toast.error("Ein Teil der Einstellungen konnte nicht geladen werden. Die verfuegbaren Tabs bleiben nutzbar.");
     }
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, []);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["settings", "users"]);
+  useEffect(() => {
+    if (tab !== "queue") return undefined;
+    load();
+    const id = window.setInterval(load, 15000);
+    return () => window.clearInterval(id);
+  }, [tab, load]);
 
   const setBrandField = (key, value) => {
     brandDirtyRef.current = true;
@@ -233,6 +274,7 @@ export default function AdminSettingsPage() {
 
   const emailNotConfigured = !email.resend_api_key_masked;
   const discordNotConfigured = !discord.configured && !discord.webhook_url_masked;
+  const filteredQueue = queue.filter((j) => !queueFilter || j.status === queueFilter);
 
   return (
     <AdminLayout>
@@ -538,7 +580,7 @@ export default function AdminSettingsPage() {
               <option value="failed">failed</option>
               <option value="skipped">skipped</option>
             </select>
-            <span className="text-xs text-white/50">{queue.length} Jobs · Worker läuft alle 30s automatisch</span>
+            <span className="text-xs text-white/50">{filteredQueue.length} / {queue.length} Jobs · Worker läuft alle 30s automatisch</span>
           </div>
           <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
             <div className="overflow-x-auto">
@@ -556,17 +598,21 @@ export default function AdminSettingsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {queue.filter((j) => !queueFilter || j.status === queueFilter).map((j) => (
+                  {filteredQueue.map((j) => (
                     <tr key={j.id} data-testid={`queue-row-${j.id}`}>
                       <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{new Date(j.created_at).toLocaleString("de-DE")}</td>
                       <td className="px-4 py-3">{j.to}</td>
-                      <td className="px-4 py-3 text-[#29B6E8] text-xs">{j.template_key}</td>
+                      <td className="px-4 py-3 text-xs">
+                        <div className="text-[#29B6E8] font-bold">{mailTemplateLabel(j)}</div>
+                        <div className="text-white/45 truncate max-w-[240px]">{j.subject || j.template_key || "—"}</div>
+                        {j.meta?.username && <div className="text-white/35 truncate max-w-[240px]">Benutzer: {j.meta.username}</div>}
+                      </td>
                       <td className="px-4 py-3">
                         {j.status === "sent" && <span className="text-[#00FF88] inline-flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> sent</span>}
                         {j.status === "failed" && <span className="text-[#FF3B30] inline-flex items-center gap-1"><XCircle className="w-3.5 h-3.5" /> failed</span>}
-                        {j.status === "pending" && <span className="text-[#FFD700]">pending</span>}
-                        {j.status === "sending" && <span className="text-[#29B6E8]">sending</span>}
-                        {j.status === "skipped" && <span className="text-white/50">skipped</span>}
+                        {j.status === "pending" && <span className="text-[#FFD700]">{j.template_key === "user_invite" ? "Einladungsmail wartet auf Versand" : STATUS_LABELS.pending}</span>}
+                        {j.status === "sending" && <span className="text-[#29B6E8]">{STATUS_LABELS.sending}</span>}
+                        {j.status === "skipped" && <span className="text-white/50">{STATUS_LABELS.skipped}</span>}
                       </td>
                       <td className="px-4 py-3 text-xs">{j.attempts}</td>
                       <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{j.next_attempt_at ? new Date(j.next_attempt_at).toLocaleString("de-DE") : "—"}</td>
@@ -577,7 +623,7 @@ export default function AdminSettingsPage() {
                       </td>
                     </tr>
                   ))}
-                  {queue.length === 0 && <tr><td colSpan="8" className="text-center py-10 text-white/40">Mail-Queue ist leer.</td></tr>}
+                  {filteredQueue.length === 0 && <tr><td colSpan="8" className="text-center py-10 text-white/40">{queue.length === 0 ? "Mail-Queue ist leer." : "Keine Jobs fuer diesen Filter."}</td></tr>}
                 </tbody>
               </table>
             </div>

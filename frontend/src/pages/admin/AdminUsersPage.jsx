@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Link as LinkIcon, Plus, Trash2, X } from "lucide-react";
 
@@ -10,12 +11,13 @@ export default function AdminUsersPage() {
   const [list, setList] = useState([]);
   const [q, setQ] = useState("");
   const [creating, setCreating] = useState(false);
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     setList(data);
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [q]);
+  }, [q]);
+
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["users"]);
 
   const setRole = async (id, role) => {
     try { await api.post(`/users/${id}/role`, { role }); toast.success("Rolle aktualisiert."); load(); }
@@ -114,12 +116,12 @@ export default function AdminUsersPage() {
         </table>
         </div>
       </div>
-      {creating && <CreateUserModal onClose={() => setCreating(false)} onSaved={() => { setCreating(false); load(); }} />}
+      {creating && <CreateUserModal onClose={() => setCreating(false)} onCreated={load} onSaved={() => { setCreating(false); load(); }} />}
     </AdminLayout>
   );
 }
 
-function CreateUserModal({ onClose, onSaved }) {
+function CreateUserModal({ onClose, onSaved, onCreated }) {
   const [form, setForm] = useState({ username: "", display_name: "", email: "", role: "player", is_active: true, privacy_public_profile: true, send_invite: true });
   const [saving, setSaving] = useState(false);
   const [inviteUrl, setInviteUrl] = useState("");
@@ -130,6 +132,7 @@ function CreateUserModal({ onClose, onSaved }) {
     setSaving(true);
     try {
       const { data } = await api.post("/users", form);
+      Promise.resolve(onCreated?.()).catch(() => null);
       if (data.invite_url) {
         setInviteUrl(data.invite_url);
         if (navigator.clipboard) await navigator.clipboard.writeText(data.invite_url).catch(() => null);

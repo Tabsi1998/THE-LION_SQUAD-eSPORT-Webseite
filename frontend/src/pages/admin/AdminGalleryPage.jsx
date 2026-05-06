@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload, prepareImageForUpload } from "@/components/tls/ImageUpload";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Save, X, Trash2, Image as ImageIcon, ArrowLeft } from "lucide-react";
 
@@ -11,18 +12,32 @@ export default function AdminGalleryPage() {
   const [editingAlbum, setEditingAlbum] = useState(null);
   const [events, setEvents] = useState([]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get("/admin/gallery");
     setAlbums(data);
-  };
+  }, []);
+
   useEffect(() => {
     load();
     api.get("/events").then(({ data }) => setEvents(data)).catch(() => {});
-  }, []);
+  }, [load]);
+  useApiInvalidation(load, ["gallery"]);
 
   const remove = async (id) => {
     if (!window.confirm("Album mit allen Fotos löschen?")) return;
-    try { await api.delete(`/gallery/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    const previous = albums;
+    setAlbums((rows) => rows.filter((a) => a.id !== id));
+    if (activeAlbum?.id === id) setActiveAlbum(null);
+    if (editingAlbum?.id === id) setEditingAlbum(null);
+    try {
+      await api.delete(`/gallery/${id}`);
+      toast.success("Gelöscht.");
+      load();
+    } catch (err) {
+      setAlbums(previous);
+      toast.error(formatApiError(err.response?.data?.detail));
+      load();
+    }
   };
 
   if (activeAlbum) {
@@ -170,12 +185,13 @@ function AlbumPhotos({ album, events, onBack }) {
   const [selectedMedia, setSelectedMedia] = useState([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get(`/admin/gallery/${album.id}`);
     setPhotos(data.photos || []);
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [album.id]);
+  }, [album.id]);
+
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["gallery"]);
 
   const onPick = async (files) => {
     if (!files || !files.length) return;
@@ -205,7 +221,16 @@ function AlbumPhotos({ album, events, onBack }) {
   };
   const remove = async (id) => {
     if (!window.confirm("Foto löschen?")) return;
-    try { await api.delete(`/gallery/photos/${id}`); load(); } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    const previous = photos;
+    setPhotos((rows) => rows.filter((p) => p.id !== id));
+    try {
+      await api.delete(`/gallery/photos/${id}`);
+      load();
+    } catch (err) {
+      setPhotos(previous);
+      toast.error(formatApiError(err.response?.data?.detail));
+      load();
+    }
   };
   const openMedia = async () => {
     setMediaOpen(true);
