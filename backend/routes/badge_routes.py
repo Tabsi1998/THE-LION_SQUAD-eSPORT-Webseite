@@ -33,6 +33,7 @@ from models import now_utc, new_id
 
 # ============ Public/User ============
 router = APIRouter(prefix="/api/achievements", tags=["achievements"])
+STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 
 
 @router.get("/groups")
@@ -50,7 +51,12 @@ async def my_achievements(user: dict = Depends(get_current_user)):
 @router.get("/user/{user_id}")
 async def user_achievements(user_id: str, viewer: dict | None = Depends(get_optional_user)):
     db = get_db()
-    if not await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1}):
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "privacy_public_profile": 1})
+    if not user:
+        raise HTTPException(404, "Nutzer nicht gefunden.")
+    viewer_is_owner = bool(viewer and viewer.get("id") == user_id)
+    viewer_is_staff = bool(viewer and viewer.get("role") in STAFF_ROLES)
+    if not user.get("privacy_public_profile") and not (viewer_is_owner or viewer_is_staff):
         raise HTTPException(404, "Nutzer nicht gefunden.")
     groups = await list_groups_for_user(user_id, viewer)
     awards = await list_user_awards(user_id, viewer)

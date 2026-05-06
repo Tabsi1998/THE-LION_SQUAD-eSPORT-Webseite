@@ -326,6 +326,8 @@ async def get_public_profile(username: str):
     # Membership data
     membership = await db.memberships.find_one({"user_id": u["id"]}, {"_id": 0})
     is_member = bool(membership and membership.get("member_status") in ("active", "honorary"))
+    if not public:
+        raise HTTPException(status_code=404, detail="Spieler nicht gefunden")
     public_member = None
     if is_member:
         public_member = {

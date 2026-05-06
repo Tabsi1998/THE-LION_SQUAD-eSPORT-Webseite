@@ -39,6 +39,44 @@ def _parse_dt(value):
         return None
 
 
+def _is_staff(user: dict | None) -> bool:
+    return bool(user and user.get("role") in STAFF_ROLES)
+
+
+async def _get_visible_tournament(tid: str, user: dict | None) -> dict:
+    db = get_db()
+    t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not t:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    is_staff = _is_staff(user)
+    if t.get("status") == "draft" and not is_staff:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if t.get("is_public") is False and not is_staff:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if not await user_can_see(user, t.get("visibility") or "public"):
+        raise HTTPException(status_code=403, detail="Turnier ist nicht sichtbar")
+    return t
+
+
+def _public_registration(reg: dict, user: dict | None, is_staff: bool) -> dict:
+    if is_staff:
+        return reg
+    is_self = bool(user and reg.get("user_id") == user.get("id"))
+    out = {
+        "id": reg.get("id"),
+        "tournament_id": reg.get("tournament_id"),
+        "status": reg.get("status"),
+        "display_name": reg.get("display_name") or reg.get("ingame_name"),
+        "ingame_name": reg.get("ingame_name"),
+        "team_id": reg.get("team_id"),
+        "seed": reg.get("seed"),
+        "created_at": reg.get("created_at"),
+    }
+    if is_self:
+        out["user_id"] = reg.get("user_id")
+    return out
+
+
 def _registration_error(t: dict) -> str | None:
     if t.get("registration_enabled") is False or t.get("is_invite_only"):
         return "Anmeldung fuer dieses Turnier ist deaktiviert"
@@ -207,10 +245,15 @@ async def delete_tournament(tid: str, me: dict = Depends(require_admin())):
 
 # --- Registrations ---
 @router.get("/{tid}/registrations")
-async def list_registrations(tid: str):
+async def list_registrations(tid: str, user=Depends(get_optional_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    t_doc = await _get_visible_tournament(tid, user)
+    is_staff = _is_staff(user)
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+    if not is_staff and t_doc.get("show_participants") is False:
+        regs = [r for r in regs if user and r.get("user_id") == user.get("id")]
+    regs = [_public_registration(r, user, is_staff) for r in regs]
     # enrich user + team
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     team_ids = list({r["team_id"] for r in regs if r.get("team_id")})
@@ -235,9 +278,7 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
                                    me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    t = await db.tournaments.find_one({"id": tid})
-    if not t:
-        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    t = await _get_visible_tournament(tid, me)
     registration_error = _registration_error(t)
     if registration_error:
         raise HTTPException(status_code=400, detail=registration_error)
@@ -489,15 +530,15 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
 
 
 @router.get("/{tid}/bracket")
-async def get_bracket(tid: str):
+async def get_bracket(tid: str, user=Depends(get_optional_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
-    if not t:
-        raise HTTPException(status_code=404)
+    t = await _get_visible_tournament(tid, user)
+    is_staff = _is_staff(user)
     t["public_phase"] = derive_public_phase(t, "tournament")
     matches = await db.matches.find({"tournament_id": t["id"]}, {"_id": 0}).sort("round", 1).to_list(1000)
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
+    regs = [_public_registration(r, user, is_staff) for r in regs]
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0}).to_list(500)}
@@ -510,14 +551,14 @@ async def get_bracket(tid: str):
 
 
 @router.get("/{tid}/standings")
-async def standings(tid: str):
+async def standings(tid: str, user=Depends(get_optional_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
-    if not t:
-        raise HTTPException(status_code=404)
+    t = await _get_visible_tournament(tid, user)
+    is_staff = _is_staff(user)
     matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(1000)
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+    regs = [_public_registration(r, user, is_staff) for r in regs]
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0}).to_list(500)}
@@ -607,7 +648,8 @@ async def groups_generate(tid: str, body: dict, me: dict = Depends(require_admin
 
 
 @router.get("/{tid}/groups")
-async def list_groups(tid: str):
+async def list_groups(tid: str, user=Depends(get_optional_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await _get_visible_tournament(tid, user)
     return await db.tournament_groups.find({"tournament_id": tid}, {"_id": 0}).to_list(50)

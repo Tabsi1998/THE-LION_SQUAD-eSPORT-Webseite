@@ -2,10 +2,70 @@
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import get_current_user, require_admin, require_role, get_optional_user
+from services.visibility import user_can_see
 from models import MatchUpdate, MatchScoreReport, MatchDispute, now_utc, new_id
 from bracket_engine import advance_match_winner
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
+STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+USER_PUBLIC_PROJECTION = {
+    "_id": 0,
+    "id": 1,
+    "username": 1,
+    "display_name": 1,
+    "avatar_url": 1,
+}
+
+
+def _is_staff(user: dict | None) -> bool:
+    return bool(user and user.get("role") in STAFF_ROLES)
+
+
+async def _user_registration_for_match(match: dict, user: dict | None) -> dict | None:
+    if not user:
+        return None
+    reg_ids = [x for x in [match.get("participant_a_id"), match.get("participant_b_id")] if x]
+    if not reg_ids:
+        return None
+    db = get_db()
+    return await db.tournament_registrations.find_one(
+        {"id": {"$in": reg_ids}, "user_id": user["id"]},
+        {"_id": 0},
+    )
+
+
+async def _assert_match_visible(match: dict, user: dict | None) -> None:
+    if _is_staff(user) or await _user_registration_for_match(match, user):
+        return
+    db = get_db()
+    t = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0})
+    if not t:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if t.get("status") == "draft" or t.get("is_public") is False:
+        raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    if not await user_can_see(user, t.get("visibility") or "public"):
+        raise HTTPException(status_code=403, detail="Match ist nicht sichtbar")
+
+
+def _public_registration(reg: dict | None, user: dict | None) -> dict | None:
+    if not reg:
+        return None
+    is_staff = _is_staff(user)
+    is_self = bool(user and reg.get("user_id") == user.get("id"))
+    if is_staff:
+        return reg
+    out = {
+        "id": reg.get("id"),
+        "tournament_id": reg.get("tournament_id"),
+        "status": reg.get("status"),
+        "display_name": reg.get("display_name") or reg.get("ingame_name"),
+        "ingame_name": reg.get("ingame_name"),
+        "team_id": reg.get("team_id"),
+        "user": reg.get("user"),
+    }
+    if is_self:
+        out["user_id"] = reg.get("user_id")
+    return out
 
 
 @router.get("/upcoming")
@@ -24,20 +84,21 @@ async def my_upcoming(me: dict = Depends(get_current_user)):
 
 
 @router.get("/{match_id}")
-async def get_match(match_id: str):
+async def get_match(match_id: str, user: dict | None = Depends(get_optional_user)):
     db = get_db()
     m = await db.matches.find_one({"id": match_id}, {"_id": 0})
     if not m:
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    await _assert_match_visible(m, user)
     # Enrich participants
     reg_ids = [x for x in [m.get("participant_a_id"), m.get("participant_b_id")] if x]
     regs = await db.tournament_registrations.find({"id": {"$in": reg_ids}}, {"_id": 0}).to_list(10)
     user_ids = [r["user_id"] for r in regs if r.get("user_id")]
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0}).to_list(10)}
+        {"id": {"$in": user_ids}}, USER_PUBLIC_PROJECTION).to_list(10)}
     regs_dict = {r["id"]: {**r, "user": users.get(r.get("user_id"))} for r in regs}
-    m["participant_a"] = regs_dict.get(m.get("participant_a_id"))
-    m["participant_b"] = regs_dict.get(m.get("participant_b_id"))
+    m["participant_a"] = _public_registration(regs_dict.get(m.get("participant_a_id")), user)
+    m["participant_b"] = _public_registration(regs_dict.get(m.get("participant_b_id")), user)
     return m
 
 
@@ -159,6 +220,11 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
 @router.post("/{match_id}/dispute")
 async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_current_user)):
     db = get_db()
+    m = await db.matches.find_one({"id": match_id})
+    if not m:
+        raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    if not _is_staff(me) and not await _user_registration_for_match(m, me):
+        raise HTTPException(status_code=403, detail="Nicht Teilnehmer dieses Matches")
     await db.matches.update_one({"id": match_id}, {
         "$push": {"disputes": {"user_id": me["id"], "reason": body.reason,
                                  "at": now_utc().isoformat()}},
