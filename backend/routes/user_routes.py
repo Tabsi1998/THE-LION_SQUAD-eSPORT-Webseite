@@ -7,6 +7,7 @@ from database import get_db
 from auth import get_current_user, require_admin, require_super, hash_password, hash_token
 from email_service import send_template
 from services.membership_service import get_membership, derived_user_type, is_active_member
+from services.visibility import user_can_see
 from models import AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -76,6 +77,22 @@ def _visible_field(user: dict, key: str, profile_public: bool):
         "battlenet": "battlenet_id",
     }.get(key, key)
     return user.get(source_key)
+
+
+async def _is_public_tournament(tournament: dict | None) -> bool:
+    if not tournament:
+        return False
+    if tournament.get("status") == "draft" or tournament.get("is_public") is False:
+        return False
+    return await user_can_see(None, tournament.get("visibility") or "public")
+
+
+async def _is_public_challenge(challenge: dict | None) -> bool:
+    if not challenge:
+        return False
+    if challenge.get("status") == "draft":
+        return False
+    return await user_can_see(None, challenge.get("visibility") or "public")
 
 
 async def _attach_membership(user: dict) -> dict:
@@ -412,16 +429,19 @@ async def get_public_profile(username: str):
     if public:
         regs = await db.tournament_registrations.find({"user_id": user_id}, {"_id": 0}).to_list(200)
         t_ids = list({r["tournament_id"] for r in regs})
-        t_map = {t["id"]: t for t in await db.tournaments.find(
+        tournaments_raw = await db.tournaments.find(
             {"id": {"$in": t_ids}}, {"_id": 0, "title": 1, "slug": 1, "game_id": 1, "format": 1,
-             "status": 1, "start_date": 1, "id": 1}).to_list(200)}
+             "status": 1, "start_date": 1, "id": 1, "visibility": 1, "is_public": 1}).to_list(200)
+        t_map = {t["id"]: t for t in tournaments_raw if await _is_public_tournament(t)}
         game_ids = list({t.get("game_id") for t in t_map.values() if t.get("game_id")})
         g_map = {g["id"]: g for g in await db.games.find(
             {"id": {"$in": game_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1}).to_list(200)}
+        visible_reg_ids = []
         for r in regs:
             t = t_map.get(r["tournament_id"])
             if not t:
                 continue
+            visible_reg_ids.append(r["id"])
             final_pos = r.get("final_position")
             tournaments.append({
                 "id": t["id"], "slug": t.get("slug"), "title": t.get("title"),
@@ -435,7 +455,7 @@ async def get_public_profile(username: str):
             if final_pos and final_pos <= 3:
                 stats["top3"] += 1
         # Match stats — look up by registration_id
-        reg_ids = [r["id"] for r in regs]
+        reg_ids = visible_reg_ids
         matches = await db.matches.find(
             {"$or": [{"participant_a_id": {"$in": reg_ids}},
                      {"participant_b_id": {"$in": reg_ids}}],
@@ -446,26 +466,28 @@ async def get_public_profile(username: str):
                 stats["matches_won"] += 1
         # F1 / Fast Lap
         from routes.f1_routes import _ms_to_time_str
-        lap_count = await db.f1_lap_times.count_documents(
-            {"user_id": user_id, "is_invalid": {"$ne": True}})
-        stats["fast_laps"] = lap_count
         # Per track best
         all_laps = await db.f1_lap_times.find(
             {"user_id": user_id, "is_invalid": {"$ne": True}},
             {"_id": 0, "track_id": 1, "challenge_id": 1, "time_ms": 1,
              "penalty_seconds": 1, "created_at": 1}).to_list(2000)
+        c_ids_f1_all = list({lap["challenge_id"] for lap in all_laps})
+        challenges_raw = await db.f1_challenges.find(
+            {"id": {"$in": c_ids_f1_all}},
+            {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "visibility": 1},
+        ).to_list(200)
+        chall_docs = {c["id"]: c for c in challenges_raw if await _is_public_challenge(c)}
+        all_laps = [lap for lap in all_laps if lap.get("challenge_id") in chall_docs]
+        stats["fast_laps"] = len(all_laps)
         best_per_track = {}
         for lap in all_laps:
             eff = lap["time_ms"] + int(lap.get("penalty_seconds", 0) * 1000)
             k = lap["track_id"]
             if k not in best_per_track or eff < best_per_track[k]["time_ms"]:
                 best_per_track[k] = {"time_ms": eff, "challenge_id": lap["challenge_id"]}
-        c_ids_f1 = list({v["challenge_id"] for v in best_per_track.values()})
         track_docs = {t["id"]: t for t in await db.f1_tracks.find(
             {"id": {"$in": list(best_per_track.keys())}},
             {"_id": 0, "id": 1, "name": 1, "country": 1}).to_list(200)}
-        chall_docs = {c["id"]: c for c in await db.f1_challenges.find(
-            {"id": {"$in": c_ids_f1}}, {"_id": 0, "id": 1, "title": 1, "slug": 1}).to_list(200)}
         for tid, entry in best_per_track.items():
             tr = track_docs.get(tid)
             ch = chall_docs.get(entry["challenge_id"])
