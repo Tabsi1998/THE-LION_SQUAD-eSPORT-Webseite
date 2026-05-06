@@ -2,6 +2,7 @@ const STATUS_MAP = {
   live: { label: "LIVE", cls: "bg-[#FF3B30]/20 text-[#FF3B30] border-[#FF3B30]/50 animate-live" },
   registration_open: { label: "ANMELDUNG OFFEN", cls: "bg-[#00FF88]/15 text-[#00FF88] border-[#00FF88]/50" },
   check_in: { label: "CHECK-IN OFFEN", cls: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/50" },
+  checkin_open: { label: "CHECK-IN OFFEN", cls: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/50" },
   paused: { label: "PAUSIERT", cls: "bg-white/10 text-white/80 border-white/20" },
   draft: { label: "ENTWURF", cls: "bg-white/5 text-white/60 border-white/10" },
   completed: { label: "BEENDET", cls: "bg-white/10 text-white/70 border-white/20" },

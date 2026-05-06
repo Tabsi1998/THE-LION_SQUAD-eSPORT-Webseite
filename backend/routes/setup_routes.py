@@ -148,6 +148,22 @@ async def skip_setup(me: dict = Depends(require_super())):
 
 # ---------- SEO: sitemap.xml ----------
 sitemap_router = APIRouter(tags=["seo"])
+SEO_HIDDEN_STATUSES = ["draft", "archived", "cancelled"]
+
+
+def _parse_sitemap_dt(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 @sitemap_router.get("/api/sitemap.xml")
@@ -162,7 +178,7 @@ async def sitemap():
     static_paths = [
         "/", "/about", "/news", "/events", "/tournaments", "/fastlap", "/f1",
         "/teams", "/players", "/members", "/membership/join",
-        "/sponsors", "/partners", "/contact", "/badges", "/galerie",
+        "/sponsors", "/partners", "/contact", "/galerie",
         "/privacy", "/imprint",
     ]
     urls: list[dict] = [
@@ -177,15 +193,15 @@ async def sitemap():
 
     # tournaments
     public_visibility = {"$or": [{"visibility": "public"}, {"visibility": {"$exists": False}}, {"visibility": None}]}
-    async for t in db.tournaments.find({"status": {"$ne": "draft"}, "is_public": {"$ne": False}, **public_visibility}, {"slug": 1, "updated_at": 1, "_id": 0}):
+    async for t in db.tournaments.find({"status": {"$nin": SEO_HIDDEN_STATUSES}, "is_public": {"$ne": False}, **public_visibility}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if t.get("slug"):
             urls.append({"loc": f"{base}/tournaments/{t['slug']}", "lastmod": t.get("updated_at"), "changefreq": "weekly", "priority": "0.7"})
     # f1 challenges
-    async for f in db.f1_challenges.find({"status": {"$ne": "draft"}, **public_visibility}, {"slug": 1, "updated_at": 1, "_id": 0}):
+    async for f in db.f1_challenges.find({"status": {"$nin": SEO_HIDDEN_STATUSES}, **public_visibility}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if f.get("slug"):
             urls.append({"loc": f"{base}/fastlap/{f['slug']}", "lastmod": f.get("updated_at"), "changefreq": "weekly", "priority": "0.7"})
     # events
-    async for e in db.events.find({"status": {"$ne": "draft"}, **public_visibility}, {"slug": 1, "updated_at": 1, "_id": 0}):
+    async for e in db.events.find({"status": {"$nin": SEO_HIDDEN_STATUSES}, **public_visibility}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if e.get("slug"):
             urls.append({"loc": f"{base}/events/{e['slug']}", "lastmod": e.get("updated_at"), "changefreq": "weekly", "priority": "0.8"})
     # news
@@ -193,6 +209,9 @@ async def sitemap():
         {"published": True, **public_visibility},
         {"slug": 1, "id": 1, "updated_at": 1, "published_at": 1, "created_at": 1, "_id": 0},
     ).sort([("published_at", -1), ("created_at", -1)]):
+        published = _parse_sitemap_dt(n.get("published_at") or n.get("created_at"))
+        if published and published > now_utc():
+            continue
         slug = n.get("slug") or n.get("id")
         if slug:
             urls.append({"loc": f"{base}/news/{slug}", "lastmod": n.get("updated_at") or n.get("published_at") or n.get("created_at"), "changefreq": "monthly", "priority": "0.85"})
@@ -237,7 +256,8 @@ async def news_sitemap():
     for n in rows:
         slug = n.get("slug") or n.get("id")
         published = n.get("published_at") or n.get("created_at")
-        if not slug or not published:
+        published_dt = _parse_sitemap_dt(published)
+        if not slug or not published or (published_dt and published_dt > now_utc()):
             continue
         xml_lines.extend([
             "<url>",

@@ -31,7 +31,7 @@ export default function SponsorsPage() {
 
   return (
     <PublicLayout>
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">UNSERE PARTNER</span>
         <h1 className="mt-3 font-heading text-4xl md:text-5xl font-black uppercase">Sponsoren</h1>
         <p className="mt-4 text-white/70 max-w-2xl">
@@ -62,17 +62,17 @@ export default function SponsorsPage() {
                     target={s.link ? "_blank" : undefined}
                     rel="noreferrer"
                     data-testid={`sponsor-${s.id}`}
-                    className="border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#101010] p-5 transition group flex flex-col min-h-56"
+                    className={`border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#101010] transition group flex flex-col ${(t === "main" || t === "platinum") ? "p-7 min-h-80" : "p-5 min-h-60"}`}
                   >
-                    <div className={`${t === "main" || t === "platinum" ? "h-36" : "h-28"} mb-4 flex items-center justify-center overflow-hidden rounded-sm bg-[#080808] border border-white/5`}>
+                    <div className={`${t === "main" || t === "platinum" ? "h-44" : "h-32"} mb-5 flex items-center justify-center overflow-hidden`}>
                       {s.logo_url ? (
-                        <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-w-[92%] max-h-[84%] w-auto h-auto" />
+                        <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="w-full h-full object-contain" />
                       ) : (
                         <span className="font-heading font-black text-2xl text-white/30">{s.name[0]}</span>
                       )}
                     </div>
-                    <div className="font-heading font-black uppercase leading-tight">{s.name}</div>
-                    {s.description && <div className="mt-1 text-xs text-white/55 line-clamp-2">{s.description}</div>}
+                    <div className={`font-heading font-black uppercase leading-tight ${(t === "main" || t === "platinum") ? "text-2xl" : ""}`}>{s.name}</div>
+                    {s.description && <div className={`${(t === "main" || t === "platinum") ? "mt-3 text-sm" : "mt-1 text-xs"} text-white/55 line-clamp-3`}>{s.description}</div>}
                     {s.link && (
                       <div className="mt-3 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-[#FFD700] group-hover:underline">
                         Webseite <ExternalLink className="w-2.5 h-2.5" />

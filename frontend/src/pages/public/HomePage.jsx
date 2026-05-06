@@ -2,18 +2,21 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { TournamentCard } from "@/components/tls/TournamentCard";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { MascotBadge } from "@/components/tls/Logo";
 import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { motion } from "framer-motion";
-import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Crown, Pin, Radio, Users as UsersIcon } from "lucide-react";
+import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Crown, Pin, Radio, MapPin, Clock, Image as ImageIcon } from "lucide-react";
+
+const HOME_DESCRIPTION = "THE LION SQUAD eSports: News, Events, Turniere, Fast-Lap-Challenges, Galerie und Vereinsinfos aus Tirol.";
 
 export default function HomePage() {
   const [state, setState] = useState(null);
+  useDocumentTitle("Startseite", HOME_DESCRIPTION);
 
   const load = useCallback(() => {
     api.get("/home/state").then(({ data }) => setState(data)).catch(() => {});
@@ -24,6 +27,7 @@ export default function HomePage() {
   }, [load]);
 
   useApiInvalidation(load, ["home", "tournaments", "events", "news", "f1", "sponsors", "settings"]);
+  useHomeStructuredData(state);
 
   return (
     <PublicLayout>
@@ -78,6 +82,17 @@ export default function HomePage() {
         </div>
       </section>
 
+      {state && <PulseStrip state={state} />}
+
+      {state && (state.featured_news?.length > 0 || hasContent(state.upcoming || {})) && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="grid lg:grid-cols-12 gap-5">
+            {state.featured_news?.[0] && <FeaturedNews news={state.featured_news[0]} />}
+            <NextUp items={mergeItems(state.upcoming || {}).slice(0, 4)} />
+          </div>
+        </section>
+      )}
+
       {/* TODAY — only shown when something is happening today */}
       {state?.today && hasContent(state.today) && (
         <Section icon={Calendar} accent="#9F7AEA" title="Heute" subtitle="Was heute im Rudel los ist">
@@ -92,8 +107,32 @@ export default function HomePage() {
         </Section>
       )}
 
+      {state?.upcoming && hasContent(state.upcoming) && (
+        <section className="border-y border-white/10 bg-[#080808]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+            <SectionHeader icon={Calendar} accent="#9F7AEA" title="Kommende Termine" actionLabel="Alle Events" actionTo="/events" />
+            <div className="mt-7 grid lg:grid-cols-3 gap-4">
+              {(state.upcoming.events || []).slice(0, 3).map((event) => (
+                <EventInfoCard key={event.id} item={{ ...event, kind: "event", url: `/events/${event.slug}`, label: event.name }} />
+              ))}
+            </div>
+            {((state.upcoming.tournaments || []).length > 0 || (state.upcoming.challenges || []).length > 0) && (
+              <div className="mt-10">
+                <SectionHeader icon={Trophy} accent="#FFD700" title="eSports Programm" actionLabel="Alles anzeigen" actionTo="/tournaments" />
+                <div className="mt-6 grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[
+                    ...(state.upcoming.tournaments || []).map((x) => ({ ...x, kind: "tournament", url: `/tournaments/${x.slug}`, label: x.title })),
+                    ...(state.upcoming.challenges || []).map((x) => ({ ...x, kind: "fastlap", url: `/fastlap/${x.slug}`, label: x.title })),
+                  ].slice(0, 6).map((item) => <EventInfoCard key={`${item.kind}-${item.id}`} item={item} />)}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* If nothing live/today/soon: show CTA grid */}
-      {state && !state.has_live && !hasContent(state.today || {}) && !hasContent(state.soon || {}) && (
+      {state && !state.has_live && !hasContent(state.today || {}) && !hasContent(state.soon || {}) && !hasContent(state.upcoming || {}) && !(state.news?.length > 0) && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="border border-dashed border-white/15 rounded-sm p-12 text-center">
             <Trophy className="w-10 h-10 mx-auto text-white/20 mb-4" />
@@ -110,33 +149,20 @@ export default function HomePage() {
       {/* Season Pass widget */}
       <SeasonPassWidget />
 
-      {/* News */}
-      {state?.news?.length > 0 && (
+      {homeNews(state).length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <SectionHeader icon={Newspaper} accent="#29B6E8" title="Aktuelle News" actionLabel="Alle News" actionTo="/news" />
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 mt-8">
-            {state.news.map((n) => (
-              <Link key={n.id} to={`/news/${n.slug}`} data-testid={`home-news-${n.slug}`} className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] overflow-hidden transition flex flex-col">
-                {n.banner_url ? (
-                  <div className="aspect-video bg-[#0A0A0A] overflow-hidden"><img src={resolveMediaUrl(n.banner_url)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" /></div>
-                ) : (
-                  <div className="aspect-video bg-gradient-to-br from-[#29B6E8]/20 via-[#0A0A0A] to-[#0A0A0A]" />
-                )}
-                <div className="p-4 flex-1">
-                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
-                    {n.category}
-                    {n.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
-                  </div>
-                  <h3 className="mt-2 font-heading font-black uppercase line-clamp-2 group-hover:text-[#29B6E8] transition">{n.title}</h3>
-                  {n.excerpt && <p className="mt-2 text-xs text-white/60 line-clamp-2">{n.excerpt}</p>}
-                </div>
-              </Link>
+          <div className="grid lg:grid-cols-4 gap-5 mt-8">
+            {homeNews(state).map((n, idx) => (
+              <NewsCard key={n.id} news={n} featured={idx === 0} />
             ))}
           </div>
         </section>
       )}
 
       <SponsorTicker />
+
+      <HomeExplore />
 
       {/* Vereins-CTA */}
       <section className="border-t border-white/10 bg-gradient-to-b from-[#0F0F0F] to-black">
@@ -153,6 +179,141 @@ export default function HomePage() {
         </div>
       </section>
     </PublicLayout>
+  );
+}
+
+function useHomeStructuredData(state) {
+  useEffect(() => {
+    const origin = window.location.origin;
+    const nextItems = state ? mergeItems(state.upcoming || {}).slice(0, 6) : [];
+    const newsItems = state ? (state.news || []).slice(0, 6) : [];
+    const data = [
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        name: "THE LION SQUAD eSports",
+        url: origin,
+        sameAs: [origin],
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: "THE LION SQUAD eSports",
+        url: origin,
+        potentialAction: {
+          "@type": "SearchAction",
+          target: `${origin}/news?q={search_term_string}`,
+          "query-input": "required name=search_term_string",
+        },
+      },
+    ];
+    if (nextItems.length) {
+      data.push({
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: "Kommende Events und eSports-Inhalte",
+        itemListElement: nextItems.map((item, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          url: `${origin}${item.url}`,
+          name: item.label,
+        })),
+      });
+    }
+    if (newsItems.length) {
+      data.push({
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: "Aktuelle News",
+        itemListElement: newsItems.map((item, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          url: `${origin}/news/${item.slug}`,
+          name: item.title,
+        })),
+      });
+    }
+    const script = document.createElement("script");
+    script.type = "application/ld+json";
+    script.dataset.tlsHomeStructuredData = "true";
+    script.textContent = JSON.stringify(data);
+    document.head.appendChild(script);
+    return () => script.remove();
+  }, [state]);
+}
+
+function PulseStrip({ state }) {
+  const stats = [
+    { label: "News", value: state.stats?.news ?? state.news?.length ?? 0, to: "/news", icon: Newspaper },
+    { label: "Events", value: state.stats?.events ?? state.upcoming?.events?.length ?? 0, to: "/events", icon: Calendar },
+    { label: "Turniere", value: state.stats?.tournaments ?? state.upcoming?.tournaments?.length ?? 0, to: "/tournaments", icon: Trophy },
+    { label: "Fast Lap", value: state.stats?.fastlaps ?? state.upcoming?.challenges?.length ?? 0, to: "/fastlap", icon: Flag },
+  ];
+  return (
+    <section className="border-b border-white/10 bg-[#0E0E0E]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+        {stats.map(({ label, value, to, icon: Icon }) => (
+          <Link key={label} to={to} className="group flex items-center justify-between gap-3 border border-white/10 hover:border-[#29B6E8]/45 rounded-sm px-4 py-3 bg-black/20 transition">
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</div>
+              <div className="mt-1 font-display text-2xl font-black tabular-nums">{value}</div>
+            </div>
+            <Icon className="w-5 h-5 text-[#29B6E8] opacity-80 group-hover:opacity-100" />
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FeaturedNews({ news }) {
+  return (
+    <Link to={`/news/${news.slug}`} data-testid={`home-featured-news-${news.slug}`} className="lg:col-span-7 group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#111] overflow-hidden grid md:grid-cols-2 transition">
+      <div className="aspect-video md:aspect-auto bg-[#070707] overflow-hidden">
+        {news.banner_url ? (
+          <img src={resolveMediaUrl(news.banner_url)} alt="" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition duration-500" />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-[#29B6E8]/20 via-[#101010] to-black" />
+        )}
+      </div>
+      <div className="p-6 flex flex-col justify-center">
+        <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
+          <Newspaper className="w-3 h-3" /> Neueste News {news.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
+        </div>
+        <h2 className="mt-3 font-heading text-3xl md:text-4xl font-black uppercase leading-tight group-hover:text-[#29B6E8] transition">{news.title}</h2>
+        {news.excerpt && <p className="mt-3 text-white/65 line-clamp-3">{news.excerpt}</p>}
+        <span className="mt-5 inline-flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-white/55 group-hover:text-[#29B6E8]">
+          Lesen <ArrowRight className="w-3.5 h-3.5" />
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function NextUp({ items }) {
+  if (!items.length) return (
+    <div className="lg:col-span-5 border border-dashed border-white/15 rounded-sm p-6 text-white/45">
+      <div className="text-[10px] uppercase tracking-widest font-bold text-white/40">Nächster Termin</div>
+      <div className="mt-3 font-heading text-xl font-black uppercase">Aktuell nichts geplant</div>
+      <p className="mt-2 text-sm">Sobald News, Events, Turniere oder Fast-Laps gepflegt werden, erscheint hier automatisch der nächste relevante Eintrag.</p>
+    </div>
+  );
+  return (
+    <div className="lg:col-span-5 border border-white/10 rounded-sm bg-[#111] p-5">
+      <div className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700]">Als Nächstes</div>
+      <div className="mt-4 space-y-3">
+        {items.map((item) => (
+          <Link key={`${item.kind}-${item.id}`} to={item.url} className="flex items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm p-3 bg-black/20 transition">
+            <KindIcon kind={item.kind} />
+            <div className="min-w-0 flex-1">
+              <div className="font-heading font-bold truncate">{item.label}</div>
+              {item.start_date && <div className="text-xs text-white/45">{new Date(item.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
+            </div>
+            {item.status && <StatusBadge status={item.status} />}
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -183,6 +344,86 @@ function LiveBanner({ state }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function EventInfoCard({ item }) {
+  return (
+    <Link to={item.url} data-testid={`home-upcoming-${item.kind}-${item.slug}`} className="group border border-white/10 hover:border-[#29B6E8]/45 rounded-sm bg-[#121212] overflow-hidden transition flex flex-col">
+      {item.banner_url ? (
+        <div className="aspect-video bg-black overflow-hidden">
+          <img src={resolveMediaUrl(item.banner_url)} alt="" className="w-full h-full object-cover opacity-85 group-hover:scale-105 transition duration-500" />
+        </div>
+      ) : null}
+      <div className="p-5 flex-1 flex flex-col">
+        <div className="flex items-center gap-2">
+          <KindIcon kind={item.kind} />
+          {item.status && <StatusBadge status={item.status} />}
+          {item.has_live_stream && <Radio className="w-3 h-3 text-[#FF3B30] animate-pulse" />}
+        </div>
+        <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight group-hover:text-[#29B6E8] transition">{item.label}</h3>
+        {item.description && <p className="mt-2 text-sm text-white/60 line-clamp-2">{item.description}</p>}
+        <div className="mt-4 space-y-1 text-xs text-white/50">
+          {item.start_date && <div className="inline-flex items-center gap-1.5"><Clock className="w-3 h-3" /> {new Date(item.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
+          {item.location && <div className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {item.location}</div>}
+          {item.event?.name && <div className="flex items-center gap-1.5"><Calendar className="w-3 h-3" /> {item.event.name}</div>}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function NewsCard({ news, featured = false }) {
+  return (
+    <Link
+      to={`/news/${news.slug}`}
+      data-testid={`home-news-${news.slug}`}
+      className={`group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] overflow-hidden transition flex flex-col ${featured ? "lg:col-span-2 lg:row-span-2" : ""}`}
+    >
+      {news.banner_url ? (
+        <div className={`${featured ? "aspect-[16/8]" : "aspect-video"} bg-[#0A0A0A] overflow-hidden`}>
+          <img src={resolveMediaUrl(news.banner_url)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+        </div>
+      ) : (
+        <div className={`${featured ? "aspect-[16/8]" : "aspect-video"} bg-gradient-to-br from-[#29B6E8]/20 via-[#0A0A0A] to-[#0A0A0A]`} />
+      )}
+      <div className="p-4 flex-1">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
+          {news.category}
+          {news.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
+        </div>
+        <h3 className={`mt-2 font-heading font-black uppercase line-clamp-2 group-hover:text-[#29B6E8] transition ${featured ? "text-2xl" : ""}`}>{news.title}</h3>
+        {(news.published_at || news.created_at) && <div className="mt-2 text-[11px] text-white/40">{new Date(news.published_at || news.created_at).toLocaleDateString("de-DE", { dateStyle: "medium" })}</div>}
+        {news.excerpt && <p className="mt-2 text-xs text-white/60 line-clamp-3">{news.excerpt}</p>}
+      </div>
+    </Link>
+  );
+}
+
+function HomeExplore() {
+  const links = [
+    { to: "/about", icon: Crown, label: "Verein", text: "Wer wir sind, was uns antreibt und wie du Teil davon wirst.", accent: "#FFD700" },
+    { to: "/galerie", icon: ImageIcon, label: "Galerie", text: "Fotos und Eindrücke von Events, LANs und Community-Abenden.", accent: "#29B6E8" },
+    { to: "/sponsors", icon: Trophy, label: "Sponsoren", text: "Partner und Unterstützer, die unsere Events möglich machen.", accent: "#FFD700" },
+    { to: "/contact", icon: ArrowRight, label: "Kontakt", text: "Anfragen, Kooperationen, Sponsoring und allgemeine Nachrichten.", accent: "#9F7AEA" },
+  ];
+  return (
+    <section className="border-y border-white/10 bg-[#080808]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {links.map(({ to, icon: Icon, label, text, accent }) => (
+            <Link key={to} to={to} className="group border border-white/10 hover:border-white/25 rounded-sm bg-[#111] p-5 transition min-h-40 flex flex-col">
+              <Icon className="w-5 h-5" style={{ color: accent }} />
+              <div className="mt-4 font-heading text-xl font-black uppercase group-hover:text-[#29B6E8] transition">{label}</div>
+              <p className="mt-2 text-sm text-white/55 leading-relaxed">{text}</p>
+              <span className="mt-auto pt-4 inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-white/45 group-hover:text-[#29B6E8]">
+                Öffnen <ArrowRight className="w-3 h-3" />
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -255,4 +496,22 @@ function SectionHeader({ icon: Icon, accent, title, actionLabel, actionTo }) {
 function hasContent(group) {
   if (!group) return false;
   return Object.values(group).some((arr) => Array.isArray(arr) && arr.length > 0);
+}
+
+function mergeItems(group) {
+  return [
+    ...(group.events || []).map((x) => ({ ...x, kind: "event", url: `/events/${x.slug}`, label: x.name })),
+    ...(group.tournaments || []).map((x) => ({ ...x, kind: "tournament", url: `/tournaments/${x.slug}`, label: x.title })),
+    ...(group.challenges || []).map((x) => ({ ...x, kind: "fastlap", url: `/fastlap/${x.slug}`, label: x.title })),
+  ].sort((a, b) => {
+    const da = a.start_date ? new Date(a.start_date).getTime() : Number.MAX_SAFE_INTEGER;
+    const db = b.start_date ? new Date(b.start_date).getTime() : Number.MAX_SAFE_INTEGER;
+    return da - db;
+  });
+}
+
+function homeNews(state) {
+  if (!state?.news?.length) return [];
+  const featuredId = state.featured_news?.[0]?.id;
+  return state.news.filter((n) => n.id !== featuredId).slice(0, 8);
 }

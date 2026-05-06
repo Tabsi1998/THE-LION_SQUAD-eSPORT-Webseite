@@ -209,6 +209,7 @@ export function PublicLayout({ children }) {
               </ul>
             </div>
           </div>
+          <SponsorTicker compact placement="footer" className="mt-10 pt-8 border-t border-white/5" />
         </div>
         {/* Reihe 2 — Bottom Bar */}
         <div className="border-t border-white/5">

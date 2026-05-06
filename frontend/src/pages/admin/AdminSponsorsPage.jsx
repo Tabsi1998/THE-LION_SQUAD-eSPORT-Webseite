@@ -51,7 +51,7 @@ export default function AdminSponsorsPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Partner</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Sponsoren</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">
-            <strong className="text-[#29B6E8]">Hauptsponsor</strong>, <strong className="text-[#E5E4E2]">Platin</strong> und <strong className="text-[#FFD700]">Gold</strong> erscheinen Startseite + Footer · <strong>Silber</strong> nur im Footer · <strong>Bronze</strong> nur auf der Sponsorenseite.
+            Standard: <strong className="text-[#29B6E8]">Hauptsponsor</strong>, <strong className="text-[#E5E4E2]">Platin</strong> und <strong className="text-[#FFD700]">Gold</strong> erscheinen auf Startseite + Footer · <strong>Silber</strong> im Footer · <strong>Bronze</strong> nur auf der Sponsorenseite. Die Häkchen im Formular überschreiben diesen Standard.
           </p>
         </div>
         <div className="flex gap-2">

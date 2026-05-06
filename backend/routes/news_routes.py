@@ -1,6 +1,7 @@
 """News, Sponsors & Gallery routes — Vereins-CMS Phase 3."""
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
+from datetime import datetime, timezone
 from database import get_db
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see, filter_visible
@@ -38,11 +39,32 @@ async def _filter_linked_items(items: list[dict], user: dict | None, is_staff: b
     return out
 
 
+def _parse_dt(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _published_now(post: dict) -> bool:
+    published_at = _parse_dt(post.get("published_at"))
+    return not published_at or published_at <= now_utc()
+
+
 # ---------- News ----------
 @router.get("/news")
 async def list_news(
     category: Optional[str] = None,
     pinned_only: bool = False,
+    sort: Optional[str] = None,
     user: dict | None = Depends(get_optional_user),
 ):
     db = get_db()
@@ -52,8 +74,21 @@ async def list_news(
         q["category"] = category
     if pinned_only:
         q["pinned"] = True
-    posts = await db.news_posts.find(q, {"_id": 0}).sort([("pinned", -1), ("published_at", -1), ("created_at", -1)]).to_list(200)
-    return await _filter_visible(posts, user)
+    posts = await db.news_posts.find(q, {"_id": 0}).sort([("published_at", -1), ("created_at", -1)]).to_list(200)
+    if not is_admin:
+        posts = [p for p in posts if _published_now(p)]
+    posts = await _filter_visible(posts, user)
+    if sort == "latest":
+        posts.sort(
+            key=lambda p: (_parse_dt(p.get("published_at") or p.get("created_at")) or datetime.min.replace(tzinfo=timezone.utc), bool(p.get("pinned"))),
+            reverse=True,
+        )
+    else:
+        posts.sort(
+            key=lambda p: (bool(p.get("pinned")), _parse_dt(p.get("published_at") or p.get("created_at")) or datetime.min.replace(tzinfo=timezone.utc)),
+            reverse=True,
+        )
+    return posts
 
 
 @router.get("/news/{slug_or_id}")
@@ -64,6 +99,8 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
         raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
     is_staff = bool(user and user.get("role") in STAFF_ROLES)
     if p.get("published") is False and not is_staff:
+        raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
+    if not is_staff and not _published_now(p):
         raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
     if not await _user_can_see(user, p.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Nicht sichtbar.")
@@ -178,6 +215,11 @@ async def news_meta():
 # 5 tiers: Hauptsponsor (main) → Platin → Gold → Silber → Bronze.
 _TIER_ORDER = {"main": 0, "platinum": 1, "gold": 2, "silver": 3, "bronze": 4}
 _LEGACY_TIER_MAP = {"supporter": "bronze", "partner": "bronze"}
+_SPONSOR_PLACEMENT_DEFAULTS = {
+    "show_on_home": {"main", "platinum", "gold"},
+    "show_on_footer": {"main", "platinum", "gold", "silver"},
+    "show_on_events": {"main", "platinum", "gold"},
+}
 
 
 def _normalize_tier(t: str | None) -> str:
@@ -187,18 +229,21 @@ def _normalize_tier(t: str | None) -> str:
     return _LEGACY_TIER_MAP.get(t, t if t in _TIER_ORDER else "bronze")
 
 
+def _sponsor_effective_flag(doc: dict, field: str) -> bool:
+    tier = _normalize_tier(doc.get("tier"))
+    raw = doc.get(field)
+    if raw is None:
+        return tier in _SPONSOR_PLACEMENT_DEFAULTS[field]
+    return bool(raw)
+
+
 def _sponsor_defaults(doc: dict) -> dict:
     """Resolve auto-derived placement flags based on tier when not explicitly set."""
     tier = _normalize_tier(doc.get("tier"))
     doc["tier"] = tier
-    if doc.get("show_on_home") is None:
-        # Hauptsponsor + Platin + Gold auf Startseite
-        doc["show_on_home"] = tier in ("main", "platinum", "gold")
-    if doc.get("show_on_footer") is None:
-        # Hauptsponsor + Platin + Gold + Silber im Footer
-        doc["show_on_footer"] = tier in ("main", "platinum", "gold", "silver")
-    if doc.get("show_on_events") is None:
-        doc["show_on_events"] = tier in ("main", "platinum", "gold")
+    for field in _SPONSOR_PLACEMENT_DEFAULTS:
+        if doc.get(field) is None:
+            doc[field] = _sponsor_effective_flag(doc, field)
     if doc.get("event_ids") is None:
         doc["event_ids"] = []
     if doc.get("is_active") is None:
@@ -215,14 +260,14 @@ async def list_sponsors(placement: Optional[str] = None):
     sp = await db.sponsors.find(q, {"_id": 0}).to_list(500)
     # Normalize legacy tiers in-flight
     for s in sp:
-        s["tier"] = _normalize_tier(s.get("tier"))
+        _sponsor_defaults(s)
     # Apply placement filter
     if placement == "home":
-        sp = [s for s in sp if s.get("show_on_home", s["tier"] in ("main", "platinum", "gold"))]
+        sp = [s for s in sp if s["show_on_home"]]
     elif placement == "footer":
-        sp = [s for s in sp if s.get("show_on_footer", s["tier"] in ("main", "platinum", "gold", "silver"))]
+        sp = [s for s in sp if s["show_on_footer"]]
     elif placement == "events":
-        sp = [s for s in sp if s.get("show_on_events", s["tier"] in ("main", "platinum", "gold"))]
+        sp = [s for s in sp if s["show_on_events"]]
     # Sort by tier then order_index
     sp.sort(key=lambda s: (_TIER_ORDER.get(s["tier"], 99), s.get("order_index") or 0, s.get("name") or ""))
     return sp
@@ -233,7 +278,7 @@ async def admin_list_sponsors(me: dict = Depends(require_admin())):
     db = get_db()
     sp = await db.sponsors.find({}, {"_id": 0}).to_list(500)
     for s in sp:
-        s["tier"] = _normalize_tier(s.get("tier"))
+        _sponsor_defaults(s)
     sp.sort(key=lambda s: (_TIER_ORDER.get(s["tier"], 99), s.get("order_index") or 0, s.get("name") or ""))
     return sp
 
@@ -259,13 +304,14 @@ async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(requi
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if not updates:
         return {"ok": True}
-    # When tier changes and home/footer flags not set, recompute defaults
-    if "tier" in updates and "show_on_home" not in updates and "show_on_footer" not in updates:
+    # When tier changes without explicit placement flags, recompute all defaults together.
+    placement_fields = set(_SPONSOR_PLACEMENT_DEFAULTS)
+    if "tier" in updates and not any(field in updates for field in placement_fields):
         cur = await db.sponsors.find_one({"id": sid}, {"_id": 0}) or {}
-        merged = {**cur, **updates, "show_on_home": None, "show_on_footer": None}
+        merged = {**cur, **updates, **{field: None for field in placement_fields}}
         merged = _sponsor_defaults(merged)
-        updates["show_on_home"] = merged["show_on_home"]
-        updates["show_on_footer"] = merged["show_on_footer"]
+        for field in placement_fields:
+            updates[field] = merged[field]
     updates["updated_at"] = now_utc().isoformat()
     res = await db.sponsors.update_one({"id": sid}, {"$set": updates})
     if res.matched_count == 0:

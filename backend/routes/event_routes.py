@@ -10,6 +10,8 @@ from models import EventCreate, EventUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+SPONSOR_EVENT_TIERS = {"main", "platinum", "gold"}
+LEGACY_SPONSOR_TIERS = {"supporter": "bronze", "partner": "bronze"}
 
 
 async def _user_can_see(user: dict | None, visibility: str) -> bool:
@@ -39,6 +41,21 @@ def _parse_dt(value):
         return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
     except ValueError:
         return None
+
+
+def _normalize_sponsor_tier(tier: str | None) -> str:
+    if not tier:
+        return "bronze"
+    if tier in {"main", "platinum", "gold", "silver", "bronze"}:
+        return tier
+    return LEGACY_SPONSOR_TIERS.get(tier, "bronze")
+
+
+def _sponsor_show_on_events(sponsor: dict) -> bool:
+    raw = sponsor.get("show_on_events")
+    if raw is not None:
+        return bool(raw)
+    return _normalize_sponsor_tier(sponsor.get("tier")) in SPONSOR_EVENT_TIERS
 
 
 def _event_phase(event: dict) -> dict:
@@ -71,13 +88,13 @@ async def _attach_event_sponsors(event: dict) -> None:
     if not sponsor_ids:
         filtered = []
         for sponsor in sponsors:
+            sponsor["tier"] = _normalize_sponsor_tier(sponsor.get("tier"))
             event_ids = sponsor.get("event_ids") or []
-            show_on_events = sponsor.get("show_on_events")
-            if show_on_events is None:
-                show_on_events = sponsor.get("tier") in ("main", "platinum", "gold")
-            if (event_ids and event.get("id") in event_ids) or (not event_ids and show_on_events is True):
+            if (event_ids and event.get("id") in event_ids) or (not event_ids and _sponsor_show_on_events(sponsor)):
                 filtered.append(sponsor)
         sponsors = filtered
+    for sponsor in sponsors:
+        sponsor["tier"] = _normalize_sponsor_tier(sponsor.get("tier"))
     sponsors.sort(key=lambda s: (s.get("order_index") or 0, s.get("name") or ""))
     event["sponsors"] = sponsors
 
@@ -111,6 +128,15 @@ async def list_events(
         if not is_admin:
             q["status"]["$nin"].append("draft")
     events = await db.events.find(q, {"_id": 0}).sort("start_date", 1 if upcoming else -1).to_list(500)
+    if upcoming:
+        now = datetime.now(timezone.utc)
+        fresh = []
+        for ev in events:
+            start = _parse_dt(ev.get("start_date"))
+            end = _parse_dt(ev.get("end_date")) or start
+            if start and (not end or end >= now):
+                fresh.append(ev)
+        events = fresh
     out = []
     for ev in events:
         if await _user_can_see(user, ev.get("visibility") or "public"):
