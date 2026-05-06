@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api, formatApiError } from "@/lib/api";
+import { normalizeApiPath } from "@/lib/apiInvalidation";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 const AuthContext = createContext(null);
 
@@ -17,6 +19,20 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => { fetchMe(); }, [fetchMe]);
+  const refreshCurrentUser = useCallback((event) => {
+    const path = normalizeApiPath(event?.path);
+    if (path === "auth/me" || path === "users/me" || path.startsWith("auth/")) {
+      return fetchMe();
+    }
+    if (path.startsWith("membership/applications")) {
+      return fetchMe();
+    }
+    if (user?.id && (path === `users/${user.id}` || path === `membership/user/${user.id}`)) {
+      return fetchMe();
+    }
+    return undefined;
+  }, [fetchMe, user?.id]);
+  useApiInvalidation(refreshCurrentUser, ["auth", "users", "membership"]);
 
   const login = async (email, password) => {
     setError(null);

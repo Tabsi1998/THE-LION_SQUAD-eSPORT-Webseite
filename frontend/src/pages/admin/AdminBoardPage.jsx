@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Trash2, Crown, Save, X, EyeOff, Eye, GripVertical } from "lucide-react";
 
@@ -10,12 +11,13 @@ export default function AdminBoardPage() {
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [p, u] = await Promise.all([api.get("/board"), api.get("/board/assignable-users")]);
     setPositions(p.data);
     setUsers(u.data);
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["board", "users"]);
 
   const toggle = async (p) => {
     try { await api.patch(`/board/${p.id}`, { is_active: !p.is_active }); load(); }

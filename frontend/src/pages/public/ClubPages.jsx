@@ -3,11 +3,12 @@
  *
  * BoardPage ist jetzt dynamisch: liest /api/board und rendert nur is_active=true.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Crown, Heart, Target, Sparkles, User as UserIcon, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -16,12 +17,15 @@ export function BoardPage() {
   const [positions, setPositions] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     api.get("/board?active_only=true")
       .then(({ data }) => setPositions(data))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["board", "users"]);
 
   return (
     <PublicLayout>

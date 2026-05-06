@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useAuth } from "@/context/AuthContext";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Crown, Users as UsersIcon, MapPin } from "lucide-react";
 
 export default function MembersDirectoryPage() {
@@ -10,9 +11,12 @@ export default function MembersDirectoryPage() {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     api.get("/membership/public").then(({ data }) => setMembers(data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["membership", "users"]);
 
   return (
     <PublicLayout>

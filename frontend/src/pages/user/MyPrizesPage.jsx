@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Award, Gift, CheckCircle2, Clock, XCircle, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -15,9 +16,12 @@ export default function MyPrizesPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     api.get("/prizes/me").then(({ data }) => { setItems(data); setLoading(false); }).catch(() => setLoading(false));
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["prizes", "tournaments"]);
 
   const open = items.filter((p) => ["pending", "ready"].includes(p.status));
   const closed = items.filter((p) => ["picked_up", "expired"].includes(p.status));

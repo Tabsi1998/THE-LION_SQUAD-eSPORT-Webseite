@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Plus, Trash2, Link as LinkIcon, X as XIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,24 +22,24 @@ export default function AdminStationsPage() {
   const [form, setForm] = useState({ name: "", device_type: "switch", notes: "" });
   const [assignFor, setAssignFor] = useState(null); // station object for assignment dialog
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get("/stations");
     setList(data);
     const { data: t } = await api.get("/tournaments");
     setTournaments(t);
-    if (!activeTid && t.length) setActiveTid(t[0].id);
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, []);
+    setActiveTid((current) => current || t?.[0]?.id || "");
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["stations", "tournaments"]);
 
-  const loadMatches = async () => {
+  const loadMatches = useCallback(async () => {
     if (!activeTid) return;
     const { data } = await api.get(`/tournaments/${activeTid}/bracket`);
     setMatches(data.matches || []);
     setRegs(data.registrations || []);
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadMatches(); }, [activeTid]);
+  }, [activeTid]);
+  useEffect(() => { loadMatches(); }, [loadMatches]);
+  useApiInvalidation(loadMatches, ["stations", "matches", "tournaments"]);
 
   const create = async (e) => {
     e.preventDefault();

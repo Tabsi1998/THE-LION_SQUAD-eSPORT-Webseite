@@ -1,9 +1,10 @@
 /**
  * Phase C — Admin Mitgliedsbewerbungen Inbox.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Crown, Check, X as XIcon, Inbox, Eye } from "lucide-react";
 
@@ -20,9 +21,9 @@ export default function AdminMembershipApplicationsPage() {
   const [list, setList] = useState([]);
   const [selected, setSelected] = useState(null);
 
-  const load = () => api.get(`/membership/applications?status=${tab}`).then(({ data }) => setList(data));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [tab]);
+  const load = useCallback(() => api.get(`/membership/applications?status=${tab}`).then(({ data }) => setList(data)), [tab]);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["membership", "users"]);
 
   const decide = async (a, decision) => {
     const note = decision === "reject" ? window.prompt("Begründung (wird per Mail gesendet):") : window.prompt("Optionale Notiz:") || "";

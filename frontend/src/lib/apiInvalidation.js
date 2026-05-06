@@ -21,6 +21,44 @@ export function resourceFromPath(path) {
   return parts[0];
 }
 
+const RESOURCE_ALIASES = {
+  "admin/achievements": ["achievements", "badges", "users"],
+  "admin/email-templates": ["email-templates", "settings"],
+  "admin/media": ["media", "uploads"],
+  "admin/nav": ["nav"],
+  "admin/pages": ["pages", "cms"],
+  "membership/applications": ["membership", "users"],
+  "membership/benefits": ["membership"],
+  "membership/user": ["membership", "users"],
+  "settings/branding": ["settings", "branding", "nav", "home"],
+  "settings/discord": ["settings", "discord"],
+  "settings/email": ["settings", "mail"],
+  "settings/mail-queue": ["settings", "mail"],
+  "settings/smtp": ["settings", "mail"],
+  uploads: ["media"],
+  matches: ["tournaments"],
+};
+
+function eventKeys(event) {
+  const path = normalizeApiPath(event?.path);
+  const resource = event?.resource || resourceFromPath(path);
+  const keys = new Set([path, resource].filter(Boolean));
+  if (path.startsWith("admin/")) {
+    keys.add(path.slice("admin/".length));
+  }
+  const parts = path.split("/").filter(Boolean);
+  for (let i = 1; i <= Math.min(parts.length, 3); i += 1) {
+    keys.add(parts.slice(0, i).join("/"));
+    if (parts[0] === "admin" && i > 1) {
+      keys.add(parts.slice(1, i).join("/"));
+    }
+  }
+  for (const key of [...keys]) {
+    (RESOURCE_ALIASES[key] || []).forEach((alias) => keys.add(alias));
+  }
+  return [...keys].filter(Boolean);
+}
+
 export function emitApiInvalidation(event = {}) {
   const enriched = {
     ...event,
@@ -48,16 +86,10 @@ export function subscribeApiInvalidation(listener) {
 
 export function invalidationMatches(event, resources = []) {
   if (!resources.length) return true;
-  const path = normalizeApiPath(event?.path);
-  const resource = event?.resource || resourceFromPath(path);
+  const keys = eventKeys(event);
   return resources.some((candidate) => {
     const normalized = normalizeApiPath(candidate);
     if (!normalized) return true;
-    return (
-      resource === normalized ||
-      resource.startsWith(`${normalized}/`) ||
-      path === normalized ||
-      path.startsWith(`${normalized}/`)
-    );
+    return keys.some((key) => key === normalized || key.startsWith(`${normalized}/`));
   });
 }

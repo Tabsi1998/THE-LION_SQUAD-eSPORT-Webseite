@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Award, CheckCircle2, Clock, XCircle, Gift, RefreshCw, AlertCircle } from "lucide-react";
 
@@ -16,16 +17,16 @@ export default function AdminPrizesPage() {
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get(filter ? `/prizes?status=${filter}` : "/prizes");
       setItems(data);
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
     setLoading(false);
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [filter]);
+  }, [filter]);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["prizes", "tournaments"]);
 
   const updateStatus = async (id, status, notes = "") => {
     try {

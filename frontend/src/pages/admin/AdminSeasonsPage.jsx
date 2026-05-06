@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Plus, Trash2, Pencil, X, Save } from "lucide-react";
@@ -82,7 +83,7 @@ export default function AdminSeasonsPage() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [s, t, c] = await Promise.all([
       api.get("/seasons"),
       api.get("/tournaments"),
@@ -91,8 +92,9 @@ export default function AdminSeasonsPage() {
     setList(s.data);
     setTournaments(t.data);
     setChallenges(c.data);
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["seasons", "tournaments", "f1"]);
 
   const del = async (season) => {
     if (!window.confirm(`Saison "${season.name}" wirklich loeschen?`)) return;

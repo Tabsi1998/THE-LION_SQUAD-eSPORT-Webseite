@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { MascotBadge } from "@/components/tls/Logo";
 import { StatusBadge } from "@/components/tls/StatusBadge";
@@ -11,15 +12,17 @@ export default function BracketTVPage() {
   const { id } = useParams();
   const [data, setData] = useState(null);
 
+  const load = useCallback(async () => {
+    const { data: br } = await api.get(`/tournaments/${id}/bracket`);
+    setData(br);
+  }, [id]);
+
   useEffect(() => {
-    const load = async () => {
-      const { data: br } = await api.get(`/tournaments/${id}/bracket`);
-      setData(br);
-    };
     load();
     const iv = setInterval(load, 15000);
     return () => clearInterval(iv);
-  }, [id]);
+  }, [load]);
+  useApiInvalidation(load, ["tournaments", "matches", "stations"]);
 
   if (!data) return <div className="min-h-screen bg-black flex items-center justify-center font-display tracking-widest text-white/40">LADE BRACKET …</div>;
   const t = data.tournament;

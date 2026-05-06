@@ -1,19 +1,20 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Trophy } from "lucide-react";
 
 export default function SeasonPage() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
-  useEffect(() => {
-    (async () => {
-      const { data: st } = await api.get(`/seasons/${slug}/standings`);
-      setData(st);
-    })();
+  const load = useCallback(async () => {
+    const { data: st } = await api.get(`/seasons/${slug}/standings`);
+    setData(st);
   }, [slug]);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["seasons", "tournaments", "f1", "users"]);
   if (!data) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
   const s = data.season;
   return (

@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, ArrowRight } from "lucide-react";
 
@@ -12,14 +13,14 @@ export function SeasonPassWidget() {
   const [data, setData] = useState(null);
   const [spotlightIdx, setSpotlightIdx] = useState(0);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data: d } = await api.get("/seasons/active/featured");
-        setData(d);
-      } catch { setData({ season: null, standings: [] }); }
-    })();
+  const load = useCallback(async () => {
+    try {
+      const { data: d } = await api.get("/seasons/active/featured");
+      setData(d);
+    } catch { setData({ season: null, standings: [] }); }
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["seasons", "tournaments", "f1", "users"]);
 
   useEffect(() => {
     if (!data?.standings?.length) return;

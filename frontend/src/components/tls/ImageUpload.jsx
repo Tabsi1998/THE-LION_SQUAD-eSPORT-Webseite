@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Upload, X, Image as ImageIcon } from "lucide-react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 
 const parseUploadMb = (value, fallback) => {
@@ -167,7 +168,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     }
   };
 
-  const openLibrary = async () => {
+  const openLibrary = useCallback(async () => {
     setLibraryOpen(true);
     setLoadingLibrary(true);
     try {
@@ -178,7 +179,11 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     } finally {
       setLoadingLibrary(false);
     }
-  };
+  }, []);
+  useApiInvalidation(() => {
+    if (libraryOpen) return openLibrary();
+    return undefined;
+  }, ["media", "uploads"]);
 
   const previewClass = variant === "wide"
     ? "aspect-[16/9] w-full"

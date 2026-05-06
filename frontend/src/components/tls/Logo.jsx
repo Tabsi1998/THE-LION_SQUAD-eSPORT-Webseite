@@ -1,28 +1,34 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 export const TLS_MASCOT = "/assets/brand/tls-mascot.png";
 export const TLS_WORDMARK = "/assets/brand/tls-wordmark.png";
 
 function useBrandingAssets() {
   const [branding, setBranding] = useState(getCachedBranding());
+  const loadBranding = useCallback(async () => {
+    try {
+      const { data } = await api.get("/settings/public");
+      setCachedBranding(data || {});
+      setBranding(data || {});
+    } catch {}
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const unsubscribe = onBrandingUpdated((next) => {
       if (!cancelled) setBranding(next || {});
     });
-    api.get("/settings/public").then(({ data }) => {
-      if (cancelled) return;
-      setCachedBranding(data || {});
-      setBranding(data || {});
-    }).catch(() => {});
+    loadBranding();
     return () => {
       cancelled = true;
       unsubscribe();
     };
-  }, []);
+  }, [loadBranding]);
+  useApiInvalidation(loadBranding, ["settings", "branding"]);
   return branding || {};
 }
 

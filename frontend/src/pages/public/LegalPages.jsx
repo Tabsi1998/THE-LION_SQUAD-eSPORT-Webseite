@@ -1,16 +1,19 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 const UPDATED_AT = "05.05.2026";
 
 function useBranding() {
   const [branding, setBranding] = useState({});
-  useEffect(() => {
+  const load = useCallback(() => {
     api.get("/settings/public").then(({ data }) => setBranding(data || {})).catch(() => {});
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["settings", "branding"]);
   return branding;
 }
 

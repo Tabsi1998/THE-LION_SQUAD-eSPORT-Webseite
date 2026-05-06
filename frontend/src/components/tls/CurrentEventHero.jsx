@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { motion } from "framer-motion";
 import { Calendar, Users, MapPin, ArrowRight, Flame, Flag, Trophy } from "lucide-react";
 import { StatusBadge } from "./StatusBadge";
@@ -13,19 +14,19 @@ import { StatusBadge } from "./StatusBadge";
 export function CurrentEventHero() {
   const [data, setData] = useState({ tournaments: [], challenges: [], loading: true });
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [t, c] = await Promise.all([
-          api.get("/tournaments"),
-          api.get("/f1/challenges"),
-        ]);
-        setData({ tournaments: t.data, challenges: c.data, loading: false });
-      } catch {
-        setData({ tournaments: [], challenges: [], loading: false });
-      }
-    })();
+  const load = useCallback(async () => {
+    try {
+      const [t, c] = await Promise.all([
+        api.get("/tournaments"),
+        api.get("/f1/challenges"),
+      ]);
+      setData({ tournaments: t.data, challenges: c.data, loading: false });
+    } catch {
+      setData({ tournaments: [], challenges: [], loading: false });
+    }
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["tournaments", "f1"]);
 
   if (data.loading) return null;
 

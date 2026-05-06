@@ -4,9 +4,10 @@
  * Tabs:
  *   Groups · Tiers · Manuell vergeben · Negative Vorfälle
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import {
   Plus, Trash2, Save, X, Pencil, Trophy, Award, AlertOctagon,
@@ -70,11 +71,12 @@ function GroupsTab() {
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get("/admin/achievements/groups");
     setGroups(data);
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["achievements"]);
 
   const togglePublic = async (g) => {
     try { await api.patch(`/admin/achievements/groups/${g.code}`, { public: !g.public }); load(); }
@@ -205,14 +207,25 @@ function TiersTab() {
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { api.get("/admin/achievements/groups").then(({ data }) => { setGroups(data); if (!groupCode && data[0]) setGroupCode(data[0].code); }); }, []);
-  useEffect(() => {
-    if (!groupCode) return;
-    api.get(`/admin/achievements/tiers?group_code=${groupCode}`).then(({ data }) => setTiers(data));
-  }, [groupCode]);
+  const loadGroups = useCallback(async () => {
+    const { data } = await api.get("/admin/achievements/groups");
+    setGroups(data);
+    setGroupCode((current) => current || data?.[0]?.code || "");
+  }, []);
+  useEffect(() => { loadGroups(); }, [loadGroups]);
 
-  const reload = () => api.get(`/admin/achievements/tiers?group_code=${groupCode}`).then(({ data }) => setTiers(data));
+  const reload = useCallback(() => {
+    if (!groupCode) return Promise.resolve();
+    return api.get(`/admin/achievements/tiers?group_code=${groupCode}`).then(({ data }) => setTiers(data));
+  }, [groupCode]);
+  useEffect(() => {
+    reload();
+  }, [reload]);
+  useApiInvalidation(() => {
+    loadGroups();
+    reload();
+  }, ["achievements"]);
+
   const del = async (t) => {
     if (!window.confirm(`Tier "${t.name}" wirklich löschen?`)) return;
     try { await api.delete(`/admin/achievements/tiers/${t.code}`); toast.success("Gelöscht"); reload(); }
@@ -342,7 +355,9 @@ function AwardTab() {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => { api.get("/admin/achievements/tiers").then(({ data }) => setTiers(data)); }, []);
+  const loadTiers = useCallback(() => api.get("/admin/achievements/tiers").then(({ data }) => setTiers(data)), []);
+  useEffect(() => { loadTiers(); }, [loadTiers]);
+  useApiInvalidation(loadTiers, ["achievements"]);
   useEffect(() => {
     const t = setTimeout(() => api.get(`/admin/achievements/users/search?q=${encodeURIComponent(q)}`).then(({ data }) => setUsers(data)), 200);
     return () => clearTimeout(t);
@@ -401,11 +416,13 @@ function AwardTab() {
 // ---------------- Negative Tab ----------------
 function NegativeTab() {
   const [list, setList] = useState([]);
-  useEffect(() => { api.get("/admin/achievements/negative/awards").then(({ data }) => setList(data)); }, []);
+  const load = useCallback(() => api.get("/admin/achievements/negative/awards").then(({ data }) => setList(data)), []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["achievements"]);
 
   const revoke = async (a) => {
     if (!window.confirm(`Vergabe "${a.tier_name}" für ${a.display_name || a.username} entfernen?`)) return;
-    try { await api.delete("/admin/achievements/award", { data: { user_id: a.user_id, tier_code: a.tier_code } }); toast.success("Entfernt"); setList(list.filter(x => !(x.user_id === a.user_id && x.tier_code === a.tier_code))); }
+    try { await api.delete("/admin/achievements/award", { data: { user_id: a.user_id, tier_code: a.tier_code } }); toast.success("Entfernt"); setList((current) => current.filter(x => !(x.user_id === a.user_id && x.tier_code === a.tier_code))); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
   };
 

@@ -4,19 +4,22 @@
  * Polls /api/streams/live every 60s. Renders horizontal scroller with
  * pulsating LIVE-Dot, viewer count, game name, thumbnail.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Tv, Eye } from "lucide-react";
 
 export function LiveStreamSlider() {
   const [streams, setStreams] = useState([]);
 
+  const load = useCallback(() => api.get("/streams/live").then(({ data }) => setStreams(data || [])).catch(() => setStreams([])), []);
+
   useEffect(() => {
-    const load = () => api.get("/streams/live").then(({ data }) => setStreams(data || [])).catch(() => setStreams([]));
     load();
     const t = setInterval(load, 60000);
     return () => clearInterval(t);
-  }, []);
+  }, [load]);
+  useApiInvalidation(load, ["streams"]);
 
   if (!streams.length) return null;
 

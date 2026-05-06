@@ -2,10 +2,11 @@
  * P0 — Admin Penalty Inbox.
  * Aggregates every penalty issued across the platform with filters.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AlertTriangle, Clock, Flag, ShieldAlert, RefreshCw } from "lucide-react";
 
 const KIND_META = {
@@ -20,7 +21,7 @@ export default function AdminPenaltiesPage() {
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = filter !== "all" ? `?kind=${filter}` : "";
@@ -28,10 +29,10 @@ export default function AdminPenaltiesPage() {
       setData(data);
     } catch {/* noop */}
     setLoading(false);
-  };
+  }, [filter]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [filter]);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["penalties", "matches", "f1"]);
 
   const counts = (() => {
     const c = { all: data.items.length, lap_penalty: 0, lap_invalid: 0, match_forfeit: 0, incident: 0 };

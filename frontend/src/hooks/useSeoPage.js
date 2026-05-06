@@ -3,23 +3,19 @@
  * Fetches /api/seo/page/{slug} and applies title, meta description, and JSON-LD.
  * Cleans up on unmount.
  */
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { api } from "@/lib/api";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 const JSON_LD_ID = "tls-jsonld-cms";
 
 export function useSeoPage(slug) {
-  useEffect(() => {
-    if (!slug) return;
-    let cancelled = false;
-    let prevTitle = document.title;
-    let prevDesc = null;
-    const descTag = document.querySelector('meta[name="description"]');
-    if (descTag) prevDesc = descTag.getAttribute("content");
-
-    api.get(`/seo/page/${slug}`).then(({ data }) => {
-      if (cancelled) return;
+  const load = useCallback((shouldApply = () => true) => {
+    if (!slug) return Promise.resolve();
+    return api.get(`/seo/page/${slug}`).then(({ data }) => {
+      if (!shouldApply()) return;
       if (data.title) document.title = data.title;
+      const descTag = document.querySelector('meta[name="description"]');
       if (data.description && descTag) descTag.setAttribute("content", data.description);
       if (data.json_ld) {
         let s = document.getElementById(JSON_LD_ID);
@@ -32,6 +28,17 @@ export function useSeoPage(slug) {
         s.textContent = JSON.stringify(data.json_ld);
       }
     }).catch(() => { /* fail-silent — page not in CMS or 404 */ });
+  }, [slug]);
+
+  useEffect(() => {
+    if (!slug) return;
+    let cancelled = false;
+    let prevTitle = document.title;
+    let prevDesc = null;
+    const descTag = document.querySelector('meta[name="description"]');
+    if (descTag) prevDesc = descTag.getAttribute("content");
+
+    load(() => !cancelled);
 
     return () => {
       cancelled = true;
@@ -40,7 +47,8 @@ export function useSeoPage(slug) {
       const s = document.getElementById(JSON_LD_ID);
       if (s) s.remove();
     };
-  }, [slug]);
+  }, [load, slug]);
+  useApiInvalidation(() => load(), ["pages", "cms", "seo"]);
 }
 
 /**

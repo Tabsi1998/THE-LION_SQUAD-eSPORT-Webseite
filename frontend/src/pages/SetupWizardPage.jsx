@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Logo } from "@/components/tls/Logo";
 import { Sparkles, Mail, Server, Lock, Check, ArrowRight, ChevronLeft } from "lucide-react";
@@ -44,7 +45,7 @@ export default function SetupWizardPage() {
     resend_api_key: "",
   });
 
-  useEffect(() => {
+  const loadStatus = useCallback(() => {
     api.get("/setup/status").then(({ data }) => {
       setStatus(data);
       if (!isAdmin) {
@@ -52,9 +53,12 @@ export default function SetupWizardPage() {
         nav("/login");
       }
     }).catch(() => {});
+  }, [isAdmin, nav]);
+  useEffect(() => { loadStatus(); }, [loadStatus]);
+  useApiInvalidation(loadStatus, ["setup", "settings"]);
+  useEffect(() => {
     if (status?.has_branding === false) setStep(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [status?.has_branding]);
 
   const upd = (k, v) => setData((p) => ({ ...p, [k]: v }));
 

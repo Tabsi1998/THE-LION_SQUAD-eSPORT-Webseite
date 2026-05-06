@@ -7,9 +7,11 @@
  * Desktop: Hover-Dropdowns mit Untertabs.
  * Mobile: Akkordeon (Sub-Items klappen auf Tap auf).
  */
-import { useState, useRef, useEffect } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
+import { api } from "@/lib/api";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 export const NAV_STRUCTURE = [
   { to: "/", label: "Home", end: true },
@@ -68,7 +70,7 @@ function NavDropdown({ item, isClubMember }) {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef(null);
   const loc = useLocation();
-  const visibleChildren = item.children.filter((c) => !c.memberOnly || isClubMember);
+  const visibleChildren = (item.children || []).filter((c) => !c.memberOnly || isClubMember);
   const isActive = visibleChildren.some((c) => loc.pathname === c.to.split("?")[0] || loc.pathname.startsWith(c.to.split("?")[0] + "/"));
 
   const onEnter = () => { clearTimeout(closeTimer.current); setOpen(true); };
@@ -172,11 +174,31 @@ function MobileAccordion({ item, isClubMember, onClose }) {
   );
 }
 
+function usePublicNavItems() {
+  const [items, setItems] = useState(NAV_STRUCTURE);
+
+  const load = useCallback(async () => {
+    try {
+      const { data } = await api.get("/nav");
+      const next = Array.isArray(data?.items) ? data.items : data;
+      setItems(Array.isArray(next) && next.length ? next : NAV_STRUCTURE);
+    } catch {
+      setItems(NAV_STRUCTURE);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["nav"]);
+
+  return items;
+}
+
 export function MainNav({ isClubMember = false }) {
+  const items = usePublicNavItems();
   return (
     <nav className="hidden lg:flex items-center gap-0.5">
-      {NAV_STRUCTURE.map((item) => (
-        item.children ? (
+      {items.map((item) => (
+        item.children?.length ? (
           <NavDropdown key={item.label} item={item} isClubMember={isClubMember} />
         ) : (
           <NavLink
@@ -199,9 +221,10 @@ export function MainNav({ isClubMember = false }) {
 }
 
 export function MobileNav({ isClubMember = false, onClose }) {
+  const items = usePublicNavItems();
   return (
     <div className="space-y-0.5">
-      {NAV_STRUCTURE.map((item) => (
+      {items.map((item) => (
         <MobileAccordion key={item.to || item.label} item={item} isClubMember={isClubMember} onClose={onClose} />
       ))}
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { API, api, formatApiError, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -9,6 +9,7 @@ import { normalizeDateTimeFields } from "@/lib/datetime";
 import { toast } from "sonner";
 import { Zap, RefreshCw, Eye } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 export default function AdminTournamentEditPage() {
   const { isAdmin, isModerator } = useAuth();
@@ -19,7 +20,7 @@ export default function AdminTournamentEditPage() {
   const [tab, setTab] = useState("participants");
   const [groups, setGroups] = useState([]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get(`/tournaments/${id}`);
     setT(data);
     const { data: r } = await api.get(`/tournaments/${id}/registrations`);
@@ -30,10 +31,10 @@ export default function AdminTournamentEditPage() {
       try { const { data: g } = await api.get(`/tournaments/${id}/groups`); setGroups(g || []); }
       catch { setGroups([]); }
     }
-  };
+  }, [id]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["tournaments", "matches", "stations"]);
 
   const generate = async () => {
     try {

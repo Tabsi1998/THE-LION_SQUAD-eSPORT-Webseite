@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { API_BASE, api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Copy, Eye } from "lucide-react";
 
@@ -12,10 +13,12 @@ export default function AdminWidgetsPage() {
   const [theme, setTheme] = useState("dark");
   const [height, setHeight] = useState(600);
 
-  useEffect(() => {
+  const loadSources = useCallback(() => {
     api.get("/tournaments").then(({ data }) => setTournaments(data));
     api.get("/f1/challenges").then(({ data }) => setChallenges(data));
   }, []);
+  useEffect(() => { loadSources(); }, [loadSources]);
+  useApiInvalidation(loadSources, ["tournaments", "f1"]);
 
   const path = selType === "bracket" ? `/display/bracket/${selId}`
     : selType === "f1" ? `/display/f1/${selId}` : "";

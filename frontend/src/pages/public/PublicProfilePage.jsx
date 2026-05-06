@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, formatMs, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import {
   Trophy, Flag, Users as UsersIcon, Medal, Shield, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink,
@@ -17,22 +18,22 @@ export default function PublicProfilePage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("overview");
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const { data } = await api.get(`/users/public/${username}`);
-        setProfile(data);
-        if (data?.id) {
-          try {
-            const { data: ach } = await api.get(`/achievements/user/${data.id}`);
-            setAchievementsData(ach);
-          } catch { setAchievementsData(null); }
-        }
-      } catch { setProfile(null); }
-      setLoading(false);
-    })();
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get(`/users/public/${username}`);
+      setProfile(data);
+      if (data?.id) {
+        try {
+          const { data: ach } = await api.get(`/achievements/user/${data.id}`);
+          setAchievementsData(ach);
+        } catch { setAchievementsData(null); }
+      }
+    } catch { setProfile(null); }
+    setLoading(false);
   }, [username]);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["users", "achievements", "tournaments", "f1", "teams"]);
 
   if (loading) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE PROFIL …</div></PublicLayout>;
   if (!profile) return <PublicLayout><div className="p-20 text-center">

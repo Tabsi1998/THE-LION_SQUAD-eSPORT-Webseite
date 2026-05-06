@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useAuth } from "@/context/AuthContext";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Mail, MessageSquare, MapPin, Send, Check } from "lucide-react";
 
@@ -22,10 +23,12 @@ export default function ContactPage() {
     accept_privacy: false,
   });
 
-  useEffect(() => {
+  const loadInfo = useCallback(() => {
     api.get("/settings/public").then(({ data }) => setBranding(data)).catch(() => {});
     api.get("/contact/topics").then(({ data }) => setTopics(data)).catch(() => {});
   }, []);
+  useEffect(() => { loadInfo(); }, [loadInfo]);
+  useApiInvalidation(loadInfo, ["settings", "contact"]);
 
   const submit = async (e) => {
     e.preventDefault();

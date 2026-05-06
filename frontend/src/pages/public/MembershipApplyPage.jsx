@@ -3,11 +3,12 @@
  *
  * Eingeloggte Community-User reichen eine Bewerbung um Vereinsmitgliedschaft ein.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useAuth } from "@/context/AuthContext";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Crown, CheckCircle2, FileText, Mail } from "lucide-react";
 
@@ -32,10 +33,13 @@ export default function MembershipApplyPage() {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
+  const loadExisting = useCallback(() => {
     if (!user) { nav("/login?next=/membership/apply"); return; }
-    api.get("/membership/apply/me").then(({ data }) => { setExisting(data); setLoading(false); }).catch(() => setLoading(false));
+    setLoading(true);
+    return api.get("/membership/apply/me").then(({ data }) => { setExisting(data); setLoading(false); }).catch(() => setLoading(false));
   }, [user, nav]);
+  useEffect(() => { loadExisting(); }, [loadExisting]);
+  useApiInvalidation(loadExisting, ["membership"]);
 
   const submit = async (e) => {
     e.preventDefault();

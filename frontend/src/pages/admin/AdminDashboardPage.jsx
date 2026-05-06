@@ -1,16 +1,19 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles } from "lucide-react";
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
   const [setupStatus, setSetupStatus] = useState(null);
-  useEffect(() => {
+  const load = useCallback(() => {
     api.get("/admin/dashboard").then(({ data }) => setData(data));
     api.get("/setup/status").then(({ data }) => setSetupStatus(data)).catch(() => {});
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load);
 
   const kpis = [
     { label: "Spieler", value: data?.player_count, icon: UsersIcon, color: "#29B6E8" },

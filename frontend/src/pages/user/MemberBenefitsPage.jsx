@@ -1,15 +1,19 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Gift, ExternalLink } from "lucide-react";
 
 export default function MemberBenefitsPage() {
   const [benefits, setBenefits] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     api.get("/membership/benefits").then(({ data }) => setBenefits(data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["membership"]);
 
   return (
     <PublicLayout>

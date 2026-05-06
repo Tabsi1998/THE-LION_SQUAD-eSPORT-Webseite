@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Search, Crown } from "lucide-react";
 
 export default function PlayersPage() {
@@ -11,7 +12,8 @@ export default function PlayersPage() {
   const [tab, setTab] = useState("all");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     Promise.allSettled([
       api.get("/users/public-list").catch(() => ({ data: [] })),
       api.get("/membership/public"),
@@ -21,6 +23,8 @@ export default function PlayersPage() {
       setLoading(false);
     });
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["users", "membership", "achievements"]);
 
   const memberUsernames = new Set(members.map((m) => m.username));
   const filtered = (tab === "members" ? members : list).filter((p) => {

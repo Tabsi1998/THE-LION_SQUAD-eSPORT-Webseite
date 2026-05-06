@@ -2,12 +2,13 @@
  * P0 — User Penalty Log.
  * Shows every penalty issued against the current user with full reason/context.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AlertTriangle, Clock, Flag, ShieldAlert, ArrowRight } from "lucide-react";
 
 const KIND_META = {
@@ -22,12 +23,15 @@ export default function MyPenaltiesPage() {
   const [data, setData] = useState({ count: 0, items: [] });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     api.get("/penalties/me")
       .then(({ data }) => setData(data))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["penalties", "matches", "f1"]);
 
   return (
     <PublicLayout>

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { toast } from "sonner";
@@ -14,15 +15,15 @@ export default function MatchHubPage() {
   const [scoreB, setScoreB] = useState(0);
   const [disputeReason, setDisputeReason] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get(`/matches/${id}`);
     setM(data);
     setScoreA(data.score_a || 0);
     setScoreB(data.score_b || 0);
-  };
+  }, [id]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["matches", "tournaments"]);
 
   if (!m) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
   const a = m.participant_a, b = m.participant_b;

@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Trophy, Bell, Crown, Gift, Award, UserCheck, AlertTriangle, Medal, Users } from "lucide-react";
 
 export default function DashboardPage() {
@@ -14,22 +15,22 @@ export default function DashboardPage() {
   const [completeness, setCompleteness] = useState(null);
   const [penaltyCount, setPenaltyCount] = useState(0);
 
-  useEffect(() => {
-    (async () => {
-      const [m, n, p, c, pen] = await Promise.allSettled([
-        api.get("/matches/upcoming"),
-        api.get("/admin/notifications"),
-        api.get("/prizes/me/open-count"),
-        api.get("/users/me/profile-completeness"),
-        api.get("/penalties/me"),
-      ]);
-      if (m.status === "fulfilled") setMatches(m.value.data);
-      if (n.status === "fulfilled") setNotifications(n.value.data);
-      if (p.status === "fulfilled") setOpenPrizes(p.value.data?.count || 0);
-      if (c.status === "fulfilled") setCompleteness(c.value.data);
-      if (pen.status === "fulfilled") setPenaltyCount(pen.value.data?.count || 0);
-    })();
+  const load = useCallback(async () => {
+    const [m, n, p, c, pen] = await Promise.allSettled([
+      api.get("/matches/upcoming"),
+      api.get("/admin/notifications"),
+      api.get("/prizes/me/open-count"),
+      api.get("/users/me/profile-completeness"),
+      api.get("/penalties/me"),
+    ]);
+    if (m.status === "fulfilled") setMatches(m.value.data);
+    if (n.status === "fulfilled") setNotifications(n.value.data);
+    if (p.status === "fulfilled") setOpenPrizes(p.value.data?.count || 0);
+    if (c.status === "fulfilled") setCompleteness(c.value.data);
+    if (pen.status === "fulfilled") setPenaltyCount(pen.value.data?.count || 0);
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["matches", "prizes", "users", "penalties", "achievements", "membership", "tournaments", "f1", "admin/notifications"]);
 
   return (
     <PublicLayout>

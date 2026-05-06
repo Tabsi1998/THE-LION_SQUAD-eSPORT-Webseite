@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { API, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { FileText, Download, Pin, ArrowLeft, Search } from "lucide-react";
 
 const CATEGORY_LABELS = {
@@ -31,12 +32,18 @@ export default function MemberDocumentsPage() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { api.get("/documents/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, []);
-  useEffect(() => {
+  const loadMeta = useCallback(() => api.get("/documents/meta").then(({ data }) => setMeta(data)).catch(() => {}), []);
+  useEffect(() => { loadMeta(); }, [loadMeta]);
+  const load = useCallback(() => {
     setLoading(true);
     const url = activeCat ? `/documents?category=${activeCat}` : "/documents";
     api.get(url).then(({ data }) => setList(data)).catch(() => {}).finally(() => setLoading(false));
   }, [activeCat]);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(() => {
+    loadMeta();
+    load();
+  }, ["documents"]);
 
   const filtered = list.filter((d) => {
     if (!q) return true;

@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Inbox, MailOpen, Trash2, ArrowLeft, AlertCircle } from "lucide-react";
 
@@ -23,13 +24,13 @@ export default function AdminContactPage() {
   const [filter, setFilter] = useState("");
   const [active, setActive] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const url = filter ? `/contact?status=${filter}` : "/contact";
     const { data } = await api.get(url);
     setList(data);
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [filter]);
+  }, [filter]);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["contact"]);
 
   const setStatus = async (id, status, note) => {
     try {

@@ -1,15 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 export default function AdminAuditPage() {
   const [logs, setLogs] = useState([]);
   const [q, setQ] = useState("");
   const [showSettings, setShowSettings] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api.get(`/audit${q ? `?action=${encodeURIComponent(q)}` : ""}`).then(({ data }) => setLogs(data));
   }, [q]);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load);
 
   const visibleLogs = useMemo(
     () => logs.filter((l) => showSettings || !String(l.action || "").startsWith("settings.")),

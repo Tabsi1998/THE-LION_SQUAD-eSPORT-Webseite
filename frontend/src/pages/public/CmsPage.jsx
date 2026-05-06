@@ -6,12 +6,13 @@
  * external lib. For the current need (vereinsstatuten/imprint/privacy/about)
  * this is enough; admin can paste plain text or simple markdown.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useSeoPage } from "@/hooks/useSeoPage";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 export default function CmsPage({ slug: forced }) {
   const params = useParams();
@@ -19,9 +20,12 @@ export default function CmsPage({ slug: forced }) {
   const [page, setPage] = useState(null);
   const [error, setError] = useState(null);
   useSeoPage(slug);
-  useEffect(() => {
-    api.get(`/pages/${slug}`).then(({ data }) => setPage(data)).catch((e) => setError(e?.response?.status || "error"));
+  const load = useCallback(() => {
+    setError(null);
+    return api.get(`/pages/${slug}`).then(({ data }) => setPage(data)).catch((e) => setError(e?.response?.status || "error"));
   }, [slug]);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["pages", "cms"]);
 
   if (error === 404) return <PublicLayout><Empty title="Seite nicht gefunden" /></PublicLayout>;
   if (!page) return <PublicLayout><div className="max-w-4xl mx-auto px-6 py-20 text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;

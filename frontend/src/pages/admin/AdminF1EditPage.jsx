@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { API, api, formatRequestError, parseTimeStr, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -8,6 +8,7 @@ import { normalizeDateTimeFields } from "@/lib/datetime";
 import { toast } from "sonner";
 import { Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 export default function AdminF1EditPage() {
   const { isAdmin } = useAuth();
@@ -24,25 +25,25 @@ export default function AdminF1EditPage() {
   const setNewTrackField = (k, v) => setNewTrack((track) => ({ ...track, [k]: v }));
   const setEditTrackField = (k, v) => setEditTrack((track) => ({ ...(track || {}), [k]: v }));
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data: c } = await api.get(`/f1/challenges/${id}`);
     setChallenge(c);
     setTracks(c.tracks || []);
-    if (!activeTrack && c.tracks?.length) setActiveTrack(c.tracks[0].id);
+    setActiveTrack((current) => (c.tracks || []).some((track) => track.id === current) ? current : c.tracks?.[0]?.id || null);
     const { data: u } = await api.get("/users");
     setUsers(u);
-  };
+  }, [id]);
 
-  const loadTimes = async () => {
+  const loadTimes = useCallback(async () => {
     if (!activeTrack) return;
     const { data } = await api.get(`/f1/challenges/${id}/times?track_id=${activeTrack}`);
     setTimes(data);
-  };
+  }, [activeTrack, id]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [id]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadTimes(); }, [activeTrack]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadTimes(); }, [loadTimes]);
+  useApiInvalidation(load, ["f1", "users"]);
+  useApiInvalidation(loadTimes, ["f1"]);
 
   const addTrack = async (e) => {
     e.preventDefault();

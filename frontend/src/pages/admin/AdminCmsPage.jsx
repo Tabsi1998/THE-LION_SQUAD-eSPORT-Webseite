@@ -3,9 +3,10 @@
  *
  * Two tabs in one shell. Markdown-light editor (textarea preview side-by-side).
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { FileText, Mail, Save, Plus, Trash2, X, Eye, EyeOff } from "lucide-react";
 
@@ -42,8 +43,9 @@ function PagesTab() {
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
 
-  const load = () => api.get("/admin/pages").then(({ data }) => setPages(data));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => api.get("/admin/pages").then(({ data }) => setPages(data)), []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["pages", "cms"]);
 
   const togglePub = async (p) => {
     try { await api.patch(`/admin/pages/${p.slug}`, { is_published: !(p.is_published ?? true) }); load(); }
@@ -156,8 +158,9 @@ function PageEditor({ page, onClose, onSaved }) {
 function TemplatesTab() {
   const [templates, setTemplates] = useState([]);
   const [editing, setEditing] = useState(null);
-  const load = () => api.get("/admin/email-templates").then(({ data }) => setTemplates(data));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => api.get("/admin/email-templates").then(({ data }) => setTemplates(data)), []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["email-templates", "settings"]);
 
   return (
     <div>

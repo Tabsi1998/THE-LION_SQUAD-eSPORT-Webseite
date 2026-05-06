@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { normalizeDateTimeFields } from "@/lib/datetime";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 
 const FORMATS = [
@@ -46,10 +47,12 @@ export default function AdminTournamentNewPage() {
   });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const loadSources = useCallback(() => {
     api.get("/games").then(({ data }) => setGames(data));
     api.get("/events").then(({ data }) => setEvents(data));
   }, []);
+  useEffect(() => { loadSources(); }, [loadSources]);
+  useApiInvalidation(loadSources, ["games", "events"]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 

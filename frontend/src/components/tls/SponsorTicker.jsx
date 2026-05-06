@@ -2,17 +2,20 @@
  * SponsorTicker — Seamless infinite horizontal marquee for sponsor logos/names.
  * Duplicates the sponsor list once so the CSS animation can loop seamlessly.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 export function SponsorTicker({ className = "", compact = false, placement = "home" }) {
   const [sponsors, setSponsors] = useState([]);
-  useEffect(() => {
-    (async () => {
-      try { const { data } = await api.get(`/sponsors?placement=${placement}`); setSponsors(data || []); }
-      catch { setSponsors([]); }
-    })();
+  const load = useCallback(async () => {
+    try { const { data } = await api.get(`/sponsors?placement=${placement}`); setSponsors(data || []); }
+    catch { setSponsors([]); }
   }, [placement]);
+  useEffect(() => {
+    load();
+  }, [load]);
+  useApiInvalidation(load, ["sponsors"]);
   if (!sponsors.length) return null;
   const items = [...sponsors, ...sponsors]; // duplicate for seamless loop
   const speed = compact ? 28 : 36;
@@ -58,12 +61,14 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
  */
 export function SponsorGrid({ max = 4 }) {
   const [sponsors, setSponsors] = useState([]);
-  useEffect(() => {
-    (async () => {
-      try { const { data } = await api.get("/sponsors?placement=footer"); setSponsors(data || []); }
-      catch { setSponsors([]); }
-    })();
+  const load = useCallback(async () => {
+    try { const { data } = await api.get("/sponsors?placement=footer"); setSponsors(data || []); }
+    catch { setSponsors([]); }
   }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+  useApiInvalidation(load, ["sponsors"]);
   if (!sponsors.length) return null;
   return (
     <div className="flex items-center gap-4" data-testid="sponsor-grid">

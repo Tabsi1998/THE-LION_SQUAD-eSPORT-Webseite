@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MultiSelect } from "@/components/tls/MultiSelect";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
 import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil } from "lucide-react";
@@ -74,13 +75,25 @@ export default function ProfilePage() {
   const [achData, setAchData] = useState(null);
   const [completeness, setCompleteness] = useState(null);
 
+  const loadAchievements = useCallback(() => {
+    api.get("/achievements/me").then(({ data }) => setAchData(data)).catch(() => setAchData({ groups: [], awards: [] }));
+    api.get("/users/me/profile-completeness").then(({ data }) => setCompleteness(data)).catch(() => null);
+  }, []);
+
   // Lazy-load achievements when tab is opened
   useEffect(() => {
     if (tab === "achievements" && !achData) {
-      api.get("/achievements/me").then(({ data }) => setAchData(data)).catch(() => setAchData({ groups: [], awards: [] }));
-      api.get("/users/me/profile-completeness").then(({ data }) => setCompleteness(data)).catch(() => null);
+      loadAchievements();
     }
-  }, [tab, achData]);
+  }, [tab, achData, loadAchievements]);
+  useApiInvalidation(() => {
+    if (tab === "achievements") {
+      loadAchievements();
+    } else {
+      setAchData(null);
+      setCompleteness(null);
+    }
+  }, ["achievements", "users"]);
 
   useEffect(() => {
     if (user) {
@@ -396,27 +409,38 @@ function TeamsPanel() {
 
   const activeTeam = teams.find((t) => t.id === activeId);
 
-  const loadTeams = async () => {
+  const loadTeams = useCallback(async () => {
     const { data } = await api.get("/teams/my");
     setTeams(data || []);
     setActiveId((cur) => cur || data?.[0]?.id || "");
-  };
+  }, []);
 
-  useEffect(() => {
-    loadTeams().catch(() => toast.error("Teams konnten nicht geladen werden."));
+  const loadMeta = useCallback(() => {
     api.get("/tournaments").then(({ data }) => setTournaments(data || [])).catch(() => {});
     api.get("/seasons").then(({ data }) => setSeasons(data || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
+    loadTeams().catch(() => toast.error("Teams konnten nicht geladen werden."));
+    loadMeta();
+  }, [loadMeta, loadTeams]);
+  useApiInvalidation(() => {
+    loadTeams();
+    loadMeta();
+  }, ["teams", "tournaments", "seasons"]);
+
+  const loadSquads = useCallback(() => {
     if (!activeId) {
       setSquads([]);
       return;
     }
-    api.get(`/teams/${activeId}/squads`)
+    return api.get(`/teams/${activeId}/squads`)
       .then(({ data }) => setSquads(data || []))
       .catch(() => setSquads([]));
   }, [activeId]);
+
+  useEffect(() => { loadSquads(); }, [loadSquads]);
+  useApiInvalidation(loadSquads, ["teams"]);
 
   const saveSquad = async (e) => {
     e.preventDefault();
@@ -434,8 +458,7 @@ function TeamsPanel() {
       else await api.post(`/teams/${activeTeam.id}/squads`, payload);
       toast.success("Squad gespeichert.");
       setEditing(null);
-      const { data } = await api.get(`/teams/${activeTeam.id}/squads`);
-      setSquads(data || []);
+      loadSquads();
       loadTeams();
     } catch (err) {
       toast.error(formatRequestError(err, "Squad konnte nicht gespeichert werden.", { name: editing.name }));

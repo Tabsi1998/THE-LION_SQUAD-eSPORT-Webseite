@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { API, api, formatMemberSince, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Crown, Gift, FileText, Bell, Calendar, Hash, Newspaper, Download, ArrowRight, User } from "lucide-react";
 
 export default function MemberAreaPage() {
@@ -12,7 +13,7 @@ export default function MemberAreaPage() {
   const [docs, setDocs] = useState([]);
   const [internalNews, setInternalNews] = useState([]);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     Promise.allSettled([
       api.get("/membership/benefits"),
       api.get("/membership/me"),
@@ -27,6 +28,8 @@ export default function MemberAreaPage() {
       }
     });
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["membership", "documents", "news", "users"]);
 
   const memberSince = my?.membership?.member_since
     ? formatMemberSince(my.membership.member_since, my.membership.member_since_precision)

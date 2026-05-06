@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatMemberSince, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Crown, Search, X, Save } from "lucide-react";
 
@@ -57,13 +58,13 @@ export default function AdminMembersPage() {
   const [filter, setFilter] = useState("all"); // all | community | members | pending
   const [editing, setEditing] = useState(null); // {user, membership}
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await api.get(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     setUsers(data);
-  };
+  }, [q]);
   useEffect(() => { api.get("/membership/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [q]);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["users", "membership"]);
 
   const filtered = users.filter((u) => {
     if (filter === "members") return u.is_club_member;

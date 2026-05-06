@@ -1,19 +1,23 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Pin, ArrowLeft, Newspaper, Crown } from "lucide-react";
 
 export default function MemberNewsPage() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     api.get("/news?visibility=members").then(({ data }) => {
       // backend doesn't filter visibility query; we filter client-side
       setList(data.filter((n) => n.visibility === "members" || n.visibility === "internal"));
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["news"]);
 
   return (
     <PublicLayout>

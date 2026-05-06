@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, formatMemberSince } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History } from "lucide-react";
 
 const STATUS_LABELS = {
@@ -19,9 +20,11 @@ export default function MyMembershipPage() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api.get("/membership/me").then(({ data }) => setData(data)).catch(() => {});
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["membership", "users"]);
 
   if (!data) return <PublicLayout><div className="p-20 text-center text-white/40">Lade …</div></PublicLayout>;
 

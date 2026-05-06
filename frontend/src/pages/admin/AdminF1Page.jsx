@@ -1,15 +1,18 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Plus, Flag } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export default function AdminF1Page() {
   const { isAdmin } = useAuth();
   const [list, setList] = useState([]);
-  useEffect(() => { api.get("/f1/challenges").then(({ data }) => setList(data)); }, []);
+  const load = useCallback(() => api.get("/f1/challenges").then(({ data }) => setList(data)), []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["f1"]);
   return (
     <AdminLayout>
       <div className="flex items-center justify-between mb-8">

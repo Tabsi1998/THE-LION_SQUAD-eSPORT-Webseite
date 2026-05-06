@@ -2,9 +2,10 @@
  * Phase F.2 — Admin Navigation Editor.
  * Allows admin to reorder, hide, and rename navigation items + children.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import {
   Save, Eye, EyeOff, ChevronUp, ChevronDown, RotateCcw, ChevronRight, ChevronDownIcon,
@@ -16,7 +17,7 @@ export default function AdminNavPage() {
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState({});
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get("/admin/nav");
@@ -26,9 +27,10 @@ export default function AdminNavPage() {
       toast.error(formatApiError(e.response?.data?.detail) || "Fehler beim Laden");
     }
     setLoading(false);
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["nav"]);
 
   const save = async () => {
     setSaving(true);

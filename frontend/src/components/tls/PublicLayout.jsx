@@ -4,21 +4,28 @@ import { Logo } from "@/components/tls/Logo";
 import { MainNav, MobileNav } from "@/components/tls/MainNav";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Menu, X, User, LogOut, Shield, Crown } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 
 export function PublicLayout({ children }) {
   const { user, logout, isAdmin, isClubMember } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [branding, setBranding] = useState(getCachedBranding());
-  useEffect(() => {
-    const unsubscribe = onBrandingUpdated((next) => setBranding(next || {}));
-    api.get("/settings/public").then(({ data }) => {
+  const loadBranding = useCallback(async () => {
+    try {
+      const { data } = await api.get("/settings/public");
       setCachedBranding(data || {});
       setBranding(data || {});
-    }).catch(() => {});
-    return unsubscribe;
+    } catch {}
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = onBrandingUpdated((next) => setBranding(next || {}));
+    loadBranding();
+    return unsubscribe;
+  }, [loadBranding]);
+  useApiInvalidation(loadBranding, ["settings", "branding"]);
   const nav = useNavigate();
   const closeMobile = () => setMobileOpen(false);
   const clubName = branding?.club_name || "THE LION SQUAD";
