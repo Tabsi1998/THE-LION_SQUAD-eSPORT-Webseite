@@ -44,7 +44,7 @@ function FastLapCard({ challenge: c }) {
   const registration = getRegistrationState(c, "Einreichung");
   return (
     <Link
-      to={`/f1/${c.slug || c.id}`}
+      to={`/fastlap/${c.slug || c.id}`}
       data-testid={`f1-list-${c.slug}`}
       className="group block border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-6 bg-[#121212] transition-all"
     >

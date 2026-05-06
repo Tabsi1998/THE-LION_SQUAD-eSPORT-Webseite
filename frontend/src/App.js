@@ -1,5 +1,5 @@
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/tls/ProtectedRoute";
@@ -11,6 +11,11 @@ function MeRedirect() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login?next=/profile" replace />;
   return <Navigate to={`/u/${user.username}`} replace />;
+}
+
+function FastLapLegacyRedirect() {
+  const { slug } = useParams();
+  return <Navigate to={slug ? `/fastlap/${slug}` : "/fastlap"} replace />;
 }
 
 import HomePage from "@/pages/public/HomePage";
@@ -121,8 +126,8 @@ function App() {
           <Route path="/tournaments/:slug" element={<TournamentDetailPage />} />
           <Route path="/tournaments/:slug/bracket" element={<TournamentBracketPage />} />
           <Route path="/tournaments/:slug/standings" element={<TournamentStandingsPage />} />
-          <Route path="/f1" element={<F1ListPage />} />
-          <Route path="/f1/:slug" element={<F1DetailPage />} />
+          <Route path="/f1" element={<FastLapLegacyRedirect />} />
+          <Route path="/f1/:slug" element={<FastLapLegacyRedirect />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/events/:slug" element={<EventDetailPage />} />
           <Route path="/teams" element={<TeamsPage />} />

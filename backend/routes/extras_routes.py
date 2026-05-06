@@ -528,9 +528,9 @@ async def get_season(slug_or_id: str):
     s = await db.seasons.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not s:
         raise HTTPException(status_code=404, detail="Saison nicht gefunden")
-    tids = s.get("tournament_ids", [])
+    tids, fids = await _resolve_season_sources(s)
     s["tournaments"] = await db.tournaments.find({"id": {"$in": tids}}, {"_id": 0}).to_list(200)
-    s["f1_challenges"] = await db.f1_challenges.find({"id": {"$in": s.get("f1_challenge_ids", [])}},
+    s["f1_challenges"] = await db.f1_challenges.find({"id": {"$in": fids}},
                                                        {"_id": 0}).to_list(200)
     return s
 
@@ -659,7 +659,6 @@ async def delete_season_entry(entry_id: str, me: dict = Depends(require_admin())
     return {"ok": True}
 
 
-@season_router.get("/{slug_or_id}/standings")
 async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
     """Resolve which tournaments + f1 challenges feed into this season.
 
@@ -683,19 +682,19 @@ async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
 
     auto_t: list[str] = []
     if not explicit_t:
-        async for t in db.tournaments.find({}, {"id": 1, "status": 1, "start_at": 1, "created_at": 1, "_id": 0}):
+        async for t in db.tournaments.find({}, {"id": 1, "status": 1, "start_date": 1, "created_at": 1, "_id": 0}):
             if t.get("status") not in relevant_status:
                 continue
-            ts = t.get("start_at") or t.get("created_at")
+            ts = t.get("start_date") or t.get("created_at")
             if start and end and ts and not (start <= ts <= end):
                 continue
             auto_t.append(t["id"])
     auto_f: list[str] = []
     if not explicit_f:
-        async for f in db.f1_challenges.find({}, {"id": 1, "status": 1, "start_at": 1, "created_at": 1, "_id": 0}):
+        async for f in db.f1_challenges.find({}, {"id": 1, "status": 1, "start_date": 1, "created_at": 1, "_id": 0}):
             if f.get("status") not in relevant_status:
                 continue
-            ts = f.get("start_at") or f.get("created_at")
+            ts = f.get("start_date") or f.get("created_at")
             if start and end and ts and not (start <= ts <= end):
                 continue
             auto_f.append(f["id"])
@@ -703,6 +702,7 @@ async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
     return (explicit_t or auto_t), (explicit_f or auto_f)
 
 
+@season_router.get("/{slug_or_id}/standings")
 async def season_standings(slug_or_id: str):
     """Aggregate standings over all tournaments + F1 challenges in the season."""
     db = get_db()
@@ -794,6 +794,14 @@ async def season_standings(slug_or_id: str):
 widget_router = APIRouter(prefix="/api/widgets", tags=["widgets"])
 
 
+async def _public_f1_challenge_or_404(slug_or_id: str) -> dict:
+    db = get_db()
+    c = await db.f1_challenges.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    if not c or c.get("status") == "draft" or (c.get("visibility") or "public") != "public":
+        raise HTTPException(status_code=404)
+    return c
+
+
 @widget_router.get("/tournament/{slug_or_id}/bracket")
 async def widget_bracket(slug_or_id: str):
     """Read-only bracket data for widget embed."""
@@ -814,9 +822,7 @@ async def widget_bracket(slug_or_id: str):
 @widget_router.get("/f1/{slug_or_id}/leaderboard")
 async def widget_f1(slug_or_id: str, track_id: Optional[str] = None):
     db = get_db()
-    c = await db.f1_challenges.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
-    if not c:
-        raise HTTPException(status_code=404)
+    c = await _public_f1_challenge_or_404(slug_or_id)
     if not track_id:
         first = await db.f1_tracks.find_one({"challenge_id": c["id"]}, {"_id": 0}, sort=[("order_index", 1)])
         if not first:
@@ -977,9 +983,7 @@ async def pdf_tournament_standings(slug_or_id: str):
 @pdf_router.get("/f1/{slug_or_id}/leaderboard.pdf")
 async def pdf_f1_lb(slug_or_id: str, track_id: Optional[str] = None):
     db = get_db()
-    c = await db.f1_challenges.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
-    if not c:
-        raise HTTPException(status_code=404)
+    c = await _public_f1_challenge_or_404(slug_or_id)
     from routes.f1_routes import leaderboard as f1_lb
     lb = await f1_lb(c["id"], track_id)
     return _pdf_response(pdf_f1_leaderboard(c, lb.get("track"), lb.get("entries", [])),
@@ -989,9 +993,7 @@ async def pdf_f1_lb(slug_or_id: str, track_id: Optional[str] = None):
 @pdf_router.get("/f1/{slug_or_id}/championship.pdf")
 async def pdf_f1_championship(slug_or_id: str):
     db = get_db()
-    c = await db.f1_challenges.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
-    if not c:
-        raise HTTPException(status_code=404)
+    c = await _public_f1_challenge_or_404(slug_or_id)
     from routes.f1_routes import championship_standings as f1_champ
     cs = await f1_champ(c["id"])
     # Reuse standings PDF shape

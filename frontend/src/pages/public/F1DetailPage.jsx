@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Tv, Trophy, Flag, Download, Twitch, FileDown } from "lucide-react";
+import { Tv, Trophy, Flag, Download, FileDown, Calendar } from "lucide-react";
 import { formatDateTime, getRegistrationState } from "@/lib/datetime";
 
 export default function F1DetailPage() {
@@ -71,6 +71,11 @@ export default function F1DetailPage() {
           </div>
           <h1 data-testid="f1-challenge-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{challenge.title}</h1>
           {challenge.description && <p className="mt-3 text-white/70 max-w-2xl">{challenge.description}</p>}
+          {challenge.event && (
+            <Link to={`/events/${challenge.event.slug || challenge.event.id}`} className="mt-4 inline-flex items-center gap-2 border border-[#9F7AEA]/40 text-[#9F7AEA] hover:bg-[#9F7AEA]/10 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+              <Calendar className="w-3.5 h-3.5" /> Teil von {challenge.event.name}
+            </Link>
+          )}
           <div className={`mt-5 border rounded-sm px-4 py-3 text-sm max-w-3xl ${
             registration.canRegister
               ? "border-[#00FF88]/30 bg-[#00FF88]/5 text-[#00FF88]"

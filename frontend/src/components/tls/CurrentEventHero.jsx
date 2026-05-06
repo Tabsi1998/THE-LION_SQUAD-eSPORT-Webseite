@@ -34,7 +34,7 @@ export function CurrentEventHero() {
   if (!featured) return null;
 
   const { kind, item } = featured;
-  const href = kind === "f1" ? `/f1/${item.slug || item.id}` : `/tournaments/${item.slug || item.id}`;
+  const href = kind === "f1" ? `/fastlap/${item.slug || item.id}` : `/tournaments/${item.slug || item.id}`;
   const maxP = item.max_participants || 0;
   const curP = item.participant_count || 0;
   const spotsLeft = maxP && curP < maxP ? maxP - curP : null;

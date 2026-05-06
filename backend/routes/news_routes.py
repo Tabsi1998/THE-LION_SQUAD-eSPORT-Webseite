@@ -4,6 +4,7 @@ from typing import Optional
 from database import get_db
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see, filter_visible
+from services.content_embed_service import resolve_content_embeds
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
     PartnerCreate, PartnerUpdate,
@@ -13,6 +14,7 @@ from models import (
 )
 
 router = APIRouter(prefix="/api", tags=["news"])
+STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 
 
 # ---------- Visibility helper (delegates to shared module) ----------
@@ -22,6 +24,18 @@ async def _user_can_see(user: dict | None, visibility: str) -> bool:
 
 async def _filter_visible(items: list, user: dict | None) -> list:
     return await filter_visible(items, user)
+
+
+async def _filter_linked_items(items: list[dict], user: dict | None, is_staff: bool, kind: str) -> list[dict]:
+    out: list[dict] = []
+    for item in items:
+        if not is_staff and item.get("status") == "draft":
+            continue
+        if kind == "tournament" and not is_staff and item.get("is_public") is False:
+            continue
+        if await _user_can_see(user, item.get("visibility") or "public"):
+            out.append(item)
+    return out
 
 
 # ---------- News ----------
@@ -48,26 +62,33 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
     p = await db.news_posts.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not p:
         raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
+    is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    if p.get("published") is False and not is_staff:
+        raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
     if not await _user_can_see(user, p.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Nicht sichtbar.")
     # Resolve linked entities
     db = get_db()
     if p.get("linked_event_ids"):
-        p["linked_events"] = await db.events.find(
-            {"id": {"$in": p["linked_event_ids"]}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "start_date": 1},
+        items = await db.events.find(
+            {"id": {"$in": p["linked_event_ids"]}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "start_date": 1, "status": 1, "visibility": 1},
         ).to_list(50)
+        p["linked_events"] = await _filter_linked_items(items, user, is_staff, "event")
     if p.get("linked_tournament_ids"):
-        p["linked_tournaments"] = await db.tournaments.find(
-            {"id": {"$in": p["linked_tournament_ids"]}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1},
+        items = await db.tournaments.find(
+            {"id": {"$in": p["linked_tournament_ids"]}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "status": 1, "visibility": 1, "is_public": 1},
         ).to_list(50)
+        p["linked_tournaments"] = await _filter_linked_items(items, user, is_staff, "tournament")
     if p.get("linked_f1_challenge_ids"):
-        p["linked_f1_challenges"] = await db.f1_challenges.find(
-            {"id": {"$in": p["linked_f1_challenge_ids"]}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "status": 1},
+        items = await db.f1_challenges.find(
+            {"id": {"$in": p["linked_f1_challenge_ids"]}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "status": 1, "visibility": 1},
         ).to_list(50)
+        p["linked_f1_challenges"] = await _filter_linked_items(items, user, is_staff, "fastlap")
     if p.get("linked_team_ids"):
         p["linked_teams"] = await db.teams.find(
             {"id": {"$in": p["linked_team_ids"]}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "logo_url": 1},
         ).to_list(50)
+    p["content_embeds"] = await resolve_content_embeds(db, p.get("content"), user)
     return p
 
 

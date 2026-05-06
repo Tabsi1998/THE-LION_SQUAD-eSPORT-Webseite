@@ -5,13 +5,28 @@ from datetime import datetime, timezone
 from database import get_db
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see
+from services.content_embed_service import resolve_content_embeds
 from models import EventCreate, EventUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
+STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 
 
 async def _user_can_see(user: dict | None, visibility: str) -> bool:
     return await user_can_see(user, visibility)
+
+
+async def _filter_related(items: list[dict], user: dict | None, kind: str) -> list[dict]:
+    is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    out: list[dict] = []
+    for item in items:
+        if not is_staff and item.get("status") == "draft":
+            continue
+        if kind == "tournament" and not is_staff and item.get("is_public") is False:
+            continue
+        if await _user_can_see(user, item.get("visibility") or "public"):
+            out.append(item)
+    return out
 
 
 def _parse_dt(value):
@@ -157,8 +172,16 @@ async def get_event(slug_or_id: str, user: dict | None = Depends(get_optional_us
     if not await _user_can_see(user, event.get("visibility") or "public"):
         raise HTTPException(403, "Event ist nicht sichtbar.")
     # Attach tournaments and f1 challenges
-    event["tournaments"] = await db.tournaments.find({"event_id": event["id"]}, {"_id": 0}).to_list(200)
-    event["f1_challenges"] = await db.f1_challenges.find({"event_id": event["id"]}, {"_id": 0}).to_list(200)
+    event["tournaments"] = await _filter_related(
+        await db.tournaments.find({"event_id": event["id"]}, {"_id": 0}).to_list(200),
+        user,
+        "tournament",
+    )
+    event["f1_challenges"] = await _filter_related(
+        await db.f1_challenges.find({"event_id": event["id"]}, {"_id": 0}).to_list(200),
+        user,
+        "fastlap",
+    )
     # Albums linked to this event
     event["albums"] = await db.gallery_albums.find(
         {"event_id": event["id"], "published": True}, {"_id": 0},
@@ -168,6 +191,7 @@ async def get_event(slug_or_id: str, user: dict | None = Depends(get_optional_us
         {"linked_event_ids": event["id"], "published": True},
         {"_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1, "created_at": 1, "published_at": 1},
     ).sort([("published_at", -1), ("created_at", -1)]).to_list(20)
+    event["content_embeds"] = await resolve_content_embeds(db, event.get("program"), user)
     await _decorate_event(event, include_sponsors=True)
     return event
 
@@ -218,4 +242,7 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
 async def delete_event(event_id: str, me: dict = Depends(require_admin())):
     db = get_db()
     await db.events.delete_one({"id": event_id})
+    await db.tournaments.update_many({"event_id": event_id}, {"$set": {"event_id": None, "updated_at": now_utc().isoformat()}})
+    await db.f1_challenges.update_many({"event_id": event_id}, {"$set": {"event_id": None, "updated_at": now_utc().isoformat()}})
+    await db.gallery_albums.update_many({"event_id": event_id}, {"$set": {"event_id": None, "updated_at": now_utc().isoformat()}})
     return {"ok": True}

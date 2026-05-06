@@ -176,21 +176,21 @@ async def sitemap():
     ]
 
     # tournaments
-    async for t in db.tournaments.find({"status": {"$ne": "draft"}}, {"slug": 1, "updated_at": 1, "_id": 0}):
+    public_visibility = {"$or": [{"visibility": "public"}, {"visibility": {"$exists": False}}, {"visibility": None}]}
+    async for t in db.tournaments.find({"status": {"$ne": "draft"}, "is_public": {"$ne": False}, **public_visibility}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if t.get("slug"):
             urls.append({"loc": f"{base}/tournaments/{t['slug']}", "lastmod": t.get("updated_at"), "changefreq": "weekly", "priority": "0.7"})
     # f1 challenges
-    async for f in db.f1_challenges.find({"status": {"$ne": "draft"}}, {"slug": 1, "updated_at": 1, "_id": 0}):
+    async for f in db.f1_challenges.find({"status": {"$ne": "draft"}, **public_visibility}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if f.get("slug"):
             urls.append({"loc": f"{base}/fastlap/{f['slug']}", "lastmod": f.get("updated_at"), "changefreq": "weekly", "priority": "0.7"})
-            urls.append({"loc": f"{base}/f1/{f['slug']}", "lastmod": f.get("updated_at"), "changefreq": "weekly", "priority": "0.5"})
     # events
-    async for e in db.events.find({"status": {"$ne": "draft"}}, {"slug": 1, "updated_at": 1, "_id": 0}):
+    async for e in db.events.find({"status": {"$ne": "draft"}, **public_visibility}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if e.get("slug"):
             urls.append({"loc": f"{base}/events/{e['slug']}", "lastmod": e.get("updated_at"), "changefreq": "weekly", "priority": "0.8"})
     # news
     async for n in db.news_posts.find(
-        {"published": True},
+        {"published": True, **public_visibility},
         {"slug": 1, "id": 1, "updated_at": 1, "published_at": 1, "created_at": 1, "_id": 0},
     ).sort([("published_at", -1), ("created_at", -1)]):
         slug = n.get("slug") or n.get("id")
@@ -225,8 +225,9 @@ async def news_sitemap():
     if not base.startswith("http"):
         base = "https://" + base
     name = branding.get("club_name") or "THE LION SQUAD"
+    public_visibility = {"$or": [{"visibility": "public"}, {"visibility": {"$exists": False}}, {"visibility": None}]}
     rows = await db.news_posts.find(
-        {"published": True},
+        {"published": True, **public_visibility},
         {"slug": 1, "id": 1, "title": 1, "published_at": 1, "created_at": 1, "_id": 0},
     ).sort([("published_at", -1), ("created_at", -1)]).limit(1000).to_list(1000)
     xml_lines = [

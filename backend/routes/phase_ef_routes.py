@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_current_user, require_admin
 from models import now_utc, new_id
+from services.content_embed_service import resolve_content_embeds
 
 
 # ============= Streams (public + admin) =============
@@ -79,6 +80,7 @@ async def public_get_page(slug: str):
     page = await db.cms_pages.find_one({"slug": slug, "is_published": {"$ne": False}}, {"_id": 0})
     if not page:
         raise HTTPException(404, "Seite nicht gefunden.")
+    page["content_embeds"] = await resolve_content_embeds(db, page.get("body_md"), None)
     return page
 
 

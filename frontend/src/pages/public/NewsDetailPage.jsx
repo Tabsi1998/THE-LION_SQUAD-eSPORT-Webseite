@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { RichContent } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Pin, ArrowLeft, Calendar, Trophy, Users, Flag } from "lucide-react";
@@ -59,9 +60,7 @@ export default function NewsDetailPage() {
             <img src={resolveMediaUrl(post.banner_url)} alt="" className="w-full h-auto" />
           </div>
         )}
-        <div className="mt-8 prose prose-invert max-w-none text-white/85 whitespace-pre-line leading-relaxed">
-          {post.content}
-        </div>
+        <RichContent text={post.content} embeds={post.content_embeds || []} className="mt-8 prose prose-invert max-w-none text-white/85" />
 
         {(post.linked_events?.length || post.linked_tournaments?.length || post.linked_f1_challenges?.length || post.linked_teams?.length) && (
           <div className="mt-10 border-t border-white/10 pt-8">

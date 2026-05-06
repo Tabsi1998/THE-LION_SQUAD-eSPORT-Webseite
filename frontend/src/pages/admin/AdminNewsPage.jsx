@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { appendEmbedToken } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Flag, Plus, Pin, Trash2, Save, X, Newspaper } from "lucide-react";
@@ -127,6 +128,12 @@ function NewsModal({ post, meta, onClose, onSaved }) {
   }, []);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const insertEmbed = (kind, item) => {
+    setForm((f) => ({ ...f, content: appendEmbedToken(f.content, kind, item) }));
+    if (kind === "event") setLinkedE((ids) => (ids.includes(item.id) ? ids : [...ids, item.id]));
+    if (kind === "tournament") setLinkedT((ids) => (ids.includes(item.id) ? ids : [...ids, item.id]));
+    if (kind === "fastlap") setLinkedF((ids) => (ids.includes(item.id) ? ids : [...ids, item.id]));
+  };
   const slugFrom = (txt) => (txt || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -172,6 +179,7 @@ function NewsModal({ post, meta, onClose, onSaved }) {
           <Field label="Kurzbeschreibung"><Input value={form.excerpt} onChange={(v) => set("excerpt", v)} testId="news-excerpt" /></Field>
           <Field label="Inhalt (Markdown / Plaintext)">
             <textarea value={form.content} onChange={(e) => set("content", e.target.value)} rows={10} required data-testid="news-content" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-mono text-sm" />
+            <div className="mt-1 text-[11px] text-white/40">Einbettungen werden als Karten gerendert, z.B. [[fastlap:slug]], [[tournament:slug]], [[event:slug]].</div>
           </Field>
           <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="news-banner" variant="wide" allowLibrary /></Field>
 
@@ -211,17 +219,17 @@ function NewsModal({ post, meta, onClose, onSaved }) {
 
           {events.length > 0 && (
             <Field label="Verknüpfte Events">
-              <MultiSelect options={events} valueKey="id" labelKey="name" selected={linkedE} onChange={setLinkedE} />
+              <MultiSelect options={events} valueKey="id" labelKey="name" selected={linkedE} onChange={setLinkedE} onEmbed={(item) => insertEmbed("event", item)} />
             </Field>
           )}
           {tournaments.length > 0 && (
             <Field label="Verknüpfte Turniere">
-              <MultiSelect options={tournaments} valueKey="id" labelKey="title" selected={linkedT} onChange={setLinkedT} />
+              <MultiSelect options={tournaments} valueKey="id" labelKey="title" selected={linkedT} onChange={setLinkedT} onEmbed={(item) => insertEmbed("tournament", item)} />
             </Field>
           )}
           {f1Challenges.length > 0 && (
             <Field label="Verknüpfte Fast-Lap Challenges">
-              <MultiSelect options={f1Challenges} valueKey="id" labelKey="title" selected={linkedF} onChange={setLinkedF} icon={Flag} />
+              <MultiSelect options={f1Challenges} valueKey="id" labelKey="title" selected={linkedF} onChange={setLinkedF} icon={Flag} onEmbed={(item) => insertEmbed("fastlap", item)} />
             </Field>
           )}
         </div>
@@ -247,16 +255,23 @@ function Field({ label, children }) {
 function Input({ value, onChange, placeholder, testId, required }) {
   return <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} required={required} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />;
 }
-function MultiSelect({ options, valueKey, labelKey, selected, onChange, icon: Icon }) {
+function MultiSelect({ options, valueKey, labelKey, selected, onChange, icon: Icon, onEmbed }) {
   const toggle = (v) => onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
   return (
     <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-2 max-h-32 overflow-y-auto space-y-1">
       {options.map((o) => (
-        <label key={o[valueKey]} className="flex items-center gap-2 text-sm hover:bg-white/5 px-2 py-1 rounded-sm cursor-pointer">
-          <input type="checkbox" checked={selected.includes(o[valueKey])} onChange={() => toggle(o[valueKey])} className="accent-[#29B6E8]" />
-          {Icon && <Icon className="w-3 h-3 text-[#29B6E8]" />}
-          <span>{o[labelKey]}</span>
-        </label>
+        <div key={o[valueKey]} className="flex items-center gap-2 text-sm hover:bg-white/5 px-2 py-1 rounded-sm">
+          <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
+            <input type="checkbox" checked={selected.includes(o[valueKey])} onChange={() => toggle(o[valueKey])} className="accent-[#29B6E8]" />
+            {Icon && <Icon className="w-3 h-3 text-[#29B6E8] shrink-0" />}
+            <span className="truncate">{o[labelKey]}</span>
+          </label>
+          {onEmbed && (
+            <button type="button" onClick={() => onEmbed(o)} className="shrink-0 text-[10px] uppercase tracking-wider font-bold text-[#29B6E8] hover:text-white">
+              Einbetten
+            </button>
+          )}
+        </div>
       ))}
     </div>
   );

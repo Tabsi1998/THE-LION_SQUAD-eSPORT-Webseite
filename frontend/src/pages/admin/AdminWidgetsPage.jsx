@@ -10,7 +10,8 @@ export default function AdminWidgetsPage() {
   const [challenges, setChallenges] = useState([]);
   const [selType, setSelType] = useState("bracket");
   const [selId, setSelId] = useState("");
-  const [theme, setTheme] = useState("dark");
+  const [tracks, setTracks] = useState([]);
+  const [selTrack, setSelTrack] = useState("");
   const [height, setHeight] = useState(600);
 
   const loadSources = useCallback(() => {
@@ -20,9 +21,18 @@ export default function AdminWidgetsPage() {
   useEffect(() => { loadSources(); }, [loadSources]);
   useApiInvalidation(loadSources, ["tournaments", "f1"]);
 
+  useEffect(() => {
+    setTracks([]);
+    setSelTrack("");
+    if (selType !== "f1" || !selId) return;
+    api.get(`/f1/challenges/${selId}`).then(({ data }) => setTracks(data.tracks || [])).catch(() => setTracks([]));
+  }, [selType, selId]);
+
   const path = selType === "bracket" ? `/display/bracket/${selId}`
     : selType === "f1" ? `/display/f1/${selId}` : "";
-  const url = selId ? `${API_BASE}${path}?theme=${theme}` : "";
+  const query = selType === "f1" && selTrack ? `?track=${encodeURIComponent(selTrack)}` : "";
+  const publicBase = typeof window !== "undefined" ? window.location.origin : API_BASE;
+  const url = selId ? `${publicBase}${path}${query}` : "";
   const iframe = url ? `<iframe src="${url}" width="100%" height="${height}" frameborder="0" style="border:none"></iframe>` : "";
 
   const copy = () => {
@@ -38,9 +48,11 @@ export default function AdminWidgetsPage() {
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Widgets & iframes</h1>
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
-          <Select label="Typ" value={selType} onChange={(v)=>{ setSelType(v); setSelId(""); }} options={[["bracket","Bracket"],["f1","F1 Leaderboard"]]} testId="widget-type"/>
-          <Select label="Quelle" value={selId} onChange={setSelId} options={[["","— auswählen —"],...options.map(o=>[o.id, o.title])]} testId="widget-source"/>
-          <Select label="Theme" value={theme} onChange={setTheme} options={[["dark","Dunkel"],["light","Hell"]]} testId="widget-theme"/>
+          <Select label="Typ" value={selType} onChange={(v)=>{ setSelType(v); setSelId(""); setSelTrack(""); }} options={[["bracket","Bracket"],["f1","Fast-Lap Leaderboard"]]} testId="widget-type"/>
+          <Select label="Quelle" value={selId} onChange={(v)=>{ setSelId(v); setSelTrack(""); }} options={[["","— auswählen —"],...options.map(o=>[o.id, o.title])]} testId="widget-source"/>
+          {selType === "f1" && tracks.length > 0 && (
+            <Select label="Strecke" value={selTrack} onChange={setSelTrack} options={[["","Automatisch rotieren"],...tracks.map(t=>[t.id, t.name])]} testId="widget-track"/>
+          )}
           <Field label="Höhe (px)" type="number" value={height} onChange={(v)=>setHeight(Number(v)||600)} testId="widget-height"/>
           <div>
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">iframe Code</div>

@@ -7,7 +7,7 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X } from "lucide-react";
+import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X, Flag } from "lucide-react";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { formatDateTime, getRegistrationState } from "@/lib/datetime";
@@ -176,6 +176,20 @@ export default function TournamentDetailPage() {
           )}
           {(t.has_live_stream || (t.twitch_enabled && t.twitch_channel)) && (
             <section data-testid="tournament-stream"><StreamEmbed source={t} /></section>
+          )}
+          {!!t.related_f1_challenges?.length && (
+            <section>
+              <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Flag className="w-4 h-4 text-[#29B6E8]" /> Fast-Lap Challenges beim Event</h2>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {t.related_f1_challenges.map((c) => (
+                  <Link key={c.id} to={`/fastlap/${c.slug || c.id}`} className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] p-4 transition">
+                    <StatusBadge status={c.status} />
+                    <div className="mt-2 font-heading font-bold">{c.title}</div>
+                    {c.start_date && <div className="mt-1 text-xs text-white/50">{formatDateTime(c.start_date)}</div>}
+                  </Link>
+                ))}
+              </div>
+            </section>
           )}
           <section>
             <h2 className="font-heading text-2xl font-bold uppercase mb-3">Teilnehmer ({regs.length})</h2>

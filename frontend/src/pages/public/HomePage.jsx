@@ -160,7 +160,7 @@ function LiveBanner({ state }) {
   const live = state.live;
   const all = [
     ...(live.tournaments || []).map((x) => ({ ...x, kind: "tournament", url: `/tournaments/${x.slug}` })),
-    ...(live.challenges || []).map((x) => ({ ...x, kind: "fastlap", url: `/f1/${x.slug}` })),
+    ...(live.challenges || []).map((x) => ({ ...x, kind: "fastlap", url: `/fastlap/${x.slug}` })),
     ...(live.events || []).map((x) => ({ ...x, kind: "event", url: `/events/${x.slug}` })),
   ];
   if (!all.length) return null;
@@ -206,7 +206,7 @@ function ItemGrid({ lists, variant }) {
   const all = [
     ...(lists.tournaments || []).map((x) => ({ ...x, kind: "tournament", url: `/tournaments/${x.slug}`, label: x.title })),
     ...(lists.events || []).map((x) => ({ ...x, kind: "event", url: `/events/${x.slug}`, label: x.name })),
-    ...(lists.challenges || []).map((x) => ({ ...x, kind: "fastlap", url: `/f1/${x.slug}`, label: x.title })),
+    ...(lists.challenges || []).map((x) => ({ ...x, kind: "fastlap", url: `/fastlap/${x.slug}`, label: x.title })),
   ];
   return (
     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">

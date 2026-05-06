@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, Response
 from fastapi.responses import StreamingResponse
 from database import get_db
 from auth import get_current_user, require_admin, require_role, get_optional_user
+from services.visibility import user_can_see
 from models import (
     F1ChallengeCreate, F1ChallengeUpdate, F1TrackCreate, F1TrackUpdate,
     F1LapTimeCreate, F1LapTimeUpdate,
@@ -29,6 +30,7 @@ def _validate_penalty_note(penalty_seconds: float, is_invalid: bool, admin_note:
 
 
 router = APIRouter(prefix="/api/f1", tags=["f1"])
+STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 
 
 def _iso(dt):
@@ -49,6 +51,28 @@ async def _resolve_cid(slug_or_id: str) -> str:
     return c["id"]
 
 
+def _auth_user(user) -> dict | None:
+    return user if isinstance(user, dict) else None
+
+
+def _is_staff(user: dict | None) -> bool:
+    user = _auth_user(user)
+    return bool(user and user.get("role") in STAFF_ROLES)
+
+
+async def _get_visible_challenge(slug_or_id: str, user: dict | None = None) -> dict:
+    db = get_db()
+    user = _auth_user(user)
+    c = await db.f1_challenges.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    if not c:
+        raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
+    if c.get("status") == "draft" and not _is_staff(user):
+        raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
+    if not await user_can_see(user, c.get("visibility") or "public"):
+        raise HTTPException(status_code=403, detail="Challenge ist nicht sichtbar")
+    return c
+
+
 def _ms_to_time_str(ms: int) -> str:
     if ms is None:
         return "—"
@@ -61,31 +85,35 @@ def _ms_to_time_str(ms: int) -> str:
 @router.get("/challenges")
 async def list_challenges(status: str | None = None, limit: int = 100, user=Depends(get_optional_user)):
     db = get_db()
-    is_staff = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
+    is_staff = _is_staff(user)
     q = {}
     if status:
         q["status"] = status
     elif not is_staff:
         q["status"] = {"$ne": "draft"}
     challenges = await db.f1_challenges.find(q, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    visible = []
     for c in challenges:
+        if not await user_can_see(user, c.get("visibility") or "public"):
+            continue
         c["track_count"] = await db.f1_tracks.count_documents({"challenge_id": c["id"]})
         c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", {"challenge_id": c["id"]}))
-    return challenges
+        visible.append(c)
+    return visible
 
 
 @router.get("/challenges/{slug_or_id}")
 async def get_challenge(slug_or_id: str, user=Depends(get_optional_user)):
     db = get_db()
-    c = await db.f1_challenges.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
-    if not c:
-        raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
-    is_staff = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
-    if c.get("status") == "draft" and not is_staff:
-        raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
+    c = await _get_visible_challenge(slug_or_id, user)
     tracks = await db.f1_tracks.find({"challenge_id": c["id"]}, {"_id": 0}).sort("order_index", 1).to_list(100)
     c["tracks"] = tracks
     c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", {"challenge_id": c["id"]}))
+    if c.get("event_id"):
+        c["event"] = await db.events.find_one(
+            {"id": c["event_id"]},
+            {"_id": 0, "id": 1, "slug": 1, "name": 1, "start_date": 1, "status": 1, "location": 1},
+        )
     return c
 
 
@@ -217,13 +245,11 @@ async def delete_track(tid: str, me: dict = Depends(require_admin())):
 
 # --- Lap times ---
 @router.get("/challenges/{cid}/leaderboard")
-async def leaderboard(cid: str, track_id: str | None = None):
+async def leaderboard(cid: str, track_id: str | None = None, user=Depends(get_optional_user)):
     """Per-track leaderboard. If no track_id, use first track."""
     db = get_db()
-    cid = await _resolve_cid(cid)
-    c = await db.f1_challenges.find_one({"id": cid}, {"_id": 0})
-    if not c:
-        raise HTTPException(status_code=404)
+    c = await _get_visible_challenge(cid, user)
+    cid = c["id"]
     if not track_id:
         first_track = await db.f1_tracks.find_one({"challenge_id": cid}, {"_id": 0},
                                                     sort=[("order_index", 1)])
@@ -274,13 +300,11 @@ async def leaderboard(cid: str, track_id: str | None = None):
 
 
 @router.get("/challenges/{cid}/championship")
-async def championship_standings(cid: str):
+async def championship_standings(cid: str, user=Depends(get_optional_user)):
     """Championship standings across all tracks using points_per_position."""
     db = get_db()
-    cid = await _resolve_cid(cid)
-    c = await db.f1_challenges.find_one({"id": cid}, {"_id": 0})
-    if not c:
-        raise HTTPException(status_code=404)
+    c = await _get_visible_challenge(cid, user)
+    cid = c["id"]
     tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).sort("order_index", 1).to_list(100)
     points_system = c.get("points_per_position", [25, 18, 15, 12, 10, 8, 6, 4, 2, 1])
     totals: dict = {}
@@ -385,7 +409,7 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_r
                     f"🏁 Neue Bestzeit · {c.get('title') or 'Fast Lap'}",
                     f"**{u.get('display_name') or u.get('username') or 'Fahrer'}** führt jetzt auf **{tr.get('name') or '–'}**!",
                     color=0xFFD700,
-                    url=f"/f1/{c.get('slug') or cid}",
+                    url=f"/fastlap/{c.get('slug') or cid}",
                     fields=[
                         {"name": "Zeit", "value": _ms_to_time_str(effective), "inline": True},
                         *([{"name": "Vorher", "value": _ms_to_time_str(prev_best), "inline": True}] if prev_best else []),
@@ -404,7 +428,7 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_r
 
 
 @router.get("/challenges/{cid}/times")
-async def list_times(cid: str, track_id: str | None = None, user_id: str | None = None):
+async def list_times(cid: str, track_id: str | None = None, user_id: str | None = None, me: dict = Depends(require_role("moderator"))):
     db = get_db()
     q = {"challenge_id": cid}
     if track_id:
@@ -454,12 +478,10 @@ async def delete_time(time_id: str, me: dict = Depends(require_role("moderator")
 
 
 @router.get("/challenges/{cid}/export.csv")
-async def export_csv(cid: str, track_id: str | None = None):
+async def export_csv(cid: str, track_id: str | None = None, user=Depends(get_optional_user)):
     db = get_db()
-    cid = await _resolve_cid(cid)
-    c = await db.f1_challenges.find_one({"id": cid})
-    if not c:
-        raise HTTPException(status_code=404)
+    c = await _get_visible_challenge(cid, user)
+    cid = c["id"]
     output = io.StringIO()
     w = csv.writer(output, delimiter=";")
     w.writerow(["Rang", "Spieler", "Discord", "Strecke", "Zeit", "Zeit (ms)", "Versuche", "Strafzeiten", "Aktualisiert"])
@@ -467,7 +489,7 @@ async def export_csv(cid: str, track_id: str | None = None):
     if track_id:
         tracks = [t for t in tracks if t["id"] == track_id]
     for tr in tracks:
-        lb = await leaderboard(cid, tr["id"])
+        lb = await leaderboard(cid, tr["id"], user)
         for entry in lb["entries"]:
             w.writerow([
                 entry["rank"], entry["display_name"], "",

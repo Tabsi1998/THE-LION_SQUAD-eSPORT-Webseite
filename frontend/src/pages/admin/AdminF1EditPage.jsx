@@ -168,7 +168,7 @@ export default function AdminF1EditPage() {
           <Link target="_blank" to={`/display/f1/${challenge.id}`} data-testid="f1-tv-admin-link" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8] text-[#29B6E8] rounded-sm uppercase tracking-wider text-sm font-bold hover:bg-[#29B6E8]/10">
             <Tv className="w-4 h-4" /> TV Modus
           </Link>
-          <Link target="_blank" to={`/f1/${challenge.slug || challenge.id}`} className="px-4 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-sm font-bold hover:border-[#29B6E8]/60">Public</Link>
+          <Link target="_blank" to={`/fastlap/${challenge.slug || challenge.id}`} className="px-4 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-sm font-bold hover:border-[#29B6E8]/60">Public</Link>
           <a href={`${API}/f1/challenges/${challenge.id}/export.csv`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">CSV</a>
           <a href={`${API}/exports/f1/${challenge.id}/leaderboard.pdf${activeTrack ? `?track_id=${activeTrack}` : ""}`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF</a>
         </div>
@@ -345,6 +345,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
     description: challenge.description || "",
     banner_url: challenge.banner_url || "",
     event_id: challenge.event_id || "",
+    visibility: challenge.visibility || "public",
     vehicle: challenge.vehicle || "",
     weather: challenge.weather || "",
     assists_allowed: challenge.assists_allowed || "",
@@ -391,6 +392,17 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
           options={[["", "— kein Event —"], ...events.map((e) => [e.id, e.name])]}
         />
       )}
+      <SmallSelect
+        label="Sichtbarkeit"
+        value={form.visibility}
+        onChange={(v) => set("visibility", v)}
+        options={[
+          ["public", "Öffentlich"],
+          ["community", "Nur registrierte Community"],
+          ["members", "Nur Vereinsmitglieder"],
+          ["internal", "Nur intern"],
+        ]}
+      />
       <ImageUpload value={form.banner_url} onChange={(v)=>set("banner_url", v)} label="Challenge-Banner" testId="f1-edit-banner-upload" variant="wide" allowLibrary />
       <div className="grid md:grid-cols-2 gap-4">
         <SmallField label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v)=>set("start_date", v)} />

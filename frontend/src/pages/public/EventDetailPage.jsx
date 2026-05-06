@@ -5,6 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { TournamentCard } from "@/components/tls/TournamentCard";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { RichContent } from "@/components/tls/RichContent";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -129,7 +130,7 @@ export default function EventDetailPage() {
         {e.program && (
           <div>
             <h2 className="font-heading text-2xl font-black uppercase mb-4">Programm</h2>
-            <div className="border border-white/10 bg-[#121212] p-6 rounded-sm whitespace-pre-line text-white/85 leading-relaxed">{e.program}</div>
+            <RichContent text={e.program} embeds={e.content_embeds || []} className="border border-white/10 bg-[#121212] p-6 rounded-sm text-white/85" />
           </div>
         )}
 

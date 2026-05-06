@@ -155,7 +155,7 @@ export default function DashboardPage() {
             <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Turniere</div>
             <div className="mt-2 font-heading text-lg font-bold">Jetzt anmelden</div>
           </Link>
-          <Link to="/f1" data-testid="dashboard-f1-link" className="border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-5 bg-[#121212] transition">
+          <Link to="/fastlap" data-testid="dashboard-f1-link" className="border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-5 bg-[#121212] transition">
             <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Fast Lap</div>
             <div className="mt-2 font-heading text-lg font-bold">Ranglisten</div>
           </Link>

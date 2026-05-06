@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { appendEmbedToken } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Flag, Plus, Save, X, Trash2, Calendar, Trophy } from "lucide-react";
@@ -166,6 +167,11 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
   }, [event?.id, tournaments, f1Challenges]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const insertProgramEmbed = (kind, item) => {
+    setForm((f) => ({ ...f, program: appendEmbedToken(f.program, kind, item) }));
+    if (kind === "tournament" && !relatedTournamentIds.includes(item.id)) setRelatedTournamentIds((ids) => [...ids, item.id]);
+    if (kind === "fastlap" && !relatedF1Ids.includes(item.id)) setRelatedF1Ids((ids) => [...ids, item.id]);
+  };
 
   const syncRelatedItems = async (eventId) => {
     const jobs = [];
@@ -272,6 +278,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
           </div>
           <Field label="Programm / Tagesablauf">
             <textarea value={form.program} onChange={(e) => set("program", e.target.value)} rows={4} placeholder="17:00 Einlass&#10;18:00 LAN-Setup&#10;19:30 Eröffnungsturnier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-mono text-sm" />
+            <div className="mt-1 text-[11px] text-white/40">Turniere/Fast-Laps können hier als Karten eingefügt werden.</div>
           </Field>
           {(tournaments.length > 0 || f1Challenges.length > 0) && (
             <div className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A] space-y-3">
@@ -288,6 +295,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
                   onChange={setRelatedTournamentIds}
                   labelKey="title"
                   accent="text-[#FFD700]"
+                  onEmbed={(item) => insertProgramEmbed("tournament", item)}
                 />
               )}
               {f1Challenges.length > 0 && (
@@ -299,6 +307,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
                   onChange={setRelatedF1Ids}
                   labelKey="title"
                   accent="text-[#29B6E8]"
+                  onEmbed={(item) => insertProgramEmbed("fastlap", item)}
                 />
               )}
             </div>
@@ -391,18 +400,25 @@ function Input({ value, onChange, placeholder, testId, required }) {
   return <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} required={required} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />;
 }
 
-function RelationSelect({ icon: Icon, label, options, selected, onChange, labelKey, accent }) {
+function RelationSelect({ icon: Icon, label, options, selected, onChange, labelKey, accent, onEmbed }) {
   const toggle = (id) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
   return (
     <div>
       <div className="text-[11px] uppercase tracking-widest font-bold text-white/50 mb-2">{label}</div>
       <div className="grid sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
         {options.map((item) => (
-          <label key={item.id} className="flex items-center gap-2 text-sm text-white/75 border border-white/5 hover:border-white/15 rounded-sm px-2 py-2 cursor-pointer">
-            <input type="checkbox" checked={selected.includes(item.id)} onChange={() => toggle(item.id)} className="accent-[#9F7AEA]" />
-            <Icon className={`w-3.5 h-3.5 ${accent}`} />
-            <span className="truncate">{item[labelKey] || item.name}</span>
-          </label>
+          <div key={item.id} className="flex items-center gap-2 text-sm text-white/75 border border-white/5 hover:border-white/15 rounded-sm px-2 py-2">
+            <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
+              <input type="checkbox" checked={selected.includes(item.id)} onChange={() => toggle(item.id)} className="accent-[#9F7AEA]" />
+              <Icon className={`w-3.5 h-3.5 ${accent} shrink-0`} />
+              <span className="truncate">{item[labelKey] || item.name}</span>
+            </label>
+            {onEmbed && (
+              <button type="button" onClick={() => onEmbed(item)} className="shrink-0 text-[10px] uppercase tracking-wider font-bold text-[#29B6E8] hover:text-white">
+                Ins Programm
+              </button>
+            )}
+          </div>
         ))}
       </div>
     </div>

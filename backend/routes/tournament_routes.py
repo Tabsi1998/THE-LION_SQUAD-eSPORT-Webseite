@@ -4,6 +4,7 @@ from typing import Optional
 from datetime import datetime, timezone
 from database import get_db
 from auth import get_current_user, require_admin, get_optional_user
+from services.visibility import user_can_see
 from models import (
     TournamentCreate, TournamentUpdate, RegistrationCreate, RegistrationUpdate,
     now_utc, new_id,
@@ -14,6 +15,7 @@ from bracket_extensions import (
 )
 
 router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
+STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 
 
 def _iso(dt):
@@ -88,7 +90,7 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
                            event_id: str | None = None, limit: int = 100,
                            user=Depends(get_optional_user)):
     db = get_db()
-    is_admin = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
+    is_admin = user and user.get("role") in STAFF_ROLES
     q = {}
     if status:
         q["status"] = status
@@ -99,6 +101,12 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     if event_id:
         q["event_id"] = event_id
     tournaments = await db.tournaments.find(q, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    if not is_admin:
+        visible = []
+        for t in tournaments:
+            if t.get("is_public") is not False and await user_can_see(user, t.get("visibility") or "public"):
+                visible.append(t)
+        tournaments = visible
     for t in tournaments:
         await _enrich_tournament(t)
     return tournaments
@@ -110,10 +118,25 @@ async def get_tournament(slug_or_id: str, user=Depends(get_optional_user)):
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    is_admin = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
+    is_admin = user and user.get("role") in STAFF_ROLES
     if t.get("status") == "draft" and not is_admin:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if not is_admin and t.get("is_public") is False:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if not await user_can_see(user, t.get("visibility") or "public"):
+        raise HTTPException(status_code=403, detail="Turnier ist nicht sichtbar")
     await _enrich_tournament(t)
+    if t.get("event_id"):
+        t["related_f1_challenges"] = await db.f1_challenges.find(
+            {"event_id": t["event_id"], "status": {"$ne": "draft"}},
+            {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "status": 1, "visibility": 1},
+        ).to_list(50)
+        if not is_admin:
+            visible_f1 = []
+            for c in t["related_f1_challenges"]:
+                if await user_can_see(user, c.get("visibility") or "public"):
+                    visible_f1.append(c)
+            t["related_f1_challenges"] = visible_f1
     return t
 
 

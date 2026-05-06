@@ -11,6 +11,7 @@ export default function AdminF1NewPage() {
   const [form, setForm] = useState({
     title: "", slug: "", description: "",
     event_id: "",
+    visibility: "public",
     vehicle: "", weather: "", assists_allowed: "",
     controller_type: "", platform: "", banner_url: "",
     unlimited_attempts: true, max_attempts: 0,
@@ -74,6 +75,12 @@ export default function AdminF1NewPage() {
             testId="f1-new-event"
           />
         )}
+        <Select label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={[
+          ["public", "Öffentlich"],
+          ["community", "Nur registrierte Community"],
+          ["members", "Nur Vereinsmitglieder"],
+          ["internal", "Nur intern"],
+        ]} testId="f1-new-visibility" />
         <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeitplan & Einreichung</div>
           <div className="grid md:grid-cols-2 gap-4">

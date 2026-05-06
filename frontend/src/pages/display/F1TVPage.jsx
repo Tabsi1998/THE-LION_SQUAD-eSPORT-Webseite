@@ -70,7 +70,7 @@ export default function F1TVPage() {
   const entries = board?.entries || [];
   const top3 = entries.slice(0, 3);
   const rest = entries.slice(3, 13);
-  const publicUrl = `${window.location.origin}/f1/${challenge.slug || challenge.id}`;
+  const publicUrl = `${window.location.origin}/fastlap/${challenge.slug || challenge.id}`;
   const prevTrack = () => challenge.tracks?.length && setActiveTrackIdx((i) => (i - 1 + challenge.tracks.length) % challenge.tracks.length);
   const nextTrack = () => challenge.tracks?.length && setActiveTrackIdx((i) => (i + 1) % challenge.tracks.length);
 
