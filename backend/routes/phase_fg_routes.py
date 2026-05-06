@@ -51,31 +51,57 @@ media_router = APIRouter(prefix="/api/media", tags=["media"])
 admin_media_router = APIRouter(prefix="/api/admin/media", tags=["cms-admin"])
 
 
-async def _list_media_items() -> list[dict]:
+ADMIN_MEDIA_ROLES = {"tournament_admin", "club_admin", "superadmin"}
+
+
+async def _list_media_items(owner_id: str | None = None, include_untracked: bool = True) -> list[dict]:
     if not UPLOAD_DIR.exists():
         return []
-    items: list[dict] = []
-    candidates = []
+    candidates: list[Path] = []
     for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
         if base.exists():
             candidates.extend([p for p in base.iterdir() if p.is_file()])
+    candidates = [
+        p for p in candidates
+        if not p.name.startswith(".") and p.suffix.lower() in PUBLIC_IMAGE_EXTS
+    ]
+    filenames = [p.name for p in candidates]
+    media_meta: dict[str, dict[str, Any]] = {}
+    if filenames:
+        db = get_db()
+        meta_query: dict[str, Any] = {"filename": {"$in": filenames}}
+        if owner_id:
+            meta_query["owner_id"] = owner_id
+        rows = await db.media_uploads.find(meta_query, {"_id": 0}).to_list(len(filenames))
+        media_meta = {row["filename"]: row for row in rows if row.get("filename")}
+    items: list[dict] = []
     for p in sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True):
-        if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in PUBLIC_IMAGE_EXTS:
-            stat = p.stat()
-            items.append({
-                "filename": p.name,
-                "url": f"/api/static/uploads/{p.name}",
-                "size": stat.st_size,
-                "mtime": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
-                "ext": p.suffix.lower().lstrip("."),
-            })
+        meta = media_meta.get(p.name)
+        if owner_id and not meta:
+            continue
+        if not include_untracked and not meta:
+            continue
+        stat = p.stat()
+        items.append({
+            "filename": p.name,
+            "url": f"/api/static/uploads/{p.name}",
+            "size": stat.st_size,
+            "mtime": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+            "ext": p.suffix.lower().lstrip("."),
+            "owner_id": meta.get("owner_id") if meta else None,
+            "owner_role": meta.get("owner_role") if meta else None,
+            "original_filename": meta.get("original_filename") if meta else None,
+            "created_at": meta.get("created_at") if meta else None,
+        })
     return items[:500]
 
 
 @media_router.get("")
 async def list_media(me: dict = Depends(get_current_user)):
-    """List public uploaded images for authenticated users."""
-    return await _list_media_items()
+    """List uploaded images visible in the current user's media picker."""
+    if me.get("role") in ADMIN_MEDIA_ROLES:
+        return await _list_media_items()
+    return await _list_media_items(owner_id=me["id"], include_untracked=False)
 
 
 @admin_media_router.get("")

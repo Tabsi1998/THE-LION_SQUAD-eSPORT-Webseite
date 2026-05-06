@@ -2,10 +2,11 @@
  * Phase F.2 — Admin Media Browser.
  * Lists all uploaded files in /api/static/uploads, preview, copy URL, delete.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { API_BASE, api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { prepareImageForUpload } from "@/components/tls/ImageUpload";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import {
   Image as ImageIcon, FileText, Trash2, Copy, ExternalLink, Search, RefreshCw, Upload,
@@ -28,7 +29,7 @@ export default function AdminMediaPage() {
   const [selected, setSelected] = useState(null);
   const [uploading, setUploading] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get("/admin/media");
@@ -37,9 +38,10 @@ export default function AdminMediaPage() {
       toast.error(formatApiError(e.response?.data?.detail) || "Fehler beim Laden");
     }
     setLoading(false);
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["admin/media", "media", "uploads"]);
 
   const filtered = useMemo(() => {
     return items.filter((it) => {
@@ -57,13 +59,17 @@ export default function AdminMediaPage() {
 
   const del = async (it) => {
     if (!window.confirm(`Datei "${it.filename}" wirklich endgültig löschen?`)) return;
+    const previous = items;
+    setItems((rows) => rows.filter((row) => row.filename !== it.filename));
+    setSelected(null);
     try {
       const { data } = await api.delete(`/admin/media/${encodeURIComponent(it.filename)}`);
       toast.success(`Datei geloescht${data?.cleared_references ? `, ${data.cleared_references} Verknuepfung(en) bereinigt` : ""}`);
-      setSelected(null);
       load();
     } catch (e) {
+      setItems(previous);
       toast.error(formatApiError(e.response?.data?.detail) || "Löschen fehlgeschlagen");
+      load();
     }
   };
 

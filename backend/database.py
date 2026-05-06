@@ -124,6 +124,10 @@ async def init_indexes():
     await db.mail_jobs.create_index([("status", 1), ("next_attempt_at", 1)])
     await db.mail_jobs.create_index("dedupe_key")
     await db.mail_jobs.create_index("created_at")
+    # Media ownership for user-facing media pickers
+    await db.media_uploads.create_index("id", unique=True)
+    await db.media_uploads.create_index("filename", unique=True)
+    await db.media_uploads.create_index("owner_id")
     # Phase 9: Prize pickups
     await db.prize_pickups.create_index("id", unique=True)
     await db.prize_pickups.create_index("tournament_id")

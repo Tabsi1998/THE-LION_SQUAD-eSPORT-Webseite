@@ -8,6 +8,8 @@ from io import BytesIO
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from PIL import Image, UnidentifiedImageError
 from auth import require_admin, get_current_user
+from database import get_db
+from models import new_id, now_utc
 
 logger = logging.getLogger("tls-arena.uploads")
 UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
@@ -138,7 +140,25 @@ async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_curr
     except OSError as exc:
         logger.error("[uploads] failed to write %s: %s", path, exc)
         raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR pruefen.")
-    return {"url": f"/api/static/uploads/{filename}", "filename": filename, "size": len(data), "original_size": original_size}
+    url = f"/api/static/uploads/{filename}"
+    try:
+        await get_db().media_uploads.insert_one({
+            "id": new_id(),
+            "filename": filename,
+            "url": url,
+            "size": len(data),
+            "original_size": original_size,
+            "original_filename": filename_hint,
+            "mime": content_type,
+            "ext": ext.lstrip("."),
+            "owner_id": me.get("id"),
+            "owner_role": me.get("role"),
+            "created_at": now_utc().isoformat(),
+            "updated_at": now_utc().isoformat(),
+        })
+    except Exception as exc:
+        logger.warning("[uploads] media metadata write failed for %s: %s", filename, exc)
+    return {"url": url, "filename": filename, "size": len(data), "original_size": original_size}
 
 
 @router.post("/sponsor-logo")
