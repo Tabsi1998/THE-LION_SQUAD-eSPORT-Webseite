@@ -7,6 +7,11 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Flag, Plus, Save, X, Trash2, Calendar, Trophy } from "lucide-react";
 
+const CREATE_STATUS_OPTIONS = [
+  ["draft", "Entwurf"],
+  ["scheduled", "Angekündigt"],
+];
+
 export default function AdminEventsPage() {
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ types: [], statuses: [], visibilities: [] });
@@ -198,7 +203,6 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
       payload.sponsor_ids = payload.owned_by_club && payload.show_sponsors ? (payload.sponsor_ids || []) : [];
       let savedEvent;
       if (isNew) {
-        delete payload.status;
         const { data } = await api.post("/events", payload);
         savedEvent = data;
       } else {
@@ -239,13 +243,20 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
                 {meta.visibilities.map((v) => <option key={v.k} value={v.k}>{v.l}</option>)}
               </select>
             </Field>
-            {!isNew && (
-              <Field label="Status">
+            <Field label={isNew ? "Veröffentlichung" : "Status"}>
+              {isNew ? (
+                <select value={form.status} onChange={(e) => set("status", e.target.value)} data-testid="event-status" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+                  {CREATE_STATUS_OPTIONS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+              ) : (
                 <select value={form.status} onChange={(e) => set("status", e.target.value)} data-testid="event-status" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
                   {meta.statuses.map((s) => <option key={s.k} value={s.k}>{s.l}</option>)}
                 </select>
-              </Field>
-            )}
+              )}
+            </Field>
+          </div>
+          <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
+            Für neue Inhalte reicht normalerweise <span className="text-white font-semibold">Entwurf</span> oder <span className="text-white font-semibold">Angekündigt</span>. Anmeldung, Live und Beendet werden über die Datumsfelder automatisch berechnet.
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Start"><input type="datetime-local" value={form.start_date} onChange={(e) => set("start_date", e.target.value)} data-testid="event-start" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>

@@ -10,6 +10,19 @@ import { Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
+const F1_STATUS_OPTIONS = [
+  ["draft", "Entwurf"],
+  ["scheduled", "Angekündigt"],
+  ["registration_open", "Einreichung offen"],
+  ["registration_closed", "Einreichung geschlossen"],
+  ["live", "Live"],
+  ["paused", "Pausiert"],
+  ["completed", "Beendet"],
+  ["results_published", "Ergebnisse veröffentlicht"],
+  ["archived", "Archiviert"],
+  ["cancelled", "Abgesagt"],
+];
+
 export default function AdminF1EditPage() {
   const { isAdmin } = useAuth();
   const { id } = useParams();
@@ -161,9 +174,12 @@ export default function AdminF1EditPage() {
         </div>
         <div className="flex gap-2 flex-wrap">
           {isAdmin && (
-            <select value={challenge.status} onChange={(e) => setStatus(e.target.value)} data-testid="f1-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
-              {["draft", "scheduled", "registration_open", "registration_closed", "live", "paused", "completed", "results_published", "archived", "cancelled"].map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <div>
+              <select value={challenge.status} onChange={(e) => setStatus(e.target.value)} data-testid="f1-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
+                {F1_STATUS_OPTIONS.map(([s, label]) => <option key={s} value={s}>{label}</option>)}
+              </select>
+              <div className="mt-1 text-[10px] text-white/40">Manuell nur für Ausnahmen; Zeitplan automatisiert.</div>
+            </div>
           )}
           <Link target="_blank" to={`/display/f1/${challenge.id}`} data-testid="f1-tv-admin-link" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8] text-[#29B6E8] rounded-sm uppercase tracking-wider text-sm font-bold hover:bg-[#29B6E8]/10">
             <Tv className="w-4 h-4" /> TV Modus

@@ -6,6 +6,11 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { normalizeDateTimeFields } from "@/lib/datetime";
 import { toast } from "sonner";
 
+const CREATE_STATUS_OPTIONS = [
+  ["draft", "Entwurf"],
+  ["scheduled", "Angekündigt"],
+];
+
 export default function AdminF1NewPage() {
   const nav = useNavigate();
   const [form, setForm] = useState({
@@ -84,17 +89,14 @@ export default function AdminF1NewPage() {
         <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeitplan & Einreichung</div>
           <div className="grid md:grid-cols-2 gap-4">
-            <Select label="Initialer Status" value={form.status} onChange={(v) => set("status", v)} options={[
-              ["draft", "Entwurf"],
-              ["scheduled", "Angekündigt"],
-              ["registration_open", "Einreichung offen"],
-              ["registration_closed", "Einreichung geschlossen"],
-              ["live", "Live"],
-            ]} testId="f1-new-status" />
+            <Select label="Veröffentlichung" value={form.status} onChange={(v) => set("status", v)} options={CREATE_STATUS_OPTIONS} testId="f1-new-status" />
             <Field label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v) => set("start_date", v)} testId="f1-new-start" />
             <Field label="Ende Challenge/Event" type="datetime-local" value={form.end_date} onChange={(v) => set("end_date", v)} testId="f1-new-end" />
             <Field label="Einreichung öffnet" type="datetime-local" value={form.registration_open_from} onChange={(v) => set("registration_open_from", v)} testId="f1-new-reg-from" />
             <Field label="Einreichung endet" type="datetime-local" value={form.registration_open_until} onChange={(v) => set("registration_open_until", v)} testId="f1-new-reg-until" />
+          </div>
+          <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
+            Einreichung offen, Live und Beendet werden anhand dieser Zeiten automatisch geschaltet. Manuelle Sonderstatus setzt du später in der Bearbeitung.
           </div>
           <label className="flex items-start gap-2 text-sm text-white/75">
             <input type="checkbox" checked={form.registration_enabled} onChange={(e) => set("registration_enabled", e.target.checked)} data-testid="f1-new-reg-enabled" className="accent-[#29B6E8] mt-1" />

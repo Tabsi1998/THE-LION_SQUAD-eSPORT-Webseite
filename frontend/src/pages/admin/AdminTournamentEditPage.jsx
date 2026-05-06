@@ -11,6 +11,20 @@ import { Zap, RefreshCw, Eye } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
+const TOURNAMENT_STATUS_OPTIONS = [
+  ["draft", "Entwurf"],
+  ["scheduled", "Angekündigt"],
+  ["registration_open", "Anmeldung offen"],
+  ["registration_closed", "Anmeldung geschlossen"],
+  ["check_in", "Check-in offen"],
+  ["live", "Live"],
+  ["paused", "Pausiert"],
+  ["completed", "Beendet"],
+  ["results_published", "Ergebnisse veröffentlicht"],
+  ["archived", "Archiviert"],
+  ["cancelled", "Abgesagt"],
+];
+
 export default function AdminTournamentEditPage() {
   const { isAdmin, isModerator } = useAuth();
   const { id } = useParams();
@@ -99,11 +113,12 @@ export default function AdminTournamentEditPage() {
         </div>
         <div className="flex gap-2 flex-wrap">
           {isAdmin && (
-            <select value={t.status} onChange={(e) => setTournStatus(e.target.value)} data-testid="admin-tr-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
-              {["draft", "scheduled", "registration_open", "registration_closed", "check_in", "live", "paused", "completed", "results_published", "archived", "cancelled"].map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+            <div>
+              <select value={t.status} onChange={(e) => setTournStatus(e.target.value)} data-testid="admin-tr-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
+                {TOURNAMENT_STATUS_OPTIONS.map(([s, label]) => <option key={s} value={s}>{label}</option>)}
+              </select>
+              <div className="mt-1 text-[10px] text-white/40">Manuell nur für Ausnahmen; Zeitplan automatisiert.</div>
+            </div>
           )}
           {isAdmin && <button onClick={generate} data-testid="admin-tr-generate" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2">
             <Zap className="w-3.5 h-3.5" /> Bracket generieren

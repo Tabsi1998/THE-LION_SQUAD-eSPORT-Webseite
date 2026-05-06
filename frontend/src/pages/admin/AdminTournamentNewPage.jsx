@@ -20,6 +20,11 @@ const FORMATS = [
   ["grand_prix", "Grand Prix"],
 ];
 
+const CREATE_STATUS_OPTIONS = [
+  ["draft", "Entwurf"],
+  ["scheduled", "Angekündigt"],
+];
+
 export default function AdminTournamentNewPage() {
   const nav = useNavigate();
   const [games, setGames] = useState([]);
@@ -101,13 +106,7 @@ export default function AdminTournamentNewPage() {
         <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeitplan & Anmeldung</div>
           <Row>
-            <Select label="Initialer Status" value={form.status} onChange={(v) => set("status", v)} options={[
-              ["draft", "Entwurf"],
-              ["scheduled", "Angekündigt"],
-              ["registration_open", "Anmeldung offen"],
-              ["registration_closed", "Anmeldung geschlossen"],
-              ["live", "Live"],
-            ]} testId="new-tr-status" />
+            <Select label="Veröffentlichung" value={form.status} onChange={(v) => set("status", v)} options={CREATE_STATUS_OPTIONS} testId="new-tr-status" />
             <Field label="Start Event/Turnier" type="datetime-local" value={form.start_date} onChange={(v) => set("start_date", v)} testId="new-tr-start" />
             <Field label="Ende Event/Turnier" type="datetime-local" value={form.end_date} onChange={(v) => set("end_date", v)} testId="new-tr-end" />
             <Field label="Anmeldung öffnet" type="datetime-local" value={form.registration_open_from} onChange={(v) => set("registration_open_from", v)} testId="new-tr-reg-from" />
@@ -115,6 +114,9 @@ export default function AdminTournamentNewPage() {
             <Field label="Check-in öffnet" type="datetime-local" value={form.check_in_from} onChange={(v) => set("check_in_from", v)} testId="new-tr-checkin-from" />
             <Field label="Check-in endet" type="datetime-local" value={form.check_in_until} onChange={(v) => set("check_in_until", v)} testId="new-tr-checkin-until" />
           </Row>
+          <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
+            Anmeldung, Check-in, Live und Beendet werden anhand dieser Zeiten automatisch geschaltet. Manuelle Sonderstatus setzt du später in der Bearbeitung.
+          </div>
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="flex items-start gap-2 text-sm text-white/75">
               <input type="checkbox" checked={form.registration_enabled} onChange={(e) => set("registration_enabled", e.target.checked)} data-testid="new-tr-reg-enabled" className="accent-[#29B6E8] mt-1" />
