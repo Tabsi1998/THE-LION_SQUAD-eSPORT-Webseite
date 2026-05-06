@@ -216,7 +216,10 @@ async def sitemap():
         if slug:
             urls.append({"loc": f"{base}/news/{slug}", "lastmod": n.get("updated_at") or n.get("published_at") or n.get("created_at"), "changefreq": "monthly", "priority": "0.85"})
     # public profiles
-    async for u in db.users.find({"privacy_public_profile": True}, {"username": 1, "updated_at": 1, "_id": 0}):
+    async for u in db.users.find(
+        {"privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}},
+        {"username": 1, "updated_at": 1, "_id": 0},
+    ):
         if u.get("username"):
             urls.append({"loc": f"{base}/u/{u['username']}", "lastmod": u.get("updated_at"), "changefreq": "monthly", "priority": "0.4"})
 

@@ -320,7 +320,7 @@ async def list_public_users():
 async def get_public_profile(username: str):
     db = get_db()
     u = await db.users.find_one({"username": username}, {"_id": 0, "password_hash": 0, "email": 0})
-    if not u:
+    if not u or u.get("is_active") is False or u.get("is_banned") is True:
         raise HTTPException(status_code=404, detail="Spieler nicht gefunden")
     public = bool(u.get("privacy_public_profile"))
     # Membership data

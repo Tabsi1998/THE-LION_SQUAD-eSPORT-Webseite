@@ -9,6 +9,7 @@ import io
 
 from database import get_db
 from auth import require_admin, require_super, get_current_user
+from services.visibility import user_can_see
 from models import now_utc, new_id
 from email_service import send_template, _get_email_config
 from pdf_service import (
@@ -802,21 +803,53 @@ async def _public_f1_challenge_or_404(slug_or_id: str) -> dict:
     return c
 
 
+async def _public_tournament_or_404(slug_or_id: str) -> dict:
+    db = get_db()
+    t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    if (
+        not t
+        or t.get("status") == "draft"
+        or t.get("is_public") is False
+        or not await user_can_see(None, t.get("visibility") or "public")
+    ):
+        raise HTTPException(status_code=404)
+    return t
+
+
+def _public_registration(reg: dict) -> dict:
+    return {
+        "id": reg.get("id"),
+        "tournament_id": reg.get("tournament_id"),
+        "status": reg.get("status"),
+        "display_name": reg.get("display_name") or reg.get("ingame_name"),
+        "ingame_name": reg.get("ingame_name"),
+        "team_id": reg.get("team_id"),
+        "seed": reg.get("seed"),
+    }
+
+
+def _public_challenge_summary(challenge: dict) -> dict:
+    return {
+        "id": challenge.get("id"),
+        "slug": challenge.get("slug"),
+        "title": challenge.get("title"),
+        "status": challenge.get("status"),
+    }
+
+
 @widget_router.get("/tournament/{slug_or_id}/bracket")
 async def widget_bracket(slug_or_id: str):
     """Read-only bracket data for widget embed."""
     db = get_db()
-    t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
-    if not t or not t.get("is_public", True):
-        raise HTTPException(status_code=404)
+    t = await _public_tournament_or_404(slug_or_id)
     matches = await db.matches.find({"tournament_id": t["id"]}, {"_id": 0, "admin_note": 0,
                                                                     "reports": 0, "disputes": 0}).to_list(2000)
     regs = await db.tournament_registrations.find(
         {"tournament_id": t["id"]},
-        {"_id": 0, "notes": 0, "discord": 0, "platform_id": 0},
+        {"_id": 0},
     ).to_list(500)
     return {"tournament": {"id": t["id"], "title": t["title"], "format": t["format"], "status": t["status"]},
-            "matches": matches, "registrations": regs}
+            "matches": matches, "registrations": [_public_registration(r) for r in regs]}
 
 
 @widget_router.get("/f1/{slug_or_id}/leaderboard")
@@ -826,7 +859,7 @@ async def widget_f1(slug_or_id: str, track_id: Optional[str] = None):
     if not track_id:
         first = await db.f1_tracks.find_one({"challenge_id": c["id"]}, {"_id": 0}, sort=[("order_index", 1)])
         if not first:
-            return {"challenge": c, "track": None, "entries": []}
+            return {"challenge": _public_challenge_summary(c), "track": None, "entries": []}
         track_id = first["id"]
     # reuse f1 leaderboard logic (inline-light)
     track = await db.f1_tracks.find_one({"id": track_id}, {"_id": 0})
@@ -846,7 +879,7 @@ async def widget_f1(slug_or_id: str, track_id: Optional[str] = None):
     for uid, tr in best_per_user.items():
         u = users.get(uid, {})
         m = tr["effective_ms"]
-        entries.append({"user_id": uid, "display_name": u.get("display_name") or u.get("username") or "—",
+        entries.append({"display_name": u.get("display_name") or u.get("username") or "—",
                          "time_ms": m,
                          "time_str": f"{m//60000}:{(m%60000)//1000:02d}.{m%1000:03d}"})
     entries.sort(key=lambda e: e["time_ms"])
@@ -854,7 +887,7 @@ async def widget_f1(slug_or_id: str, track_id: Optional[str] = None):
         e["rank"] = i + 1
         e["gap_ms"] = e["time_ms"] - entries[0]["time_ms"] if i > 0 else 0
         e["gap_str"] = f"+{e['gap_ms']/1000:.3f}s" if i > 0 else ""
-    return {"challenge": {"id": c["id"], "title": c["title"], "status": c["status"]},
+    return {"challenge": _public_challenge_summary(c),
             "track": track, "entries": entries}
 
 
