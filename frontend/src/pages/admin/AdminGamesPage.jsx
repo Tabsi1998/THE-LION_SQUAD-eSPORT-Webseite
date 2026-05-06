@@ -13,11 +13,13 @@ const slugFrom = (txt) => (txt || "")
   .toLowerCase()
   .replace(/[^a-z0-9]+/g, "-")
   .replace(/^-|-$/g, "")
-  .slice(0, 80);
+    .slice(0, 80);
+
+const fieldKeyFrom = (txt) => slugFrom(txt).replace(/-/g, "_");
 
 export default function AdminGamesPage() {
   const [list, setList] = useState([]);
-  const [form, setForm] = useState({ name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "" });
+  const [form, setForm] = useState({ name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "", player_id_fields: [] });
   const [editing, setEditing] = useState(null);
   const load = useCallback(async () => { const { data } = await api.get("/games"); setList(data); }, []);
   useEffect(() => { load(); }, [load]);
@@ -30,9 +32,10 @@ export default function AdminGamesPage() {
       await api.post("/games", {
         ...form,
         platforms: form.platforms ? form.platforms.split(",").map((s) => s.trim()) : [],
+        player_id_fields: normalizePlayerIdFields(form.player_id_fields),
       });
       toast.success("Spiel erstellt.");
-      setForm({ name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "" });
+      setForm({ name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "", player_id_fields: [] });
       load();
     } catch (err) { toast.error(formatRequestError(err, "Spiel konnte nicht erstellt werden.", { slug: form.slug, name: form.name })); }
   };
@@ -63,6 +66,7 @@ export default function AdminGamesPage() {
           <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-platforms" />
           <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="game-logo" variant="square" allowLibrary />
           <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Cover" testId="game-cover" variant="wide" allowLibrary />
+          <PlayerIdFieldsEditor value={form.player_id_fields} onChange={(v) => set("player_id_fields", v)} />
           <button data-testid="game-submit" className="w-full px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] inline-flex items-center justify-center gap-2">
             <Plus className="w-4 h-4" /> Anlegen
           </button>
@@ -120,7 +124,19 @@ function toForm(game) {
     supports_grand_prix: game.supports_grand_prix ?? false,
     default_team_size: game.default_team_size ?? 1,
     default_format: game.default_format || "single_elim",
+    player_id_fields: game.player_id_fields || [],
   };
+}
+
+function normalizePlayerIdFields(fields = []) {
+  return (fields || [])
+    .map((field) => ({
+      key: fieldKeyFrom(field.key || field.label || ""),
+      label: field.label || field.key || "",
+      help_text: field.help_text || "",
+      required: field.required !== false,
+    }))
+    .filter((field) => field.key && field.label);
 }
 
 function gamePayload(form) {
@@ -129,6 +145,7 @@ function gamePayload(form) {
     slug: slugFrom(form.slug),
     platforms: form.platforms ? form.platforms.split(",").map((s) => s.trim()).filter(Boolean) : [],
     default_team_size: Number(form.default_team_size) || 1,
+    player_id_fields: normalizePlayerIdFields(form.player_id_fields),
   };
 }
 
@@ -167,6 +184,7 @@ function EditGameModal({ game, onClose, onSaved }) {
           <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-edit-platforms" />
           <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="game-edit-logo" variant="square" allowLibrary />
           <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Cover" testId="game-edit-cover" variant="wide" allowLibrary />
+          <PlayerIdFieldsEditor value={form.player_id_fields} onChange={(v) => set("player_id_fields", v)} />
           <div className="grid md:grid-cols-2 gap-3">
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_solo} onChange={(e) => set("supports_solo", e.target.checked)} className="accent-[#29B6E8]" /> Solo</label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_teams} onChange={(e) => set("supports_teams", e.target.checked)} className="accent-[#29B6E8]" /> Teams</label>
@@ -186,6 +204,38 @@ function EditGameModal({ game, onClose, onSaved }) {
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function PlayerIdFieldsEditor({ value = [], onChange }) {
+  const fields = value || [];
+  const update = (idx, patch) => {
+    const next = [...fields];
+    next[idx] = { ...next[idx], ...patch };
+    onChange(next);
+  };
+  return (
+    <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-3 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spieler-IDs</div>
+          <div className="text-[10px] text-white/45 mt-0.5">Pflichtfelder werden bei Turnieranmeldungen geprüft.</div>
+        </div>
+        <button type="button" onClick={() => onChange([...fields, { key: "", label: "", help_text: "", required: true }])} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8]">+ Feld</button>
+      </div>
+      {fields.map((field, idx) => (
+        <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+          <input value={field.label || ""} onChange={(e) => update(idx, { label: e.target.value, key: field.key || fieldKeyFrom(e.target.value) })} placeholder="Label, z.B. Activision ID" className="col-span-5 bg-[#121212] border border-white/10 px-2 py-2 rounded-sm text-xs" />
+          <input value={field.key || ""} onChange={(e) => update(idx, { key: fieldKeyFrom(e.target.value) })} placeholder="key" className="col-span-3 bg-[#121212] border border-white/10 px-2 py-2 rounded-sm text-xs" />
+          <input value={field.help_text || ""} onChange={(e) => update(idx, { help_text: e.target.value })} placeholder="Hinweis" className="col-span-3 bg-[#121212] border border-white/10 px-2 py-2 rounded-sm text-xs" />
+          <button type="button" onClick={() => onChange(fields.filter((_, i) => i !== idx))} className="col-span-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+          <label className="col-span-12 inline-flex items-center gap-2 text-xs text-white/65">
+            <input type="checkbox" checked={field.required !== false} onChange={(e) => update(idx, { required: e.target.checked })} className="accent-[#29B6E8]" />
+            Pflichtfeld für Turnieranmeldung
+          </label>
+        </div>
+      ))}
     </div>
   );
 }

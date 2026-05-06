@@ -16,17 +16,36 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 export const NAV_STRUCTURE = [
   { to: "/", label: "Home", end: true },
   {
+    to: "/news",
+    label: "News",
+    children: [
+      { to: "/news", label: "Alle News" },
+      { to: "/events", label: "Events" },
+      { to: "/tournaments", label: "Turniere" },
+      { to: "/fastlap", label: "Fast Lap" },
+    ],
+  },
+  {
+    to: "/events",
+    label: "Events",
+    children: [
+      { to: "/events", label: "Alle Events" },
+      { to: "/tournaments", label: "Turniere" },
+      { to: "/fastlap", label: "Fast Lap" },
+      { to: "/galerie", label: "Galerie" },
+    ],
+  },
+  {
     label: "Verein",
     children: [
       { to: "/about", label: "Über uns" },
       { to: "/board", label: "Vorstand" },
       { to: "/values", label: "Werte & Ziele" },
+      { to: "/partners", label: "Partner" },
       { to: "/sponsors", label: "Sponsoren" },
       { to: "/galerie", label: "Galerie" },
     ],
   },
-  { to: "/news", label: "News" },
-  { to: "/events", label: "Events" },
   {
     label: "eSports",
     children: [

@@ -44,6 +44,15 @@ def _upload_mb_from_env(name: str, default: int) -> int:
     return value
 
 
+def _int_from_env(name: str, default: int) -> int:
+    try:
+        value = int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        logger.warning("[uploads] invalid %s, falling back to %s", name, default)
+        return default
+    return value if value > 0 else default
+
+
 ALLOWED_DOC = {
     "application/pdf",
     "application/zip",
@@ -59,13 +68,23 @@ ALLOWED_DOC = {
     "text/markdown",
     "image/png", "image/jpeg",
 }
-MAX_IMAGE_UPLOAD_MB = _upload_mb_from_env("MAX_IMAGE_UPLOAD_MB", 50)
+MAX_IMAGE_UPLOAD_MB = _upload_mb_from_env("MAX_IMAGE_UPLOAD_MB", 120)
 MAX_DOCUMENT_UPLOAD_MB = _upload_mb_from_env("MAX_DOCUMENT_UPLOAD_MB", 50)
 MAX_BYTES = MAX_IMAGE_UPLOAD_MB * 1024 * 1024  # images before re-encoding
 MAX_DOC_BYTES = MAX_DOCUMENT_UPLOAD_MB * 1024 * 1024  # docs
-MAX_IMAGE_PIXELS = 36_000_000
+MAX_IMAGE_DIMENSION = _int_from_env("MAX_IMAGE_DIMENSION", 4096)
+MAX_IMAGE_PIXELS = _int_from_env("MAX_IMAGE_PIXELS", 200_000_000)
+Image.MAX_IMAGE_PIXELS = max(Image.MAX_IMAGE_PIXELS or 0, MAX_IMAGE_PIXELS)
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
+
+
+def _resize_for_storage(img: Image.Image) -> tuple[Image.Image, bool]:
+    if img.width <= MAX_IMAGE_DIMENSION and img.height <= MAX_IMAGE_DIMENSION:
+        return img, False
+    resized = img.copy()
+    resized.thumbnail((MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION), Image.Resampling.LANCZOS)
+    return resized, True
 
 
 @router.post("/image")
@@ -89,8 +108,6 @@ async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_curr
         with Image.open(BytesIO(data)) as img:
             img.verify()
         with Image.open(BytesIO(data)) as img:
-            if img.width * img.height > MAX_IMAGE_PIXELS:
-                raise HTTPException(status_code=413, detail="Bild ist zu gross (max 36 Megapixel)")
             detected_format = (img.format or "").upper()
             if detected_format not in PIL_IMAGE_FORMATS:
                 raise HTTPException(
@@ -112,7 +129,11 @@ async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_curr
                     detected_format,
                     filename_hint,
                 )
-            output_format = img.format
+            img, resized = _resize_for_storage(img)
+            output_format = img.format or detected_format
+            if resized or original_size > 12 * 1024 * 1024:
+                output_format = "WEBP"
+                content_type, ext = "image/webp", ".webp"
             out = BytesIO()
             save_kwargs = {}
             if output_format == "JPEG":
@@ -121,8 +142,9 @@ async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_curr
             elif output_format == "PNG":
                 img = img.convert("RGBA" if img.mode in ("RGBA", "LA", "P") else "RGB")
                 save_kwargs = {"optimize": True}
-            elif output_format == "WEBP" and img.mode not in ("RGB", "RGBA"):
-                img = img.convert("RGBA" if "A" in img.getbands() else "RGB")
+            elif output_format == "WEBP":
+                if img.mode not in ("RGB", "RGBA"):
+                    img = img.convert("RGBA" if "A" in img.getbands() else "RGB")
                 save_kwargs = {"quality": 88, "method": 6}
             img.save(out, format=output_format, **save_kwargs)
             data = out.getvalue()

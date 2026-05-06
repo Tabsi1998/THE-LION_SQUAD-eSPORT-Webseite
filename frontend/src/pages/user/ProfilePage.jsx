@@ -74,6 +74,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [achData, setAchData] = useState(null);
   const [completeness, setCompleteness] = useState(null);
+  const [games, setGames] = useState([]);
 
   const loadAchievements = useCallback(() => {
     api.get("/achievements/me").then(({ data }) => setAchData(data)).catch(() => setAchData({ groups: [], awards: [] }));
@@ -94,6 +95,10 @@ export default function ProfilePage() {
       setCompleteness(null);
     }
   }, ["achievements", "users"]);
+
+  useEffect(() => {
+    api.get("/games").then(({ data }) => setGames(data || [])).catch(() => setGames([]));
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -117,6 +122,7 @@ export default function ProfilePage() {
         input_device: user.input_device || "",
         input_devices: user.input_devices || (user.input_device ? [user.input_device] : []),
         gaming_subscriptions: user.gaming_subscriptions || [],
+        game_ids: user.game_ids || {},
         // socials
         discord_name: user.discord_name || "",
         twitch_handle: user.twitch_handle || "",
@@ -143,6 +149,13 @@ export default function ProfilePage() {
   }, [user]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setGameId = (gameSlug, fieldKey, value) => setForm((f) => ({
+    ...f,
+    game_ids: {
+      ...(f.game_ids || {}),
+      [gameSlug]: { ...((f.game_ids || {})[gameSlug] || {}), [fieldKey]: value },
+    },
+  }));
   const setVisibility = (field, level) => setForm((f) => ({
     ...f,
     profile_visibility: { ...(f.profile_visibility || {}), [field]: level },
@@ -248,6 +261,26 @@ export default function ProfilePage() {
                 <MultiSelect options={SUBSCRIPTIONS} value={form.gaming_subscriptions} onChange={(v) => set("gaming_subscriptions", v)} testId="profile-subs" />
               </Field>
               <Field label="Bevorzugte Rolle"><Input value={form.preferred_role} onChange={(v) => set("preferred_role", v)} placeholder="z.B. IGL, Support, Driver" /></Field>
+              {games.some((g) => g.player_id_fields?.length) && (
+                <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-5 space-y-4">
+                  <div>
+                    <h3 className="font-heading font-black uppercase">Spiel-IDs</h3>
+                    <p className="text-xs text-white/50 mt-1">Diese IDs können bei Turnieren als Pflichtfelder verlangt werden. Sichtbar sind sie nicht automatisch öffentlich.</p>
+                  </div>
+                  {games.filter((g) => g.player_id_fields?.length).map((game) => (
+                    <div key={game.id} className="border-t border-white/10 pt-4 first:border-t-0 first:pt-0">
+                      <div className="text-[11px] uppercase tracking-widest font-bold text-[#29B6E8] mb-3">{game.name}</div>
+                      <Row>
+                        {game.player_id_fields.map((field) => (
+                          <Field key={field.key} label={`${field.label}${field.required !== false ? " *" : ""}`}>
+                            <Input value={form.game_ids?.[game.slug]?.[field.key] || ""} onChange={(v) => setGameId(game.slug, field.key, v)} placeholder={field.help_text || field.label} />
+                          </Field>
+                        ))}
+                      </Row>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Section>
           )}
 
@@ -355,6 +388,17 @@ export default function ProfilePage() {
                     { k: "steam", l: "Steam" },
                     { k: "psn", l: "PSN" },
                     { k: "xbox", l: "Xbox" },
+                    { k: "youtube", l: "YouTube" },
+                    { k: "instagram", l: "Instagram" },
+                    { k: "x", l: "X / Twitter" },
+                    { k: "epic", l: "Epic" },
+                    { k: "nintendo", l: "Nintendo Friend Code" },
+                    { k: "ea", l: "EA ID" },
+                    { k: "riot", l: "Riot ID" },
+                    { k: "battlenet", l: "Battle.net" },
+                    { k: "main_platforms", l: "Plattformen" },
+                    { k: "input_devices", l: "Eingabegeräte" },
+                    { k: "favorite_games", l: "Lieblingsspiele" },
                   ].map((f) => (
                     <div key={f.k} className="flex items-center justify-between gap-3">
                       <span className="text-sm text-white/80">{f.l}</span>

@@ -1,10 +1,17 @@
 /**
- * SponsorTicker — Seamless infinite horizontal marquee for sponsor logos/names.
- * Duplicates the sponsor list once so the CSS animation can loop seamlessly.
+ * SponsorTicker — seamless logo marquee.
  */
 import { useCallback, useEffect, useState } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+
+const tierSize = {
+  main: "h-14 md:h-16",
+  platinum: "h-12 md:h-14",
+  gold: "h-11 md:h-12",
+  silver: "h-10",
+  bronze: "h-9",
+};
 
 export function SponsorTicker({ className = "", compact = false, placement = "home" }) {
   const [sponsors, setSponsors] = useState([]);
@@ -18,36 +25,34 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
   useApiInvalidation(load, ["sponsors"]);
   if (!sponsors.length) return null;
   const items = [...sponsors, ...sponsors]; // duplicate for seamless loop
-  const speed = compact ? 28 : 36;
+  const speed = compact ? 34 : 48;
   return (
-    <section className={`relative overflow-hidden border-y border-white/5 bg-[#0A0A0A] ${className}`} data-testid="sponsor-ticker">
+    <section className={`relative overflow-hidden border-y border-white/5 bg-[#070707] ${className}`} data-testid="sponsor-ticker">
       {!compact && (
-        <div className="max-w-7xl mx-auto px-4 py-3 text-center">
-          <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-white/40">Presented by our Partners</span>
+        <div className="max-w-7xl mx-auto px-4 pt-4 pb-1 text-right">
+          <span className="text-[9px] uppercase tracking-[0.35em] font-bold text-white/35">Presented by our Partners</span>
         </div>
       )}
       <div className="relative overflow-hidden group">
         <div
-          className="flex gap-12 whitespace-nowrap"
+          className="flex items-center gap-16 whitespace-nowrap py-5"
           style={{ animation: `tls-marquee ${speed}s linear infinite`, width: "max-content" }}
         >
           {items.map((s, i) => (
-            <div key={`${s.id}-${i}`} className="inline-flex items-center gap-3 py-4 px-2 shrink-0">
+            <a
+              key={`${s.id}-${i}`}
+              href={s.link || undefined}
+              target={s.link ? "_blank" : undefined}
+              rel="noreferrer"
+              className="inline-flex items-center justify-center shrink-0 min-w-32 opacity-75 hover:opacity-100 transition"
+              title={s.name}
+            >
               {s.logo_url ? (
-                <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className={`${compact ? "h-8" : "h-10"} w-auto object-contain opacity-80 group-hover:opacity-100 transition`} />
+                <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className={`${compact ? "h-8" : tierSize[s.tier] || "h-10"} max-w-56 object-contain`} />
               ) : (
-                <div className={`${compact ? "h-8 w-8" : "h-10 w-10"} rounded-sm bg-[#29B6E8]/10 border border-[#29B6E8]/20 flex items-center justify-center text-[#29B6E8] font-display font-bold text-xs`}>
-                  {s.name.slice(0, 2).toUpperCase()}
-                </div>
+                <span className="font-heading font-black uppercase text-white/80">{s.name}</span>
               )}
-              <div>
-                <div className={`font-heading font-bold uppercase text-white ${compact ? "text-sm" : "text-lg"} tracking-tight`}>{s.name}</div>
-                {!compact && s.tier && (
-                  <div className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700]">{s.tier}</div>
-                )}
-              </div>
-              <span className="mx-4 text-white/10">◆</span>
-            </div>
+            </a>
           ))}
         </div>
       </div>
@@ -71,18 +76,15 @@ export function SponsorGrid({ max = 4 }) {
   useApiInvalidation(load, ["sponsors"]);
   if (!sponsors.length) return null;
   return (
-    <div className="flex items-center gap-4" data-testid="sponsor-grid">
+    <div className="flex items-center gap-5" data-testid="sponsor-grid">
       {sponsors.slice(0, max).map((s) => (
-        <div key={s.id} className="flex items-center gap-2 px-3 py-1.5 border border-white/10 rounded-sm bg-white/[0.02]">
+        <a key={s.id} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" className="inline-flex items-center justify-center opacity-75 hover:opacity-100 transition" title={s.name}>
           {s.logo_url ? (
-            <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="h-6 w-auto object-contain" />
+            <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="h-7 max-w-32 object-contain" />
           ) : (
-            <div className="h-6 w-6 rounded-sm bg-[#29B6E8]/10 border border-[#29B6E8]/20 flex items-center justify-center text-[#29B6E8] text-[10px] font-display font-bold">
-              {s.name.slice(0, 2).toUpperCase()}
-            </div>
+            <span className="font-heading text-xs font-bold uppercase text-white/70">{s.name}</span>
           )}
-          <span className="font-heading text-sm font-bold uppercase text-white truncate max-w-[140px]">{s.name}</span>
-        </div>
+        </a>
       ))}
     </div>
   );

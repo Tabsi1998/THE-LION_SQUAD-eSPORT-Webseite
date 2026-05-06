@@ -42,12 +42,40 @@ USER_NULLABLE_FIELDS = {
     "display_name", "avatar_url", "banner_url", "bio", "first_name", "last_name",
     "nickname", "birth_date", "country", "state", "city", "favorite_games",
     "main_platform", "main_platforms", "preferred_role", "input_device",
-    "input_devices", "gaming_subscriptions", "website", "discord_name",
+    "input_devices", "gaming_subscriptions", "website", "game_ids", "discord_name",
     "discord_id", "switch_code", "steam_id", "epic_id", "psn_id", "xbox_id",
     "riot_id", "twitch_handle", "youtube_handle", "tiktok_handle",
     "instagram_handle", "x_handle", "nintendo_fc", "ea_id", "battlenet_id",
     "profile_visibility",
 }
+
+
+def _field_visible(user: dict, key: str, profile_public: bool) -> bool:
+    if not profile_public:
+        return False
+    visibility = (user.get("profile_visibility") or {}).get(key, "public")
+    return visibility == "public"
+
+
+def _visible_field(user: dict, key: str, profile_public: bool):
+    if not _field_visible(user, key, profile_public):
+        return None
+    source_key = {
+        "discord": "discord_name",
+        "twitch": "twitch_handle",
+        "youtube": "youtube_handle",
+        "instagram": "instagram_handle",
+        "x": "x_handle",
+        "steam": "steam_id",
+        "epic": "epic_id",
+        "psn": "psn_id",
+        "xbox": "xbox_id",
+        "nintendo": "nintendo_fc",
+        "ea": "ea_id",
+        "riot": "riot_id",
+        "battlenet": "battlenet_id",
+    }.get(key, key)
+    return user.get(source_key)
 
 
 async def _attach_membership(user: dict) -> dict:
@@ -313,19 +341,27 @@ async def get_public_profile(username: str):
         "avatar_url": u.get("avatar_url"), "banner_url": u.get("banner_url"),
         "bio": u.get("bio") if public else None,
         "role": u.get("role"), "created_at": u.get("created_at"),
-        "country": u.get("country") if public else None,
-        "city": u.get("city") if public else None,
-        "discord_name": u.get("discord_name") if public else None,
-        "twitch_handle": u.get("twitch_handle") if public else None,
-        "youtube_handle": u.get("youtube_handle") if public else None,
-        "instagram_handle": u.get("instagram_handle") if public else None,
-        "x_handle": u.get("x_handle") if public else None,
-        "main_platform": u.get("main_platform") if public else None,
-        "main_platforms": u.get("main_platforms") or [],
-        "input_devices": u.get("input_devices") or [],
-        "gaming_subscriptions": u.get("gaming_subscriptions") if public else None,
-        "favorite_games": u.get("favorite_games") or [],
-        "website": u.get("website") if public else None,
+        "country": _visible_field(u, "country", public),
+        "city": _visible_field(u, "city", public),
+        "discord_name": _visible_field(u, "discord", public),
+        "twitch_handle": _visible_field(u, "twitch", public),
+        "youtube_handle": _visible_field(u, "youtube", public),
+        "instagram_handle": _visible_field(u, "instagram", public),
+        "x_handle": _visible_field(u, "x", public),
+        "steam_id": _visible_field(u, "steam", public),
+        "epic_id": _visible_field(u, "epic", public),
+        "psn_id": _visible_field(u, "psn", public),
+        "xbox_id": _visible_field(u, "xbox", public),
+        "nintendo_fc": _visible_field(u, "nintendo", public),
+        "ea_id": _visible_field(u, "ea", public),
+        "riot_id": _visible_field(u, "riot", public),
+        "battlenet_id": _visible_field(u, "battlenet", public),
+        "main_platform": _visible_field(u, "main_platform", public),
+        "main_platforms": (u.get("main_platforms") or []) if _field_visible(u, "main_platforms", public) else [],
+        "input_devices": (u.get("input_devices") or []) if _field_visible(u, "input_devices", public) else [],
+        "gaming_subscriptions": _visible_field(u, "gaming_subscriptions", public),
+        "favorite_games": (u.get("favorite_games") or []) if _field_visible(u, "favorite_games", public) else [],
+        "website": _visible_field(u, "website", public),
         "show_twitch_embed": bool(u.get("show_twitch_embed")) if public else False,
         "privacy_public_profile": public,
         "is_club_member": is_member,

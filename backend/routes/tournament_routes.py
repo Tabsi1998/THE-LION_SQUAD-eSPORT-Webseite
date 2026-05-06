@@ -51,6 +51,14 @@ def _registration_error(t: dict) -> str | None:
     return None
 
 
+def _required_game_fields(game: dict | None) -> list[dict]:
+    fields = []
+    for field in (game or {}).get("player_id_fields") or []:
+        if isinstance(field, dict) and field.get("required") is not False and field.get("key"):
+            fields.append(field)
+    return fields
+
+
 async def _enrich_tournament(t: dict) -> dict:
     db = get_db()
     if t.get("game_id"):
@@ -207,6 +215,17 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
     existing = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": me["id"]})
     if existing:
         raise HTTPException(status_code=409, detail="Bereits angemeldet")
+    game = await db.games.find_one({"id": t.get("game_id")}, {"_id": 0}) if t.get("game_id") else None
+    submitted_ids = body.player_ids or {}
+    profile_game_ids = ((me.get("game_ids") or {}).get(game.get("slug")) if game else {}) or {}
+    player_ids = {**profile_game_ids, **submitted_ids}
+    missing = [
+        field.get("label") or field.get("key")
+        for field in _required_game_fields(game)
+        if not str(player_ids.get(field.get("key"), "")).strip()
+    ]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Für dieses Turnier fehlen Pflicht-IDs: {', '.join(missing)}")
     # Count approved
     count = await db.tournament_registrations.count_documents(
         {"tournament_id": tid, "status": {"$in": ["pending", "approved", "checked_in"]}})
@@ -222,6 +241,7 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
         "ingame_name": body.ingame_name or me.get("display_name") or me.get("username"),
         "discord": body.discord or me.get("discord_name"),
         "platform_id": body.platform_id,
+        "player_ids": player_ids,
         "notes": body.notes,
         "accepted_rules": body.accept_rules,
         "accepted_privacy": body.accept_privacy,

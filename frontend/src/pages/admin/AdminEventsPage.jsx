@@ -9,6 +9,7 @@ import { Plus, Save, X, Trash2, Calendar } from "lucide-react";
 export default function AdminEventsPage() {
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ types: [], statuses: [], visibilities: [] });
+  const [sponsors, setSponsors] = useState([]);
   const [editing, setEditing] = useState(null);
 
   const load = useCallback(async () => {
@@ -18,6 +19,7 @@ export default function AdminEventsPage() {
   useEffect(() => {
     load();
     api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {});
+    api.get("/sponsors/admin").then(({ data }) => setSponsors(data || [])).catch(() => {});
   }, [load]);
   useApiInvalidation(load, ["events"]);
 
@@ -80,12 +82,12 @@ export default function AdminEventsPage() {
         </div>
       )}
 
-      {editing && <EventModal event={editing} meta={meta} onClose={() => setEditing(null)} onSaved={load} />}
+      {editing && <EventModal event={editing} meta={meta} sponsors={sponsors} onClose={() => setEditing(null)} onSaved={load} />}
     </AdminLayout>
   );
 }
 
-function EventModal({ event, meta, onClose, onSaved }) {
+function EventModal({ event, meta, sponsors = [], onClose, onSaved }) {
   const isNew = !event?.id;
   const slugFrom = (txt) => (txt || "")
     .normalize("NFD")
@@ -106,8 +108,19 @@ function EventModal({ event, meta, onClose, onSaved }) {
     door_time: event.door_time?.slice(0, 16) || "",
     registration_opens_at: event.registration_opens_at?.slice(0, 16) || "",
     registration_closes_at: event.registration_closes_at?.slice(0, 16) || "",
+    has_registration: event.has_registration ?? false,
+    registration_url: event.registration_url || "",
     location: event.location || "",
     address: event.address || "",
+    postal_code: event.postal_code || "",
+    city: event.city || "",
+    country: event.country || "Österreich",
+    show_map: event.show_map ?? true,
+    organizer_name: event.organizer_name || "",
+    organizer_url: event.organizer_url || "",
+    owned_by_club: event.owned_by_club ?? true,
+    show_sponsors: event.show_sponsors ?? true,
+    sponsor_ids: event.sponsor_ids || [],
     is_online: event.is_online ?? false,
     is_hybrid: event.is_hybrid ?? false,
     banner_url: event.banner_url || "",
@@ -121,6 +134,7 @@ function EventModal({ event, meta, onClose, onSaved }) {
     status: event.status || "draft",
   });
   const [saving, setSaving] = useState(false);
+  const eventTypes = (meta.types || []).filter((t) => !meta.primary_types || meta.primary_types.includes(t.k) || t.k === form.event_type);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const submit = async (ev) => {
@@ -130,6 +144,7 @@ function EventModal({ event, meta, onClose, onSaved }) {
       const payload = { ...form };
       Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
       if (payload.max_participants) payload.max_participants = parseInt(payload.max_participants);
+      payload.sponsor_ids = payload.owned_by_club && payload.show_sponsors ? (payload.sponsor_ids || []) : [];
       if (isNew) {
         delete payload.status;
         await api.post("/events", payload);
@@ -161,7 +176,7 @@ function EventModal({ event, meta, onClose, onSaved }) {
           <div className="grid grid-cols-3 gap-3">
             <Field label="Typ">
               <select value={form.event_type} onChange={(e) => set("event_type", e.target.value)} data-testid="event-type" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-                {meta.types.map((t) => <option key={t.k} value={t.k}>{t.l}</option>)}
+                {eventTypes.map((t) => <option key={t.k} value={t.k}>{t.l}</option>)}
               </select>
             </Field>
             <Field label="Sichtbarkeit">
@@ -182,12 +197,29 @@ function EventModal({ event, meta, onClose, onSaved }) {
             <Field label="Ende"><input type="datetime-local" value={form.end_date} onChange={(e) => set("end_date", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
             <Field label="Einlass / Türöffnung"><input type="datetime-local" value={form.door_time} onChange={(e) => set("door_time", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
             <Field label="Max. Teilnehmer"><input type="number" value={form.max_participants} onChange={(e) => set("max_participants", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-            <Field label="Anmeldung öffnet"><input type="datetime-local" value={form.registration_opens_at} onChange={(e) => set("registration_opens_at", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-            <Field label="Anmeldung schließt"><input type="datetime-local" value={form.registration_closes_at} onChange={(e) => set("registration_closes_at", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
             <Field label="Ort / Location"><Input value={form.location} onChange={(v) => set("location", v)} placeholder="Innsbruck" /></Field>
             <Field label="Adresse"><Input value={form.address} onChange={(v) => set("address", v)} placeholder="Maria-Theresien-Str. 1" /></Field>
+            <Field label="PLZ"><Input value={form.postal_code} onChange={(v) => set("postal_code", v)} placeholder="6020" /></Field>
+            <Field label="Stadt"><Input value={form.city} onChange={(v) => set("city", v)} placeholder="Innsbruck" /></Field>
+            <Field label="Land"><Input value={form.country} onChange={(v) => set("country", v)} placeholder="Österreich" /></Field>
+            <Field label="Veranstalter"><Input value={form.organizer_name} onChange={(v) => set("organizer_name", v)} placeholder="THE LION SQUAD oder extern" /></Field>
+            <Field label="Veranstalter-Link"><Input value={form.organizer_url} onChange={(v) => set("organizer_url", v)} placeholder="https://…" /></Field>
             <Field label="Banner-Bild"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="event-banner" variant="wide" allowLibrary /></Field>
             <Field label="Kontakt"><Input value={form.contact} onChange={(v) => set("contact", v)} placeholder="Name oder E-Mail" /></Field>
+          </div>
+          <div className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A] space-y-3">
+            <div className="text-[11px] uppercase tracking-widest font-bold text-white/60">Anmeldung</div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.has_registration} onChange={(e) => set("has_registration", e.target.checked)} className="accent-[#9F7AEA]" />
+              Registrierung/Anmeldung für dieses Event anzeigen
+            </label>
+            {form.has_registration && (
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Anmeldung öffnet"><input type="datetime-local" value={form.registration_opens_at} onChange={(e) => set("registration_opens_at", e.target.value)} className="w-full bg-[#121212] border border-white/10 px-3 py-2 rounded-sm" /></Field>
+                <Field label="Anmeldung schließt"><input type="datetime-local" value={form.registration_closes_at} onChange={(e) => set("registration_closes_at", e.target.value)} className="w-full bg-[#121212] border border-white/10 px-3 py-2 rounded-sm" /></Field>
+                <Field label="Externer Anmeldelink"><Input value={form.registration_url} onChange={(v) => set("registration_url", v)} placeholder="https://…" /></Field>
+              </div>
+            )}
           </div>
           <Field label="Programm / Tagesablauf">
             <textarea value={form.program} onChange={(e) => set("program", e.target.value)} rows={4} placeholder="17:00 Einlass&#10;18:00 LAN-Setup&#10;19:30 Eröffnungsturnier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-mono text-sm" />
@@ -224,7 +256,38 @@ function EventModal({ event, meta, onClose, onSaved }) {
               <input type="checkbox" checked={form.show_participants} onChange={(e) => set("show_participants", e.target.checked)} className="accent-[#9F7AEA]" />
               Teilnehmer öffentlich anzeigen
             </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.show_map} onChange={(e) => set("show_map", e.target.checked)} className="accent-[#9F7AEA]" />
+              Karte anzeigen
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.owned_by_club} onChange={(e) => set("owned_by_club", e.target.checked)} className="accent-[#9F7AEA]" />
+              Event von uns
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.show_sponsors} onChange={(e) => set("show_sponsors", e.target.checked)} disabled={!form.owned_by_club} className="accent-[#9F7AEA]" />
+              Sponsoren beim Event anzeigen
+            </label>
           </div>
+          {form.owned_by_club && form.show_sponsors && sponsors.length > 0 && (
+            <div className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A]">
+              <div className="text-[11px] uppercase tracking-widest font-bold text-white/60 mb-3">Event-Sponsoren</div>
+              <div className="grid sm:grid-cols-2 gap-2">
+                {sponsors.filter((s) => s.is_active !== false).map((s) => (
+                  <label key={s.id} className="flex items-center gap-2 text-sm text-white/75">
+                    <input
+                      type="checkbox"
+                      checked={(form.sponsor_ids || []).includes(s.id)}
+                      onChange={(ev) => set("sponsor_ids", ev.target.checked ? [...(form.sponsor_ids || []), s.id] : (form.sponsor_ids || []).filter((id) => id !== s.id))}
+                      className="accent-[#FFD700]"
+                    />
+                    {s.name}
+                  </label>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-white/40">Leer lassen, um automatisch Sponsoren mit Event-Platzierung zu zeigen.</p>
+            </div>
+          )}
         </div>
         <div className="flex gap-3 p-5 border-t border-white/10">
           <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm">Abbrechen</button>

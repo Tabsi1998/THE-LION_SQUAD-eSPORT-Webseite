@@ -6,6 +6,7 @@ from auth import require_admin, get_optional_user
 from services.visibility import user_can_see, filter_visible
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
+    PartnerCreate, PartnerUpdate,
     GalleryAlbumCreate, GalleryAlbumUpdate,
     GalleryPhotoCreate, GalleryPhotoUpdate,
     now_utc, new_id,
@@ -164,6 +165,10 @@ def _sponsor_defaults(doc: dict) -> dict:
     if doc.get("show_on_footer") is None:
         # Hauptsponsor + Platin + Gold + Silber im Footer
         doc["show_on_footer"] = tier in ("main", "platinum", "gold", "silver")
+    if doc.get("show_on_events") is None:
+        doc["show_on_events"] = tier in ("main", "platinum", "gold")
+    if doc.get("event_ids") is None:
+        doc["event_ids"] = []
     if doc.get("is_active") is None:
         doc["is_active"] = True
     return doc
@@ -184,6 +189,8 @@ async def list_sponsors(placement: Optional[str] = None):
         sp = [s for s in sp if s.get("show_on_home", s["tier"] in ("main", "platinum", "gold"))]
     elif placement == "footer":
         sp = [s for s in sp if s.get("show_on_footer", s["tier"] in ("main", "platinum", "gold", "silver"))]
+    elif placement == "events":
+        sp = [s for s in sp if s.get("show_on_events", s["tier"] in ("main", "platinum", "gold"))]
     # Sort by tier then order_index
     sp.sort(key=lambda s: (_TIER_ORDER.get(s["tier"], 99), s.get("order_index") or 0, s.get("name") or ""))
     return sp
@@ -215,7 +222,7 @@ async def create_sponsor(body: SponsorCreate, me: dict = Depends(require_admin()
 @router.patch("/sponsors/{sid}")
 async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(require_admin())):
     db = get_db()
-    nullable_fields = {"logo_url", "link", "description"}
+    nullable_fields = {"logo_url", "link", "description", "event_ids"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if not updates:
@@ -238,6 +245,66 @@ async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(requi
 async def delete_sponsor(sid: str, me: dict = Depends(require_admin())):
     db = get_db()
     await db.sponsors.delete_one({"id": sid})
+    return {"ok": True}
+
+
+# ---------- Partners ----------
+def _partner_defaults(doc: dict) -> dict:
+    if doc.get("is_active") is None:
+        doc["is_active"] = True
+    if not doc.get("kind"):
+        doc["kind"] = "verein"
+    return doc
+
+
+@router.get("/partners")
+async def list_partners():
+    db = get_db()
+    partners = await db.partners.find({"is_active": {"$ne": False}}, {"_id": 0}).to_list(500)
+    partners.sort(key=lambda p: (p.get("order_index") or 0, p.get("name") or ""))
+    return partners
+
+
+@router.get("/partners/admin")
+async def admin_list_partners(me: dict = Depends(require_admin())):
+    db = get_db()
+    partners = await db.partners.find({}, {"_id": 0}).to_list(500)
+    partners.sort(key=lambda p: (p.get("order_index") or 0, p.get("name") or ""))
+    return partners
+
+
+@router.post("/partners")
+async def create_partner(body: PartnerCreate, me: dict = Depends(require_admin())):
+    db = get_db()
+    doc = _partner_defaults(body.model_dump())
+    doc["id"] = new_id()
+    doc["created_at"] = now_utc().isoformat()
+    doc["updated_at"] = now_utc().isoformat()
+    await db.partners.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@router.put("/partners/{pid}")
+@router.patch("/partners/{pid}")
+async def update_partner(pid: str, body: PartnerUpdate, me: dict = Depends(require_admin())):
+    db = get_db()
+    nullable_fields = {"logo_url", "link", "description"}
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    if not updates:
+        return {"ok": True}
+    updates["updated_at"] = now_utc().isoformat()
+    res = await db.partners.update_one({"id": pid}, {"$set": updates})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Partner nicht gefunden.")
+    return await db.partners.find_one({"id": pid}, {"_id": 0})
+
+
+@router.delete("/partners/{pid}")
+async def delete_partner(pid: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    await db.partners.delete_one({"id": pid})
     return {"ok": True}
 
 

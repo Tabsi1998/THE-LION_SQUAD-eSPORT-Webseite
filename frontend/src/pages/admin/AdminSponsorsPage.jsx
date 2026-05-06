@@ -12,6 +12,7 @@ const TIER_COLORS = { main: "text-[#29B6E8]", platinum: "text-[#E5E4E2]", gold: 
 
 export default function AdminSponsorsPage() {
   const [list, setList] = useState([]);
+  const [events, setEvents] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
   const [migrating, setMigrating] = useState(false);
@@ -19,6 +20,7 @@ export default function AdminSponsorsPage() {
   const load = useCallback(async () => {
     const { data } = await api.get("/sponsors/admin");
     setList(data);
+    api.get("/events").then(({ data }) => setEvents(data || [])).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["sponsors", "uploads"]);
@@ -66,7 +68,7 @@ export default function AdminSponsorsPage() {
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-3 min-w-0">
                 {s.logo_url ? (
-                  <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="w-14 h-14 object-contain rounded-sm bg-white/5 p-2 border border-white/10" />
+                  <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="w-14 h-14 object-contain rounded-sm bg-black/20 p-1" />
                 ) : (
                   <div className="w-14 h-14 rounded-sm bg-[#29B6E8]/10 border border-[#29B6E8]/30 flex items-center justify-center font-display font-bold text-[#29B6E8]">
                     {s.name.slice(0, 2).toUpperCase()}
@@ -78,6 +80,7 @@ export default function AdminSponsorsPage() {
                   <div className="flex gap-1 mt-1 flex-wrap">
                     {s.show_on_home && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest">Home</span>}
                     {s.show_on_footer && <span className="text-[9px] px-1.5 py-0.5 bg-white/10 text-white/70 rounded-sm font-bold uppercase tracking-widest">Footer</span>}
+                    {s.show_on_events && <span className="text-[9px] px-1.5 py-0.5 bg-[#FFD700]/15 text-[#FFD700] rounded-sm font-bold uppercase tracking-widest">Events</span>}
                     {s.is_active === false && <span className="text-[9px] px-1.5 py-0.5 bg-[#FF3B30]/15 text-[#FF3B30] rounded-sm font-bold uppercase tracking-widest">Inaktiv</span>}
                   </div>
                 </div>
@@ -97,6 +100,7 @@ export default function AdminSponsorsPage() {
       {(editing || creating) && (
         <SponsorForm
           sponsor={editing || null}
+          events={events}
           onClose={() => { setEditing(null); setCreating(false); }}
           onSaved={() => { setEditing(null); setCreating(false); load(); }}
         />
@@ -105,7 +109,7 @@ export default function AdminSponsorsPage() {
   );
 }
 
-function SponsorForm({ sponsor, onClose, onSaved }) {
+function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
   const [form, setForm] = useState({
     name: sponsor?.name || "", logo_url: sponsor?.logo_url || "",
     link: sponsor?.link || "", description: sponsor?.description || "",
@@ -113,6 +117,8 @@ function SponsorForm({ sponsor, onClose, onSaved }) {
     is_active: sponsor?.is_active !== false,
     show_on_home: sponsor?.show_on_home,
     show_on_footer: sponsor?.show_on_footer,
+    show_on_events: sponsor?.show_on_events,
+    event_ids: sponsor?.event_ids || [],
     order_index: sponsor?.order_index ?? 0,
   });
   const [saving, setSaving] = useState(false);
@@ -143,7 +149,7 @@ function SponsorForm({ sponsor, onClose, onSaved }) {
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Tier</div>
-            <select value={form.tier} onChange={(e) => setForm((f) => ({ ...f, tier: e.target.value, show_on_home: undefined, show_on_footer: undefined }))} data-testid="sponsor-tier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+            <select value={form.tier} onChange={(e) => setForm((f) => ({ ...f, tier: e.target.value, show_on_home: undefined, show_on_footer: undefined, show_on_events: undefined }))} data-testid="sponsor-tier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
               {TIERS.map((t) => <option key={t} value={t}>{TIER_LABELS[t]}</option>)}
             </select>
           </label>
@@ -152,7 +158,7 @@ function SponsorForm({ sponsor, onClose, onSaved }) {
             <input type="number" value={form.order_index ?? 0} onChange={(e) => set("order_index", parseInt(e.target.value, 10) || 0)} data-testid="sponsor-order" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           </label>
         </div>
-        <div className="grid grid-cols-3 gap-3 text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           <label className="inline-flex items-center gap-2">
             <input type="checkbox" checked={form.is_active !== false} onChange={(e) => set("is_active", e.target.checked)} data-testid="sponsor-active" className="accent-[#29B6E8]" />
             Aktiv
@@ -165,7 +171,30 @@ function SponsorForm({ sponsor, onClose, onSaved }) {
             <input type="checkbox" checked={form.show_on_footer === true || (form.show_on_footer === undefined && ["main", "platinum", "gold", "silver"].includes(form.tier))} onChange={(e) => set("show_on_footer", e.target.checked)} data-testid="sponsor-show-footer" className="accent-[#29B6E8]" />
             Im Footer
           </label>
+          <label className="inline-flex items-center gap-2">
+            <input type="checkbox" checked={form.show_on_events === true || (form.show_on_events === undefined && ["main", "platinum", "gold"].includes(form.tier))} onChange={(e) => set("show_on_events", e.target.checked)} data-testid="sponsor-show-events" className="accent-[#FFD700]" />
+            Events
+          </label>
         </div>
+        {events.length > 0 && (
+          <div className="border border-white/10 rounded-sm p-3 bg-[#0A0A0A]">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-2">Nur bestimmte Events</div>
+            <div className="max-h-28 overflow-y-auto space-y-1">
+              {events.map((ev) => (
+                <label key={ev.id} className="flex items-center gap-2 text-xs text-white/70">
+                  <input
+                    type="checkbox"
+                    checked={(form.event_ids || []).includes(ev.id)}
+                    onChange={(e) => set("event_ids", e.target.checked ? [...(form.event_ids || []), ev.id] : (form.event_ids || []).filter((id) => id !== ev.id))}
+                    className="accent-[#FFD700]"
+                  />
+                  {ev.name}
+                </label>
+              ))}
+            </div>
+            <p className="mt-2 text-[10px] text-white/40">Leer lassen = Sponsor darf bei allen eigenen Events genutzt werden.</p>
+          </div>
+        )}
         <label className="block">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Beschreibung</div>
           <textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} data-testid="sponsor-description" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />

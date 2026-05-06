@@ -71,6 +71,7 @@ class UserUpdate(BaseModel):
     input_devices: Optional[List[str]] = None  # multi-select: keyboard_mouse / controller / wheel / mobile_touch / arcade
     gaming_subscriptions: Optional[List[str]] = None  # nintendo_online, ea_play, ps_plus, xbox_game_pass, ubisoft_plus, ea_pro, gog_galaxy
     website: Optional[str] = None
+    game_ids: Optional[Dict[str, Dict[str, str]]] = None  # game_slug -> field_key -> value
     # Public profile features
     show_twitch_embed: Optional[bool] = None  # show live twitch on public profile
     # Socials (legacy fields for compatibility)
@@ -232,6 +233,7 @@ class GameCreate(BaseModel):
     supports_grand_prix: bool = False
     default_team_size: int = 1
     default_format: str = "single_elim"
+    player_id_fields: List[dict] = []
 
 
 class GameUpdate(BaseModel):
@@ -249,6 +251,7 @@ class GameUpdate(BaseModel):
     supports_grand_prix: Optional[bool] = None
     default_team_size: Optional[int] = None
     default_format: Optional[str] = None
+    player_id_fields: Optional[List[dict]] = None
 
 
 # ---------- Events ----------
@@ -277,8 +280,19 @@ class EventCreate(BaseModel):
     door_time: Optional[datetime] = None
     registration_opens_at: Optional[datetime] = None
     registration_closes_at: Optional[datetime] = None
+    has_registration: bool = False
+    registration_url: Optional[str] = None
     location: Optional[str] = None
     address: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    show_map: bool = True
+    organizer_name: Optional[str] = None
+    organizer_url: Optional[str] = None
+    owned_by_club: bool = True
+    show_sponsors: bool = True
+    sponsor_ids: List[str] = []
     is_online: bool = False
     is_hybrid: bool = False
     banner_url: Optional[str] = None
@@ -301,8 +315,19 @@ class EventUpdate(BaseModel):
     door_time: Optional[datetime] = None
     registration_opens_at: Optional[datetime] = None
     registration_closes_at: Optional[datetime] = None
+    has_registration: Optional[bool] = None
+    registration_url: Optional[str] = None
     location: Optional[str] = None
     address: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    show_map: Optional[bool] = None
+    organizer_name: Optional[str] = None
+    organizer_url: Optional[str] = None
+    owned_by_club: Optional[bool] = None
+    show_sponsors: Optional[bool] = None
+    sponsor_ids: Optional[List[str]] = None
     is_online: Optional[bool] = None
     is_hybrid: Optional[bool] = None
     banner_url: Optional[str] = None
@@ -423,6 +448,7 @@ class RegistrationCreate(BaseModel):
     ingame_name: Optional[str] = None
     discord: Optional[str] = None
     platform_id: Optional[str] = None
+    player_ids: Optional[Dict[str, str]] = None
     notes: Optional[str] = None
     accept_rules: bool = True
     accept_privacy: bool = True
@@ -632,6 +658,8 @@ class SponsorCreate(BaseModel):
     is_active: bool = True
     show_on_home: Optional[bool] = None  # auto-derived when None: gold/main yes, others no
     show_on_footer: Optional[bool] = None
+    show_on_events: Optional[bool] = None
+    event_ids: List[str] = []
     order_index: int = 0
 
 
@@ -644,6 +672,28 @@ class SponsorUpdate(BaseModel):
     is_active: Optional[bool] = None
     show_on_home: Optional[bool] = None
     show_on_footer: Optional[bool] = None
+    show_on_events: Optional[bool] = None
+    event_ids: Optional[List[str]] = None
+    order_index: Optional[int] = None
+
+
+class PartnerCreate(BaseModel):
+    name: str
+    logo_url: Optional[str] = None
+    link: Optional[str] = None
+    description: Optional[str] = None
+    kind: str = "verein"
+    is_active: bool = True
+    order_index: int = 0
+
+
+class PartnerUpdate(BaseModel):
+    name: Optional[str] = None
+    logo_url: Optional[str] = None
+    link: Optional[str] = None
+    description: Optional[str] = None
+    kind: Optional[str] = None
+    is_active: Optional[bool] = None
     order_index: Optional[int] = None
 
 

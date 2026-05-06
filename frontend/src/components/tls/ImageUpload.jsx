@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Upload, X, Image as ImageIcon } from "lucide-react";
+import { Check, Crop, RotateCcw, RotateCw, Upload, X, Image as ImageIcon } from "lucide-react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
@@ -9,10 +9,10 @@ const parseUploadMb = (value, fallback) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-const DEFAULT_IMAGE_UPLOAD_MB = parseUploadMb(process.env.REACT_APP_MAX_IMAGE_UPLOAD_MB, 50);
-const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(process.env.REACT_APP_PROXY_UPLOAD_LIMIT_MB, Math.ceil(DEFAULT_IMAGE_UPLOAD_MB * 1.2));
-const IMAGE_COMPRESS_TRIGGER_MB = parseUploadMb(process.env.REACT_APP_IMAGE_COMPRESS_TRIGGER_MB, 8);
-const IMAGE_COMPRESS_TARGET_MB = parseUploadMb(process.env.REACT_APP_IMAGE_COMPRESS_TARGET_MB, Math.min(8, DEFAULT_IMAGE_UPLOAD_MB));
+const DEFAULT_IMAGE_UPLOAD_MB = parseUploadMb(process.env.REACT_APP_MAX_IMAGE_UPLOAD_MB, 120);
+const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(process.env.REACT_APP_PROXY_UPLOAD_LIMIT_MB, Math.ceil(DEFAULT_IMAGE_UPLOAD_MB * 1.25));
+const IMAGE_COMPRESS_TRIGGER_MB = parseUploadMb(process.env.REACT_APP_IMAGE_COMPRESS_TRIGGER_MB, 4);
+const IMAGE_COMPRESS_TARGET_MB = parseUploadMb(process.env.REACT_APP_IMAGE_COMPRESS_TARGET_MB, Math.min(10, DEFAULT_IMAGE_UPLOAD_MB));
 const IMAGE_MAX_DIMENSION = Number.parseInt(process.env.REACT_APP_IMAGE_MAX_DIMENSION || "4096", 10) || 4096;
 const SUPPORTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const SUPPORTED_IMAGE_EXT_RE = /\.(png|jpe?g|webp)$/i;
@@ -52,6 +52,11 @@ function canvasToBlob(canvas, type, quality) {
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
+function normalizeRotation(value) {
+  const rounded = Math.round(Number(value || 0) / 90) * 90;
+  return ((rounded % 360) + 360) % 360;
+}
+
 async function loadImage(file) {
   const url = URL.createObjectURL(file);
   try {
@@ -73,7 +78,7 @@ async function loadImage(file) {
   }
 }
 
-export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB) {
+export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB, editOptions = null) {
   if (!file) return file;
   if (!fileLooksSupported(file)) {
     throw new Error("Nur PNG, JPG oder WebP erlaubt.");
@@ -87,19 +92,42 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
   try {
     imageData = await loadImage(file);
     const { img } = imageData;
-    const needsResize = img.naturalWidth > IMAGE_MAX_DIMENSION || img.naturalHeight > IMAGE_MAX_DIMENSION;
-    const needsCompression = file.size > triggerBytes || file.size > maxBytes || needsResize;
+    const rotation = normalizeRotation(editOptions?.rotation || 0);
+    const cropMode = editOptions?.cropMode || "original";
+    const cropAspect = cropMode === "square" ? 1 : cropMode === "wide" ? 16 / 9 : null;
+    let sourceX = 0;
+    let sourceY = 0;
+    let sourceW = img.naturalWidth;
+    let sourceH = img.naturalHeight;
+    if (cropAspect) {
+      const sourceAspect = sourceW / sourceH;
+      if (sourceAspect > cropAspect) {
+        sourceW = Math.round(sourceH * cropAspect);
+        sourceX = Math.round((img.naturalWidth - sourceW) / 2);
+      } else {
+        sourceH = Math.round(sourceW / cropAspect);
+        sourceY = Math.round((img.naturalHeight - sourceH) / 2);
+      }
+    }
+    const needsEdit = rotation !== 0 || cropMode !== "original";
+    const needsResize = sourceW > IMAGE_MAX_DIMENSION || sourceH > IMAGE_MAX_DIMENSION;
+    const needsCompression = needsEdit || file.size > triggerBytes || file.size > maxBytes || needsResize;
     if (!needsCompression) return file;
 
-    const scale = Math.min(1, IMAGE_MAX_DIMENSION / img.naturalWidth, IMAGE_MAX_DIMENSION / img.naturalHeight);
-    const width = Math.max(1, Math.round(img.naturalWidth * scale));
-    const height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const scale = Math.min(1, IMAGE_MAX_DIMENSION / sourceW, IMAGE_MAX_DIMENSION / sourceH);
+    const width = Math.max(1, Math.round(sourceW * scale));
+    const height = Math.max(1, Math.round(sourceH * scale));
+    const rotated = rotation === 90 || rotation === 270;
     const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = rotated ? height : width;
+    canvas.height = rotated ? width : height;
     const ctx = canvas.getContext("2d");
     if (!ctx) return file;
-    ctx.drawImage(img, 0, 0, width, height);
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    if (rotation) ctx.rotate((rotation * Math.PI) / 180);
+    ctx.drawImage(img, sourceX, sourceY, sourceW, sourceH, -width / 2, -height / 2, width, height);
+    ctx.restore();
 
     let bestBlob = null;
     for (const quality of [0.9, 0.82, 0.74, 0.66, 0.58]) {
@@ -138,13 +166,22 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [library, setLibrary] = useState([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
+  const [editor, setEditor] = useState(null);
 
-  const handleFile = async (file) => {
+  const closeEditor = useCallback(() => {
+    setEditor((cur) => {
+      if (cur?.url) URL.revokeObjectURL(cur.url);
+      return null;
+    });
+    if (fileRef.current) fileRef.current.value = "";
+  }, []);
+
+  const uploadFile = async (file, editOptions = null) => {
     if (!file) return;
     setUploading(true);
     changeActiveUploads(1);
     try {
-      const uploadFile = await prepareImageForUpload(file, maxSizeMb);
+      const uploadFile = await prepareImageForUpload(file, maxSizeMb, editOptions);
       if (uploadFile.size > maxSizeMb * 1024 * 1024) {
         toast.error(`Datei zu gross (max ${maxSizeMb} MB). Bitte Bild kleiner exportieren oder Proxy-Limit erhoehen.`);
         return;
@@ -166,6 +203,21 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
       setUploading(false);
       changeActiveUploads(-1);
     }
+  };
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    if (!fileLooksSupported(file)) {
+      toast.error("Nur PNG, JPG oder WebP erlaubt.");
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    if (browserCanOptimizeImages()) {
+      const url = URL.createObjectURL(file);
+      setEditor({ file, url, rotation: 0, cropMode: variant === "square" ? "square" : "original" });
+      return;
+    }
+    await uploadFile(file);
   };
 
   const openLibrary = useCallback(async () => {
@@ -263,6 +315,60 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {editor && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" onClick={closeEditor}>
+          <div className="max-w-3xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="font-heading text-xl font-black uppercase">Bild bearbeiten</h3>
+              <button type="button" onClick={closeEditor} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <div className={`mx-auto bg-[#050505] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center ${editor.cropMode === "wide" ? "aspect-video" : editor.cropMode === "square" ? "aspect-square max-h-[55vh]" : "min-h-[280px] max-h-[55vh]"}`}>
+              <img
+                src={editor.url}
+                alt=""
+                className={`${editor.cropMode === "original" ? "max-w-full max-h-[55vh] object-contain" : "w-full h-full object-cover"} transition-transform`}
+                style={{ transform: `rotate(${editor.rotation}deg)` }}
+              />
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  ["original", "Original"],
+                  ["square", "1:1"],
+                  ["wide", "16:9"],
+                ].map(([mode, text]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setEditor((cur) => ({ ...cur, cropMode: mode }))}
+                    className={`inline-flex items-center gap-2 px-3 py-2 border rounded-sm text-xs font-bold uppercase tracking-wider ${editor.cropMode === mode ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/60 hover:text-white"}`}
+                  >
+                    <Crop className="w-3.5 h-3.5" /> {text}
+                  </button>
+                ))}
+                <button type="button" onClick={() => setEditor((cur) => ({ ...cur, rotation: normalizeRotation(cur.rotation - 90) }))} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm text-xs font-bold uppercase tracking-wider">
+                  <RotateCcw className="w-3.5 h-3.5" /> Links
+                </button>
+                <button type="button" onClick={() => setEditor((cur) => ({ ...cur, rotation: normalizeRotation(cur.rotation + 90) }))} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm text-xs font-bold uppercase tracking-wider">
+                  <RotateCw className="w-3.5 h-3.5" /> Rechts
+                </button>
+              </div>
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={async () => {
+                  const current = editor;
+                  await uploadFile(current.file, { rotation: current.rotation, cropMode: current.cropMode });
+                  closeEditor();
+                }}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50"
+              >
+                <Check className="w-4 h-4" /> Übernehmen
+              </button>
+            </div>
           </div>
         </div>
       )}

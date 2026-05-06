@@ -1,6 +1,7 @@
 """Event routes — Vereins-CMS Phase 3."""
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
+from datetime import datetime, timezone
 from database import get_db
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see
@@ -11,6 +12,66 @@ router = APIRouter(prefix="/api/events", tags=["events"])
 
 async def _user_can_see(user: dict | None, visibility: str) -> bool:
     return await user_can_see(user, visibility)
+
+
+def _parse_dt(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
+    except ValueError:
+        return None
+
+
+def _event_phase(event: dict) -> dict:
+    status = event.get("status") or "draft"
+    target = _parse_dt(event.get("door_time")) or _parse_dt(event.get("start_date"))
+    if status in {"live", "completed", "results_published", "archived", "cancelled"} or not target:
+        return {"state": status, "label": None, "target_at": target.isoformat() if target else None}
+    diff = (target - datetime.now(timezone.utc)).total_seconds()
+    if diff <= 0:
+        return {"state": "opening_now", "label": "Öffnet jetzt", "target_at": target.isoformat()}
+    if diff <= 24 * 60 * 60:
+        hours = max(1, round(diff / 3600))
+        return {"state": "opens_24h", "label": f"Öffnet in {hours} h", "target_at": target.isoformat()}
+    if diff <= 7 * 24 * 60 * 60:
+        days = max(1, round(diff / (24 * 3600)))
+        return {"state": "opens_7d", "label": f"Öffnet in {days} Tagen", "target_at": target.isoformat()}
+    return {"state": "announced", "label": "Angekündigt", "target_at": target.isoformat()}
+
+
+async def _attach_event_sponsors(event: dict) -> None:
+    if event.get("owned_by_club") is False or event.get("show_sponsors") is False:
+        event["sponsors"] = []
+        return
+    db = get_db()
+    sponsor_ids = [sid for sid in event.get("sponsor_ids") or [] if sid]
+    query: dict = {"is_active": {"$ne": False}}
+    if sponsor_ids:
+        query["id"] = {"$in": sponsor_ids}
+    sponsors = await db.sponsors.find(query, {"_id": 0}).to_list(100)
+    if not sponsor_ids:
+        filtered = []
+        for sponsor in sponsors:
+            event_ids = sponsor.get("event_ids") or []
+            show_on_events = sponsor.get("show_on_events")
+            if show_on_events is None:
+                show_on_events = sponsor.get("tier") in ("main", "platinum", "gold")
+            if (event_ids and event.get("id") in event_ids) or (not event_ids and show_on_events is True):
+                filtered.append(sponsor)
+        sponsors = filtered
+    sponsors.sort(key=lambda s: (s.get("order_index") or 0, s.get("name") or ""))
+    event["sponsors"] = sponsors
+
+
+async def _decorate_event(event: dict, include_sponsors: bool = False) -> dict:
+    event["event_phase"] = _event_phase(event)
+    if include_sponsors:
+        await _attach_event_sponsors(event)
+    return event
 
 
 @router.get("")
@@ -38,6 +99,7 @@ async def list_events(
     out = []
     for ev in events:
         if await _user_can_see(user, ev.get("visibility") or "public"):
+            await _decorate_event(ev)
             out.append(ev)
     return out
 
@@ -46,20 +108,21 @@ async def list_events(
 async def event_meta():
     return {
         "types": [
+            {"k": "general", "l": "Allgemein"},
+            {"k": "public_event", "l": "Public Event"},
             {"k": "club_evening", "l": "Vereinsabend"},
             {"k": "lan_party", "l": "LAN-Party"},
-            {"k": "public_event", "l": "Public Event"},
+            {"k": "online_event", "l": "Online Event"},
+            {"k": "expo", "l": "Messe / Expo"},
             {"k": "community_evening", "l": "Community-Abend"},
             {"k": "grill_evening", "l": "Grillabend"},
             {"k": "mario_kart_event", "l": "Mario Kart Event"},
             {"k": "f1_event", "l": "F1 Event"},
-            {"k": "expo", "l": "Messe / Expo"},
-            {"k": "online_event", "l": "Online Event"},
             {"k": "internal", "l": "Interner Termin"},
             {"k": "sponsor_action", "l": "Sponsorenaktion"},
             {"k": "tournament_finals", "l": "Turnier-Finals"},
-            {"k": "general", "l": "Allgemein"},
         ],
+        "primary_types": ["general", "public_event", "club_evening", "lan_party", "online_event", "expo"],
         "statuses": [
             {"k": "draft", "l": "Entwurf"},
             {"k": "scheduled", "l": "Warten auf Öffnung"},
@@ -105,6 +168,7 @@ async def get_event(slug_or_id: str, user: dict | None = Depends(get_optional_us
         {"linked_event_ids": event["id"], "published": True},
         {"_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1, "created_at": 1},
     ).sort("created_at", -1).to_list(20)
+    await _decorate_event(event, include_sponsors=True)
     return event
 
 
@@ -133,9 +197,11 @@ async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
 async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(require_admin())):
     db = get_db()
     nullable_fields = {
-        "description", "location", "address", "banner_url", "registration_url",
+        "description", "location", "address", "postal_code", "city", "country",
+        "banner_url", "registration_url", "organizer_name", "organizer_url",
         "twitch_channel", "stream_url", "stream_title", "event_url",
         "door_time", "registration_opens_at", "registration_closes_at", "end_date",
+        "contact", "program", "stream_platform",
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}

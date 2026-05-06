@@ -51,19 +51,19 @@ export default function SponsorsPage() {
                 <h2 className="font-heading text-xl font-black uppercase tracking-wider">{tierLabel[t] || t}</h2>
                 <div className="flex-1 border-t border-white/10" />
               </div>
-              <div className={`grid gap-5 ${(t === "main" || t === "gold") ? "md:grid-cols-2" : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
+              <div className={`grid gap-5 ${(t === "main" || t === "platinum") ? "md:grid-cols-2" : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
                 {grouped[t].map((s) => (
                   <a
                     key={s.id}
-                    href={s.link || "#"}
-                    target="_blank"
+                    href={s.link || undefined}
+                    target={s.link ? "_blank" : undefined}
                     rel="noreferrer"
                     data-testid={`sponsor-${s.id}`}
-                    className="border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#121212] p-6 transition group flex flex-col"
+                    className="border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#101010] p-6 transition group flex flex-col"
                   >
-                    <div className="aspect-video bg-[#0A0A0A] rounded-sm mb-4 flex items-center justify-center overflow-hidden">
+                    <div className="h-28 mb-4 flex items-center justify-center overflow-hidden">
                       {s.logo_url ? (
-                        <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="w-full h-full object-contain p-3" />
+                        <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-w-full max-h-full object-contain" />
                       ) : (
                         <span className="font-heading font-black text-2xl text-white/30">{s.name[0]}</span>
                       )}

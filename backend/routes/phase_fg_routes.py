@@ -151,9 +151,26 @@ DEFAULT_NAV = {
     "id": NAV_DOC_ID,
     "items": [
         {"key": "home", "to": "/", "label": "Home", "visible": True, "order": 0},
-        {"key": "club", "to": "/about", "label": "Verein", "visible": True, "order": 1},
-        {"key": "news", "to": "/news", "label": "News", "visible": True, "order": 2},
-        {"key": "events", "to": "/events", "label": "Events", "visible": True, "order": 3},
+        {"key": "news", "to": "/news", "label": "News", "visible": True, "order": 1, "children": [
+            {"key": "news-overview", "to": "/news", "label": "Alle News", "visible": True},
+            {"key": "news-events", "to": "/events", "label": "Events", "visible": True},
+            {"key": "news-tournaments", "to": "/tournaments", "label": "Turniere", "visible": True},
+            {"key": "news-fastlap", "to": "/fastlap", "label": "Fast Lap", "visible": True},
+        ]},
+        {"key": "events", "to": "/events", "label": "Events", "visible": True, "order": 2, "children": [
+            {"key": "events-overview", "to": "/events", "label": "Alle Events", "visible": True},
+            {"key": "events-tournaments", "to": "/tournaments", "label": "Turniere", "visible": True},
+            {"key": "events-fastlap", "to": "/fastlap", "label": "Fast Lap", "visible": True},
+            {"key": "events-gallery", "to": "/galerie", "label": "Galerie", "visible": True},
+        ]},
+        {"key": "club", "to": "/about", "label": "Verein", "visible": True, "order": 3, "children": [
+            {"key": "about", "to": "/about", "label": "Über uns", "visible": True},
+            {"key": "board", "to": "/board", "label": "Vorstand", "visible": True},
+            {"key": "values", "to": "/values", "label": "Werte & Ziele", "visible": True},
+            {"key": "partners", "to": "/partners", "label": "Partner", "visible": True},
+            {"key": "sponsors", "to": "/sponsors", "label": "Sponsoren", "visible": True},
+            {"key": "gallery", "to": "/galerie", "label": "Galerie", "visible": True},
+        ]},
         {"key": "esports", "label": "eSports", "visible": True, "order": 4, "children": [
             {"key": "tournaments", "to": "/tournaments", "label": "Turniere", "visible": True},
             {"key": "fastlap", "to": "/fastlap", "label": "Fast Lap", "visible": True},
@@ -175,6 +192,13 @@ async def seed_default_nav():
     existing = await db.cms_nav.find_one({"id": NAV_DOC_ID})
     if not existing:
         await db.cms_nav.insert_one({**DEFAULT_NAV, "updated_at": now_utc().isoformat()})
+    else:
+        normalized = _normalize_nav_doc(existing)
+        if normalized.get("items") != existing.get("items"):
+            await db.cms_nav.update_one(
+                {"id": NAV_DOC_ID},
+                {"$set": {"items": normalized["items"], "updated_at": now_utc().isoformat()}},
+            )
 
 
 nav_router = APIRouter(prefix="/api/nav", tags=["cms"])
@@ -192,10 +216,37 @@ def _filter_visible(items: list[dict]) -> list[dict]:
     return out
 
 
+def _merge_nav_item(current: dict, default: dict) -> dict:
+    merged = {**default, **current}
+    default_children = default.get("children") or []
+    current_children = current.get("children") or []
+    if default_children:
+        current_by_key = {c.get("key") or c.get("to") or c.get("label"): c for c in current_children}
+        merged_children = []
+        for child_default in default_children:
+            key = child_default.get("key") or child_default.get("to") or child_default.get("label")
+            merged_children.append(_merge_nav_item(current_by_key.pop(key, {}), child_default))
+        merged_children.extend(current_by_key.values())
+        merged["children"] = merged_children
+    return merged
+
+
+def _normalize_nav_doc(doc: dict) -> dict:
+    current_items = doc.get("items") or []
+    current_by_key = {it.get("key") or it.get("to") or it.get("label"): it for it in current_items}
+    normalized = []
+    for default_item in DEFAULT_NAV["items"]:
+        key = default_item.get("key") or default_item.get("to") or default_item.get("label")
+        normalized.append(_merge_nav_item(current_by_key.pop(key, {}), default_item))
+    normalized.extend(current_by_key.values())
+    return {**doc, "id": NAV_DOC_ID, "items": normalized}
+
+
 @nav_router.get("")
 async def public_nav():
     db = get_db()
     doc = await db.cms_nav.find_one({"id": NAV_DOC_ID}, {"_id": 0}) or DEFAULT_NAV
+    doc = _normalize_nav_doc(doc)
     items = sorted(doc.get("items", []), key=lambda x: x.get("order", 0))
     return {"items": _filter_visible(items)}
 
@@ -207,7 +258,7 @@ admin_nav_router = APIRouter(prefix="/api/admin/nav", tags=["cms-admin"])
 async def admin_get_nav(me: dict = Depends(require_admin())):
     db = get_db()
     doc = await db.cms_nav.find_one({"id": NAV_DOC_ID}, {"_id": 0}) or DEFAULT_NAV
-    return doc
+    return _normalize_nav_doc(doc)
 
 
 class NavBody(BaseModel):

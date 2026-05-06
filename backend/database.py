@@ -62,6 +62,7 @@ async def init_indexes():
     # News + sponsors
     await db.news_posts.create_index("id", unique=True)
     await db.sponsors.create_index("id", unique=True)
+    await db.partners.create_index("id", unique=True)
     # Notifications
     await db.notifications.create_index("id", unique=True)
     await db.notifications.create_index("user_id")

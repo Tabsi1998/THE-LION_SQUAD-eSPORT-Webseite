@@ -7,7 +7,7 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, Twitch } from "lucide-react";
+import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X } from "lucide-react";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { formatDateTime, getRegistrationState } from "@/lib/datetime";
@@ -20,6 +20,7 @@ export default function TournamentDetailPage() {
   const [regs, setRegs] = useState([]);
   const [myReg, setMyReg] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [registerModal, setRegisterModal] = useState(false);
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/tournaments/${slug}`);
@@ -37,20 +38,31 @@ export default function TournamentDetailPage() {
 
   useApiInvalidation(load, ["tournaments"]);
 
-  const handleRegister = async () => {
+  const submitRegistration = async (playerIds = {}) => {
     if (!user) { nav(`/login?next=/tournaments/${slug}`); return; }
     setLoading(true);
     try {
       await api.post(`/tournaments/${t.id}/register`, {
         ingame_name: user.display_name || user.username,
         discord: user.discord_name,
+        player_ids: playerIds,
         accept_rules: true, accept_privacy: true,
       });
       toast.success("Erfolgreich angemeldet!");
+      setRegisterModal(false);
       load();
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail));
     } finally { setLoading(false); }
+  };
+
+  const handleRegister = async () => {
+    if (!user) { nav(`/login?next=/tournaments/${slug}`); return; }
+    if (t.game?.player_id_fields?.length) {
+      setRegisterModal(true);
+      return;
+    }
+    await submitRegistration();
   };
 
   const handleCheckin = async () => {
@@ -193,7 +205,59 @@ export default function TournamentDetailPage() {
           {t.discord_link && <a href={t.discord_link} target="_blank" rel="noreferrer" className="block px-4 py-3 border border-white/10 rounded-sm text-center text-sm font-bold uppercase tracking-wider hover:border-[#29B6E8]/60 hover:text-[#29B6E8]">Discord</a>}
         </aside>
       </div>
+      {registerModal && (
+        <RegistrationModal
+          tournament={t}
+          user={user}
+          loading={loading}
+          onClose={() => setRegisterModal(false)}
+          onSubmit={submitRegistration}
+        />
+      )}
     </PublicLayout>
+  );
+}
+
+function RegistrationModal({ tournament, user, loading, onClose, onSubmit }) {
+  const game = tournament.game || {};
+  const fields = game.player_id_fields || [];
+  const initial = { ...((user?.game_ids || {})[game.slug] || {}) };
+  const [playerIds, setPlayerIds] = useState(initial);
+  const set = (key, value) => setPlayerIds((cur) => ({ ...cur, [key]: value }));
+  const submit = (e) => {
+    e.preventDefault();
+    onSubmit(playerIds);
+  };
+  return (
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <form onSubmit={submit} className="w-full max-w-lg bg-[#121212] border border-white/10 rounded-sm p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-heading text-xl font-black uppercase">Turnier-Anmeldung</h3>
+            <p className="text-xs text-white/50 mt-1">{game.name} benötigt zusätzliche Spieler-IDs.</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-white/45 hover:text-white"><X className="w-5 h-5" /></button>
+        </div>
+        {fields.map((field) => (
+          <label key={field.key} className="block">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{field.label}{field.required !== false ? " *" : ""}</div>
+            <input
+              value={playerIds[field.key] || ""}
+              onChange={(e) => set(field.key, e.target.value)}
+              required={field.required !== false}
+              placeholder={field.help_text || field.label}
+              className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"
+            />
+          </label>
+        ))}
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/15 text-white/70 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
+          <button disabled={loading} className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
+            {loading ? "Sendet…" : "Anmelden"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

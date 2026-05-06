@@ -43,6 +43,7 @@ export default function EventsPage() {
     if (tab === "past" && !["completed", "archived", "results_published"].includes(e.status)) return false;
     return true;
   });
+  const filterTypes = (meta.types || []).filter((t) => !meta.primary_types || meta.primary_types.includes(t.k));
 
   return (
     <PublicLayout>
@@ -60,7 +61,7 @@ export default function EventsPage() {
           </div>
           <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} data-testid="events-type-filter" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
             <option value="">Alle Typen</option>
-            {meta.types.map((t) => <option key={t.k} value={t.k}>{t.l}</option>)}
+            {filterTypes.map((t) => <option key={t.k} value={t.k}>{t.l}</option>)}
           </select>
         </div>
 
@@ -84,6 +85,7 @@ function EventCard({ e, meta }) {
   const VIcon = VIS_ICON[e.visibility];
   const statusColor = STATUS_COLORS[e.status] || "#6B7280";
   const typeLabel = meta.types.find((t) => t.k === e.event_type)?.l || e.event_type;
+  const statusLabel = e.event_phase?.label || STATUS_LABELS[e.status] || e.status;
   return (
     <Link
       to={`/events/${e.slug}`}
@@ -103,7 +105,7 @@ function EventCard({ e, meta }) {
         <div className="flex items-center gap-2 flex-wrap text-[10px] uppercase tracking-widest font-bold">
           <span className="text-[#9F7AEA]">{typeLabel}</span>
           <span className="px-2 py-0.5 rounded-sm border" style={{ color: statusColor, borderColor: `${statusColor}40` }}>
-            {STATUS_LABELS[e.status] || e.status}
+            {statusLabel}
           </span>
           {VIcon && <VIcon className="w-3 h-3 text-[#FFD700]" />}
         </div>

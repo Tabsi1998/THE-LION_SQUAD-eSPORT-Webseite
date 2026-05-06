@@ -62,6 +62,7 @@ import AdminMediaPage from "@/pages/admin/AdminMediaPage";
 import AdminNavPage from "@/pages/admin/AdminNavPage";
 import MembershipApplyPage from "@/pages/public/MembershipApplyPage";
 import AdminSponsorsPage from "@/pages/admin/AdminSponsorsPage";
+import AdminPartnersPage from "@/pages/admin/AdminPartnersPage";
 
 import AboutPage from "@/pages/public/AboutPage";
 import ContactPage from "@/pages/public/ContactPage";
@@ -182,6 +183,7 @@ function App() {
 
           {/* Admin */}
           <Route path="/admin/sponsors" element={<ProtectedRoute requireAdmin><AdminSponsorsPage /></ProtectedRoute>} />
+          <Route path="/admin/partners" element={<ProtectedRoute requireAdmin><AdminPartnersPage /></ProtectedRoute>} />
           <Route path="/admin/achievements" element={<ProtectedRoute requireAdmin><AdminAchievementsPage /></ProtectedRoute>} />
           <Route path="/admin/membership-applications" element={<ProtectedRoute requireAdmin><AdminMembershipApplicationsPage /></ProtectedRoute>} />
           <Route path="/admin/cms" element={<ProtectedRoute requireAdmin><AdminCmsPage /></ProtectedRoute>} />
