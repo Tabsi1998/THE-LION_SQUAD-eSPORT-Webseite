@@ -169,7 +169,7 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
  *   label: optional label
  *   testId: data-testid prefix
  *   variant: "square" | "wide" (visual)
- *   endpoint: "/uploads/image" (default) or "/uploads/sponsor-logo"
+ *   endpoint: "/uploads/image" (default), "/uploads/logo" or "/uploads/sponsor-logo"
  */
 export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", endpoint = "/uploads/image", maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB, allowLibrary = false }) {
   const fileRef = useRef(null);

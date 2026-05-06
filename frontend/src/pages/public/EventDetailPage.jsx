@@ -147,7 +147,7 @@ export default function EventDetailPage() {
             <h2 className="font-heading text-2xl font-black uppercase mb-5">Fast-Lap Challenges</h2>
             <div className="space-y-3">
               {e.f1_challenges.map((c) => (
-                <Link key={c.id} to={`/f1/${c.slug || c.id}`} className="block border border-white/10 rounded-sm p-4 bg-[#121212] hover:border-[#FFD700]/60 transition">
+                <Link key={c.id} to={`/fastlap/${c.slug || c.id}`} className="block border border-white/10 rounded-sm p-4 bg-[#121212] hover:border-[#FFD700]/60 transition">
                   <div className="flex items-center justify-between">
                     <div>
                       <StatusBadge status={c.status} />
@@ -183,7 +183,7 @@ export default function EventDetailPage() {
             <div className="grid sm:grid-cols-2 gap-4">
               {e.news.map((n) => (
                 <Link key={n.id} to={`/news/${n.slug}`} className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] p-4 transition">
-                  <div className="text-[10px] uppercase tracking-widest text-white/40">{new Date(n.created_at).toLocaleDateString("de-DE")}</div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/40">{new Date(n.published_at || n.created_at).toLocaleDateString("de-DE")}</div>
                   <div className="font-heading font-bold mt-1">{n.title}</div>
                   {n.excerpt && <div className="text-xs text-white/60 mt-1 line-clamp-2">{n.excerpt}</div>}
                 </Link>

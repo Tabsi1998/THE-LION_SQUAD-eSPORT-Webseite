@@ -344,6 +344,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
     title: challenge.title || "",
     description: challenge.description || "",
     banner_url: challenge.banner_url || "",
+    event_id: challenge.event_id || "",
     vehicle: challenge.vehicle || "",
     weather: challenge.weather || "",
     assists_allowed: challenge.assists_allowed || "",
@@ -357,10 +358,17 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
     unlimited_attempts: challenge.unlimited_attempts !== false,
     max_attempts: challenge.max_attempts || 0,
   });
+  const [events, setEvents] = useState([]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    api.get("/events").then(({ data }) => setEvents(data || [])).catch(() => {});
+  }, []);
+
   const save = async () => {
     try {
       const payload = { ...form };
+      if (!payload.event_id) payload.event_id = null;
       if (payload.unlimited_attempts) payload.max_attempts = null;
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
       await api.patch(`/f1/challenges/${challenge.id}`, payload);
@@ -375,6 +383,14 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
         <SmallField label="Titel" value={form.title} onChange={(v)=>set("title", v)} />
         <SmallField label="Plattform" value={form.platform} onChange={(v)=>set("platform", v)} />
       </div>
+      {events.length > 0 && (
+        <SmallSelect
+          label="Zugehöriges Event"
+          value={form.event_id || ""}
+          onChange={(v) => set("event_id", v)}
+          options={[["", "— kein Event —"], ...events.map((e) => [e.id, e.name])]}
+        />
+      )}
       <ImageUpload value={form.banner_url} onChange={(v)=>set("banner_url", v)} label="Challenge-Banner" testId="f1-edit-banner-upload" variant="wide" allowLibrary />
       <div className="grid md:grid-cols-2 gap-4">
         <SmallField label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v)=>set("start_date", v)} />
@@ -404,6 +420,17 @@ function SmallField({ label, value, onChange, type = "text" }) {
     <label className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
       <input type={type} value={value ?? ""} onChange={(e)=>onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+    </label>
+  );
+}
+
+function SmallSelect({ label, value, onChange, options }) {
+  return (
+    <label className="block">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <select value={value ?? ""} onChange={(e)=>onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
     </label>
   );
 }

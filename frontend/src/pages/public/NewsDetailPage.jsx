@@ -5,7 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { Pin, ArrowLeft, Calendar, Trophy, Users } from "lucide-react";
+import { Pin, ArrowLeft, Calendar, Trophy, Users, Flag } from "lucide-react";
 
 export default function NewsDetailPage() {
   const { slug } = useParams();
@@ -26,7 +26,7 @@ export default function NewsDetailPage() {
     load();
   }, [load]);
 
-  useApiInvalidation(load, ["news", "events", "tournaments", "teams"]);
+  useApiInvalidation(load, ["news", "events", "tournaments", "f1", "teams"]);
 
   if (error) return (
     <PublicLayout>
@@ -49,7 +49,7 @@ export default function NewsDetailPage() {
         <div className="mt-6 flex items-center gap-3 text-[11px] uppercase tracking-widest font-bold">
           <span className="text-[#29B6E8]">{post.category}</span>
           {post.pinned && <span className="inline-flex items-center gap-1 text-[#FFD700]"><Pin className="w-3 h-3" /> Angepinnt</span>}
-          <span className="text-white/40 ml-auto">{new Date(post.created_at).toLocaleDateString("de-DE", { dateStyle: "long" })}</span>
+          <span className="text-white/40 ml-auto">{new Date(post.published_at || post.created_at).toLocaleDateString("de-DE", { dateStyle: "long" })}</span>
         </div>
         <h1 className="mt-3 font-heading text-3xl md:text-5xl font-black uppercase leading-tight">{post.title}</h1>
         {post.excerpt && <p className="mt-4 text-lg text-white/70">{post.excerpt}</p>}
@@ -63,7 +63,7 @@ export default function NewsDetailPage() {
           {post.content}
         </div>
 
-        {(post.linked_events?.length || post.linked_tournaments?.length || post.linked_teams?.length) && (
+        {(post.linked_events?.length || post.linked_tournaments?.length || post.linked_f1_challenges?.length || post.linked_teams?.length) && (
           <div className="mt-10 border-t border-white/10 pt-8">
             <h2 className="font-heading text-xl font-black uppercase mb-4">Verknüpft</h2>
             <div className="grid sm:grid-cols-2 gap-3">
@@ -80,6 +80,15 @@ export default function NewsDetailPage() {
                 <Link key={t.id} to={`/tournaments/${t.slug}`} className="flex items-center gap-3 border border-white/10 hover:border-[#FFD700]/50 p-3 rounded-sm">
                   <Trophy className="w-4 h-4 text-[#FFD700]" />
                   <div className="font-bold text-sm">{t.title}</div>
+                </Link>
+              ))}
+              {post.linked_f1_challenges?.map((c) => (
+                <Link key={c.id} to={`/fastlap/${c.slug || c.id}`} className="flex items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 p-3 rounded-sm">
+                  <Flag className="w-4 h-4 text-[#29B6E8]" />
+                  <div>
+                    <div className="font-bold text-sm">{c.title}</div>
+                    {c.start_date && <div className="text-xs text-white/50">{new Date(c.start_date).toLocaleDateString("de-DE")}</div>}
+                  </div>
                 </Link>
               ))}
               {post.linked_teams?.map((t) => (

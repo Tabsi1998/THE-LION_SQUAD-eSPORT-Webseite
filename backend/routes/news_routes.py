@@ -60,6 +60,10 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
         p["linked_tournaments"] = await db.tournaments.find(
             {"id": {"$in": p["linked_tournament_ids"]}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1},
         ).to_list(50)
+    if p.get("linked_f1_challenge_ids"):
+        p["linked_f1_challenges"] = await db.f1_challenges.find(
+            {"id": {"$in": p["linked_f1_challenge_ids"]}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "status": 1},
+        ).to_list(50)
     if p.get("linked_team_ids"):
         p["linked_teams"] = await db.teams.find(
             {"id": {"$in": p["linked_team_ids"]}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "logo_url": 1},
@@ -83,8 +87,11 @@ async def create_news(body: NewsCreate, me: dict = Depends(require_admin())):
     if doc.get("published_at"):
         doc["published_at"] = doc["published_at"].isoformat()
     doc["id"] = new_id()
-    doc["created_at"] = now_utc().isoformat()
-    doc["updated_at"] = now_utc().isoformat()
+    created_at = now_utc().isoformat()
+    doc["created_at"] = created_at
+    doc["updated_at"] = created_at
+    if doc.get("published") and not doc.get("published_at"):
+        doc["published_at"] = created_at
     doc["author_id"] = me["id"]
     doc["author_name"] = me.get("display_name") or me.get("username")
     await db.news_posts.insert_one(doc)
@@ -101,6 +108,10 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_adm
         raise HTTPException(400, "Keine Änderungen.")
     if update.get("published_at"):
         update["published_at"] = update["published_at"].isoformat()
+    if update.get("published") is True and "published_at" not in update:
+        existing = await db.news_posts.find_one({"id": nid}, {"_id": 0, "published_at": 1})
+        if existing and not existing.get("published_at"):
+            update["published_at"] = now_utc().isoformat()
     update["updated_at"] = now_utc().isoformat()
     res = await db.news_posts.update_one({"id": nid}, {"$set": update})
     if res.matched_count == 0:

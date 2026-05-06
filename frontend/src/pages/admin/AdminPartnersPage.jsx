@@ -112,7 +112,7 @@ function PartnerForm({ partner, onClose, onSaved }) {
           <button type="button" onClick={onClose} className="text-white/40 hover:text-white"><X className="w-4 h-4" /></button>
         </div>
         <Field label="Name" value={form.name} onChange={(v) => set("name", v)} required />
-        <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="partner-logo" variant="square" allowLibrary />
+        <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="partner-logo" variant="square" endpoint="/uploads/logo" allowLibrary />
         <Field label="Link" value={form.link} onChange={(v) => set("link", v)} placeholder="https://…" />
         <div className="grid grid-cols-2 gap-3">
           <Field label="Typ" value={form.kind} onChange={(v) => set("kind", v)} placeholder="Verein, Messe, Community" />

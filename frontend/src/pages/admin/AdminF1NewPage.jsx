@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -10,6 +10,7 @@ export default function AdminF1NewPage() {
   const nav = useNavigate();
   const [form, setForm] = useState({
     title: "", slug: "", description: "",
+    event_id: "",
     vehicle: "", weather: "", assists_allowed: "",
     controller_type: "", platform: "", banner_url: "",
     unlimited_attempts: true, max_attempts: 0,
@@ -19,14 +20,20 @@ export default function AdminF1NewPage() {
     twitch_channel: "", twitch_enabled: false,
     prize_places: [],
   });
+  const [events, setEvents] = useState([]);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    api.get("/events").then(({ data }) => setEvents(data || [])).catch(() => {});
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
       const payload = { ...form };
+      if (!payload.event_id) payload.event_id = null;
       if (payload.unlimited_attempts) payload.max_attempts = null;
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
       payload.prize_places = (payload.prize_places || [])
@@ -58,6 +65,15 @@ export default function AdminF1NewPage() {
         <Field label="Slug (URL)" value={form.slug} onChange={(v) => set("slug", autoSlug(v))} required testId="f1-new-slug" />
         <Textarea label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="f1-new-description" />
         <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Challenge-Banner" testId="f1-new-banner-upload" variant="wide" allowLibrary />
+        {events.length > 0 && (
+          <Select
+            label="Zugehöriges Event"
+            value={form.event_id || ""}
+            onChange={(v) => set("event_id", v)}
+            options={[["", "— kein Event —"], ...events.map((e) => [e.id, e.name])]}
+            testId="f1-new-event"
+          />
+        )}
         <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeitplan & Einreichung</div>
           <div className="grid md:grid-cols-2 gap-4">

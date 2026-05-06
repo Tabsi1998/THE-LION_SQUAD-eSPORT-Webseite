@@ -6,7 +6,7 @@ import pathlib
 import logging
 from io import BytesIO
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageChops, UnidentifiedImageError
 from auth import require_admin, get_current_user
 from database import get_db
 from models import new_id, now_utc
@@ -87,8 +87,51 @@ def _resize_for_storage(img: Image.Image) -> tuple[Image.Image, bool]:
     return resized, True
 
 
+def _crop_with_padding(img: Image.Image, bbox: tuple[int, int, int, int] | None) -> tuple[Image.Image, bool]:
+    if not bbox:
+        return img, False
+    left, top, right, bottom = bbox
+    if left <= 0 and top <= 0 and right >= img.width and bottom >= img.height:
+        return img, False
+    crop_w = right - left
+    crop_h = bottom - top
+    if crop_w >= img.width * 0.97 and crop_h >= img.height * 0.97:
+        return img, False
+    pad = max(4, int(max(crop_w, crop_h) * 0.06))
+    left = max(0, left - pad)
+    top = max(0, top - pad)
+    right = min(img.width, right + pad)
+    bottom = min(img.height, bottom + pad)
+    return img.crop((left, top, right, bottom)), True
+
+
+def _trim_empty_borders(img: Image.Image) -> tuple[Image.Image, bool]:
+    """Crop transparent or flat-color whitespace around logos.
+
+    This is intentionally conservative and only crops when the detected content
+    is clearly smaller than the canvas.
+    """
+    rgba = img.convert("RGBA")
+    alpha_mask = rgba.getchannel("A").point(lambda p: 255 if p > 8 else 0)
+    alpha_bbox = alpha_mask.getbbox()
+    if alpha_bbox:
+        alpha_area = (alpha_bbox[2] - alpha_bbox[0]) * (alpha_bbox[3] - alpha_bbox[1])
+        full_area = rgba.width * rgba.height
+        if alpha_area < full_area * 0.92:
+            return _crop_with_padding(rgba, alpha_bbox)
+
+    bg = Image.new("RGBA", rgba.size, rgba.getpixel((0, 0)))
+    diff = ImageChops.difference(rgba, bg)
+    mask = diff.convert("L").point(lambda p: 255 if p > 18 else 0)
+    return _crop_with_padding(rgba, mask.getbbox())
+
+
 @router.post("/image")
-async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_current_user)):
+async def upload_image(
+    file: UploadFile = File(...),
+    me: dict = Depends(get_current_user),
+    trim_empty_borders: bool = False,
+):
     """Upload an image. Returns public URL `/uploads/{filename}`.
     Accepts PNG/JPEG/WebP and re-encodes before serving."""
     declared_content_type = file.content_type or ""
@@ -129,9 +172,12 @@ async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_curr
                     detected_format,
                     filename_hint,
                 )
+            trimmed = False
+            if trim_empty_borders:
+                img, trimmed = _trim_empty_borders(img)
             img, resized = _resize_for_storage(img)
             output_format = img.format or detected_format
-            if resized or original_size > 12 * 1024 * 1024:
+            if trimmed or resized or original_size > 12 * 1024 * 1024:
                 output_format = "WEBP"
                 content_type, ext = "image/webp", ".webp"
             out = BytesIO()
@@ -186,7 +232,13 @@ async def upload_image(file: UploadFile = File(...), me: dict = Depends(get_curr
 @router.post("/sponsor-logo")
 async def upload_sponsor_logo(file: UploadFile = File(...), me: dict = Depends(require_admin())):
     """Admin-only convenience alias for sponsor logos."""
-    return await upload_image(file, me)
+    return await upload_image(file, me, trim_empty_borders=True)
+
+
+@router.post("/logo")
+async def upload_logo(file: UploadFile = File(...), me: dict = Depends(require_admin())):
+    """Admin-only logo upload with automatic whitespace trimming."""
+    return await upload_image(file, me, trim_empty_borders=True)
 
 
 @router.post("/migrate-external-images")

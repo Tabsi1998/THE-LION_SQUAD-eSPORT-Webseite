@@ -4,24 +4,41 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Plus, Save, X, Trash2, Calendar } from "lucide-react";
+import { Flag, Plus, Save, X, Trash2, Calendar, Trophy } from "lucide-react";
 
 export default function AdminEventsPage() {
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ types: [], statuses: [], visibilities: [] });
   const [sponsors, setSponsors] = useState([]);
+  const [tournaments, setTournaments] = useState([]);
+  const [f1Challenges, setF1Challenges] = useState([]);
   const [editing, setEditing] = useState(null);
 
   const load = useCallback(async () => {
     const { data } = await api.get("/events");
     setList(data);
   }, []);
+  const loadRelations = useCallback(async () => {
+    Promise.allSettled([
+      api.get("/sponsors/admin"),
+      api.get("/tournaments"),
+      api.get("/f1/challenges"),
+    ]).then(([s, t, f]) => {
+      if (s.status === "fulfilled") setSponsors(s.value.data || []);
+      if (t.status === "fulfilled") setTournaments(t.value.data || []);
+      if (f.status === "fulfilled") setF1Challenges(f.value.data || []);
+    });
+  }, []);
+  const refreshAll = useCallback(() => {
+    load();
+    loadRelations();
+  }, [load, loadRelations]);
   useEffect(() => {
     load();
     api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {});
-    api.get("/sponsors/admin").then(({ data }) => setSponsors(data || [])).catch(() => {});
-  }, [load]);
-  useApiInvalidation(load, ["events"]);
+    loadRelations();
+  }, [load, loadRelations]);
+  useApiInvalidation(refreshAll, ["events", "tournaments", "f1"]);
 
   const remove = async (id) => {
     if (!window.confirm("Event löschen?")) return;
@@ -82,12 +99,12 @@ export default function AdminEventsPage() {
         </div>
       )}
 
-      {editing && <EventModal event={editing} meta={meta} sponsors={sponsors} onClose={() => setEditing(null)} onSaved={load} />}
+      {editing && <EventModal event={editing} meta={meta} sponsors={sponsors} tournaments={tournaments} f1Challenges={f1Challenges} onClose={() => setEditing(null)} onSaved={refreshAll} />}
     </AdminLayout>
   );
 }
 
-function EventModal({ event, meta, sponsors = [], onClose, onSaved }) {
+function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges = [], onClose, onSaved }) {
   const isNew = !event?.id;
   const slugFrom = (txt) => (txt || "")
     .normalize("NFD")
@@ -134,9 +151,37 @@ function EventModal({ event, meta, sponsors = [], onClose, onSaved }) {
     status: event.status || "draft",
   });
   const [saving, setSaving] = useState(false);
+  const [relatedTournamentIds, setRelatedTournamentIds] = useState([]);
+  const [relatedF1Ids, setRelatedF1Ids] = useState([]);
   const eventTypes = (meta.types || []).filter((t) => !meta.primary_types || meta.primary_types.includes(t.k) || t.k === form.event_type);
 
+  useEffect(() => {
+    if (!event?.id) {
+      setRelatedTournamentIds([]);
+      setRelatedF1Ids([]);
+      return;
+    }
+    setRelatedTournamentIds(tournaments.filter((t) => t.event_id === event.id).map((t) => t.id));
+    setRelatedF1Ids(f1Challenges.filter((c) => c.event_id === event.id).map((c) => c.id));
+  }, [event?.id, tournaments, f1Challenges]);
+
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const syncRelatedItems = async (eventId) => {
+    const jobs = [];
+    tournaments.forEach((t) => {
+      const selected = relatedTournamentIds.includes(t.id);
+      if (selected && t.event_id !== eventId) jobs.push(api.patch(`/tournaments/${t.id}`, { event_id: eventId }));
+      if (!selected && t.event_id === eventId) jobs.push(api.patch(`/tournaments/${t.id}`, { event_id: null }));
+    });
+    f1Challenges.forEach((c) => {
+      const selected = relatedF1Ids.includes(c.id);
+      if (selected && c.event_id !== eventId) jobs.push(api.patch(`/f1/challenges/${c.id}`, { event_id: eventId }));
+      if (!selected && c.event_id === eventId) jobs.push(api.patch(`/f1/challenges/${c.id}`, { event_id: null }));
+    });
+    if (jobs.length) await Promise.all(jobs);
+  };
+
   const submit = async (ev) => {
     ev.preventDefault();
     setSaving(true);
@@ -145,12 +190,16 @@ function EventModal({ event, meta, sponsors = [], onClose, onSaved }) {
       Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
       if (payload.max_participants) payload.max_participants = parseInt(payload.max_participants);
       payload.sponsor_ids = payload.owned_by_club && payload.show_sponsors ? (payload.sponsor_ids || []) : [];
+      let savedEvent;
       if (isNew) {
         delete payload.status;
-        await api.post("/events", payload);
+        const { data } = await api.post("/events", payload);
+        savedEvent = data;
       } else {
-        await api.patch(`/events/${event.id}`, payload);
+        const { data } = await api.patch(`/events/${event.id}`, payload);
+        savedEvent = data;
       }
+      await syncRelatedItems(savedEvent.id);
       toast.success("Gespeichert.");
       onSaved();
       onClose();
@@ -224,6 +273,36 @@ function EventModal({ event, meta, sponsors = [], onClose, onSaved }) {
           <Field label="Programm / Tagesablauf">
             <textarea value={form.program} onChange={(e) => set("program", e.target.value)} rows={4} placeholder="17:00 Einlass&#10;18:00 LAN-Setup&#10;19:30 Eröffnungsturnier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-mono text-sm" />
           </Field>
+          {(tournaments.length > 0 || f1Challenges.length > 0) && (
+            <div className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A] space-y-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-widest font-bold text-white/60">Verknüpfte eSports-Inhalte</div>
+                <p className="mt-1 text-xs text-white/45">Diese Zuordnung erscheint direkt auf der Eventseite.</p>
+              </div>
+              {tournaments.length > 0 && (
+                <RelationSelect
+                  icon={Trophy}
+                  label="Turniere"
+                  options={tournaments}
+                  selected={relatedTournamentIds}
+                  onChange={setRelatedTournamentIds}
+                  labelKey="title"
+                  accent="text-[#FFD700]"
+                />
+              )}
+              {f1Challenges.length > 0 && (
+                <RelationSelect
+                  icon={Flag}
+                  label="Fast-Lap Challenges"
+                  options={f1Challenges}
+                  selected={relatedF1Ids}
+                  onChange={setRelatedF1Ids}
+                  labelKey="title"
+                  accent="text-[#29B6E8]"
+                />
+              )}
+            </div>
+          )}
           <div className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A] space-y-3">
             <div className="text-[11px] uppercase tracking-widest font-bold text-white/60">Live Stream (optional)</div>
             <label className="flex items-center gap-2 text-sm">
@@ -310,4 +389,22 @@ function Field({ label, children }) {
 }
 function Input({ value, onChange, placeholder, testId, required }) {
   return <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} required={required} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />;
+}
+
+function RelationSelect({ icon: Icon, label, options, selected, onChange, labelKey, accent }) {
+  const toggle = (id) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-widest font-bold text-white/50 mb-2">{label}</div>
+      <div className="grid sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
+        {options.map((item) => (
+          <label key={item.id} className="flex items-center gap-2 text-sm text-white/75 border border-white/5 hover:border-white/15 rounded-sm px-2 py-2 cursor-pointer">
+            <input type="checkbox" checked={selected.includes(item.id)} onChange={() => toggle(item.id)} className="accent-[#9F7AEA]" />
+            <Icon className={`w-3.5 h-3.5 ${accent}`} />
+            <span className="truncate">{item[labelKey] || item.name}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
 }

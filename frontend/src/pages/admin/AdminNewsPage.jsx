@@ -4,7 +4,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Plus, Pin, Trash2, Save, X, Newspaper } from "lucide-react";
+import { Flag, Plus, Pin, Trash2, Save, X, Newspaper } from "lucide-react";
 
 export default function AdminNewsPage() {
   const [list, setList] = useState([]);
@@ -72,7 +72,7 @@ export default function AdminNewsPage() {
                     <td className="px-4 py-3 text-xs">
                       {n.published ? <span className="text-[#10B981] font-bold uppercase">Veröffentlicht</span> : <span className="text-white/40 uppercase">Entwurf</span>}
                     </td>
-                    <td className="px-4 py-3 text-xs text-white/55">{new Date(n.created_at).toLocaleDateString("de-DE")}</td>
+                    <td className="px-4 py-3 text-xs text-white/55">{new Date(n.published_at || n.created_at).toLocaleDateString("de-DE")}</td>
                     <td className="px-4 py-3 text-center space-x-2 whitespace-nowrap">
                       <button onClick={() => setEditing(n)} data-testid={`news-edit-${n.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10">Bearbeiten</button>
                       <button onClick={() => remove(n.id)} data-testid={`news-delete-${n.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
@@ -108,17 +108,21 @@ function NewsModal({ post, meta, onClose, onSaved }) {
   });
   const [tournaments, setTournaments] = useState([]);
   const [events, setEvents] = useState([]);
+  const [f1Challenges, setF1Challenges] = useState([]);
   const [linkedT, setLinkedT] = useState(post.linked_tournament_ids || []);
   const [linkedE, setLinkedE] = useState(post.linked_event_ids || []);
+  const [linkedF, setLinkedF] = useState(post.linked_f1_challenge_ids || []);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     Promise.allSettled([
       api.get("/tournaments"),
       api.get("/events"),
-    ]).then(([t, e]) => {
+      api.get("/f1/challenges"),
+    ]).then(([t, e, f]) => {
       if (t.status === "fulfilled") setTournaments(t.value.data);
       if (e.status === "fulfilled") setEvents(e.value.data);
+      if (f.status === "fulfilled") setF1Challenges(f.value.data);
     });
   }, []);
 
@@ -136,7 +140,7 @@ function NewsModal({ post, meta, onClose, onSaved }) {
     ev.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form, linked_tournament_ids: linkedT, linked_event_ids: linkedE };
+      const payload = { ...form, linked_tournament_ids: linkedT, linked_event_ids: linkedE, linked_f1_challenge_ids: linkedF };
       // Convert datetime-local back to ISO with seconds + UTC marker
       if (payload.published_at) {
         const d = new Date(payload.published_at);
@@ -215,6 +219,11 @@ function NewsModal({ post, meta, onClose, onSaved }) {
               <MultiSelect options={tournaments} valueKey="id" labelKey="title" selected={linkedT} onChange={setLinkedT} />
             </Field>
           )}
+          {f1Challenges.length > 0 && (
+            <Field label="Verknüpfte Fast-Lap Challenges">
+              <MultiSelect options={f1Challenges} valueKey="id" labelKey="title" selected={linkedF} onChange={setLinkedF} icon={Flag} />
+            </Field>
+          )}
         </div>
         <div className="flex gap-3 p-5 border-t border-white/10">
           <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm">Abbrechen</button>
@@ -238,13 +247,14 @@ function Field({ label, children }) {
 function Input({ value, onChange, placeholder, testId, required }) {
   return <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} required={required} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />;
 }
-function MultiSelect({ options, valueKey, labelKey, selected, onChange }) {
+function MultiSelect({ options, valueKey, labelKey, selected, onChange, icon: Icon }) {
   const toggle = (v) => onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
   return (
     <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-2 max-h-32 overflow-y-auto space-y-1">
       {options.map((o) => (
         <label key={o[valueKey]} className="flex items-center gap-2 text-sm hover:bg-white/5 px-2 py-1 rounded-sm cursor-pointer">
           <input type="checkbox" checked={selected.includes(o[valueKey])} onChange={() => toggle(o[valueKey])} className="accent-[#29B6E8]" />
+          {Icon && <Icon className="w-3 h-3 text-[#29B6E8]" />}
           <span>{o[labelKey]}</span>
         </label>
       ))}

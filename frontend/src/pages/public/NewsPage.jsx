@@ -124,7 +124,7 @@ function NewsCard({ n, featured = false }) {
           <span style={{ color: c }}>{n.category}</span>
           {n.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
           {VIcon && <VIcon className="w-3 h-3 text-[#FFD700]" />}
-          <span className="text-white/30 ml-auto">{new Date(n.created_at).toLocaleDateString("de-DE")}</span>
+          <span className="text-white/30 ml-auto">{new Date(n.published_at || n.created_at).toLocaleDateString("de-DE")}</span>
         </div>
         <h3 className={`mt-2 font-heading font-black ${featured ? "text-2xl" : "text-lg"} group-hover:text-[#29B6E8] transition`}>
           {n.title}

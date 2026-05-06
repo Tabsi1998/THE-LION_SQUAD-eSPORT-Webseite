@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { SmartLogo } from "@/components/tls/SmartLogo";
 
 const tierSize = {
   main: "h-14 md:h-16",
@@ -48,7 +49,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
               title={s.name}
             >
               {s.logo_url ? (
-                <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className={`${compact ? "h-7" : tierSize[s.tier] || "h-10"} ${compact ? "max-w-28" : "max-w-56"} object-contain`} />
+                <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className={`${compact ? "h-7 max-w-32" : `${tierSize[s.tier] || "h-10"} max-w-64`} w-auto`} />
               ) : (
                 <span className="font-heading font-black uppercase text-white/80">{s.name}</span>
               )}
@@ -80,7 +81,7 @@ export function SponsorGrid({ max = 4 }) {
       {sponsors.slice(0, max).map((s) => (
         <a key={s.id} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" className="inline-flex items-center justify-center opacity-75 hover:opacity-100 transition" title={s.name}>
           {s.logo_url ? (
-            <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="h-7 max-w-32 object-contain" />
+            <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="h-7 max-w-36 w-auto" />
           ) : (
             <span className="font-heading text-xs font-bold uppercase text-white/70">{s.name}</span>
           )}

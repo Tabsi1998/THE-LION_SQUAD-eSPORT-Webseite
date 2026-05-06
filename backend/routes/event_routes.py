@@ -166,8 +166,8 @@ async def get_event(slug_or_id: str, user: dict | None = Depends(get_optional_us
     # Linked news
     event["news"] = await db.news_posts.find(
         {"linked_event_ids": event["id"], "published": True},
-        {"_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1, "created_at": 1},
-    ).sort("created_at", -1).to_list(20)
+        {"_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1, "created_at": 1, "published_at": 1},
+    ).sort([("published_at", -1), ("created_at", -1)]).to_list(20)
     await _decorate_event(event, include_sponsors=True)
     return event
 

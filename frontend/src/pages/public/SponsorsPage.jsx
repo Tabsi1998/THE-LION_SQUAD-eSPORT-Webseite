@@ -3,6 +3,7 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { SmartLogo } from "@/components/tls/SmartLogo";
 import { Star, ExternalLink } from "lucide-react";
 
 const tierLabel = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
@@ -63,9 +64,9 @@ export default function SponsorsPage() {
                     data-testid={`sponsor-${s.id}`}
                     className="border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#101010] p-5 transition group flex flex-col min-h-56"
                   >
-                    <div className={`${t === "main" || t === "platinum" ? "h-36" : "h-28"} mb-4 flex items-center justify-center overflow-hidden rounded-sm bg-black/20`}>
+                    <div className={`${t === "main" || t === "platinum" ? "h-36" : "h-28"} mb-4 flex items-center justify-center overflow-hidden rounded-sm bg-[#080808] border border-white/5`}>
                       {s.logo_url ? (
-                        <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-w-[86%] max-h-[78%] object-contain" />
+                        <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-w-[92%] max-h-[84%] w-auto h-auto" />
                       ) : (
                         <span className="font-heading font-black text-2xl text-white/30">{s.name[0]}</span>
                       )}

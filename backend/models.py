@@ -545,6 +545,7 @@ class F1ChallengeUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     status: Optional[TournamentStatus] = None
+    event_id: Optional[str] = None
     vehicle: Optional[str] = None
     weather: Optional[str] = None
     assists_allowed: Optional[str] = None
@@ -628,6 +629,7 @@ class NewsCreate(BaseModel):
     pinned: bool = False
     linked_event_ids: List[str] = []
     linked_tournament_ids: List[str] = []
+    linked_f1_challenge_ids: List[str] = []
     linked_team_ids: List[str] = []
 
 
@@ -643,6 +645,7 @@ class NewsUpdate(BaseModel):
     pinned: Optional[bool] = None
     linked_event_ids: Optional[List[str]] = None
     linked_tournament_ids: Optional[List[str]] = None
+    linked_f1_challenge_ids: Optional[List[str]] = None
     linked_team_ids: Optional[List[str]] = None
 
 

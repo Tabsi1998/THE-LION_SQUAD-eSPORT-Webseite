@@ -115,7 +115,7 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
     existing = await db.f1_challenges.find_one({"id": cid}, {"_id": 0}) or {}
     raw = body.model_dump(exclude_unset=True)
     nullable_fields = {
-        "description", "vehicle", "weather", "assists_allowed", "controller_type",
+        "description", "event_id", "vehicle", "weather", "assists_allowed", "controller_type",
         "platform", "banner_url", "twitch_channel", "stream_platform",
         "stream_url", "stream_title", "max_attempts", "prize_places",
         "registration_open_from", "registration_open_until", "start_date", "end_date",

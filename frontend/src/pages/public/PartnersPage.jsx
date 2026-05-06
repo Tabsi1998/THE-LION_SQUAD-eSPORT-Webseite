@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { SmartLogo } from "@/components/tls/SmartLogo";
 import { ExternalLink, Handshake } from "lucide-react";
 
 export default function PartnersPage() {
@@ -30,30 +31,32 @@ export default function PartnersPage() {
             <div className="text-sm mt-2">Du willst mit uns zusammenarbeiten? Schreib uns direkt über die Kontaktseite.</div>
           </div>
         ) : (
-          <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {partners.map((p) => (
+          <div className="mt-12 space-y-8">
+            {partners.map((p, idx) => (
               <a
                 key={p.id}
                 href={p.link || undefined}
                 target={p.link ? "_blank" : undefined}
                 rel="noreferrer"
-                className="border border-white/10 hover:border-[#29B6E8]/60 rounded-sm bg-[#121212] p-6 transition group"
+                className="grid lg:grid-cols-2 gap-0 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#101010] overflow-hidden transition group"
               >
-                <div className="h-24 flex items-center justify-start">
+                <div className={`${idx % 2 === 1 ? "lg:order-2" : ""} min-h-72 bg-[#070707] border-b lg:border-b-0 ${idx % 2 === 1 ? "lg:border-l" : "lg:border-r"} border-white/10 flex items-center justify-center p-10`}>
                   {p.logo_url ? (
-                    <img src={resolveMediaUrl(p.logo_url)} alt={p.name} className="max-h-20 max-w-52 object-contain" />
+                    <SmartLogo src={resolveMediaUrl(p.logo_url)} alt={p.name} className="max-h-44 max-w-[80%] w-auto h-auto" />
                   ) : (
-                    <Handshake className="w-8 h-8 text-[#29B6E8]" />
+                    <Handshake className="w-14 h-14 text-[#29B6E8]" />
                   )}
                 </div>
-                <div className="mt-4 text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{p.kind || "Partner"}</div>
-                <h3 className="mt-1 font-heading font-black uppercase text-lg">{p.name}</h3>
-                {p.description && <p className="mt-2 text-sm text-white/65 line-clamp-3">{p.description}</p>}
-                {p.link && (
-                  <span className="mt-4 inline-flex items-center gap-1 text-xs uppercase tracking-wider font-bold text-[#29B6E8] group-hover:underline">
-                    Website <ExternalLink className="w-3 h-3" />
-                  </span>
-                )}
+                <div className="p-7 md:p-10 flex flex-col justify-center">
+                  <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{p.kind || "Partner"}</div>
+                  <h3 className="mt-2 font-heading font-black uppercase text-2xl md:text-3xl leading-tight">{p.name}</h3>
+                  {p.description && <p className="mt-4 text-white/70 leading-relaxed">{p.description}</p>}
+                  {p.link && (
+                    <span className="mt-6 inline-flex items-center gap-1 text-xs uppercase tracking-wider font-bold text-[#29B6E8] group-hover:underline">
+                      Website <ExternalLink className="w-3 h-3" />
+                    </span>
+                  )}
+                </div>
               </a>
             ))}
           </div>
