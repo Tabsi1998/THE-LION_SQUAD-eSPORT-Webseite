@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from database import get_db
 from auth import get_current_user, require_admin, require_role, get_optional_user
 from services.visibility import user_can_see
+from services.public_phase import derive_public_phase
 from models import (
     F1ChallengeCreate, F1ChallengeUpdate, F1TrackCreate, F1TrackUpdate,
     F1LapTimeCreate, F1LapTimeUpdate,
@@ -70,6 +71,7 @@ async def _get_visible_challenge(slug_or_id: str, user: dict | None = None) -> d
         raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
     if not await user_can_see(user, c.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Challenge ist nicht sichtbar")
+    c["public_phase"] = derive_public_phase(c, "f1")
     return c
 
 
@@ -96,6 +98,7 @@ async def list_challenges(status: str | None = None, limit: int = 100, user=Depe
     for c in challenges:
         if not await user_can_see(user, c.get("visibility") or "public"):
             continue
+        c["public_phase"] = derive_public_phase(c, "f1")
         c["track_count"] = await db.f1_tracks.count_documents({"challenge_id": c["id"]})
         c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", {"challenge_id": c["id"]}))
         visible.append(c)

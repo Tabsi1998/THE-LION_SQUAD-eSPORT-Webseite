@@ -3,13 +3,12 @@ import { useParams, Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
-import { TournamentCard } from "@/components/tls/TournamentCard";
-import { StatusBadge } from "@/components/tls/StatusBadge";
+import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { RichContent } from "@/components/tls/RichContent";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Clock } from "lucide-react";
+import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag } from "lucide-react";
 
 const TYPE_LABELS = {
   club_evening: "Vereinsabend", lan_party: "LAN-Party", public_event: "Public Event",
@@ -70,8 +69,7 @@ export default function EventDetailPage() {
           <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Events", to: "/events" }, { label: e.name }]} className="mb-4" />
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#9F7AEA]">{TYPE_LABELS[e.event_type] || "EVENT"}</span>
-            <StatusBadge status={e.status || "draft"} size="md" />
-            {e.event_phase?.label && <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]"><Clock className="w-3 h-3" /> {e.event_phase.label}</span>}
+            <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status || "draft"} size="md" />
             {e.visibility === "members" && <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]"><Crown className="w-3 h-3" /> Mitglieder</span>}
             {e.visibility === "internal" && <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-white/60"><Lock className="w-3 h-3" /> Intern</span>}
           </div>
@@ -137,8 +135,8 @@ export default function EventDetailPage() {
         {!!e.tournaments?.length && (
           <div>
             <h2 className="font-heading text-2xl font-black uppercase mb-5">Turniere</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {e.tournaments.map((t) => <TournamentCard key={t.id} tournament={t} />)}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {e.tournaments.map((t) => <EventTournamentEmbed key={t.id} tournament={t} />)}
             </div>
           </div>
         )}
@@ -146,18 +144,8 @@ export default function EventDetailPage() {
         {!!e.f1_challenges?.length && (
           <div>
             <h2 className="font-heading text-2xl font-black uppercase mb-5">Fast-Lap Challenges</h2>
-            <div className="space-y-3">
-              {e.f1_challenges.map((c) => (
-                <Link key={c.id} to={`/fastlap/${c.slug || c.id}`} className="block border border-white/10 rounded-sm p-4 bg-[#121212] hover:border-[#FFD700]/60 transition">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <StatusBadge status={c.status} />
-                      <div className="mt-1 font-heading text-lg font-bold">{c.title}</div>
-                    </div>
-                    <span className="text-[#FFD700] text-sm font-bold uppercase tracking-wider">Öffnen →</span>
-                  </div>
-                </Link>
-              ))}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {e.f1_challenges.map((c) => <EventFastLapEmbed key={c.id} challenge={c} />)}
             </div>
           </div>
         )}
@@ -212,4 +200,122 @@ export default function EventDetailPage() {
       </div>
     </PublicLayout>
   );
+}
+
+function EventTournamentEmbed({ tournament }) {
+  const [bracket, setBracket] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api.get(`/tournaments/${tournament.id}/bracket`)
+      .then(({ data }) => { if (active) setBracket(data); })
+      .catch(() => { if (active) setBracket(null); })
+      .finally(() => { if (active) setLoaded(true); });
+    return () => { active = false; };
+  }, [tournament.id]);
+
+  const matches = (bracket?.matches || []).slice(0, 4);
+  const regMap = new Map((bracket?.registrations || []).map((r) => [r.id, r]));
+
+  return (
+    <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
+      <Link to={`/tournaments/${tournament.slug || tournament.id}`} className="block p-5 hover:bg-white/[0.03] transition">
+        <div className="flex flex-wrap items-center gap-2">
+          <Trophy className="w-4 h-4 text-[#FFD700]" />
+          <PhaseBadge phase={tournament.public_phase} status={tournament.status} />
+          {tournament.start_date && <span className="text-xs text-white/45">{new Date(tournament.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</span>}
+        </div>
+        <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#FFD700] transition">{tournament.title}</h3>
+        <div className="mt-2 flex flex-wrap gap-3 text-xs text-white/55">
+          {tournament.game?.name && <span>{tournament.game.name}</span>}
+          {tournament.format && <span>{tournament.format.replace("_", " ")}</span>}
+          {Number.isFinite(tournament.participant_count) && <span>{tournament.participant_count}/{tournament.max_participants} Teilnehmer</span>}
+        </div>
+      </Link>
+      <div className="border-t border-white/10 p-5">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">Bracket-Vorschau</div>
+          <Link to={`/tournaments/${tournament.slug || tournament.id}/bracket`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">Öffnen</Link>
+        </div>
+        {!loaded ? (
+          <div className="text-sm text-white/40 py-4">Lade Bracket…</div>
+        ) : matches.length ? (
+          <div className="space-y-2">
+            {matches.map((match) => (
+              <div key={match.id} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
+                <div className="text-[10px] uppercase tracking-widest text-white/35">{match.round_name || `Runde ${match.round}`}</div>
+                <div className="mt-1 text-sm text-white/75 flex items-center justify-between gap-3">
+                  <span className="truncate">{registrationName(regMap, match.participant_a_id)}</span>
+                  <span className="text-white/30">vs</span>
+                  <span className="truncate text-right">{registrationName(regMap, match.participant_b_id)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-white/45 border border-dashed border-white/10 rounded-sm p-4">Bracket wurde noch nicht generiert.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EventFastLapEmbed({ challenge }) {
+  const [board, setBoard] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api.get(`/f1/challenges/${challenge.id}/leaderboard`)
+      .then(({ data }) => { if (active) setBoard(data); })
+      .catch(() => { if (active) setBoard(null); })
+      .finally(() => { if (active) setLoaded(true); });
+    return () => { active = false; };
+  }, [challenge.id]);
+
+  const entries = (board?.entries || []).slice(0, 3);
+
+  return (
+    <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
+      <Link to={`/fastlap/${challenge.slug || challenge.id}`} className="block p-5 hover:bg-white/[0.03] transition">
+        <div className="flex flex-wrap items-center gap-2">
+          <Flag className="w-4 h-4 text-[#29B6E8]" />
+          <PhaseBadge phase={challenge.public_phase} status={challenge.status} />
+          {challenge.start_date && <span className="text-xs text-white/45">{new Date(challenge.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</span>}
+        </div>
+        <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#29B6E8] transition">{challenge.title}</h3>
+        {challenge.description && <p className="mt-2 text-sm text-white/55 line-clamp-2">{challenge.description}</p>}
+      </Link>
+      <div className="border-t border-white/10 p-5">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">Top 3{board?.track?.name ? ` · ${board.track.name}` : ""}</div>
+          <Link to={`/fastlap/${challenge.slug || challenge.id}`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">Leaderboard</Link>
+        </div>
+        {!loaded ? (
+          <div className="text-sm text-white/40 py-4">Lade Zeiten…</div>
+        ) : entries.length ? (
+          <div className="space-y-2">
+            {entries.map((entry) => (
+              <div key={entry.user_id} className="flex items-center justify-between gap-3 border border-white/10 bg-black/20 rounded-sm px-3 py-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`font-display font-black w-6 ${entry.rank === 1 ? "text-[#FFD700]" : entry.rank === 2 ? "text-white/75" : "text-[#CD7F32]"}`}>{entry.rank}</span>
+                  <span className="truncate text-sm text-white/80">{entry.display_name || entry.username}</span>
+                </div>
+                <span className="font-display text-sm text-[#29B6E8] tabular-nums">{entry.time_str}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-white/45 border border-dashed border-white/10 rounded-sm p-4">Noch keine gültigen Zeiten eingetragen.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function registrationName(regMap, id) {
+  const reg = regMap.get(id);
+  if (!id) return "TBD";
+  return reg?.display_name || reg?.user?.display_name || reg?.ingame_name || "TBD";
 }

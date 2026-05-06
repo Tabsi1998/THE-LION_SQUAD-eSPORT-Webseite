@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { BracketTree } from "@/components/tls/BracketTree";
-import { StatusBadge } from "@/components/tls/StatusBadge";
+import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Tv } from "lucide-react";
 
@@ -36,7 +36,7 @@ export default function TournamentBracketPage() {
             <Link to={`/tournaments/${t.slug}`} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
             <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">{t.title}</h1>
             <div className="mt-2 flex gap-2 items-center">
-              <StatusBadge status={t.status} />
+              <PhaseBadge phase={t.public_phase} status={t.status} />
               <span className="text-white/40 text-sm">{t.format?.replace("_", " ")}</span>
             </div>
           </div>

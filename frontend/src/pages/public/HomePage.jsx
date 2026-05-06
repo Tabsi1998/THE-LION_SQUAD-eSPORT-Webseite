@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { StatusBadge } from "@/components/tls/StatusBadge";
+import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { MascotBadge } from "@/components/tls/Logo";
 import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
@@ -10,7 +10,7 @@ import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { motion } from "framer-motion";
-import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Crown, Pin, Radio, MapPin, Clock, Image as ImageIcon } from "lucide-react";
+import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Crown, Pin, Radio, Image as ImageIcon } from "lucide-react";
 
 const HOME_DESCRIPTION = "THE LION SQUAD eSports: News, Events, Turniere, Fast-Lap-Challenges, Galerie und Vereinsinfos aus Tirol.";
 
@@ -28,6 +28,10 @@ export default function HomePage() {
 
   useApiInvalidation(load, ["home", "tournaments", "events", "news", "f1", "sponsors", "settings"]);
   useHomeStructuredData(state);
+  const timeline = state ? buildHomeTimeline(state).slice(0, 5) : [];
+  const primaryNews = state?.featured_news?.[0] || state?.news?.[0] || null;
+  const newsItems = homeNews(state, primaryNews?.id).slice(0, 3);
+  const isEmptyHome = state && !state.has_live && !timeline.length && !primaryNews && !newsItems.length;
 
   return (
     <PublicLayout>
@@ -82,57 +86,17 @@ export default function HomePage() {
         </div>
       </section>
 
-      {state && <PulseStrip state={state} />}
-
-      {state && (state.featured_news?.length > 0 || hasContent(state.upcoming || {})) && (
+      {state && (primaryNews || timeline.length > 0) && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid lg:grid-cols-12 gap-5">
-            {state.featured_news?.[0] && <FeaturedNews news={state.featured_news[0]} />}
-            <NextUp items={mergeItems(state.upcoming || {}).slice(0, 4)} />
+            {primaryNews && <FeaturedNews news={primaryNews} />}
+            <NextUp items={timeline} wide={!primaryNews} />
           </div>
         </section>
       )}
 
-      {/* TODAY — only shown when something is happening today */}
-      {state?.today && hasContent(state.today) && (
-        <Section icon={Calendar} accent="#9F7AEA" title="Heute" subtitle="Was heute im Rudel los ist">
-          <ItemGrid lists={state.today} variant="today" />
-        </Section>
-      )}
-
-      {/* SOON */}
-      {state?.soon && hasContent(state.soon) && (
-        <Section icon={ArrowRight} accent="#29B6E8" title="In Kürze" subtitle="Anmeldung läuft oder bald öffnend">
-          <ItemGrid lists={state.soon} variant="soon" />
-        </Section>
-      )}
-
-      {state?.upcoming && hasContent(state.upcoming) && (
-        <section className="border-y border-white/10 bg-[#080808]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-            <SectionHeader icon={Calendar} accent="#9F7AEA" title="Kommende Termine" actionLabel="Alle Events" actionTo="/events" />
-            <div className="mt-7 grid lg:grid-cols-3 gap-4">
-              {(state.upcoming.events || []).slice(0, 3).map((event) => (
-                <EventInfoCard key={event.id} item={{ ...event, kind: "event", url: `/events/${event.slug}`, label: event.name }} />
-              ))}
-            </div>
-            {((state.upcoming.tournaments || []).length > 0 || (state.upcoming.challenges || []).length > 0) && (
-              <div className="mt-10">
-                <SectionHeader icon={Trophy} accent="#FFD700" title="eSports Programm" actionLabel="Alles anzeigen" actionTo="/tournaments" />
-                <div className="mt-6 grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[
-                    ...(state.upcoming.tournaments || []).map((x) => ({ ...x, kind: "tournament", url: `/tournaments/${x.slug}`, label: x.title })),
-                    ...(state.upcoming.challenges || []).map((x) => ({ ...x, kind: "fastlap", url: `/fastlap/${x.slug}`, label: x.title })),
-                  ].slice(0, 6).map((item) => <EventInfoCard key={`${item.kind}-${item.id}`} item={item} />)}
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* If nothing live/today/soon: show CTA grid */}
-      {state && !state.has_live && !hasContent(state.today || {}) && !hasContent(state.soon || {}) && !hasContent(state.upcoming || {}) && !(state.news?.length > 0) && (
+      {/* If nothing current is published, show a quiet fallback. */}
+      {isEmptyHome && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="border border-dashed border-white/15 rounded-sm p-12 text-center">
             <Trophy className="w-10 h-10 mx-auto text-white/20 mb-4" />
@@ -149,11 +113,11 @@ export default function HomePage() {
       {/* Season Pass widget */}
       <SeasonPassWidget />
 
-      {homeNews(state).length > 0 && (
+      {newsItems.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <SectionHeader icon={Newspaper} accent="#29B6E8" title="Aktuelle News" actionLabel="Alle News" actionTo="/news" />
           <div className="grid lg:grid-cols-4 gap-5 mt-8">
-            {homeNews(state).map((n, idx) => (
+            {newsItems.map((n, idx) => (
               <NewsCard key={n.id} news={n} featured={idx === 0} />
             ))}
           </div>
@@ -185,7 +149,7 @@ export default function HomePage() {
 function useHomeStructuredData(state) {
   useEffect(() => {
     const origin = window.location.origin;
-    const nextItems = state ? mergeItems(state.upcoming || {}).slice(0, 6) : [];
+    const nextItems = state ? buildHomeTimeline(state).slice(0, 6) : [];
     const newsItems = state ? (state.news || []).slice(0, 6) : [];
     const data = [
       {
@@ -242,30 +206,6 @@ function useHomeStructuredData(state) {
   }, [state]);
 }
 
-function PulseStrip({ state }) {
-  const stats = [
-    { label: "News", value: state.stats?.news ?? state.news?.length ?? 0, to: "/news", icon: Newspaper },
-    { label: "Events", value: state.stats?.events ?? state.upcoming?.events?.length ?? 0, to: "/events", icon: Calendar },
-    { label: "Turniere", value: state.stats?.tournaments ?? state.upcoming?.tournaments?.length ?? 0, to: "/tournaments", icon: Trophy },
-    { label: "Fast Lap", value: state.stats?.fastlaps ?? state.upcoming?.challenges?.length ?? 0, to: "/fastlap", icon: Flag },
-  ];
-  return (
-    <section className="border-b border-white/10 bg-[#0E0E0E]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 grid grid-cols-2 md:grid-cols-4 gap-3">
-        {stats.map(({ label, value, to, icon: Icon }) => (
-          <Link key={label} to={to} className="group flex items-center justify-between gap-3 border border-white/10 hover:border-[#29B6E8]/45 rounded-sm px-4 py-3 bg-black/20 transition">
-            <div>
-              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</div>
-              <div className="mt-1 font-display text-2xl font-black tabular-nums">{value}</div>
-            </div>
-            <Icon className="w-5 h-5 text-[#29B6E8] opacity-80 group-hover:opacity-100" />
-          </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function FeaturedNews({ news }) {
   return (
     <Link to={`/news/${news.slug}`} data-testid={`home-featured-news-${news.slug}`} className="lg:col-span-7 group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#111] overflow-hidden grid md:grid-cols-2 transition">
@@ -290,17 +230,20 @@ function FeaturedNews({ news }) {
   );
 }
 
-function NextUp({ items }) {
+function NextUp({ items, wide = false }) {
   if (!items.length) return (
-    <div className="lg:col-span-5 border border-dashed border-white/15 rounded-sm p-6 text-white/45">
+    <div className={`${wide ? "lg:col-span-12" : "lg:col-span-5"} border border-dashed border-white/15 rounded-sm p-6 text-white/45`}>
       <div className="text-[10px] uppercase tracking-widest font-bold text-white/40">Nächster Termin</div>
       <div className="mt-3 font-heading text-xl font-black uppercase">Aktuell nichts geplant</div>
       <p className="mt-2 text-sm">Sobald News, Events, Turniere oder Fast-Laps gepflegt werden, erscheint hier automatisch der nächste relevante Eintrag.</p>
     </div>
   );
   return (
-    <div className="lg:col-span-5 border border-white/10 rounded-sm bg-[#111] p-5">
-      <div className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700]">Als Nächstes</div>
+    <div className={`${wide ? "lg:col-span-12" : "lg:col-span-5"} border border-white/10 rounded-sm bg-[#111] p-5`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700]">Nächste Termine</div>
+        <Link to="/events" className="text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-[#29B6E8]">Alle Events</Link>
+      </div>
       <div className="mt-4 space-y-3">
         {items.map((item) => (
           <Link key={`${item.kind}-${item.id}`} to={item.url} className="flex items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm p-3 bg-black/20 transition">
@@ -309,7 +252,7 @@ function NextUp({ items }) {
               <div className="font-heading font-bold truncate">{item.label}</div>
               {item.start_date && <div className="text-xs text-white/45">{new Date(item.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
             </div>
-            {item.status && <StatusBadge status={item.status} />}
+            {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} />}
           </Link>
         ))}
       </div>
@@ -344,32 +287,6 @@ function LiveBanner({ state }) {
         </div>
       </div>
     </div>
-  );
-}
-
-function EventInfoCard({ item }) {
-  return (
-    <Link to={item.url} data-testid={`home-upcoming-${item.kind}-${item.slug}`} className="group border border-white/10 hover:border-[#29B6E8]/45 rounded-sm bg-[#121212] overflow-hidden transition flex flex-col">
-      {item.banner_url ? (
-        <div className="aspect-video bg-black overflow-hidden">
-          <img src={resolveMediaUrl(item.banner_url)} alt="" className="w-full h-full object-cover opacity-85 group-hover:scale-105 transition duration-500" />
-        </div>
-      ) : null}
-      <div className="p-5 flex-1 flex flex-col">
-        <div className="flex items-center gap-2">
-          <KindIcon kind={item.kind} />
-          {item.status && <StatusBadge status={item.status} />}
-          {item.has_live_stream && <Radio className="w-3 h-3 text-[#FF3B30] animate-pulse" />}
-        </div>
-        <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight group-hover:text-[#29B6E8] transition">{item.label}</h3>
-        {item.description && <p className="mt-2 text-sm text-white/60 line-clamp-2">{item.description}</p>}
-        <div className="mt-4 space-y-1 text-xs text-white/50">
-          {item.start_date && <div className="inline-flex items-center gap-1.5"><Clock className="w-3 h-3" /> {new Date(item.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
-          {item.location && <div className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {item.location}</div>}
-          {item.event?.name && <div className="flex items-center gap-1.5"><Calendar className="w-3 h-3" /> {item.event.name}</div>}
-        </div>
-      </div>
-    </Link>
   );
 }
 
@@ -427,49 +344,6 @@ function HomeExplore() {
   );
 }
 
-function Section({ icon: Icon, accent, title, subtitle, children }) {
-  return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-      <div className="flex items-end justify-between gap-4 flex-wrap mb-6">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.3em] font-bold flex items-center gap-2" style={{ color: accent }}>
-            <Icon className="w-3.5 h-3.5" /> {title}
-          </div>
-          {subtitle && <h2 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">{subtitle}</h2>}
-        </div>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function ItemGrid({ lists, variant }) {
-  const all = [
-    ...(lists.tournaments || []).map((x) => ({ ...x, kind: "tournament", url: `/tournaments/${x.slug}`, label: x.title })),
-    ...(lists.events || []).map((x) => ({ ...x, kind: "event", url: `/events/${x.slug}`, label: x.name })),
-    ...(lists.challenges || []).map((x) => ({ ...x, kind: "fastlap", url: `/fastlap/${x.slug}`, label: x.title })),
-  ];
-  return (
-    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {all.map((x) => (
-        <Link key={`${x.kind}-${x.id}`} to={x.url} data-testid={`home-${variant}-${x.kind}-${x.slug}`} className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] p-5 transition flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <KindIcon kind={x.kind} />
-            <StatusBadge status={x.status} />
-            {x.has_live_stream && <Radio className="w-3 h-3 text-[#FF3B30] animate-pulse" />}
-          </div>
-          <div className="font-heading font-black text-lg group-hover:text-[#29B6E8] transition line-clamp-2">{x.label}</div>
-          {x.start_date && (
-            <div className="text-xs text-white/50 inline-flex items-center gap-1.5">
-              <Calendar className="w-3 h-3" /> {new Date(x.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}
-            </div>
-          )}
-        </Link>
-      ))}
-    </div>
-  );
-}
-
 function KindIcon({ kind }) {
   if (kind === "tournament") return <Trophy className="w-3.5 h-3.5 text-[#FFD700]" />;
   if (kind === "fastlap") return <Flag className="w-3.5 h-3.5 text-[#29B6E8]" />;
@@ -493,25 +367,49 @@ function SectionHeader({ icon: Icon, accent, title, actionLabel, actionTo }) {
   );
 }
 
-function hasContent(group) {
-  if (!group) return false;
-  return Object.values(group).some((arr) => Array.isArray(arr) && arr.length > 0);
+function normalizeTimelineItem(item, kind, source, sourcePriority) {
+  const slug = item.slug || item.id;
+  const label = kind === "event" ? item.name : item.title;
+  const url = kind === "event" ? `/events/${slug}` : kind === "tournament" ? `/tournaments/${slug}` : `/fastlap/${slug}`;
+  return { ...item, kind, source, sourcePriority, url, label };
 }
 
-function mergeItems(group) {
-  return [
-    ...(group.events || []).map((x) => ({ ...x, kind: "event", url: `/events/${x.slug}`, label: x.name })),
-    ...(group.tournaments || []).map((x) => ({ ...x, kind: "tournament", url: `/tournaments/${x.slug}`, label: x.title })),
-    ...(group.challenges || []).map((x) => ({ ...x, kind: "fastlap", url: `/fastlap/${x.slug}`, label: x.title })),
-  ].sort((a, b) => {
+function buildHomeTimeline(state) {
+  if (!state) return [];
+  const groups = [
+    ["live", state.live || {}, 0],
+    ["today", state.today || {}, 1],
+    ["soon", state.soon || {}, 2],
+    ["upcoming", state.upcoming || {}, 3],
+  ];
+  const byKey = new Map();
+  for (const [source, group, sourcePriority] of groups) {
+    const rows = [
+      ...(group.events || []).map((x) => normalizeTimelineItem(x, "event", source, sourcePriority)),
+      ...(group.tournaments || []).map((x) => normalizeTimelineItem(x, "tournament", source, sourcePriority)),
+      ...(group.challenges || []).map((x) => normalizeTimelineItem(x, "fastlap", source, sourcePriority)),
+    ];
+    for (const item of rows) {
+      const key = `${item.kind}-${item.id || item.slug}`;
+      const existing = byKey.get(key);
+      if (!existing || item.sourcePriority < existing.sourcePriority) {
+        byKey.set(key, item);
+      }
+    }
+  }
+  return [...byKey.values()].sort((a, b) => {
+    const liveRankA = a.public_phase?.state === "live" ? 0 : 1;
+    const liveRankB = b.public_phase?.state === "live" ? 0 : 1;
+    if (liveRankA !== liveRankB) return liveRankA - liveRankB;
     const da = a.start_date ? new Date(a.start_date).getTime() : Number.MAX_SAFE_INTEGER;
     const db = b.start_date ? new Date(b.start_date).getTime() : Number.MAX_SAFE_INTEGER;
-    return da - db;
+    if (da !== db) return da - db;
+    return a.sourcePriority - b.sourcePriority;
   });
 }
 
-function homeNews(state) {
+function homeNews(state, excludeId) {
   if (!state?.news?.length) return [];
-  const featuredId = state.featured_news?.[0]?.id;
+  const featuredId = excludeId || state.featured_news?.[0]?.id;
   return state.news.filter((n) => n.id !== featuredId).slice(0, 8);
 }

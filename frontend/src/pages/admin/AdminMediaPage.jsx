@@ -21,6 +21,21 @@ const fmtBytes = (n) => {
   return `${(n / 1024 / 1024).toFixed(2)} MB`;
 };
 
+function BrokenImageState({ compact = false }) {
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2 text-center text-[#FF3B30]/80">
+      <ImageIcon className={compact ? "w-6 h-6" : "w-10 h-10"} />
+      <span className="text-[9px] uppercase tracking-widest font-bold">Bild nicht erreichbar</span>
+    </div>
+  );
+}
+
+function MediaImage({ src, alt, className, compact = false }) {
+  const [error, setError] = useState(false);
+  if (error) return <BrokenImageState compact={compact} />;
+  return <img src={src} alt={alt} className={className} loading="lazy" onError={() => setError(true)} />;
+}
+
 export default function AdminMediaPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -180,11 +195,11 @@ export default function AdminMediaPage() {
                 >
                   <div className="aspect-square bg-[#0A0A0A] flex items-center justify-center overflow-hidden">
                     {isImg ? (
-                      <img
+                      <MediaImage
                         src={fullUrl}
                         alt={it.filename}
                         className="w-full h-full object-cover group-hover:scale-105 transition"
-                        loading="lazy"
+                        compact
                       />
                     ) : (
                       <div className="flex flex-col items-center gap-2 text-white/40">
@@ -238,7 +253,7 @@ function MediaDetailModal({ item, onClose, onCopy, onDelete }) {
 
         <div className="bg-[#0A0A0A] rounded-sm p-3 flex items-center justify-center min-h-[300px]">
           {isImg ? (
-            <img src={fullUrl} alt={item.filename} className="max-h-[60vh] object-contain" />
+            <MediaImage src={fullUrl} alt={item.filename} className="max-h-[60vh] object-contain" />
           ) : (
             <div className="flex flex-col items-center gap-3 text-white/50 py-12">
               <FileText className="w-16 h-16" />

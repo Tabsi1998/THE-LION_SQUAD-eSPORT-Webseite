@@ -2,21 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Calendar, MapPin, Users as UsersIcon, Crown, Lock } from "lucide-react";
-
-const STATUS_LABELS = {
-  draft: "Entwurf", scheduled: "Bald öffnend", registration_open: "Anmeldung offen",
-  registration_closed: "Anmeldung geschlossen", checkin_open: "Check-in offen",
-  live: "LIVE", paused: "Pausiert", completed: "Beendet", results_published: "Ergebnisse",
-  archived: "Archiviert", cancelled: "Abgesagt",
-};
-
-const STATUS_COLORS = {
-  registration_open: "#10B981", live: "#FF3B30", scheduled: "#29B6E8",
-  checkin_open: "#FFD700", completed: "#6B7280", cancelled: "#FF3B30",
-};
 
 const VIS_ICON = { members: Crown, internal: Lock };
 
@@ -42,7 +31,8 @@ export default function EventsPage() {
 
   const filtered = list.filter((e) => {
     if (typeFilter && e.event_type !== typeFilter) return false;
-    if (tab === "past" && !["completed", "archived", "results_published"].includes(e.status)) return false;
+    const phaseState = e.public_phase?.state || e.event_phase?.state || e.status;
+    if (tab === "past" && !["completed", "archived", "results_published"].includes(phaseState)) return false;
     return true;
   });
   const filterTypes = (meta.types || []).filter((t) => !meta.primary_types || meta.primary_types.includes(t.k));
@@ -85,9 +75,7 @@ export default function EventsPage() {
 
 function EventCard({ e, meta }) {
   const VIcon = VIS_ICON[e.visibility];
-  const statusColor = STATUS_COLORS[e.status] || "#6B7280";
   const typeLabel = meta.types.find((t) => t.k === e.event_type)?.l || e.event_type;
-  const statusLabel = e.event_phase?.label || STATUS_LABELS[e.status] || e.status;
   return (
     <Link
       to={`/events/${e.slug}`}
@@ -106,9 +94,7 @@ function EventCard({ e, meta }) {
       <div className="p-5 flex-1 flex flex-col">
         <div className="flex items-center gap-2 flex-wrap text-[10px] uppercase tracking-widest font-bold">
           <span className="text-[#9F7AEA]">{typeLabel}</span>
-          <span className="px-2 py-0.5 rounded-sm border" style={{ color: statusColor, borderColor: `${statusColor}40` }}>
-            {statusLabel}
-          </span>
+          <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status} />
           {VIcon && <VIcon className="w-3 h-3 text-[#FFD700]" />}
         </div>
         <h3 className="mt-2 font-heading font-black text-lg group-hover:text-[#9F7AEA] transition">{e.name}</h3>

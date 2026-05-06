@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { motion } from "framer-motion";
 import { Calendar, Users, MapPin, ArrowRight, Flame, Flag, Trophy } from "lucide-react";
-import { StatusBadge } from "./StatusBadge";
+import { PhaseBadge } from "./PhaseBadge";
 
 /**
  * CurrentEventHero — Prominent hero card on home.
@@ -79,7 +79,7 @@ export function CurrentEventHero() {
               <Link to={href} data-testid="hero-cta-primary" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
                 {item.status === "registration_open" ? "Jetzt anmelden" : "Details ansehen"} <ArrowRight className="w-4 h-4" />
               </Link>
-              <StatusBadge status={item.status} size="lg" />
+              <PhaseBadge phase={item.public_phase} status={item.status} size="lg" />
             </div>
           </div>
           {/* Right: mini card with prize preview if available */}

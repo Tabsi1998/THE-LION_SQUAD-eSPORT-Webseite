@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { StatusBadge } from "./StatusBadge";
+import { PhaseBadge } from "./PhaseBadge";
 import { Calendar, Users, Trophy } from "lucide-react";
 import { formatDate, getRegistrationState } from "@/lib/datetime";
 import { resolveMediaUrl } from "@/lib/api";
@@ -24,7 +24,7 @@ export function TournamentCard({ tournament, index = 0 }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/70 to-transparent" />
         <div className="absolute top-3 left-3 flex gap-2">
-          <StatusBadge status={t.status} />
+          <PhaseBadge phase={t.public_phase} status={t.status} />
         </div>
         <div className="absolute top-3 right-3">
           <span className="text-[10px] font-bold uppercase tracking-wider text-[#29B6E8] bg-[#29B6E8]/10 border border-[#29B6E8]/30 px-2 py-1 rounded-sm">

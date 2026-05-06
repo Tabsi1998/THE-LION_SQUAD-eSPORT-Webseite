@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends
 from database import get_db
 from auth import get_optional_user
 from services.visibility import user_can_see
+from services.public_phase import derive_public_phase
 
 router = APIRouter(prefix="/api/home", tags=["home"])
 
@@ -52,6 +53,8 @@ def _normalize_status(row: dict, kind: str | None = None) -> dict:
     if kind == "event" and row.get("status") == "checkin_open":
         row["source_status"] = "checkin_open"
         row["status"] = "check_in"
+    phase_kind = "f1" if kind == "fastlap" else (kind or "content")
+    row["public_phase"] = derive_public_phase(row, phase_kind)
     return row
 
 

@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { API, api, formatMs, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
-import { StatusBadge } from "@/components/tls/StatusBadge";
+import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -66,7 +66,7 @@ export default function F1DetailPage() {
           <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "eSports", to: "/fastlap" }, { label: "Fast Lap", to: "/fastlap" }, { label: challenge.title }]} className="mb-3" />
           <Link to="/fastlap" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Fast Lap Challenges</Link>
           <div className="mt-2 flex flex-wrap items-center gap-3 mb-3">
-            <StatusBadge status={challenge.status} size="lg" />
+            <PhaseBadge phase={challenge.public_phase} status={challenge.status} size="lg" />
             {challenge.is_championship && <span className="text-[11px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 px-2 py-1 rounded-sm">Championship</span>}
           </div>
           <h1 data-testid="f1-challenge-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{challenge.title}</h1>

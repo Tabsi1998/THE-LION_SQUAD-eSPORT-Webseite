@@ -103,7 +103,7 @@ export default function AdminTournamentNewPage() {
           <Row>
             <Select label="Initialer Status" value={form.status} onChange={(v) => set("status", v)} options={[
               ["draft", "Entwurf"],
-              ["scheduled", "Warten auf Registrierung/Event"],
+              ["scheduled", "Angekündigt"],
               ["registration_open", "Anmeldung offen"],
               ["registration_closed", "Anmeldung geschlossen"],
               ["live", "Live"],

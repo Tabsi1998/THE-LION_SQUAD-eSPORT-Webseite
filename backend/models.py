@@ -347,7 +347,7 @@ TournamentFormat = Literal[
     "groups", "ffa", "battle_royale", "league", "time_trial", "grand_prix"
 ]
 # Unified status vocabulary across Events / Tournaments / Challenges / Fast-Lap.
-# `scheduled` = "Warten auf Öffnung" (announced but not open for registration yet)
+# `scheduled` = announced but not open/live yet.
 TournamentStatus = Literal[
     "draft", "scheduled", "registration_open", "registration_closed",
     "check_in", "live", "paused", "completed", "results_published",
@@ -400,7 +400,7 @@ class TournamentCreate(BaseModel):
     # Phase 7
     season_weight: float = 2.0
     visibility: Literal["public", "community", "members", "internal"] = "public"
-    # Optional initial status — admin can publish straight to 'scheduled' (Warten auf Öffnung)
+    # Optional initial status — admin can publish straight to 'scheduled'.
     status: Optional[TournamentStatus] = None
 
 

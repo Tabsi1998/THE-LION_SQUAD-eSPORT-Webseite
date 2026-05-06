@@ -48,6 +48,84 @@ function fileLooksSupported(file) {
   return SUPPORTED_IMAGE_TYPES.has(type) || SUPPORTED_IMAGE_EXT_RE.test(file.name || "");
 }
 
+function imageFileName(value) {
+  if (!value) return "";
+  try {
+    const url = new URL(resolveMediaUrl(value), window.location.origin);
+    return decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || String(value));
+  } catch {
+    return String(value).split("/").pop() || String(value);
+  }
+}
+
+function ImagePreviewBox({ value, previewClass, onClear, testId }) {
+  const [state, setState] = useState(value ? "loading" : "empty");
+  const src = value ? resolveMediaUrl(value) : "";
+
+  useEffect(() => {
+    setState(value ? "loading" : "empty");
+  }, [value]);
+
+  return (
+    <div className={`${previewClass} bg-[#0A0A0A] border ${value ? "border-white/10" : "border-dashed border-white/20"} rounded-sm overflow-hidden shrink-0 relative group`} data-testid={`${testId}-preview`}>
+      {value ? (
+        <>
+          {state !== "error" && (
+            <img
+              key={src}
+              src={src}
+              alt=""
+              className={`w-full h-full object-contain transition-opacity ${state === "loaded" ? "opacity-100" : "opacity-0"}`}
+              onLoad={() => setState("loaded")}
+              onError={() => setState("error")}
+            />
+          )}
+          {state === "loading" && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/35">
+              <ImageIcon className="w-7 h-7 animate-pulse" />
+              <span className="text-[10px] uppercase tracking-widest font-bold">Lade Vorschau</span>
+            </div>
+          )}
+          {state === "error" && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 text-center bg-[#0A0A0A]">
+              <ImageIcon className="w-7 h-7 text-[#FF3B30]/70" />
+              <span className="text-[10px] uppercase tracking-widest font-bold text-[#FF3B30]">Bild nicht erreichbar</span>
+              <span className="text-[10px] text-white/35 break-all line-clamp-2">{imageFileName(value)}</span>
+            </div>
+          )}
+          <button type="button" onClick={onClear} className="absolute top-1 right-1 p-1 bg-black/70 text-white/80 rounded-sm opacity-0 group-hover:opacity-100 transition" data-testid={`${testId}-clear`}>
+            <X className="w-3 h-3" />
+          </button>
+        </>
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-white/20">
+          <ImageIcon className="w-8 h-8" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LibraryThumb({ item }) {
+  const [error, setError] = useState(false);
+  if (error) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2 text-center text-[#FF3B30]/80">
+        <ImageIcon className="w-6 h-6" />
+        <span className="text-[9px] uppercase tracking-widest font-bold">Defekt</span>
+      </div>
+    );
+  }
+  return (
+    <img
+      src={resolveMediaUrl(item.url)}
+      alt=""
+      className="w-full h-full object-cover"
+      onError={() => setError(true)}
+    />
+  );
+}
+
 function canvasToBlob(canvas, type, quality) {
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
@@ -258,20 +336,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     <div>
       {label && <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>}
       <div className={variant === "wide" ? "" : "flex items-start gap-3"}>
-        <div className={`${previewClass} bg-[#0A0A0A] border ${value ? "border-white/10" : "border-dashed border-white/20"} rounded-sm overflow-hidden shrink-0 relative group`}>
-          {value ? (
-            <>
-              <img src={resolveMediaUrl(value)} alt="" className="w-full h-full object-contain" />
-              <button type="button" onClick={() => onChange("")} className="absolute top-1 right-1 p-1 bg-black/70 text-white/80 rounded-sm opacity-0 group-hover:opacity-100 transition" data-testid={`${testId}-clear`}>
-                <X className="w-3 h-3" />
-              </button>
-            </>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-white/20">
-              <ImageIcon className="w-8 h-8" />
-            </div>
-          )}
-        </div>
+        <ImagePreviewBox value={value} previewClass={previewClass} onClear={() => onChange("")} testId={testId} />
         <div className={variant === "wide" ? "mt-2" : "flex-1 space-y-2"}>
           <input
             ref={fileRef}
@@ -324,7 +389,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                     className="aspect-square border border-white/10 bg-[#0A0A0A] rounded-sm overflow-hidden hover:border-[#29B6E8]/70 transition"
                     title={item.filename}
                   >
-                    <img src={resolveMediaUrl(item.url)} alt="" className="w-full h-full object-cover" />
+                    <LibraryThumb item={item} />
                   </button>
                 ))}
               </div>

@@ -70,20 +70,34 @@ def _parse_dt(value):
         return None
 
 
-def _next_status(doc: dict, now: datetime) -> str | None:
+def _next_status(doc: dict, now: datetime, kind: str = "tournament") -> str | None:
     status = doc.get("status")
-    reg_enabled = doc.get("registration_enabled") is not False and not doc.get("is_invite_only")
-    reg_from = _parse_dt(doc.get("registration_open_from"))
-    reg_until = _parse_dt(doc.get("registration_open_until"))
+    if kind == "event":
+        reg_enabled = bool(doc.get("has_registration") or doc.get("registration_url"))
+        reg_from = _parse_dt(doc.get("registration_opens_at"))
+        reg_until = _parse_dt(doc.get("registration_closes_at"))
+    else:
+        reg_enabled = doc.get("registration_enabled") is not False and not doc.get("is_invite_only")
+        reg_from = _parse_dt(doc.get("registration_open_from"))
+        reg_until = _parse_dt(doc.get("registration_open_until"))
+    check_from = _parse_dt(doc.get("check_in_from"))
+    check_until = _parse_dt(doc.get("check_in_until"))
     start = _parse_dt(doc.get("start_date"))
+    end = _parse_dt(doc.get("end_date"))
 
-    if status in ("draft", "live", "paused", "completed", "results_published", "archived", "cancelled"):
+    if status in ("draft", "paused", "completed", "results_published", "archived", "cancelled"):
         return None
+    if end and now >= end:
+        return "completed"
     if status == "scheduled" and reg_enabled and reg_from and now >= reg_from and (not reg_until or now <= reg_until):
         return "registration_open"
+    if kind != "event" and status in ("scheduled", "registration_open", "registration_closed") and check_from and now >= check_from and (not check_until or now <= check_until):
+        return "check_in"
     if status == "registration_open" and reg_until and now > reg_until:
         return "registration_closed"
-    if status in ("scheduled", "registration_open", "registration_closed", "check_in") and start and now >= start:
+    if status == "check_in" and check_until and now > check_until:
+        return "registration_closed"
+    if status in ("scheduled", "registration_open", "registration_closed", "check_in", "checkin_open") and start and now >= start:
         return "live"
     return None
 
@@ -96,13 +110,13 @@ async def _safe_status_transitions():
         now = datetime.now(timezone.utc)
         now_iso = now_utc().isoformat()
         changed = 0
-        for collection_name in ("tournaments", "f1_challenges"):
+        for collection_name, kind in (("tournaments", "tournament"), ("f1_challenges", "f1"), ("events", "event")):
             cursor = db[collection_name].find(
-                {"status": {"$in": ["scheduled", "registration_open", "registration_closed", "check_in"]}},
+                {"status": {"$in": ["scheduled", "registration_open", "registration_closed", "check_in", "checkin_open", "live"]}},
                 {"_id": 0},
             )
             async for doc in cursor:
-                nxt = _next_status(doc, now)
+                nxt = _next_status(doc, now, kind)
                 if nxt and nxt != doc.get("status"):
                     await db[collection_name].update_one(
                         {"id": doc["id"]},

@@ -15,7 +15,7 @@ const STATUS_MAP = {
   checked_in: { label: "CHECKED IN", cls: "bg-[#29B6E8]/15 text-[#29B6E8] border-[#29B6E8]/40" },
   disputed: { label: "DISPUTE", cls: "bg-[#FF3B30]/20 text-[#FF3B30] border-[#FF3B30]/50" },
   ready: { label: "BEREIT", cls: "bg-[#29B6E8]/15 text-[#29B6E8] border-[#29B6E8]/40" },
-  scheduled: { label: "WARTEN AUF ÖFFNUNG", cls: "bg-[#29B6E8]/10 text-[#29B6E8] border-[#29B6E8]/40" },
+  scheduled: { label: "ANGEKÜNDIGT", cls: "bg-[#29B6E8]/10 text-[#29B6E8] border-[#29B6E8]/40" },
   registration_closed: { label: "ANMELDUNG GESCHLOSSEN", cls: "bg-white/10 text-white/70 border-white/20" },
   results_published: { label: "ERGEBNISSE", cls: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/40" },
   cancelled: { label: "ABGESAGT", cls: "bg-[#FF3B30]/15 text-[#FF3B30] border-[#FF3B30]/40" },

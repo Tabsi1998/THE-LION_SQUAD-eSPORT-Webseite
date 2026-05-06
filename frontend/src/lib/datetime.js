@@ -56,7 +56,7 @@ export function getRegistrationState(item, noun = "Anmeldung") {
   }
   if (item.status === "scheduled") {
     const suffix = openFromMs ? ` ab ${formatDateTime(item.registration_open_from)}` : "";
-    return { state: "scheduled", canRegister: false, label: `Warten auf Öffnung${suffix}` };
+    return { state: "scheduled", canRegister: false, label: `${noun} öffnet${suffix}` };
   }
   if (item.status !== "registration_open") {
     return { state: "closed", canRegister: false, label: `${noun} geschlossen` };

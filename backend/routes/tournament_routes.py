@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from database import get_db
 from auth import get_current_user, require_admin, get_optional_user
 from services.visibility import user_can_see
+from services.public_phase import derive_public_phase
 from models import (
     TournamentCreate, TournamentUpdate, RegistrationCreate, RegistrationUpdate,
     now_utc, new_id,
@@ -63,6 +64,7 @@ def _required_game_fields(game: dict | None) -> list[dict]:
 
 async def _enrich_tournament(t: dict) -> dict:
     db = get_db()
+    t["public_phase"] = derive_public_phase(t, "tournament")
     if t.get("game_id"):
         g = await db.games.find_one({"id": t["game_id"]}, {"_id": 0})
         t["game"] = g
@@ -135,8 +137,12 @@ async def get_tournament(slug_or_id: str, user=Depends(get_optional_user)):
             visible_f1 = []
             for c in t["related_f1_challenges"]:
                 if await user_can_see(user, c.get("visibility") or "public"):
+                    c["public_phase"] = derive_public_phase(c, "f1")
                     visible_f1.append(c)
             t["related_f1_challenges"] = visible_f1
+        else:
+            for c in t["related_f1_challenges"]:
+                c["public_phase"] = derive_public_phase(c, "f1")
     return t
 
 
@@ -154,7 +160,7 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
               "check_in_until", "start_date", "end_date"]:
         doc[k] = _iso(doc.get(k))
     doc["id"] = new_id()
-    # Allow scheduling directly (Warten auf Öffnung) — fall back to draft.
+    # Allow scheduling directly (announced) — fall back to draft.
     if not doc.get("status"):
         doc["status"] = "draft"
     doc["created_at"] = now_utc().isoformat()
@@ -489,6 +495,7 @@ async def get_bracket(tid: str):
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404)
+    t["public_phase"] = derive_public_phase(t, "tournament")
     matches = await db.matches.find({"tournament_id": t["id"]}, {"_id": 0}).sort("round", 1).to_list(1000)
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})

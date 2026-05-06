@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X, Flag } from "lucide-react";
@@ -89,7 +90,7 @@ export default function TournamentDetailPage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
           <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "eSports", to: "/tournaments" }, { label: "Turniere", to: "/tournaments" }, { label: t.title }]} className="mb-4" />
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            <StatusBadge status={t.status} size="lg" />
+            <PhaseBadge phase={t.public_phase} status={t.status} size="lg" />
             <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1">{t.format?.replace("_", " ")}</span>
             {t.game && <span className="text-white/60 text-sm">· {t.game.name}</span>}
           </div>
@@ -183,7 +184,7 @@ export default function TournamentDetailPage() {
               <div className="grid sm:grid-cols-2 gap-3">
                 {t.related_f1_challenges.map((c) => (
                   <Link key={c.id} to={`/fastlap/${c.slug || c.id}`} className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] p-4 transition">
-                    <StatusBadge status={c.status} />
+                    <PhaseBadge phase={c.public_phase} status={c.status} />
                     <div className="mt-2 font-heading font-bold">{c.title}</div>
                     {c.start_date && <div className="mt-1 text-xs text-white/50">{formatDateTime(c.start_date)}</div>}
                   </Link>

@@ -6,6 +6,7 @@ from database import get_db
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see
 from services.content_embed_service import resolve_content_embeds
+from services.public_phase import derive_public_phase
 from models import EventCreate, EventUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -27,6 +28,8 @@ async def _filter_related(items: list[dict], user: dict | None, kind: str) -> li
         if kind == "tournament" and not is_staff and item.get("is_public") is False:
             continue
         if await _user_can_see(user, item.get("visibility") or "public"):
+            phase_kind = "f1" if kind == "fastlap" else kind
+            item["public_phase"] = derive_public_phase(item, phase_kind)
             out.append(item)
     return out
 
@@ -59,20 +62,7 @@ def _sponsor_show_on_events(sponsor: dict) -> bool:
 
 
 def _event_phase(event: dict) -> dict:
-    status = event.get("status") or "draft"
-    target = _parse_dt(event.get("door_time")) or _parse_dt(event.get("start_date"))
-    if status in {"live", "completed", "results_published", "archived", "cancelled"} or not target:
-        return {"state": status, "label": None, "target_at": target.isoformat() if target else None}
-    diff = (target - datetime.now(timezone.utc)).total_seconds()
-    if diff <= 0:
-        return {"state": "opening_now", "label": "Öffnet jetzt", "target_at": target.isoformat()}
-    if diff <= 24 * 60 * 60:
-        hours = max(1, round(diff / 3600))
-        return {"state": "opens_24h", "label": f"Öffnet in {hours} h", "target_at": target.isoformat()}
-    if diff <= 7 * 24 * 60 * 60:
-        days = max(1, round(diff / (24 * 3600)))
-        return {"state": "opens_7d", "label": f"Öffnet in {days} Tagen", "target_at": target.isoformat()}
-    return {"state": "announced", "label": "Angekündigt", "target_at": target.isoformat()}
+    return derive_public_phase(event, "event")
 
 
 async def _attach_event_sponsors(event: dict) -> None:
@@ -100,7 +90,8 @@ async def _attach_event_sponsors(event: dict) -> None:
 
 
 async def _decorate_event(event: dict, include_sponsors: bool = False) -> dict:
-    event["event_phase"] = _event_phase(event)
+    event["public_phase"] = _event_phase(event)
+    event["event_phase"] = event["public_phase"]
     if include_sponsors:
         await _attach_event_sponsors(event)
     return event
@@ -166,7 +157,7 @@ async def event_meta():
         "primary_types": ["general", "public_event", "club_evening", "lan_party", "online_event", "expo"],
         "statuses": [
             {"k": "draft", "l": "Entwurf"},
-            {"k": "scheduled", "l": "Warten auf Öffnung"},
+            {"k": "scheduled", "l": "Angekündigt"},
             {"k": "registration_open", "l": "Anmeldung offen"},
             {"k": "registration_closed", "l": "Anmeldung geschlossen"},
             {"k": "checkin_open", "l": "Check-in offen"},

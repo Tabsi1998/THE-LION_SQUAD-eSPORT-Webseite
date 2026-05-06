@@ -86,7 +86,7 @@ export default function AdminF1NewPage() {
           <div className="grid md:grid-cols-2 gap-4">
             <Select label="Initialer Status" value={form.status} onChange={(v) => set("status", v)} options={[
               ["draft", "Entwurf"],
-              ["scheduled", "Warten auf Registrierung/Event"],
+              ["scheduled", "Angekündigt"],
               ["registration_open", "Einreichung offen"],
               ["registration_closed", "Einreichung geschlossen"],
               ["live", "Live"],

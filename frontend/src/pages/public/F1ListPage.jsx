@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { StatusBadge } from "@/components/tls/StatusBadge";
+import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { Flag, Users, Clock, ChevronRight } from "lucide-react";
 import { formatDate, getRegistrationState } from "@/lib/datetime";
 
@@ -52,7 +52,7 @@ function FastLapCard({ challenge: c }) {
         {c.banner_url && <img src={resolveMediaUrl(c.banner_url)} alt="" className="w-32 h-20 object-cover rounded-sm hidden sm:block" />}
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-2">
-            <StatusBadge status={c.status} />
+            <PhaseBadge phase={c.public_phase} status={c.status} />
             {c.is_championship && <span className="text-[10px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 px-2 py-[3px] rounded-sm">Championship</span>}
           </div>
           <h2 className="font-heading text-2xl font-bold group-hover:text-[#29B6E8] transition">{c.title}</h2>
