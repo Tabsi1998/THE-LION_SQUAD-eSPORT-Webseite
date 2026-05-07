@@ -93,12 +93,42 @@ def _age_from_birth_date(value: str | date | None) -> int | None:
     return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
 
-def _public_profile(doc: dict, detail: bool = False) -> dict:
+def _title_for_position(position: dict, person: dict | None = None) -> str:
+    if person and person.get("gender") == "female" and position.get("title_female"):
+        return position["title_female"]
+    return position.get("title_male") or position.get("display_title") or "Vorstand"
+
+
+async def _board_titles_by_profile_id(db) -> dict[str, str]:
+    profiles = await db.club_member_profiles.find(
+        {},
+        {"_id": 0, "id": 1, "user_id": 1, "gender": 1},
+    ).to_list(2000)
+    by_profile_id = {p["id"]: p for p in profiles}
+    by_user_id = {p["user_id"]: p for p in profiles if p.get("user_id")}
+    titles: dict[str, str] = {}
+    positions = await db.board_positions.find(
+        {"is_active": True}, {"_id": 0}
+    ).sort("order_index", 1).to_list(200)
+    for position in positions:
+        main = by_profile_id.get(position.get("user_id")) or by_user_id.get(position.get("user_id"))
+        if main:
+            titles[main["id"]] = _title_for_position(position, main)
+        deputy = by_profile_id.get(position.get("deputy_user_id")) or by_user_id.get(position.get("deputy_user_id"))
+        if deputy:
+            titles[deputy["id"]] = f"{_title_for_position(position, deputy)}-Stv."
+    return titles
+
+
+def _public_profile(doc: dict, detail: bool = False, board_title: str | None = None) -> dict:
+    role_title = board_title or doc.get("role_title")
     out = {
         "id": doc["id"],
         "slug": doc["slug"],
         "display_name": doc.get("display_name"),
-        "role_title": doc.get("role_title"),
+        "role_title": role_title,
+        "editorial_role_title": doc.get("role_title"),
+        "board_title": board_title,
         "photo_url": doc.get("photo_url"),
         "cover_url": doc.get("cover_url"),
         "games": doc.get("games") or [],
@@ -346,7 +376,8 @@ async def list_public_member_profiles():
     rows = await db.club_member_profiles.find(
         {"is_active": {"$ne": False}}, {"_id": 0}
     ).sort([("order_index", 1), ("display_name", 1)]).to_list(1000)
-    return [_public_profile(row) for row in rows]
+    board_titles = await _board_titles_by_profile_id(db)
+    return [_public_profile(row, board_title=board_titles.get(row["id"])) for row in rows]
 
 
 @router.get("/profiles/{slug}")
@@ -357,14 +388,21 @@ async def get_public_member_profile(slug: str):
     )
     if not row:
         raise HTTPException(404, "Mitglied nicht gefunden.")
-    return _public_profile(row, detail=True)
+    board_titles = await _board_titles_by_profile_id(db)
+    return _public_profile(row, detail=True, board_title=board_titles.get(row["id"]))
 
 
 @router.get("/profiles/admin/all")
 async def admin_list_member_profiles(me: dict = Depends(require_admin())):
     db = get_db()
     rows = await db.club_member_profiles.find({}, {"_id": 0}).sort([("order_index", 1), ("display_name", 1)]).to_list(1000)
-    return [_admin_profile(row) for row in rows]
+    board_titles = await _board_titles_by_profile_id(db)
+    out = []
+    for row in rows:
+        item = _admin_profile(row)
+        item["board_title"] = board_titles.get(row["id"])
+        out.append(item)
+    return out
 
 
 @router.post("/profiles/admin")

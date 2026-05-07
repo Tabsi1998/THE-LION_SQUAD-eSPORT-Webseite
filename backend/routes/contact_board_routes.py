@@ -240,6 +240,17 @@ def _board_person_from_user(user: dict) -> dict:
     }
 
 
+async def _normalize_board_assignee(db, assignee_id: str | None) -> str | None:
+    """Prefer editable club member profile ids, even when an old user id is submitted."""
+    if not assignee_id:
+        return None
+    profile = await db.club_member_profiles.find_one(
+        {"$or": [{"id": assignee_id}, {"user_id": assignee_id}]},
+        {"_id": 0, "id": 1},
+    )
+    return profile["id"] if profile else assignee_id
+
+
 @board_router.get("")
 async def list_board_positions(active_only: bool = False, me=Depends(get_current_user_optional)):
     """Public list. By default returns active+inactive; ?active_only=true filters."""
@@ -252,10 +263,13 @@ async def list_board_positions(active_only: bool = False, me=Depends(get_current
     people = {}
     if assignment_ids:
         async for profile in db.club_member_profiles.find(
-            {"id": {"$in": assignment_ids}},
-            {"_id": 0, "id": 1, "slug": 1, "display_name": 1, "photo_url": 1, "cover_url": 1, "gender": 1, "role_title": 1},
+            {"$or": [{"id": {"$in": assignment_ids}}, {"user_id": {"$in": assignment_ids}}]},
+            {"_id": 0, "id": 1, "user_id": 1, "slug": 1, "display_name": 1, "photo_url": 1, "cover_url": 1, "gender": 1, "role_title": 1},
         ):
-            people[profile["id"]] = _board_person_from_profile(profile)
+            person = _board_person_from_profile(profile)
+            people[profile["id"]] = person
+            if profile.get("user_id"):
+                people[profile["user_id"]] = person
         missing_ids = [pid for pid in assignment_ids if pid not in people]
         if missing_ids:
             async for u in db.users.find({"id": {"$in": missing_ids}},
@@ -264,6 +278,10 @@ async def list_board_positions(active_only: bool = False, me=Depends(get_current
     for p in positions:
         u = people.get(p.get("user_id")) if p.get("user_id") else None
         d = people.get(p.get("deputy_user_id")) if p.get("deputy_user_id") else None
+        if u and u.get("source") == "member_profile":
+            p["user_id"] = u["id"]
+        if d and d.get("source") == "member_profile":
+            p["deputy_user_id"] = d["id"]
         p["user"] = u
         p["deputy_user"] = d
         # Resolve display title based on gender
@@ -299,6 +317,8 @@ async def update_position(pid: str, body: BoardPositionUpdate, me: dict = Depend
     for k in ("user_id", "deputy_user_id"):
         if k in updates and updates[k] == "":
             updates[k] = None
+        elif k in updates and updates[k]:
+            updates[k] = await _normalize_board_assignee(db, updates[k])
     res = await db.board_positions.update_one({"id": pid}, {"$set": updates})
     if res.matched_count == 0:
         raise HTTPException(404, "Position nicht gefunden.")

@@ -18,6 +18,7 @@ const emptyForm = {
   bio: "",
   birth_date: "",
   gender: "",
+  user_id: "",
   games: "",
   platforms: "",
   order_index: 0,
@@ -46,6 +47,7 @@ function toForm(profile) {
     bio: profile.bio || "",
     birth_date: profile.birth_date || "",
     gender: profile.gender || "",
+    user_id: profile.user_id || "",
     games: listToText(profile.games),
     platforms: listToText(profile.platforms),
     order_index: profile.order_index || 0,
@@ -55,6 +57,7 @@ function toForm(profile) {
 
 export default function AdminClubMemberProfilesPage() {
   const [profiles, setProfiles] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState(null);
@@ -63,8 +66,12 @@ export default function AdminClubMemberProfilesPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/membership/profiles/admin/all");
-      setProfiles(data || []);
+      const [profilesRes, usersRes] = await Promise.all([
+        api.get("/membership/profiles/admin/all"),
+        api.get("/users"),
+      ]);
+      setProfiles(profilesRes.data || []);
+      setUsers(usersRes.data || []);
     } catch (e) {
       toast.error(formatRequestError(e, "Mitgliederprofile konnten nicht geladen werden."));
     } finally {
@@ -73,7 +80,7 @@ export default function AdminClubMemberProfilesPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["membership", "media", "uploads"]);
+  useApiInvalidation(load, ["membership", "media", "uploads", "users", "board"]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -133,7 +140,10 @@ export default function AdminClubMemberProfilesPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="font-heading font-black uppercase truncate">{profile.display_name}</h2>
-                    <p className="text-xs text-[#FFD700] uppercase tracking-wider font-bold">{profile.role_title || "Mitglied"}</p>
+                    <p className="text-xs text-[#FFD700] uppercase tracking-wider font-bold">{profile.board_title || profile.role_title || "Mitglied"}</p>
+                    {profile.board_title && profile.role_title && profile.board_title !== profile.role_title && (
+                      <p className="text-[10px] text-white/35 uppercase tracking-widest">Profil: {profile.role_title}</p>
+                    )}
                   </div>
                   <span className="text-[10px] text-white/40 font-mono">#{profile.order_index || 0}</span>
                 </div>
@@ -160,6 +170,7 @@ export default function AdminClubMemberProfilesPage() {
       {editing && (
         <ProfileModal
           entry={editing}
+          users={users}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load(); }}
         />
@@ -168,7 +179,7 @@ export default function AdminClubMemberProfilesPage() {
   );
 }
 
-function ProfileModal({ entry, onClose, onSaved }) {
+function ProfileModal({ entry, users = [], onClose, onSaved }) {
   const [form, setForm] = useState(entry.form);
   const [saving, setSaving] = useState(false);
   const isEdit = !!entry.profile;
@@ -183,6 +194,7 @@ function ProfileModal({ entry, onClose, onSaved }) {
     bio: form.bio || "",
     birth_date: form.birth_date || null,
     gender: form.gender || null,
+    user_id: form.user_id || null,
     games: textToList(form.games),
     platforms: textToList(form.platforms),
     order_index: Number(form.order_index) || 0,
@@ -223,6 +235,12 @@ function ProfileModal({ entry, onClose, onSaved }) {
                 <option value="male">Maennlich</option>
                 <option value="female">Weiblich</option>
                 <option value="diverse">Divers</option>
+              </select></Field>
+              <Field label="Plattform-Konto"><select value={form.user_id || ""} onChange={(e) => set("user_id", e.target.value)} className="input">
+                <option value="">Kein Account verknuepft</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>{u.display_name || u.username} · @{u.username}</option>
+                ))}
               </select></Field>
               <Field label="Games"><input value={form.games} onChange={(e) => set("games", e.target.value)} placeholder="F1 25, Valorant, Rocket League" className="input" /></Field>
               <Field label="Plattformen"><input value={form.platforms} onChange={(e) => set("platforms", e.target.value)} placeholder="PC, PS5, Xbox" className="input" /></Field>
