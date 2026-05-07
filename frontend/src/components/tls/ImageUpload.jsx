@@ -43,6 +43,20 @@ function browserCanOptimizeImages() {
   return typeof window !== "undefined" && typeof document !== "undefined" && typeof Image !== "undefined";
 }
 
+function defaultMediaScope() {
+  return typeof window !== "undefined" && window.location.pathname.startsWith("/admin") ? "admin" : "user";
+}
+
+function defaultLibraryEndpoint() {
+  return defaultMediaScope() === "admin" ? "/admin/media?type=images" : "/media?type=images";
+}
+
+function endpointWithMediaScope(endpoint, scope) {
+  if (!scope || scope === "user") return endpoint;
+  const separator = endpoint.includes("?") ? "&" : "?";
+  return `${endpoint}${separator}media_scope=${encodeURIComponent(scope)}`;
+}
+
 function fileLooksSupported(file) {
   const type = (file.type || "").toLowerCase();
   return SUPPORTED_IMAGE_TYPES.has(type) || SUPPORTED_IMAGE_EXT_RE.test(file.name || "");
@@ -248,9 +262,12 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
  *   testId: data-testid prefix
  *   variant: "square" | "wide" (visual)
  *   endpoint: "/uploads/image" (default), "/uploads/logo" or "/uploads/sponsor-logo"
+ *   mediaScope: "user" | "admin" | "sponsor" | "branding" | "gallery"; defaults by route
  */
-export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", endpoint = "/uploads/image", maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB, allowLibrary = false }) {
+export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", endpoint = "/uploads/image", maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB, allowLibrary = false, mediaScope, libraryEndpoint }) {
   const fileRef = useRef(null);
+  const effectiveMediaScope = mediaScope || defaultMediaScope();
+  const effectiveLibraryEndpoint = libraryEndpoint || defaultLibraryEndpoint();
   const [uploading, setUploading] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [library, setLibrary] = useState([]);
@@ -273,12 +290,12 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     try {
       const uploadFile = await prepareImageForUpload(file, maxSizeMb, editOptions);
       if (uploadFile.size > maxSizeMb * 1024 * 1024) {
-        toast.error(`Datei zu gross (max ${maxSizeMb} MB). Bitte Bild kleiner exportieren oder Proxy-Limit erhoehen.`);
+        toast.error(`Datei zu groß (max ${maxSizeMb} MB). Bitte Bild kleiner exportieren oder Proxy-Limit erhöhen.`);
         return false;
       }
       const fd = new FormData();
       fd.append("file", uploadFile);
-      const { data } = await api.post(endpoint, fd);
+      const { data } = await api.post(endpointWithMediaScope(endpoint, effectiveMediaScope), fd);
       onChange(data.url);
       toast.success(uploadFile !== file ? "Bild optimiert und hochgeladen." : "Bild hochgeladen.");
       return true;
@@ -286,7 +303,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
       const detail = e.response?.data?.detail;
       const status = e.response?.status;
       const message = status === 413
-        ? `Datei zu gross oder Reverse Proxy blockiert den Upload. App-Limit: ${maxSizeMb} MB, externer Proxy bitte auf mindestens ${PROXY_UPLOAD_LIMIT_MB} MB setzen.`
+        ? `Datei zu groß oder Reverse Proxy blockiert den Upload. App-Limit: ${maxSizeMb} MB, externer Proxy bitte auf mindestens ${PROXY_UPLOAD_LIMIT_MB} MB setzen.`
         : detail ? formatApiError(detail) : e.message || "Upload fehlgeschlagen";
       toast.error(status ? `Upload fehlgeschlagen (${status}): ${message}` : `Upload fehlgeschlagen: ${message}`);
       return false;
@@ -316,14 +333,14 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     setLibraryOpen(true);
     setLoadingLibrary(true);
     try {
-      const { data } = await api.get("/media?type=images");
+      const { data } = await api.get(effectiveLibraryEndpoint);
       setLibrary(data || []);
     } catch {
       toast.error("Medienbibliothek konnte nicht geladen werden.");
     } finally {
       setLoadingLibrary(false);
     }
-  }, []);
+  }, [effectiveLibraryEndpoint]);
   useApiInvalidation(() => {
     if (libraryOpen) return openLibrary();
     return undefined;

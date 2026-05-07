@@ -8,7 +8,7 @@ import { Plus, Trash2, Crown, Save, X, EyeOff, Eye, GripVertical } from "lucide-
 
 export default function AdminBoardPage() {
   const [positions, setPositions] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [members, setMembers] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
   const confirm = useConfirm();
@@ -16,10 +16,10 @@ export default function AdminBoardPage() {
   const load = useCallback(async () => {
     const [p, u] = await Promise.all([api.get("/board"), api.get("/board/assignable-users")]);
     setPositions(p.data);
-    setUsers(u.data);
+    setMembers(u.data);
   }, []);
   useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["board", "users"]);
+  useApiInvalidation(load, ["board", "membership"]);
 
   const toggle = async (p) => {
     try { await api.patch(`/board/${p.id}`, { is_active: !p.is_active }); load(); }
@@ -81,14 +81,14 @@ export default function AdminBoardPage() {
                   <td className="px-4 py-3">
                     <select value={p.user_id || ""} onChange={(e) => assign(p, "user_id", e.target.value)} data-testid={`board-assign-${p.slug}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs min-w-[180px]">
                       <option value="">— offen —</option>
-                      {users.map((u) => <option key={`${u.source || "user"}-${u.id}`} value={u.id}>{u.display_name || u.username}{u.source === "member_profile" ? " · Profil" : " · Account"}</option>)}
+                      {members.map((u) => <option key={u.id} value={u.id}>{u.display_name || u.username}</option>)}
                     </select>
                   </td>
                   <td className="px-4 py-3">
                     {p.allow_deputy ? (
                       <select value={p.deputy_user_id || ""} onChange={(e) => assign(p, "deputy_user_id", e.target.value)} data-testid={`board-deputy-${p.slug}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs min-w-[180px]">
                         <option value="">— optional —</option>
-                        {users.map((u) => <option key={`${u.source || "user"}-${u.id}`} value={u.id}>{u.display_name || u.username}{u.source === "member_profile" ? " · Profil" : " · Account"}</option>)}
+                        {members.map((u) => <option key={u.id} value={u.id}>{u.display_name || u.username}</option>)}
                       </select>
                     ) : <span className="text-white/30 text-xs">—</span>}
                   </td>

@@ -68,6 +68,14 @@ export default function MemberProfilePage() {
                   {(profile.level || profile.age) && <InfoLine label="Level" value={`Level ${profile.level || profile.age}`} />}
                   <InfoChips icon={Gamepad2} label="Games" values={profile.games} />
                   <InfoChips icon={Monitor} label="Plattformen" values={profile.platforms} />
+                  {profile.linked_account?.profile_url && (
+                    <div>
+                      <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Plattformkonto</div>
+                      <Link to={profile.linked_account.profile_url} className="mt-2 inline-flex items-center gap-2 text-[#29B6E8] hover:text-white text-sm font-bold">
+                        <UserIcon className="w-4 h-4" /> @{profile.linked_account.username}
+                      </Link>
+                    </div>
+                  )}
                 </InfoPanel>
                 <Link to="/members" className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 border border-white/10 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white hover:bg-white/5">
                   <ArrowLeft className="w-4 h-4" /> Alle Mitglieder

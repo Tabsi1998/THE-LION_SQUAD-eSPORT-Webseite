@@ -209,7 +209,7 @@ function AlbumPhotos({ album, events, onBack }) {
         const uploadFile = await prepareImageForUpload(file);
         const fd = new FormData();
         fd.append("file", uploadFile);
-        const { data } = await api.post("/uploads/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+        const { data } = await api.post("/uploads/image?media_scope=gallery", fd, { headers: { "Content-Type": "multipart/form-data" } });
         await api.post(`/gallery/${album.id}/photos`, {
           image_url: data.url,
           thumbnail_url: data.url,
@@ -262,7 +262,7 @@ function AlbumPhotos({ album, events, onBack }) {
       : [...rows, item]);
   };
   const addSelectedMedia = async () => {
-    if (!selectedMedia.length) return toast.error("Bitte mindestens ein Bild auswaehlen.");
+    if (!selectedMedia.length) return toast.error("Bitte mindestens ein Bild auswählen.");
     let ok = 0, fail = 0;
     for (const item of selectedMedia) {
       try {
@@ -275,10 +275,10 @@ function AlbumPhotos({ album, events, onBack }) {
         ok++;
       } catch (err) {
         fail++;
-        toast.error(`${item.filename || "Bild"}: ${formatRequestError(err, "Bild konnte nicht hinzugefuegt werden.")}`);
+        toast.error(`${item.filename || "Bild"}: ${formatRequestError(err, "Bild konnte nicht hinzugefügt werden.")}`);
       }
     }
-    toast.success(`${ok} Bild(er) aus Medien hinzugefuegt${fail ? `, ${fail} fehlgeschlagen` : ""}.`);
+    toast.success(`${ok} Bild(er) aus Medien hinzugefügt${fail ? `, ${fail} fehlgeschlagen` : ""}.`);
     setMediaOpen(false);
     setSelectedMedia([]);
     load();
@@ -323,12 +323,12 @@ function AlbumPhotos({ album, events, onBack }) {
             <div className="flex items-center justify-between gap-3 mb-4">
               <div>
                 <h3 className="font-heading text-xl font-black uppercase">Bilder aus Medienbibliothek</h3>
-                <div className="text-xs text-white/45">{selectedMedia.length} ausgewaehlt</div>
+                <div className="text-xs text-white/45">{selectedMedia.length} ausgewählt</div>
               </div>
               <button type="button" onClick={() => setMediaOpen(false)} className="text-white/50 hover:text-white">×</button>
             </div>
             {loadingMedia ? (
-              <div className="text-white/40 py-12 text-center">Lade Medien...</div>
+              <div className="text-white/40 py-12 text-center">Lade Medien…</div>
             ) : media.length === 0 ? (
               <div className="text-white/40 py-12 text-center">Keine Bilder vorhanden.</div>
             ) : (
@@ -352,7 +352,7 @@ function AlbumPhotos({ album, events, onBack }) {
             )}
             <div className="mt-5 flex justify-end gap-2 border-t border-white/10 pt-4">
               <button type="button" onClick={() => setMediaOpen(false)} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
-              <button type="button" onClick={addSelectedMedia} disabled={!selectedMedia.length} data-testid="photo-media-add" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Auswahl hinzufuegen</button>
+              <button type="button" onClick={addSelectedMedia} disabled={!selectedMedia.length} data-testid="photo-media-add" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Auswahl hinzufügen</button>
             </div>
           </div>
         </div>

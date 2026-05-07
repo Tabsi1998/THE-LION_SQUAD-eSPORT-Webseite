@@ -81,7 +81,7 @@ export default function AdminMediaPage() {
     setSelected(null);
     try {
       const { data } = await api.delete(`/admin/media/${encodeURIComponent(it.filename)}`);
-      toast.success(`Datei geloescht${data?.cleared_references ? `, ${data.cleared_references} Verknuepfung(en) bereinigt` : ""}`);
+      toast.success(`Datei gelöscht${data?.cleared_references ? `, ${data.cleared_references} Verknüpfung(en) bereinigt` : ""}`);
       load();
     } catch (e) {
       setItems(previous);
@@ -110,7 +110,7 @@ export default function AdminMediaPage() {
         const uploadFile = await prepareImageForUpload(file);
         const fd = new FormData();
         fd.append("file", uploadFile);
-        await api.post("/uploads/image", fd);
+        await api.post("/uploads/image?media_scope=admin", fd);
         ok++;
       } catch (e) {
         failed++;

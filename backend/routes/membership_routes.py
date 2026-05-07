@@ -121,7 +121,7 @@ async def _board_titles_by_profile_id(db) -> dict[str, str]:
 
 
 def _public_profile(doc: dict, detail: bool = False, board_title: str | None = None) -> dict:
-    role_title = board_title or doc.get("role_title")
+    role_title = board_title or doc.get("role_title") or "Mitglied"
     out = {
         "id": doc["id"],
         "slug": doc["slug"],
@@ -153,6 +153,90 @@ def _admin_profile(doc: dict) -> dict:
         "updated_at": doc.get("updated_at"),
     })
     return out
+
+
+def _public_account(user: dict | None, admin: bool = False) -> dict | None:
+    if not user:
+        return None
+    out = {
+        "id": user.get("id"),
+        "username": user.get("username"),
+        "display_name": user.get("display_name"),
+        "avatar_url": user.get("avatar_url"),
+        "profile_url": f"/u/{user.get('username')}" if user.get("username") else None,
+    }
+    if admin:
+        out["email"] = user.get("email")
+        out["is_club_member"] = user.get("is_club_member")
+    return out
+
+
+async def _account_map_for_profiles(db, rows: list[dict], public_only: bool = True) -> dict[str, dict]:
+    user_ids = [row.get("user_id") for row in rows if row.get("user_id")]
+    if not user_ids:
+        return {}
+    query: dict = {
+        "id": {"$in": list(set(user_ids))},
+        "is_active": True,
+        "is_banned": {"$ne": True},
+    }
+    if public_only:
+        query["privacy_public_profile"] = True
+    projection = {
+        "_id": 0,
+        "id": 1,
+        "username": 1,
+        "display_name": 1,
+        "avatar_url": 1,
+        "email": 1,
+        "is_club_member": 1,
+    }
+    return {user["id"]: user for user in await db.users.find(query, projection).to_list(2000)}
+
+
+async def _attach_linked_accounts(db, rows: list[dict], items: list[dict], public_only: bool = True, admin: bool = False) -> list[dict]:
+    accounts = await _account_map_for_profiles(db, rows, public_only=public_only)
+    for row, item in zip(rows, items):
+        item["linked_account"] = _public_account(accounts.get(row.get("user_id")), admin=admin)
+    return items
+
+
+async def _normalize_linked_user_id(db, user_id: str | None, current_profile_id: str | None = None) -> str | None:
+    user_id = str(user_id or "").strip()
+    if not user_id:
+        return None
+    user = await db.users.find_one({"id": user_id}, {"_id": 1})
+    if not user:
+        raise HTTPException(400, "Verknüpftes Plattform-Konto wurde nicht gefunden.")
+    duplicate_query: dict = {"user_id": user_id}
+    if current_profile_id:
+        duplicate_query["id"] = {"$ne": current_profile_id}
+    duplicate = await db.club_member_profiles.find_one(duplicate_query, {"_id": 0, "display_name": 1})
+    if duplicate:
+        raise HTTPException(409, f"Dieses Plattform-Konto ist bereits mit {duplicate.get('display_name') or 'einem Mitgliederprofil'} verknüpft.")
+    return user_id
+
+
+async def _activate_linked_membership(profile: dict, actor_id: str):
+    user_id = profile.get("user_id")
+    if not user_id or profile.get("is_active") is False:
+        return
+    existing = await get_membership(user_id)
+    payload = {}
+    if not existing or existing.get("member_status") not in ACTIVE_STATUSES:
+        payload["member_status"] = "active"
+    if not existing or not existing.get("membership_type"):
+        payload["membership_type"] = "ordinary"
+    if not payload:
+        return
+    try:
+        await upsert_membership(
+            user_id=user_id,
+            actor_id=actor_id,
+            **payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
 
 
 async def _unique_profile_slug(db, slug: str, current_id: str | None = None) -> str:
@@ -377,7 +461,8 @@ async def list_public_member_profiles():
         {"is_active": {"$ne": False}}, {"_id": 0}
     ).sort([("order_index", 1), ("display_name", 1)]).to_list(1000)
     board_titles = await _board_titles_by_profile_id(db)
-    return [_public_profile(row, board_title=board_titles.get(row["id"])) for row in rows]
+    items = [_public_profile(row, board_title=board_titles.get(row["id"])) for row in rows]
+    return await _attach_linked_accounts(db, rows, items, public_only=True)
 
 
 @router.get("/profiles/{slug}")
@@ -389,7 +474,8 @@ async def get_public_member_profile(slug: str):
     if not row:
         raise HTTPException(404, "Mitglied nicht gefunden.")
     board_titles = await _board_titles_by_profile_id(db)
-    return _public_profile(row, detail=True, board_title=board_titles.get(row["id"]))
+    item = _public_profile(row, detail=True, board_title=board_titles.get(row["id"]))
+    return (await _attach_linked_accounts(db, [row], [item], public_only=True))[0]
 
 
 @router.get("/profiles/admin/all")
@@ -401,8 +487,9 @@ async def admin_list_member_profiles(me: dict = Depends(require_admin())):
     for row in rows:
         item = _admin_profile(row)
         item["board_title"] = board_titles.get(row["id"])
+        item["role_title"] = board_titles.get(row["id"]) or item.get("role_title")
         out.append(item)
-    return out
+    return await _attach_linked_accounts(db, rows, out, public_only=False, admin=True)
 
 
 @router.post("/profiles/admin")
@@ -413,6 +500,7 @@ async def admin_create_member_profile(body: ClubMemberProfileCreate, me: dict = 
         raise HTTPException(400, "Name ist erforderlich.")
     slug = await _unique_profile_slug(db, body.slug or name)
     payload = body.model_dump()
+    payload["user_id"] = await _normalize_linked_user_id(db, payload.get("user_id"))
     doc = {
         "id": new_id(),
         **payload,
@@ -430,9 +518,11 @@ async def admin_create_member_profile(body: ClubMemberProfileCreate, me: dict = 
         "created_by": me["id"],
     }
     await db.club_member_profiles.insert_one(doc)
+    await _activate_linked_membership(doc, me["id"])
     await _audit(me["id"], "club_member_profile.create", doc["id"], {"display_name": name})
     doc.pop("_id", None)
-    return _admin_profile(doc)
+    item = _admin_profile(doc)
+    return (await _attach_linked_accounts(db, [doc], [item], public_only=False, admin=True))[0]
 
 
 @router.put("/profiles/admin/{profile_id}")
@@ -459,13 +549,17 @@ async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUp
         update["birth_date"] = update["birth_date"].isoformat()
     if "gender" in update:
         update["gender"] = _clean_gender(update.get("gender"))
+    if "user_id" in update:
+        update["user_id"] = await _normalize_linked_user_id(db, update.get("user_id"), profile_id)
     if not update:
         raise HTTPException(400, "Keine Änderungen.")
     update["updated_at"] = now_utc().isoformat()
     await db.club_member_profiles.update_one({"id": profile_id}, {"$set": update})
     await _audit(me["id"], "club_member_profile.update", profile_id, update)
     row = await db.club_member_profiles.find_one({"id": profile_id}, {"_id": 0})
-    return _admin_profile(row)
+    await _activate_linked_membership(row, me["id"])
+    item = _admin_profile(row)
+    return (await _attach_linked_accounts(db, [row], [item], public_only=False, admin=True))[0]
 
 
 @router.delete("/profiles/admin/{profile_id}")

@@ -54,10 +54,11 @@ media_router = APIRouter(prefix="/api/media", tags=["media"])
 admin_media_router = APIRouter(prefix="/api/admin/media", tags=["cms-admin"])
 
 
-ADMIN_MEDIA_ROLES = {"tournament_admin", "club_admin", "superadmin"}
-
-
-async def _list_media_items(owner_id: str | None = None, include_untracked: bool = True) -> list[dict]:
+async def _list_media_items(
+    owner_id: str | None = None,
+    include_untracked: bool = True,
+    exclude_user_scope: bool = False,
+) -> list[dict]:
     if not UPLOAD_DIR.exists():
         return []
     candidates: list[Path] = []
@@ -84,6 +85,9 @@ async def _list_media_items(owner_id: str | None = None, include_untracked: bool
             continue
         if not include_untracked and not meta:
             continue
+        media_scope = (meta.get("media_scope") or "legacy") if meta else "legacy"
+        if exclude_user_scope and meta and media_scope == "user":
+            continue
         stat = p.stat()
         items.append({
             "filename": p.name,
@@ -93,6 +97,7 @@ async def _list_media_items(owner_id: str | None = None, include_untracked: bool
             "ext": p.suffix.lower().lstrip("."),
             "owner_id": meta.get("owner_id") if meta else None,
             "owner_role": meta.get("owner_role") if meta else None,
+            "media_scope": media_scope,
             "original_filename": meta.get("original_filename") if meta else None,
             "created_at": meta.get("created_at") if meta else None,
         })
@@ -102,15 +107,13 @@ async def _list_media_items(owner_id: str | None = None, include_untracked: bool
 @media_router.get("")
 async def list_media(me: dict = Depends(get_current_user)):
     """List uploaded images visible in the current user's media picker."""
-    if me.get("role") in ADMIN_MEDIA_ROLES:
-        return await _list_media_items()
     return await _list_media_items(owner_id=me["id"], include_untracked=False)
 
 
 @admin_media_router.get("")
-async def admin_list_media(me: dict = Depends(require_admin())):
-    """List all files in the upload directory with metadata."""
-    return await _list_media_items()
+async def admin_list_media(include_user_uploads: bool = False, me: dict = Depends(require_admin())):
+    """List CMS/admin files in the upload directory with metadata."""
+    return await _list_media_items(exclude_user_scope=not include_user_uploads)
 
 
 async def _clear_media_references(url: str) -> int:

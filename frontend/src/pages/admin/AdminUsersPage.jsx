@@ -167,7 +167,7 @@ function CreateUserModal({ onClose, onSaved, onCreated }) {
           <Field label="Geschlecht">
             <select value={form.gender || ""} onChange={(e) => set("gender", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
               <option value="">Keine Angabe</option>
-              <option value="male">Maennlich</option>
+              <option value="male">Männlich</option>
               <option value="female">Weiblich</option>
               <option value="diverse">Divers</option>
             </select>
@@ -190,8 +190,8 @@ function CreateUserModal({ onClose, onSaved, onCreated }) {
           )}
         </div>
         <div className="flex justify-end gap-2 p-5 border-t border-white/10">
-          <button type="button" onClick={inviteUrl ? onSaved : onClose} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">{inviteUrl ? "Schliessen" : "Abbrechen"}</button>
-          {!inviteUrl && <button disabled={saving} data-testid="create-user-submit" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere..." : "Anlegen & einladen"}</button>}
+          <button type="button" onClick={inviteUrl ? onSaved : onClose} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">{inviteUrl ? "Schließen" : "Abbrechen"}</button>
+          {!inviteUrl && <button disabled={saving} data-testid="create-user-submit" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Anlegen & einladen"}</button>}
         </div>
       </form>
     </div>

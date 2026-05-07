@@ -41,7 +41,7 @@ function toForm(profile) {
   return {
     display_name: profile.display_name || "",
     slug: profile.slug || "",
-    role_title: profile.role_title || "",
+    role_title: profile.editorial_role_title || "",
     photo_url: profile.photo_url || "",
     cover_url: profile.cover_url || "",
     bio: profile.bio || "",
@@ -85,7 +85,7 @@ export default function AdminClubMemberProfilesPage() {
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return profiles;
-    return profiles.filter((p) => [p.display_name, p.role_title, p.slug, ...(p.games || []), ...(p.platforms || [])].join(" ").toLowerCase().includes(needle));
+    return profiles.filter((p) => [p.display_name, p.role_title, p.board_title, p.slug, p.linked_account?.username, ...(p.games || []), ...(p.platforms || [])].join(" ").toLowerCase().includes(needle));
   }, [profiles, q]);
 
   const remove = async (profile) => {
@@ -106,7 +106,7 @@ export default function AdminClubMemberProfilesPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Öffentliche Seite</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Vereinsmitglieder</h1>
           <p className="text-sm text-white/60 mt-1 max-w-3xl">
-            Redaktionelle Mitgliederübersicht mit festen Profilen, großen Bildern, Bio, Games und Plattformen. Diese Seite ist unabhängig von User-Privacy-Schaltern.
+            Redaktionelle Mitgliederübersicht mit festen Profilen, großen Bildern, Bio, Games und Plattformen. Funktionen wie Obmann/Kassier kommen automatisch aus dem Vorstand.
           </p>
         </div>
         <button onClick={() => setEditing({ profile: null, form: toForm(null) })} className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black rounded-sm text-xs font-black uppercase tracking-wider hover:bg-[#e8c200]">
@@ -116,7 +116,7 @@ export default function AdminClubMemberProfilesPage() {
 
       <div className="flex items-center gap-2 max-w-md mb-5">
         <Search className="w-4 h-4 text-white/40" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, Rolle, Game suchen..." className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, Funktion, Game suchen…" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
       </div>
 
       {loading ? (
@@ -143,6 +143,9 @@ export default function AdminClubMemberProfilesPage() {
                     <p className="text-xs text-[#FFD700] uppercase tracking-wider font-bold">{profile.board_title || profile.role_title || "Mitglied"}</p>
                     {profile.board_title && profile.role_title && profile.board_title !== profile.role_title && (
                       <p className="text-[10px] text-white/35 uppercase tracking-widest">Profil: {profile.role_title}</p>
+                    )}
+                    {profile.linked_account && (
+                      <p className="text-[10px] text-white/35 truncate">@{profile.linked_account.username}</p>
                     )}
                   </div>
                   <span className="text-[10px] text-white/40 font-mono">#{profile.order_index || 0}</span>
@@ -228,22 +231,24 @@ function ProfileModal({ entry, users = [], onClose, onSaved }) {
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label="Name"><input required value={form.display_name} onChange={(e) => set("display_name", e.target.value)} className="input" /></Field>
               <Field label="URL-Slug"><input value={form.slug} onChange={(e) => set("slug", e.target.value)} placeholder="wird aus Name erstellt" className="input font-mono" /></Field>
-              <Field label="Rolle / Funktion"><input value={form.role_title} onChange={(e) => set("role_title", e.target.value)} placeholder="z.B. Fahrer, Moderator, Vorstand" className="input" /></Field>
               <Field label="Geburtsdatum"><input type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} className="input" /></Field>
               <Field label="Geschlecht"><select value={form.gender || ""} onChange={(e) => set("gender", e.target.value)} className="input">
                 <option value="">Keine Angabe</option>
-                <option value="male">Maennlich</option>
+                <option value="male">Männlich</option>
                 <option value="female">Weiblich</option>
                 <option value="diverse">Divers</option>
               </select></Field>
               <Field label="Plattform-Konto"><select value={form.user_id || ""} onChange={(e) => set("user_id", e.target.value)} className="input">
-                <option value="">Kein Account verknuepft</option>
+                <option value="">Kein Account verknüpft</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>{u.display_name || u.username} · @{u.username}</option>
                 ))}
               </select></Field>
               <Field label="Games"><input value={form.games} onChange={(e) => set("games", e.target.value)} placeholder="F1 25, Valorant, Rocket League" className="input" /></Field>
               <Field label="Plattformen"><input value={form.platforms} onChange={(e) => set("platforms", e.target.value)} placeholder="PC, PS5, Xbox" className="input" /></Field>
+            </div>
+            <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 px-3 py-2 text-xs text-white/60 rounded-sm">
+              Ohne Vorstandszuteilung ist die öffentliche Funktion automatisch <span className="text-white font-bold">Mitglied</span>. Obmann, Kassierin und Stellvertretungen steuerst du im Tab <span className="text-white font-bold">Vorstand</span>.
             </div>
             <Field label="Biografie">
               <MarkdownEditor value={form.bio} onChange={(v) => set("bio", v)} rows={8} testId="club-member-bio" />
@@ -262,7 +267,7 @@ function ProfileModal({ entry, users = [], onClose, onSaved }) {
         <div className="flex gap-3 p-5 border-t border-white/10">
           <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm">Abbrechen</button>
           <button type="submit" disabled={saving} className="ml-auto inline-flex items-center gap-2 px-5 py-2 bg-[#FFD700] text-black text-xs uppercase tracking-wider font-black rounded-sm hover:bg-[#e8c200] disabled:opacity-50">
-            <Save className="w-3.5 h-3.5" /> {saving ? "Speichere..." : "Speichern"}
+            <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
           </button>
         </div>
       </form>

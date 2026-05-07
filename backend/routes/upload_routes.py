@@ -23,6 +23,8 @@ PRIVATE_DOC_DIR = UPLOAD_DIR / "documents"
 PUBLIC_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 PRIVATE_DOC_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE = {"image/png", "image/jpeg", "image/webp"}
+ADMIN_MEDIA_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
+ALLOWED_MEDIA_SCOPES = {"user", "admin", "sponsor", "branding", "gallery"}
 IMAGE_MIME_BY_EXT = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
@@ -83,6 +85,15 @@ Image.MAX_IMAGE_PIXELS = max(Image.MAX_IMAGE_PIXELS or 0, MAX_IMAGE_PIXELS)
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 
 
+def _clean_media_scope(value: str | None, me: dict) -> str:
+    scope = str(value or "user").strip().lower()
+    if scope not in ALLOWED_MEDIA_SCOPES:
+        scope = "user"
+    if scope != "user" and me.get("role") not in ADMIN_MEDIA_ROLES:
+        raise HTTPException(status_code=403, detail="Admin-Medienupload nicht erlaubt.")
+    return scope
+
+
 def _resize_for_storage(img: Image.Image) -> tuple[Image.Image, bool]:
     if img.width <= MAX_IMAGE_DIMENSION and img.height <= MAX_IMAGE_DIMENSION:
         return img, False
@@ -135,9 +146,11 @@ async def upload_image(
     file: UploadFile = File(...),
     me: dict = Depends(get_current_user),
     trim_empty_borders: bool = False,
+    media_scope: str = "user",
 ):
     """Upload an image. Returns public URL `/api/static/uploads/{filename}`.
     Accepts PNG/JPEG/WebP and re-encodes before serving."""
+    media_scope = _clean_media_scope(media_scope, me)
     declared_content_type = file.content_type or ""
     suffix = pathlib.Path(file.filename or "").suffix.lower()
     filename_hint = file.filename or "upload"
@@ -150,7 +163,7 @@ async def upload_image(
     data = await file.read()
     original_size = len(data)
     if len(data) > MAX_BYTES:
-        raise HTTPException(status_code=413, detail=f"Datei zu gross (max {MAX_IMAGE_UPLOAD_MB} MB)")
+        raise HTTPException(status_code=413, detail=f"Datei zu groß (max {MAX_IMAGE_UPLOAD_MB} MB)")
     try:
         with Image.open(BytesIO(data)) as img:
             img.verify()
@@ -199,7 +212,7 @@ async def upload_image(
             img.save(out, format=output_format, **save_kwargs)
             data = out.getvalue()
     except UnidentifiedImageError:
-        raise HTTPException(status_code=400, detail="Ungueltige Bilddatei")
+        raise HTTPException(status_code=400, detail="Ungültige Bilddatei")
     except HTTPException:
         raise
     except Exception as exc:
@@ -211,7 +224,7 @@ async def upload_image(
         path.write_bytes(data)
     except OSError as exc:
         logger.error("[uploads] failed to write %s: %s", path, exc)
-        raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR pruefen.")
+        raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR prüfen.")
     url = f"/api/static/uploads/{filename}"
     try:
         await get_db().media_uploads.insert_one({
@@ -225,24 +238,25 @@ async def upload_image(
             "ext": ext.lstrip("."),
             "owner_id": me.get("id"),
             "owner_role": me.get("role"),
+            "media_scope": media_scope,
             "created_at": now_utc().isoformat(),
             "updated_at": now_utc().isoformat(),
         })
     except Exception as exc:
         logger.warning("[uploads] media metadata write failed for %s: %s", filename, exc)
-    return {"url": url, "filename": filename, "size": len(data), "original_size": original_size}
+    return {"url": url, "filename": filename, "size": len(data), "original_size": original_size, "media_scope": media_scope}
 
 
 @router.post("/sponsor-logo")
 async def upload_sponsor_logo(file: UploadFile = File(...), me: dict = Depends(require_admin())):
     """Admin-only convenience alias for sponsor logos."""
-    return await upload_image(file, me, trim_empty_borders=True)
+    return await upload_image(file, me, trim_empty_borders=True, media_scope="sponsor")
 
 
 @router.post("/logo")
 async def upload_logo(file: UploadFile = File(...), me: dict = Depends(require_admin())):
     """Admin-only logo upload with automatic whitespace trimming."""
-    return await upload_image(file, me, trim_empty_borders=True)
+    return await upload_image(file, me, trim_empty_borders=True, media_scope="branding")
 
 
 @router.post("/migrate-external-images")
@@ -297,9 +311,9 @@ async def upload_document(file: UploadFile = File(...), me: dict = Depends(requi
         raise HTTPException(status_code=400, detail=f"Dateityp nicht erlaubt: {file.content_type}")
     data = await file.read()
     if len(data) > MAX_DOC_BYTES:
-        raise HTTPException(status_code=413, detail=f"Datei zu gross (max {MAX_DOCUMENT_UPLOAD_MB} MB)")
+        raise HTTPException(status_code=413, detail=f"Datei zu groß (max {MAX_DOCUMENT_UPLOAD_MB} MB)")
     if file.content_type == "application/pdf" and not data.startswith(b"%PDF-"):
-        raise HTTPException(status_code=400, detail="Dateiinhalt ist kein gueltiges PDF")
+        raise HTTPException(status_code=400, detail="Dateiinhalt ist kein gültiges PDF")
     if file.content_type in {
         "application/zip",
         "application/x-zip-compressed",
@@ -313,7 +327,7 @@ async def upload_document(file: UploadFile = File(...), me: dict = Depends(requi
             with Image.open(BytesIO(data)) as img:
                 img.verify()
         except UnidentifiedImageError:
-            raise HTTPException(status_code=400, detail="Ungueltige Bilddatei")
+            raise HTTPException(status_code=400, detail="Ungültige Bilddatei")
     # Extension by mime, fallback to original name extension
     ext = _EXT_BY_MIME.get(file.content_type)
     if not ext and file.filename:

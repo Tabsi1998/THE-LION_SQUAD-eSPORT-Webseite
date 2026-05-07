@@ -63,7 +63,7 @@ export default function RegisterPage() {
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Geschlecht (optional)</div>
             <select value={form.gender} onChange={set("gender")} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2.5 rounded-sm text-white focus:outline-none">
               <option value="">Keine Angabe</option>
-              <option value="male">Maennlich</option>
+              <option value="male">Männlich</option>
               <option value="female">Weiblich</option>
               <option value="diverse">Divers</option>
             </select>

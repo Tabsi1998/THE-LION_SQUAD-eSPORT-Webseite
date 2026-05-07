@@ -142,6 +142,12 @@ function markdownToEditorHtml(value) {
   return html || "<p></p>";
 }
 
+function defaultLibraryEndpoint() {
+  return typeof window !== "undefined" && window.location.pathname.startsWith("/admin")
+    ? "/admin/media?type=images"
+    : "/media?type=images";
+}
+
 function ToolButton({ active, label, onClick, icon: Icon, disabled = false }) {
   return (
     <button
@@ -197,6 +203,7 @@ export function MarkdownEditor({
   placeholder = "",
   helperText = "WYSIWYG-Editor mit Markdown-Speicherung, HTML-Import, Tabellen und Medienbibliothek.",
   required = false,
+  libraryEndpoint,
 }) {
   const [mode, setMode] = useState("visual");
   const [htmlInput, setHtmlInput] = useState("");
@@ -276,7 +283,7 @@ export function MarkdownEditor({
     setMediaOpen(true);
     setMediaLoading(true);
     try {
-      const { data } = await api.get("/media?type=images");
+      const { data } = await api.get(libraryEndpoint || defaultLibraryEndpoint());
       setMedia(Array.isArray(data) ? data : []);
     } catch {
       toast.error("Medienbibliothek konnte nicht geladen werden.");
@@ -404,7 +411,7 @@ export function MarkdownEditor({
               </button>
             </div>
             {mediaLoading ? (
-              <div className="text-white/40 py-12 text-center">Lade Medien...</div>
+              <div className="text-white/40 py-12 text-center">Lade Medien…</div>
             ) : media.length === 0 ? (
               <div className="text-white/40 py-12 text-center">Keine Bilder in der Medienbibliothek vorhanden.</div>
             ) : (

@@ -339,14 +339,13 @@ async def delete_position(pid: str, me: dict = Depends(require_admin())):
 
 @board_router.get("/assignable-users")
 async def list_assignable_users(me: dict = Depends(require_admin())):
-    """Returns editable club member profiles first, with legacy user accounts as fallback."""
+    """Returns only editable club member profiles for board assignments."""
     db = get_db()
     profiles = await db.club_member_profiles.find(
         {"is_active": {"$ne": False}},
         {"_id": 0, "id": 1, "slug": 1, "display_name": 1, "photo_url": 1, "cover_url": 1, "role_title": 1, "gender": 1, "user_id": 1},
     ).sort([("order_index", 1), ("display_name", 1)]).to_list(500)
     out = []
-    linked_user_ids = {p.get("user_id") for p in profiles if p.get("user_id")}
     for p in profiles:
         out.append({
             **_board_person_from_profile(p),
@@ -354,13 +353,4 @@ async def list_assignable_users(me: dict = Depends(require_admin())):
             "role": "club_member_profile",
             "is_club_member": True,
         })
-
-    legacy_users = await db.users.find(
-        {"$or": [{"role": {"$in": ["superadmin", "admin", "moderator"]}}, {"is_club_member": True}]},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1, "is_club_member": 1, "gender": 1},
-    ).sort("display_name", 1).to_list(500)
-    for u in legacy_users:
-        if u["id"] in linked_user_ids:
-            continue
-        out.append(_board_person_from_user(u))
     return out

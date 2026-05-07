@@ -66,7 +66,7 @@ const VISIBILITY = [
 
 const GENDER_OPTIONS = [
   ["", "Keine Angabe"],
-  ["male", "Maennlich"],
+  ["male", "Männlich"],
   ["female", "Weiblich"],
   ["diverse", "Divers"],
 ];
@@ -685,7 +685,7 @@ function TeamsPanel() {
             </div>
             <div className="flex justify-end gap-2 p-5 border-t border-white/10">
               <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
-              <button disabled={saving} className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere..." : "Speichern"}</button>
+              <button disabled={saving} className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
             </div>
           </form>
         </div>

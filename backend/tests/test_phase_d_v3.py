@@ -136,8 +136,7 @@ class TestBoard:
         assert r.status_code == 200
         users = r.json()
         assert isinstance(users, list)
-        emails_or_roles = [u for u in users if u.get("role") in ("superadmin", "admin", "moderator") or u.get("is_club_member")]
-        assert len(emails_or_roles) >= 1
+        assert all(u.get("source") == "member_profile" for u in users)
 
     def test_create_patch_delete_custom(self, admin_h):
         # Create custom
