@@ -97,7 +97,7 @@ export default function AdminF1NewPage() {
             {form.registration_enabled && <Field label="Online-Einreichung endet" type="datetime-local" value={form.registration_open_until} onChange={(v) => set("registration_open_until", v)} testId="f1-new-reg-until" />}
           </div>
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
-            Live und Beendet werden anhand von Start/Ende automatisch geschaltet. Online-Einreichung ist optional; lokale Zeiten koennen Moderatoren immer im Admin eintragen.
+            Live und Beendet werden anhand von Start/Ende automatisch geschaltet. Online-Einreichung ist optional; lokale Zeiten können Moderatoren immer im Admin eintragen.
           </div>
           <label className="flex items-start gap-2 text-sm text-white/75">
             <input type="checkbox" checked={form.registration_enabled} onChange={(e) => set("registration_enabled", e.target.checked)} data-testid="f1-new-reg-enabled" className="accent-[#29B6E8] mt-1" />

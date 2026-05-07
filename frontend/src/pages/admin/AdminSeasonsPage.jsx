@@ -147,7 +147,7 @@ export default function AdminSeasonsPage() {
                 </button>
                 <Link to={`/seasons/${s.slug}`} target="_blank" className="px-3 py-1.5 border border-white/15 text-white/70 text-xs uppercase font-bold rounded-sm hover:text-white">Public</Link>
                 <button onClick={() => del(s)} className="px-3 py-1.5 border border-[#FF3B30]/40 text-[#FF3B30] text-xs uppercase font-bold rounded-sm inline-flex items-center gap-1">
-                  <Trash2 className="w-3 h-3" /> Loeschen
+                  <Trash2 className="w-3 h-3" /> Löschen
                 </button>
               </div>
             </div>
@@ -292,7 +292,7 @@ function SourcePicker({ label, items, selected, onToggle, getLabel }) {
             <span className="truncate">{getLabel(item)}</span>
           </label>
         ))}
-        {items.length === 0 && <div className="text-xs text-white/35 p-2">Keine Eintraege vorhanden.</div>}
+        {items.length === 0 && <div className="text-xs text-white/35 p-2">Keine Einträge vorhanden.</div>}
       </div>
     </div>
   );

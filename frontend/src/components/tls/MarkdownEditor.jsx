@@ -37,6 +37,7 @@ import {
 import { toast } from "sonner";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { renderMarkdownLite } from "@/lib/markdownLite";
+import { usePrompt } from "@/components/tls/ConfirmDialog";
 
 function normalizeMarkdown(value) {
   return String(value || "")
@@ -210,6 +211,7 @@ export function MarkdownEditor({
   const [mediaOpen, setMediaOpen] = useState(false);
   const [mediaLoading, setMediaLoading] = useState(false);
   const [media, setMedia] = useState([]);
+  const prompt = usePrompt();
   const syncingRef = useRef(false);
   const preview = useMemo(() => renderMarkdownLite(value), [value]);
 
@@ -260,11 +262,18 @@ export function MarkdownEditor({
     command(editor.chain().focus()).run();
   };
 
-  const setLink = () => {
+  const setLink = async () => {
     if (!editor) return;
     const previous = editor.getAttributes("link").href || "";
-    const href = window.prompt("Link-URL", previous);
-    if (href === null) return;
+    const href = await prompt({
+      title: "Link einfügen",
+      description: "URL für den markierten Text.",
+      defaultValue: previous,
+      placeholder: "https://...",
+      confirmLabel: "Link setzen",
+      multiline: false,
+    });
+    if (href === false) return;
     if (!href.trim()) {
       editor.chain().focus().extendMarkRange("link").unsetLink().run();
       return;
@@ -272,9 +281,16 @@ export function MarkdownEditor({
     editor.chain().focus().extendMarkRange("link").setLink({ href: href.trim() }).run();
   };
 
-  const setImageUrl = () => {
+  const setImageUrl = async () => {
     if (!editor) return;
-    const src = window.prompt("Bild-URL");
+    const src = await prompt({
+      title: "Bild per URL einfügen",
+      description: "Direkte Bild-URL einfügen. Für eigene Bilder besser die Medienbibliothek verwenden.",
+      placeholder: "https://...",
+      confirmLabel: "Bild einfügen",
+      multiline: false,
+    });
+    if (src === false) return;
     if (!src?.trim()) return;
     editor.chain().focus().setImage({ src: src.trim(), alt: "Bild" }).run();
   };

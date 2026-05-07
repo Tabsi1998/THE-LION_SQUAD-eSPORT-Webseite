@@ -1,4 +1,5 @@
 import "@/App.css";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -7,6 +8,10 @@ import { BrandingHead } from "@/components/tls/BrandingHead";
 import { ApiInvalidationBridge } from "@/components/tls/ApiInvalidationBridge";
 import { CookieConsentProvider } from "@/components/tls/CookieConsent";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
+
+function RouteFallback() {
+  return <div className="min-h-screen flex items-center justify-center text-white/40 font-display tracking-widest">LADE …</div>;
+}
 
 function MeRedirect() {
   const { user } = useAuth();
@@ -35,39 +40,39 @@ import RegisterPage from "@/pages/public/RegisterPage";
 import { ForgotPasswordPage, ResetPasswordPage } from "@/pages/public/PasswordRecoveryPage";
 import { PrivacyPage, ImprintPage } from "@/pages/public/LegalPages";
 
-import DashboardPage from "@/pages/user/DashboardPage";
-import ProfilePage from "@/pages/user/ProfilePage";
-import MatchHubPage from "@/pages/user/MatchHubPage";
-import PrivacyAccountPage from "@/pages/user/PrivacyAccountPage";
+const DashboardPage = lazy(() => import("@/pages/user/DashboardPage"));
+const ProfilePage = lazy(() => import("@/pages/user/ProfilePage"));
+const MatchHubPage = lazy(() => import("@/pages/user/MatchHubPage"));
+const PrivacyAccountPage = lazy(() => import("@/pages/user/PrivacyAccountPage"));
 
-import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
-import AdminTournamentsPage from "@/pages/admin/AdminTournamentsPage";
-import AdminTournamentNewPage from "@/pages/admin/AdminTournamentNewPage";
-import AdminTournamentEditPage from "@/pages/admin/AdminTournamentEditPage";
-import AdminF1Page from "@/pages/admin/AdminF1Page";
-import AdminF1NewPage from "@/pages/admin/AdminF1NewPage";
-import AdminF1EditPage from "@/pages/admin/AdminF1EditPage";
-import AdminGamesPage from "@/pages/admin/AdminGamesPage";
-import AdminUsersPage from "@/pages/admin/AdminUsersPage";
-import AdminStationsPage from "@/pages/admin/AdminStationsPage";
-import AdminEventsPage from "@/pages/admin/AdminEventsPage";
-import AdminNewsPage from "@/pages/admin/AdminNewsPage";
-import AdminSettingsPage from "@/pages/admin/AdminSettingsPage";
-import AdminSeasonsPage from "@/pages/admin/AdminSeasonsPage";
-import AdminAuditPage from "@/pages/admin/AdminAuditPage";
-import AdminWidgetsPage from "@/pages/admin/AdminWidgetsPage";
-import AdminMembersPage from "@/pages/admin/AdminMembersPage";
-import AdminClubMemberProfilesPage from "@/pages/admin/AdminClubMemberProfilesPage";
-import AdminBenefitsPage from "@/pages/admin/AdminBenefitsPage";
-import AdminGalleryPage from "@/pages/admin/AdminGalleryPage";
-import AdminDocumentsPage from "@/pages/admin/AdminDocumentsPage";
+const AdminDashboardPage = lazy(() => import("@/pages/admin/AdminDashboardPage"));
+const AdminTournamentsPage = lazy(() => import("@/pages/admin/AdminTournamentsPage"));
+const AdminTournamentNewPage = lazy(() => import("@/pages/admin/AdminTournamentNewPage"));
+const AdminTournamentEditPage = lazy(() => import("@/pages/admin/AdminTournamentEditPage"));
+const AdminF1Page = lazy(() => import("@/pages/admin/AdminF1Page"));
+const AdminF1NewPage = lazy(() => import("@/pages/admin/AdminF1NewPage"));
+const AdminF1EditPage = lazy(() => import("@/pages/admin/AdminF1EditPage"));
+const AdminGamesPage = lazy(() => import("@/pages/admin/AdminGamesPage"));
+const AdminUsersPage = lazy(() => import("@/pages/admin/AdminUsersPage"));
+const AdminStationsPage = lazy(() => import("@/pages/admin/AdminStationsPage"));
+const AdminEventsPage = lazy(() => import("@/pages/admin/AdminEventsPage"));
+const AdminNewsPage = lazy(() => import("@/pages/admin/AdminNewsPage"));
+const AdminSettingsPage = lazy(() => import("@/pages/admin/AdminSettingsPage"));
+const AdminSeasonsPage = lazy(() => import("@/pages/admin/AdminSeasonsPage"));
+const AdminAuditPage = lazy(() => import("@/pages/admin/AdminAuditPage"));
+const AdminWidgetsPage = lazy(() => import("@/pages/admin/AdminWidgetsPage"));
+const AdminMembersPage = lazy(() => import("@/pages/admin/AdminMembersPage"));
+const AdminClubMemberProfilesPage = lazy(() => import("@/pages/admin/AdminClubMemberProfilesPage"));
+const AdminBenefitsPage = lazy(() => import("@/pages/admin/AdminBenefitsPage"));
+const AdminGalleryPage = lazy(() => import("@/pages/admin/AdminGalleryPage"));
+const AdminDocumentsPage = lazy(() => import("@/pages/admin/AdminDocumentsPage"));
 import SeasonPage from "@/pages/public/SeasonPage";
-import PublicProfilePage from "@/pages/public/PublicProfilePage";
-import AdminAchievementsPage from "@/pages/admin/AdminAchievementsPage";
-import AdminMembershipApplicationsPage from "@/pages/admin/AdminMembershipApplicationsPage";
-import AdminCmsPage from "@/pages/admin/AdminCmsPage";
-import AdminMediaPage from "@/pages/admin/AdminMediaPage";
-import AdminNavPage from "@/pages/admin/AdminNavPage";
+const PublicProfilePage = lazy(() => import("@/pages/public/PublicProfilePage"));
+const AdminAchievementsPage = lazy(() => import("@/pages/admin/AdminAchievementsPage"));
+const AdminMembershipApplicationsPage = lazy(() => import("@/pages/admin/AdminMembershipApplicationsPage"));
+const AdminCmsPage = lazy(() => import("@/pages/admin/AdminCmsPage"));
+const AdminMediaPage = lazy(() => import("@/pages/admin/AdminMediaPage"));
+const AdminNavPage = lazy(() => import("@/pages/admin/AdminNavPage"));
 import MembershipApplyPage from "@/pages/public/MembershipApplyPage";
 import AdminSponsorsPage from "@/pages/admin/AdminSponsorsPage";
 import AdminPartnersPage from "@/pages/admin/AdminPartnersPage";
@@ -84,21 +89,21 @@ import JoinMembershipPage from "@/pages/public/JoinMembershipPage";
 import NewsDetailPage from "@/pages/public/NewsDetailPage";
 import GalleryPage from "@/pages/public/GalleryPage";
 import GalleryAlbumPage from "@/pages/public/GalleryAlbumPage";
-import MemberAreaPage from "@/pages/user/MemberAreaPage";
-import MemberBenefitsPage from "@/pages/user/MemberBenefitsPage";
-import MemberDocumentsPage from "@/pages/user/MemberDocumentsPage";
-import MemberNewsPage from "@/pages/user/MemberNewsPage";
-import MyMembershipPage from "@/pages/user/MyMembershipPage";
+const MemberAreaPage = lazy(() => import("@/pages/user/MemberAreaPage"));
+const MemberBenefitsPage = lazy(() => import("@/pages/user/MemberBenefitsPage"));
+const MemberDocumentsPage = lazy(() => import("@/pages/user/MemberDocumentsPage"));
+const MemberNewsPage = lazy(() => import("@/pages/user/MemberNewsPage"));
+const MyMembershipPage = lazy(() => import("@/pages/user/MyMembershipPage"));
 
 import F1TVPage from "@/pages/display/F1TVPage";
 import BracketTVPage from "@/pages/display/BracketTVPage";
-import MyPrizesPage from "@/pages/user/MyPrizesPage";
-import MyPenaltiesPage from "@/pages/user/MyPenaltiesPage";
-import AdminPrizesPage from "@/pages/admin/AdminPrizesPage";
-import AdminPenaltiesPage from "@/pages/admin/AdminPenaltiesPage";
-import AdminContactPage from "@/pages/admin/AdminContactPage";
-import AdminBoardPage from "@/pages/admin/AdminBoardPage";
-import SetupWizardPage from "@/pages/SetupWizardPage";
+const MyPrizesPage = lazy(() => import("@/pages/user/MyPrizesPage"));
+const MyPenaltiesPage = lazy(() => import("@/pages/user/MyPenaltiesPage"));
+const AdminPrizesPage = lazy(() => import("@/pages/admin/AdminPrizesPage"));
+const AdminPenaltiesPage = lazy(() => import("@/pages/admin/AdminPenaltiesPage"));
+const AdminContactPage = lazy(() => import("@/pages/admin/AdminContactPage"));
+const AdminBoardPage = lazy(() => import("@/pages/admin/AdminBoardPage"));
+const SetupWizardPage = lazy(() => import("@/pages/SetupWizardPage"));
 import { NotFoundPage, ForbiddenPage } from "@/pages/ErrorPages";
 import { BoardPage, ValuesPage } from "@/pages/public/ClubPages";
 import CurrentSeasonRedirect from "@/pages/public/CurrentSeasonRedirect";
@@ -112,6 +117,7 @@ function App() {
             <BrandingHead />
             <ApiInvalidationBridge />
             <Toaster theme="dark" position="top-right" richColors />
+            <Suspense fallback={<RouteFallback />}>
             <Routes>
           {/* Public — Verein */}
           <Route path="/" element={<HomePage />} />
@@ -224,6 +230,7 @@ function App() {
           <Route path="/403" element={<ForbiddenPage />} />
           <Route path="*" element={<NotFoundPage />} />
             </Routes>
+            </Suspense>
           </ConfirmDialogProvider>
         </CookieConsentProvider>
       </BrowserRouter>

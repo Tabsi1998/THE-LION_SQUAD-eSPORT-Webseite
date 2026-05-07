@@ -558,7 +558,7 @@ function TeamsPanel() {
         <div>
           <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Team-Verwaltung</div>
           <h2 className="font-heading text-2xl md:text-3xl font-black uppercase mt-1">Meine Teams</h2>
-          <p className="text-sm text-white/55 mt-1">Teams sind deine Organisation, Squads sind konkrete Lineups fuer Seasons oder Turniere.</p>
+          <p className="text-sm text-white/55 mt-1">Teams sind deine Organisation, Squads sind konkrete Lineups für Seasons oder Turniere.</p>
         </div>
         <Link to="/teams" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10">
           <Plus className="w-3.5 h-3.5" /> Team erstellen
@@ -635,7 +635,7 @@ function TeamsPanel() {
                       </div>
                     </div>
                   ))}
-                  {squads.length === 0 && <div className="sm:col-span-2 text-center py-10 text-white/35 border border-dashed border-white/10 rounded-sm">Noch keine Squads fuer dieses Team.</div>}
+                  {squads.length === 0 && <div className="sm:col-span-2 text-center py-10 text-white/35 border border-dashed border-white/10 rounded-sm">Noch keine Squads für dieses Team.</div>}
                 </div>
               </>
             )}

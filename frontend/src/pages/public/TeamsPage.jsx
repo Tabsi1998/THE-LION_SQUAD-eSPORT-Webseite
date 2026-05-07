@@ -146,7 +146,7 @@ function TeamDetail({ id }) {
       await api.post(`/teams/${team.id}/members/${m.id}/role`, { role });
       toast.success(role === "co_leader" ? "Zum Co-Leader befördert." : "Co-Leader-Rolle entzogen.");
       load();
-    } catch (err) { toast.error(formatRequestError(err, "Rolle konnte nicht geaendert werden.")); }
+    } catch (err) { toast.error(formatRequestError(err, "Rolle konnte nicht geändert werden.")); }
   };
 
   const transferLead = async (m) => {
@@ -160,7 +160,7 @@ function TeamDetail({ id }) {
       await api.post(`/teams/${team.id}/transfer-leader`, { new_leader_id: m.id });
       toast.success("Leadership übertragen.");
       load();
-    } catch (err) { toast.error(formatRequestError(err, "Leadership konnte nicht uebertragen werden.")); }
+    } catch (err) { toast.error(formatRequestError(err, "Leadership konnte nicht übertragen werden.")); }
   };
 
   const copyJoin = async () => {

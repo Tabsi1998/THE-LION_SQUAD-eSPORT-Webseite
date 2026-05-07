@@ -79,14 +79,14 @@ def _public_registration(reg: dict, user: dict | None, is_staff: bool) -> dict:
 
 def _registration_error(t: dict) -> str | None:
     if t.get("registration_enabled") is False or t.get("is_invite_only"):
-        return "Anmeldung fuer dieses Turnier ist deaktiviert"
+        return "Anmeldung für dieses Turnier ist deaktiviert"
     if t.get("status") != "registration_open":
-        return "Anmeldung fuer dieses Turnier geschlossen"
+        return "Anmeldung für dieses Turnier geschlossen"
     now = datetime.now(timezone.utc)
     open_from = _parse_dt(t.get("registration_open_from"))
     open_until = _parse_dt(t.get("registration_open_until"))
     if open_from and now < open_from:
-        return "Anmeldung ist noch nicht geoeffnet"
+        return "Anmeldung ist noch nicht geöffnet"
     if open_until and now > open_until:
         return "Anmeldung ist bereits beendet"
     return None

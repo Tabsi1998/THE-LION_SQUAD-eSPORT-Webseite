@@ -28,7 +28,7 @@ const MONTHS = [
   ["", "Monat offen lassen"],
   ["01", "Januar"],
   ["02", "Februar"],
-  ["03", "Maerz"],
+  ["03", "März"],
   ["04", "April"],
   ["05", "Mai"],
   ["06", "Juni"],

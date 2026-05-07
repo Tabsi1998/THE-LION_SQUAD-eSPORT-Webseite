@@ -44,7 +44,7 @@ export default function AdminUsersPage() {
       await api.delete(`/users/${u.id}`);
       toast.success("Benutzer gelöscht.");
       load();
-    } catch (e) { toast.error(formatRequestError(e, "Loeschen fehlgeschlagen.")); }
+    } catch (e) { toast.error(formatRequestError(e, "Löschen fehlgeschlagen.")); }
   };
   const resendInvite = async (u) => {
     try {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
-import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Award, CheckCircle2, Clock, XCircle, Gift, RefreshCw, AlertCircle } from "lucide-react";
@@ -18,6 +18,7 @@ export default function AdminPrizesPage() {
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const confirm = useConfirm();
+  const prompt = usePrompt();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,6 +48,19 @@ export default function AdminPrizesPage() {
     })) return;
     try { await api.delete(`/prizes/${id}`); toast.success("Gelöscht."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+
+  const markPickedUp = async (id) => {
+    const notes = await prompt({
+      title: "Preis abgeholt",
+      description: "Optionale Notiz zur Abholung.",
+      placeholder: "z.B. persönlich übergeben, Versand erledigt...",
+      confirmLabel: "Abgeholt markieren",
+      multiline: true,
+      tone: "info",
+    });
+    if (notes === false) return;
+    await updateStatus(id, "picked_up", notes || "");
   };
 
   const counts = items.reduce((acc, p) => { acc[p.status] = (acc[p.status] || 0) + 1; return acc; }, {});
@@ -118,7 +132,7 @@ export default function AdminPrizesPage() {
                         <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-mark-ready-${p.id}`} className="text-[#29B6E8] hover:underline mr-3 text-xs font-semibold">Bereit ▸</button>
                       )}
                       {p.status === "ready" && (
-                        <button onClick={() => updateStatus(p.id, "picked_up", window.prompt("Notiz (optional):") || "")} data-testid={`prize-pickup-${p.id}`} className="text-[#00FF88] hover:underline mr-3 text-xs font-semibold">Abgeholt ✓</button>
+                        <button onClick={() => markPickedUp(p.id)} data-testid={`prize-pickup-${p.id}`} className="text-[#00FF88] hover:underline mr-3 text-xs font-semibold">Abgeholt ✓</button>
                       )}
                       {p.status === "picked_up" && (
                         <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-revert-${p.id}`} className="text-white/50 hover:text-white mr-3 text-xs"><RefreshCw className="w-3 h-3 inline mr-1" />Zurück</button>

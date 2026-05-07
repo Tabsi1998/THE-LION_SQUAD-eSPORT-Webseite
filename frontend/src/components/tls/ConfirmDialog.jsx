@@ -5,11 +5,14 @@ const ConfirmContext = createContext(null);
 
 export function ConfirmDialogProvider({ children }) {
   const [dialog, setDialog] = useState(null);
+  const [draft, setDraft] = useState("");
   const resolverRef = useRef(null);
 
   const confirm = useCallback((options) => new Promise((resolve) => {
     resolverRef.current = resolve;
+    setDraft("");
     setDialog({
+      kind: "confirm",
       title: options?.title || "Aktion bestätigen",
       description: options?.description || "Diese Aktion kann nicht automatisch rückgängig gemacht werden.",
       confirmLabel: options?.confirmLabel || "Bestätigen",
@@ -18,13 +21,31 @@ export function ConfirmDialogProvider({ children }) {
     });
   }), []);
 
+  const prompt = useCallback((options) => new Promise((resolve) => {
+    resolverRef.current = resolve;
+    setDraft(options?.defaultValue || "");
+    setDialog({
+      kind: "prompt",
+      title: options?.title || "Eingabe",
+      description: options?.description || "",
+      confirmLabel: options?.confirmLabel || "Übernehmen",
+      cancelLabel: options?.cancelLabel || "Abbrechen",
+      tone: options?.tone || "info",
+      placeholder: options?.placeholder || "",
+      required: !!options?.required,
+      multiline: options?.multiline !== false,
+    });
+  }), []);
+
   const close = useCallback((result) => {
-    resolverRef.current?.(result);
+    resolverRef.current?.(dialog?.kind === "prompt" && result ? draft : result);
     resolverRef.current = null;
     setDialog(null);
-  }, []);
+    setDraft("");
+  }, [dialog?.kind, draft]);
 
-  const value = useMemo(() => ({ confirm }), [confirm]);
+  const value = useMemo(() => ({ confirm, prompt }), [confirm, prompt]);
+  const promptInvalid = dialog?.kind === "prompt" && dialog.required && !draft.trim();
 
   return (
     <ConfirmContext.Provider value={value}>
@@ -39,6 +60,25 @@ export function ConfirmDialogProvider({ children }) {
               <div className="min-w-0 flex-1">
                 <h2 id="confirm-title" className="font-heading font-black uppercase text-lg">{dialog.title}</h2>
                 <p className="mt-1 text-sm text-white/60 leading-relaxed">{dialog.description}</p>
+                {dialog.kind === "prompt" && (
+                  dialog.multiline ? (
+                    <textarea
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      placeholder={dialog.placeholder}
+                      className="mt-4 input min-h-28 resize-y"
+                      autoFocus
+                    />
+                  ) : (
+                    <input
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      placeholder={dialog.placeholder}
+                      className="mt-4 input"
+                      autoFocus
+                    />
+                  )
+                )}
               </div>
               <button type="button" onClick={() => close(false)} className="p-1 text-white/45 hover:text-white" aria-label="Schließen">
                 <X className="w-4 h-4" />
@@ -48,7 +88,7 @@ export function ConfirmDialogProvider({ children }) {
               <button type="button" onClick={() => close(false)} className="px-4 py-2 border border-white/10 text-white/65 hover:text-white hover:bg-white/5 rounded-sm text-xs font-bold uppercase tracking-wider">
                 {dialog.cancelLabel}
               </button>
-              <button type="button" onClick={() => close(true)} className={`px-4 py-2 rounded-sm text-xs font-black uppercase tracking-wider ${dialog.tone === "danger" ? "bg-[#FF3B30] text-white hover:bg-[#ff5b52]" : "bg-[#29B6E8] text-black hover:bg-[#6FD6FF]"}`}>
+              <button type="button" onClick={() => close(true)} disabled={promptInvalid} className={`px-4 py-2 rounded-sm text-xs font-black uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed ${dialog.tone === "danger" ? "bg-[#FF3B30] text-white hover:bg-[#ff5b52]" : "bg-[#29B6E8] text-black hover:bg-[#6FD6FF]"}`}>
                 {dialog.confirmLabel}
               </button>
             </div>
@@ -63,4 +103,10 @@ export function useConfirm() {
   const context = useContext(ConfirmContext);
   if (!context) throw new Error("useConfirm must be used within ConfirmDialogProvider");
   return context.confirm;
+}
+
+export function usePrompt() {
+  const context = useContext(ConfirmContext);
+  if (!context) throw new Error("usePrompt must be used within ConfirmDialogProvider");
+  return context.prompt;
 }

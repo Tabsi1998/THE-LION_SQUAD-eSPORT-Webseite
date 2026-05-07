@@ -24,7 +24,7 @@ export default function AdminTournamentsPage() {
       toast.success(`Status: ${status}`);
       load();
     } catch (e) {
-      toast.error(formatRequestError(e, "Status konnte nicht geaendert werden."));
+      toast.error(formatRequestError(e, "Status konnte nicht geändert werden."));
     }
   };
 

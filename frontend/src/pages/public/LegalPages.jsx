@@ -94,9 +94,9 @@ export function ImprintPage() {
         <InfoList
           items={[
             ["Verein", legalName],
-            ["Rechtsform", branding.legal_form || "eingetragener Verein nach oesterreichischem Vereinsrecht"],
+            ["Rechtsform", branding.legal_form || "eingetragener Verein nach österreichischem Vereinsrecht"],
             ["ZVR-Zahl", valueOrOpen(branding.zvr_number)],
-            ["Vereinssitz", branding.registered_seat || branding.city || "Tirol, Oesterreich"],
+            ["Vereinssitz", branding.registered_seat || branding.city || "Tirol, Österreich"],
             ["Adresse", lines.length ? lines.map((line) => <div key={line}>{line}</div>) : valueOrOpen("")],
             ["Website", <a href={domain} className="text-[#29B6E8] hover:underline">{domain}</a>],
             ["E-Mail", <a href={`mailto:${contactEmail}`} className="text-[#29B6E8] hover:underline">{contactEmail}</a>],
@@ -119,26 +119,26 @@ export function ImprintPage() {
       <Section title="Grundlegende Richtung">
         <p>
           Diese Website ist das offizielle Informations- und Serviceangebot von {legalName}. Sie
-          informiert ueber den Verein, Mitgliedschaft, Vorstand, Veranstaltungen, Community,
+          informiert über den Verein, Mitgliedschaft, Vorstand, Veranstaltungen, Community,
           eSports-Turniere, Fast-Lap-Challenges, Ranglisten, News, Sponsoren und Kontaktmoeglichkeiten.
         </p>
         <p>
-          Der Vereinssitz liegt in Tirol. Die Vereinstaetigkeit ist nicht auf Gewinn gerichtet,
+          Der Vereinssitz liegt in Tirol. Die Vereinstätigkeit ist nicht auf Gewinn gerichtet,
           soweit sich aus den Statuten nichts anderes ergibt.
         </p>
       </Section>
 
       <Section title="Turniere, Startgeld und Preise">
         <p>
-          Auf der Plattform koennen auch Turniere oder Veranstaltungen mit Startgeld, Sachpreisen
-          oder sonstigen Gewinnen angekuendigt werden. Die konkreten Teilnahmebedingungen,
-          Altersgrenzen, Regeln, Kosten, Zahlungsmodalitaeten, Fristen und Preisbedingungen ergeben
+          Auf der Plattform können auch Turniere oder Veranstaltungen mit Startgeld, Sachpreisen
+          oder sonstigen Gewinnen angekündigt werden. Die konkreten Teilnahmebedingungen,
+          Altersgrenzen, Regeln, Kosten, Zahlungsmodalitäten, Fristen und Preisbedingungen ergeben
           sich jeweils aus der Turnier- oder Eventbeschreibung und den dort verlinkten Regeln.
         </p>
         {branding.paid_tournaments_enabled ? (
           <p>
-            Bezahlte Turniere koennen stattfinden. Die Website stellt dafuer organisatorische
-            Informationen bereit; die jeweilige Ausschreibung ist fuer Details massgeblich.
+            Bezahlte Turniere können stattfinden. Die Website stellt dafür organisatorische
+            Informationen bereit; die jeweilige Ausschreibung ist für Details maßgeblich.
           </p>
         ) : (
           <p>
@@ -166,14 +166,14 @@ export function ImprintPage() {
 
       <Section title="Haftung und externe Links">
         <p>
-          Die Inhalte dieser Website werden mit Sorgfalt erstellt und gepflegt. Fuer Aktualitaet,
-          Richtigkeit und Vollstaendigkeit wird, soweit gesetzlich zulaessig, keine Gewaehr
-          uebernommen. Inhalte koennen sich kurzfristig aendern, insbesondere bei Turnieren,
+          Die Inhalte dieser Website werden mit Sorgfalt erstellt und gepflegt. Für Aktualität,
+          Richtigkeit und Vollständigkeit wird, soweit gesetzlich zulässig, keine Gewähr
+          übernommen. Inhalte können sich kurzfristig ändern, insbesondere bei Turnieren,
           Events, Ranglisten und organisatorischen Hinweisen.
         </p>
         <p>
-          Diese Website kann Links zu externen Angeboten enthalten. Fuer externe Inhalte sind
-          ausschliesslich deren Betreiber verantwortlich. Bei Bekanntwerden rechtswidriger Inhalte
+          Diese Website kann Links zu externen Angeboten enthalten. Für externe Inhalte sind
+          ausschließlich deren Betreiber verantwortlich. Bei Bekanntwerden rechtswidriger Inhalte
           werden entsprechende Links entfernt.
         </p>
       </Section>
@@ -182,22 +182,22 @@ export function ImprintPage() {
         <p>
           Texte, Bilder, Grafiken, Logos, Videos, Turnierdaten und sonstige Inhalte dieser Website
           unterliegen, soweit nicht anders angegeben, dem Urheberrecht bzw. den Nutzungsrechten des
-          Vereins oder der jeweiligen Rechteinhaber. Eine Verwendung ausserhalb der gesetzlich
-          erlaubten Faelle bedarf der vorherigen Zustimmung.
+          Vereins oder der jeweiligen Rechteinhaber. Eine Verwendung außerhalb der gesetzlich
+          erlaubten Fälle bedarf der vorherigen Zustimmung.
         </p>
       </Section>
 
       <Section title="Datenschutzkontakt">
         <p>
-          Datenschutzanfragen koennen an{" "}
+          Datenschutzanfragen können an{" "}
           <a href={`mailto:${privacyEmail}`} className="text-[#29B6E8] hover:underline">{privacyEmail}</a>{" "}
           gerichtet werden. Weitere Informationen stehen in der{" "}
-          <Link to="/privacy" className="text-[#29B6E8] hover:underline">Datenschutzerklaerung</Link>.
+          <Link to="/privacy" className="text-[#29B6E8] hover:underline">Datenschutzerklärung</Link>.
         </p>
       </Section>
 
       {(branding.imprint || branding.legal_extra) && (
-        <Section title="Ergaenzende Angaben">
+        <Section title="Ergänzende Angaben">
           <TextBlock>{[branding.imprint, branding.legal_extra].filter(Boolean).join("\n\n")}</TextBlock>
         </Section>
       )}
@@ -215,7 +215,7 @@ export function PrivacyPage() {
 
   return (
     <LegalArticle
-      title="Datenschutzerklaerung"
+      title="Datenschutzerklärung"
       intro="Informationen zur Verarbeitung personenbezogener Daten auf dieser Vereinsplattform."
     >
       <Section title="Verantwortlicher">
@@ -230,14 +230,14 @@ export function PrivacyPage() {
         />
       </Section>
 
-      <Section title="Grundsaetze und Rechtsgrundlagen">
+      <Section title="Grundsätze und Rechtsgrundlagen">
         <p>
-          Wir verarbeiten personenbezogene Daten ausschliesslich auf Grundlage der DSGVO, des
-          oesterreichischen Datenschutzgesetzes und sonstiger anwendbarer Vorschriften. Massgebliche
-          Rechtsgrundlagen sind insbesondere Art. 6 Abs. 1 lit. b DSGVO fuer Vertrag,
-          Mitgliedschaft und vorvertragliche Massnahmen, Art. 6 Abs. 1 lit. c DSGVO fuer rechtliche
-          Pflichten, Art. 6 Abs. 1 lit. f DSGVO fuer berechtigte Interessen sowie Art. 6 Abs. 1
-          lit. a DSGVO fuer Einwilligungen.
+          Wir verarbeiten personenbezogene Daten ausschließlich auf Grundlage der DSGVO, des
+          österreichischen Datenschutzgesetzes und sonstiger anwendbarer Vorschriften. Maßgebliche
+          Rechtsgrundlagen sind insbesondere Art. 6 Abs. 1 lit. b DSGVO für Vertrag,
+          Mitgliedschaft und vorvertragliche Maßnahmen, Art. 6 Abs. 1 lit. c DSGVO für rechtliche
+          Pflichten, Art. 6 Abs. 1 lit. f DSGVO für berechtigte Interessen sowie Art. 6 Abs. 1
+          lit. a DSGVO für Einwilligungen.
         </p>
         <p>
           Berechtigte Interessen sind insbesondere sicherer Websitebetrieb, Missbrauchsschutz,
@@ -265,17 +265,17 @@ export function PrivacyPage() {
           <li>Registrierung, Login, Rollen- und Rechteverwaltung.</li>
           <li>Organisation von Verein, Mitgliedschaft, Vorstand, Dokumenten und Mitgliederbereich.</li>
           <li>Organisation von Turnieren, Challenges, Teams, Events, Preisen und Ranglisten.</li>
-          <li>Bearbeitung von Kontaktanfragen, Mitgliedsantraegen und Supportfaellen.</li>
+          <li>Bearbeitung von Kontaktanfragen, Mitgliedsanträgen und Supportfällen.</li>
           <li>Versand von Systemmails, Passwort-Reset, Turnier- und Vereinsbenachrichtigungen.</li>
-          <li>Erfuellung gesetzlicher Aufbewahrungs-, Nachweis- und Sicherheitsverpflichtungen.</li>
+          <li>Erfüllung gesetzlicher Aufbewahrungs-, Nachweis- und Sicherheitsverpflichtungen.</li>
         </ul>
       </Section>
 
-      <Section title="Oeffentliche Profile, Ranglisten und Achievements">
+      <Section title="Öffentliche Profile, Ranglisten und Achievements">
         <p>
-          Nutzerprofile, Ranglisten, Turnierergebnisse und Achievements koennen oeffentlich sichtbar
-          sein, soweit dies fuer Community- und Wettbewerbsfunktionen vorgesehen ist. Nutzer koennen
-          die Sichtbarkeit ihres oeffentlichen Profils im Profilbereich einschraenken. Negative oder
+          Nutzerprofile, Ranglisten, Turnierergebnisse und Achievements können öffentlich sichtbar
+          sein, soweit dies für Community- und Wettbewerbsfunktionen vorgesehen ist. Nutzer können
+          die Sichtbarkeit ihres öffentlichen Profils im Profilbereich einschränken. Negative oder
           geheime Fun-/Negative-Achievements werden erst nach Freischaltung im Profil angezeigt.
         </p>
       </Section>
@@ -283,21 +283,21 @@ export function PrivacyPage() {
       <Section title="Kontaktformular und Mitgliedsantrag">
         <p>
           Angaben aus Formularen werden zur Bearbeitung der Anfrage, zur Kommunikation und zur
-          Dokumentation verarbeitet. Bei Mitgliedsantraegen werden die Daten zusaetzlich zur Pruefung,
+          Dokumentation verarbeitet. Bei Mitgliedsanträgen werden die Daten zusätzlich zur Prüfung,
           Aufnahme und Verwaltung der Mitgliedschaft genutzt.
         </p>
       </Section>
 
       <Section title="E-Mail, SMTP und Discord">
         <p>
-          Fuer Systemmails, Passwort-Reset, Mitgliedschaftsinformationen, Kontaktantworten und
-          Benachrichtigungen koennen eigene SMTP-Server oder E-Mail-Dienstleister eingesetzt werden.
-          Dabei werden Empfaengeradresse, Betreff, Inhalt, Versandstatus und technische Versanddaten
+          Für Systemmails, Passwort-Reset, Mitgliedschaftsinformationen, Kontaktantworten und
+          Benachrichtigungen können eigene SMTP-Server oder E-Mail-Dienstleister eingesetzt werden.
+          Dabei werden Empfängeradresse, Betreff, Inhalt, Versandstatus und technische Versanddaten
           verarbeitet.
         </p>
         <p>
-          Wenn Discord-Webhooks aktiviert sind, koennen Ereignisse wie Turniere, Matches,
-          Achievements oder Tests in einen konfigurierten Discord-Kanal uebermittelt werden.
+          Wenn Discord-Webhooks aktiviert sind, können Ereignisse wie Turniere, Matches,
+          Achievements oder Tests in einen konfigurierten Discord-Kanal übermittelt werden.
         </p>
       </Section>
 
@@ -309,75 +309,75 @@ export function PrivacyPage() {
         <InfoList
           items={[
             ["Hosting / Betrieb", branding.hosting_provider || "Vom Verein bzw. beauftragten Dienstleistern betrieben"],
-            ["Hosting-Region", branding.hosting_country || "Oesterreich/EU"],
+            ["Hosting-Region", branding.hosting_country || "Österreich/EU"],
           ]}
         />
       </Section>
 
       <Section title="Cookies und lokale Speicherung">
         <p>
-          Die Plattform verwendet technisch notwendige Cookies und lokale Speichermechanismen fuer
+          Die Plattform verwendet technisch notwendige Cookies und lokale Speichermechanismen für
           Login, Session, Refresh-Token, CSRF-Schutz und grundlegende Bedienfunktionen. Ohne diese
-          Funktionen sind geschuetzte Bereiche nicht nutzbar. Tracking- oder Marketing-Cookies sind
-          fuer den Betrieb dieser Plattform nicht erforderlich.
+          Funktionen sind geschützte Bereiche nicht nutzbar. Tracking- oder Marketing-Cookies sind
+          für den Betrieb dieser Plattform nicht erforderlich.
         </p>
       </Section>
 
-      <Section title="Empfaenger und Auftragsverarbeiter">
+      <Section title="Empfänger und Auftragsverarbeiter">
         <p>
-          Daten koennen an technische Dienstleister weitergegeben werden, soweit dies fuer Hosting,
+          Daten können an technische Dienstleister weitergegeben werden, soweit dies für Hosting,
           Datenbankbetrieb, E-Mail-Versand, Backups, Sicherheit, Wartung oder Support erforderlich
           ist. Eine Weitergabe erfolgt nur im erforderlichen Umfang.
         </p>
         <p>
-          Bei extern eingebundenen Diensten wie Discord, Twitch, YouTube oder aehnlichen Plattformen
-          gelten zusaetzlich die Datenschutzbedingungen der jeweiligen Anbieter, sobald deren Inhalte
-          geoeffnet oder eingebunden werden.
+          Bei extern eingebundenen Diensten wie Discord, Twitch, YouTube oder ähnlichen Plattformen
+          gelten zusätzlich die Datenschutzbedingungen der jeweiligen Anbieter, sobald deren Inhalte
+          geöffnet oder eingebunden werden.
         </p>
       </Section>
 
       <Section title="Speicherdauer">
         <p>
-          Daten werden nur so lange gespeichert, wie es fuer die jeweiligen Zwecke erforderlich ist.
-          Account- und Profildaten bestehen grundsaetzlich bis zur Loeschung des Accounts. Turnier-,
-          Vereins-, Zahlungs- und Nachweisdaten koennen laenger gespeichert werden, soweit berechtigte
+          Daten werden nur so lange gespeichert, wie es für die jeweiligen Zwecke erforderlich ist.
+          Account- und Profildaten bestehen grundsätzlich bis zur Löschung des Accounts. Turnier-,
+          Vereins-, Zahlungs- und Nachweisdaten können länger gespeichert werden, soweit berechtigte
           Interessen, Dokumentationspflichten oder gesetzliche Aufbewahrungspflichten bestehen.
-          Technische Logs werden regelmaessig begrenzt aufbewahrt.
+          Technische Logs werden regelmäßig begrenzt aufbewahrt.
         </p>
       </Section>
 
       <Section title="Sicherheit">
         <p>
-          Passwoerter werden nicht im Klartext gespeichert, sondern gehasht. Zugriffe auf geschuetzte
-          Bereiche erfolgen rollenbasiert. Zusaetzlich kommen Schutzmassnahmen wie CSRF-Schutz,
-          Zugriffsbeschraenkungen, private Dokumentdownloads, SMTP-Diagnose und Audit-Logs zum Einsatz.
+          Passwörter werden nicht im Klartext gespeichert, sondern gehasht. Zugriffe auf geschützte
+          Bereiche erfolgen rollenbasiert. Zusätzlich kommen Schutzmaßnahmen wie CSRF-Schutz,
+          Zugriffsbeschränkungen, private Dokumentdownloads, SMTP-Diagnose und Audit-Logs zum Einsatz.
         </p>
       </Section>
 
       <Section title="Betroffenenrechte">
         <p>
-          Betroffene Personen haben nach Massgabe der DSGVO Rechte auf Information, Auskunft,
-          Berichtigung, Loeschung, Einschraenkung, Datenuebertragbarkeit, Widerspruch sowie Widerruf
-          erteilter Einwilligungen. Zur Ausuebung genuegt eine Nachricht an{" "}
+          Betroffene Personen haben nach Maßgabe der DSGVO Rechte auf Information, Auskunft,
+          Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit, Widerspruch sowie Widerruf
+          erteilter Einwilligungen. Zur Ausübung genügt eine Nachricht an{" "}
           <a href={`mailto:${privacyEmail}`} className="text-[#29B6E8] hover:underline">{privacyEmail}</a>.
         </p>
         <p>
-          Ausserdem besteht das Recht auf Beschwerde bei der Oesterreichischen Datenschutzbehoerde,
+          Außerdem besteht das Recht auf Beschwerde bei der Österreichischen Datenschutzbehörde,
           Barichgasse 40-42, 1030 Wien,{" "}
           <a href="https://www.dsb.gv.at/" target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">www.dsb.gv.at</a>.
         </p>
       </Section>
 
       {(branding.privacy_policy || branding.privacy_extra) && (
-        <Section title="Ergaenzende Datenschutzhinweise">
+        <Section title="Ergänzende Datenschutzhinweise">
           <TextBlock>{[branding.privacy_policy, branding.privacy_extra].filter(Boolean).join("\n\n")}</TextBlock>
         </Section>
       )}
 
-      <Section title="Aenderungen">
+      <Section title="Änderungen">
         <p>
-          Diese Datenschutzerklaerung kann angepasst werden, wenn sich Funktionen, Dienstleister,
-          Turnierformate oder rechtliche Anforderungen aendern. Die jeweils aktuelle Fassung ist auf
+          Diese Datenschutzerklärung kann angepasst werden, wenn sich Funktionen, Dienstleister,
+          Turnierformate oder rechtliche Anforderungen ändern. Die jeweils aktuelle Fassung ist auf
           dieser Seite abrufbar.
         </p>
       </Section>

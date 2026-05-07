@@ -57,7 +57,7 @@ export function ResetPasswordPage() {
       return;
     }
     if (password !== confirm) {
-      toast.error("Passwoerter stimmen nicht ueberein.");
+      toast.error("Passwörter stimmen nicht überein.");
       return;
     }
     setLoading(true);
@@ -72,10 +72,10 @@ export function ResetPasswordPage() {
   };
 
   return (
-    <AuthShell title={isInvite ? "Account aktivieren" : "Passwort setzen"} subtitle="Vergib ein neues Passwort fuer deinen Account.">
+    <AuthShell title={isInvite ? "Account aktivieren" : "Passwort setzen"} subtitle="Vergib ein neues Passwort für deinen Account.">
       {!token ? (
         <div className="text-sm text-[#FF3B30] border border-[#FF3B30]/30 bg-[#FF3B30]/10 p-4 rounded-sm">
-          Der Link ist unvollstaendig. Bitte fordere einen neuen Link an.
+          Der Link ist unvollständig. Bitte fordere einen neuen Link an.
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4">

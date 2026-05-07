@@ -155,7 +155,7 @@ async def public_settings(response: Response):
     return {
         "club_name": b.get("club_name", "THE LION SQUAD"),
         "tagline": tagline,
-        "site_description": b.get("site_description") or "THE LION SQUAD eSports - Vereinsplattform fuer Turniere, Fast Lap Challenges, News und Mitgliederbereich.",
+        "site_description": b.get("site_description") or "THE LION SQUAD eSports - Vereinsplattform für Turniere, Fast Lap Challenges, News und Mitgliederbereich.",
         "primary_color": b.get("primary_color", "#29B6E8"),
         "logo_url": b.get("logo_url"),
         "mascot_url": b.get("mascot_url"),
@@ -438,7 +438,7 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_admin
     if "webhook_url" in updates:
         from discord_service import is_valid_discord_webhook_url
         if not is_valid_discord_webhook_url(updates["webhook_url"]):
-            raise HTTPException(400, "Ungueltige Discord Webhook URL. Erlaubt sind https://discord.com/api/webhooks/... URLs.")
+            raise HTTPException(400, "Ungültige Discord Webhook URL. Erlaubt sind https://discord.com/api/webhooks/... URLs.")
     for key in ("username", "avatar_url"):
         if key in updates and isinstance(updates[key], str):
             updates[key] = updates[key].strip()

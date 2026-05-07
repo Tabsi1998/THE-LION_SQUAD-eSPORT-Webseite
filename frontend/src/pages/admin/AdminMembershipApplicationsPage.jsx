@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { usePrompt } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Crown, Check, X as XIcon, Inbox, Eye } from "lucide-react";
@@ -20,13 +21,22 @@ export default function AdminMembershipApplicationsPage() {
   const [tab, setTab] = useState("pending");
   const [list, setList] = useState([]);
   const [selected, setSelected] = useState(null);
+  const prompt = usePrompt();
 
   const load = useCallback(() => api.get(`/membership/applications?status=${tab}`).then(({ data }) => setList(data)), [tab]);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["membership", "users"]);
 
   const decide = async (a, decision) => {
-    const note = decision === "reject" ? window.prompt("Begründung (wird per Mail gesendet):") : window.prompt("Optionale Notiz:") || "";
+    const note = await prompt({
+      title: decision === "reject" ? "Bewerbung ablehnen" : "Bewerbung annehmen",
+      description: decision === "reject" ? "Diese Begründung wird per Mail gesendet." : "Optionale interne oder externe Notiz.",
+      placeholder: decision === "reject" ? "Kurze, klare Begründung..." : "Optionale Notiz...",
+      confirmLabel: decision === "reject" ? "Ablehnen" : "Annehmen",
+      required: decision === "reject",
+      tone: decision === "reject" ? "danger" : "info",
+    });
+    if (note === false) return;
     if (decision === "reject" && !note) return;
     try {
       await api.patch(`/membership/applications/${a.id}`, { decision, note: note || undefined });

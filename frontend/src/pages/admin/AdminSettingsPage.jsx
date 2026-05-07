@@ -53,7 +53,7 @@ export default function AdminSettingsPage() {
   const [brand, setBrand] = useState({
     club_name: "", tagline: "", site_description: "", primary_color: "#29B6E8",
     logo_url: "", mascot_url: "", favicon_url: "", contact_email: "", domain: "", timezone: "Europe/Vienna",
-    legal_name: "", legal_form: "eingetragener Verein nach oesterreichischem Vereinsrecht", zvr_number: "",
+    legal_name: "", legal_form: "eingetragener Verein nach österreichischem Vereinsrecht", zvr_number: "",
     street_address: "", address_extra: "", postal_code: "", city: "", state: "Tirol", country: "Oesterreich",
     registered_seat: "", register_authority: "", representative_name: "", representative_role: "",
     content_responsible: "", phone: "", privacy_contact_email: "", hosting_provider: "", hosting_country: "Oesterreich/EU",
@@ -140,7 +140,7 @@ export default function AdminSettingsPage() {
   };
   const saveBrand = async () => {
     if (savingBrand) return;
-    if (imageUploadBusy) return toast.error("Bild-Upload laeuft noch. Bitte kurz warten und dann speichern.");
+    if (imageUploadBusy) return toast.error("Bild-Upload läuft noch. Bitte kurz warten und dann speichern.");
     setSavingBrand(true);
     try {
       loadSeqRef.current += 1;
@@ -156,7 +156,7 @@ export default function AdminSettingsPage() {
   };
   const saveDiscord = async () => {
     if (savingDiscord) return;
-    if (imageUploadBusy) return toast.error("Bild-Upload laeuft noch. Bitte kurz warten und dann speichern.");
+    if (imageUploadBusy) return toast.error("Bild-Upload läuft noch. Bitte kurz warten und dann speichern.");
     const payload = { ...discord };
     if (!payload.webhook_url) delete payload.webhook_url;
     delete payload.configured;
@@ -204,7 +204,7 @@ export default function AdminSettingsPage() {
     if (savingSmtp) return;
     const payload = { ...smtp };
     if (payload.provider === "smtp" && payload.smtp_auth === "login") {
-      if (!payload.smtp_user) return toast.error("SMTP User fehlt. Fuer einfachen Versand bitte office@... eintragen.");
+      if (!payload.smtp_user) return toast.error("SMTP User fehlt. Für einfachen Versand bitte office@... eintragen.");
       if (!payload.smtp_pass && !payload.smtp_pass_masked) return toast.error("SMTP Passwort fehlt.");
     }
     if (!payload.smtp_pass) delete payload.smtp_pass;
@@ -248,7 +248,7 @@ export default function AdminSettingsPage() {
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const diagnoseSmtp = async () => {
-    if (!smtpTestEmail) return toast.error("E-Mail-Adresse fuer Diagnose eingeben");
+    if (!smtpTestEmail) return toast.error("E-Mail-Adresse für Diagnose eingeben");
     try {
       const { data } = await api.post("/settings/smtp/diagnose", { to: smtpTestEmail });
       setSmtpDiag(data);
@@ -260,7 +260,7 @@ export default function AdminSettingsPage() {
     try {
       const { data } = await api.get("/settings/smtp/deliverability");
       setSmtpDeliverability(data);
-      if (data.ok) toast.success("Zustellbarkeit sieht grundsaetzlich okay aus.");
+      if (data.ok) toast.success("Zustellbarkeit sieht grundsätzlich okay aus.");
       else toast.error("Zustellbarkeit hat offene Punkte.");
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
@@ -337,7 +337,7 @@ export default function AdminSettingsPage() {
             <div>
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Antworten an</div>
               <input type="email" value={email.reply_to_email || ""} onChange={(e) => setEmail({ ...email, reply_to_email: e.target.value })} data-testid="email-reply-to" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder="office@lionsquad.at" />
-              <p className="text-xs text-white/40 mt-1">Reply-To fuer Rueckfragen. Leer = sichtbare Absender-E-Mail.</p>
+              <p className="text-xs text-white/40 mt-1">Reply-To für Rückfragen. Leer = sichtbare Absender-E-Mail.</p>
             </div>
             <button onClick={saveEmail} disabled={savingEmail} data-testid="email-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingEmail ? "Speichere..." : "Speichern"}</button>
           </div>
@@ -399,7 +399,7 @@ export default function AdminSettingsPage() {
                   <option value="auto">Automatisch (Altbestand)</option>
                   <option value="none">Ohne Anmeldung (lokaler Relay)</option>
                 </select>
-                <p className="mt-1 text-[11px] text-white/40">Fuer normalen Versand: Benutzer/Passwort auf Port 587.</p>
+                <p className="mt-1 text-[11px] text-white/40">Für normalen Versand: Benutzer/Passwort auf Port 587.</p>
               </div>
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">User</div>
@@ -459,7 +459,7 @@ export default function AdminSettingsPage() {
                   className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
                   placeholder="office@lionsquad.at"
                 />
-                <p className="mt-1 text-[11px] text-white/40">Reply-To fuer Rueckfragen.</p>
+                <p className="mt-1 text-[11px] text-white/40">Reply-To für Rückfragen.</p>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -486,12 +486,12 @@ export default function AdminSettingsPage() {
                 <p className="mt-1 text-[11px] text-white/40">Optional. Leer lassen ist erlaubt; dann nutzt die SMTP-Bibliothek ihren Standardnamen.</p>
               </div>
               <div className="text-xs text-white/45 flex items-end pb-1">
-                Hinweis: Diese Domain-Felder sind Mail-Identitaet, nicht Verbindung. Der SMTP Host darf weiterhin nur die IP sein.
+                Hinweis: Diese Domain-Felder sind Mail-Identität, nicht Verbindung. Der SMTP Host darf weiterhin nur die IP sein.
               </div>
             </div>
             <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 text-xs text-white/60">
               <div className="font-bold uppercase tracking-widest text-[#FFD700] mb-2">DNS Checkliste gegen Spam</div>
-              <p>Gmail bewertet die oeffentliche Ausgangs-IP deines Mailservers. Wichtig sind SPF, DKIM, DMARC, PTR/rDNS und die Mailserver-Logs. Der SMTP Host in dieser App darf trotzdem eine lokale IP sein.</p>
+              <p>Gmail bewertet die öffentliche Ausgangs-IP deines Mailservers. Wichtig sind SPF, DKIM, DMARC, PTR/rDNS und die Mailserver-Logs. Der SMTP Host in dieser App darf trotzdem eine lokale IP sein.</p>
             </div>
             <button onClick={saveSmtp} disabled={savingSmtp} data-testid="smtp-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingSmtp ? "Speichere..." : "Speichern"}</button>
           </div>
@@ -572,7 +572,7 @@ export default function AdminSettingsPage() {
                 )}
               </div>
             )}
-            <p className="text-xs text-white/50">Testet die SMTP-Verbindung direkt. Auto-TLS verhaelt sich wie beim OmniFM-Bot: Port 465 SSL/TLS, Port 25 plain, sonst STARTTLS.</p>
+            <p className="text-xs text-white/50">Testet die SMTP-Verbindung direkt. Auto-TLS verhält sich wie beim OmniFM-Bot: Port 465 SSL/TLS, Port 25 plain, sonst STARTTLS.</p>
             <p className="text-xs text-white/50">Bei self-signed Zertifikat kann "TLS Zertifikat pruefen" deaktiviert werden; besser ist ein vertrauenswuerdiges Zertifikat am Mailserver.</p>
           </div>
         </div>
@@ -633,7 +633,7 @@ export default function AdminSettingsPage() {
                       </td>
                     </tr>
                   ))}
-                  {filteredQueue.length === 0 && <tr><td colSpan="8" className="text-center py-10 text-white/40">{queue.length === 0 ? "Mail-Queue ist leer." : "Keine Jobs fuer diesen Filter."}</td></tr>}
+                  {filteredQueue.length === 0 && <tr><td colSpan="8" className="text-center py-10 text-white/40">{queue.length === 0 ? "Mail-Queue ist leer." : "Keine Jobs für diesen Filter."}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -721,7 +721,7 @@ export default function AdminSettingsPage() {
         <div className="max-w-4xl space-y-4">
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-5">
             <div>
-              <div className="font-heading font-bold uppercase">Vereinsdaten fuer Impressum und Datenschutz</div>
+              <div className="font-heading font-bold uppercase">Vereinsdaten für Impressum und Datenschutz</div>
               <p className="text-xs text-white/50 mt-1">Diese Angaben werden dynamisch auf /imprint und /privacy ausgegeben. ZVR, Adresse und vertretungsbefugte Person bitte mit den echten Vereinsdaten eintragen.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -754,12 +754,12 @@ export default function AdminSettingsPage() {
             </div>
             <label className="flex items-start gap-2 text-sm text-white/75">
               <input type="checkbox" checked={!!brand.paid_tournaments_enabled} onChange={(e) => setBrandField("paid_tournaments_enabled", e.target.checked)} data-testid="legal-paid-tournaments" className="accent-[#29B6E8] mt-1" />
-              <span>Preisturniere oder Turniere mit Startgeld koennen stattfinden.</span>
+              <span>Preisturniere oder Turniere mit Startgeld können stattfinden.</span>
             </label>
             <LegalTextArea label="Freitext Impressum" value={brand.imprint} onChange={(v) => setBrandField("imprint", v)} testId="brand-imprint" rows={4} />
-            <LegalTextArea label="Zusaetzliche rechtliche Hinweise" value={brand.legal_extra} onChange={(v) => setBrandField("legal_extra", v)} testId="legal-extra" rows={4} />
+            <LegalTextArea label="Zusätzliche rechtliche Hinweise" value={brand.legal_extra} onChange={(v) => setBrandField("legal_extra", v)} testId="legal-extra" rows={4} />
             <LegalTextArea label="Freitext Datenschutz" value={brand.privacy_policy} onChange={(v) => setBrandField("privacy_policy", v)} testId="brand-privacy" rows={5} />
-            <LegalTextArea label="Zusaetzliche Datenschutzhinweise" value={brand.privacy_extra} onChange={(v) => setBrandField("privacy_extra", v)} testId="privacy-extra" rows={5} />
+            <LegalTextArea label="Zusätzliche Datenschutzhinweise" value={brand.privacy_extra} onChange={(v) => setBrandField("privacy_extra", v)} testId="privacy-extra" rows={5} />
             <button onClick={saveBrand} disabled={imageUploadBusy || savingBrand} data-testid="legal-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingBrand ? "Speichere..." : "Rechtliches speichern"}</button>
           </div>
         </div>
@@ -769,7 +769,7 @@ export default function AdminSettingsPage() {
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2 items-center">
             <button onClick={load} data-testid="system-refresh" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5" /> Aktualisieren</button>
-            <span className="text-xs text-white/50">Live-Status fuer Versand, Uploads, Scheduler und Queue.</span>
+            <span className="text-xs text-white/50">Live-Status für Versand, Uploads, Scheduler und Queue.</span>
           </div>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
             <SystemCard title="Datenbank" ok={systemStatus?.database?.ok} detail={systemStatus?.database?.error || "MongoDB Ping"} />
