@@ -10,7 +10,7 @@ import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import {
   Trophy, Flag, Users as UsersIcon, Medal, Shield, Calendar,
-  MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio,
+  MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio, Gamepad2, Globe,
 } from "lucide-react";
 
 function normalizeTwitchChannel(value) {
@@ -35,6 +35,73 @@ function twitchPlayerSrc(channel) {
     autoplay: "false",
   });
   return `https://player.twitch.tv/?${params.toString()}`;
+}
+
+function externalUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `https://${raw}`;
+}
+
+function cleanHandle(value) {
+  return String(value || "").trim().replace(/^@/, "");
+}
+
+function socialUrl(platform, value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const handle = cleanHandle(raw);
+  if (platform === "youtube") return `https://www.youtube.com/@${handle}`;
+  if (platform === "instagram") return `https://www.instagram.com/${handle}`;
+  if (platform === "tiktok") return `https://www.tiktok.com/@${handle}`;
+  if (platform === "x") return `https://x.com/${handle}`;
+  if (platform === "steam") {
+    return /^\d{17}$/.test(handle)
+      ? `https://steamcommunity.com/profiles/${handle}`
+      : `https://steamcommunity.com/id/${handle}`;
+  }
+  return "";
+}
+
+function publicSocialLinks(profile, twitchUrl) {
+  const links = [
+    profile.discord_name && { label: "Discord", value: profile.discord_name },
+    twitchUrl && { label: "Twitch", value: `twitch.tv/${normalizeTwitchChannel(profile.twitch_handle)}`, url: twitchUrl },
+    profile.youtube_handle && { label: "YouTube", value: cleanHandle(profile.youtube_handle), url: socialUrl("youtube", profile.youtube_handle) },
+    profile.instagram_handle && { label: "Instagram", value: cleanHandle(profile.instagram_handle), url: socialUrl("instagram", profile.instagram_handle) },
+    profile.tiktok_handle && { label: "TikTok", value: cleanHandle(profile.tiktok_handle), url: socialUrl("tiktok", profile.tiktok_handle) },
+    profile.x_handle && { label: "X", value: cleanHandle(profile.x_handle), url: socialUrl("x", profile.x_handle) },
+    profile.website && { label: "Website", value: profile.website, url: externalUrl(profile.website) },
+  ].filter(Boolean);
+
+  const extra = (profile.socials || []).map((social) => ({
+    label: social.platform,
+    value: social.value || social.url,
+    url: social.url || socialUrl(social.platform, social.value) || (/^https?:\/\//i.test(String(social.value || "")) ? externalUrl(social.value) : ""),
+  })).filter((social) => social.value);
+
+  const seen = new Set();
+  return [...links, ...extra].filter((link) => {
+    const key = `${String(link.label).toLowerCase()}:${String(link.value).toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function publicGamingIds(profile) {
+  return [
+    profile.steam_id && { label: "Steam", value: profile.steam_id, url: socialUrl("steam", profile.steam_id) },
+    profile.epic_id && { label: "Epic", value: profile.epic_id },
+    profile.psn_id && { label: "PSN", value: profile.psn_id },
+    profile.xbox_id && { label: "Xbox", value: profile.xbox_id },
+    profile.nintendo_fc && { label: "Nintendo", value: profile.nintendo_fc },
+    profile.ea_id && { label: "EA", value: profile.ea_id },
+    profile.riot_id && { label: "Riot", value: profile.riot_id },
+    profile.battlenet_id && { label: "Battle.net", value: profile.battlenet_id },
+  ].filter(Boolean);
 }
 
 export default function PublicProfilePage() {
@@ -80,6 +147,8 @@ export default function PublicProfilePage() {
   const liveStream = twitchChannel
     ? liveStreams.find((stream) => stream.twitch_login === twitchChannel || stream.username === profile.username || stream.user_id === profile.id)
     : null;
+  const socialLinks = publicSocialLinks(profile, twitchUrl);
+  const gamingIds = publicGamingIds(profile);
 
   return (
     <PublicLayout>
@@ -219,61 +288,65 @@ export default function PublicProfilePage() {
                 <button onClick={() => setTab("badges")} className="mt-4 text-sm font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">Alle Achievements ansehen →</button>
               )}
             </div>
-            {/* Top tournaments */}
-            {profile.show_twitch_embed && twitchChannel && (
-              <div className="mb-8" data-testid="public-profile-twitch-embed">
-                <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-[#9146FF]" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
-                  Live auf Twitch
-                </h2>
-                {hasConsent("external_media") ? (
-                  <div className="border border-[#9146FF]/30 bg-black rounded-sm overflow-hidden aspect-video">
-                    <iframe
-                      title={`Twitch Stream ${twitchChannel}`}
-                      src={twitchPlayerSrc(twitchChannel)}
-                      width="100%"
-                      height="100%"
-                      allow="autoplay; fullscreen; picture-in-picture"
-                      allowFullScreen
-                      frameBorder="0"
-                    />
+            <div className="space-y-6">
+              {profile.show_twitch_embed && twitchChannel && (
+                <div data-testid="public-profile-twitch-embed">
+                  <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-[#9146FF]" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
+                    Live auf Twitch
+                  </h2>
+                  {hasConsent("external_media") ? (
+                    <div className="border border-[#9146FF]/30 bg-black rounded-sm overflow-hidden aspect-video">
+                      <iframe
+                        title={`Twitch Stream ${twitchChannel}`}
+                        src={twitchPlayerSrc(twitchChannel)}
+                        width="100%"
+                        height="100%"
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        allowFullScreen
+                        frameBorder="0"
+                      />
+                    </div>
+                  ) : (
+                    <div className="border border-[#9146FF]/30 bg-[#121212] rounded-sm p-6">
+                      <div className="font-heading font-black uppercase">Twitch blockiert</div>
+                      <p className="mt-2 text-sm text-white/60">Für Twitch-Einbettungen brauchen wir deine Zustimmung zu externen Medien.</p>
+                      <button type="button" onClick={openSettings} className="mt-4 px-4 py-2 border border-[#9146FF]/50 text-[#b88cff] text-xs uppercase tracking-wider font-bold rounded-sm">Cookie-Einstellungen</button>
+                    </div>
+                  )}
+                  <a href={twitchUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-[#9146FF] hover:text-[#a86bff]">
+                    <ExternalLink className="w-3 h-3" /> twitch.tv/{twitchChannel}
+                  </a>
+                  {liveStream && (
+                    <div className="mt-2 text-xs text-white/55">
+                      <span className="text-[#FF3B30] font-bold uppercase tracking-widest">Jetzt live:</span> {liveStream.title || "Stream läuft"}
+                      {liveStream.viewer_count ? ` · ${liveStream.viewer_count} Zuschauer` : ""}
+                    </div>
+                  )}
+                  {s.twitch_stream_minutes > 0 && (
+                    <div className="mt-1 text-[11px] text-white/35">
+                      Erkannte Streamzeit: {Math.round(s.twitch_stream_minutes / 60)} Stunden in {s.twitch_live_sessions || 0} Sessions.
+                    </div>
+                  )}
+                  <p className="mt-1 text-[11px] text-white/35">
+                    Falls Twitch eine Inhaltsklassifizierung blockiert, öffne den Stream direkt bei Twitch. Das kommt vom Twitch-Player, nicht vom TLS-Profil.
+                  </p>
+                </div>
+              )}
+
+              {socialLinks.length > 0 && <ProfileLinksCard links={socialLinks} />}
+              {gamingIds.length > 0 && <GamingIdsCard ids={gamingIds} />}
+
+              <div>
+                <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Recent Turniere</h2>
+                {profile.tournaments?.length ? (
+                  <div className="space-y-2">
+                    {profile.tournaments.slice(0, 5).map((t) => <TournamentRow key={t.id} t={t} />)}
                   </div>
                 ) : (
-                  <div className="border border-[#9146FF]/30 bg-[#121212] rounded-sm p-6">
-                    <div className="font-heading font-black uppercase">Twitch blockiert</div>
-                    <p className="mt-2 text-sm text-white/60">Für Twitch-Einbettungen brauchen wir deine Zustimmung zu externen Medien.</p>
-                    <button type="button" onClick={openSettings} className="mt-4 px-4 py-2 border border-[#9146FF]/50 text-[#b88cff] text-xs uppercase tracking-wider font-bold rounded-sm">Cookie-Einstellungen</button>
-                  </div>
+                  <EmptyState text="Noch keine Turniere gespielt." />
                 )}
-                <a href={twitchUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-[#9146FF] hover:text-[#a86bff]">
-                  <ExternalLink className="w-3 h-3" /> twitch.tv/{twitchChannel}
-                </a>
-                {liveStream && (
-                  <div className="mt-2 text-xs text-white/55">
-                    <span className="text-[#FF3B30] font-bold uppercase tracking-widest">Jetzt live:</span> {liveStream.title || "Stream läuft"}
-                    {liveStream.viewer_count ? ` · ${liveStream.viewer_count} Zuschauer` : ""}
-                  </div>
-                )}
-                {s.twitch_stream_minutes > 0 && (
-                  <div className="mt-1 text-[11px] text-white/35">
-                    Erkannte Streamzeit: {Math.round(s.twitch_stream_minutes / 60)} Stunden in {s.twitch_live_sessions || 0} Sessions.
-                  </div>
-                )}
-                <p className="mt-1 text-[11px] text-white/35">
-                  Falls Twitch eine Inhaltsklassifizierung blockiert, öffne den Stream direkt bei Twitch. Das kommt vom Twitch-Player, nicht vom TLS-Profil.
-                </p>
               </div>
-            )}
-
-            <div>
-              <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Recent Turniere</h2>
-              {profile.tournaments?.length ? (
-                <div className="space-y-2">
-                  {profile.tournaments.slice(0, 5).map((t) => <TournamentRow key={t.id} t={t} />)}
-                </div>
-              ) : (
-                <EmptyState text="Noch keine Turniere gespielt." />
-              )}
             </div>
           </div>
         )}
@@ -334,6 +407,57 @@ function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", testId }) {
     <div data-testid={testId} className="border border-white/10 rounded-sm bg-[#121212] px-3 py-3">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-white/40"><Icon className="w-3 h-3" /> {label}</div>
       <div className="mt-1 font-display font-bold text-2xl tabular-nums" style={{ color }}>{value}</div>
+    </div>
+  );
+}
+
+function ProfileLinksCard({ links }) {
+  return (
+    <div className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="public-profile-socials">
+      <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2">
+        <Globe className="w-4 h-4 text-[#29B6E8]" /> Socials
+      </h2>
+      <div className="space-y-2">
+        {links.map((link) => (
+          link.url ? (
+            <a key={`${link.label}:${link.value}`} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-3 border border-white/10 bg-[#0A0A0A] hover:border-[#29B6E8]/50 px-3 py-2 rounded-sm transition">
+              <span className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{link.label}</span>
+              <span className="min-w-0 text-right text-sm text-white/80 truncate inline-flex items-center gap-1">
+                {link.value}<ExternalLink className="w-3 h-3 text-white/35 shrink-0" />
+              </span>
+            </a>
+          ) : (
+            <div key={`${link.label}:${link.value}`} className="flex items-center justify-between gap-3 border border-white/10 bg-[#0A0A0A] px-3 py-2 rounded-sm">
+              <span className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{link.label}</span>
+              <span className="min-w-0 text-right text-sm text-white/80 truncate">{link.value}</span>
+            </div>
+          )
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GamingIdsCard({ ids }) {
+  return (
+    <div className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="public-profile-gaming-ids">
+      <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2">
+        <Gamepad2 className="w-4 h-4 text-[#FFD700]" /> Gaming IDs
+      </h2>
+      <div className="grid gap-2">
+        {ids.map((id) => (
+          <div key={`${id.label}:${id.value}`} className="border border-white/10 bg-[#0A0A0A] px-3 py-2 rounded-sm">
+            <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{id.label}</div>
+            {id.url ? (
+              <a href={id.url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex max-w-full items-center gap-1 text-sm text-white/85 hover:text-[#29B6E8]">
+                <span className="truncate">{id.value}</span><ExternalLink className="w-3 h-3 shrink-0" />
+              </a>
+            ) : (
+              <div className="mt-1 text-sm text-white/85 break-all">{id.value}</div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
