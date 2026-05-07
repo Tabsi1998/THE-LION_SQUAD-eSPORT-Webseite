@@ -14,6 +14,8 @@ UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
 LOCAL_PREFIX = "/api/static/uploads/"
 PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+ADMIN_OWNER_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
+MEDIA_SCOPES = {"user", "admin", "sponsor", "branding", "gallery"}
 
 TARGETS: list[tuple[str, list[str]]] = [
     ("settings", ["logo_url", "mascot_url", "favicon_url", "avatar_url"]),
@@ -41,6 +43,25 @@ TEXT_TARGETS: list[tuple[str, list[str]]] = [
     ("tournaments", ["description"]),
     ("f1_challenges", ["description"]),
     ("club_member_profiles", ["bio"]),
+]
+
+SCOPE_TARGETS: list[tuple[str, list[str], str]] = [
+    ("users", ["avatar_url", "banner_url"], "user"),
+    ("settings", ["logo_url", "mascot_url", "favicon_url", "avatar_url"], "branding"),
+    ("sponsors", ["logo_url"], "sponsor"),
+    ("gallery_albums", ["cover_url"], "gallery"),
+    ("gallery_photos", ["image_url", "thumbnail_url"], "gallery"),
+    ("teams", ["logo_url", "banner_url"], "admin"),
+    ("partners", ["logo_url"], "admin"),
+    ("news_posts", ["banner_url", "cover_url"], "admin"),
+    ("events", ["banner_url", "cover_url"], "admin"),
+    ("games", ["cover_url", "logo_url"], "admin"),
+    ("tournaments", ["banner_url", "cover_url"], "admin"),
+    ("f1_challenges", ["banner_url", "cover_url"], "admin"),
+    ("f1_tracks", ["image_url"], "admin"),
+    ("seasons", ["banner_url"], "admin"),
+    ("member_benefits", ["image_url"], "admin"),
+    ("club_member_profiles", ["photo_url", "cover_url"], "admin"),
 ]
 
 TEXT_IMAGE_RE = re.compile(
@@ -232,3 +253,91 @@ async def audit_image_references(repair: bool = False, clear_missing: bool = Fal
                 summary["text_normalized"] += len(updates) - 1
 
     return {"ok": True, "repair": repair, "clear_missing": clear_missing, "summary": summary, "examples": examples}
+
+
+async def _infer_scope_from_references(filename: str) -> tuple[str | None, dict | None]:
+    db = get_db()
+    suffix_re = f"{re.escape(filename)}$"
+    for coll_name, fields, scope in SCOPE_TARGETS:
+        collection = db[coll_name]
+        for field in fields:
+            doc = await collection.find_one({field: {"$regex": suffix_re}}, {"_id": 0, "id": 1, field: 1})
+            if doc:
+                return scope, {
+                    "collection": coll_name,
+                    "id": doc.get("id"),
+                    "field": field,
+                    "scope": scope,
+                }
+    for coll_name, fields in TEXT_TARGETS:
+        collection = db[coll_name]
+        for field in fields:
+            doc = await collection.find_one({field: {"$regex": re.escape(filename)}}, {"_id": 0, "id": 1, "slug": 1})
+            if doc:
+                return "admin", {
+                    "collection": coll_name,
+                    "id": doc.get("id") or doc.get("slug"),
+                    "field": field,
+                    "scope": "admin",
+                }
+    return None, None
+
+
+async def audit_media_scopes(repair: bool = False) -> dict:
+    """Classify legacy media metadata into user/admin/CMS scopes.
+
+    This only changes metadata in media_uploads. Files and image references are
+    left untouched.
+    """
+    db = get_db()
+    summary = {
+        "scanned": 0,
+        "already_scoped": 0,
+        "updated": 0,
+        "unresolved": 0,
+        "user": 0,
+        "admin": 0,
+        "sponsor": 0,
+        "branding": 0,
+        "gallery": 0,
+    }
+    examples: dict[str, list[dict]] = {
+        "updated": [],
+        "unresolved": [],
+        "already_scoped": [],
+    }
+
+    def add_example(kind: str, item: dict) -> None:
+        if len(examples[kind]) < 20:
+            examples[kind].append(item)
+
+    async for media in db.media_uploads.find({}, {"_id": 0}):
+        summary["scanned"] += 1
+        filename = media.get("filename")
+        current_scope = str(media.get("media_scope") or "").strip().lower()
+        if current_scope in MEDIA_SCOPES:
+            summary["already_scoped"] += 1
+            summary[current_scope] += 1
+            add_example("already_scoped", {"filename": filename, "scope": current_scope})
+            continue
+        if not filename:
+            summary["unresolved"] += 1
+            add_example("unresolved", {"id": media.get("id"), "reason": "filename fehlt"})
+            continue
+        inferred_scope, source = await _infer_scope_from_references(filename)
+        if not inferred_scope:
+            inferred_scope = "admin" if media.get("owner_role") in ADMIN_OWNER_ROLES else "user"
+            source = {"reason": "Fallback über Besitzerrolle", "scope": inferred_scope}
+        summary[inferred_scope] += 1
+        item = {"filename": filename, "scope": inferred_scope, "source": source}
+        if repair:
+            await db.media_uploads.update_one(
+                {"filename": filename},
+                {"$set": {"media_scope": inferred_scope, "updated_at": now_utc().isoformat()}},
+            )
+            summary["updated"] += 1
+            add_example("updated", item)
+        else:
+            add_example("unresolved", item)
+
+    return {"ok": True, "repair": repair, "summary": summary, "examples": examples}

@@ -129,6 +129,7 @@ async def init_indexes():
     await db.media_uploads.create_index("id", unique=True)
     await db.media_uploads.create_index("filename", unique=True)
     await db.media_uploads.create_index("owner_id")
+    await db.media_uploads.create_index("media_scope")
     # Phase 9: Prize pickups
     await db.prize_pickups.create_index("id", unique=True)
     await db.prize_pickups.create_index("tournament_id")

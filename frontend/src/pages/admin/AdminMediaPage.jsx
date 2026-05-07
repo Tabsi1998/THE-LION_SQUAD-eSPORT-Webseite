@@ -44,6 +44,9 @@ export default function AdminMediaPage() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [scopeAudit, setScopeAudit] = useState(null);
+  const [auditingScopes, setAuditingScopes] = useState(false);
+  const [repairingScopes, setRepairingScopes] = useState(false);
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
@@ -122,6 +125,40 @@ export default function AdminMediaPage() {
     load();
   };
 
+  const auditScopes = async () => {
+    setAuditingScopes(true);
+    try {
+      const { data } = await api.get("/uploads/audit-media-scopes");
+      setScopeAudit(data);
+      const s = data.summary || {};
+      toast.success(`Medien geprüft: ${s.already_scoped || 0} einsortiert, ${(s.scanned || 0) - (s.already_scoped || 0)} Legacy.`);
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Medien-Scope-Prüfung fehlgeschlagen.");
+    } finally {
+      setAuditingScopes(false);
+    }
+  };
+
+  const repairScopes = async () => {
+    if (!await confirm({
+      title: "Medien sauber einsortieren?",
+      description: "Alte Upload-Metadaten ohne Scope werden anhand der gespeicherten Bildverknüpfungen in Profil-, Admin-, Sponsor-, Branding- oder Galerie-Medien einsortiert.",
+      confirmLabel: "Einsortieren",
+      tone: "info",
+    })) return;
+    setRepairingScopes(true);
+    try {
+      const { data } = await api.post("/uploads/repair-media-scopes");
+      setScopeAudit(data);
+      toast.success(`${data.summary?.updated || 0} Medien-Einträge einsortiert.`);
+      load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Medien-Scope-Reparatur fehlgeschlagen.");
+    } finally {
+      setRepairingScopes(false);
+    }
+  };
+
   return (
     <AdminLayout>
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Phase F</span>
@@ -163,6 +200,22 @@ export default function AdminMediaPage() {
         >
           <RefreshCw className="w-3.5 h-3.5" /> Neu laden
         </button>
+        <button
+          onClick={auditScopes}
+          disabled={auditingScopes}
+          data-testid="media-scope-audit"
+          className="px-3 py-2 border border-white/10 hover:border-[#29B6E8]/60 hover:text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
+        >
+          {auditingScopes ? "Prüfe…" : "Scopes prüfen"}
+        </button>
+        <button
+          onClick={repairScopes}
+          disabled={repairingScopes}
+          data-testid="media-scope-repair"
+          className="px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
+        >
+          {repairingScopes ? "Sortiere…" : "Scopes reparieren"}
+        </button>
         <label className={`px-3 py-2 bg-[#FFD700] text-black rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer ${uploading ? "opacity-60" : ""}`} data-testid="media-upload">
           <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Bilder hochladen"}
           <input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={uploading} className="hidden" onChange={(e) => uploadFiles(e.target.files)} />
@@ -171,6 +224,35 @@ export default function AdminMediaPage() {
           {filtered.length} / {items.length} · {fmtBytes(totalSize)} gesamt
         </span>
       </div>
+
+      {scopeAudit?.summary && (
+        <div className="mt-4 border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/50">Medien-Einsortierung</div>
+              <p className="mt-1 text-xs text-white/45">Zeigt, wie viele Uploads persönliche Profilbilder, Admin/CMS-Medien oder Spezialmedien sind.</p>
+            </div>
+            {scopeAudit.repair && <span className="text-[10px] uppercase tracking-widest font-bold text-[#00FF88]">Reparatur ausgeführt</span>}
+          </div>
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-xs">
+            {[
+              ["Gesamt", scopeAudit.summary.scanned],
+              ["Schon sauber", scopeAudit.summary.already_scoped],
+              ["Repariert", scopeAudit.summary.updated],
+              ["Profil", scopeAudit.summary.user],
+              ["Admin", scopeAudit.summary.admin],
+              ["Sponsor", scopeAudit.summary.sponsor],
+              ["Branding", scopeAudit.summary.branding],
+              ["Galerie", scopeAudit.summary.gallery],
+            ].map(([label, value]) => (
+              <div key={label} className="border border-white/10 rounded-sm px-3 py-2">
+                <div className="text-white/45 uppercase tracking-wider font-bold">{label}</div>
+                <div className="font-display text-lg text-white mt-1">{value || 0}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Grid */}
       <div className="mt-6">

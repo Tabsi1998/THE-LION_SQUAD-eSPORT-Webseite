@@ -289,6 +289,20 @@ async def clear_missing_image_refs(me: dict = Depends(require_admin())):
     return await audit_image_references(repair=True, clear_missing=True)
 
 
+@router.get("/audit-media-scopes")
+async def audit_media_upload_scopes(me: dict = Depends(require_admin())):
+    """Report legacy media metadata entries that need a media_scope."""
+    from services.media_audit import audit_media_scopes
+    return await audit_media_scopes(repair=False)
+
+
+@router.post("/repair-media-scopes")
+async def repair_media_upload_scopes(me: dict = Depends(require_admin())):
+    """Backfill media_scope on legacy media metadata entries."""
+    from services.media_audit import audit_media_scopes
+    return await audit_media_scopes(repair=True)
+
+
 _EXT_BY_MIME = {
     "application/pdf": ".pdf",
     "application/zip": ".zip", "application/x-zip-compressed": ".zip",
