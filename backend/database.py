@@ -144,6 +144,7 @@ async def init_indexes():
     await db.board_positions.create_index("order_index")
     await db.club_member_profiles.create_index("id", unique=True)
     await db.club_member_profiles.create_index("slug", unique=True)
+    await db.club_member_profiles.create_index("gamertag")
     await db.club_member_profiles.create_index("order_index")
 
 

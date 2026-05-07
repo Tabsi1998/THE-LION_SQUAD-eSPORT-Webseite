@@ -20,6 +20,8 @@ router = APIRouter(prefix="/api/membership", tags=["membership"])
 
 class ClubMemberProfileCreate(BaseModel):
     display_name: str
+    gamertag: str | None = None
+    real_name: str | None = None
     slug: str | None = None
     role_title: str | None = None
     photo_url: str | None = None
@@ -36,6 +38,8 @@ class ClubMemberProfileCreate(BaseModel):
 
 class ClubMemberProfileUpdate(BaseModel):
     display_name: str | None = None
+    gamertag: str | None = None
+    real_name: str | None = None
     slug: str | None = None
     role_title: str | None = None
     photo_url: str | None = None
@@ -80,6 +84,11 @@ def _clean_list(values: list[str] | None) -> list[str]:
 def _clean_gender(value: str | None) -> str | None:
     value = str(value or "").strip().lower()
     return value if value in {"male", "female", "diverse"} else None
+
+
+def _clean_name(value: str | None, limit: int = 120) -> str | None:
+    value = str(value or "").strip()
+    return value[:limit] if value else None
 
 
 def _age_from_birth_date(value: str | date | None) -> int | None:
@@ -145,6 +154,8 @@ def _public_profile(doc: dict, detail: bool = False, board_title: str | None = N
         "id": doc["id"],
         "slug": doc["slug"],
         "display_name": doc.get("display_name"),
+        "gamertag": doc.get("gamertag"),
+        "real_name": doc.get("real_name"),
         "role_title": role_title,
         "editorial_role_title": doc.get("role_title"),
         "board_title": board_title,
@@ -234,7 +245,12 @@ async def _account_map_for_profiles(db, rows: list[dict], public_only: bool = Tr
 async def _attach_linked_accounts(db, rows: list[dict], items: list[dict], public_only: bool = True, admin: bool = False) -> list[dict]:
     accounts = await _account_map_for_profiles(db, rows, public_only=public_only)
     for row, item in zip(rows, items):
-        item["linked_account"] = _public_account(accounts.get(row.get("user_id")), admin=admin)
+        account = _public_account(accounts.get(row.get("user_id")), admin=admin)
+        item["linked_account"] = account
+        item["gamertag"] = item.get("gamertag") or (account or {}).get("username") or item.get("display_name")
+        item["real_name"] = item.get("real_name") or (
+            item.get("display_name") if item.get("display_name") != item.get("gamertag") else None
+        )
     return items
 
 
@@ -542,6 +558,8 @@ async def admin_create_member_profile(body: ClubMemberProfileCreate, me: dict = 
         "id": new_id(),
         **payload,
         "display_name": name,
+        "gamertag": _clean_name(payload.get("gamertag"), 40),
+        "real_name": _clean_name(payload.get("real_name")) or name,
         "slug": slug,
         "photo_url": payload.get("photo_url") or None,
         "cover_url": payload.get("cover_url") or None,
@@ -570,12 +588,16 @@ async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUp
     if not existing:
         raise HTTPException(404, "Mitgliedsprofil nicht gefunden.")
     raw = body.model_dump(exclude_unset=True)
-    nullable = {"role_title", "photo_url", "cover_url", "bio", "birth_date", "gender", "user_id"}
+    nullable = {"role_title", "photo_url", "cover_url", "bio", "birth_date", "gender", "user_id", "gamertag", "real_name"}
     update = {k: v for k, v in raw.items() if v is not None or k in nullable}
     if "display_name" in update:
         update["display_name"] = str(update["display_name"] or "").strip()
         if not update["display_name"]:
             raise HTTPException(400, "Name ist erforderlich.")
+    if "gamertag" in update:
+        update["gamertag"] = _clean_name(update.get("gamertag"), 40)
+    if "real_name" in update:
+        update["real_name"] = _clean_name(update.get("real_name"))
     if "slug" in update:
         update["slug"] = await _unique_profile_slug(db, update["slug"] or existing.get("display_name") or "mitglied", profile_id)
     if "games" in update:

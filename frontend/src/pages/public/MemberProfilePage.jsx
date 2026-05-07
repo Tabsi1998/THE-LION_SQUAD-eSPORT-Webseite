@@ -36,24 +36,7 @@ export default function MemberProfilePage() {
           </div>
         ) : (
           <>
-            <div className="relative min-h-[24rem] overflow-hidden border border-white/10 bg-[#121212] rounded-sm">
-              {(profile.cover_url || profile.photo_url) && (
-                <img src={resolveMediaUrl(profile.cover_url || profile.photo_url)} alt="" className="absolute inset-0 w-full h-full object-cover opacity-35" />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/65 to-transparent" />
-              <div className="relative z-10 min-h-[24rem] flex flex-col justify-end p-5 sm:p-8">
-                <div className="w-36 h-48 sm:w-44 sm:h-56 border-2 border-[#FFD700]/60 bg-[#0A0A0A] rounded-sm overflow-hidden mb-5">
-                  {profile.photo_url ? (
-                    <img src={resolveMediaUrl(profile.photo_url)} alt="" className="w-full h-full object-contain object-bottom" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-white/20"><UserIcon className="w-12 h-12" /></div>
-                  )}
-                </div>
-                <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Vereinsmitglied</span>
-                <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">{profile.display_name}</h1>
-                {profile.role_title && <p className="mt-2 text-[#FFD700] font-bold uppercase tracking-wider">{profile.role_title}</p>}
-              </div>
-            </div>
+            <MemberHero profile={profile} />
 
             <div className="mt-8 grid lg:grid-cols-[1fr_20rem] gap-8">
               <div className="min-w-0">
@@ -79,6 +62,41 @@ export default function MemberProfilePage() {
         )}
       </section>
     </PublicLayout>
+  );
+}
+
+function memberGamertag(profile) {
+  return profile?.gamertag || profile?.linked_account?.username || profile?.display_name;
+}
+
+function memberRealName(profile) {
+  const tag = memberGamertag(profile);
+  return profile?.real_name || (profile?.display_name && profile.display_name !== tag ? profile.display_name : "");
+}
+
+function MemberHero({ profile }) {
+  return (
+    <div className="relative min-h-[24rem] overflow-hidden bg-[#101010] rounded-sm">
+      {(profile.cover_url || profile.photo_url) && (
+        <img src={resolveMediaUrl(profile.cover_url || profile.photo_url)} alt="" className="absolute inset-0 w-full h-full object-cover opacity-35" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/65 to-transparent" />
+      <div className="relative z-10 min-h-[24rem] grid md:grid-cols-[17rem_1fr] gap-4 items-end p-5 sm:p-8">
+        <div className="relative h-72 md:h-80 flex items-end justify-center md:justify-start -mb-8 md:-mb-10">
+          {profile.photo_url ? (
+            <img src={resolveMediaUrl(profile.photo_url)} alt="" className="max-h-[115%] w-full object-contain object-bottom drop-shadow-[0_26px_44px_rgba(0,0,0,0.55)]" />
+          ) : (
+            <div className="w-44 h-56 flex items-center justify-center text-white/20"><UserIcon className="w-12 h-12" /></div>
+          )}
+        </div>
+        <div className="pb-3 md:pb-8">
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Vereinsmitglied</span>
+          <h1 className="mt-2 font-heading text-5xl md:text-7xl font-black uppercase leading-none">{memberGamertag(profile)}</h1>
+          {memberRealName(profile) && <p className="mt-2 text-white/60 font-bold">{memberRealName(profile)}</p>}
+          {profile.role_title && <p className="mt-2 text-[#FFD700] font-bold uppercase tracking-wider">{profile.role_title}</p>}
+        </div>
+      </div>
+    </div>
   );
 }
 

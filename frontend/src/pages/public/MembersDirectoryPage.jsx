@@ -6,6 +6,15 @@ import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Crown, Gamepad2, Monitor, Users as UsersIcon } from "lucide-react";
 
+function memberGamertag(member) {
+  return member.gamertag || member.linked_account?.username || member.display_name;
+}
+
+function memberRealName(member) {
+  const tag = memberGamertag(member);
+  return member.real_name || (member.display_name && member.display_name !== tag ? member.display_name : "");
+}
+
 export default function MembersDirectoryPage() {
   const { isClubMember } = useAuth();
   const [members, setMembers] = useState([]);
@@ -45,33 +54,36 @@ export default function MembersDirectoryPage() {
             <div className="text-sm mt-2">Sobald Admins Vereinsmitglieder freigeben, erscheinen sie hier.</div>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12 pt-4">
             {members.map((m) => (
               <Link
                 key={m.slug}
                 to={`/members/${m.slug}`}
                 data-testid={`member-card-${m.slug}`}
-                className="group border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#101010] overflow-hidden transition"
+                className="group relative rounded-sm bg-[#101010] overflow-visible transition"
               >
-                <div className="relative min-h-[25rem] sm:min-h-[29rem] bg-[radial-gradient(circle_at_50%_18%,rgba(255,215,0,0.16),rgba(41,182,232,0.08)_34%,rgba(10,10,10,0)_68%)] overflow-hidden">
+                <div className="relative min-h-[25rem] sm:min-h-[29rem] bg-[radial-gradient(circle_at_50%_18%,rgba(255,215,0,0.14),rgba(41,182,232,0.07)_32%,rgba(10,10,10,0)_68%)] overflow-hidden">
                   {m.photo_url ? (
-                    <img src={resolveMediaUrl(m.photo_url)} alt="" className="absolute inset-x-0 bottom-0 mx-auto h-[108%] w-full object-contain object-bottom group-hover:scale-[1.025] transition duration-500" />
+                    <img src={resolveMediaUrl(m.photo_url)} alt="" className="absolute inset-x-0 -top-8 bottom-0 mx-auto h-[116%] w-[112%] object-contain object-bottom drop-shadow-[0_20px_34px_rgba(0,0,0,0.45)] group-hover:scale-[1.025] group-hover:-translate-y-1 transition duration-500" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-white/20">
                       <UsersIcon className="w-12 h-12" />
                     </div>
                   )}
-                  <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black via-black/70 to-transparent">
-                    <div className="font-heading font-black text-white group-hover:text-[#FFD700] uppercase flex items-center gap-1.5">
-                      {m.display_name}
+                  <div className="absolute inset-x-0 bottom-0 p-4 pt-16 bg-gradient-to-t from-black via-black/75 to-transparent">
+                    <div className="font-heading font-black text-2xl text-white group-hover:text-[#FFD700] uppercase flex items-center gap-1.5 leading-none">
+                      {memberGamertag(m)}
                       <Crown className="w-3.5 h-3.5 text-[#FFD700]" />
                     </div>
+                    {memberRealName(m) && (
+                      <div className="mt-1 text-xs text-white/55 truncate">{memberRealName(m)}</div>
+                    )}
                     {m.role_title && (
                       <div className="mt-1 text-[10px] uppercase tracking-widest text-[#FFD700]/85 font-bold">{m.role_title}</div>
                     )}
                   </div>
                 </div>
-                <div className="p-4">
+                <div className="px-4 py-4 border-t border-white/5 bg-[#101010]">
                   <div className="space-y-2">
                     {!!m.games?.length && (
                       <div className="flex items-start gap-2 text-xs text-white/55">

@@ -11,6 +11,8 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 const emptyForm = {
   display_name: "",
+  gamertag: "",
+  real_name: "",
   slug: "",
   role_title: "",
   photo_url: "",
@@ -40,6 +42,8 @@ function toForm(profile) {
   if (!profile) return emptyForm;
   return {
     display_name: profile.display_name || "",
+    gamertag: profile.gamertag || "",
+    real_name: profile.real_name || "",
     slug: profile.slug || "",
     role_title: profile.editorial_role_title || "",
     photo_url: profile.photo_url || "",
@@ -85,7 +89,7 @@ export default function AdminClubMemberProfilesPage() {
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return profiles;
-    return profiles.filter((p) => [p.display_name, p.role_title, p.board_title, p.slug, p.linked_account?.username, ...(p.games || []), ...(p.platforms || [])].join(" ").toLowerCase().includes(needle));
+    return profiles.filter((p) => [p.display_name, p.gamertag, p.real_name, p.role_title, p.board_title, p.slug, p.linked_account?.username, ...(p.games || []), ...(p.platforms || [])].join(" ").toLowerCase().includes(needle));
   }, [profiles, q]);
 
   const remove = async (profile) => {
@@ -139,7 +143,8 @@ export default function AdminClubMemberProfilesPage() {
               <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="font-heading font-black uppercase truncate">{profile.display_name}</h2>
+                    <h2 className="font-heading font-black uppercase truncate">{profile.gamertag || profile.display_name}</h2>
+                    {profile.real_name && <p className="text-[10px] text-white/40 truncate">{profile.real_name}</p>}
                     <p className="text-xs text-[#FFD700] uppercase tracking-wider font-bold">{profile.board_title || profile.role_title || "Mitglied"}</p>
                     {profile.board_title && profile.role_title && profile.board_title !== profile.role_title && (
                       <p className="text-[10px] text-white/35 uppercase tracking-widest">Profil: {profile.role_title}</p>
@@ -190,7 +195,9 @@ function ProfileModal({ entry, users = [], onClose, onSaved }) {
 
   const payload = () => ({
     display_name: form.display_name,
-    slug: form.slug || suggestSlug(form.display_name).replace(/-\d{4}$/, ""),
+    gamertag: form.gamertag || null,
+    real_name: form.real_name || form.display_name || null,
+    slug: form.slug || suggestSlug(form.gamertag || form.display_name).replace(/-\d{4}$/, ""),
     role_title: form.role_title || null,
     photo_url: form.photo_url || null,
     cover_url: form.cover_url || null,
@@ -229,8 +236,10 @@ function ProfileModal({ entry, users = [], onClose, onSaved }) {
         <div className="p-5 grid lg:grid-cols-[minmax(0,1fr)_19rem] gap-5">
           <div className="space-y-4 min-w-0">
             <div className="grid sm:grid-cols-2 gap-3">
-              <Field label="Name"><input required value={form.display_name} onChange={(e) => set("display_name", e.target.value)} className="input" /></Field>
-              <Field label="URL-Slug"><input value={form.slug} onChange={(e) => set("slug", e.target.value)} placeholder="wird aus Name erstellt" className="input font-mono" /></Field>
+              <Field label="Gamertag"><input value={form.gamertag} onChange={(e) => set("gamertag", e.target.value)} placeholder="z.B. Tabsi98" className="input" /></Field>
+              <Field label="Vor- und Nachname"><input required value={form.display_name} onChange={(e) => set("display_name", e.target.value)} placeholder="z.B. Fabian Tabelander" className="input" /></Field>
+              <Field label="Öffentlicher Realname"><input value={form.real_name} onChange={(e) => set("real_name", e.target.value)} placeholder="leer = Vor- und Nachname" className="input" /></Field>
+              <Field label="URL-Slug"><input value={form.slug} onChange={(e) => set("slug", e.target.value)} placeholder="wird aus Gamertag erstellt" className="input font-mono" /></Field>
               <Field label="Geburtsdatum"><input type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} className="input" /></Field>
               <Field label="Geschlecht"><select value={form.gender || ""} onChange={(e) => set("gender", e.target.value)} className="input">
                 <option value="">Keine Angabe</option>

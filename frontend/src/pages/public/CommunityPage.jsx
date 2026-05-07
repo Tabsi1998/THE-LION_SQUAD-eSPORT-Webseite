@@ -4,6 +4,15 @@ import { Crown, Gamepad2, Shield, Users } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { api, resolveMediaUrl } from "@/lib/api";
 
+function memberGamertag(member) {
+  return member.gamertag || member.linked_account?.username || member.display_name;
+}
+
+function memberRealName(member) {
+  const tag = memberGamertag(member);
+  return member.real_name || (member.display_name && member.display_name !== tag ? member.display_name : "");
+}
+
 export default function CommunityPage() {
   const [players, setPlayers] = useState([]);
   const [teams, setTeams] = useState([]);
@@ -84,8 +93,8 @@ export default function CommunityPage() {
             items={clubMembers.slice(0, 6).map((m) => ({
               key: m.slug,
               to: `/members/${m.slug}`,
-              title: m.display_name,
-              subtitle: m.role_title || "Vereinsmitglied",
+              title: memberGamertag(m),
+              subtitle: [memberRealName(m), m.role_title || "Vereinsmitglied"].filter(Boolean).join(" · "),
               image: m.photo_url,
             }))}
           />

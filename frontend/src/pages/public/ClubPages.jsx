@@ -12,6 +12,15 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Crown, Heart, Target, Sparkles, User as UserIcon, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
+function personGamertag(person) {
+  return person?.gamertag || person?.username || person?.display_name;
+}
+
+function personRealName(person) {
+  const tag = personGamertag(person);
+  return person?.real_name || (person?.display_name && person.display_name !== tag ? person.display_name : "");
+}
+
 export function BoardPage() {
   useDocumentTitle("Vorstand", "Der Vorstand von THE LION SQUAD eSports.");
   const [positions, setPositions] = useState([]);
@@ -126,7 +135,8 @@ function BoardCard({ p, compact = false, featured = false }) {
                 </div>
               )}
               <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black via-black/70 to-transparent">
-                <div className="font-heading text-xl font-black text-white group-hover:text-[#FFD700] transition uppercase truncate">{u.display_name || u.username}</div>
+                <div className="font-heading text-xl font-black text-white group-hover:text-[#FFD700] transition uppercase truncate">{personGamertag(u)}</div>
+                {personRealName(u) && <div className="mt-0.5 text-xs text-white/55 truncate">{personRealName(u)}</div>}
                 {u.role_title && <div className="mt-1 text-[10px] uppercase tracking-widest text-white/45">{u.role_title}</div>}
               </div>
             </div>
@@ -141,7 +151,8 @@ function BoardCard({ p, compact = false, featured = false }) {
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <div className="font-bold text-white text-sm group-hover:text-[#FFD700] transition truncate">{u.display_name || u.username}</div>
+                <div className="font-bold text-white text-sm group-hover:text-[#FFD700] transition truncate">{personGamertag(u)}</div>
+                {personRealName(u) && <div className="text-[10px] text-white/50 truncate">{personRealName(u)}</div>}
                 <div className="text-[10px] text-white/40 uppercase tracking-widest">{u.source === "member_profile" ? "Vereinsprofil" : `@${u.username}`}</div>
               </div>
               <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-[#FFD700] transition" />
@@ -176,7 +187,8 @@ function BoardDeputyCard({ position }) {
       )}
       <div className="min-w-0">
         <div className="text-[10px] uppercase tracking-widest text-white/40">{title}</div>
-        <div className="mt-1 font-heading font-bold uppercase group-hover:text-[#FFD700] transition truncate">{d.display_name || d.username}</div>
+        <div className="mt-1 font-heading font-bold uppercase group-hover:text-[#FFD700] transition truncate">{personGamertag(d)}</div>
+        {personRealName(d) && <div className="text-[10px] text-white/50 truncate">{personRealName(d)}</div>}
       </div>
     </Link>
   );

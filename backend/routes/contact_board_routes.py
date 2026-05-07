@@ -217,11 +217,14 @@ def _slugify(value: str) -> str:
 
 
 def _board_person_from_profile(profile: dict) -> dict:
+    gamertag = profile.get("gamertag") or profile.get("display_name")
     return {
         "id": profile["id"],
         "username": profile.get("slug"),
         "slug": profile.get("slug"),
         "display_name": profile.get("display_name"),
+        "gamertag": gamertag,
+        "real_name": profile.get("real_name") or (profile.get("display_name") if profile.get("display_name") != gamertag else None),
         "avatar_url": profile.get("photo_url"),
         "photo_url": profile.get("photo_url"),
         "cover_url": profile.get("cover_url"),
@@ -264,7 +267,7 @@ async def list_board_positions(active_only: bool = False, me=Depends(get_current
     if assignment_ids:
         async for profile in db.club_member_profiles.find(
             {"$or": [{"id": {"$in": assignment_ids}}, {"user_id": {"$in": assignment_ids}}]},
-            {"_id": 0, "id": 1, "user_id": 1, "slug": 1, "display_name": 1, "photo_url": 1, "cover_url": 1, "gender": 1, "role_title": 1},
+            {"_id": 0, "id": 1, "user_id": 1, "slug": 1, "display_name": 1, "gamertag": 1, "real_name": 1, "photo_url": 1, "cover_url": 1, "gender": 1, "role_title": 1},
         ):
             person = _board_person_from_profile(profile)
             people[profile["id"]] = person
@@ -343,7 +346,7 @@ async def list_assignable_users(me: dict = Depends(require_admin())):
     db = get_db()
     profiles = await db.club_member_profiles.find(
         {"is_active": {"$ne": False}},
-        {"_id": 0, "id": 1, "slug": 1, "display_name": 1, "photo_url": 1, "cover_url": 1, "role_title": 1, "gender": 1, "user_id": 1},
+        {"_id": 0, "id": 1, "slug": 1, "display_name": 1, "gamertag": 1, "real_name": 1, "photo_url": 1, "cover_url": 1, "role_title": 1, "gender": 1, "user_id": 1},
     ).sort([("order_index", 1), ("display_name", 1)]).to_list(500)
     out = []
     for p in profiles:
