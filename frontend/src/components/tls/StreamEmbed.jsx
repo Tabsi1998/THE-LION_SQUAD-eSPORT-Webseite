@@ -27,8 +27,9 @@ export function StreamEmbed({ source }) {
   const enabled = source.has_live_stream === true || (source.twitch_enabled && source.twitch_channel);
   if (!enabled) return null;
 
-  const platform = source.stream_platform || (source.twitch_channel ? "twitch" : null);
-  const url = source.stream_url || (source.twitch_channel ? `https://www.twitch.tv/${source.twitch_channel}` : null);
+  const platform = String(source.stream_platform || (source.twitch_channel ? "twitch" : "")).toLowerCase();
+  const legacyTwitchChannel = normalizeTwitchChannel(source.twitch_channel);
+  const url = source.stream_url || (legacyTwitchChannel ? `https://www.twitch.tv/${legacyTwitchChannel}` : null);
   if (!platform) return null;
 
   let embedSrc = null;

@@ -6,7 +6,7 @@ import { ImageUpload, useImageUploadBusy } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity } from "lucide-react";
+import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye } from "lucide-react";
 
 const MAIL_TEMPLATE_LABELS = {
   user_invite: "Einladungsmail",
@@ -59,16 +59,20 @@ export default function AdminSettingsPage() {
     content_responsible: "", phone: "", privacy_contact_email: "", hosting_provider: "", hosting_country: "Oesterreich/EU",
     vat_number: "", tournament_terms_url: "", paid_tournaments_enabled: false,
     imprint: "", privacy_policy: "", legal_extra: "", privacy_extra: "",
-    discord_invite_url: "", twitch_channel: "",
+    discord_invite_url: "", twitch_channel: "", twitch_client_id: "", twitch_client_secret: "",
+    twitch_client_secret_masked: "", twitch_live_detection: true,
   });
   const [discord, setDiscord] = useState({ webhook_url: "", username: "", avatar_url: "", enabled: true, configured: false, webhook_url_masked: "", last_status: "", last_error: "", last_event_key: "", last_checked_at: "" });
   const [testEmail, setTestEmail] = useState("");
   const [logs, setLogs] = useState([]);
   const [systemStatus, setSystemStatus] = useState(null);
+  const [twitchStatus, setTwitchStatus] = useState(null);
   const [savingEmail, setSavingEmail] = useState(false);
   const [savingSmtp, setSavingSmtp] = useState(false);
   const [savingBrand, setSavingBrand] = useState(false);
   const [savingDiscord, setSavingDiscord] = useState(false);
+  const [savingTwitch, setSavingTwitch] = useState(false);
+  const [refreshingTwitch, setRefreshingTwitch] = useState(false);
   const imageUploadBusy = useImageUploadBusy();
   const brandDirtyRef = useRef(false);
   const discordDirtyRef = useRef(false);
@@ -85,10 +89,11 @@ export default function AdminSettingsPage() {
       api.get("/settings/smtp"),
       api.get("/settings/mail-queue?limit=100"),
       api.get("/admin/system-status"),
+      api.get("/admin/streams/status"),
     ]);
     if (seq !== loadSeqRef.current) return;
     const value = (i) => requests[i].status === "fulfilled" ? requests[i].value.data : null;
-    const e = value(0), b = value(1), d = value(2), l = value(3), sm = value(4), q = value(5), st = value(6);
+    const e = value(0), b = value(1), d = value(2), l = value(3), sm = value(4), q = value(5), st = value(6), tw = value(7);
     if (e) setEmail((prev) => ({ ...prev, ...e, resend_api_key: "" }));
     if (b && !brandDirtyRef.current) setBrand((prev) => ({ ...prev, ...b }));
     if (d && !discordDirtyRef.current) setDiscord((prev) => ({ ...prev, ...d, webhook_url: "" }));
@@ -96,6 +101,7 @@ export default function AdminSettingsPage() {
     if (sm) setSmtp((prev) => ({ ...prev, ...sm, smtp_pass: "" }));
     if (q) setQueue(q);
     if (st) setSystemStatus(st);
+    if (tw) setTwitchStatus(tw);
     if (requests.some((r) => r.status === "rejected")) {
       toast.error("Ein Teil der Einstellungen konnte nicht geladen werden. Die verfuegbaren Tabs bleiben nutzbar.");
     }
@@ -104,7 +110,7 @@ export default function AdminSettingsPage() {
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["settings", "users"]);
   useEffect(() => {
-    if (tab !== "queue") return undefined;
+    if (tab !== "queue" && tab !== "twitch") return undefined;
     load();
     const id = window.setInterval(load, 15000);
     return () => window.clearInterval(id);
@@ -138,13 +144,19 @@ export default function AdminSettingsPage() {
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
     finally { setSavingEmail(false); }
   };
+  const buildBrandPayload = (source = brand) => {
+    const payload = { ...source };
+    if (!payload.twitch_client_secret) delete payload.twitch_client_secret;
+    delete payload.twitch_client_secret_masked;
+    return payload;
+  };
   const saveBrand = async () => {
     if (savingBrand) return;
     if (imageUploadBusy) return toast.error("Bild-Upload läuft noch. Bitte kurz warten und dann speichern.");
     setSavingBrand(true);
     try {
       loadSeqRef.current += 1;
-      const { data } = await api.put("/settings/branding", brand);
+      const { data } = await api.put("/settings/branding", buildBrandPayload());
       brandDirtyRef.current = false;
       if (data && !data.ok) setBrand((prev) => ({ ...prev, ...data }));
       await refreshPublicBranding();
@@ -153,6 +165,36 @@ export default function AdminSettingsPage() {
     }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
     finally { setSavingBrand(false); }
+  };
+  const saveTwitch = async () => {
+    if (savingTwitch) return;
+    setSavingTwitch(true);
+    try {
+      const payload = buildBrandPayload({
+        twitch_channel: brand.twitch_channel,
+        twitch_client_id: brand.twitch_client_id,
+        twitch_client_secret: brand.twitch_client_secret,
+        twitch_live_detection: !!brand.twitch_live_detection,
+      });
+      loadSeqRef.current += 1;
+      const { data } = await api.put("/settings/branding", payload);
+      brandDirtyRef.current = false;
+      setBrand((prev) => ({ ...prev, ...data, twitch_client_secret: "" }));
+      toast.success("Twitch-Einstellungen gespeichert.");
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setSavingTwitch(false); }
+  };
+  const refreshTwitch = async () => {
+    if (refreshingTwitch) return;
+    setRefreshingTwitch(true);
+    try {
+      const { data } = await api.post("/admin/streams/refresh");
+      if (data?.ok) toast.success(`Twitch geprüft: ${data.live || 0} live von ${data.checked || 0} Kanälen.`);
+      else toast.error(`Twitch nicht geprüft: ${data?.skipped || "unbekannt"}`);
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setRefreshingTwitch(false); }
   };
   const saveDiscord = async () => {
     if (savingDiscord) return;
@@ -292,7 +334,7 @@ export default function AdminSettingsPage() {
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Einstellungen</h1>
 
       <div className="flex gap-1 mb-6 border-b border-white/10 overflow-x-auto">
-        {[["email", "Resend", Mail], ["smtp", "SMTP", Server], ["queue", "Mail-Queue", Inbox], ["discord", "Discord", MessageSquare], ["brand", "Branding", Palette], ["legal", "Rechtliches", FileText], ["system", "Status", Activity], ["logs", "Versandlogs", Send]].map(([k, l, Icn]) => (
+        {[["email", "Resend", Mail], ["smtp", "SMTP", Server], ["queue", "Mail-Queue", Inbox], ["discord", "Discord", MessageSquare], ["twitch", "Twitch", Radio], ["brand", "Branding", Palette], ["legal", "Rechtliches", FileText], ["system", "Status", Activity], ["logs", "Versandlogs", Send]].map(([k, l, Icn]) => (
           <button key={k} onClick={() => setTab(k)} data-testid={`settings-tab-${k}`}
             className={`px-4 py-3 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap ${tab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
             <Icn className="w-3.5 h-3.5" />{l}
@@ -685,6 +727,74 @@ export default function AdminSettingsPage() {
               {discord.configured && <button onClick={clearDiscordWebhook} data-testid="discord-clear" className="px-4 py-2 border border-[#FF3B30]/60 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm">Webhook entfernen</button>}
             </div>
           </div>
+        </div>
+      )}
+
+      {tab === "twitch" && (
+        <div className="max-w-4xl space-y-4">
+          {!twitchStatus?.configured && (
+            <div className="flex items-start gap-3 border border-[#9146FF]/30 bg-[#9146FF]/10 rounded-sm p-4">
+              <Radio className="w-5 h-5 text-[#9146FF] shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <div className="font-bold text-[#b88cff] uppercase tracking-wider text-xs">Twitch Helix noch nicht aktiv</div>
+                <p className="text-white/70 mt-1">Für Live-Erkennung, Streamer-Achievements und den Live-Slider brauchst du Client-ID und Client-Secret aus einer Twitch Developer App.</p>
+              </div>
+            </div>
+          )}
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-4">
+            <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-heading font-bold uppercase">Live-Erkennung</div>
+                  <p className="mt-1 text-xs text-white/45">Prüft verknüpfte Twitch-Kanäle, füllt /streams/live und wertet Streamer-Achievements aus.</p>
+                </div>
+                <label className="flex items-center gap-2 text-sm whitespace-nowrap">
+                  <input type="checkbox" checked={brand.twitch_live_detection !== false} onChange={(e) => setBrandField("twitch_live_detection", e.target.checked)} className="accent-[#9146FF]" data-testid="twitch-live-detection" />
+                  <span>Aktiv</span>
+                </label>
+              </div>
+              <div className="grid md:grid-cols-2 gap-3">
+                <BrandField label="TLS Twitch Channel" value={brand.twitch_channel} onChange={(v) => setBrandField("twitch_channel", v)} testId="twitch-channel" />
+                <BrandField label="Twitch Client ID" value={brand.twitch_client_id} onChange={(v) => setBrandField("twitch_client_id", v)} testId="twitch-client-id" />
+              </div>
+              <label className="block">
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">
+                  Twitch Client Secret {brand.twitch_client_secret_masked && <span className="text-white/40 normal-case">(aktuell gespeichert)</span>}
+                </div>
+                <input type="password" value={brand.twitch_client_secret || ""} onChange={(e) => setBrandField("twitch_client_secret", e.target.value)} data-testid="twitch-client-secret" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder={brand.twitch_client_secret_masked ? "Leer lassen, um Secret beizubehalten" : "Client Secret eintragen"} />
+                <p className="mt-1 text-xs text-white/40">Das Secret wird beim Laden nicht mehr im Klartext zurückgegeben.</p>
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button onClick={saveTwitch} disabled={savingTwitch} data-testid="twitch-save" className="px-5 py-2 bg-[#9146FF] text-white font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingTwitch ? "Speichere..." : "Speichern"}</button>
+                <button onClick={refreshTwitch} disabled={refreshingTwitch || !twitchStatus?.configured || brand.twitch_live_detection === false} data-testid="twitch-refresh" className="px-4 py-2 border border-[#9146FF]/70 text-[#b88cff] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
+                  <RefreshCw className={`w-3.5 h-3.5 ${refreshingTwitch ? "animate-spin" : ""}`} /> Jetzt prüfen
+                </button>
+              </div>
+            </div>
+            <div className="grid gap-3">
+              <SystemCard title="Twitch API" ok={twitchStatus?.configured && twitchStatus?.enabled} detail={twitchStatus?.configured ? "Credentials gespeichert" : "Client-ID oder Secret fehlt"} />
+              <SystemCard title="Kanäle" ok={(twitchStatus?.checked_users || 0) > 0} detail={`${twitchStatus?.checked_users || 0} Accounts mit Twitch-Feld`} />
+              <SystemCard title="Live" ok={(twitchStatus?.live_count || 0) > 0} detail={`${twitchStatus?.live_count || 0} Stream(s) aktuell live`} />
+              <SystemCard title="Token" ok={!!twitchStatus?.token_expires_at} detail={twitchStatus?.token_expires_at ? `gültig bis ${new Date(twitchStatus.token_expires_at).toLocaleString("de-DE")}` : "wird beim nächsten Refresh erstellt"} />
+            </div>
+          </div>
+          {twitchStatus?.live_streams?.length > 0 && (
+            <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/5 font-heading font-bold uppercase">Aktuell live</div>
+              <div className="divide-y divide-white/5">
+                {twitchStatus.live_streams.map((stream) => (
+                  <a key={stream.stream_id || stream.user_id} href={stream.stream_url} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5">
+                    <Radio className="w-4 h-4 text-[#FF3B30] animate-pulse" />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold truncate">{stream.display_name || stream.username || stream.twitch_login}</div>
+                      <div className="text-xs text-white/45 truncate">{stream.title || "Stream läuft"}{stream.game_name ? ` · ${stream.game_name}` : ""}</div>
+                    </div>
+                    <span className="inline-flex items-center gap-1 text-xs text-white/60"><Eye className="w-3.5 h-3.5" /> {stream.viewer_count || 0}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

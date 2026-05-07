@@ -89,7 +89,15 @@ class DiscordSettings(BaseModel):
     enabled: bool = True
 
 
-SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "webhook_url"}
+SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "webhook_url", "twitch_client_secret"}
+
+
+def _hide_branding_secrets(settings: dict) -> dict:
+    out = dict(settings or {})
+    if out.get("twitch_client_secret"):
+        out["twitch_client_secret_masked"] = "********"
+        out.pop("twitch_client_secret", None)
+    return out
 
 
 def _normalize_setting_value(value):
@@ -374,7 +382,7 @@ async def get_branding(response: Response, me: dict = Depends(require_admin())):
     for k, v in defaults.items():
         if not saved.get(k):
             saved[k] = v
-    return saved
+    return _hide_branding_secrets(saved)
 
 
 @settings_router.put("/branding")
@@ -393,7 +401,7 @@ async def update_branding(body: BrandingSettings, me: dict = Depends(require_adm
     )
     await _audit_settings_change(db, "settings.branding.update", "branding", me["id"], changed_fields)
     saved = await db.settings.find_one({"id": "branding"}, {"_id": 0})
-    return saved or {"ok": True}
+    return _hide_branding_secrets(saved) if saved else {"ok": True}
 
 
 @settings_router.get("/email/logs")

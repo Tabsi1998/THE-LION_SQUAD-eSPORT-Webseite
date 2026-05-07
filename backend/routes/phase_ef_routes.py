@@ -46,6 +46,39 @@ async def admin_streams_refresh(me: dict = Depends(require_admin())):
     return await fetch_live_streams()
 
 
+@admin_streams_router.get("/status")
+async def admin_streams_status(me: dict = Depends(require_admin())):
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
+    token = await db.settings.find_one({"id": "twitch_app_token"}, {"_id": 0}) or {}
+    twitch_user_query = {
+        "$or": [
+            {"twitch_handle": {"$nin": [None, ""]}},
+            {"twitch_channel": {"$nin": [None, ""]}},
+        ]
+    }
+    checked_users = await db.users.count_documents(twitch_user_query)
+    live_streams = await db.live_streams.find({}, {"_id": 0}).sort("viewer_count", -1).limit(10).to_list(10)
+    latest_session = await db.twitch_stream_sessions.find_one(
+        {},
+        {"_id": 0, "last_seen_at": 1, "started_at": 1, "ended_at": 1, "twitch_login": 1},
+        sort=[("last_seen_at", -1)],
+    )
+    return {
+        "configured": bool(branding.get("twitch_client_id") and branding.get("twitch_client_secret")),
+        "enabled": bool(branding.get("twitch_live_detection", True)),
+        "client_id_configured": bool(branding.get("twitch_client_id")),
+        "client_secret_configured": bool(branding.get("twitch_client_secret")),
+        "client_secret_masked": "********" if branding.get("twitch_client_secret") else "",
+        "channel": branding.get("twitch_channel"),
+        "checked_users": checked_users,
+        "live_count": len(live_streams),
+        "live_streams": live_streams,
+        "latest_session": latest_session,
+        "token_expires_at": token.get("expires_at"),
+    }
+
+
 # ============= Pages CMS =============
 pages_router = APIRouter(prefix="/api/pages", tags=["cms"])
 admin_pages_router = APIRouter(prefix="/api/admin/pages", tags=["cms-admin"])
