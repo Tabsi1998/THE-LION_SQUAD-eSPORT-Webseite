@@ -303,7 +303,7 @@ export default function ProfilePage() {
             <Section>
               <Row>
                 <Field label="Discord Name"><Input value={form.discord_name} onChange={(v) => set("discord_name", v)} testId="profile-discord" /></Field>
-                <Field label="Twitch"><Input value={form.twitch_handle} onChange={(v) => set("twitch_handle", v)} testId="profile-twitch" placeholder="thelionsquad_esports" /></Field>
+                <Field label="Twitch"><Input value={form.twitch_handle} onChange={(v) => set("twitch_handle", v)} testId="profile-twitch" placeholder="tabsi98 oder https://www.twitch.tv/tabsi98" /></Field>
               </Row>
               {form.twitch_handle && (
                 <label className="flex items-start gap-3 p-3 border border-[#9146FF]/30 bg-[#9146FF]/5 rounded-sm">

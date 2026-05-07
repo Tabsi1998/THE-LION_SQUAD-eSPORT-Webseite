@@ -7,6 +7,20 @@
 import { Radio, ExternalLink } from "lucide-react";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 
+function normalizeTwitchChannel(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw.startsWith("http") ? raw : `https://${raw.replace(/^@/, "")}`);
+    if (/(^|\.)twitch\.tv$/i.test(parsed.hostname)) {
+      return (parsed.pathname.split("/").filter(Boolean)[0] || "").replace(/^@/, "").toLowerCase();
+    }
+  } catch {
+    // Fall through to handle cleanup below.
+  }
+  return raw.replace(/^@/, "").replace(/^twitch\.tv\//i, "").replace(/^www\.twitch\.tv\//i, "").split(/[/?#]/)[0].toLowerCase();
+}
+
 export function StreamEmbed({ source }) {
   const { hasConsent, openSettings } = useCookieConsent();
   if (!source) return null;
@@ -19,10 +33,11 @@ export function StreamEmbed({ source }) {
 
   let embedSrc = null;
   if (platform === "twitch") {
-    const channel = source.stream_url
-      ? source.stream_url.replace(/.*twitch\.tv\//, "").replace(/\/.*$/, "")
-      : source.twitch_channel;
-    if (channel) embedSrc = `https://player.twitch.tv/?channel=${encodeURIComponent(channel)}&parent=${window.location.hostname}&muted=true`;
+    const channel = normalizeTwitchChannel(source.stream_url || source.twitch_channel);
+    if (channel) {
+      const params = new URLSearchParams({ channel, parent: window.location.hostname, muted: "true", autoplay: "false" });
+      embedSrc = `https://player.twitch.tv/?${params.toString()}`;
+    }
   } else if (platform === "youtube" && source.stream_url) {
     const m = source.stream_url.match(/(?:youtu\.be\/|v=|\/embed\/)([\w-]{11})/);
     if (m) embedSrc = `https://www.youtube.com/embed/${m[1]}?autoplay=0`;
@@ -45,7 +60,7 @@ export function StreamEmbed({ source }) {
       </div>
       {embedSrc && hasConsent("external_media") ? (
         <div className="aspect-video">
-          <iframe src={embedSrc} className="w-full h-full" allowFullScreen frameBorder={0} title="Live Stream" />
+          <iframe src={embedSrc} className="w-full h-full" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen frameBorder={0} title="Live Stream" />
         </div>
       ) : embedSrc ? (
         <div className="p-8 text-center">

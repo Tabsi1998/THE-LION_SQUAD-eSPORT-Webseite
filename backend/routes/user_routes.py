@@ -1,7 +1,9 @@
 """User profile + admin user management routes."""
 import os
 import secrets
+import re
 from datetime import datetime, timezone, timedelta
+from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import get_current_user, require_admin, require_super, hash_password, hash_token
@@ -77,6 +79,29 @@ def _visible_field(user: dict, key: str, profile_public: bool):
         "battlenet": "battlenet_id",
     }.get(key, key)
     return user.get(source_key)
+
+
+def _normalize_twitch_handle(value: str | None) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    raw = raw.replace("\\", "/")
+    if raw.startswith("@"):
+        raw = raw[1:]
+    parsed = urlparse(raw if raw.startswith(("http://", "https://")) else f"https://{raw}")
+    host = (parsed.netloc or "").lower()
+    if host in {"twitch.tv", "www.twitch.tv", "m.twitch.tv"}:
+        parts = [p for p in parsed.path.split("/") if p]
+        raw = parts[0] if parts else ""
+    raw = raw.strip().lstrip("@").split("?")[0].split("#")[0]
+    raw = re.sub(r"[^A-Za-z0-9_]", "", raw)
+    return raw.lower()[:25] or None
+
+
+def _normalize_social_updates(updates: dict) -> dict:
+    if "twitch_handle" in updates:
+        updates["twitch_handle"] = _normalize_twitch_handle(updates.get("twitch_handle"))
+    return updates
 
 
 async def _is_public_tournament(tournament: dict | None) -> bool:
@@ -555,6 +580,7 @@ async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
     db = get_db()
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}
+    updates = _normalize_social_updates(updates)
     if not updates:
         await _attach_membership(me)
         return me
@@ -618,6 +644,7 @@ async def admin_update_user(user_id: str, body: UserUpdate,
     db = get_db()
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}
+    updates = _normalize_social_updates(updates)
     updates["updated_at"] = now_utc().isoformat()
     await db.users.update_one({"id": user_id}, {"$set": updates})
     u = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
