@@ -1,5 +1,6 @@
 """Phase 10: Setup status + sitemap + simple setup-wizard helpers."""
 import json
+import re
 from xml.sax.saxutils import escape
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
@@ -8,10 +9,44 @@ from datetime import datetime, timezone
 import bcrypt
 
 from database import get_db
-from auth import require_super, get_current_user
+from auth import require_admin, require_super, get_current_user
 from models import now_utc, new_id
 
 router = APIRouter(prefix="/api/setup", tags=["setup"])
+HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def _normalise_base_url(value: str | None) -> str:
+    base = (value or "https://lionsquad.at").strip().rstrip("/")
+    if not base:
+        base = "https://lionsquad.at"
+    if not base.startswith(("http://", "https://")):
+        base = "https://" + base
+    return base
+
+
+def _domain_from_url(value: str | None) -> str:
+    base = _normalise_base_url(value)
+    return base.replace("https://", "").replace("http://", "").split("/")[0]
+
+
+def _truthy_mail_config(mail: dict, legacy_email: dict) -> bool:
+    provider = mail.get("provider") or ("resend" if legacy_email.get("resend_api_key") else "")
+    if provider == "resend":
+        return bool(legacy_email.get("resend_api_key") or mail.get("resend_api_key"))
+    return bool(mail.get("smtp_host") and (mail.get("sender_email") or legacy_email.get("sender_email")))
+
+
+def _setup_checks(s: dict, branding: dict, mail: dict, legacy_email: dict, has_admin: bool) -> list[dict]:
+    return [
+        {"key": "admin", "label": "Superadmin vorhanden", "ok": has_admin, "target": "/admin/users"},
+        {"key": "completed", "label": "Setup abgeschlossen", "ok": bool(s.get("completed")), "target": "/setup"},
+        {"key": "club_name", "label": "Vereinsname gepflegt", "ok": bool(branding.get("club_name")), "target": "/admin/settings?tab=brand"},
+        {"key": "domain", "label": "Öffentliche Domain gesetzt", "ok": bool(branding.get("domain")), "target": "/admin/settings?tab=brand"},
+        {"key": "contact_email", "label": "Kontakt-E-Mail gesetzt", "ok": bool(branding.get("contact_email")), "target": "/admin/settings?tab=brand"},
+        {"key": "legal", "label": "Impressum/Datenschutz ergänzt", "ok": bool(branding.get("imprint") or branding.get("privacy_policy")), "target": "/admin/settings?tab=legal"},
+        {"key": "mail", "label": "E-Mail-Versand konfiguriert", "ok": _truthy_mail_config(mail, legacy_email), "target": "/admin/settings?tab=smtp"},
+    ]
 
 
 @router.get("/status")
@@ -23,12 +58,58 @@ async def setup_status():
     mail = await db.settings.find_one({"id": "mail"}, {"_id": 0}) or {}
     legacy_email = await db.settings.find_one({"id": "email"}, {"_id": 0}) or {}
     has_admin = await db.users.count_documents({"role": "superadmin"}) > 0
+    checks = _setup_checks(s, branding, mail, legacy_email, has_admin)
+    done = sum(1 for c in checks if c["ok"])
     return {
         "completed": bool(s.get("completed")),
         "completed_at": s.get("completed_at"),
         "has_admin": has_admin,
         "has_branding": bool(branding.get("club_name")),
-        "has_email": bool(mail.get("smtp_host") or legacy_email.get("resend_api_key")),
+        "has_email": _truthy_mail_config(mail, legacy_email),
+        "health_score": round((done / len(checks)) * 100) if checks else 0,
+        "checks": checks,
+        "missing": [c for c in checks if not c["ok"]],
+    }
+
+
+@router.get("/defaults")
+async def setup_defaults(me: dict = Depends(require_admin())):
+    """Admin-only: current setup values for pre-filling the wizard."""
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
+    mail = await db.settings.find_one({"id": "mail"}, {"_id": 0}) or {}
+    legacy_email = await db.settings.find_one({"id": "email"}, {"_id": 0}) or {}
+    return {
+        "branding": {
+            "club_name": branding.get("club_name") or "THE LION SQUAD",
+            "tagline": branding.get("tagline") or "eSports Verein",
+            "site_description": branding.get("site_description") or "",
+            "domain": branding.get("domain") or "lionsquad.at",
+            "primary_color": branding.get("primary_color") or "#29B6E8",
+            "contact_email": branding.get("contact_email") or "",
+            "favicon_url": branding.get("favicon_url") or "",
+            "imprint": branding.get("imprint") or "",
+            "privacy_policy": branding.get("privacy_policy") or "",
+            "discord_invite_url": branding.get("discord_invite_url") or "",
+            "twitch_channel": branding.get("twitch_channel") or "",
+        },
+        "mail": {
+            "mail_provider": mail.get("provider") or ("resend" if legacy_email.get("resend_api_key") else "smtp"),
+            "smtp_host": mail.get("smtp_host") or "",
+            "smtp_port": mail.get("smtp_port") or 587,
+            "smtp_user": mail.get("smtp_user") or "",
+            "smtp_auth": mail.get("smtp_auth") or "auto",
+            "smtp_security": mail.get("smtp_security") or "starttls",
+            "smtp_tls_verify": mail.get("smtp_tls_verify", True),
+            "smtp_envelope_from": mail.get("smtp_envelope_from") or "",
+            "smtp_helo_name": mail.get("smtp_helo_name") or "",
+            "sender_name": mail.get("sender_name") or legacy_email.get("sender_name") or "THE LION SQUAD",
+            "sender_email": mail.get("sender_email") or legacy_email.get("sender_email") or "noreply@lionsquad.at",
+            "reply_to_email": mail.get("reply_to_email") or legacy_email.get("reply_to_email") or "office@lionsquad.at",
+            "message_id_domain": mail.get("message_id_domain") or "",
+            "smtp_pass_masked": "********" if mail.get("smtp_pass") else "",
+            "resend_api_key_masked": "********" if legacy_email.get("resend_api_key") else "",
+        },
     }
 
 
@@ -69,6 +150,15 @@ async def complete_setup(body: SetupWizardBody, me: dict = Depends(require_super
     db = get_db()
     now_iso = now_utc().isoformat()
 
+    if body.primary_color and not HEX_COLOR_RE.match(body.primary_color):
+        raise HTTPException(400, "Akzentfarbe muss ein HEX-Wert sein, z.B. #29B6E8.")
+    if body.domain:
+        body.domain = _normalise_base_url(body.domain)
+    if body.sender_email and "@" not in body.sender_email:
+        raise HTTPException(400, "Absender-E-Mail ist ungültig.")
+    if body.reply_to_email and "@" not in body.reply_to_email:
+        raise HTTPException(400, "Antwort-E-Mail ist ungültig.")
+
     # Branding
     brand_keys = ["club_name", "tagline", "site_description", "primary_color", "contact_email",
                   "domain", "favicon_url", "imprint",
@@ -88,7 +178,14 @@ async def complete_setup(body: SetupWizardBody, me: dict = Depends(require_super
                  "smtp_helo_name", "sender_name", "sender_email", "reply_to_email", "message_id_domain"]
     mail_updates = {k: getattr(body, k) for k in mail_keys if getattr(body, k) not in (None, "")}
     if body.mail_provider:
+        if body.mail_provider not in ("smtp", "resend"):
+            raise HTTPException(400, "Mail-Provider muss smtp oder resend sein.")
         mail_updates["provider"] = body.mail_provider
+    if body.mail_provider == "smtp":
+        if body.smtp_port is not None and not (1 <= int(body.smtp_port) <= 65535):
+            raise HTTPException(400, "SMTP-Port muss zwischen 1 und 65535 liegen.")
+        if body.message_id_domain is None and body.domain:
+            mail_updates["message_id_domain"] = _domain_from_url(body.domain)
     if mail_updates:
         mail_updates["updated_at"] = now_iso
         await db.settings.update_one(
@@ -128,6 +225,7 @@ async def complete_setup(body: SetupWizardBody, me: dict = Depends(require_super
     )
     await db.audit_logs.insert_one({
         "id": new_id(), "actor_id": me["id"], "action": "setup.complete",
+        "details": {"fields": sorted([k for k, v in body.model_dump(exclude_unset=True).items() if v not in (None, "") and "pass" not in k and "key" not in k])},
         "created_at": now_iso,
     })
     return {"ok": True}
@@ -171,9 +269,7 @@ def _parse_sitemap_dt(value):
 async def sitemap():
     db = get_db()
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
-    base = (branding.get("domain") or "https://lionsquad.at").rstrip("/")
-    if not base.startswith("http"):
-        base = "https://" + base
+    base = _normalise_base_url(branding.get("domain"))
 
     static_paths = [
         "/", "/about", "/news", "/events", "/tournaments", "/fastlap", "/f1",
@@ -222,6 +318,20 @@ async def sitemap():
     ):
         if u.get("username"):
             urls.append({"loc": f"{base}/u/{u['username']}", "lastmod": u.get("updated_at"), "changefreq": "monthly", "priority": "0.4"})
+    # public club member profiles
+    async for m in db.club_member_profiles.find(
+        {"is_public": {"$ne": False}},
+        {"slug": 1, "updated_at": 1, "_id": 0},
+    ):
+        if m.get("slug"):
+            urls.append({"loc": f"{base}/members/{m['slug']}", "lastmod": m.get("updated_at"), "changefreq": "monthly", "priority": "0.55"})
+    # public gallery albums
+    async for a in db.gallery_albums.find(
+        {"visibility": {"$in": ["public", None]}, "is_public": {"$ne": False}},
+        {"slug": 1, "updated_at": 1, "_id": 0},
+    ):
+        if a.get("slug"):
+            urls.append({"loc": f"{base}/galerie/{a['slug']}", "lastmod": a.get("updated_at"), "changefreq": "monthly", "priority": "0.5"})
 
     xml_lines = ['<?xml version="1.0" encoding="UTF-8"?>',
                  '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
@@ -243,9 +353,7 @@ async def sitemap():
 async def news_sitemap():
     db = get_db()
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
-    base = (branding.get("domain") or "https://lionsquad.at").rstrip("/")
-    if not base.startswith("http"):
-        base = "https://" + base
+    base = _normalise_base_url(branding.get("domain"))
     name = branding.get("club_name") or "THE LION SQUAD"
     public_visibility = {"$or": [{"visibility": "public"}, {"visibility": {"$exists": False}}, {"visibility": None}]}
     rows = await db.news_posts.find(

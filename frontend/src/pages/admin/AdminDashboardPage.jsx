@@ -33,14 +33,21 @@ export default function AdminDashboardPage() {
         <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Dashboard</h1>
       </div>
 
-      {setupStatus && !setupStatus.completed && (
+      {setupStatus && (!setupStatus.completed || (setupStatus.health_score || 0) < 100) && (
         <Link to="/setup" data-testid="dashboard-setup-cta" className="block mb-6 border border-[#29B6E8]/40 bg-gradient-to-r from-[#29B6E8]/10 to-transparent rounded-sm p-4 hover:border-[#29B6E8] transition group">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Sparkles className="w-5 h-5 text-[#29B6E8] shrink-0" />
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Erst-Einrichtung empfohlen</div>
-                <div className="font-heading text-base mt-0.5">Setup-Wizard ausführen — Branding, SMTP & Admin-Passwort in 4 Schritten</div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Plattform-Setup {setupStatus.health_score ?? 0}%</div>
+                <div className="font-heading text-base mt-0.5">
+                  {setupStatus.completed ? "Setup prüfen — es fehlen noch sinnvolle Konfigurationspunkte" : "Setup-Wizard ausführen — Branding, SMTP & Admin-Passwort in 4 Schritten"}
+                </div>
+                {(setupStatus.missing || []).length > 0 && (
+                  <div className="text-xs text-white/45 mt-1">
+                    Offen: {(setupStatus.missing || []).slice(0, 3).map((m) => m.label).join(", ")}
+                  </div>
+                )}
               </div>
             </div>
             <div className="text-[#29B6E8] text-2xl group-hover:translate-x-1 transition-transform">→</div>

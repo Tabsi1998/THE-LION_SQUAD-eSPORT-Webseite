@@ -302,6 +302,8 @@ async def robots():
     db = get_db()
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
     base = (branding.get("domain") or "").rstrip("/") or os.environ.get("PUBLIC_URL", "").rstrip("/")
+    if base and not base.startswith(("http://", "https://")):
+        base = "https://" + base
     body = [
         "User-agent: *",
         "Allow: /",

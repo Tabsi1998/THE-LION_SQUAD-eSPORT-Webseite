@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Logo } from "@/components/tls/Logo";
-import { Sparkles, Mail, Server, Lock, Check, ArrowRight, ChevronLeft } from "lucide-react";
+import { Sparkles, Mail, Server, Lock, Check, ArrowRight, ChevronLeft, ShieldCheck, AlertTriangle } from "lucide-react";
 
 const STEPS = [
   { key: "welcome", label: "Willkommen" },
@@ -23,8 +23,13 @@ export default function SetupWizardPage() {
   const [data, setData] = useState({
     club_name: "THE LION SQUAD",
     tagline: "eSports Verein",
+    site_description: "",
+    contact_email: "",
     domain: "lionsquad.at",
     primary_color: "#29B6E8",
+    favicon_url: "",
+    imprint: "",
+    privacy_policy: "",
     discord_invite_url: "",
     twitch_channel: "",
     new_admin_password: "",
@@ -44,6 +49,7 @@ export default function SetupWizardPage() {
     message_id_domain: "lionsquad.at",
     resend_api_key: "",
   });
+  const [saving, setSaving] = useState(false);
 
   const loadStatus = useCallback(() => {
     api.get("/setup/status").then(({ data }) => {
@@ -55,6 +61,18 @@ export default function SetupWizardPage() {
     }).catch(() => {});
   }, [isAdmin, nav]);
   useEffect(() => { loadStatus(); }, [loadStatus]);
+  useEffect(() => {
+    if (!isAdmin) return;
+    api.get("/setup/defaults").then(({ data: defaults }) => {
+      setData((current) => ({
+        ...current,
+        ...(defaults?.branding || {}),
+        ...(defaults?.mail || {}),
+        smtp_pass: "",
+        resend_api_key: "",
+      }));
+    }).catch(() => {});
+  }, [isAdmin]);
   useApiInvalidation(loadStatus, ["setup", "settings"]);
   useEffect(() => {
     if (status?.has_branding === false) setStep(0);
@@ -75,7 +93,9 @@ export default function SetupWizardPage() {
   const prev = () => setStep((s) => Math.max(0, s - 1));
 
   const finish = async () => {
+    if (saving) return;
     try {
+      setSaving(true);
       const payload = { ...data };
       delete payload.new_admin_password_confirm;
       if (!payload.new_admin_password) delete payload.new_admin_password;
@@ -91,6 +111,7 @@ export default function SetupWizardPage() {
       setStep(STEPS.length - 1);
       setTimeout(() => nav("/admin"), 1500);
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setSaving(false); }
   };
 
   const skip = async () => {
@@ -129,10 +150,19 @@ export default function SetupWizardPage() {
                 später jederzeit im Admin-Bereich ändern.
               </p>
               {status && (
-                <div className="text-xs text-white/40 space-y-1 mb-6">
-                  <div>Admin-Account: {status.has_admin ? "✓" : "—"}</div>
-                  <div>Branding: {status.has_branding ? "✓" : "—"}</div>
-                  <div>E-Mail-Versand: {status.has_email ? "✓" : "—"}</div>
+                <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 text-left mb-6 max-w-md mx-auto">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold">Setup-Status</div>
+                    <div className="font-heading font-black text-[#29B6E8]">{status.health_score ?? 0}%</div>
+                  </div>
+                  <div className="space-y-1.5">
+                    {(status.checks || []).map((check) => (
+                      <div key={check.key} className="flex items-center gap-2 text-xs">
+                        {check.ok ? <ShieldCheck className="w-3.5 h-3.5 text-[#00FF88]" /> : <AlertTriangle className="w-3.5 h-3.5 text-[#FFD700]" />}
+                        <span className={check.ok ? "text-white/65" : "text-white/90"}>{check.label}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -143,12 +173,21 @@ export default function SetupWizardPage() {
               <h2 className="font-heading text-2xl font-black uppercase mb-3">Vereinsdaten</h2>
               <Field label="Vereinsname *" testId="wizard-club-name" value={data.club_name} onChange={(v) => upd("club_name", v)} />
               <Field label="Tagline" testId="wizard-tagline" value={data.tagline} onChange={(v) => upd("tagline", v)} />
+              <Field label="Kurzbeschreibung" testId="wizard-description" value={data.site_description} onChange={(v) => upd("site_description", v)} />
               <div className="grid sm:grid-cols-2 gap-3">
                 <Field label="Domain" testId="wizard-domain" value={data.domain} onChange={(v) => upd("domain", v)} />
                 <Field label="Akzentfarbe" testId="wizard-color" value={data.primary_color} onChange={(v) => upd("primary_color", v)} />
               </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <Field label="Kontakt E-Mail" testId="wizard-contact-email" type="email" value={data.contact_email} onChange={(v) => upd("contact_email", v)} />
+                <Field label="Favicon URL" testId="wizard-favicon" value={data.favicon_url} onChange={(v) => upd("favicon_url", v)} />
+              </div>
               <Field label="Discord Einladung (URL)" testId="wizard-discord" value={data.discord_invite_url} onChange={(v) => upd("discord_invite_url", v)} />
               <Field label="Twitch Channel" testId="wizard-twitch" value={data.twitch_channel} onChange={(v) => upd("twitch_channel", v)} />
+              <div className="grid sm:grid-cols-2 gap-3">
+                <TextArea label="Impressum Zusatz" testId="wizard-imprint" value={data.imprint} onChange={(v) => upd("imprint", v)} />
+                <TextArea label="Datenschutz Zusatz" testId="wizard-privacy" value={data.privacy_policy} onChange={(v) => upd("privacy_policy", v)} />
+              </div>
             </div>
           )}
 
@@ -246,8 +285,8 @@ export default function SetupWizardPage() {
               </button>
             )}
             {step === STEPS.length - 2 && (
-              <button onClick={finish} data-testid="wizard-finish" className="px-6 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
-                Fertigstellen <Check className="w-4 h-4" />
+              <button onClick={finish} disabled={saving} data-testid="wizard-finish" className="px-6 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 disabled:opacity-50">
+                {saving ? "Speichere..." : "Fertigstellen"} <Check className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -263,6 +302,16 @@ function Field({ label, value, onChange, testId, type = "text", placeholder = ""
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
       <input type={type} value={value || ""} onChange={(e) => onChange(e.target.value)} data-testid={testId} placeholder={placeholder}
         className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+    </label>
+  );
+}
+
+function TextArea({ label, value, onChange, testId, placeholder = "" }) {
+  return (
+    <label className="block">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <textarea value={value || ""} onChange={(e) => onChange(e.target.value)} data-testid={testId} placeholder={placeholder} rows={4}
+        className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm resize-y" />
     </label>
   );
 }
