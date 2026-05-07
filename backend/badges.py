@@ -270,6 +270,7 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
             int(t.get("points") or 0)
             for t in award_tiers
             if not group_is_negative.get(t.get("group_code"), False)
+            and t.get("group_code") != "level_progression"
         )
     else:
         p["achievement_points"] = 0

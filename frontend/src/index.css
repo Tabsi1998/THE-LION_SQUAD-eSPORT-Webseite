@@ -133,11 +133,20 @@ body {
 .tls-account-frame {
   box-shadow: 0 0 0 1px rgba(41,182,232,0.18), 0 0 18px rgba(41,182,232,0.08);
 }
+.tls-account-frame-challenger {
+  box-shadow: 0 0 0 1px rgba(0,255,136,0.20), 0 0 20px rgba(0,255,136,0.10);
+}
 .tls-account-frame-pro {
   box-shadow: 0 0 0 1px rgba(41,182,232,0.28), 0 0 26px rgba(41,182,232,0.16);
 }
+.tls-account-frame-veteran {
+  box-shadow: 0 0 0 1px rgba(168,85,247,0.28), 0 0 30px rgba(168,85,247,0.15);
+}
 .tls-account-frame-elite {
   box-shadow: 0 0 0 1px rgba(255,215,0,0.28), 0 0 34px rgba(255,215,0,0.16), inset 0 0 18px rgba(255,215,0,0.05);
+}
+.tls-account-frame-champion {
+  animation: tls-level-champion 4.6s ease-in-out infinite;
 }
 .tls-account-frame-legendary {
   animation: tls-level-prestige 3.8s ease-in-out infinite;
@@ -145,23 +154,49 @@ body {
 .tls-account-avatar-frame {
   box-shadow: 0 0 0 1px rgba(41,182,232,0.14);
 }
+.tls-account-avatar-frame-challenger {
+  box-shadow: 0 0 0 1px rgba(0,255,136,0.20), 0 0 14px rgba(0,255,136,0.10);
+}
 .tls-account-avatar-frame-pro {
   box-shadow: 0 0 0 1px rgba(41,182,232,0.22), 0 0 18px rgba(41,182,232,0.13);
+}
+.tls-account-avatar-frame-veteran {
+  box-shadow: 0 0 0 1px rgba(168,85,247,0.26), 0 0 18px rgba(168,85,247,0.14);
 }
 .tls-account-avatar-frame-elite {
   box-shadow: 0 0 0 1px rgba(255,215,0,0.26), 0 0 20px rgba(255,215,0,0.14);
 }
+.tls-account-avatar-frame-champion {
+  animation: tls-level-champion 4.6s ease-in-out infinite;
+}
 .tls-account-avatar-frame-legendary {
   animation: tls-level-prestige 3.8s ease-in-out infinite;
+}
+
+@keyframes tls-level-champion {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255,59,48,0.26), 0 0 28px rgba(255,59,48,0.12), 0 0 0 rgba(255,215,0,0); }
+  50% { box-shadow: 0 0 0 1px rgba(255,59,48,0.52), 0 0 38px rgba(255,59,48,0.20), 0 0 16px rgba(255,215,0,0.12); }
 }
 
 @keyframes tls-level-prestige {
   0%, 100% { box-shadow: 0 0 0 1px rgba(255,215,0,0.30), 0 0 28px rgba(255,215,0,0.14), 0 0 0 rgba(255,59,48,0); }
   50% { box-shadow: 0 0 0 1px rgba(255,215,0,0.58), 0 0 44px rgba(255,215,0,0.24), 0 0 22px rgba(255,59,48,0.14); }
 }
+.tls-account-progress-prestige {
+  background-image: linear-gradient(90deg, currentColor, rgba(255,255,255,0.88), currentColor);
+  background-size: 180% 100%;
+  animation: tls-account-progress-sheen 3.8s ease-in-out infinite;
+}
+@keyframes tls-account-progress-sheen {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
 @media (prefers-reduced-motion: reduce) {
   .tls-account-frame-legendary,
+  .tls-account-frame-champion,
   .tls-account-avatar-frame-legendary,
+  .tls-account-avatar-frame-champion,
+  .tls-account-progress-prestige,
   .animate-live {
     animation: none;
   }

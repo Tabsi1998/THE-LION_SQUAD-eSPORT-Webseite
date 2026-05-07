@@ -46,3 +46,11 @@ def test_membership_tenure_is_marked_member_only():
     membership_tiers = [t for t in ACHIEVEMENT_TIERS if t["group_code"] == "membership_tenure"]
     assert membership_tiers
     assert all(t.get("member_only") is True for t in membership_tiers)
+
+
+def test_level_progression_has_long_term_milestones():
+    tiers = [t for t in ACHIEVEMENT_TIERS if t["group_code"] == "level_progression"]
+    targets = {t["code"]: t["progress_target"] for t in tiers}
+    assert targets["level_progression_10"] == 8100
+    assert targets["level_progression_15"] == 19600
+    assert targets["level_progression_20"] == 36100

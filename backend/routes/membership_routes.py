@@ -111,14 +111,31 @@ def _achievement_level(points: int) -> dict:
     next_floor = level * level * 100
     span = max(next_floor - current_floor, 1)
     progress = round(((points - current_floor) / span) * 100)
+    title = _achievement_level_title(level)
     return {
         "level": level,
         "points": points,
         "current_level_points": current_floor,
         "next_level_points": next_floor,
         "progress": max(0, min(progress, 100)),
-        "title": f"Level {level}",
+        "title": title,
     }
+
+
+def _achievement_level_title(level: int) -> str:
+    if level >= 20:
+        return "Legendär"
+    if level >= 16:
+        return "Champion"
+    if level >= 12:
+        return "Elite"
+    if level >= 8:
+        return "Veteran"
+    if level >= 5:
+        return "Pro"
+    if level >= 3:
+        return "Challenger"
+    return "Rookie"
 
 
 def _title_for_position(position: dict, person: dict | None = None) -> str:
