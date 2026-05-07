@@ -1,28 +1,67 @@
-# Update Guide
+# Update-Anleitung
 
-## Update TLS ARENA in place
+Der normale Server-Ablauf ist:
 
 ```bash
-cd /opt/tls-arena
-sudo docker compose down
-git pull
-sudo docker compose up -d --build
-sudo docker compose logs -f
+cd /root/THE-LION_SQUAD-eSPORT-Webseite
+./update.sh u
 ```
 
-## Preserve uploaded data
+Das Script zieht den neuesten Code, baut Frontend/Backend neu, startet die Container und prueft Backend, Frontend und wichtige SPA-Routen.
 
-The MongoDB volume `mongo_data` is preserved across `down`/`up` cycles. Do not run `docker compose down -v` unless you want to wipe the database.
+## Danach pruefen
 
-## Zero-downtime update
+```bash
+docker compose ps
+docker compose logs --tail=100 backend
+curl -fsS http://localhost:8001/api/health
+```
 
-1. Build new backend image: `sudo docker compose build backend`
-2. Restart: `sudo docker compose up -d --no-deps backend`
-3. Repeat for frontend.
+Oeffentlich pruefen:
+
+- `https://lionsquad.at`
+- `https://lionsquad.at/community`
+- `https://lionsquad.at/events`
+- `https://lionsquad.at/members`
+
+Im Admin:
+
+- `Einstellungen -> Status`
+- `Einstellungen -> Discord`
+- `Einstellungen -> Twitch`
+- ein kleiner Upload-Test
+
+## Daten behalten
+
+MongoDB und Uploads liegen in Docker-Volumes bzw. persistenten Upload-Pfaden.
+
+Nicht ausfuehren, ausser du willst Daten bewusst loeschen:
+
+```bash
+docker compose down -v
+```
+
+## Wenn public routes alte Assets liefern
+
+`update.sh` prueft unter anderem `/community` und `/seasons/current`. Wenn dort alte `main.*.js` oder `main.*.css` Dateien auftauchen:
+
+1. Reverse-Proxy-Cache leeren.
+2. HTML-Caching fuer SPA-Routen deaktivieren.
+3. `./update.sh u` nochmal laufen lassen.
+
+Mehr Details: [OPERATIONS.md](OPERATIONS.md).
 
 ## Rollback
 
 ```bash
+git log --oneline -5
 git checkout <previous-commit>
-sudo docker compose up -d --build
+docker compose up -d --build
+```
+
+Danach wieder auf `main`:
+
+```bash
+git checkout main
+git pull --ff-only
 ```

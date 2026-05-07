@@ -47,6 +47,9 @@ docker-compose.yml
 .env.example
 INSTALL.md
 UPDATE.md
+ADMIN_GUIDE.md
+OPERATIONS.md
+LIVE_TESTS.md
 BACKUP_RESTORE.md
 ROLE_AUDIT.md
 ```
@@ -104,9 +107,7 @@ sonst bewusst ab.
 
 ```bash
 cd /root/THE-LION_SQUAD-eSPORT-Webseite
-git pull
-docker compose up -d --build
-docker compose logs -f backend
+./update.sh u
 ```
 
 Nach jedem Update pruefen:
@@ -116,6 +117,13 @@ curl -I https://lionsquad.at
 curl https://lionsquad.at/api/health
 docker compose ps
 ```
+
+Weitere Details:
+
+- [UPDATE.md](UPDATE.md) fuer den normalen Update-Ablauf.
+- [OPERATIONS.md](OPERATIONS.md) fuer Betrieb, Proxy, Uploads, Logs und Rollback.
+- [ADMIN_GUIDE.md](ADMIN_GUIDE.md) fuer Admin-Pflege von Medien, Mitgliedern, Vorstand, Achievements, Discord, Twitch, Events und Sponsoren.
+- [LIVE_TESTS.md](LIVE_TESTS.md) fuer Live-Tests gegen `lionsquad.at`.
 
 ## Deployment-Checkliste
 

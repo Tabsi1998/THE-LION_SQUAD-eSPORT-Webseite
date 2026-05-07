@@ -26,9 +26,9 @@ newgrp docker
 ## 2. Clone + Configure
 
 ```bash
-cd /opt
-sudo git clone <your-repo> tls-arena
-cd tls-arena
+cd /root
+sudo git clone <your-repo> THE-LION_SQUAD-eSPORT-Webseite
+cd THE-LION_SQUAD-eSPORT-Webseite
 sudo cp .env.example .env
 sudo nano .env
 ```
@@ -51,8 +51,8 @@ The frontend is now at http://your-server:3000 and backend at http://your-server
 ## 4. Reverse Proxy (Nginx Proxy Manager)
 
 Create two proxy hosts:
-1. `lionsquad.at` → `tls-frontend:80`
-2. `lionsquad.at/api/*` → `tls-backend:8001` (or run under a separate `api.` subdomain)
+1. `lionsquad.at` -> frontend container / host port `3000`
+2. `lionsquad.at/api/*` -> backend container / host port `8001`
 
 Enable HTTPS (Let's Encrypt) inside NPM.
 Set the proxy body size to at least 60 MB, otherwise image/document uploads can fail with
