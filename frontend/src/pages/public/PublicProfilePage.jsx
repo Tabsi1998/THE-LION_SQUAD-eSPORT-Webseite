@@ -5,28 +5,13 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { AccountLevelPill, AccountLevelProgress, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import {
   Trophy, Flag, Users as UsersIcon, Medal, Shield, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio,
 } from "lucide-react";
-
-function accountLevelFrame(level) {
-  const value = Number(level || 1);
-  if (value >= 15) return "tls-account-frame tls-account-frame-legendary border-[#FFD700]/80";
-  if (value >= 10) return "tls-account-frame tls-account-frame-elite border-[#FFD700]/70";
-  if (value >= 5) return "tls-account-frame tls-account-frame-pro border-[#29B6E8]/70";
-  return "tls-account-frame border-[#29B6E8]/40";
-}
-
-function accountLevelTitle(level) {
-  const value = Number(level || 1);
-  if (value >= 15) return "Legendär";
-  if (value >= 10) return "Elite";
-  if (value >= 5) return "Pro";
-  return "Rookie";
-}
 
 function normalizeTwitchChannel(value) {
   const raw = String(value || "").trim();
@@ -89,8 +74,7 @@ export default function PublicProfilePage() {
   const level = profile.achievement_level || { level: s.level || 1, progress: 0, points: s.points || 0, next_level_points: 100 };
   const isPrivate = profile.privacy_public_profile === false;
   const joinedDate = profile.created_at ? new Date(profile.created_at) : null;
-  const avatarFrame = accountLevelFrame(level.level);
-  const levelTitle = accountLevelTitle(level.level);
+  const avatarFrame = accountLevelFrameClass(level.level);
   const twitchChannel = normalizeTwitchChannel(profile.twitch_handle);
   const twitchUrl = twitchChannel ? `https://www.twitch.tv/${twitchChannel}` : "";
   const liveStream = twitchChannel
@@ -127,9 +111,7 @@ export default function PublicProfilePage() {
               </h1>
               <div className="mt-2 text-white/50 text-sm flex flex-wrap items-center gap-3">
                 <span>@{profile.username}</span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#29B6E8]/40 text-[#29B6E8] text-[10px] uppercase tracking-widest rounded-sm">
-                  <Zap className="w-3 h-3" /> Level {level.level} · {levelTitle}
-                </span>
+                <AccountLevelPill level={level.level} />
                 {liveStream && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] text-[10px] uppercase tracking-widest rounded-sm">
                     <Radio className="w-3 h-3 animate-live" /> Live
@@ -165,13 +147,7 @@ export default function PublicProfilePage() {
                 </div>
               )}
               <div className="mt-4 max-w-md" data-testid="profile-level-progress">
-                <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/45 font-bold">
-                  <span>Achievement-Level</span>
-                  <span>{level.points} / {level.next_level_points} Punkte · {levelTitle}</span>
-                </div>
-                <div className="mt-2 h-2 rounded-sm bg-white/10 overflow-hidden">
-                  <div className="h-full bg-[#29B6E8]" style={{ width: `${level.progress || 0}%` }} />
-                </div>
+                <AccountLevelProgress level={level.level} points={level.points} nextLevelPoints={level.next_level_points} progress={level.progress} />
               </div>
               {/* Quick stats */}
               <div className="mt-6 grid grid-cols-3 md:grid-cols-6 gap-3">

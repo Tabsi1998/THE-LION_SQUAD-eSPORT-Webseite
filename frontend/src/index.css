@@ -142,10 +142,29 @@ body {
 .tls-account-frame-legendary {
   animation: tls-level-prestige 3.8s ease-in-out infinite;
 }
+.tls-account-avatar-frame {
+  box-shadow: 0 0 0 1px rgba(41,182,232,0.14);
+}
+.tls-account-avatar-frame-pro {
+  box-shadow: 0 0 0 1px rgba(41,182,232,0.22), 0 0 18px rgba(41,182,232,0.13);
+}
+.tls-account-avatar-frame-elite {
+  box-shadow: 0 0 0 1px rgba(255,215,0,0.26), 0 0 20px rgba(255,215,0,0.14);
+}
+.tls-account-avatar-frame-legendary {
+  animation: tls-level-prestige 3.8s ease-in-out infinite;
+}
 
 @keyframes tls-level-prestige {
   0%, 100% { box-shadow: 0 0 0 1px rgba(255,215,0,0.30), 0 0 28px rgba(255,215,0,0.14), 0 0 0 rgba(255,59,48,0); }
   50% { box-shadow: 0 0 0 1px rgba(255,215,0,0.58), 0 0 44px rgba(255,215,0,0.24), 0 0 22px rgba(255,59,48,0.14); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tls-account-frame-legendary,
+  .tls-account-avatar-frame-legendary,
+  .animate-live {
+    animation: none;
+  }
 }
 
 /* focus ring */

@@ -4,6 +4,7 @@ import { ArrowLeft, Crown, ExternalLink, Gamepad2, Monitor, User as UserIcon } f
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
+import { AccountLevelPill, AccountLevelProgress, accountAvatarFrameClass, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 import { api, resolveMediaUrl } from "@/lib/api";
 
 export default function MemberProfilePage() {
@@ -109,10 +110,10 @@ function LinkedAccountCard({ account }) {
       <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Plattformkonto</div>
       <Link
         to={account.profile_url}
-        className="mt-2 group block border border-[#29B6E8]/30 bg-[#08151A] rounded-sm p-3 hover:border-[#29B6E8] hover:bg-[#0B1D24] transition"
+        className={`mt-2 group block border ${accountLevelFrameClass(level)} bg-[#08151A] rounded-sm p-3 hover:border-[#29B6E8] hover:bg-[#0B1D24] transition`}
       >
         <div className="flex items-center gap-3">
-          <div className="w-14 h-14 rounded-sm border border-white/10 bg-[#0A0A0A] overflow-hidden shrink-0">
+          <div className={`w-14 h-14 rounded-sm border ${accountAvatarFrameClass(level)} bg-[#0A0A0A] overflow-hidden shrink-0`}>
             {account.avatar_url ? (
               <img src={resolveMediaUrl(account.avatar_url)} alt="" className="w-full h-full object-cover" />
             ) : (
@@ -123,10 +124,8 @@ function LinkedAccountCard({ account }) {
             <div className="font-heading font-black uppercase truncate text-white group-hover:text-[#29B6E8]">{account.display_name || account.username}</div>
             <div className="text-xs text-white/45 truncate">@{account.username}</div>
             <div className="mt-2 flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700]">Level {level}</span>
-              <div className="h-1 flex-1 bg-white/10 rounded-full overflow-hidden">
-                <div className="h-full bg-[#FFD700]" style={{ width: `${progress}%` }} />
-              </div>
+              <AccountLevelPill level={level} className="shrink-0 px-1.5 py-0 text-[9px]" />
+              <div className="flex-1"><AccountLevelProgress level={level} progress={progress} compact /></div>
             </div>
           </div>
           <ExternalLink className="w-4 h-4 text-white/35 group-hover:text-[#29B6E8] shrink-0" />
