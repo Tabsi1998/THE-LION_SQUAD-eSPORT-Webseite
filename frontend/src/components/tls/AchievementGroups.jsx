@@ -1,9 +1,9 @@
 /**
  * Achievement Groups View — Phase B v4.
  *
- * Renders all groups returned from /api/achievements/{me|user/:id}.
- * Each group is a collapsible card. The CURRENT highest-earned tier is the
- * showcase; clicking the card expands to show all tiers (earned + locked).
+ * Renders achievement groups returned from /api/achievements/{me|user/:id}.
+ * In profile-edit views it can show earned + locked tiers. Public profile views
+ * pass earnedOnly so visitors see only achievements the user actually has.
  *
  * Secret negative/fun groups appear only after a user has earned at least one
  * tier. Locked negative tiers are never sent by the API.
@@ -32,13 +32,23 @@ const CATEGORY_META = {
 
 function pascal(s) { return s.split("-").map(w => w.charAt(0).toUpperCase()+w.slice(1)).join(""); }
 
-export function AchievementGroupsView({ groups = [], emptyText = "Noch keine Achievements freigeschaltet." }) {
+export function AchievementGroupsView({ groups = [], emptyText = "Noch keine Achievements freigeschaltet.", earnedOnly = false }) {
+  const visibleGroups = earnedOnly
+    ? groups
+        .map((group) => ({
+          ...group,
+          tiers: (group.tiers || []).filter((tier) => tier.earned),
+          tier_count: (group.tiers || []).filter((tier) => tier.earned).length,
+          earned_count: (group.tiers || []).filter((tier) => tier.earned).length,
+        }))
+        .filter((group) => group.tiers.length > 0)
+    : groups;
   // Group by category
   const byCat = {};
-  for (const g of groups) (byCat[g.category] ||= []).push(g);
+  for (const g of visibleGroups) (byCat[g.category] ||= []).push(g);
   const order = ["club", "tournament", "match", "fastlap", "special", "negative"];
 
-  if (!groups.length) {
+  if (!visibleGroups.length) {
     return (
       <div className="border border-dashed border-white/10 rounded-sm p-12 text-center text-white/50" data-testid="achievements-empty">
         {emptyText}
@@ -61,7 +71,7 @@ export function AchievementGroupsView({ groups = [], emptyText = "Noch keine Ach
               <span className="text-[10px] uppercase tracking-widest text-white/40">{byCat[cat].length} Gruppen</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {byCat[cat].map(g => <GroupCard key={g.code} group={g} />)}
+              {byCat[cat].map(g => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} />)}
             </div>
           </section>
         );
@@ -70,13 +80,13 @@ export function AchievementGroupsView({ groups = [], emptyText = "Noch keine Ach
   );
 }
 
-function GroupCard({ group }) {
+function GroupCard({ group, earnedOnly = false }) {
   const [open, setOpen] = useState(false);
   const Icon = Icons[pascal(group.icon || "trophy")] || Icons.Trophy;
   const earnedTiers = group.tiers.filter(t => t.earned).sort((a, b) => b.level - a.level);
   const lockedTiers = group.tiers.filter(t => !t.earned).sort((a, b) => a.level - b.level);
   const highest = earnedTiers[0]; // top tier achieved
-  const nextLocked = lockedTiers[0];
+  const nextLocked = earnedOnly ? null : lockedTiers[0];
   const hasAny = earnedTiers.length > 0;
   const accent = group.accent_color || "#29B6E8";
   const isNegative = Boolean(group.is_negative || group.category === "negative");
@@ -117,7 +127,7 @@ function GroupCard({ group }) {
                 {isNegative ? "Geheim" : `${LEVEL_META[highest.level].icon} ${LEVEL_META[highest.level].name}`}
               </span>
             )}
-            {!hasAny && nextLocked && (
+            {!earnedOnly && !hasAny && nextLocked && (
               <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-white/10 text-white/50">
                 Locked
               </span>
@@ -125,7 +135,7 @@ function GroupCard({ group }) {
           </div>
           <div className="mt-1 text-xs text-white/55 line-clamp-1">{group.description}</div>
           {/* Compact progress hint when nothing earned yet */}
-          {!isNegative && !hasAny && nextLocked && nextLocked.target > 0 && nextLocked.condition_status !== "planned" && (
+          {!earnedOnly && !isNegative && !hasAny && nextLocked && nextLocked.target > 0 && nextLocked.condition_status !== "planned" && (
             <div className="mt-2 flex items-center gap-2">
               <div className="flex-1 h-1 bg-white/5 rounded-sm overflow-hidden max-w-[200px]">
                 <div className="h-full" style={{ width: `${nextLocked.percent}%`, backgroundColor: accent }} />
@@ -136,7 +146,7 @@ function GroupCard({ group }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[10px] uppercase tracking-widest text-white/40 hidden sm:inline">
-            {isNegative ? `${group.earned_count} geheim` : `${group.earned_count}/${group.tier_count}`}
+            {earnedOnly ? group.earned_count : (isNegative ? `${group.earned_count} geheim` : `${group.earned_count}/${group.tier_count}`)}
           </span>
           <ChevronDown className={`w-4 h-4 text-white/40 transition-transform ${open ? "rotate-180" : ""}`} />
         </div>

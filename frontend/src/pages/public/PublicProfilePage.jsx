@@ -353,7 +353,7 @@ export default function PublicProfilePage() {
 
         {tab === "badges" && (
           <div>
-            <AchievementGroupsView groups={achievementsData?.groups || []} emptyText="Noch keine Achievements freigeschaltet." />
+            <AchievementGroupsView groups={achievementsData?.groups || []} earnedOnly emptyText="Noch keine Achievements freigeschaltet." />
           </div>
         )}
 
