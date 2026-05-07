@@ -1,4 +1,6 @@
 """Phase 9: PrizePickup admin + user routes."""
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Literal
@@ -6,7 +8,7 @@ from typing import Optional, Literal
 from database import get_db
 from auth import require_admin, get_current_user
 from models import now_utc, new_id
-from services.prize_service import mark_ready, mark_picked_up
+from services.prize_service import DEFAULT_PICKUP_WINDOW_DAYS, mark_ready, mark_picked_up
 
 router = APIRouter(prefix="/api/prizes", tags=["prizes"])
 
@@ -19,6 +21,44 @@ class PrizeUpdate(BaseModel):
     pickup_deadline: Optional[str] = None
     prize_label: Optional[str] = None
     prize_value: Optional[str] = None
+
+
+async def _hydrate_pickups(pickups: list[dict]) -> list[dict]:
+    """Attach safe recipient context for admin and user prize views."""
+    if not pickups:
+        return pickups
+    db = get_db()
+    user_ids = list({p.get("user_id") for p in pickups if p.get("user_id")})
+    team_ids = list({p.get("team_id") for p in pickups if p.get("team_id")})
+    users = await db.users.find(
+        {"id": {"$in": user_ids}},
+        {"_id": 0, "id": 1, "display_name": 1, "username": 1, "email": 1, "avatar_url": 1},
+    ).to_list(500) if user_ids else []
+    teams = await db.teams.find(
+        {"id": {"$in": team_ids}},
+        {"_id": 0, "id": 1, "name": 1, "tag": 1, "logo_url": 1, "member_ids": 1},
+    ).to_list(500) if team_ids else []
+    user_map = {u["id"]: u for u in users}
+    team_map = {t["id"]: t for t in teams}
+    for p in pickups:
+        user = user_map.get(p.get("user_id")) or {}
+        team = team_map.get(p.get("team_id")) or {}
+        if team:
+            p["recipient_type"] = "team"
+            p["recipient_label"] = team.get("tag") or team.get("name") or "Team"
+            p["recipient_subtitle"] = team.get("name") or f"{len(team.get('member_ids') or [])} Mitglieder"
+            p["recipient_url"] = f"/teams/{team.get('id')}"
+            p["team"] = {k: team.get(k) for k in ("id", "name", "tag", "logo_url", "member_ids")}
+        else:
+            p["recipient_type"] = "user"
+            p["recipient_label"] = user.get("display_name") or user.get("username") or "Unbekannter User"
+            p["recipient_subtitle"] = user.get("email") or user.get("username") or ""
+            p["recipient_url"] = f"/u/{user.get('username')}" if user.get("username") else None
+        p["display_name"] = p["recipient_label"]
+        p["email"] = user.get("email")
+        if user:
+            p["user"] = {k: user.get(k) for k in ("id", "display_name", "username", "avatar_url")}
+    return pickups
 
 
 @router.get("")
@@ -34,33 +74,43 @@ async def list_prizes(
     if tournament_id:
         q["tournament_id"] = tournament_id
     pickups = await db.prize_pickups.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
-    # Hydrate display_name
-    user_ids = list({p.get("user_id") for p in pickups if p.get("user_id")})
-    users = await db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1, "email": 1}).to_list(500)
-    umap = {u["id"]: u for u in users}
-    for p in pickups:
-        u = umap.get(p.get("user_id")) or {}
-        p["display_name"] = u.get("display_name") or u.get("username") or "—"
-        p["email"] = u.get("email")
-    return pickups
+    return await _hydrate_pickups(pickups)
 
 
 @router.get("/me")
 async def my_prizes(me: dict = Depends(get_current_user)):
     db = get_db()
+    team_ids = [
+        t["id"] for t in await db.teams.find(
+            {"member_ids": me["id"]}, {"_id": 0, "id": 1}
+        ).to_list(100)
+    ]
+    q = {"$or": [{"user_id": me["id"]}]}
+    if team_ids:
+        q["$or"].append({"team_id": {"$in": team_ids}})
     pickups = await db.prize_pickups.find(
-        {"user_id": me["id"]}, {"_id": 0}
+        q, {"_id": 0}
     ).sort("created_at", -1).to_list(100)
-    return pickups
+    return await _hydrate_pickups(pickups)
 
 
 @router.get("/me/open-count")
 async def my_open_prize_count(me: dict = Depends(get_current_user)):
     """Lightweight endpoint for dashboard hint badge."""
     db = get_db()
-    count = await db.prize_pickups.count_documents({
-        "user_id": me["id"],
+    team_ids = [
+        t["id"] for t in await db.teams.find(
+            {"member_ids": me["id"]}, {"_id": 0, "id": 1}
+        ).to_list(100)
+    ]
+    q = {
+        "$or": [{"user_id": me["id"]}],
         "status": {"$in": ["pending", "ready"]},
+    }
+    if team_ids:
+        q["$or"].append({"team_id": {"$in": team_ids}})
+    count = await db.prize_pickups.count_documents({
+        **q,
     })
     return {"count": count}
 
@@ -113,6 +163,18 @@ class PrizeCreate(BaseModel):
 async def create_prize_manually(body: PrizeCreate, me: dict = Depends(require_admin())):
     db = get_db()
     t = await db.tournaments.find_one({"id": body.tournament_id}, {"_id": 0}) or {}
+    user = await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1})
+    if not user:
+        raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
+    existing = await db.prize_pickups.find_one({
+        "tournament_id": body.tournament_id,
+        "user_id": body.user_id,
+        "team_id": None,
+        "place": body.place,
+    })
+    if existing:
+        raise HTTPException(status_code=409, detail="Für diesen Benutzer und Platz existiert bereits ein Gewinn")
+    deadline = body.pickup_deadline or (now_utc() + timedelta(days=DEFAULT_PICKUP_WINDOW_DAYS)).isoformat()
     doc = {
         "id": new_id(),
         "tournament_id": body.tournament_id,
@@ -125,7 +187,7 @@ async def create_prize_manually(body: PrizeCreate, me: dict = Depends(require_ad
         "prize_label": body.prize_label,
         "prize_value": body.prize_value or "",
         "status": "pending",
-        "pickup_deadline": body.pickup_deadline,
+        "pickup_deadline": deadline,
         "ready_at": None,
         "picked_up_at": None,
         "picked_up_by": None,
@@ -134,6 +196,11 @@ async def create_prize_manually(body: PrizeCreate, me: dict = Depends(require_ad
         "updated_at": now_utc().isoformat(),
     }
     await db.prize_pickups.insert_one(doc)
+    await db.audit_logs.insert_one({
+        "id": new_id(), "actor_id": me["id"], "action": "prizes.create",
+        "entity_id": doc["id"], "details": {"tournament_id": body.tournament_id, "user_id": body.user_id, "place": body.place},
+        "created_at": now_utc().isoformat(),
+    })
     return {k: v for k, v in doc.items() if k != "_id"}
 
 
