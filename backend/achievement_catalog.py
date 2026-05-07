@@ -699,6 +699,7 @@ CONDITION_KEY_STATUS = {
     "season_points_total": "live",
     "seasons_active": "live",
     "teams_founded": "live",
+    "team_days_max": "live",
     "tournaments_registered": "live",
     "tournaments_won": "live",
     "twitch_live_sessions": "live",
@@ -736,7 +737,6 @@ CONDITION_KEY_STATUS = {
     "reverse_lap_count": "planned",
     "slowest_lap_count": "planned",
     "sub_target_count": "planned",
-    "team_days_max": "planned",
     "team_kills": "planned",
     "team_late_count": "planned",
     "team_member_churn": "planned",
@@ -744,6 +744,207 @@ CONDITION_KEY_STATUS = {
     "unproven_laps": "planned",
     "zero_eight_losses": "planned",
 }
+
+
+# ---------- Phase B v4.3 — Catalog Quality Pass ----------
+# Keep seeded legacy codes stable, but hide concepts that do not make sense for
+# normal users. Event creation is a club/admin workflow, not a player goal.
+DEPRECATED_GROUP_CODES = {"event_host"}
+for _group in ACHIEVEMENT_GROUPS:
+    if _group["code"] in DEPRECATED_GROUP_CODES:
+        _group.update({
+            "public": False,
+            "is_special": True,
+            "description": "Archivierte System-Group. Nicht im öffentlichen Katalog anzeigen.",
+        })
+
+# Anything that is not wired to live/counter data is made manual instead of
+# showing as a grey planned goal. Manual awards still fully work through admin.
+for _tier in ACHIEVEMENT_TIERS:
+    _ck = _tier.get("condition_key")
+    if _ck and CONDITION_KEY_STATUS.get(_ck) == "planned":
+        _tier["manual_only"] = True
+        _tier["condition_key"] = None
+        _tier["progress_target"] = None
+        if "manuell" not in (_tier.get("description") or "").lower():
+            _tier["description"] = f"{_tier.get('description') or 'Besondere Situation.'} Wird vom Team manuell vergeben."
+
+# Negative/fun awards are secret, but should still feel rewarding once earned.
+for _group in ACHIEVEMENT_GROUPS:
+    if _group.get("is_negative"):
+        _group["public"] = False
+for _tier in ACHIEVEMENT_TIERS:
+    _group = next((g for g in ACHIEVEMENT_GROUPS if g["code"] == _tier["group_code"]), {})
+    if _group.get("is_negative"):
+        _tier["manual_only"] = True
+        _tier["condition_key"] = None
+        _tier["progress_target"] = None
+        if int(_tier.get("points") or 0) <= 0:
+            _tier["points"] = 5
+
+
+ACHIEVEMENT_GROUPS_V43 = [
+    {"code": "platform_identity", "name": "Account-Identität", "category": "club", "icon": "id-card",
+     "accent_color": "#29B6E8", "description": "Pflege Profil, Plattformen und öffentliche Identität.",
+     "public": True, "is_special": False, "is_negative": False, "sort_order": 414},
+    {"code": "community_presence", "name": "Community-Präsenz", "category": "club", "icon": "users-round",
+     "accent_color": "#00FF88", "description": "Zeige Aktivität über Discord, Teams und Profilpflege.",
+     "public": True, "is_special": False, "is_negative": False, "sort_order": 415},
+    {"code": "stream_growth", "name": "Stream-Wachstum", "category": "club", "icon": "broadcast",
+     "accent_color": "#9146FF", "description": "Twitch-Sessions und Streamzeit über die Live-Erkennung.",
+     "public": True, "is_special": False, "is_negative": False, "sort_order": 416},
+    {"code": "grind_legend", "name": "Langzeit-Grind", "category": "match", "icon": "dumbbell",
+     "accent_color": "#A855F7", "description": "Sehr langfristige Match- und Turnier-Meilensteine.",
+     "public": True, "is_special": False, "is_negative": False, "sort_order": 118},
+    {"code": "fastlap_elite", "name": "Fast-Lap-Elite", "category": "fastlap", "icon": "gauge",
+     "accent_color": "#FFD700", "description": "Langfristige Bestzeiten, Strecken und gültige Runden.",
+     "public": True, "is_special": False, "is_negative": False, "sort_order": 305},
+    {"code": "neg_secret_fun", "name": "Geheime Patzer", "category": "negative", "icon": "badge-alert",
+     "accent_color": "#FF3B30", "description": "Geheime Fun-/Negative-Awards. Werden erst nach Vergabe sichtbar.",
+     "public": False, "is_special": False, "is_negative": True, "sort_order": 906},
+]
+ACHIEVEMENT_GROUPS.extend(ACHIEVEMENT_GROUPS_V43)
+
+
+def _add_generated_tiers():
+    public_specs = []
+    public_specs.extend([
+        ("level_progression", "achievement_points", target, f"Level {level}", f"Erreiche Level {level} durch Achievement-Punkte.", 0, "badge-plus")
+        for level, target in [
+            (25, 57600), (30, 84100), (35, 115600), (40, 152100), (50, 240100),
+            (60, 348100), (75, 547600), (90, 792100), (110, 1188100), (130, 1664100),
+            (150, 2220100), (175, 3062600), (200, 3960100), (250, 6200100), (300, 8940100),
+        ]
+    ])
+    public_specs.extend([
+        ("achievement_collector", "achievements_unlocked", target, name, f"Schalte {target} Achievements frei.", points, "trophy")
+        for target, name, points in [
+            (125, "Katalog-Kenner", 350), (150, "Badge-Jäger", 450), (175, "Sammlungsdrang", 550),
+            (200, "Archiv-Füller", 650), (250, "Trophäen-Archiv", 800), (300, "Achievement-Maschine", 1000),
+            (400, "Sammler-Elite", 1300), (500, "Katalog-Legende", 1600), (750, "Mythos-Sammler", 2200), (1000, "Alles gesehen", 3000),
+        ]
+    ])
+    public_specs.extend([
+        ("grind_legend", "matches_played", target, name, f"Spiele {target} Matches.", points, "swords")
+        for target, name, points in [
+            (500, "Queue-Stammspieler", 550), (750, "Match-Grinder", 850), (1000, "Tausender-Club", 1200), (1500, "Endlos-Queue", 1800),
+        ]
+    ])
+    public_specs.extend([
+        ("grind_legend", "matches_won", target, name, f"Gewinne {target} Matches.", points, "trophy")
+        for target, name, points in [
+            (250, "Win-Spezialist", 600), (400, "Sieg-Routine", 900), (600, "Winner Mindset", 1400), (1000, "Siegesmonument", 2400),
+        ]
+    ])
+    public_specs.extend([
+        ("grind_legend", "match_streak_max", target, name, f"Gewinne {target} Matches in Folge.", points, "flame")
+        for target, name, points in [
+            (25, "Feuerlauf", 800), (30, "Streak-Baron", 1200), (40, "Unantastbar", 1800), (50, "Perfect Storm", 2600),
+        ]
+    ])
+    public_specs.extend([
+        ("tournament_veteran", "tournaments_registered", target, name, f"Nimm an {target} Turnieren teil.", points, "shield")
+        for target, name, points in [
+            (150, "Turnier-Dauerkarte", 700), (200, "Bracket-Bewohner", 1000), (300, "Arena-Stammgast", 1600), (500, "Turnier-Inventar", 2600),
+        ]
+    ])
+    public_specs.extend([
+        ("tournament_champion", "tournaments_won", target, name, f"Gewinne {target} Turniere.", points, "crown")
+        for target, name, points in [
+            (40, "Champion-Veteran", 1800), (60, "Titeljäger", 2600), (100, "Kronensammler", 4200), (150, "Champion-Mythos", 6500),
+        ]
+    ])
+    public_specs.extend([
+        ("podium_collector", "podium_finishes", target, name, f"Erreiche {target} Podestplätze.", points, "medal")
+        for target, name, points in [
+            (90, "Podest-Dauerkarte", 1200), (120, "Medal-Magnet", 1800), (200, "Podium-Legende", 3000), (300, "Podest-Mythos Ultra", 4800),
+        ]
+    ])
+    public_specs.extend([
+        ("fastlap_elite", "fastlap_valid_count", target, name, f"Reiche {target} gültige Fast-Lap-Zeiten ein.", points, "flag")
+        for target, name, points in [
+            (1500, "Rundenwerk", 1100), (2500, "Lap-Fabrik", 1800), (5000, "Zeitjäger Ultra", 3400), (10000, "Endurance Driver", 7000),
+        ]
+    ])
+    public_specs.extend([
+        ("fastlap_elite", "pole_count", target, name, f"Halte {target} Pole Positions.", points, "gauge")
+        for target, name, points in [
+            (50, "Pole-Elite", 1500), (75, "Qualifying-König", 2300), (100, "One-Lap-Gott", 3400), (150, "Pole-Mythos Ultra", 5200),
+        ]
+    ])
+    public_specs.extend([
+        ("fastlap_elite", "distinct_tracks", target, name, f"Fahre auf {target} unterschiedlichen Strecken.", points, "map")
+        for target, name, points in [
+            (35, "Streckenreisender", 600), (50, "Track-Sammler", 1000), (75, "Weltkarte voll", 1600), (100, "Global Hotlapper", 2500),
+        ]
+    ])
+    public_specs.extend([
+        ("stream_growth", "twitch_live_sessions", target, name, f"Gehe {target} Mal mit verknüpftem Twitch live.", points, "radio")
+        for target, name, points in [
+            (10, "Stream-Rhythmus", 150), (25, "Live-Stammplatz", 350), (50, "On-Air-Routine", 700), (100, "Broadcast-Legende", 1500),
+        ]
+    ])
+    public_specs.extend([
+        ("stream_growth", "twitch_stream_minutes", target, name, f"Sammle {target // 60} Stunden erkannte Streamzeit.", points, "tv")
+        for target, name, points in [
+            (6000, "Hundert Stunden Live", 800), (15000, "Stream-Grinder", 1500), (30000, "Broadcast-Marathon", 2800), (60000, "Live-Mythos", 5200),
+        ]
+    ])
+    public_specs.extend([
+        ("community_presence", "discord_messages", target, name, f"Sammle {target} Discord-Nachrichten im Counter.", points, "message-circle")
+        for target, name, points in [
+            (5000, "Discord-Stammgast", 400), (10000, "Voice-of-Community", 800), (25000, "Chat-Legende", 1800), (50000, "Discord-Mythos", 3500),
+        ]
+    ])
+    public_specs.extend([
+        ("platform_identity", "profile_completeness", 100, "Profil poliert", "Halte dein Profil vollständig gepflegt.", 120, "user-check"),
+        ("platform_identity", "distinct_platforms", 3, "Multi-Setup", "Pflege 3 Plattformen im Profil.", 60, "cpu"),
+        ("platform_identity", "distinct_platforms", 4, "Setup-Sammler", "Pflege 4 Plattformen im Profil.", 120, "cpu"),
+        ("platform_identity", "distinct_platforms", 6, "Hardware-Wanderer", "Pflege 6 Plattformen im Profil.", 240, "cpu"),
+        ("community_presence", "teams_founded", 1, "Team-Captain", "Gründe oder leite dein erstes Team.", 80, "users"),
+        ("community_presence", "team_days_max", 365, "Team-Jahrestag", "Bleibe 365 Tage in einem Team.", 180, "shield"),
+        ("community_presence", "team_days_max", 730, "Zwei Jahre Teamtreue", "Bleibe 730 Tage in einem Team.", 360, "shield"),
+        ("community_presence", "team_days_max", 1095, "Drei Jahre Teamtreue", "Bleibe 1095 Tage in einem Team.", 600, "shield"),
+        ("community_presence", "events_attended", 100, "Event-Legende", "Besuche 100 eingetragene Vereinsevents.", 800, "calendar-check"),
+        ("season_consistency", "seasons_active", 15, "Saison-Dauerläufer", "Sei in 15 Saisons aktiv.", 900, "calendar-check"),
+        ("season_points", "season_points_total", 1000, "Punkte-Elite", "Sammle 1000 Season-Punkte.", 900, "star"),
+        ("season_points", "season_points_total", 2500, "Ranglisten-Mythos", "Sammle 2500 Season-Punkte.", 2000, "star"),
+        ("multitalent", "distinct_games_registered", 10, "Zehnkampf-Gamer", "Tritt in 10 verschiedenen Spielen an.", 350, "layers"),
+        ("multitalent", "distinct_games_registered", 15, "Game-Hopper Elite", "Tritt in 15 verschiedenen Spielen an.", 700, "layers"),
+        ("format_master", "distinct_formats", 6, "Format-Architekt", "Tritt in 6 verschiedenen Turnierformaten an.", 450, "git-branch"),
+        ("format_master", "distinct_formats", 8, "Bracket-Chamäleon", "Tritt in 8 verschiedenen Turnierformaten an.", 900, "git-branch"),
+    ])
+
+    for idx, (group, key, target, name, desc, points, icon) in enumerate(public_specs, start=1):
+        code = f"v43_{group}_{key}_{target}".replace("-", "_")
+        ACHIEVEMENT_TIERS.append(_t(code, group, 5, name, desc,
+                                    condition_key=key, progress_target=target,
+                                    points=points, icon=icon))
+
+    negative_specs = [
+        ("neg_stream_muted", "Stumm auf Sendung", "Der Stream lief, aber niemand hat dich gehört.", "mic-off"),
+        ("neg_wrong_game", "Falsches Spiel gestartet", "Bereit fürs Match, nur im falschen Game.", "gamepad-2"),
+        ("neg_bracket_blind", "Bracket übersehen", "Der Gegner stand schon lange fest.", "eye-off"),
+        ("neg_ping_panic", "Ping-Panik", "Die Verbindung war heute dein Bossfight.", "wifi-off"),
+        ("neg_keyboard_gymnastics", "Tastatur-Akrobat", "Mehr Shortcuts als Spielzüge.", "keyboard"),
+        ("neg_controller_lowbat", "Low-Battery-Held", "Controllerakku zur perfekten Zeit leer.", "battery-low"),
+        ("neg_last_second_update", "Update in letzter Sekunde", "Patch startet genau vor dem Match.", "download"),
+        ("neg_rule_question_loop", "Regelfrage-Schleife", "Die Antwort stand schon im Regelwerk.", "book-open"),
+        ("neg_wrong_car", "Falsches Setup, voller Einsatz", "Mit dem falschen Auto trotzdem los.", "car"),
+        ("neg_boxenfunk_chaos", "Boxenfunk-Chaos", "Kommunikation mit besonderem Unterhaltungswert.", "radio"),
+        ("neg_photo_finish_fail", "Fotofinish verpasst", "Screenshot oder Beweis kam zu spät.", "image-off"),
+        ("neg_lobby_tourist", "Lobby-Tourist", "Kurz überall, nur nicht dort wo nötig.", "map-pin-off"),
+        ("neg_capslock_strategy", "CAPSLOCK-Strategie", "Taktik wurde sehr deutlich kommuniziert.", "megaphone"),
+        ("neg_snack_meta", "Snack-Meta", "Der Snack war wichtiger als der Start.", "cookie"),
+        ("neg_warmup_worldchamp", "Warmup-Weltmeister", "Im Warmup unschlagbar, im Match menschlich.", "flame"),
+        ("neg_setup_jenga", "Setup-Jenga", "Ein Kabel und alles wurde spannend.", "cable"),
+    ]
+    for idx, (code, name, desc, icon) in enumerate(negative_specs, start=1):
+        ACHIEVEMENT_TIERS.append(_t(code, "neg_secret_fun", 1, name, desc,
+                                    points=7, icon=icon, manual_only=True))
+
+
+_add_generated_tiers()
 
 GROUP_BY_CODE = {g["code"]: g for g in ACHIEVEMENT_GROUPS}
 TIER_BY_CODE = {t["code"]: t for t in ACHIEVEMENT_TIERS}

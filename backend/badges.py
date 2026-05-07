@@ -287,9 +287,29 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     else:
         p["achievement_points"] = 0
 
-    teams = await db.teams.find({"members.user_id": user_id}, {"_id": 0, "id": 1, "founder_id": 1}).to_list(50)
-    p["teams_founded"] = sum(1 for t in teams if t.get("founder_id") == user_id)
-    p["team_days_max"] = 0
+    teams = await db.teams.find(
+        {"member_ids": user_id},
+        {"_id": 0, "id": 1, "leader_id": 1, "created_by": 1, "created_at": 1},
+    ).to_list(100)
+    p["teams_founded"] = sum(1 for t in teams if t.get("leader_id") == user_id or t.get("created_by") == user_id)
+    team_days_max = 0
+    team_ids = [t["id"] for t in teams if t.get("id")]
+    if team_ids:
+        memberships = await db.team_members.find(
+            {"team_id": {"$in": team_ids}, "user_id": user_id},
+            {"_id": 0, "joined_at": 1, "team_id": 1},
+        ).to_list(100)
+        joined_by_team = {m.get("team_id"): m.get("joined_at") for m in memberships if m.get("team_id")}
+        for team in teams:
+            raw_joined = joined_by_team.get(team.get("id")) or team.get("created_at")
+            try:
+                joined = datetime.fromisoformat(str(raw_joined).replace("Z", "+00:00"))
+                if joined.tzinfo is None:
+                    joined = joined.replace(tzinfo=timezone.utc)
+                team_days_max = max(team_days_max, max((datetime.now(timezone.utc) - joined).days, 1))
+            except (ValueError, TypeError):
+                continue
+    p["team_days_max"] = team_days_max
 
     p["best_season_rank_inv"] = 0
     p["best_championship_rank_inv"] = 0
@@ -533,6 +553,22 @@ NEGATIVE_INCIDENTS = {
     "start_sleep":       "neg_start_sleep",
     "setup_curse":       "neg_setup_curse",
     "capslock_captain":  "neg_capslock_captain",
+    "stream_muted":      "neg_stream_muted",
+    "wrong_game":        "neg_wrong_game",
+    "bracket_blind":     "neg_bracket_blind",
+    "ping_panic":        "neg_ping_panic",
+    "keyboard_gymnastics": "neg_keyboard_gymnastics",
+    "controller_lowbat": "neg_controller_lowbat",
+    "last_second_update": "neg_last_second_update",
+    "rule_question_loop": "neg_rule_question_loop",
+    "wrong_car":         "neg_wrong_car",
+    "boxenfunk_chaos":   "neg_boxenfunk_chaos",
+    "photo_finish_fail": "neg_photo_finish_fail",
+    "lobby_tourist":     "neg_lobby_tourist",
+    "capslock_strategy": "neg_capslock_strategy",
+    "snack_meta":        "neg_snack_meta",
+    "warmup_worldchamp": "neg_warmup_worldchamp",
+    "setup_jenga":       "neg_setup_jenga",
 }
 
 

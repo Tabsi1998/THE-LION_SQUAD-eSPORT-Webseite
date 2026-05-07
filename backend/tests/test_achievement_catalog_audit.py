@@ -54,3 +54,30 @@ def test_level_progression_has_long_term_milestones():
     assert targets["level_progression_10"] == 8100
     assert targets["level_progression_15"] == 19600
     assert targets["level_progression_20"] == 36100
+    assert any(t["progress_target"] >= 8940100 for t in tiers)
+
+
+def test_catalog_has_long_term_depth_and_secret_negative_awards():
+    assert len(ACHIEVEMENT_TIERS) >= 300
+    negative_groups = {g["code"] for g in ACHIEVEMENT_GROUPS if g.get("is_negative")}
+    negative_tiers = [t for t in ACHIEVEMENT_TIERS if t["group_code"] in negative_groups]
+    assert len(negative_tiers) >= 50
+    assert all(t.get("manual_only") is True for t in negative_tiers)
+    assert all(int(t.get("points") or 0) > 0 for t in negative_tiers)
+
+
+def test_no_public_tier_uses_planned_automation():
+    groups = {g["code"]: g for g in ACHIEVEMENT_GROUPS}
+    public_tiers = [
+        t for t in ACHIEVEMENT_TIERS
+        if groups[t["group_code"]].get("public") and not groups[t["group_code"]].get("is_negative")
+    ]
+    assert [
+        t["code"] for t in public_tiers
+        if CONDITION_KEY_STATUS.get(t.get("condition_key")) == "planned"
+    ] == []
+
+
+def test_event_host_group_is_hidden_from_public_catalog():
+    event_host = next(g for g in ACHIEVEMENT_GROUPS if g["code"] == "event_host")
+    assert event_host["public"] is False

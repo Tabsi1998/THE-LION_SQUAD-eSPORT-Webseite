@@ -85,7 +85,15 @@ Regel:
 - Counter-Achievements: werden aus gepflegten Zaehlern berechnet, z.B. Discord-Nachrichten.
 - Manuelle Achievements: werden von Admins vergeben.
 - Member-only-Achievements: nur aktive oder Ehren-Vereinsmitglieder koennen sie erhalten.
-- Negative/Fun-Achievements: bleiben kontrolliert sichtbar und sollen sparsam eingesetzt werden.
+- Negative/Fun-Achievements: bleiben geheim, bis sie vergeben wurden. Danach sieht man nur die freigeschalteten geheimen Awards.
+
+Der Systemkatalog hat mehr als 300 Achievements, davon mindestens 50 geheime Negative-/Fun-Awards. Nicht automatisch messbare Ziele sind bewusst manuell markiert, damit im oeffentlichen Profil keine kaputten oder unechten Progress-Balken erscheinen.
+
+Nicht sinnvoll fuer normale User:
+
+- Event-Gastgeber/Organisator-Achievements werden nicht oeffentlich angezeigt, weil Vereinsevents ein Admin-/Vereinsworkflow sind.
+
+Negative/Fun-Awards werden ueber `Admin -> Achievements -> Vorfall` oder als manuelle Vergabe ausgelöst. Sie geben kleine Punkte, sind aber versteckt und sollen gezielt eingesetzt werden.
 
 ### Levelsystem
 
@@ -96,6 +104,24 @@ Empfehlung:
 - Viele kleine Achievements fuer Aktivitaet.
 - Wenige besondere Achievements fuer grosse Meilensteine.
 - Animationen und starke Rahmen nur fuer hohe Level oder besondere Achievements verwenden.
+
+Live angebundene Quellen:
+
+- Turnier-Anmeldungen, Siege, Podestplaetze, Formate und Spiele
+- abgeschlossene Matches und Siegesserien
+- Fast-Lap-Zeiten, Strecken und Pole Positions
+- Profilvollstaendigkeit und Plattformfelder
+- Vereinsmitgliedschaftsdauer
+- Teamgruendung und Teamzugehoerigkeit
+- Season-Punkte und aktive Saisons
+- Twitch Live-Sessions und Stream-Minuten
+- Discord-Nachrichten-Counter
+
+Manuelle Quellen:
+
+- Community-Hilfe, Mentor, Creator, besondere Events
+- faire/negative Sonderfaelle, wenn keine sichere automatische Messung existiert
+- alle geheimen Fun-/Negative-Awards
 
 ## Discord
 
