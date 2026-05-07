@@ -87,7 +87,7 @@ export default function EventDetailPage() {
       <div className="relative border-b border-white/10">
         {e.banner_url && <img src={resolveMediaUrl(e.banner_url)} className="absolute inset-0 w-full h-full object-cover opacity-25" alt="" />}
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/40 via-[#0A0A0A]/80 to-[#0A0A0A]" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 min-w-0">
           <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Events", to: "/events" }, { label: e.name }]} className="mb-4" />
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#9F7AEA]">{TYPE_LABELS[e.event_type] || "EVENT"}</span>
@@ -95,13 +95,13 @@ export default function EventDetailPage() {
             {e.visibility === "members" && <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]"><Crown className="w-3 h-3" /> Mitglieder</span>}
             {e.visibility === "internal" && <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-white/60"><Lock className="w-3 h-3" /> Intern</span>}
           </div>
-          <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{e.name}</h1>
+          <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase leading-tight break-words">{e.name}</h1>
           {e.description && <div className="mt-3 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(e.description) }} />}
-          <div className="mt-6 flex flex-wrap gap-5 text-sm text-white/70">
-            {e.start_date && <span className="inline-flex items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA]" />{new Date(e.start_date).toLocaleString("de-DE", { dateStyle: "long", timeStyle: "short" })}</span>}
-            {(e.location || fullAddress(e)) && <span className="inline-flex items-center gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA]" />{[e.location, fullAddress(e)].filter(Boolean).join(", ")}</span>}
-            {e.contact && <span className="inline-flex items-center gap-2"><Mail className="w-4 h-4 text-[#9F7AEA]" />{e.contact}</span>}
-            {e.max_participants && <span className="inline-flex items-center gap-2"><Users className="w-4 h-4 text-[#9F7AEA]" />max. {e.max_participants}</span>}
+          <div className="mt-6 flex flex-wrap gap-5 text-sm text-white/70 min-w-0">
+            {e.start_date && <span className="inline-flex min-w-0 items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{new Date(e.start_date).toLocaleString("de-DE", { dateStyle: "long", timeStyle: "short" })}</span></span>}
+            {(e.location || fullAddress(e)) && <span className="inline-flex min-w-0 items-center gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{[e.location, fullAddress(e)].filter(Boolean).join(", ")}</span></span>}
+            {e.contact && <span className="inline-flex min-w-0 items-center gap-2"><Mail className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-all">{e.contact}</span></span>}
+            {e.max_participants && <span className="inline-flex items-center gap-2"><Users className="w-4 h-4 text-[#9F7AEA] shrink-0" />max. {e.max_participants}</span>}
             {e.organizer_name && (
               e.organizer_url ? (
                 <a href={e.organizer_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-[#29B6E8] hover:underline">
@@ -113,9 +113,9 @@ export default function EventDetailPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12 min-w-0">
         {(e.has_registration || (e.show_map && mapEmbedUrl(e))) && (
-          <div className="grid lg:grid-cols-2 gap-5">
+          <div className="grid lg:grid-cols-2 gap-5 min-w-0">
             {e.has_registration && (
               <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
                 <div className="text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">Anmeldung</div>
@@ -157,7 +157,7 @@ export default function EventDetailPage() {
         {!!e.tournaments?.length && (
           <div>
             <h2 className="font-heading text-2xl font-black uppercase mb-5">Turniere</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 min-w-0">
               {e.tournaments.map((t) => <EventTournamentEmbed key={t.id} tournament={t} />)}
             </div>
           </div>
@@ -166,7 +166,7 @@ export default function EventDetailPage() {
         {!!e.f1_challenges?.length && (
           <div>
             <h2 className="font-heading text-2xl font-black uppercase mb-5">Fast-Lap Challenges</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 min-w-0">
               {e.f1_challenges.map((c) => <EventFastLapEmbed key={c.id} challenge={c} />)}
             </div>
           </div>
@@ -206,7 +206,7 @@ export default function EventDetailPage() {
         {!!eventSponsors.length && (
           <div>
             <h2 className="font-heading text-2xl font-black uppercase mb-5">Unterstützt von</h2>
-            <div className="flex flex-wrap items-center gap-8 border-y border-white/10 py-6">
+            <div className="flex flex-wrap items-center gap-8 border-y border-white/10 py-6 min-w-0">
               {eventSponsors.map((s) => (
                 <a key={sponsorKey(s)} href={s.link || "#"} target={s.link ? "_blank" : undefined} rel="noreferrer" aria-label={s.name} className="group inline-flex items-center justify-center min-w-32">
                   <img src={resolveMediaUrl(s.logo_url)} alt="" className="max-h-14 max-w-44 object-contain opacity-80 group-hover:opacity-100 transition" />
@@ -237,14 +237,14 @@ function EventTournamentEmbed({ tournament }) {
   const regMap = new Map((bracket?.registrations || []).map((r) => [r.id, r]));
 
   return (
-    <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
+    <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden min-w-0">
       <Link to={`/tournaments/${tournament.slug || tournament.id}`} className="block p-5 hover:bg-white/[0.03] transition">
         <div className="flex flex-wrap items-center gap-2">
           <Trophy className="w-4 h-4 text-[#FFD700]" />
           <PhaseBadge phase={tournament.public_phase} status={tournament.status} />
           {tournament.start_date && <span className="text-xs text-white/45">{new Date(tournament.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</span>}
         </div>
-        <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#FFD700] transition">{tournament.title}</h3>
+        <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#FFD700] transition break-words">{tournament.title}</h3>
         <div className="mt-2 flex flex-wrap gap-3 text-xs text-white/55">
           {tournament.game?.name && <span>{tournament.game.name}</span>}
           {tournament.format && <span>{tournament.format.replace("_", " ")}</span>}
@@ -252,7 +252,7 @@ function EventTournamentEmbed({ tournament }) {
         </div>
       </Link>
       <div className="border-t border-white/10 p-5">
-        <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center justify-between gap-3 mb-3 min-w-0">
           <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">Bracket-Vorschau</div>
           <Link to={`/tournaments/${tournament.slug || tournament.id}/bracket`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">Öffnen</Link>
         </div>
@@ -263,7 +263,7 @@ function EventTournamentEmbed({ tournament }) {
             {matches.map((match) => (
               <div key={match.id} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
                 <div className="text-[10px] uppercase tracking-widest text-white/35">{match.round_name || `Runde ${match.round}`}</div>
-                <div className="mt-1 text-sm text-white/75 flex items-center justify-between gap-3">
+                <div className="mt-1 text-sm text-white/75 flex items-center justify-between gap-3 min-w-0">
                   <span className="truncate">{registrationName(regMap, match.participant_a_id)}</span>
                   <span className="text-white/30">vs</span>
                   <span className="truncate text-right">{registrationName(regMap, match.participant_b_id)}</span>
@@ -295,19 +295,19 @@ function EventFastLapEmbed({ challenge }) {
   const entries = (board?.entries || []).slice(0, 3);
 
   return (
-    <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
+    <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden min-w-0">
       <Link to={`/fastlap/${challenge.slug || challenge.id}`} className="block p-5 hover:bg-white/[0.03] transition">
         <div className="flex flex-wrap items-center gap-2">
           <Flag className="w-4 h-4 text-[#29B6E8]" />
           <PhaseBadge phase={challenge.public_phase} status={challenge.status} />
           {challenge.start_date && <span className="text-xs text-white/45">{new Date(challenge.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</span>}
         </div>
-        <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#29B6E8] transition">{challenge.title}</h3>
+        <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#29B6E8] transition break-words">{challenge.title}</h3>
         {challenge.description && <p className="mt-2 text-sm text-white/55 line-clamp-2">{challenge.description}</p>}
       </Link>
       <div className="border-t border-white/10 p-5">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">Top 3{board?.track?.name ? ` · ${board.track.name}` : ""}</div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3 min-w-0">
+          <div className="text-[10px] uppercase tracking-widest font-bold text-white/45 break-words">Top 3{board?.track?.name ? ` · ${board.track.name}` : ""}</div>
           <Link to={`/fastlap/${challenge.slug || challenge.id}`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">Leaderboard</Link>
         </div>
         {!loaded ? (

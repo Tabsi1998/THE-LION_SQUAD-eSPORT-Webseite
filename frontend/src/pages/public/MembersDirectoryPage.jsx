@@ -30,16 +30,16 @@ export default function MembersDirectoryPage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
-          <div>
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-10 min-w-0">
+          <div className="min-w-0">
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">DAS RUDEL</span>
-            <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">Vereinsmitglieder</h1>
+            <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2 break-words">Vereinsmitglieder</h1>
             <p className="mt-3 text-white/60 max-w-2xl">
               Offizielle Mitglieder von THE LION SQUAD — eSports. Diese Übersicht wird redaktionell gepflegt und zeigt die Personen, die den Verein sichtbar mittragen.
             </p>
           </div>
           {!isClubMember && (
-            <Link to="/membership/join" data-testid="members-join-cta" className="inline-flex items-center gap-2 px-5 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#e8c200] transition">
+            <Link to="/membership/join" data-testid="members-join-cta" className="inline-flex items-center self-start shrink-0 gap-2 px-5 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#e8c200] transition">
               <Crown className="w-4 h-4" /> Mitglied werden
             </Link>
           )}
@@ -54,13 +54,13 @@ export default function MembersDirectoryPage() {
             <div className="text-sm mt-2">Sobald Admins Vereinsmitglieder freigeben, erscheinen sie hier.</div>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16 pt-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16 pt-8 min-w-0">
             {members.map((m) => (
               <Link
                 key={m.slug}
                 to={`/members/${m.slug}`}
                 data-testid={`member-card-${m.slug}`}
-                className="group relative block min-h-[30rem] sm:min-h-[33rem] overflow-visible"
+                className="group relative block min-h-[30rem] sm:min-h-[33rem] overflow-visible min-w-0"
               >
                 <div className="absolute inset-x-4 top-10 bottom-20 bg-[radial-gradient(circle_at_50%_18%,rgba(255,215,0,0.16),rgba(41,182,232,0.08)_35%,rgba(10,10,10,0)_72%)] opacity-90 group-hover:opacity-100 transition" />
                 <div className="absolute inset-x-8 bottom-[5.4rem] h-10 bg-black/45 blur-2xl rounded-full" />

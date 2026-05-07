@@ -56,14 +56,14 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
   const items = shouldMarquee ? [...logoSponsors, ...logoSponsors] : logoSponsors;
   const speed = compact ? Math.max(24, logoSponsors.length * 8) : 48;
   return (
-    <section className={`relative overflow-hidden ${compact ? "bg-transparent" : "border-y border-white/5 bg-[#070707]"} ${className}`} data-testid="sponsor-ticker">
+    <section className={`relative max-w-full overflow-hidden ${compact ? "bg-transparent" : "border-y border-white/5 bg-[#070707]"} ${className}`} data-testid="sponsor-ticker">
       {!compact && (
         <div className="max-w-7xl mx-auto px-4 pt-4 pb-1 text-right">
           <span className="text-[9px] uppercase tracking-[0.35em] font-bold text-white/35">Presented by our Partners</span>
         </div>
       )}
       <div
-        className="relative overflow-hidden group"
+        className="relative max-w-full overflow-hidden group"
         style={shouldMarquee ? { maskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)" } : undefined}
       >
         <div

@@ -85,7 +85,7 @@ export function PhaseBadge({ phase, status, size = "sm", className = "" }) {
   const sz = size === "lg" ? "text-sm px-3 py-1" : size === "md" ? "text-[11px] px-2.5 py-1" : "text-[10px] px-2 py-[3px]";
 
   return (
-    <span className={`inline-flex items-center gap-1 font-bold uppercase tracking-wider border rounded-sm tabular-nums ${sz} ${PHASE_STYLES[state] || PHASE_STYLES.announced} ${className}`}>
+    <span className={`inline-flex max-w-full min-w-0 items-center gap-1 font-bold uppercase tracking-wider border rounded-sm tabular-nums whitespace-normal break-words leading-tight ${sz} ${PHASE_STYLES[state] || PHASE_STYLES.announced} ${className}`}>
       {state === "live" ? <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" /> : null}
       {label}
     </span>

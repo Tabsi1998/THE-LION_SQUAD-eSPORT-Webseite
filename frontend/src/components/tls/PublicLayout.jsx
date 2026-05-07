@@ -35,7 +35,7 @@ export function PublicLayout({ children }) {
   const twitchUrl = getTwitchUrl(branding?.twitch_channel);
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col">
+    <div className="min-h-screen max-w-full overflow-x-clip bg-[#0A0A0A] text-white flex flex-col">
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#0A0A0A]/80 border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between gap-4">
           <Logo size="md" />
@@ -136,8 +136,8 @@ export function PublicLayout({ children }) {
           </div>
         )}
       </header>
-      <main className="flex-1">{children}</main>
-      <footer className="border-t border-white/10 bg-[#0A0A0A] mt-24">
+      <main className="flex-1 min-w-0 max-w-full overflow-x-clip">{children}</main>
+      <footer className="border-t border-white/10 bg-[#0A0A0A] mt-24 min-w-0 max-w-full overflow-x-clip">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           {/* Reihe 1 — Brand + 4 Link-Spalten */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-12 gap-8">
@@ -215,9 +215,9 @@ export function PublicLayout({ children }) {
         </div>
         {/* Reihe 2 — Bottom Bar */}
         <div className="border-t border-white/5">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-white/40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-white/40 min-w-0">
             <span>© {new Date().getFullYear()} {clubName} — {tagline}. Alle Rechte vorbehalten.</span>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center justify-center md:justify-end gap-4">
               <Link to="/imprint" className="hover:text-[#29B6E8] transition" data-testid="footer-imprint">Impressum</Link>
               <Link to="/privacy" className="hover:text-[#29B6E8] transition" data-testid="footer-privacy">Datenschutz</Link>
               <button type="button" onClick={openCookieSettings} className="hover:text-[#29B6E8] transition">Cookies</button>
