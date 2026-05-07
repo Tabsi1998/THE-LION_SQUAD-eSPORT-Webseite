@@ -19,6 +19,7 @@ export function AdminLayout({ children }) {
   const items = [
     { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
     { to: "/admin/members", label: "Mitglieder", icon: Crown },
+    { to: "/admin/member-profiles", label: "Mitgliederseite", icon: UserCheck },
     { to: "/admin/benefits", label: "Mitgliedervorteile", icon: Gift },
     { to: "/admin/users", label: "Benutzer", icon: UsersIcon },
     { to: "/admin/tournaments", label: "Turniere", icon: Trophy },

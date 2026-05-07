@@ -4,7 +4,7 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Crown, Users as UsersIcon, MapPin } from "lucide-react";
+import { Crown, Gamepad2, Monitor, Users as UsersIcon } from "lucide-react";
 
 export default function MembersDirectoryPage() {
   const { isClubMember } = useAuth();
@@ -13,7 +13,7 @@ export default function MembersDirectoryPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get("/membership/public").then(({ data }) => setMembers(data)).catch(() => {}).finally(() => setLoading(false));
+    api.get("/membership/profiles").then(({ data }) => setMembers(data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["membership", "users"]);
@@ -26,7 +26,7 @@ export default function MembersDirectoryPage() {
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">DAS RUDEL</span>
             <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">Vereinsmitglieder</h1>
             <p className="mt-3 text-white/60 max-w-2xl">
-              Offizielle Mitglieder von THE LION SQUAD — eSports. Hier siehst du alle Spieler, die aktiv den Verein tragen, intern Verantwortung übernehmen und das Rudel ausmachen.
+              Offizielle Mitglieder von THE LION SQUAD — eSports. Diese Übersicht wird redaktionell gepflegt und zeigt die Personen, die den Verein sichtbar mittragen.
             </p>
           </div>
           {!isClubMember && (
@@ -42,38 +42,49 @@ export default function MembersDirectoryPage() {
           <div className="border border-dashed border-white/15 rounded-sm p-10 text-center text-white/50">
             <UsersIcon className="w-8 h-8 mx-auto opacity-40 mb-3" />
             <div className="font-heading font-bold text-lg">Noch keine öffentlichen Mitglieder</div>
-            <div className="text-sm mt-2">Sobald Mitglieder ihre Profile öffentlich schalten, erscheinen sie hier.</div>
+            <div className="text-sm mt-2">Sobald Admins Vereinsmitglieder freigeben, erscheinen sie hier.</div>
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {members.map((m) => (
               <Link
-                key={m.username}
-                to={`/u/${m.username}`}
-                data-testid={`member-card-${m.username}`}
-                className="group border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#121212] p-5 flex items-center gap-4 transition"
+                key={m.slug}
+                to={`/members/${m.slug}`}
+                data-testid={`member-card-${m.slug}`}
+                className="group border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#121212] overflow-hidden transition"
               >
-                <div className="w-14 h-14 rounded-sm border border-[#FFD700]/40 bg-[#0A0A0A] flex items-center justify-center overflow-hidden">
-                  {m.avatar_url ? (
-                    <img src={resolveMediaUrl(m.avatar_url)} alt={m.display_name} className="w-full h-full object-cover" />
+                <div className="aspect-[4/3] bg-[#0A0A0A] overflow-hidden">
+                  {m.photo_url ? (
+                    <img src={resolveMediaUrl(m.photo_url)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                   ) : (
-                    <span className="font-heading font-black text-[#FFD700] text-xl">{(m.display_name || m.username)[0]}</span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-heading font-bold text-white group-hover:text-[#FFD700] truncate flex items-center gap-1.5">
-                    {m.display_name || m.username}
-                    <Crown className="w-3.5 h-3.5 text-[#FFD700]" />
-                  </div>
-                  <div className="text-xs text-white/50 truncate">@{m.username}</div>
-                  {m.internal_role && (
-                    <div className="mt-1 text-[10px] uppercase tracking-widest text-[#FFD700]/80 font-bold">{m.internal_role}</div>
-                  )}
-                  {m.country && (
-                    <div className="mt-1 inline-flex items-center gap-1 text-[10px] text-white/40 uppercase tracking-wider">
-                      <MapPin className="w-2.5 h-2.5" /> {m.country}
+                    <div className="w-full h-full flex items-center justify-center text-white/20">
+                      <UsersIcon className="w-12 h-12" />
                     </div>
                   )}
+                </div>
+                <div className="p-5">
+                  <div className="font-heading font-black text-white group-hover:text-[#FFD700] uppercase flex items-center gap-1.5">
+                    {m.display_name}
+                    <Crown className="w-3.5 h-3.5 text-[#FFD700]" />
+                  </div>
+                  {m.role_title && (
+                    <div className="mt-1 text-[10px] uppercase tracking-widest text-[#FFD700]/80 font-bold">{m.role_title}</div>
+                  )}
+                  <div className="mt-4 space-y-2">
+                    {!!m.games?.length && (
+                      <div className="flex items-start gap-2 text-xs text-white/55">
+                        <Gamepad2 className="w-3.5 h-3.5 mt-0.5 text-[#29B6E8]" />
+                        <span className="line-clamp-1">{m.games.join(", ")}</span>
+                      </div>
+                    )}
+                    {!!m.platforms?.length && (
+                      <div className="flex items-start gap-2 text-xs text-white/55">
+                        <Monitor className="w-3.5 h-3.5 mt-0.5 text-[#29B6E8]" />
+                        <span className="line-clamp-1">{m.platforms.join(", ")}</span>
+                      </div>
+                    )}
+                    {m.age && <div className="text-[10px] text-white/35 uppercase tracking-wider">{m.age} Jahre</div>}
+                  </div>
                 </div>
               </Link>
             ))}

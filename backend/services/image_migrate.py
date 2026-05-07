@@ -43,6 +43,7 @@ TARGETS: list[tuple[str, list[str]]] = [
     ("gallery_albums", ["cover_url"]),
     ("gallery_photos", ["image_url", "thumbnail_url"]),
     ("member_benefits", ["image_url"]),
+    ("club_member_profiles", ["photo_url", "cover_url"]),
 ]
 
 TEXT_TARGETS: list[tuple[str, list[str]]] = [
@@ -51,6 +52,7 @@ TEXT_TARGETS: list[tuple[str, list[str]]] = [
     ("events", ["description", "program"]),
     ("tournaments", ["description"]),
     ("f1_challenges", ["description"]),
+    ("club_member_profiles", ["bio"]),
 ]
 
 TEXT_IMAGE_RE = re.compile(

@@ -1,5 +1,8 @@
 """Membership routes — admin can mark users as official club members."""
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
+from datetime import date
+import re
 from database import get_db
 from auth import get_current_user, require_admin, get_optional_user
 from services.membership_service import (
@@ -15,6 +18,36 @@ from email_service import send_template
 router = APIRouter(prefix="/api/membership", tags=["membership"])
 
 
+class ClubMemberProfileCreate(BaseModel):
+    display_name: str
+    slug: str | None = None
+    role_title: str | None = None
+    photo_url: str | None = None
+    cover_url: str | None = None
+    bio: str | None = None
+    birth_date: date | None = None
+    games: list[str] = []
+    platforms: list[str] = []
+    user_id: str | None = None
+    order_index: int = 0
+    is_active: bool = True
+
+
+class ClubMemberProfileUpdate(BaseModel):
+    display_name: str | None = None
+    slug: str | None = None
+    role_title: str | None = None
+    photo_url: str | None = None
+    cover_url: str | None = None
+    bio: str | None = None
+    birth_date: date | None = None
+    games: list[str] | None = None
+    platforms: list[str] | None = None
+    user_id: str | None = None
+    order_index: int | None = None
+    is_active: bool | None = None
+
+
 # ---------- Helpers ----------
 async def _audit(actor_id: str, action: str, target_id: str, data: dict | None = None):
     db = get_db()
@@ -26,6 +59,75 @@ async def _audit(actor_id: str, action: str, target_id: str, data: dict | None =
         "data": data or {},
         "created_at": now_utc().isoformat(),
     })
+
+
+def _slugify(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", str(value or "").lower()).strip("-")
+    return slug[:80] or "mitglied"
+
+
+def _clean_list(values: list[str] | None) -> list[str]:
+    out: list[str] = []
+    for value in values or []:
+        item = str(value or "").strip()
+        if item and item not in out:
+            out.append(item[:80])
+    return out[:20]
+
+
+def _age_from_birth_date(value: str | date | None) -> int | None:
+    if not value:
+        return None
+    try:
+        born = value if isinstance(value, date) else date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+    today = date.today()
+    return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+
+
+def _public_profile(doc: dict, detail: bool = False) -> dict:
+    out = {
+        "id": doc["id"],
+        "slug": doc["slug"],
+        "display_name": doc.get("display_name"),
+        "role_title": doc.get("role_title"),
+        "photo_url": doc.get("photo_url"),
+        "cover_url": doc.get("cover_url"),
+        "games": doc.get("games") or [],
+        "platforms": doc.get("platforms") or [],
+        "age": _age_from_birth_date(doc.get("birth_date")),
+        "order_index": doc.get("order_index") or 0,
+    }
+    if detail:
+        out["bio"] = doc.get("bio") or ""
+    return out
+
+
+def _admin_profile(doc: dict) -> dict:
+    out = _public_profile(doc, detail=True)
+    out.update({
+        "birth_date": doc.get("birth_date"),
+        "user_id": doc.get("user_id"),
+        "is_active": doc.get("is_active", True),
+        "created_at": doc.get("created_at"),
+        "updated_at": doc.get("updated_at"),
+    })
+    return out
+
+
+async def _unique_profile_slug(db, slug: str, current_id: str | None = None) -> str:
+    base = _slugify(slug)
+    candidate = base
+    counter = 2
+    while True:
+        query = {"slug": candidate}
+        if current_id:
+            query["id"] = {"$ne": current_id}
+        if not await db.club_member_profiles.find_one(query, {"_id": 1}):
+            return candidate
+        candidate = f"{base}-{counter}"
+        counter += 1
 
 
 # ---------- Public meta ----------
@@ -225,6 +327,104 @@ async def delete_benefit(benefit_id: str, me: dict = Depends(require_admin())):
     if res.deleted_count == 0:
         raise HTTPException(404, "Vorteil nicht gefunden.")
     await _audit(me["id"], "benefit.delete", benefit_id)
+    return {"ok": True}
+
+
+# ---------- Editable public club member profiles ----------
+@router.get("/profiles")
+async def list_public_member_profiles():
+    db = get_db()
+    rows = await db.club_member_profiles.find(
+        {"is_active": {"$ne": False}}, {"_id": 0}
+    ).sort([("order_index", 1), ("display_name", 1)]).to_list(1000)
+    return [_public_profile(row) for row in rows]
+
+
+@router.get("/profiles/{slug}")
+async def get_public_member_profile(slug: str):
+    db = get_db()
+    row = await db.club_member_profiles.find_one(
+        {"slug": slug, "is_active": {"$ne": False}}, {"_id": 0}
+    )
+    if not row:
+        raise HTTPException(404, "Mitglied nicht gefunden.")
+    return _public_profile(row, detail=True)
+
+
+@router.get("/profiles/admin/all")
+async def admin_list_member_profiles(me: dict = Depends(require_admin())):
+    db = get_db()
+    rows = await db.club_member_profiles.find({}, {"_id": 0}).sort([("order_index", 1), ("display_name", 1)]).to_list(1000)
+    return [_admin_profile(row) for row in rows]
+
+
+@router.post("/profiles/admin")
+async def admin_create_member_profile(body: ClubMemberProfileCreate, me: dict = Depends(require_admin())):
+    db = get_db()
+    name = body.display_name.strip()
+    if not name:
+        raise HTTPException(400, "Name ist erforderlich.")
+    slug = await _unique_profile_slug(db, body.slug or name)
+    payload = body.model_dump()
+    doc = {
+        "id": new_id(),
+        **payload,
+        "display_name": name,
+        "slug": slug,
+        "photo_url": payload.get("photo_url") or None,
+        "cover_url": payload.get("cover_url") or None,
+        "role_title": payload.get("role_title") or None,
+        "bio": payload.get("bio") or "",
+        "games": _clean_list(payload.get("games")),
+        "platforms": _clean_list(payload.get("platforms")),
+        "birth_date": payload.get("birth_date").isoformat() if payload.get("birth_date") else None,
+        "created_at": now_utc().isoformat(),
+        "created_by": me["id"],
+    }
+    await db.club_member_profiles.insert_one(doc)
+    await _audit(me["id"], "club_member_profile.create", doc["id"], {"display_name": name})
+    doc.pop("_id", None)
+    return _admin_profile(doc)
+
+
+@router.put("/profiles/admin/{profile_id}")
+@router.patch("/profiles/admin/{profile_id}")
+async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUpdate, me: dict = Depends(require_admin())):
+    db = get_db()
+    existing = await db.club_member_profiles.find_one({"id": profile_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Mitgliedsprofil nicht gefunden.")
+    raw = body.model_dump(exclude_unset=True)
+    nullable = {"role_title", "photo_url", "cover_url", "bio", "birth_date", "user_id"}
+    update = {k: v for k, v in raw.items() if v is not None or k in nullable}
+    if "display_name" in update:
+        update["display_name"] = str(update["display_name"] or "").strip()
+        if not update["display_name"]:
+            raise HTTPException(400, "Name ist erforderlich.")
+    if "slug" in update:
+        update["slug"] = await _unique_profile_slug(db, update["slug"] or existing.get("display_name") or "mitglied", profile_id)
+    if "games" in update:
+        update["games"] = _clean_list(update["games"])
+    if "platforms" in update:
+        update["platforms"] = _clean_list(update["platforms"])
+    if "birth_date" in update and update["birth_date"]:
+        update["birth_date"] = update["birth_date"].isoformat()
+    if not update:
+        raise HTTPException(400, "Keine Änderungen.")
+    update["updated_at"] = now_utc().isoformat()
+    await db.club_member_profiles.update_one({"id": profile_id}, {"$set": update})
+    await _audit(me["id"], "club_member_profile.update", profile_id, update)
+    row = await db.club_member_profiles.find_one({"id": profile_id}, {"_id": 0})
+    return _admin_profile(row)
+
+
+@router.delete("/profiles/admin/{profile_id}")
+async def admin_delete_member_profile(profile_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    res = await db.club_member_profiles.delete_one({"id": profile_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Mitgliedsprofil nicht gefunden.")
+    await _audit(me["id"], "club_member_profile.delete", profile_id)
     return {"ok": True}
 
 

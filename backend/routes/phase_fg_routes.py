@@ -45,6 +45,7 @@ IMAGE_REFERENCE_FIELDS = [
     ("gallery_albums", {}, ["cover_url"]),
     ("gallery_photos", {}, ["image_url", "thumbnail_url"]),
     ("member_benefits", {}, ["image_url"]),
+    ("club_member_profiles", {}, ["photo_url", "cover_url"]),
 ]
 
 

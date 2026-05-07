@@ -56,6 +56,7 @@ import AdminSeasonsPage from "@/pages/admin/AdminSeasonsPage";
 import AdminAuditPage from "@/pages/admin/AdminAuditPage";
 import AdminWidgetsPage from "@/pages/admin/AdminWidgetsPage";
 import AdminMembersPage from "@/pages/admin/AdminMembersPage";
+import AdminClubMemberProfilesPage from "@/pages/admin/AdminClubMemberProfilesPage";
 import AdminBenefitsPage from "@/pages/admin/AdminBenefitsPage";
 import AdminGalleryPage from "@/pages/admin/AdminGalleryPage";
 import AdminDocumentsPage from "@/pages/admin/AdminDocumentsPage";
@@ -76,6 +77,7 @@ import SponsorsPage from "@/pages/public/SponsorsPage";
 import PartnersPage from "@/pages/public/PartnersPage";
 import PlayersPage from "@/pages/public/PlayersPage";
 import MembersDirectoryPage from "@/pages/public/MembersDirectoryPage";
+import MemberProfilePage from "@/pages/public/MemberProfilePage";
 import JoinMembershipPage from "@/pages/public/JoinMembershipPage";
 import NewsDetailPage from "@/pages/public/NewsDetailPage";
 import GalleryPage from "@/pages/public/GalleryPage";
@@ -118,6 +120,7 @@ function App() {
           <Route path="/partners" element={<PartnersPage />} />
           <Route path="/players" element={<PlayersPage />} />
           <Route path="/members" element={<MembersDirectoryPage />} />
+          <Route path="/members/:slug" element={<MemberProfilePage />} />
           <Route path="/membership/join" element={<JoinMembershipPage />} />
           <Route path="/membership/apply" element={<MembershipApplyPage />} />
 
@@ -157,6 +160,7 @@ function App() {
           {/* Admin */}
           <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboardPage /></ProtectedRoute>} />
           <Route path="/admin/members" element={<ProtectedRoute requireAdmin><AdminMembersPage /></ProtectedRoute>} />
+          <Route path="/admin/member-profiles" element={<ProtectedRoute requireAdmin><AdminClubMemberProfilesPage /></ProtectedRoute>} />
           <Route path="/admin/benefits" element={<ProtectedRoute requireAdmin><AdminBenefitsPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments" element={<ProtectedRoute requireModerator><AdminTournamentsPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments/new" element={<ProtectedRoute requireAdmin><AdminTournamentNewPage /></ProtectedRoute>} />

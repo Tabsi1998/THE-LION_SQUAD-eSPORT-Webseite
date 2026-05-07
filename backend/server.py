@@ -86,7 +86,7 @@ async def lifespan(app: FastAPI):
             "gallery_albums", "gallery_photos", "documents", "season_points",
             "audit_logs", "email_logs", "notifications", "password_reset_tokens",
             "login_attempts", "user_achievements", "achievements", "achievement_groups",
-            "mail_jobs", "media_uploads", "prize_pickups",
+            "mail_jobs", "media_uploads", "prize_pickups", "club_member_profiles",
         ]:
             try:
                 await db[coll].delete_many({})
