@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Bold,
   Code,
@@ -49,10 +49,11 @@ export function MarkdownEditor({
   required = false,
 }) {
   const [mode, setMode] = useState("write");
+  const textareaRef = useRef(null);
   const preview = useMemo(() => renderMarkdownLite(value), [value]);
 
   const apply = (kind) => {
-    const textarea = document.querySelector(`[data-markdown-editor="${testId || "default"}"]`);
+    const textarea = textareaRef.current;
     const start = textarea?.selectionStart ?? String(value).length;
     const end = textarea?.selectionEnd ?? String(value).length;
     let result;
@@ -127,6 +128,7 @@ export function MarkdownEditor({
           placeholder={placeholder}
           data-testid={testId}
           data-markdown-editor={testId || "default"}
+          ref={textareaRef}
           className="w-full bg-[#0A0A0A] px-3 py-3 text-sm font-mono text-white focus:outline-none resize-y"
         />
       ) : (
