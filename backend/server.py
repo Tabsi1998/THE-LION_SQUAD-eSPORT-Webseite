@@ -243,6 +243,11 @@ async def public_upload(filename: str):
     raise HTTPException(status_code=404, detail="File not found")
 
 
+@app.get("/uploads/{filename}")
+async def legacy_public_upload(filename: str):
+    return await public_upload(filename)
+
+
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 CSRF_EXEMPT_PATHS = {
     "/api/auth/login",

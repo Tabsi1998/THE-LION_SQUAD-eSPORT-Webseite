@@ -2,13 +2,14 @@
 
 Scans sponsors, news posts, events, gallery_albums, gallery_photos, users,
 teams, tournaments, f1_challenges and downloads any external (http/https) image
-URL, stores it under /app/backend/uploads/ and rewrites the field to the local
+URL, stores it under the configured UPLOAD_DIR and rewrites the field to the local
 /api/static/uploads/{filename} URL.
 
 Idempotent: skips URLs that already point at /api/static/uploads/.
 Safe: errors per row are logged and don't abort the whole run.
 """
 import logging
+import os
 import uuid
 import pathlib
 import asyncio
@@ -21,8 +22,9 @@ from database import get_db
 
 logger = logging.getLogger("tls.image_migrate")
 
-UPLOAD_DIR = pathlib.Path("/app/backend/uploads")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
+PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
+PUBLIC_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # (collection, list of fields, optional pointer to nested list of {url_field}, optional sub-doc field-name)
 TARGETS: list[tuple[str, list[str]]] = [
@@ -70,7 +72,7 @@ async def _download_to_local(url: str, client: httpx.AsyncClient) -> Optional[st
             logger.warning(f"[image-migrate] skip (too large): {url}")
             return None
         filename = f"{uuid.uuid4().hex}{ext}"
-        (UPLOAD_DIR / filename).write_bytes(resp.content)
+        (PUBLIC_UPLOAD_DIR / filename).write_bytes(resp.content)
         return f"{LOCAL_PREFIX}{filename}"
     except Exception as exc:
         logger.warning(f"[image-migrate] failed {url}: {exc}")

@@ -4,7 +4,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { SmartLogo } from "@/components/tls/SmartLogo";
-import { Star, ExternalLink } from "lucide-react";
+import { Star } from "lucide-react";
 
 const tierLabel = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const tierColor = { main: "#29B6E8", platinum: "#E5E4E2", gold: "#FFD700", silver: "#C0C0C0", bronze: "#CD7F32" };
@@ -22,7 +22,8 @@ export default function SponsorsPage() {
 
   useApiInvalidation(load, ["sponsors"]);
 
-  const grouped = list.reduce((acc, s) => {
+  const publicSponsors = list.filter((s) => s.logo_url);
+  const grouped = publicSponsors.reduce((acc, s) => {
     const t = ["main", "platinum", "gold", "silver", "bronze"].includes(s.tier) ? s.tier : "bronze";
     (acc[t] = acc[t] || []).push(s);
     return acc;
@@ -38,7 +39,7 @@ export default function SponsorsPage() {
           Diese Marken und Unternehmen unterstützen THE LION SQUAD — eSports. Ohne sie wären viele unserer Events, Turniere und Aktionen nicht möglich. Danke!
         </p>
 
-        {list.length === 0 && (
+        {publicSponsors.length === 0 && (
           <div className="mt-12 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
             <Star className="w-10 h-10 mx-auto opacity-40 mb-4" />
             <div className="font-heading font-bold text-lg">Bald hier</div>
@@ -61,23 +62,17 @@ export default function SponsorsPage() {
                     href={s.link || undefined}
                     target={s.link ? "_blank" : undefined}
                     rel="noreferrer"
+                    aria-label={s.name}
                     data-testid={`sponsor-${s.id}`}
-                    className={`border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#101010] transition group flex flex-col ${(t === "main" || t === "platinum") ? "p-7 min-h-80" : "p-5 min-h-60"}`}
+                    className={`border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#101010] transition group flex items-center justify-center ${(t === "main" || t === "platinum") ? "p-7 min-h-60" : "p-5 min-h-44"}`}
                   >
-                    <div className={`${t === "main" || t === "platinum" ? "h-44" : "h-32"} mb-5 flex items-center justify-center overflow-hidden`}>
+                    <div className={`${t === "main" || t === "platinum" ? "h-44" : "h-28"} w-full flex items-center justify-center overflow-hidden`}>
                       {s.logo_url ? (
                         <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="w-full h-full object-contain" />
                       ) : (
-                        <span className="font-heading font-black text-2xl text-white/30">{s.name[0]}</span>
+                        <span className="sr-only">{s.name}</span>
                       )}
                     </div>
-                    <div className={`font-heading font-black uppercase leading-tight ${(t === "main" || t === "platinum") ? "text-2xl" : ""}`}>{s.name}</div>
-                    {s.description && <div className={`${(t === "main" || t === "platinum") ? "mt-3 text-sm" : "mt-1 text-xs"} text-white/55 line-clamp-3`}>{s.description}</div>}
-                    {s.link && (
-                      <div className="mt-3 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-[#FFD700] group-hover:underline">
-                        Webseite <ExternalLink className="w-2.5 h-2.5" />
-                      </div>
-                    )}
                   </a>
                 ))}
               </div>

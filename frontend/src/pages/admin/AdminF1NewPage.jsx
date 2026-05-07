@@ -21,7 +21,7 @@ export default function AdminF1NewPage() {
     vehicle: "", weather: "", assists_allowed: "",
     controller_type: "", platform: "", banner_url: "",
     unlimited_attempts: true, max_attempts: 0,
-    registration_enabled: true, registration_open_from: "", registration_open_until: "",
+    registration_enabled: false, registration_open_from: "", registration_open_until: "",
     start_date: "", end_date: "", status: "draft",
     is_championship: false,
     twitch_channel: "", twitch_enabled: false,
@@ -93,15 +93,15 @@ export default function AdminF1NewPage() {
             <Select label="Veröffentlichung" value={form.status} onChange={(v) => set("status", v)} options={CREATE_STATUS_OPTIONS} testId="f1-new-status" />
             <Field label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v) => set("start_date", v)} testId="f1-new-start" />
             <Field label="Ende Challenge/Event" type="datetime-local" value={form.end_date} onChange={(v) => set("end_date", v)} testId="f1-new-end" />
-            <Field label="Einreichung öffnet" type="datetime-local" value={form.registration_open_from} onChange={(v) => set("registration_open_from", v)} testId="f1-new-reg-from" />
-            <Field label="Einreichung endet" type="datetime-local" value={form.registration_open_until} onChange={(v) => set("registration_open_until", v)} testId="f1-new-reg-until" />
+            {form.registration_enabled && <Field label="Online-Einreichung öffnet" type="datetime-local" value={form.registration_open_from} onChange={(v) => set("registration_open_from", v)} testId="f1-new-reg-from" />}
+            {form.registration_enabled && <Field label="Online-Einreichung endet" type="datetime-local" value={form.registration_open_until} onChange={(v) => set("registration_open_until", v)} testId="f1-new-reg-until" />}
           </div>
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
-            Einreichung offen, Live und Beendet werden anhand dieser Zeiten automatisch geschaltet. Manuelle Sonderstatus setzt du später in der Bearbeitung.
+            Live und Beendet werden anhand von Start/Ende automatisch geschaltet. Online-Einreichung ist optional; lokale Zeiten koennen Moderatoren immer im Admin eintragen.
           </div>
           <label className="flex items-start gap-2 text-sm text-white/75">
             <input type="checkbox" checked={form.registration_enabled} onChange={(e) => set("registration_enabled", e.target.checked)} data-testid="f1-new-reg-enabled" className="accent-[#29B6E8] mt-1" />
-            <span>Zeiten/Einreichungen grundsätzlich erlauben</span>
+            <span>Online-Einreichung auf der öffentlichen Seite anzeigen</span>
           </label>
         </div>
         <div className="grid md:grid-cols-2 gap-4">

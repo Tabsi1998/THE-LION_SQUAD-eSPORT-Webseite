@@ -1,5 +1,9 @@
-"""File upload routes. Stores images and documents on local disk at /app/backend/uploads/
-served via /uploads/... static mount."""
+"""File upload routes.
+
+Public images are stored on local disk and served through
+/api/static/uploads/{filename}. A legacy /uploads/{filename} route is also kept
+for older stored URLs.
+"""
 import os
 import uuid
 import pathlib
@@ -132,7 +136,7 @@ async def upload_image(
     me: dict = Depends(get_current_user),
     trim_empty_borders: bool = False,
 ):
-    """Upload an image. Returns public URL `/uploads/{filename}`.
+    """Upload an image. Returns public URL `/api/static/uploads/{filename}`.
     Accepts PNG/JPEG/WebP and re-encodes before serving."""
     declared_content_type = file.content_type or ""
     suffix = pathlib.Path(file.filename or "").suffix.lower()
@@ -248,6 +252,20 @@ async def migrate_external_images(me: dict = Depends(require_admin())):
     from services.image_migrate import migrate_all
     summary = await migrate_all()
     return {"ok": True, "summary": summary}
+
+
+@router.get("/audit-images")
+async def audit_images(me: dict = Depends(require_admin())):
+    """Report stored image references that are external, legacy or missing."""
+    from services.media_audit import audit_image_references
+    return await audit_image_references(repair=False)
+
+
+@router.post("/normalize-image-urls")
+async def normalize_image_urls(me: dict = Depends(require_admin())):
+    """Normalize legacy local image URLs to /api/static/uploads/{filename}."""
+    from services.media_audit import audit_image_references
+    return await audit_image_references(repair=True)
 
 
 _EXT_BY_MIME = {

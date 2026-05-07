@@ -141,6 +141,17 @@ def derive_public_phase(doc: dict, kind: str = "content", now: datetime | None =
             "now": now.isoformat(),
         }
 
+    if normalized_status == "registration_open" and not reg_enabled:
+        return {
+            "state": "announced",
+            "label": _label("announced"),
+            "raw_status": raw_status,
+            "target_at": _iso(start_target),
+            "next_transition_at": _iso(start_target),
+            "countdown_kind": "starts",
+            "now": now.isoformat(),
+        }
+
     if reg_enabled and (not reg_from or now >= reg_from) and (not reg_until or now <= reg_until):
         return {
             "state": "registration_open",

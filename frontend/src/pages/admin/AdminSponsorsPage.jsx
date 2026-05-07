@@ -16,6 +16,9 @@ export default function AdminSponsorsPage() {
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
   const [migrating, setMigrating] = useState(false);
+  const [auditing, setAuditing] = useState(false);
+  const [normalizing, setNormalizing] = useState(false);
+  const [imageAudit, setImageAudit] = useState(null);
 
   const load = useCallback(async () => {
     const { data } = await api.get("/sponsors/admin");
@@ -39,9 +42,33 @@ export default function AdminSponsorsPage() {
       const { data } = await api.post("/uploads/migrate-external-images");
       const total = Object.values(data.summary || {}).reduce((s, v) => s + (v.updated || 0), 0);
       toast.success(`${total} Bilder lokal gespeichert.`);
+      auditImages();
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
     setMigrating(false);
+  };
+
+  const auditImages = async () => {
+    setAuditing(true);
+    try {
+      const { data } = await api.get("/uploads/audit-images");
+      setImageAudit(data);
+      const s = data.summary || {};
+      toast.success(`Bilder geprüft: ${s.local_ok || 0} ok, ${s.legacy_local || 0} alte URLs, ${s.missing_file || 0} fehlend, ${s.external || 0} extern.`);
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Bildprüfung fehlgeschlagen."); }
+    setAuditing(false);
+  };
+
+  const normalizeImages = async () => {
+    if (!window.confirm("Alte lokale Bild-URLs jetzt auf /api/static/uploads/... normalisieren?")) return;
+    setNormalizing(true);
+    try {
+      const { data } = await api.post("/uploads/normalize-image-urls");
+      setImageAudit(data);
+      toast.success(`${data.summary?.normalized || 0} Bild-URLs normalisiert.`);
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Normalisierung fehlgeschlagen."); }
+    setNormalizing(false);
   };
 
   return (
@@ -55,12 +82,40 @@ export default function AdminSponsorsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button onClick={auditImages} disabled={auditing} data-testid="sponsor-audit-images-btn" className="px-4 py-2.5 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:border-[#FFD700] hover:text-[#FFD700] disabled:opacity-50 text-xs">
+            {auditing ? "Prüfe…" : "Bilder prüfen"}
+          </button>
+          <button onClick={normalizeImages} disabled={normalizing} data-testid="sponsor-normalize-images-btn" className="px-4 py-2.5 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:border-[#29B6E8] hover:text-[#29B6E8] disabled:opacity-50 text-xs">
+            {normalizing ? "Repariere…" : "URLs reparieren"}
+          </button>
           <button onClick={migrate} disabled={migrating} data-testid="sponsor-migrate-btn" className="px-4 py-2.5 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:border-[#29B6E8] hover:text-[#29B6E8] disabled:opacity-50 text-xs">
             <Upload className="w-4 h-4" /> {migrating ? "Migriere…" : "Bilder migrieren"}
           </button>
           <button onClick={() => setCreating(true)} data-testid="sponsor-new-btn" className="px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><Plus className="w-4 h-4" /> Neuer Sponsor</button>
         </div>
       </div>
+
+      {imageAudit?.summary && (
+        <div className="mb-6 border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
+          <div className="text-[11px] font-bold uppercase tracking-widest text-white/50 mb-3">Bildprüfung</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-xs">
+            {[
+              ["OK", imageAudit.summary.local_ok],
+              ["Alte URLs", imageAudit.summary.legacy_local],
+              ["Repariert", imageAudit.summary.normalized],
+              ["Extern", imageAudit.summary.external],
+              ["Datei fehlt", imageAudit.summary.missing_file],
+              ["Ungültig", imageAudit.summary.invalid_local],
+              ["Sonstige", imageAudit.summary.other],
+            ].map(([label, value]) => (
+              <div key={label} className="border border-white/10 rounded-sm px-3 py-2">
+                <div className="text-white/45 uppercase tracking-wider font-bold">{label}</div>
+                <div className="font-display text-lg text-white mt-1">{value || 0}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {list.map((s) => (

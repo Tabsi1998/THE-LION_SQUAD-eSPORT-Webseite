@@ -7,11 +7,30 @@ export const API_BASE =
   configuredBackendUrl || (typeof window !== "undefined" ? window.location.origin : "");
 export const API = `${API_BASE}/api`;
 
+function normalizeUploadPath(pathname) {
+  const normalized = String(pathname || "").replace(/^\/+/, "");
+  if (normalized.startsWith("api/static/uploads/")) return `/${normalized}`;
+  if (normalized.startsWith("static/uploads/")) return `/api/${normalized}`;
+  if (normalized.startsWith("uploads/")) return `/api/static/${normalized}`;
+  return null;
+}
+
 export function resolveMediaUrl(url) {
   if (!url) return "";
-  const value = String(url);
-  if (/^(https?:|data:|blob:)/i.test(value)) return value;
-  return `${API_BASE}${value.startsWith("/") ? value : `/${value}`}`;
+  const value = String(url).trim();
+  if (/^(data:|blob:)/i.test(value)) return value;
+  if (/^https?:/i.test(value)) {
+    try {
+      const parsed = new URL(value);
+      const uploadPath = normalizeUploadPath(parsed.pathname);
+      if (uploadPath) return `${API_BASE}${uploadPath}`;
+    } catch {}
+    return value;
+  }
+  const uploadPath = normalizeUploadPath(value);
+  if (uploadPath) return `${API_BASE}${uploadPath}`;
+  const normalized = value.replace(/^\/+/, "");
+  return `${API_BASE}/${normalized}`;
 }
 
 function getCookie(name) {

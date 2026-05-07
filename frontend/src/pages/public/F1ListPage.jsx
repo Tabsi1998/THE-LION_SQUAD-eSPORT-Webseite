@@ -41,7 +41,7 @@ export default function F1ListPage() {
 }
 
 function FastLapCard({ challenge: c }) {
-  const registration = getRegistrationState(c, "Einreichung");
+  const registration = c.registration_enabled !== false ? getRegistrationState(c, "Einreichung") : null;
   return (
     <Link
       to={`/fastlap/${c.slug || c.id}`}
@@ -63,11 +63,13 @@ function FastLapCard({ challenge: c }) {
             {c.platform && <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.platform}</span>}
             {c.start_date && <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#29B6E8]" /> Start {formatDate(c.start_date)}</span>}
           </div>
-          <div className={`mt-3 text-[11px] uppercase tracking-widest font-bold ${
-            registration.canRegister ? "text-[#00FF88]" : registration.state === "scheduled" ? "text-[#29B6E8]" : "text-white/45"
-          }`}>
-            {registration.label}
-          </div>
+          {registration && (
+            <div className={`mt-3 text-[11px] uppercase tracking-widest font-bold ${
+              registration.canRegister ? "text-[#00FF88]" : registration.state === "scheduled" ? "text-[#29B6E8]" : "text-white/45"
+            }`}>
+              {registration.label}
+            </div>
+          )}
         </div>
         <ChevronRight className="w-6 h-6 text-white/30 group-hover:text-[#29B6E8] transition" />
       </div>

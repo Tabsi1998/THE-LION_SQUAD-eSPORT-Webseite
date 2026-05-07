@@ -424,8 +424,8 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
       <div className="grid md:grid-cols-2 gap-4">
         <SmallField label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v)=>set("start_date", v)} />
         <SmallField label="Ende Challenge/Event" type="datetime-local" value={form.end_date} onChange={(v)=>set("end_date", v)} />
-        <SmallField label="Einreichung öffnet" type="datetime-local" value={form.registration_open_from} onChange={(v)=>set("registration_open_from", v)} />
-        <SmallField label="Einreichung endet" type="datetime-local" value={form.registration_open_until} onChange={(v)=>set("registration_open_until", v)} />
+        {form.registration_enabled && <SmallField label="Online-Einreichung öffnet" type="datetime-local" value={form.registration_open_from} onChange={(v)=>set("registration_open_from", v)} />}
+        {form.registration_enabled && <SmallField label="Online-Einreichung endet" type="datetime-local" value={form.registration_open_until} onChange={(v)=>set("registration_open_until", v)} />}
       </div>
       <div className="grid md:grid-cols-2 gap-4">
         <SmallField label="Fahrzeug" value={form.vehicle} onChange={(v)=>set("vehicle", v)} />
@@ -435,7 +435,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
       </div>
       <MarkdownEditor value={form.description} onChange={(v)=>set("description", v)} rows={5} testId="f1-edit-description" placeholder="Beschreibung" />
       <div className="grid sm:grid-cols-2 gap-3">
-        <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.registration_enabled} onChange={(e)=>set("registration_enabled", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Zeiten/Einreichungen erlauben</span></label>
+        <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.registration_enabled} onChange={(e)=>set("registration_enabled", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Online-Einreichung öffentlich anzeigen</span></label>
         <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.unlimited_attempts} onChange={(e)=>set("unlimited_attempts", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Unbegrenzte Versuche</span></label>
       </div>
       {!form.unlimited_attempts && <SmallField label="Max Versuche" type="number" value={form.max_attempts} onChange={(v)=>set("max_attempts", Number(v))} />}

@@ -24,8 +24,9 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
     load();
   }, [load]);
   useApiInvalidation(load, ["sponsors"]);
-  if (!sponsors.length) return null;
-  const items = [...sponsors, ...sponsors]; // duplicate for seamless loop
+  const logoSponsors = sponsors.filter((s) => s.logo_url);
+  if (!logoSponsors.length) return null;
+  const items = [...logoSponsors, ...logoSponsors]; // duplicate for seamless loop
   const speed = compact ? 34 : 48;
   return (
     <section className={`relative overflow-hidden ${compact ? "bg-transparent" : "border-y border-white/5 bg-[#070707]"} ${className}`} data-testid="sponsor-ticker">
@@ -48,11 +49,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
               className="inline-flex items-center justify-center shrink-0 min-w-32 opacity-75 hover:opacity-100 transition"
               title={s.name}
             >
-              {s.logo_url ? (
-                <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className={`${compact ? "h-7 max-w-32" : `${tierSize[s.tier] || "h-10"} max-w-64`} w-auto`} />
-              ) : (
-                <span className="font-heading font-black uppercase text-white/80">{s.name}</span>
-              )}
+              <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className={`${compact ? "h-7 max-w-32" : `${tierSize[s.tier] || "h-10"} max-w-64`} w-auto`} />
             </a>
           ))}
         </div>
@@ -75,16 +72,13 @@ export function SponsorGrid({ max = 4 }) {
     load();
   }, [load]);
   useApiInvalidation(load, ["sponsors"]);
-  if (!sponsors.length) return null;
+  const logoSponsors = sponsors.filter((s) => s.logo_url);
+  if (!logoSponsors.length) return null;
   return (
     <div className="flex items-center gap-5" data-testid="sponsor-grid">
-      {sponsors.slice(0, max).map((s) => (
+      {logoSponsors.slice(0, max).map((s) => (
         <a key={s.id} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" className="inline-flex items-center justify-center opacity-75 hover:opacity-100 transition" title={s.name}>
-          {s.logo_url ? (
-            <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="h-7 max-w-36 w-auto" />
-          ) : (
-            <span className="font-heading text-xs font-bold uppercase text-white/70">{s.name}</span>
-          )}
+          <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="h-7 max-w-36 w-auto" />
         </a>
       ))}
     </div>
