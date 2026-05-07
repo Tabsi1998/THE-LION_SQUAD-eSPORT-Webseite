@@ -4,6 +4,7 @@ import { API, api, formatRequestError, parseTimeStr, resolveMediaUrl } from "@/l
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields } from "@/lib/datetime";
 import { toast } from "sonner";
 import { Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
@@ -432,7 +433,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
         <SmallField label="Fahrhilfen" value={form.assists_allowed} onChange={(v)=>set("assists_allowed", v)} />
         <SmallField label="Controller-Typ" value={form.controller_type} onChange={(v)=>set("controller_type", v)} />
       </div>
-      <textarea rows={3} value={form.description} onChange={(e)=>set("description", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="Beschreibung" />
+      <MarkdownEditor value={form.description} onChange={(v)=>set("description", v)} rows={5} testId="f1-edit-description" placeholder="Beschreibung" />
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.registration_enabled} onChange={(e)=>set("registration_enabled", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Zeiten/Einreichungen erlauben</span></label>
         <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.unlimited_attempts} onChange={(e)=>set("unlimited_attempts", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Unbegrenzte Versuche</span></label>

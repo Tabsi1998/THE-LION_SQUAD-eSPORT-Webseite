@@ -9,6 +9,7 @@ import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Tv, Trophy, Flag, Download, FileDown, Calendar } from "lucide-react";
 import { formatDateTime, getRegistrationState } from "@/lib/datetime";
+import { renderMarkdownLite } from "@/lib/markdownLite";
 
 export default function F1DetailPage() {
   const { slug } = useParams();
@@ -70,7 +71,7 @@ export default function F1DetailPage() {
             {challenge.is_championship && <span className="text-[11px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 px-2 py-1 rounded-sm">Championship</span>}
           </div>
           <h1 data-testid="f1-challenge-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{challenge.title}</h1>
-          {challenge.description && <p className="mt-3 text-white/70 max-w-2xl">{challenge.description}</p>}
+          {challenge.description && <div className="mt-3 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(challenge.description) }} />}
           {challenge.event && (
             <Link to={`/events/${challenge.event.slug || challenge.event.id}`} className="mt-4 inline-flex items-center gap-2 border border-[#9F7AEA]/40 text-[#9F7AEA] hover:bg-[#9F7AEA]/10 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
               <Calendar className="w-3.5 h-3.5" /> Teil von {challenge.event.name}

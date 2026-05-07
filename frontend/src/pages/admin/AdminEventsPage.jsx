@@ -231,7 +231,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
           <Field label="Name"><Input value={form.name} onChange={(v) => { set("name", v); if (isNew && !form.slug) set("slug", slugFrom(v)); }} testId="event-name" required /></Field>
           <Field label="Slug"><Input value={form.slug} onChange={(v) => set("slug", slugFrom(v))} testId="event-slug" required /></Field>
           <Field label="Beschreibung">
-            <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
+            <MarkdownEditor value={form.description} onChange={(v) => set("description", v)} rows={5} testId="event-description" />
           </Field>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Typ">

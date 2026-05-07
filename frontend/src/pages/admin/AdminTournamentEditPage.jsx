@@ -5,6 +5,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields } from "@/lib/datetime";
 import { toast } from "sonner";
 import { Zap, RefreshCw, Eye } from "lucide-react";
@@ -365,7 +366,7 @@ function Fld({ label, value, onChange, type="text", testId }) {
   return (<label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><input type={type} value={value ?? ""} onChange={(e)=>onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"/></label>);
 }
 function Txt({ label, value, onChange, testId }) {
-  return (<label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><textarea rows={3} value={value ?? ""} onChange={(e)=>onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"/></label>);
+  return (<label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><MarkdownEditor value={value ?? ""} onChange={onChange} rows={5} testId={testId} /></label>);
 }
 
 function PrizeEditor({ value = [], onChange }) {

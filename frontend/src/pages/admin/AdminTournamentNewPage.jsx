@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields } from "@/lib/datetime";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
@@ -233,7 +234,7 @@ function Textarea({ label, value, onChange, testId }) {
   return (
     <label className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <textarea value={value || ""} onChange={(e) => onChange(e.target.value)} rows={3} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white focus:outline-none" />
+      <MarkdownEditor value={value || ""} onChange={onChange} rows={5} testId={testId} />
     </label>
   );
 }

@@ -12,6 +12,7 @@ import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X, Flag } from "
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { formatDateTime, getRegistrationState } from "@/lib/datetime";
+import { renderMarkdownLite } from "@/lib/markdownLite";
 
 export default function TournamentDetailPage() {
   const { slug } = useParams();
@@ -95,7 +96,7 @@ export default function TournamentDetailPage() {
             {t.game && <span className="text-white/60 text-sm">· {t.game.name}</span>}
           </div>
           <h1 data-testid="tournament-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{t.title}</h1>
-          {t.description && <p className="mt-4 text-white/70 max-w-2xl">{t.description}</p>}
+          {t.description && <div className="mt-4 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(t.description) }} />}
 
           <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
             <InfoTile icon={Calendar} label="Start" value={formatDateTime(t.start_date)} />

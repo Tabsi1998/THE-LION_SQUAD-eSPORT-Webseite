@@ -8,6 +8,7 @@ import { RichContent } from "@/components/tls/RichContent";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { renderMarkdownLite } from "@/lib/markdownLite";
 import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag } from "lucide-react";
 
 const TYPE_LABELS = {
@@ -74,7 +75,7 @@ export default function EventDetailPage() {
             {e.visibility === "internal" && <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-white/60"><Lock className="w-3 h-3" /> Intern</span>}
           </div>
           <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{e.name}</h1>
-          {e.description && <p className="mt-3 text-white/70 max-w-2xl text-lg">{e.description}</p>}
+          {e.description && <div className="mt-3 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(e.description) }} />}
           <div className="mt-6 flex flex-wrap gap-5 text-sm text-white/70">
             {e.start_date && <span className="inline-flex items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA]" />{new Date(e.start_date).toLocaleString("de-DE", { dateStyle: "long", timeStyle: "short" })}</span>}
             {(e.location || fullAddress(e)) && <span className="inline-flex items-center gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA]" />{[e.location, fullAddress(e)].filter(Boolean).join(", ")}</span>}
