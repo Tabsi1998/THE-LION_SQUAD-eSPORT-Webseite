@@ -119,16 +119,19 @@ async def mark_ready(pickup_id: str, actor_id: str) -> Optional[dict]:
     )
     # Mail user
     if p.get("user_id"):
-        u = await db.users.find_one({"id": p["user_id"]}, {"email": 1, "display_name": 1})
+        u = await db.users.find_one(
+            {"id": p["user_id"]},
+            {"email": 1, "display_name": 1, "username": 1, "newsletter_consent": 1, "notification_preferences": 1},
+        )
         if u and u.get("email"):
-            from email_service import send_template
+            from services.notification_preferences import send_user_template
             deadline_str = ""
             try:
                 deadline_str = datetime.fromisoformat(p.get("pickup_deadline")).strftime("%d.%m.%Y")
             except Exception:
                 pass
-            await send_template(
-                "prize_ready", u["email"],
+            await send_user_template(
+                u, "prize_ready",
                 display_name=u.get("display_name", ""),
                 tournament_title=p.get("tournament_title", ""),
                 place=str(p.get("place_label") or p.get("place")),
@@ -154,11 +157,14 @@ async def mark_picked_up(pickup_id: str, actor_id: str, notes: str = "") -> Opti
         }},
     )
     if p.get("user_id"):
-        u = await db.users.find_one({"id": p["user_id"]}, {"email": 1, "display_name": 1})
+        u = await db.users.find_one(
+            {"id": p["user_id"]},
+            {"email": 1, "display_name": 1, "username": 1, "newsletter_consent": 1, "notification_preferences": 1},
+        )
         if u and u.get("email"):
-            from email_service import send_template
-            await send_template(
-                "prize_picked_up", u["email"],
+            from services.notification_preferences import send_user_template
+            await send_user_template(
+                u, "prize_picked_up",
                 display_name=u.get("display_name", ""),
                 tournament_title=p.get("tournament_title", ""),
                 prize_label=p.get("prize_label", ""),
@@ -186,11 +192,14 @@ async def expire_overdue() -> int:
         )
         expired += 1
         if p.get("user_id"):
-            u = await db.users.find_one({"id": p["user_id"]}, {"email": 1, "display_name": 1})
+            u = await db.users.find_one(
+                {"id": p["user_id"]},
+                {"email": 1, "display_name": 1, "username": 1, "newsletter_consent": 1, "notification_preferences": 1},
+            )
             if u and u.get("email"):
-                from email_service import send_template
-                await send_template(
-                    "prize_expired", u["email"],
+                from services.notification_preferences import send_user_template
+                await send_user_template(
+                    u, "prize_expired",
                     display_name=u.get("display_name", ""),
                     tournament_title=p.get("tournament_title", ""),
                     prize_label=p.get("prize_label", ""),

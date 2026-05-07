@@ -10,6 +10,10 @@ from auth import get_current_user, require_admin, require_super, hash_password, 
 from email_service import send_template
 from services.membership_service import get_membership, derived_user_type, is_active_member
 from services.visibility import user_can_see
+from services.notification_preferences import (
+    OPTIONAL_EMAIL_PREFERENCES,
+    public_preferences_payload,
+)
 from models import AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -119,6 +123,13 @@ def _normalize_social_updates(updates: dict) -> dict:
     if "twitch_handle" in updates:
         updates["twitch_handle"] = _normalize_twitch_handle(updates.get("twitch_handle"))
     return updates
+
+
+def _normalize_notification_preferences(value) -> dict:
+    if not isinstance(value, dict):
+        return {}
+    allowed = set(OPTIONAL_EMAIL_PREFERENCES)
+    return {key: bool(value[key]) for key in allowed if key in value}
 
 
 async def _is_public_tournament(tournament: dict | None) -> bool:
@@ -600,6 +611,8 @@ async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}
     updates = _normalize_social_updates(updates)
+    if "notification_preferences" in updates:
+        updates["notification_preferences"] = _normalize_notification_preferences(updates.get("notification_preferences"))
     if not updates:
         await _attach_membership(me)
         return me
@@ -608,6 +621,15 @@ async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
     u = await db.users.find_one({"id": me["id"]}, {"_id": 0, "password_hash": 0})
     await _attach_membership(u)
     return u
+
+
+@router.get("/me/notification-preferences")
+async def get_my_notification_preferences(me: dict = Depends(get_current_user)):
+    db = get_db()
+    user = await db.users.find_one({"id": me["id"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(404, "Nutzer nicht gefunden.")
+    return public_preferences_payload(user)
 
 
 # ---------- User socials ----------
@@ -664,6 +686,8 @@ async def admin_update_user(user_id: str, body: UserUpdate,
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}
     updates = _normalize_social_updates(updates)
+    if "notification_preferences" in updates:
+        updates["notification_preferences"] = _normalize_notification_preferences(updates.get("notification_preferences"))
     updates["updated_at"] = now_utc().isoformat()
     await db.users.update_one({"id": user_id}, {"$set": updates})
     u = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})

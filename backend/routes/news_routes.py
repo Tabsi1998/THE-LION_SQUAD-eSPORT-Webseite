@@ -7,6 +7,7 @@ from auth import require_admin, get_optional_user
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
 from services.sponsor_utils import dedupe_public_sponsors
+from services.notification_preferences import enqueue_newsletter_for_item
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
     PartnerCreate, PartnerUpdate,
@@ -170,6 +171,18 @@ async def create_news(body: NewsCreate, me: dict = Depends(require_admin())):
     doc["author_id"] = me["id"]
     doc["author_name"] = me.get("display_name") or me.get("username")
     await db.news_posts.insert_one(doc)
+    if doc.get("published") and _published_now(doc):
+        result = await enqueue_newsletter_for_item("news", doc)
+        if result.get("reason") not in {"internal_visibility", "not_published"}:
+            doc["newsletter_sent_at"] = now_utc().isoformat()
+            doc["newsletter_sent_count"] = int(result.get("queued") or 0)
+            await db.news_posts.update_one(
+                {"id": doc["id"]},
+                {"$set": {
+                    "newsletter_sent_at": doc["newsletter_sent_at"],
+                    "newsletter_sent_count": doc["newsletter_sent_count"],
+                }},
+            )
     doc.pop("_id", None)
     return doc
 
@@ -178,6 +191,9 @@ async def create_news(body: NewsCreate, me: dict = Depends(require_admin())):
 @router.patch("/news/{nid}")
 async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_admin())):
     db = get_db()
+    existing = await db.news_posts.find_one({"id": nid}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Beitrag nicht gefunden.")
     update = body.model_dump(exclude_unset=True)
     if not update:
         raise HTTPException(400, "Keine Änderungen.")
@@ -191,7 +207,19 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_adm
     res = await db.news_posts.update_one({"id": nid}, {"$set": update})
     if res.matched_count == 0:
         raise HTTPException(404, "Beitrag nicht gefunden.")
-    return await db.news_posts.find_one({"id": nid}, {"_id": 0})
+    saved = await db.news_posts.find_one({"id": nid}, {"_id": 0})
+    if saved and saved.get("published") and _published_now(saved) and not saved.get("newsletter_sent_at"):
+        result = await enqueue_newsletter_for_item("news", saved)
+        if result.get("reason") not in {"internal_visibility", "not_published"}:
+            await db.news_posts.update_one(
+                {"id": nid},
+                {"$set": {
+                    "newsletter_sent_at": now_utc().isoformat(),
+                    "newsletter_sent_count": int(result.get("queued") or 0),
+                }},
+            )
+            saved = await db.news_posts.find_one({"id": nid}, {"_id": 0})
+    return saved
 
 
 @router.delete("/news/{nid}")

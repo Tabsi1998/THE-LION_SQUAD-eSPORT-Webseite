@@ -30,21 +30,24 @@ async def _participants_for_match(match: dict) -> list[dict]:
         if not raw:
             continue
         # Try direct user
-        u = await db.users.find_one({"id": raw}, {"id": 1, "email": 1, "display_name": 1})
+        u = await db.users.find_one({"id": raw}, {"id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1})
         if u:
             out.append(u)
             continue
         # Try via registration
         reg = await db.tournament_registrations.find_one({"id": raw}, {"_id": 0})
         if reg and reg.get("user_id"):
-            u2 = await db.users.find_one({"id": reg["user_id"]}, {"id": 1, "email": 1, "display_name": 1})
+            u2 = await db.users.find_one({"id": reg["user_id"]}, {"id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1})
             if u2:
                 out.append(u2)
         elif reg and reg.get("team_id"):
             members = await db.team_members.find({"team_id": reg["team_id"]}, {"_id": 0, "user_id": 1}).to_list(20)
             uids = [m["user_id"] for m in members if m.get("user_id")]
             if uids:
-                users = await db.users.find({"id": {"$in": uids}}, {"id": 1, "email": 1, "display_name": 1}).to_list(20)
+                users = await db.users.find(
+                    {"id": {"$in": uids}},
+                    {"id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1},
+                ).to_list(20)
                 out.extend(users)
     return out
 
@@ -84,10 +87,10 @@ async def schedule_match_reminders() -> dict:
                     continue
                 if not p.get("email"):
                     continue
-                from email_service import send_template
+                from services.notification_preferences import send_user_template
                 dedupe = f"match_reminder:{m.get('id')}:{p.get('id')}:{label}"
-                await send_template(
-                    tpl_key, p["email"],
+                await send_user_template(
+                    p, tpl_key,
                     tournament_title=t.get("title", "Turnier"),
                     opponent=opp_name,
                     when=when_str,

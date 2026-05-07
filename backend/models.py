@@ -99,6 +99,7 @@ class UserUpdate(BaseModel):
     privacy_public_profile: Optional[bool] = None
     profile_visibility: Optional[Dict[str, VisibilityLevel]] = None  # field_name -> level
     newsletter_consent: Optional[bool] = None
+    notification_preferences: Optional[Dict[str, bool]] = None
 
 
 class UserPublic(BaseModel):

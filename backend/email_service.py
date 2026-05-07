@@ -284,6 +284,23 @@ def tpl_membership_blocked(display_name: str) -> tuple[str, str]:
     )
 
 
+def tpl_newsletter_news(display_name: str, title: str, excerpt: str = "", url: str = "") -> tuple[str, str]:
+    body = f"<p>Hallo {display_name or 'Löwe'},</p><p>es gibt neue Vereinsnews:</p><p><strong>{title}</strong></p>"
+    if excerpt:
+        body += f"<p>{excerpt}</p>"
+    return f"Neue Vereinsnews: {title}", _wrap("Neue Vereinsnews", body, "News lesen", url)
+
+
+def tpl_newsletter_event(display_name: str, title: str, when: str = "", location: str = "", url: str = "") -> tuple[str, str]:
+    facts = ""
+    if when:
+        facts += f"<p><strong>Datum:</strong> {when}</p>"
+    if location:
+        facts += f"<p><strong>Ort:</strong> {location}</p>"
+    body = f"<p>Hallo {display_name or 'Löwe'},</p><p>ein neues Event wurde veröffentlicht:</p><p><strong>{title}</strong></p>{facts}"
+    return f"Neues Event: {title}", _wrap("Neues Event", body, "Event ansehen", url)
+
+
 def _wrap(title: str, body_html: str, cta_label: Optional[str] = None, cta_url: Optional[str] = None) -> str:
     """Neutral transactional email layout tuned for inbox placement."""
     cta = ""
@@ -311,6 +328,7 @@ def _wrap(title: str, body_html: str, cta_label: Optional[str] = None, cta_url: 
     </td></tr>
     <tr><td style="padding:16px 32px;border-top:1px solid #edf0f3;color:#6b7280;font-size:12px;line-height:1.5">
       Diese automatische Nachricht wurde von THE LION SQUAD eSports versendet.
+      Newsletter und optionale Hinweise kannst du jederzeit in deinem Profil unter Privatsphäre deaktivieren.
     </td></tr>
   </table>
 </td></tr></table></body></html>"""
@@ -360,6 +378,8 @@ async def send_template(
         "membership_activated": tpl_membership_activated,
         "membership_deactivated": tpl_membership_deactivated,
         "membership_blocked": tpl_membership_blocked,
+        "newsletter_news": tpl_newsletter_news,
+        "newsletter_event": tpl_newsletter_event,
     }
     fn = templates.get(template_key)
     if not fn:

@@ -13,7 +13,7 @@ from services.membership_service import (
 from models import (
     MembershipUpdate, MemberBenefitCreate, MemberBenefitUpdate, now_utc, new_id,
 )
-from email_service import send_template
+from services.notification_preferences import send_user_template
 
 router = APIRouter(prefix="/api/membership", tags=["membership"])
 
@@ -417,9 +417,9 @@ async def update_user_membership(
     # Fire emails based on transitions
     new_status = payload.get("member_status")
     if new_status == "active":
-        await send_template(
+        await send_user_template(
+            user,
             "membership_activated",
-            user["email"],
             display_name=user.get("display_name") or user.get("username"),
             member_number=m.get("member_number") or "",
         )
@@ -430,15 +430,15 @@ async def update_user_membership(
         except Exception:
             pass
     elif new_status == "blocked":
-        await send_template(
+        await send_user_template(
+            user,
             "membership_blocked",
-            user["email"],
             display_name=user.get("display_name") or user.get("username"),
         )
     elif new_status in ("inactive", "former"):
-        await send_template(
+        await send_user_template(
+            user,
             "membership_deactivated",
-            user["email"],
             display_name=user.get("display_name") or user.get("username"),
         )
 

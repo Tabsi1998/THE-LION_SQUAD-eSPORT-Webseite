@@ -8,7 +8,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
-import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil, Target, RefreshCw, Sparkles } from "lucide-react";
+import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil, Target, RefreshCw, Sparkles, Bell, Mail } from "lucide-react";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 
 const TABS = [
@@ -69,6 +69,14 @@ const GENDER_OPTIONS = [
   ["male", "Männlich"],
   ["female", "Weiblich"],
   ["diverse", "Divers"],
+];
+
+const EMAIL_PREFERENCES = [
+  { k: "match_reminders", l: "Match-Erinnerungen", d: "Startzeiten, Match-Hub und Check-in-nahe Hinweise.", defaultOn: true },
+  { k: "tournament_updates", l: "Turnier-Updates", d: "Anmeldung, Status, Ergebnisse und wichtige Turnierinfos.", defaultOn: true },
+  { k: "prize_updates", l: "Gewinne & Abholung", d: "Gewinn bereit, übergeben oder Frist abgelaufen.", defaultOn: true },
+  { k: "membership_updates", l: "Vereinsmitgliedschaft", d: "Bewerbung, Mitgliedsstatus und Vereinsvorteile.", defaultOn: true },
+  { k: "news_events", l: "News & Events", d: "Neue Vereinsnews, neue Events und wichtige Ankündigungen.", requiresNewsletter: true },
 ];
 
 const ACHIEVEMENT_ACTIONS = {
@@ -213,6 +221,7 @@ export default function ProfilePage() {
         // privacy
         privacy_public_profile: user.privacy_public_profile ?? true,
         newsletter_consent: !!user.newsletter_consent,
+        notification_preferences: user.notification_preferences || {},
         profile_visibility: user.profile_visibility || {},
       });
     }
@@ -230,6 +239,17 @@ export default function ProfilePage() {
     ...f,
     profile_visibility: { ...(f.profile_visibility || {}), [field]: level },
   }));
+  const setNotificationPreference = (field, enabled) => setForm((f) => ({
+    ...f,
+    notification_preferences: { ...(f.notification_preferences || {}), [field]: enabled },
+  }));
+  const notificationEnabled = (field) => {
+    if (field === "news_events" && !form.newsletter_consent) return false;
+    const pref = form.notification_preferences || {};
+    const meta = EMAIL_PREFERENCES.find((item) => item.k === field);
+    if (Object.prototype.hasOwnProperty.call(pref, field)) return !!pref[field];
+    return !!meta?.defaultOn || (field === "news_events" && !!form.newsletter_consent);
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -469,9 +489,43 @@ export default function ProfilePage() {
                 <input type="checkbox" checked={form.newsletter_consent} onChange={(e) => set("newsletter_consent", e.target.checked)} className="accent-[#29B6E8] mt-1" />
                 <div>
                   <div className="font-bold text-white">Newsletter</div>
-                  <div className="text-sm text-white/60 mt-1">Ich willige separat ein, Newsletter und Vereinsinfos per E-Mail zu erhalten. Jederzeit widerrufbar.</div>
+                  <div className="text-sm text-white/60 mt-1">Ich willige separat ein, Newsletter, Event-Hinweise und Vereinsnews per E-Mail zu erhalten. Jederzeit widerrufbar.</div>
                 </div>
               </label>
+
+              <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]">
+                <div className="flex items-start gap-3 mb-4">
+                  <Bell className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />
+                  <div>
+                    <h3 className="font-heading font-black uppercase mb-1">E-Mail-Benachrichtigungen</h3>
+                    <p className="text-xs text-white/50">Wähle, welche optionalen E-Mails du bekommen möchtest. Account- und Sicherheitsmails bleiben immer aktiv.</p>
+                  </div>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {EMAIL_PREFERENCES.map((pref) => {
+                    const disabled = pref.requiresNewsletter && !form.newsletter_consent;
+                    const checked = notificationEnabled(pref.k);
+                    return (
+                      <label key={pref.k} className={`flex items-start gap-3 border rounded-sm p-3 ${checked ? "border-[#29B6E8]/45 bg-[#29B6E8]/5" : "border-white/10 bg-[#121212]"} ${disabled ? "opacity-55" : ""}`}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={disabled}
+                          onChange={(e) => setNotificationPreference(pref.k, e.target.checked)}
+                          data-testid={`profile-mail-pref-${pref.k}`}
+                          className="accent-[#29B6E8] mt-1"
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 font-bold text-white text-sm">
+                            <Mail className="w-3.5 h-3.5 text-[#29B6E8]" /> {pref.l}
+                          </div>
+                          <div className="text-xs text-white/50 mt-1">{disabled ? "Newsletter-Einwilligung zuerst aktivieren." : pref.d}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
 
               <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]">
                 <h3 className="font-heading font-black uppercase mb-1">Sichtbarkeit einzelner Felder</h3>

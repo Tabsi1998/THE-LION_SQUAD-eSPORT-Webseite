@@ -19,6 +19,36 @@ Dieses Dokument beschreibt die wichtigsten Admin-Ablaeufe fuer die THE LION SQUA
 6. Einen kleinen Upload-Test im Medienbereich oder Branding machen.
 7. Startseite, Community, Verein, Events und ein Profil oeffnen.
 
+## E-Mail und Benachrichtigungen
+
+Das System trennt Pflichtmails und optionale Benachrichtigungen.
+
+Pflichtmails:
+
+- Registrierung
+- Passwort-Reset
+- Admin-Einladung
+- Testmail
+
+Diese Mails werden nicht durch Profil-Opt-outs blockiert.
+
+Optionale Mails:
+
+- Match-Erinnerungen
+- Turnier-Updates
+- Gewinn- und Abholhinweise
+- Mitgliedschaftsinfos
+- News und Events
+
+Newsletter, News und Event-Hinweise gehen nur an Accounts mit expliziter Newsletter-Einwilligung. User verwalten das unter `Mein Profil -> Privatsphaere -> E-Mail-Benachrichtigungen`.
+
+Regeln:
+
+- Interne Inhalte werden nicht per Newsletter verschickt.
+- Mitglieder-spezifische Newsletter gehen nur an aktive oder Ehren-Vereinsmitglieder.
+- News/Event-Veröffentlichungen werden dedupliziert, damit dieselbe Person dieselbe Mail nicht mehrfach bekommt.
+- Nach groesseren Veröffentlichungen `Admin -> Einstellungen -> Mail-Queue` und `Versandlogs` pruefen.
+
 ## Medien und Uploads
 
 ### User-Uploads

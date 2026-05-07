@@ -182,7 +182,10 @@ async def admin_decide_application(app_id: str, body: DecisionBody,
     try:
         from services.mail_queue import enqueue_mail
         from routes.phase_ef_routes import render_template
-        u = await db.users.find_one({"id": app["user_id"]}, {"_id": 0, "email": 1, "display_name": 1, "username": 1})
+        u = await db.users.find_one(
+            {"id": app["user_id"]},
+            {"_id": 0, "email": 1, "display_name": 1, "username": 1, "newsletter_consent": 1, "notification_preferences": 1},
+        )
         if u and u.get("email"):
             tpl_key = "membership_approve" if body.decision == "approve" else "membership_reject"
             display = u.get("display_name") or u.get("username") or "Spieler"
@@ -194,7 +197,9 @@ async def admin_decide_application(app_id: str, body: DecisionBody,
                                f"{'angenommen' if body.decision == 'approve' else 'abgelehnt'}.</p>"
                                f"<p>{body.note or ''}</p>"),
             )
-            await enqueue_mail(to=u["email"], subject=subj, html=html)
+            from services.notification_preferences import email_allowed
+            if email_allowed(u, tpl_key, "membership_updates"):
+                await enqueue_mail(to=u["email"], subject=subj, html=html)
     except Exception:
         pass
 

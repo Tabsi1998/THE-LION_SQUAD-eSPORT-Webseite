@@ -8,6 +8,7 @@ from services.visibility import user_can_see
 from services.content_embed_service import resolve_content_embeds
 from services.public_phase import derive_public_phase
 from services.sponsor_utils import dedupe_public_sponsors
+from services.notification_preferences import enqueue_newsletter_for_item
 from models import EventCreate, EventUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -243,6 +244,18 @@ async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
     doc["updated_at"] = now_utc().isoformat()
     doc["created_by"] = me["id"]
     await db.events.insert_one(doc)
+    if doc.get("status") not in {"draft", "archived", "cancelled"}:
+        result = await enqueue_newsletter_for_item("event", doc)
+        if result.get("reason") not in {"internal_visibility", "not_announced"}:
+            doc["newsletter_sent_at"] = now_utc().isoformat()
+            doc["newsletter_sent_count"] = int(result.get("queued") or 0)
+            await db.events.update_one(
+                {"id": doc["id"]},
+                {"$set": {
+                    "newsletter_sent_at": doc["newsletter_sent_at"],
+                    "newsletter_sent_count": doc["newsletter_sent_count"],
+                }},
+            )
     doc.pop("_id", None)
     return doc
 
@@ -251,6 +264,9 @@ async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
 @router.patch("/{event_id}")
 async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(require_admin())):
     db = get_db()
+    existing = await db.events.find_one({"id": event_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Event nicht gefunden.")
     nullable_fields = {
         "description", "location", "address", "postal_code", "city", "country",
         "banner_url", "registration_url", "organizer_name", "organizer_url",
@@ -266,6 +282,17 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
     updates["updated_at"] = now_utc().isoformat()
     await db.events.update_one({"id": event_id}, {"$set": updates})
     event = await db.events.find_one({"id": event_id}, {"_id": 0})
+    if event and event.get("status") not in {"draft", "archived", "cancelled"} and not event.get("newsletter_sent_at"):
+        result = await enqueue_newsletter_for_item("event", event)
+        if result.get("reason") not in {"internal_visibility", "not_announced"}:
+            await db.events.update_one(
+                {"id": event_id},
+                {"$set": {
+                    "newsletter_sent_at": now_utc().isoformat(),
+                    "newsletter_sent_count": int(result.get("queued") or 0),
+                }},
+            )
+            event = await db.events.find_one({"id": event_id}, {"_id": 0})
     return event
 
 
