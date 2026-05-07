@@ -167,6 +167,7 @@ body {
 .prose-cms li { margin: 0.25rem 0; }
 .prose-cms strong { color: #fff; }
 .prose-cms em { color: rgba(255,255,255,0.86); }
+.prose-cms u { color: #fff; text-underline-offset: 0.18em; }
 .prose-cms del { color: rgba(255,255,255,0.55); }
 .prose-cms blockquote {
   margin: 1.25rem 0;
@@ -227,6 +228,28 @@ body {
   font-weight: 800;
 }
 .prose-cms hr { border-color: rgba(255,255,255,0.1); margin: 2rem 0; }
+
+.tiptap-editor {
+  min-height: 12rem;
+  color: rgba(255,255,255,0.82);
+}
+.tiptap-editor:focus { outline: none; }
+.tiptap-editor p.is-editor-empty:first-child::before {
+  color: rgba(255,255,255,0.28);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.tiptap-editor .selectedCell {
+  background: rgba(41,182,232,0.16);
+}
+.tiptap-editor table {
+  table-layout: fixed;
+}
+.tiptap-editor img.ProseMirror-selectednode {
+  outline: 2px solid #29B6E8;
+}
 
 /* Disable default number input spinner where not needed */
 input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-button {

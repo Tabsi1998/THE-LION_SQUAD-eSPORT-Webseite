@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Link as LinkIcon, Plus, Trash2, X } from "lucide-react";
@@ -11,6 +12,7 @@ export default function AdminUsersPage() {
   const [list, setList] = useState([]);
   const [q, setQ] = useState("");
   const [creating, setCreating] = useState(false);
+  const confirm = useConfirm();
   const load = useCallback(async () => {
     const { data } = await api.get(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     setList(data);
@@ -33,7 +35,11 @@ export default function AdminUsersPage() {
     }
   };
   const deleteUser = async (u) => {
-    if (!window.confirm(`Benutzer "${u.username}" wirklich endgültig löschen? Das entfernt auch Login, Mitgliedschaft, Registrierungen, Achievements und Zeiten.`)) return;
+    if (!await confirm({
+      title: "Benutzer endgültig löschen?",
+      description: `Benutzer "${u.username}" wird inklusive Login, Mitgliedschaft, Registrierungen, Achievements und Zeiten gelöscht.`,
+      confirmLabel: "Endgültig löschen",
+    })) return;
     try {
       await api.delete(`/users/${u.id}`);
       toast.success("Benutzer gelöscht.");

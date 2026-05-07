@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Trash2, Save, Gift } from "lucide-react";
@@ -19,6 +20,7 @@ export default function AdminBenefitsPage() {
   const [list, setList] = useState([]);
   const [editing, setEditing] = useState(null); // null | {} | object
   const [meta, setMeta] = useState({ types: [] });
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const { data } = await api.get("/membership/benefits/all");
@@ -28,7 +30,11 @@ export default function AdminBenefitsPage() {
   useApiInvalidation(load, ["membership"]);
 
   const remove = async (id) => {
-    if (!window.confirm("Mitgliedervorteil löschen?")) return;
+    if (!await confirm({
+      title: "Mitgliedervorteil löschen?",
+      description: "Dieser Vorteil wird aus dem Mitgliederbereich entfernt.",
+      confirmLabel: "Löschen",
+    })) return;
     try { await api.delete(`/membership/benefits/${id}`); toast.success("Gelöscht."); load(); }
     catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
   };

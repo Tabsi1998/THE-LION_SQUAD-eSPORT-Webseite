@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Handshake, Pencil, Plus, Trash2, X } from "lucide-react";
@@ -19,6 +20,7 @@ const emptyPartner = {
 export default function AdminPartnersPage() {
   const [list, setList] = useState([]);
   const [editing, setEditing] = useState(null);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const { data } = await api.get("/partners/admin");
@@ -29,7 +31,7 @@ export default function AdminPartnersPage() {
   useApiInvalidation(load, ["partners", "uploads"]);
 
   const remove = async (id) => {
-    if (!window.confirm("Partner wirklich löschen?")) return;
+    if (!await confirm({ title: "Partner löschen?", description: "Der Partner wird dauerhaft aus der Partnerseite entfernt.", confirmLabel: "Löschen" })) return;
     await api.delete(`/partners/${id}`);
     toast.success("Partner gelöscht.");
     load();

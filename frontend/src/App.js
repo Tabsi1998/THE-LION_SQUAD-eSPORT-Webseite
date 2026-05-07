@@ -6,6 +6,7 @@ import { ProtectedRoute } from "@/components/tls/ProtectedRoute";
 import { BrandingHead } from "@/components/tls/BrandingHead";
 import { ApiInvalidationBridge } from "@/components/tls/ApiInvalidationBridge";
 import { CookieConsentProvider } from "@/components/tls/CookieConsent";
+import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 
 function MeRedirect() {
   const { user } = useAuth();
@@ -107,10 +108,11 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <CookieConsentProvider>
-          <BrandingHead />
-          <ApiInvalidationBridge />
-          <Toaster theme="dark" position="top-right" richColors />
-          <Routes>
+          <ConfirmDialogProvider>
+            <BrandingHead />
+            <ApiInvalidationBridge />
+            <Toaster theme="dark" position="top-right" richColors />
+            <Routes>
           {/* Public — Verein */}
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
@@ -221,7 +223,8 @@ function App() {
           {/* Error pages */}
           <Route path="/403" element={<ForbiddenPage />} />
           <Route path="*" element={<NotFoundPage />} />
-          </Routes>
+            </Routes>
+          </ConfirmDialogProvider>
         </CookieConsentProvider>
       </BrowserRouter>
     </AuthProvider>

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { FileText, Mail, Save, Plus, Trash2, X, Eye, EyeOff } from "lucide-react";
@@ -43,6 +44,7 @@ function PagesTab() {
   const [pages, setPages] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
+  const confirm = useConfirm();
 
   const load = useCallback(() => api.get("/admin/pages").then(({ data }) => setPages(data)), []);
   useEffect(() => { load(); }, [load]);
@@ -53,7 +55,11 @@ function PagesTab() {
     catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
   };
   const del = async (p) => {
-    if (!window.confirm(`Seite "${p.title}" wirklich löschen?`)) return;
+    if (!await confirm({
+      title: "CMS-Seite löschen?",
+      description: `Seite "${p.title}" wirklich löschen?`,
+      confirmLabel: "Löschen",
+    })) return;
     try { await api.delete(`/admin/pages/${p.slug}`); toast.success("Gelöscht"); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
   };

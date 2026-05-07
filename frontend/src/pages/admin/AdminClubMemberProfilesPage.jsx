@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { api, formatRequestError, resolveMediaUrl, suggestSlug } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
@@ -55,6 +56,7 @@ export default function AdminClubMemberProfilesPage() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState(null);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,7 +80,7 @@ export default function AdminClubMemberProfilesPage() {
   }, [profiles, q]);
 
   const remove = async (profile) => {
-    if (!window.confirm(`Mitgliederprofil "${profile.display_name}" wirklich löschen?`)) return;
+    if (!await confirm({ title: "Mitgliederprofil löschen?", description: `"${profile.display_name}" wird von der öffentlichen Vereinsmitgliederseite entfernt.`, confirmLabel: "Löschen" })) return;
     try {
       await api.delete(`/membership/profiles/admin/${profile.id}`);
       toast.success("Mitgliederprofil gelöscht.");

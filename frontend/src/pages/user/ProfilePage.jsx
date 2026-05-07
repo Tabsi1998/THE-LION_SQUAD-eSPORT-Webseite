@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MultiSelect } from "@/components/tls/MultiSelect";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
@@ -450,6 +451,7 @@ function TeamsPanel() {
   const [seasons, setSeasons] = useState([]);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
 
   const activeTeam = teams.find((t) => t.id === activeId);
 
@@ -512,7 +514,11 @@ function TeamsPanel() {
   };
 
   const deleteSquad = async (squad) => {
-    if (!window.confirm(`Squad "${squad.name}" wirklich loeschen?`)) return;
+    if (!await confirm({
+      title: "Squad löschen?",
+      description: `Squad "${squad.name}" wirklich löschen?`,
+      confirmLabel: "Löschen",
+    })) return;
     try {
       await api.delete(`/teams/${activeTeam.id}/squads/${squad.id}`);
       toast.success("Squad geloescht.");

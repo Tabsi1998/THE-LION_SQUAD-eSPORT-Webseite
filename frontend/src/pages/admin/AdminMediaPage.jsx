@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { API_BASE, api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { prepareImageForUpload } from "@/components/tls/ImageUpload";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import {
@@ -43,6 +44,7 @@ export default function AdminMediaPage() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,7 +75,7 @@ export default function AdminMediaPage() {
   );
 
   const del = async (it) => {
-    if (!window.confirm(`Datei "${it.filename}" wirklich endgültig löschen?`)) return;
+    if (!await confirm({ title: "Datei endgültig löschen?", description: `"${it.filename}" wird aus der Medienbibliothek entfernt. Verknüpfte Bildfelder werden bereinigt.`, confirmLabel: "Löschen" })) return;
     const previous = items;
     setItems((rows) => rows.filter((row) => row.filename !== it.filename));
     setSelected(null);

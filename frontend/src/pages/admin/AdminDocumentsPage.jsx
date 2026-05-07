@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { API, api, formatApiError, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Save, X, Trash2, FileText, Pin, UploadCloud } from "lucide-react";
@@ -34,6 +35,7 @@ export default function AdminDocumentsPage() {
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ categories: [], visibilities: [] });
   const [editing, setEditing] = useState(null);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const { data } = await api.get("/documents/admin");
@@ -43,7 +45,11 @@ export default function AdminDocumentsPage() {
   useApiInvalidation(load, ["documents", "uploads"]);
 
   const remove = async (id) => {
-    if (!window.confirm("Dokument löschen?")) return;
+    if (!await confirm({
+      title: "Dokument löschen?",
+      description: "Das Dokument wird aus dem Mitglieder-CMS entfernt.",
+      confirmLabel: "Löschen",
+    })) return;
     try { await api.delete(`/documents/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Dokument konnte nicht geloescht werden.")); }
   };
 

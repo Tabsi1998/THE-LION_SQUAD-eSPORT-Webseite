@@ -32,6 +32,7 @@ export function PublicLayout({ children }) {
   const closeMobile = () => setMobileOpen(false);
   const clubName = branding?.club_name || "THE LION SQUAD";
   const tagline = branding?.tagline || "eSports";
+  const twitchUrl = getTwitchUrl(branding?.twitch_channel);
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col">
@@ -167,7 +168,7 @@ export function PublicLayout({ children }) {
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
                 </a>
                 {/* Streaming: Twitch */}
-                <a href={branding?.twitch_channel ? `https://www.twitch.tv/${branding.twitch_channel}` : "https://www.twitch.tv/the_lion_squad_esports"} target="_blank" rel="noreferrer" data-testid="footer-twitch" aria-label="Twitch" className="w-9 h-9 inline-flex items-center justify-center border border-white/10 rounded-sm hover:border-[#9146FF] hover:text-[#9146FF] text-white/70 transition">
+                <a href={twitchUrl} target="_blank" rel="noreferrer" data-testid="footer-twitch" aria-label="Twitch" className="w-9 h-9 inline-flex items-center justify-center border border-white/10 rounded-sm hover:border-[#9146FF] hover:text-[#9146FF] text-white/70 transition">
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
                 </a>
               </div>
@@ -227,4 +228,12 @@ export function PublicLayout({ children }) {
       </footer>
     </div>
   );
+}
+
+function getTwitchUrl(value) {
+  const fallback = "https://www.twitch.tv/the_lion_squad_esports";
+  const raw = String(value || "").trim();
+  if (!raw) return fallback;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `https://www.twitch.tv/${raw.replace(/^@/, "")}`;
 }

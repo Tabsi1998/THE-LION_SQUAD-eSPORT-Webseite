@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload, prepareImageForUpload } from "@/components/tls/ImageUpload";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Save, X, Trash2, Image as ImageIcon, ArrowLeft } from "lucide-react";
@@ -11,6 +12,7 @@ export default function AdminGalleryPage() {
   const [activeAlbum, setActiveAlbum] = useState(null);
   const [editingAlbum, setEditingAlbum] = useState(null);
   const [events, setEvents] = useState([]);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const { data } = await api.get("/admin/gallery");
@@ -24,7 +26,11 @@ export default function AdminGalleryPage() {
   useApiInvalidation(load, ["gallery"]);
 
   const remove = async (id) => {
-    if (!window.confirm("Album mit allen Fotos löschen?")) return;
+    if (!await confirm({
+      title: "Album löschen?",
+      description: "Das Album und alle zugeordneten Fotos werden entfernt.",
+      confirmLabel: "Löschen",
+    })) return;
     const previous = albums;
     setAlbums((rows) => rows.filter((a) => a.id !== id));
     if (activeAlbum?.id === id) setActiveAlbum(null);
@@ -184,6 +190,7 @@ function AlbumPhotos({ album, events, onBack }) {
   const [media, setMedia] = useState([]);
   const [selectedMedia, setSelectedMedia] = useState([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/admin/gallery/${album.id}`);
@@ -220,7 +227,11 @@ function AlbumPhotos({ album, events, onBack }) {
     load();
   };
   const remove = async (id) => {
-    if (!window.confirm("Foto löschen?")) return;
+    if (!await confirm({
+      title: "Foto löschen?",
+      description: "Das Foto wird aus diesem Album entfernt.",
+      confirmLabel: "Löschen",
+    })) return;
     const previous = photos;
     setPhotos((rows) => rows.filter((p) => p.id !== id));
     try {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Award, CheckCircle2, Clock, XCircle, Gift, RefreshCw, AlertCircle } from "lucide-react";
@@ -16,6 +17,7 @@ export default function AdminPrizesPage() {
   const [items, setItems] = useState([]);
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,7 +40,11 @@ export default function AdminPrizesPage() {
   };
 
   const remove = async (id) => {
-    if (!window.confirm("Gewinn-Eintrag wirklich löschen?")) return;
+    if (!await confirm({
+      title: "Gewinn-Eintrag löschen?",
+      description: "Der Preis wird aus der Gewinnabholung entfernt.",
+      confirmLabel: "Löschen",
+    })) return;
     try { await api.delete(`/prizes/${id}`); toast.success("Gelöscht."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };

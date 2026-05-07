@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import {
@@ -70,6 +71,7 @@ function GroupsTab() {
   const [groups, setGroups] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const { data } = await api.get("/admin/achievements/groups");
@@ -83,7 +85,11 @@ function GroupsTab() {
     catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
   };
   const del = async (g) => {
-    if (!window.confirm(`Group "${g.name}" inkl. aller Tiers und Awards wirklich löschen?`)) return;
+    if (!await confirm({
+      title: "Achievement-Group löschen?",
+      description: `Group "${g.name}" inklusive aller Tiers und Awards wirklich löschen?`,
+      confirmLabel: "Löschen",
+    })) return;
     try { await api.delete(`/admin/achievements/groups/${g.code}`); toast.success("Gelöscht"); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
   };
@@ -206,6 +212,7 @@ function TiersTab() {
   const [tiers, setTiers] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
+  const confirm = useConfirm();
 
   const loadGroups = useCallback(async () => {
     const { data } = await api.get("/admin/achievements/groups");
@@ -227,7 +234,11 @@ function TiersTab() {
   }, ["achievements"]);
 
   const del = async (t) => {
-    if (!window.confirm(`Tier "${t.name}" wirklich löschen?`)) return;
+    if (!await confirm({
+      title: "Achievement-Stufe löschen?",
+      description: `Tier "${t.name}" wirklich löschen?`,
+      confirmLabel: "Löschen",
+    })) return;
     try { await api.delete(`/admin/achievements/tiers/${t.code}`); toast.success("Gelöscht"); reload(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
   };
@@ -416,12 +427,17 @@ function AwardTab() {
 // ---------------- Negative Tab ----------------
 function NegativeTab() {
   const [list, setList] = useState([]);
+  const confirm = useConfirm();
   const load = useCallback(() => api.get("/admin/achievements/negative/awards").then(({ data }) => setList(data)), []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["achievements"]);
 
   const revoke = async (a) => {
-    if (!window.confirm(`Vergabe "${a.tier_name}" für ${a.display_name || a.username} entfernen?`)) return;
+    if (!await confirm({
+      title: "Vergabe entfernen?",
+      description: `Vergabe "${a.tier_name}" für ${a.display_name || a.username} entfernen?`,
+      confirmLabel: "Entfernen",
+    })) return;
     try { await api.delete("/admin/achievements/award", { data: { user_id: a.user_id, tier_code: a.tier_code } }); toast.success("Entfernt"); setList((current) => current.filter(x => !(x.user_id === a.user_id && x.tier_code === a.tier_code))); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
   };

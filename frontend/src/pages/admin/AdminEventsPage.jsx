@@ -3,6 +3,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { appendEmbedToken } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
@@ -21,6 +22,7 @@ export default function AdminEventsPage() {
   const [tournaments, setTournaments] = useState([]);
   const [f1Challenges, setF1Challenges] = useState([]);
   const [editing, setEditing] = useState(null);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const { data } = await api.get("/events");
@@ -49,7 +51,11 @@ export default function AdminEventsPage() {
   useApiInvalidation(refreshAll, ["events", "tournaments", "f1"]);
 
   const remove = async (id) => {
-    if (!window.confirm("Event löschen?")) return;
+    if (!await confirm({
+      title: "Event löschen?",
+      description: "Das Event wird aus der öffentlichen Event-Liste entfernt.",
+      confirmLabel: "Löschen",
+    })) return;
     try { await api.delete(`/events/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Event konnte nicht geloescht werden.")); }
   };
 

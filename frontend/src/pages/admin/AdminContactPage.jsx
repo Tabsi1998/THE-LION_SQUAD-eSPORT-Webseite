@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Inbox, MailOpen, Trash2, ArrowLeft, AlertCircle } from "lucide-react";
@@ -23,6 +24,7 @@ export default function AdminContactPage() {
   const [list, setList] = useState([]);
   const [filter, setFilter] = useState("");
   const [active, setActive] = useState(null);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const url = filter ? `/contact?status=${filter}` : "/contact";
@@ -42,7 +44,11 @@ export default function AdminContactPage() {
   };
 
   const remove = async (id) => {
-    if (!window.confirm("Nachricht unwiderruflich löschen?")) return;
+    if (!await confirm({
+      title: "Nachricht löschen?",
+      description: "Diese Nachricht wird unwiderruflich aus der Inbox entfernt.",
+      confirmLabel: "Löschen",
+    })) return;
     try { await api.delete(`/contact/${id}`); toast.success("Gelöscht."); setActive(null); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
   };

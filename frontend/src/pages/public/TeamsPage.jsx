@@ -4,6 +4,7 @@ import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Copy, Edit, Plus, Shield, Trash2, Users, UserPlus } from "lucide-react";
@@ -80,6 +81,7 @@ function TeamDetail({ id }) {
   const [team, setTeam] = useState(null);
   const [editing, setEditing] = useState(null);
   const [joinCode, setJoinCode] = useState("");
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/teams/${id}`);
@@ -114,7 +116,11 @@ function TeamDetail({ id }) {
   };
 
   const remove = async () => {
-    if (!window.confirm("Team wirklich endgültig löschen?")) return;
+    if (!await confirm({
+      title: "Team endgültig löschen?",
+      description: "Das Team wird inklusive Verwaltung und Mitgliedschaften entfernt.",
+      confirmLabel: "Endgültig löschen",
+    })) return;
     try {
       await api.delete(`/teams/${team.id}`);
       toast.success("Team gelöscht.");
@@ -123,7 +129,11 @@ function TeamDetail({ id }) {
   };
 
   const kickMember = async (m) => {
-    if (!window.confirm(`${m.display_name || m.username} wirklich aus dem Team entfernen?`)) return;
+    if (!await confirm({
+      title: "Mitglied entfernen?",
+      description: `${m.display_name || m.username} wirklich aus dem Team entfernen?`,
+      confirmLabel: "Entfernen",
+    })) return;
     try {
       await api.delete(`/teams/${team.id}/members/${m.id}`);
       toast.success(`${m.display_name || m.username} entfernt.`);
@@ -140,7 +150,12 @@ function TeamDetail({ id }) {
   };
 
   const transferLead = async (m) => {
-    if (!window.confirm(`Leadership an ${m.display_name || m.username} übergeben? Du wirst automatisch Co-Leader.`)) return;
+    if (!await confirm({
+      title: "Leadership übertragen?",
+      description: `Leadership an ${m.display_name || m.username} übergeben? Du wirst automatisch Co-Leader.`,
+      confirmLabel: "Übertragen",
+      tone: "info",
+    })) return;
     try {
       await api.post(`/teams/${team.id}/transfer-leader`, { new_leader_id: m.id });
       toast.success("Leadership übertragen.");

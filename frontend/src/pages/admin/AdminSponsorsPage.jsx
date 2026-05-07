@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Trash2, Upload, Pencil, X as XIcon } from "lucide-react";
@@ -20,6 +21,7 @@ export default function AdminSponsorsPage() {
   const [normalizing, setNormalizing] = useState(false);
   const [clearingMissing, setClearingMissing] = useState(false);
   const [imageAudit, setImageAudit] = useState(null);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const { data } = await api.get("/sponsors/admin");
@@ -30,14 +32,14 @@ export default function AdminSponsorsPage() {
   useApiInvalidation(load, ["sponsors", "uploads"]);
 
   const del = async (id) => {
-    if (!window.confirm("Sponsor wirklich löschen?")) return;
+    if (!await confirm({ title: "Sponsor löschen?", description: "Der Sponsor wird dauerhaft entfernt.", confirmLabel: "Löschen" })) return;
     await api.delete(`/sponsors/${id}`);
     toast.success("Sponsor gelöscht.");
     load();
   };
 
   const migrate = async () => {
-    if (!window.confirm("Externe Bilder JETZT lokal speichern? (Sponsoren, News, Events, Galerie, Avatare)")) return;
+    if (!await confirm({ title: "Externe Bilder lokal speichern?", description: "Externe Bild-URLs werden heruntergeladen und durch lokale Upload-URLs ersetzt.", confirmLabel: "Migrieren", tone: "info" })) return;
     setMigrating(true);
     try {
       const { data } = await api.post("/uploads/migrate-external-images");
@@ -61,7 +63,7 @@ export default function AdminSponsorsPage() {
   };
 
   const normalizeImages = async () => {
-    if (!window.confirm("Alte lokale Bild-URLs jetzt auf /api/static/uploads/... normalisieren?")) return;
+    if (!await confirm({ title: "Bild-URLs reparieren?", description: "Alte lokale Bildpfade werden auf /api/static/uploads/... normalisiert.", confirmLabel: "Reparieren", tone: "info" })) return;
     setNormalizing(true);
     try {
       const { data } = await api.post("/uploads/normalize-image-urls");
@@ -73,7 +75,7 @@ export default function AdminSponsorsPage() {
   };
 
   const clearMissingImages = async () => {
-    if (!window.confirm("Kaputte Bild-Verknüpfungen leeren, wenn die lokale Datei nicht mehr existiert?")) return;
+    if (!await confirm({ title: "Fehlende Bilder leeren?", description: "Bildfelder, die auf nicht mehr vorhandene Upload-Dateien zeigen, werden geleert.", confirmLabel: "Bereinigen" })) return;
     setClearingMissing(true);
     try {
       const { data } = await api.post("/uploads/clear-missing-image-refs");

@@ -67,6 +67,10 @@ export const NAV_USER = [
   },
 ];
 
+function navTestId(label) {
+  return label.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+}
+
 // --- Desktop Dropdown ---
 function NavDropdown({ item, isClubMember }) {
   const [open, setOpen] = useState(false);
@@ -103,7 +107,7 @@ function NavDropdown({ item, isClubMember }) {
                 <NavLink
                   to={c.to}
                   onClick={() => setOpen(false)}
-                  data-testid={`nav-sub-${c.label.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}`}
+                  data-testid={`nav-sub-${navTestId(c.label)}`}
                   className={({ isActive }) =>
                     `block px-4 py-2 text-sm transition ${
                       isActive ? "text-[#29B6E8] bg-[#29B6E8]/5" : "text-white/80 hover:text-[#29B6E8] hover:bg-white/5"
@@ -161,6 +165,7 @@ function MobileAccordion({ item, isClubMember, onClose }) {
               key={c.to}
               to={c.to}
               onClick={onClose}
+              data-testid={`mobile-nav-sub-${navTestId(c.label)}`}
               className={({ isActive }) =>
                 `block px-3 py-2 text-xs uppercase tracking-wider transition ${
                   isActive ? "text-[#29B6E8]" : "text-white/65 hover:text-[#29B6E8]"

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Trash2, Crown, Save, X, EyeOff, Eye, GripVertical } from "lucide-react";
@@ -10,6 +11,7 @@ export default function AdminBoardPage() {
   const [users, setUsers] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const [p, u] = await Promise.all([api.get("/board"), api.get("/board/assignable-users")]);
@@ -28,7 +30,11 @@ export default function AdminBoardPage() {
     catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
   };
   const del = async (p) => {
-    if (!window.confirm(`Position "${p.title_male}" wirklich löschen?`)) return;
+    if (!await confirm({
+      title: "Vorstandsposition löschen?",
+      description: `Position "${p.title_male}" wirklich löschen?`,
+      confirmLabel: "Löschen",
+    })) return;
     try { await api.delete(`/board/${p.id}`); toast.success("Gelöscht"); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
   };

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -82,6 +83,7 @@ export default function AdminSeasonsPage() {
   const [challenges, setChallenges] = useState([]);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(null);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const [s, t, c] = await Promise.all([
@@ -97,7 +99,11 @@ export default function AdminSeasonsPage() {
   useApiInvalidation(load, ["seasons", "tournaments", "f1"]);
 
   const del = async (season) => {
-    if (!window.confirm(`Saison "${season.name}" wirklich loeschen?`)) return;
+    if (!await confirm({
+      title: "Saison löschen?",
+      description: `Saison "${season.name}" wirklich löschen?`,
+      confirmLabel: "Löschen",
+    })) return;
     try {
       await api.delete(`/seasons/${season.id}`);
       toast.success("Saison geloescht.");

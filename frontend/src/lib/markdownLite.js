@@ -28,6 +28,7 @@ function formatInlineText(rawText) {
   return escapeHtml(rawText)
     .replace(/`(.+?)`/g, "<code>$1</code>")
     .replace(/~~(.+?)~~/g, "<del>$1</del>")
+    .replace(/\+\+(.+?)\+\+/g, "<u>$1</u>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>");
 }

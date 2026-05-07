@@ -3,6 +3,7 @@ import { api, formatApiError } from "@/lib/api";
 import { setCachedBranding } from "@/lib/brandingEvents";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload, useImageUploadBusy } from "@/components/tls/ImageUpload";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity } from "lucide-react";
@@ -72,6 +73,7 @@ export default function AdminSettingsPage() {
   const brandDirtyRef = useRef(false);
   const discordDirtyRef = useRef(false);
   const loadSeqRef = useRef(0);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const seq = ++loadSeqRef.current;
@@ -186,7 +188,11 @@ export default function AdminSettingsPage() {
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const clearDiscordWebhook = async () => {
-    if (!window.confirm("Discord Webhook wirklich entfernen?")) return;
+    if (!await confirm({
+      title: "Discord Webhook entfernen?",
+      description: "Automatische Discord-Meldungen werden danach nicht mehr versendet.",
+      confirmLabel: "Entfernen",
+    })) return;
     try {
       await api.put("/settings/discord", { clear_webhook: true });
       toast.success("Discord Webhook entfernt.");
@@ -267,7 +273,11 @@ export default function AdminSettingsPage() {
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const deleteJob = async (id) => {
-    if (!window.confirm("Mail-Job wirklich löschen?")) return;
+    if (!await confirm({
+      title: "Mail-Job löschen?",
+      description: "Der Queue-Eintrag wird entfernt und nicht mehr versendet.",
+      confirmLabel: "Löschen",
+    })) return;
     try { await api.delete(`/settings/mail-queue/${id}`); toast.success("Job gelöscht."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
