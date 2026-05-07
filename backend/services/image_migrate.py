@@ -13,6 +13,7 @@ import uuid
 import pathlib
 import asyncio
 import mimetypes
+import re
 from typing import Optional
 
 import httpx
@@ -31,16 +32,31 @@ TARGETS: list[tuple[str, list[str]]] = [
     ("users", ["avatar_url", "banner_url"]),
     ("teams", ["logo_url", "banner_url"]),
     ("sponsors", ["logo_url"]),
+    ("partners", ["logo_url"]),
     ("news_posts", ["banner_url", "cover_url"]),
     ("events", ["banner_url", "cover_url"]),
     ("games", ["cover_url", "logo_url"]),
     ("tournaments", ["banner_url", "cover_url"]),
     ("f1_challenges", ["banner_url", "cover_url"]),
     ("f1_tracks", ["image_url"]),
+    ("seasons", ["banner_url"]),
     ("gallery_albums", ["cover_url"]),
     ("gallery_photos", ["image_url", "thumbnail_url"]),
     ("member_benefits", ["image_url"]),
 ]
+
+TEXT_TARGETS: list[tuple[str, list[str]]] = [
+    ("cms_pages", ["body_md"]),
+    ("news_posts", ["content"]),
+    ("events", ["description", "program"]),
+    ("tournaments", ["description"]),
+    ("f1_challenges", ["description"]),
+]
+
+TEXT_IMAGE_RE = re.compile(
+    r"!\[[^\]\n]*\]\((?P<md>[^)\s]+)\)|<img\b[^>]*\bsrc=[\"'](?P<html>[^\"']+)[\"']",
+    re.IGNORECASE,
+)
 
 LOCAL_PREFIX = "/api/static/uploads/"
 
@@ -86,6 +102,7 @@ async def migrate_all() -> dict:
     """Run the migration. Returns counts per collection."""
     db = get_db()
     summary: dict[str, dict[str, int]] = {}
+    cache: dict[str, Optional[str]] = {}
     async with httpx.AsyncClient(headers={"User-Agent": "TLS-ImageMigrate/1.0"}) as client:
         for coll_name, fields in TARGETS:
             scanned = 0
@@ -99,7 +116,9 @@ async def migrate_all() -> dict:
                     val = doc.get(f)
                     if not _is_external(val):
                         continue
-                    new_url = await _download_to_local(val, client)
+                    if val not in cache:
+                        cache[val] = await _download_to_local(val, client)
+                    new_url = cache[val]
                     if new_url:
                         updates[f] = new_url
                     else:
@@ -108,6 +127,38 @@ async def migrate_all() -> dict:
                     await db[coll_name].update_one({"id": doc["id"]} if doc.get("id") else {"_id": doc["_id"]}, {"$set": updates})
                     updated += 1
             summary[coll_name] = {"scanned": scanned, "updated": updated, "failed": failed}
+        for coll_name, fields in TEXT_TARGETS:
+            scanned = 0
+            updated = 0
+            failed = 0
+            cursor = db[coll_name].find({})
+            async for doc in cursor:
+                scanned += 1
+                updates: dict[str, str] = {}
+                for f in fields:
+                    text = doc.get(f)
+                    if not isinstance(text, str) or not text:
+                        continue
+                    next_text = text
+                    for match in TEXT_IMAGE_RE.finditer(text):
+                        val = match.group("md") or match.group("html")
+                        if not _is_external(val):
+                            continue
+                        if val not in cache:
+                            cache[val] = await _download_to_local(val, client)
+                        new_url = cache[val]
+                        if new_url:
+                            next_text = next_text.replace(val, new_url)
+                        else:
+                            failed += 1
+                    if next_text != text:
+                        updates[f] = next_text
+                if updates:
+                    query = {"id": doc["id"]} if doc.get("id") else ({"slug": doc["slug"]} if doc.get("slug") else {"_id": doc["_id"]})
+                    await db[coll_name].update_one(query, {"$set": updates})
+                    updated += 1
+            key = f"{coll_name}:text"
+            summary[key] = {"scanned": scanned, "updated": updated, "failed": failed}
     logger.info(f"[image-migrate] done: {summary}")
     return summary
 

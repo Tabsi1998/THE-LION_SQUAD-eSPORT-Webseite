@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 from urllib.parse import urlparse
 
 from database import get_db
@@ -19,16 +20,31 @@ TARGETS: list[tuple[str, list[str]]] = [
     ("users", ["avatar_url", "banner_url"]),
     ("teams", ["logo_url", "banner_url"]),
     ("sponsors", ["logo_url"]),
+    ("partners", ["logo_url"]),
     ("news_posts", ["banner_url", "cover_url"]),
     ("events", ["banner_url", "cover_url"]),
     ("games", ["cover_url", "logo_url"]),
     ("tournaments", ["banner_url", "cover_url"]),
     ("f1_challenges", ["banner_url", "cover_url"]),
     ("f1_tracks", ["image_url"]),
+    ("seasons", ["banner_url"]),
     ("gallery_albums", ["cover_url"]),
     ("gallery_photos", ["image_url", "thumbnail_url"]),
     ("member_benefits", ["image_url"]),
 ]
+
+TEXT_TARGETS: list[tuple[str, list[str]]] = [
+    ("cms_pages", ["body_md"]),
+    ("news_posts", ["content"]),
+    ("events", ["description", "program"]),
+    ("tournaments", ["description"]),
+    ("f1_challenges", ["description"]),
+]
+
+TEXT_IMAGE_RE = re.compile(
+    r"!\[[^\]\n]*\]\((?P<md>[^)\s]+)\)|<img\b[^>]*\bsrc=[\"'](?P<html>[^\"']+)[\"']",
+    re.IGNORECASE,
+)
 
 
 def _upload_path(value: str) -> str | None:
@@ -60,13 +76,24 @@ def _file_exists(filename: str) -> bool:
     return any((base / filename).is_file() for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR))
 
 
+def _iter_text_image_urls(value: str) -> list[str]:
+    urls: list[str] = []
+    for match in TEXT_IMAGE_RE.finditer(str(value or "")):
+        url = match.group("md") or match.group("html")
+        if url and url not in urls:
+            urls.append(url)
+    return urls
+
+
 async def audit_image_references(repair: bool = False) -> dict:
     db = get_db()
     summary = {
         "scanned": 0,
+        "text_scanned": 0,
         "local_ok": 0,
         "legacy_local": 0,
         "normalized": 0,
+        "text_normalized": 0,
         "external": 0,
         "missing_file": 0,
         "invalid_local": 0,
@@ -138,5 +165,63 @@ async def audit_image_references(repair: bool = False) -> dict:
                 query = {"id": doc["id"]} if doc.get("id") else {"_id": doc["_id"]}
                 await collection.update_one(query, {"$set": updates})
                 summary["normalized"] += len(updates) - 1
+
+    for coll_name, fields in TEXT_TARGETS:
+        collection = db[coll_name]
+        async for doc in collection.find({}):
+            updates: dict[str, str] = {}
+            for field in fields:
+                text = doc.get(field)
+                if not isinstance(text, str) or not text:
+                    continue
+                next_text = text
+                for value in _iter_text_image_urls(text):
+                    summary["text_scanned"] += 1
+                    item = {
+                        "collection": coll_name,
+                        "id": doc.get("id") or doc.get("slug") or str(doc.get("_id")),
+                        "field": field,
+                        "value": value,
+                    }
+                    upload_path = _upload_path(value)
+                    if value.startswith("http://") or value.startswith("https://"):
+                        if upload_path:
+                            filename = _filename_from_upload_path(upload_path)
+                            if filename and _file_exists(filename):
+                                summary["legacy_local"] += 1
+                                add_example("legacy_local", {**item, "normalized": upload_path})
+                                if repair:
+                                    next_text = next_text.replace(value, upload_path)
+                                continue
+                        summary["external"] += 1
+                        add_example("external", item)
+                        continue
+                    if upload_path:
+                        filename = _filename_from_upload_path(upload_path)
+                        if not filename:
+                            summary["invalid_local"] += 1
+                            add_example("invalid_local", item)
+                            continue
+                        if not _file_exists(filename):
+                            summary["missing_file"] += 1
+                            add_example("missing_file", {**item, "normalized": upload_path})
+                            continue
+                        if value != upload_path:
+                            summary["legacy_local"] += 1
+                            add_example("legacy_local", {**item, "normalized": upload_path})
+                            if repair:
+                                next_text = next_text.replace(value, upload_path)
+                        else:
+                            summary["local_ok"] += 1
+                        continue
+                    summary["other"] += 1
+                    add_example("other", item)
+                if next_text != text:
+                    updates[field] = next_text
+            if updates:
+                updates["updated_at"] = now_utc().isoformat()
+                query = {"id": doc["id"]} if doc.get("id") else ({"slug": doc["slug"]} if doc.get("slug") else {"_id": doc["_id"]})
+                await collection.update_one(query, {"$set": updates})
+                summary["text_normalized"] += len(updates) - 1
 
     return {"ok": True, "repair": repair, "summary": summary, "examples": examples}
