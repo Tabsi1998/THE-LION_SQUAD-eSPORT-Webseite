@@ -10,7 +10,7 @@ import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { motion } from "framer-motion";
-import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Crown, Pin, Radio, Image as ImageIcon } from "lucide-react";
+import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Crown, Pin, Radio, Image as ImageIcon, Gamepad2 } from "lucide-react";
 
 const HOME_DESCRIPTION = "THE LION SQUAD eSports: News, Events, Turniere, Fast-Lap-Challenges, Galerie und Vereinsinfos aus Tirol.";
 
@@ -68,11 +68,11 @@ export default function HomePage() {
                 <Link to="/about" data-testid="hero-cta-about" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] hover:shadow-[0_0_24px_rgba(41,182,232,0.6)] transition-all">
                   Über den Verein <ArrowRight className="w-4 h-4" />
                 </Link>
-                <Link to="/membership/join" data-testid="hero-cta-join" className="inline-flex items-center gap-2 px-6 py-3 border border-[#FFD700] text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition-all">
-                  <Crown className="w-4 h-4" /> Mitglied werden
+                <Link to="/events" data-testid="hero-cta-events" className="inline-flex items-center gap-2 px-6 py-3 border border-[#9F7AEA]/50 text-[#C4A7FF] hover:bg-[#9F7AEA]/10 font-bold uppercase tracking-wider rounded-sm transition-all">
+                  <Calendar className="w-4 h-4" /> Events
                 </Link>
                 <Link to="/tournaments" data-testid="hero-cta-tournaments" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm transition-all">
-                  Turniere
+                  <Gamepad2 className="w-4 h-4" /> eSports
                 </Link>
               </div>
             </motion.div>
@@ -128,20 +128,6 @@ export default function HomePage() {
 
       <HomeExplore />
 
-      {/* Vereins-CTA */}
-      <section className="border-t border-white/10 bg-gradient-to-b from-[#0F0F0F] to-black">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-          <Crown className="w-10 h-10 mx-auto text-[#FFD700] mb-4" />
-          <h2 className="font-heading text-3xl md:text-5xl font-black uppercase">Du willst Teil des Rudels werden?</h2>
-          <p className="mt-4 text-white/70 max-w-2xl mx-auto">
-            Registriere dich, lerne uns kennen und bewirb dich auf eine offizielle Vereinsmitgliedschaft.
-          </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Link to="/register" className="px-7 py-3.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">Account erstellen</Link>
-            <Link to="/membership/join" className="px-7 py-3.5 border-2 border-[#FFD700] text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700] hover:text-black transition">Mitglied werden</Link>
-          </div>
-        </div>
-      </section>
     </PublicLayout>
   );
 }
@@ -319,7 +305,7 @@ function NewsCard({ news, featured = false }) {
 
 function HomeExplore() {
   const links = [
-    { to: "/about", icon: Crown, label: "Verein", text: "Wer wir sind, was uns antreibt und wie du Teil davon wirst.", accent: "#FFD700" },
+    { to: "/about", icon: Crown, label: "Verein", text: "Wer wir sind, wofür wir stehen und was THE LION SQUAD ausmacht.", accent: "#FFD700" },
     { to: "/galerie", icon: ImageIcon, label: "Galerie", text: "Fotos und Eindrücke von Events, LANs und Community-Abenden.", accent: "#29B6E8" },
     { to: "/sponsors", icon: Trophy, label: "Sponsoren", text: "Partner und Unterstützer, die unsere Events möglich machen.", accent: "#FFD700" },
     { to: "/contact", icon: ArrowRight, label: "Kontakt", text: "Anfragen, Kooperationen, Sponsoring und allgemeine Nachrichten.", accent: "#9F7AEA" },
