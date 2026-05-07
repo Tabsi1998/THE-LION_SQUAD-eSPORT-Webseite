@@ -7,6 +7,7 @@ from auth import require_admin, get_optional_user
 from services.visibility import user_can_see
 from services.content_embed_service import resolve_content_embeds
 from services.public_phase import derive_public_phase
+from services.sponsor_utils import dedupe_public_sponsors
 from models import EventCreate, EventUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -91,7 +92,7 @@ async def _attach_event_sponsors(event: dict) -> None:
     for sponsor in sponsors:
         sponsor["tier"] = _normalize_sponsor_tier(sponsor.get("tier"))
     sponsors.sort(key=lambda s: (s.get("order_index") or 0, s.get("name") or ""))
-    event["sponsors"] = sponsors
+    event["sponsors"] = dedupe_public_sponsors(sponsors)
 
 
 async def _decorate_event(event: dict, include_sponsors: bool = False) -> dict:

@@ -29,6 +29,25 @@ function mapEmbedUrl(e) {
   return query ? `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed` : "";
 }
 
+function sponsorKey(sponsor) {
+  const logo = String(sponsor.logo_url || "").trim().toLowerCase();
+  if (logo) return `logo:${logo}`;
+  const id = String(sponsor.id || "").trim().toLowerCase();
+  if (id) return `id:${id}`;
+  return `${sponsor.link || ""}|${sponsor.name || ""}`.toLowerCase();
+}
+
+function uniqueLogoSponsors(sponsors = []) {
+  const seen = new Set();
+  return sponsors.filter((sponsor) => {
+    if (!sponsor.logo_url) return false;
+    const key = sponsorKey(sponsor);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export default function EventDetailPage() {
   const { slug } = useParams();
   const [e, setE] = useState(null);
@@ -60,6 +79,8 @@ export default function EventDetailPage() {
     </PublicLayout>
   );
   if (!e) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
+
+  const eventSponsors = uniqueLogoSponsors(e.sponsors || []);
 
   return (
     <PublicLayout>
@@ -182,12 +203,12 @@ export default function EventDetailPage() {
           </div>
         )}
 
-        {!!e.sponsors?.filter((s) => s.logo_url).length && (
+        {!!eventSponsors.length && (
           <div>
             <h2 className="font-heading text-2xl font-black uppercase mb-5">Unterstützt von</h2>
             <div className="flex flex-wrap items-center gap-8 border-y border-white/10 py-6">
-              {e.sponsors.filter((s) => s.logo_url).map((s) => (
-                <a key={s.id} href={s.link || "#"} target={s.link ? "_blank" : undefined} rel="noreferrer" aria-label={s.name} className="group inline-flex items-center justify-center min-w-32">
+              {eventSponsors.map((s) => (
+                <a key={sponsorKey(s)} href={s.link || "#"} target={s.link ? "_blank" : undefined} rel="noreferrer" aria-label={s.name} className="group inline-flex items-center justify-center min-w-32">
                   <img src={resolveMediaUrl(s.logo_url)} alt="" className="max-h-14 max-w-44 object-contain opacity-80 group-hover:opacity-100 transition" />
                 </a>
               ))}

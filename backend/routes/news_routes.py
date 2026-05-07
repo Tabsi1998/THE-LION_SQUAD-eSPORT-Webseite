@@ -6,6 +6,7 @@ from database import get_db
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
+from services.sponsor_utils import dedupe_public_sponsors
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
     PartnerCreate, PartnerUpdate,
@@ -286,7 +287,7 @@ async def list_sponsors(placement: Optional[str] = None):
         sp = [s for s in sp if s["show_on_events"]]
     # Sort by tier then order_index
     sp.sort(key=lambda s: (_TIER_ORDER.get(s["tier"], 99), s.get("order_index") or 0, s.get("name") or ""))
-    return sp
+    return dedupe_public_sponsors(sp)
 
 
 @router.get("/sponsors/admin")

@@ -15,8 +15,11 @@ const tierSize = {
 };
 
 function sponsorKey(sponsor) {
+  const logo = String(sponsor.logo_url || "").trim().toLowerCase();
+  if (logo) return `logo:${logo}`;
+  const id = String(sponsor.id || "").trim().toLowerCase();
+  if (id) return `id:${id}`;
   return [
-    sponsor.logo_url || "",
     sponsor.link || "",
     sponsor.name || "",
   ].join("|").toLowerCase();
