@@ -1,12 +1,22 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { getCachedBranding, onBrandingUpdated } from "@/lib/brandingEvents";
 
-const BASE = "THE LION SQUAD";
+const DEFAULT_SITE_TITLE = "THE LION SQUAD - eSPORTS";
+
+function titleBase(branding) {
+  return branding?.site_title || DEFAULT_SITE_TITLE;
+}
 
 /** Sets document.title and key meta description. Restores original on unmount. */
 export function useDocumentTitle(title, description) {
+  const [branding, setBranding] = useState(() => getCachedBranding());
+
+  useEffect(() => onBrandingUpdated((next) => setBranding(next || {})), []);
+
   useEffect(() => {
     const prev = document.title;
-    document.title = title ? `${title} · ${BASE}` : `${BASE} · eSports Vereinsplattform`;
+    const base = titleBase(branding);
+    document.title = title ? `${title} · ${base}` : base;
     let descTag = document.querySelector('meta[name="description"]');
     const prevDesc = descTag?.getAttribute("content");
     let ogTitle = document.querySelector('meta[property="og:title"]');
@@ -31,5 +41,5 @@ export function useDocumentTitle(title, description) {
       if (ogDesc && prevOgDesc !== undefined) ogDesc.setAttribute("content", prevOgDesc);
       if (canonical && prevCanonical !== undefined) canonical.setAttribute("href", prevCanonical);
     };
-  }, [title, description]);
+  }, [title, description, branding]);
 }

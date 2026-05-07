@@ -31,6 +31,7 @@ class EmailSettings(BaseModel):
 class BrandingSettings(BaseModel):
     club_name: Optional[str] = None
     tagline: Optional[str] = None
+    site_title: Optional[str] = None
     site_description: Optional[str] = None
     primary_color: Optional[str] = None
     logo_url: Optional[str] = None
@@ -163,7 +164,8 @@ async def public_settings(response: Response):
     return {
         "club_name": b.get("club_name", "THE LION SQUAD"),
         "tagline": tagline,
-        "site_description": b.get("site_description") or "THE LION SQUAD eSports - Vereinsplattform für Turniere, Fast Lap Challenges, News und Mitgliederbereich.",
+        "site_title": b.get("site_title") or "THE LION SQUAD - eSPORTS",
+        "site_description": b.get("site_description") or "THE LION SQUAD - eSPORTS: Turniere, Fast Lap Challenges, News, Events und Mitgliederbereich.",
         "primary_color": b.get("primary_color", "#29B6E8"),
         "logo_url": b.get("logo_url"),
         "mascot_url": b.get("mascot_url"),
@@ -397,6 +399,7 @@ async def get_branding(response: Response, me: dict = Depends(require_admin())):
     db = get_db()
     saved = (await db.settings.find_one({"id": "branding"}, {"_id": 0})) or {}
     defaults = {
+        "site_title": "THE LION SQUAD - eSPORTS",
         "discord_invite_url": "https://discord.com/invite/thelionsquadesports",
         "twitch_channel": "the_lion_squad_esports",
         "facebook_url": "https://www.facebook.com/thelionsquadesports",

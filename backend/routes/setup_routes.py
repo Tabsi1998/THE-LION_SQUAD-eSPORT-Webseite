@@ -83,6 +83,7 @@ async def setup_defaults(me: dict = Depends(require_admin())):
         "branding": {
             "club_name": branding.get("club_name") or "THE LION SQUAD",
             "tagline": branding.get("tagline") or "eSports Verein",
+            "site_title": branding.get("site_title") or "THE LION SQUAD - eSPORTS",
             "site_description": branding.get("site_description") or "",
             "domain": branding.get("domain") or "lionsquad.at",
             "primary_color": branding.get("primary_color") or "#29B6E8",
@@ -116,6 +117,7 @@ async def setup_defaults(me: dict = Depends(require_admin())):
 class SetupWizardBody(BaseModel):
     club_name: Optional[str] = None
     tagline: Optional[str] = None
+    site_title: Optional[str] = None
     site_description: Optional[str] = None
     primary_color: Optional[str] = None
     contact_email: Optional[str] = None
@@ -160,7 +162,7 @@ async def complete_setup(body: SetupWizardBody, me: dict = Depends(require_super
         raise HTTPException(400, "Antwort-E-Mail ist ungültig.")
 
     # Branding
-    brand_keys = ["club_name", "tagline", "site_description", "primary_color", "contact_email",
+    brand_keys = ["club_name", "tagline", "site_title", "site_description", "primary_color", "contact_email",
                   "domain", "favicon_url", "imprint",
                   "privacy_policy", "discord_invite_url", "twitch_channel"]
     brand_updates = {k: getattr(body, k) for k in brand_keys if getattr(body, k) is not None}
@@ -389,7 +391,8 @@ async def web_manifest():
     db = get_db()
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
     name = branding.get("club_name") or "THE LION SQUAD"
-    description = branding.get("site_description") or "THE LION SQUAD eSports Vereinsplattform"
+    name = branding.get("site_title") or name
+    description = branding.get("site_description") or "THE LION SQUAD - eSPORTS"
     icon = branding.get("favicon_url") or branding.get("mascot_url") or branding.get("logo_url") or "/assets/brand/tls-mascot.png"
     manifest = {
         "name": name,

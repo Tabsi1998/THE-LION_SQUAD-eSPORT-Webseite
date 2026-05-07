@@ -52,7 +52,7 @@ export default function AdminSettingsPage() {
   const [queueStats, setQueueStats] = useState(null);
   const [queueFilter, setQueueFilter] = useState("");
   const [brand, setBrand] = useState({
-    club_name: "", tagline: "", site_description: "", primary_color: "#29B6E8",
+    club_name: "", tagline: "", site_title: "THE LION SQUAD - eSPORTS", site_description: "", primary_color: "#29B6E8",
     logo_url: "", mascot_url: "", favicon_url: "", contact_email: "", domain: "", timezone: "Europe/Vienna",
     legal_name: "", legal_form: "eingetragener Verein nach österreichischem Vereinsrecht", zvr_number: "",
     street_address: "", address_extra: "", postal_code: "", city: "", state: "Tirol", country: "Oesterreich",
@@ -953,6 +953,7 @@ export default function AdminSettingsPage() {
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
             <BrandField label="Vereinsname" value={brand.club_name} onChange={(v) => setBrandField("club_name", v)} testId="brand-club-name" />
             <BrandField label="Tagline" value={brand.tagline} onChange={(v) => setBrandField("tagline", v)} testId="brand-tagline" />
+            <BrandField label="Website-/Browsertitel" value={brand.site_title} onChange={(v) => setBrandField("site_title", v)} testId="brand-site-title" placeholder="THE LION SQUAD - eSPORTS" />
             <BrandField label="SEO Beschreibung" value={brand.site_description} onChange={(v) => setBrandField("site_description", v)} testId="brand-site-description" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <BrandField label="Akzentfarbe (HEX)" value={brand.primary_color} onChange={(v) => setBrandField("primary_color", v)} testId="brand-color" />
@@ -1087,11 +1088,11 @@ export default function AdminSettingsPage() {
   );
 }
 
-function BrandField({ label, value, onChange, testId }) {
+function BrandField({ label, value, onChange, testId, placeholder = "" }) {
   return (
     <label className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <input value={value || ""} onChange={(e) => onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+      <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
     </label>
   );
 }

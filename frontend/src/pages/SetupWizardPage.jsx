@@ -23,6 +23,7 @@ export default function SetupWizardPage() {
   const [data, setData] = useState({
     club_name: "THE LION SQUAD",
     tagline: "eSports Verein",
+    site_title: "THE LION SQUAD - eSPORTS",
     site_description: "",
     contact_email: "",
     domain: "lionsquad.at",
@@ -173,6 +174,7 @@ export default function SetupWizardPage() {
               <h2 className="font-heading text-2xl font-black uppercase mb-3">Vereinsdaten</h2>
               <Field label="Vereinsname *" testId="wizard-club-name" value={data.club_name} onChange={(v) => upd("club_name", v)} />
               <Field label="Tagline" testId="wizard-tagline" value={data.tagline} onChange={(v) => upd("tagline", v)} />
+              <Field label="Website-/Browsertitel" testId="wizard-site-title" value={data.site_title} onChange={(v) => upd("site_title", v)} />
               <Field label="Kurzbeschreibung" testId="wizard-description" value={data.site_description} onChange={(v) => upd("site_description", v)} />
               <div className="grid sm:grid-cols-2 gap-3">
                 <Field label="Domain" testId="wizard-domain" value={data.domain} onChange={(v) => upd("domain", v)} />
