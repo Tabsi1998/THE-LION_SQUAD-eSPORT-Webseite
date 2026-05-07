@@ -8,7 +8,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
-import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil } from "lucide-react";
+import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil, Target, RefreshCw, Sparkles } from "lucide-react";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 
 const TABS = [
@@ -71,6 +71,61 @@ const GENDER_OPTIONS = [
   ["diverse", "Divers"],
 ];
 
+const ACHIEVEMENT_ACTIONS = {
+  profile_completion: "Profil weiter ausfüllen",
+  tournaments_joined: "Bei Turnieren mitmachen",
+  tournaments_won: "Turniere gewinnen",
+  matches_played: "Matches spielen",
+  matches_won: "Matches gewinnen",
+  f1_laps_submitted: "Fast-Lap-Zeiten einreichen",
+  f1_podiums: "Fast-Lap-Podium holen",
+  f1_wins: "Fast-Lap-Challenge gewinnen",
+  discord_messages: "Im Discord aktiv sein",
+  twitch_live_sessions: "Mit Twitch live gehen",
+  twitch_stream_minutes: "Streamzeit sammeln",
+  membership_days: "Vereinsmitgliedschaft pflegen",
+};
+
+function flattenAchievementTiers(data) {
+  return (data?.groups || []).flatMap((group) =>
+    (group.tiers || []).map((tier) => ({
+      ...tier,
+      group_code: group.code,
+      group_name: group.name,
+      group_category: group.category,
+      group_accent: group.accent_color || "#29B6E8",
+    }))
+  );
+}
+
+function achievementInsights(data) {
+  const tiers = flattenAchievementTiers(data);
+  const earned = tiers.filter((tier) => tier.earned);
+  const openProgress = tiers
+    .filter((tier) => !tier.earned && !tier.manual_only && tier.condition_status !== "planned" && Number(tier.target || 0) > 0)
+    .sort((a, b) => {
+      const byPercent = Number(b.percent || 0) - Number(a.percent || 0);
+      if (byPercent) return byPercent;
+      const aMissing = Number(a.target || 0) - Number(a.current || 0);
+      const bMissing = Number(b.target || 0) - Number(b.current || 0);
+      if (aMissing !== bMissing) return aMissing - bMissing;
+      return Number(b.points || 0) - Number(a.points || 0);
+    });
+  const manual = tiers.filter((tier) => !tier.earned && tier.manual_only);
+  const planned = tiers.filter((tier) => !tier.earned && tier.condition_status === "planned");
+  const points = (data?.awards || []).reduce((sum, award) => sum + Number(award.points || 0), 0);
+  return {
+    tiers,
+    earned,
+    openProgress,
+    manual,
+    planned,
+    points,
+    total: tiers.length,
+    earnedPercent: tiers.length ? Math.round((earned.length / tiers.length) * 100) : 0,
+  };
+}
+
 export default function ProfilePage() {
   const { user, refresh, isClubMember } = useAuth();
   const [params, setParams] = useSearchParams();
@@ -80,13 +135,19 @@ export default function ProfilePage() {
   useEffect(() => { setParams({ tab }, { replace: true }); }, [tab]);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [evaluatingAchievements, setEvaluatingAchievements] = useState(false);
   const [achData, setAchData] = useState(null);
   const [completeness, setCompleteness] = useState(null);
   const [games, setGames] = useState([]);
 
-  const loadAchievements = useCallback(() => {
-    api.get("/achievements/me").then(({ data }) => setAchData(data)).catch(() => setAchData({ groups: [], awards: [] }));
-    api.get("/users/me/profile-completeness").then(({ data }) => setCompleteness(data)).catch(() => null);
+  const loadAchievements = useCallback(async () => {
+    const [achievements, profileCompleteness] = await Promise.allSettled([
+      api.get("/achievements/me"),
+      api.get("/users/me/profile-completeness"),
+    ]);
+    if (achievements.status === "fulfilled") setAchData(achievements.value.data);
+    else setAchData({ groups: [], awards: [] });
+    if (profileCompleteness.status === "fulfilled") setCompleteness(profileCompleteness.value.data);
   }, []);
 
   // Lazy-load achievements when tab is opened
@@ -191,7 +252,24 @@ export default function ProfilePage() {
     }
   };
 
+  const evaluateAchievements = async () => {
+    if (evaluatingAchievements) return;
+    setEvaluatingAchievements(true);
+    try {
+      const { data } = await api.post("/achievements/evaluate");
+      await loadAchievements();
+      await refresh();
+      toast.success(data?.newly_awarded ? `${data.newly_awarded} neue Achievements freigeschaltet.` : "Achievements aktualisiert.");
+    } catch (err) {
+      toast.error(formatRequestError(err, "Achievements konnten nicht aktualisiert werden."));
+    } finally {
+      setEvaluatingAchievements(false);
+    }
+  };
+
   if (!user) return null;
+
+  const achInsights = achData ? achievementInsights(achData) : null;
 
   return (
     <PublicLayout>
@@ -348,21 +426,27 @@ export default function ProfilePage() {
                 <div className="relative w-14 h-14 shrink-0">
                   <svg viewBox="0 0 36 36" className="w-14 h-14 -rotate-90">
                     <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
-                    <circle cx="18" cy="18" r="16" fill="none" stroke="#A855F7" strokeWidth="3" strokeDasharray={`${completeness?.score || 0} 100`} pathLength="100" strokeLinecap="round" />
+                    <circle cx="18" cy="18" r="16" fill="none" stroke="#A855F7" strokeWidth="3" strokeDasharray={`${achInsights?.earnedPercent ?? completeness?.score ?? 0} 100`} pathLength="100" strokeLinecap="round" />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="font-heading font-black text-sm">{completeness?.score || 0}%</span>
+                    <span className="font-heading font-black text-sm">{achInsights?.earnedPercent ?? 0}%</span>
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#A855F7]">Profil-Pflege & Achievements</div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#A855F7]">Account-Level & Achievements</div>
                   <h2 className="font-heading text-2xl md:text-3xl font-black uppercase mt-1">Deine Achievements</h2>
-                  <p className="text-sm text-white/55 mt-1">{achData ? `${achData.awards.length} freigeschaltet · ${achData.groups.reduce((s,g)=>s+g.tier_count,0)} im Katalog verfügbar` : "Lade …"}</p>
+                  <p className="text-sm text-white/55 mt-1">{achInsights ? `${achInsights.earned.length} freigeschaltet · ${achInsights.total} im Katalog · ${achInsights.points} Punkte` : "Lade …"}</p>
                 </div>
+                <button type="button" onClick={evaluateAchievements} disabled={evaluatingAchievements} data-testid="profile-achievements-evaluate" className="inline-flex items-center gap-2 px-4 py-2 border border-[#A855F7]/50 text-[#c084fc] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#A855F7]/10 disabled:opacity-50">
+                  <RefreshCw className={`w-3.5 h-3.5 ${evaluatingAchievements ? "animate-spin" : ""}`} /> Aktualisieren
+                </button>
               </div>
 
               {achData ? (
-                <AchievementGroupsView groups={achData.groups} emptyText="Spiel mit, melde dich für Turniere an oder schalte Fast-Lap-Runden frei – dann tauchen hier deine ersten Achievements auf." />
+                <>
+                  <AchievementOverview insights={achInsights} profileScore={completeness?.score || 0} />
+                  <AchievementGroupsView groups={achData.groups} emptyText="Spiel mit, melde dich für Turniere an oder schalte Fast-Lap-Runden frei – dann tauchen hier deine ersten Achievements auf." />
+                </>
               ) : (
                 <div className="text-center py-20 text-white/40 font-display tracking-widest">LADE ACHIEVEMENTS …</div>
               )}
@@ -445,6 +529,134 @@ export default function ProfilePage() {
         </form>
       </div>
     </PublicLayout>
+  );
+}
+
+function AchievementOverview({ insights, profileScore }) {
+  if (!insights) return null;
+  const next = insights.openProgress.slice(0, 3);
+  const nearlyDone = insights.openProgress.filter((tier) => Number(tier.percent || 0) >= 50).slice(0, 3);
+  const manual = insights.manual.slice(0, 3);
+  const planned = insights.planned.slice(0, 3);
+
+  return (
+    <div className="space-y-4" data-testid="achievement-overview">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <AchievementStat icon={Medal} label="Freigeschaltet" value={`${insights.earned.length}/${insights.total}`} color="#FFD700" />
+        <AchievementStat icon={Sparkles} label="Punkte" value={insights.points.toLocaleString("de-DE")} color="#A855F7" />
+        <AchievementStat icon={Target} label="Machbar" value={insights.openProgress.length} color="#00FF88" />
+        <AchievementStat icon={User} label="Profilpflege" value={`${profileScore}%`} color="#29B6E8" />
+      </div>
+
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-4">
+        <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#00FF88]">Nächste Ziele</div>
+              <h3 className="font-heading text-xl font-black uppercase mt-1">Was als Nächstes lohnt</h3>
+            </div>
+            <Target className="w-5 h-5 text-[#00FF88]" />
+          </div>
+          {next.length ? (
+            <div className="space-y-2">
+              {next.map((tier) => <NextAchievementRow key={tier.code} tier={tier} />)}
+            </div>
+          ) : (
+            <div className="border border-dashed border-white/10 rounded-sm p-8 text-sm text-white/45 text-center">
+              Keine automatisch messbaren offenen Ziele. Schau bei manuellen oder geplanten Achievements nach.
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <SmallAchievementPanel
+            title="Fast geschafft"
+            empty="Noch kein Ziel über 50%."
+            rows={nearlyDone}
+            color="#FFD700"
+          />
+          <SmallAchievementPanel
+            title="Manuell / Event"
+            empty="Keine manuellen Ziele offen."
+            rows={manual}
+            color="#FF3B30"
+            manual
+          />
+          <SmallAchievementPanel
+            title="Geplant"
+            empty="Keine geplanten Ziele offen."
+            rows={planned}
+            color="#FFFFFF"
+            manual
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AchievementStat({ icon: Icon, label, value, color }) {
+  return (
+    <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/45 font-bold">
+        <Icon className="w-3.5 h-3.5" style={{ color }} /> {label}
+      </div>
+      <div className="mt-2 font-heading text-2xl font-black tabular-nums" style={{ color }}>{value}</div>
+    </div>
+  );
+}
+
+function NextAchievementRow({ tier }) {
+  const missing = Math.max(Number(tier.target || 0) - Number(tier.current || 0), 0);
+  const action = ACHIEVEMENT_ACTIONS[tier.condition_key] || "Weiter aktiv bleiben";
+  return (
+    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3" data-testid={`next-achievement-${tier.code}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-widest font-bold" style={{ color: tier.group_accent }}>{tier.group_name}</div>
+          <div className="font-heading font-bold text-lg truncate">{tier.name}</div>
+          <div className="text-xs text-white/50 mt-1">{action}{missing ? ` · noch ${missing.toLocaleString("de-DE")}` : ""}</div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-xs text-white/45 uppercase tracking-widest">+{tier.points}</div>
+          {tier.member_only && <div className="mt-1 text-[9px] uppercase tracking-widest text-[#FFD700]">Verein</div>}
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <div className="flex-1 h-1.5 bg-white/5 rounded-sm overflow-hidden">
+          <div className="h-full" style={{ width: `${Math.max(0, Math.min(100, Number(tier.percent || 0)))}%`, backgroundColor: tier.group_accent }} />
+        </div>
+        <span className="text-[10px] text-white/45 tabular-nums">{tier.current}/{tier.target}</span>
+      </div>
+    </div>
+  );
+}
+
+function SmallAchievementPanel({ title, rows, empty, color, manual = false }) {
+  return (
+    <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <h3 className="font-heading font-black uppercase text-base">{title}</h3>
+        <span className="text-[10px] uppercase tracking-widest text-white/35">{rows.length}</span>
+      </div>
+      {rows.length ? (
+        <div className="space-y-2">
+          {rows.map((tier) => (
+            <div key={tier.code} className="border border-white/10 bg-[#0A0A0A] rounded-sm px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold text-sm truncate">{tier.name}</div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/35 truncate">{manual ? tier.group_name : `${tier.current}/${tier.target}`}</div>
+                </div>
+                <span className="text-xs font-bold shrink-0" style={{ color }}>{manual ? "Event" : `${tier.percent}%`}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-sm text-white/40 border border-dashed border-white/10 rounded-sm p-4 text-center">{empty}</div>
+      )}
+    </div>
   );
 }
 
