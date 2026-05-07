@@ -125,7 +125,7 @@ function GroupCard({ group }) {
           </div>
           <div className="mt-1 text-xs text-white/55 line-clamp-1">{group.description}</div>
           {/* Compact progress hint when nothing earned yet */}
-          {!isNegative && !hasAny && nextLocked && nextLocked.target > 0 && (
+          {!isNegative && !hasAny && nextLocked && nextLocked.target > 0 && nextLocked.condition_status !== "planned" && (
             <div className="mt-2 flex items-center gap-2">
               <div className="flex-1 h-1 bg-white/5 rounded-sm overflow-hidden max-w-[200px]">
                 <div className="h-full" style={{ width: `${nextLocked.percent}%`, backgroundColor: accent }} />
@@ -190,15 +190,28 @@ function TierRow({ tier, accent, isNegative = false }) {
             {isNegative ? "Geheim" : `${lvl.icon} ${lvl.name}`}
           </span>
           <span className={`text-sm font-semibold truncate ${tier.earned ? "text-white" : "text-white/55"}`}>{tier.name}</span>
+          {tier.member_only && (
+            <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-[#FFD700]/35 text-[#FFD700]/85">
+              Verein
+            </span>
+          )}
+          {tier.condition_status === "planned" && !tier.earned && (
+            <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-white/10 text-white/35">
+              geplant
+            </span>
+          )}
         </div>
         <div className="text-xs text-white/45 mt-0.5">{tier.description}</div>
-        {!tier.earned && tier.target > 0 && !tier.manual_only && (
+        {!tier.earned && tier.target > 0 && !tier.manual_only && tier.condition_status !== "planned" && (
           <div className="mt-1.5 flex items-center gap-2">
             <div className="flex-1 h-1 bg-white/5 rounded-sm overflow-hidden">
               <div className="h-full" style={{ width: `${tier.percent}%`, backgroundColor: accent }} />
             </div>
             <span className="text-[10px] text-white/40 tabular-nums">{tier.current}/{tier.target}</span>
           </div>
+        )}
+        {!tier.earned && tier.condition_status === "planned" && !tier.manual_only && (
+          <div className="mt-1 text-[10px] uppercase tracking-widest text-white/30">Automatisierung geplant</div>
         )}
         {!tier.earned && tier.manual_only && (
           <div className="mt-1 text-[10px] uppercase tracking-widest text-white/30">Wird manuell vergeben</div>

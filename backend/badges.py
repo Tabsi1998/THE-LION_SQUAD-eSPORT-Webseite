@@ -20,6 +20,7 @@ from database import get_db
 from models import now_utc, new_id
 from achievement_catalog import (
     ACHIEVEMENT_GROUPS, ACHIEVEMENT_TIERS, GROUP_BY_CODE, TIER_BY_CODE,
+    CONDITION_KEY_STATUS,
 )
 
 logger = logging.getLogger("tls.achievements")
@@ -362,6 +363,8 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
                 "target": target,
                 "percent": (round(100 * min(cur, target) / target) if target else (100 if earned_doc else 0)),
                 "manual_only": bool(t.get("manual_only")),
+                "member_only": bool(t.get("member_only")),
+                "condition_status": CONDITION_KEY_STATUS.get(ck) if ck else None,
                 "is_negative": is_negative,
                 "secret": is_negative,
             }
@@ -412,6 +415,8 @@ async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
             "group_accent": g["accent_color"],
             "is_negative": is_negative,
             "secret": is_negative,
+            "member_only": bool(t.get("member_only")),
+            "condition_status": CONDITION_KEY_STATUS.get(t.get("condition_key")) if t.get("condition_key") else None,
             "level_name": _level_name(t.get("level", 1)),
             "level_color": _color_for_level(t.get("level", 1)),
             "earned_at": a["earned_at"],

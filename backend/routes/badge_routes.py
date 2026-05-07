@@ -30,6 +30,7 @@ from badges import (
     NEGATIVE_INCIDENTS,
 )
 from models import now_utc, new_id
+from achievement_catalog import CONDITION_KEY_STATUS
 
 # ============ Public/User ============
 router = APIRouter(prefix="/api/achievements", tags=["achievements"])
@@ -158,6 +159,7 @@ class TierCreate(BaseModel):
     points: int = 10
     icon: Optional[str] = None
     manual_only: bool = False
+    member_only: bool = False
 
 
 class TierPatch(BaseModel):
@@ -169,6 +171,7 @@ class TierPatch(BaseModel):
     points: Optional[int] = None
     icon: Optional[str] = None
     manual_only: Optional[bool] = None
+    member_only: Optional[bool] = None
 
 
 @admin_router.get("/tiers")
@@ -178,7 +181,11 @@ async def admin_list_tiers(group_code: Optional[str] = None,
     q: dict = {}
     if group_code:
         q["group_code"] = group_code
-    return await db.achievements.find(q, {"_id": 0}).sort([("group_code", 1), ("level", 1)]).to_list(2000)
+    tiers = await db.achievements.find(q, {"_id": 0}).sort([("group_code", 1), ("level", 1)]).to_list(2000)
+    for tier in tiers:
+        key = tier.get("condition_key")
+        tier["condition_status"] = CONDITION_KEY_STATUS.get(key) if key else None
+    return tiers
 
 
 @admin_router.post("/tiers")

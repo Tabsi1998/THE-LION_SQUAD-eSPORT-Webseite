@@ -145,12 +145,13 @@ ACHIEVEMENT_GROUPS = [
 # ---------- TIERS ----------
 # levels: 1=Bronze, 2=Silber, 3=Gold, 4=Platin, 5=Special-Rot
 def _t(code, group_code, level, name, description, *, condition_key=None,
-       progress_target=None, points=10, icon=None, manual_only=False):
+       progress_target=None, points=10, icon=None, manual_only=False, member_only=False):
     return {
         "code": code, "group_code": group_code, "level": level,
         "name": name, "description": description,
         "condition_key": condition_key, "progress_target": progress_target,
         "points": points, "icon": icon, "manual_only": manual_only,
+        "member_only": member_only,
     }
 
 
@@ -200,7 +201,7 @@ ACHIEVEMENT_TIERS = [
        condition_key="dispute_free_matches", progress_target=5, points=10, icon="heart-handshake"),
     _t("fairplay_s", "fairplay", 2, "Sportsmanship", "20 Matches ohne Dispute.",
        condition_key="dispute_free_matches", progress_target=20, points=30, icon="heart-handshake"),
-    _t("fairplay_g", "fairplay", 3, "Vorbild", "50 Matches ohne Dispute.",
+    _t("fairplay_g", "fairplay", 3, "Fairplay-Vorbild", "50 Matches ohne Dispute.",
        condition_key="dispute_free_matches", progress_target=50, points=75, icon="heart-handshake"),
     _t("fairplay_p", "fairplay", 4, "Ritter-Modus", "100 Matches ohne Dispute.",
        condition_key="dispute_free_matches", progress_target=100, points=200, icon="heart-handshake"),
@@ -214,9 +215,9 @@ ACHIEVEMENT_TIERS = [
        condition_key="long_matches_120", progress_target=5, points=100, icon="timer"),
 
     # --- early_bird_match / night_owl_match: single tier ---
-    _t("early_bird_match_p", "early_bird_match", 4, "Frühaufsteher", "Match zwischen 05–08 Uhr.",
+    _t("early_bird_match_p", "early_bird_match", 1, "Erste Frühschicht", "Match zwischen 05–08 Uhr.",
        condition_key="matches_early", progress_target=1, points=15, icon="sun"),
-    _t("night_owl_match_p", "night_owl_match", 4, "Nachteule", "Match zwischen 02–05 Uhr.",
+    _t("night_owl_match_p", "night_owl_match", 1, "Erste Nachtschicht", "Match zwischen 02–05 Uhr.",
        condition_key="matches_late", progress_target=1, points=15, icon="moon"),
 
     # --- tournament_veteran: 1/5/15/40 ---
@@ -282,11 +283,11 @@ ACHIEVEMENT_TIERS = [
        condition_key="fast_registrations", progress_target=5, points=30, icon="zap"),
 
     # --- season_climber ---
-    _t("season_climber_b", "season_climber", 1, "Top 25", "Saison-Top-25.",
+    _t("season_climber_b", "season_climber", 1, "Saison Top 25", "Saison-Top-25.",
        condition_key="best_season_rank_inv", progress_target=25, points=40, icon="trending-up"),
-    _t("season_climber_s", "season_climber", 2, "Top 10", "Saison-Top-10.",
+    _t("season_climber_s", "season_climber", 2, "Saison Top 10", "Saison-Top-10.",
        condition_key="best_season_rank_inv", progress_target=10, points=80, icon="trending-up"),
-    _t("season_climber_g", "season_climber", 3, "Top 3", "Saison-Top-3.",
+    _t("season_climber_g", "season_climber", 3, "Saison Top 3", "Saison-Top-3.",
        condition_key="best_season_rank_inv", progress_target=3, points=200, icon="trending-up"),
     _t("season_climber_p", "season_climber", 4, "Saison-Champion", "Saison-Sieger.",
        condition_key="best_season_rank_inv", progress_target=1, points=500, icon="crown"),
@@ -320,13 +321,13 @@ ACHIEVEMENT_TIERS = [
        condition_key="sub_target_count", progress_target=12, points=250, icon="timer"),
 
     # --- championship_top ---
-    _t("championship_top_b", "championship_top", 1, "Top 10", "Top-10-Platz Championship.",
+    _t("championship_top_b", "championship_top", 1, "Championship Top 10", "Top-10-Platz Championship.",
        condition_key="best_championship_rank_inv", progress_target=10, points=40, icon="crown"),
-    _t("championship_top_s", "championship_top", 2, "Top 5", "Top-5 Championship.",
+    _t("championship_top_s", "championship_top", 2, "Championship Top 5", "Top-5 Championship.",
        condition_key="best_championship_rank_inv", progress_target=5, points=80, icon="crown"),
-    _t("championship_top_g", "championship_top", 3, "Top 3", "Podest Championship.",
+    _t("championship_top_g", "championship_top", 3, "Championship Top 3", "Podest Championship.",
        condition_key="best_championship_rank_inv", progress_target=3, points=200, icon="crown"),
-    _t("championship_top_p", "championship_top", 4, "Champion", "Championship-Sieger.",
+    _t("championship_top_p", "championship_top", 4, "Championship Champion", "Championship-Sieger.",
        condition_key="best_championship_rank_inv", progress_target=1, points=500, icon="crown"),
 
     # --- track_master: distinct tracks driven ---
@@ -339,13 +340,13 @@ ACHIEVEMENT_TIERS = [
 
     # --- membership_tenure: 0/90/180/365 days ---
     _t("membership_join", "membership_tenure", 1, "Offiziell im Rudel", "Offizielles Vereinsmitglied.",
-       condition_key="membership_days", progress_target=1, points=50, icon="crown"),
+       condition_key="membership_days", progress_target=1, points=50, icon="crown", member_only=True),
     _t("membership_silver", "membership_tenure", 2, "Mitgliedschaft Silber", "6 Monate Vereinsmitglied.",
-       condition_key="membership_days", progress_target=180, points=100, icon="badge"),
+       condition_key="membership_days", progress_target=180, points=100, icon="badge", member_only=True),
     _t("membership_gold", "membership_tenure", 3, "Mitgliedschaft Gold", "12 Monate Vereinsmitglied.",
-       condition_key="membership_days", progress_target=365, points=200, icon="badge"),
+       condition_key="membership_days", progress_target=365, points=200, icon="badge", member_only=True),
     _t("membership_platin", "membership_tenure", 4, "Mitgliedschaft Platin", "24 Monate Vereinsmitglied.",
-       condition_key="membership_days", progress_target=730, points=400, icon="award"),
+       condition_key="membership_days", progress_target=730, points=400, icon="award", member_only=True),
 
     # --- event_attendance: 1/5/15/30 ---
     _t("event_attendance_b", "event_attendance", 1, "Erstes Event", "Eintritt zum ersten Event.",
@@ -366,7 +367,7 @@ ACHIEVEMENT_TIERS = [
        condition_key="discord_messages", progress_target=500, points=80, icon="message-circle"),
 
     # --- team_founder: single ---
-    _t("team_founder_p", "team_founder", 4, "Team-Gründer", "Gründe ein eigenes Team.",
+    _t("team_founder_p", "team_founder", 1, "Team gegründet", "Gründe ein eigenes Team.",
        condition_key="teams_founded", progress_target=1, points=30, icon="users"),
 
     # --- team_loyalty: days in same team ---
@@ -543,13 +544,13 @@ ACHIEVEMENT_GROUPS.extend(ACHIEVEMENT_GROUPS_V41)
 ACHIEVEMENT_TIERS_V41 = [
     _t("community_helper_b", "community_helper", 1, "Hilfsbereit", "5 hilfreiche Beiträge in der Community.",
        points=20, icon="hand-helping", manual_only=True),
-    _t("community_helper_s", "community_helper", 2, "Vorbild", "20 hilfreiche Beiträge.",
+    _t("community_helper_s", "community_helper", 2, "Community-Vorbild", "20 hilfreiche Beiträge.",
        points=60, icon="hand-helping", manual_only=True),
     _t("community_helper_g", "community_helper", 3, "Mentor", "50 hilfreiche Beiträge.",
        points=150, icon="hand-helping", manual_only=True),
     _t("community_helper_p", "community_helper", 4, "Säule der Community", "100+ hilfreiche Beiträge.",
        points=400, icon="hand-helping", manual_only=True),
-    _t("event_host_b", "event_host", 1, "Erster Event", "Erstes Event organisiert.",
+    _t("event_host_b", "event_host", 1, "Event-Debüt", "Erstes Event organisiert.",
        points=30, icon="calendar-plus", manual_only=True),
     _t("event_host_s", "event_host", 2, "Event-Profi", "5 Events organisiert.",
        points=120, icon="calendar-plus", manual_only=True),
@@ -666,6 +667,73 @@ ACHIEVEMENT_TIERS_V42 = [
        points=0, icon="keyboard", manual_only=True),
 ]
 ACHIEVEMENT_TIERS.extend(ACHIEVEMENT_TIERS_V42)
+
+CONDITION_KEY_STATUS = {
+    # Live: computed from current platform data in badges.compute_user_progress.
+    "achievement_points": "live",
+    "achievements_unlocked": "live",
+    "distinct_formats": "live",
+    "distinct_games_registered": "live",
+    "distinct_platforms": "live",
+    "distinct_tracks": "live",
+    "events_attended": "live",
+    "fastlap_valid_count": "live",
+    "match_streak_max": "live",
+    "matches_played": "live",
+    "matches_won": "live",
+    "membership_days": "live",
+    "podium_finishes": "live",
+    "pole_count": "live",
+    "profile_completeness": "live",
+    "rank_4_count": "live",
+    "season_points_total": "live",
+    "seasons_active": "live",
+    "teams_founded": "live",
+    "tournaments_registered": "live",
+    "tournaments_won": "live",
+    "twitch_live_sessions": "live",
+    "twitch_stream_minutes": "live",
+
+    # Counter: stored on the user, currently maintained by integration/admin tooling.
+    "discord_messages": "counter",
+
+    # Planned: visible catalog goals, but the exact data hook still has to be wired.
+    "afk_count": "planned",
+    "best_championship_rank_inv": "planned",
+    "best_season_rank_inv": "planned",
+    "chat_warnings": "planned",
+    "checkins_in_a_row": "planned",
+    "clutch_count": "planned",
+    "dispute_free_matches": "planned",
+    "disputes_opened": "planned",
+    "disputes_opened_season": "planned",
+    "dnfs_season": "planned",
+    "fast_registrations": "planned",
+    "ghost_count": "planned",
+    "hardware_incidents": "planned",
+    "invalid_laps_session": "planned",
+    "late_checkins": "planned",
+    "long_break_count": "planned",
+    "long_matches_120": "planned",
+    "long_matches_60": "planned",
+    "long_warmup_count": "planned",
+    "loss_streak": "planned",
+    "matches_early": "planned",
+    "matches_late": "planned",
+    "no_show_count": "planned",
+    "offroad_count": "planned",
+    "rage_quits": "planned",
+    "reverse_lap_count": "planned",
+    "slowest_lap_count": "planned",
+    "sub_target_count": "planned",
+    "team_days_max": "planned",
+    "team_kills": "planned",
+    "team_late_count": "planned",
+    "team_member_churn": "planned",
+    "team_no_show_count": "planned",
+    "unproven_laps": "planned",
+    "zero_eight_losses": "planned",
+}
 
 GROUP_BY_CODE = {g["code"]: g for g in ACHIEVEMENT_GROUPS}
 TIER_BY_CODE = {t["code"]: t for t in ACHIEVEMENT_TIERS}

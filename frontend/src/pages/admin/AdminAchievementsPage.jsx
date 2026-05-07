@@ -274,8 +274,16 @@ function TiersTab() {
                   <td className="px-4 py-3 font-semibold">{t.name}</td>
                   <td className="px-4 py-3 text-xs text-white/55">
                     {t.manual_only ? <span className="text-[#FF3B30]">manuell</span>
-                      : t.condition_key ? <>{t.condition_key} ≥ {t.progress_target}</>
+                      : t.condition_key ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span>{t.condition_key} ≥ {t.progress_target}</span>
+                          {t.condition_status === "live" && <span className="text-[9px] uppercase tracking-widest text-[#00FF88]">live</span>}
+                          {t.condition_status === "counter" && <span className="text-[9px] uppercase tracking-widest text-[#FFD700]">counter</span>}
+                          {t.condition_status === "planned" && <span className="text-[9px] uppercase tracking-widest text-white/35">geplant</span>}
+                        </div>
+                      )
                       : "—"}
+                    {t.member_only && <div className="mt-1 text-[9px] uppercase tracking-widest text-[#FFD700]">Verein</div>}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">+{t.points}</td>
                   <td className="px-4 py-3 text-right">
@@ -309,6 +317,7 @@ function TierForm({ tier, groupCode, onClose, onSaved }) {
     points: tier?.points || 10,
     icon: tier?.icon || "trophy",
     manual_only: tier?.manual_only ?? false,
+    member_only: tier?.member_only ?? false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -340,6 +349,7 @@ function TierForm({ tier, groupCode, onClose, onSaved }) {
         </div>
         <Field label="Beschreibung"><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input" /></Field>
         <Check label="Manuell vergeben (kein Progress-Auto-Award)" checked={form.manual_only} onChange={(v) => setForm({ ...form, manual_only: v })} testId="tier-manual" />
+        <Check label="Nur für offizielle Vereinsmitglieder markieren" checked={form.member_only} onChange={(v) => setForm({ ...form, member_only: v })} testId="tier-member-only" />
         {!form.manual_only && (
           <div className="grid grid-cols-2 gap-3">
             <Field label="Condition Key"><input value={form.condition_key} onChange={(e) => setForm({ ...form, condition_key: e.target.value })} placeholder="z. B. matches_played" className="input" /></Field>
