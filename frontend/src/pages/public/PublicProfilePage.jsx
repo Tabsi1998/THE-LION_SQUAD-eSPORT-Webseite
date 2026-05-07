@@ -49,15 +49,16 @@ function cleanHandle(value) {
 }
 
 function socialUrl(platform, value) {
+  const kind = String(platform || "").toLowerCase();
   const raw = String(value || "").trim();
   if (!raw) return "";
   if (/^https?:\/\//i.test(raw)) return raw;
   const handle = cleanHandle(raw);
-  if (platform === "youtube") return `https://www.youtube.com/@${handle}`;
-  if (platform === "instagram") return `https://www.instagram.com/${handle}`;
-  if (platform === "tiktok") return `https://www.tiktok.com/@${handle}`;
-  if (platform === "x") return `https://x.com/${handle}`;
-  if (platform === "steam") {
+  if (kind === "youtube") return `https://www.youtube.com/@${handle}`;
+  if (kind === "instagram") return `https://www.instagram.com/${handle}`;
+  if (kind === "tiktok") return `https://www.tiktok.com/@${handle}`;
+  if (kind === "x" || kind === "twitter") return `https://x.com/${handle}`;
+  if (kind === "steam") {
     return /^\d{17}$/.test(handle)
       ? `https://steamcommunity.com/profiles/${handle}`
       : `https://steamcommunity.com/id/${handle}`;
@@ -67,16 +68,17 @@ function socialUrl(platform, value) {
 
 function publicSocialLinks(profile, twitchUrl) {
   const links = [
-    profile.discord_name && { label: "Discord", value: profile.discord_name },
-    twitchUrl && { label: "Twitch", value: `twitch.tv/${normalizeTwitchChannel(profile.twitch_handle)}`, url: twitchUrl },
-    profile.youtube_handle && { label: "YouTube", value: cleanHandle(profile.youtube_handle), url: socialUrl("youtube", profile.youtube_handle) },
-    profile.instagram_handle && { label: "Instagram", value: cleanHandle(profile.instagram_handle), url: socialUrl("instagram", profile.instagram_handle) },
-    profile.tiktok_handle && { label: "TikTok", value: cleanHandle(profile.tiktok_handle), url: socialUrl("tiktok", profile.tiktok_handle) },
-    profile.x_handle && { label: "X", value: cleanHandle(profile.x_handle), url: socialUrl("x", profile.x_handle) },
-    profile.website && { label: "Website", value: profile.website, url: externalUrl(profile.website) },
+    profile.discord_name && { platform: "discord", label: "Discord", value: profile.discord_name },
+    twitchUrl && { platform: "twitch", label: "Twitch", value: normalizeTwitchChannel(profile.twitch_handle), url: twitchUrl },
+    profile.youtube_handle && { platform: "youtube", label: "YouTube", value: cleanHandle(profile.youtube_handle), url: socialUrl("youtube", profile.youtube_handle) },
+    profile.instagram_handle && { platform: "instagram", label: "Instagram", value: cleanHandle(profile.instagram_handle), url: socialUrl("instagram", profile.instagram_handle) },
+    profile.tiktok_handle && { platform: "tiktok", label: "TikTok", value: cleanHandle(profile.tiktok_handle), url: socialUrl("tiktok", profile.tiktok_handle) },
+    profile.x_handle && { platform: "x", label: "X", value: cleanHandle(profile.x_handle), url: socialUrl("x", profile.x_handle) },
+    profile.website && { platform: "website", label: "Website", value: profile.website, url: externalUrl(profile.website) },
   ].filter(Boolean);
 
   const extra = (profile.socials || []).map((social) => ({
+    platform: String(social.platform || "").toLowerCase(),
     label: social.platform,
     value: social.value || social.url,
     url: social.url || socialUrl(social.platform, social.value) || (/^https?:\/\//i.test(String(social.value || "")) ? externalUrl(social.value) : ""),
@@ -84,11 +86,33 @@ function publicSocialLinks(profile, twitchUrl) {
 
   const seen = new Set();
   return [...links, ...extra].filter((link) => {
-    const key = `${String(link.label).toLowerCase()}:${String(link.value).toLowerCase()}`;
+    const key = `${String(link.platform || link.label).toLowerCase()}:${String(link.url || link.value).toLowerCase()}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+}
+
+function socialMeta(link) {
+  const platform = String(link.platform || link.label || "").toLowerCase();
+  if (platform.includes("discord")) return { key: "discord", label: "Discord", color: "#5865F2" };
+  if (platform.includes("twitch")) return { key: "twitch", label: "Twitch", color: "#9146FF" };
+  if (platform.includes("youtube")) return { key: "youtube", label: "YouTube", color: "#FF0000" };
+  if (platform.includes("instagram")) return { key: "instagram", label: "Instagram", color: "#E4405F" };
+  if (platform.includes("tiktok")) return { key: "tiktok", label: "TikTok", color: "#69C9D0" };
+  if (platform === "x" || platform.includes("twitter")) return { key: "x", label: "X", color: "#FFFFFF" };
+  if (platform.includes("website") || platform.includes("web")) return { key: "website", label: "Website", color: "#29B6E8" };
+  return { key: "website", label: link.label || "Link", color: "#29B6E8" };
+}
+
+function SocialIcon({ kind, className = "w-4 h-4" }) {
+  if (kind === "discord") return <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.25-.192.372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.42 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.334-.956 2.42-2.157 2.42Zm7.975 0c-1.183 0-2.157-1.085-2.157-2.42 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.334-.946 2.42-2.157 2.42Z" /></svg>;
+  if (kind === "twitch") return <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0 1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z" /></svg>;
+  if (kind === "youtube") return <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814ZM9.545 15.568V8.432L15.818 12z" /></svg>;
+  if (kind === "instagram") return <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069ZM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12s.014 3.668.072 4.948c.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24s3.668-.014 4.948-.072c4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948s-.014-3.667-.072-4.947c-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0Zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324ZM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881Z" /></svg>;
+  if (kind === "tiktok") return <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1.84-.1Z" /></svg>;
+  if (kind === "x") return <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2h3.308l-7.227 8.26L22.827 22h-6.657l-5.214-6.817L4.99 22H1.68l7.73-8.835L1.254 2h6.826l4.713 6.231Zm-1.161 17.93h1.833L7.084 3.963H5.117Z" /></svg>;
+  return <Globe className={className} />;
 }
 
 function publicGamingIds(profile) {
@@ -209,12 +233,6 @@ export default function PublicProfilePage() {
                   )}
                 </div>
               )}
-              {profile.discord_name && (
-                <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-[#5865F2]/10 border border-[#5865F2]/30 rounded-sm text-sm">
-                  <span className="text-[#5865F2] text-[10px] uppercase tracking-widest font-bold">Discord</span>
-                  <span className="text-white">{profile.discord_name}</span>
-                </div>
-              )}
               <div className="mt-4 max-w-md" data-testid="profile-level-progress">
                 <AccountLevelProgress level={level.level} points={level.points} nextLevelPoints={level.next_level_points} progress={level.progress} />
               </div>
@@ -314,8 +332,8 @@ export default function PublicProfilePage() {
                       <button type="button" onClick={openSettings} className="mt-4 px-4 py-2 border border-[#9146FF]/50 text-[#b88cff] text-xs uppercase tracking-wider font-bold rounded-sm">Cookie-Einstellungen</button>
                     </div>
                   )}
-                  <a href={twitchUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-[#9146FF] hover:text-[#a86bff]">
-                    <ExternalLink className="w-3 h-3" /> twitch.tv/{twitchChannel}
+                  <a href={twitchUrl} target="_blank" rel="noopener noreferrer" aria-label="Twitch öffnen" title="Twitch öffnen" className="mt-2 inline-flex h-9 w-9 items-center justify-center border border-[#9146FF]/40 text-[#9146FF] hover:border-[#9146FF] hover:text-[#b88cff] rounded-sm transition">
+                    <SocialIcon kind="twitch" className="w-4 h-4" />
                   </a>
                   {liveStream && (
                     <div className="mt-2 text-xs text-white/55">
@@ -417,22 +435,42 @@ function ProfileLinksCard({ links }) {
       <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2">
         <Globe className="w-4 h-4 text-[#29B6E8]" /> Socials
       </h2>
-      <div className="space-y-2">
-        {links.map((link) => (
-          link.url ? (
-            <a key={`${link.label}:${link.value}`} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-3 border border-white/10 bg-[#0A0A0A] hover:border-[#29B6E8]/50 px-3 py-2 rounded-sm transition">
-              <span className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{link.label}</span>
-              <span className="min-w-0 text-right text-sm text-white/80 truncate inline-flex items-center gap-1">
-                {link.value}<ExternalLink className="w-3 h-3 text-white/35 shrink-0" />
-              </span>
-            </a>
-          ) : (
-            <div key={`${link.label}:${link.value}`} className="flex items-center justify-between gap-3 border border-white/10 bg-[#0A0A0A] px-3 py-2 rounded-sm">
-              <span className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{link.label}</span>
-              <span className="min-w-0 text-right text-sm text-white/80 truncate">{link.value}</span>
-            </div>
-          )
-        ))}
+      <div className="flex flex-wrap gap-2">
+        {links.map((link) => {
+          const meta = socialMeta(link);
+          const key = `${meta.key}:${link.url || link.value}`;
+          const className = "inline-flex h-10 w-10 items-center justify-center border border-white/10 bg-[#0A0A0A] rounded-sm text-white/70 transition hover:bg-white/[0.03]";
+          const style = { "--social-color": meta.color };
+          if (link.url) {
+            return (
+              <a
+                key={key}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${meta.label} öffnen`}
+                title={`${meta.label} öffnen`}
+                data-testid={`profile-social-${meta.key}`}
+                className={`${className} hover:border-[var(--social-color)] hover:text-[var(--social-color)]`}
+                style={style}
+              >
+                <SocialIcon kind={meta.key} />
+              </a>
+            );
+          }
+          return (
+            <span
+              key={key}
+              aria-label={`${meta.label} angegeben`}
+              title={`${meta.label} angegeben`}
+              data-testid={`profile-social-${meta.key}`}
+              className={`${className} cursor-default border-[var(--social-color)]/40 text-[var(--social-color)]`}
+              style={style}
+            >
+              <SocialIcon kind={meta.key} />
+            </span>
+          );
+        })}
       </div>
     </div>
   );

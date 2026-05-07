@@ -86,6 +86,51 @@ test("club members render gamertag-first cards", async ({ page }) => {
   await expect(card.getByText("Obmann")).toBeVisible();
 });
 
+test("public profile social links render as icons without raw values", async ({ page }) => {
+  await mockPublicChrome(page);
+  await page.route("**/api/users/public/tabsi98", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: "user-1",
+        username: "tabsi98",
+        display_name: "Tabsi98",
+        bio: "",
+        created_at: "2025-01-01T00:00:00Z",
+        privacy_public_profile: true,
+        discord_name: "tabsi98#1234",
+        twitch_handle: "https://www.twitch.tv/tabsi98",
+        youtube_handle: "https://www.youtube.com/@tabsi98",
+        instagram_handle: "tabsi98",
+        tiktok_handle: "@tabsi98",
+        x_handle: "tabsi98",
+        website: "https://lionsquad.at",
+        stats: {},
+        achievement_level: { level: 4, points: 320, next_level_points: 500, progress: 64 },
+        tournaments: [],
+        f1_bests: [],
+        teams: [],
+      }),
+    });
+  });
+  await page.route("**/api/streams/live", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify([]) });
+  });
+  await page.route("**/api/achievements/user/user-1", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ groups: [], awards: [] }) });
+  });
+
+  await page.goto("/u/tabsi98");
+  await acceptCookies(page);
+
+  const socials = page.getByTestId("public-profile-socials");
+  await expect(socials).toBeVisible();
+  for (const key of ["discord", "twitch", "youtube", "instagram", "tiktok", "x", "website"]) {
+    await expect(socials.getByTestId(`profile-social-${key}`)).toBeVisible();
+  }
+  await expect(socials).not.toContainText(/twitch\.tv|youtube\.com|instagram\.com|tiktok\.com|lionsquad\.at|tabsi98#1234/i);
+});
+
 test("public pages do not create horizontal page scroll on mobile and tablet", async ({ page }) => {
   await mockPublicChrome(page);
   await page.route("**/api/events/meta", async (route) => {
