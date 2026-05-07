@@ -182,17 +182,13 @@ export default function EventDetailPage() {
           </div>
         )}
 
-        {!!e.sponsors?.length && (
+        {!!e.sponsors?.filter((s) => s.logo_url).length && (
           <div>
             <h2 className="font-heading text-2xl font-black uppercase mb-5">Unterstützt von</h2>
             <div className="flex flex-wrap items-center gap-8 border-y border-white/10 py-6">
-              {e.sponsors.map((s) => (
-                <a key={s.id} href={s.link || "#"} target={s.link ? "_blank" : undefined} rel="noreferrer" className="group inline-flex items-center justify-center min-w-32">
-                  {s.logo_url ? (
-                    <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-h-14 max-w-44 object-contain opacity-80 group-hover:opacity-100 transition" />
-                  ) : (
-                    <span className="font-heading font-black uppercase text-white/70">{s.name}</span>
-                  )}
+              {e.sponsors.filter((s) => s.logo_url).map((s) => (
+                <a key={s.id} href={s.link || "#"} target={s.link ? "_blank" : undefined} rel="noreferrer" aria-label={s.name} className="group inline-flex items-center justify-center min-w-32">
+                  <img src={resolveMediaUrl(s.logo_url)} alt="" className="max-h-14 max-w-44 object-contain opacity-80 group-hover:opacity-100 transition" />
                 </a>
               ))}
             </div>

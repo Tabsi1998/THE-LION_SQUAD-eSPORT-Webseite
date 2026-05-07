@@ -1,9 +1,8 @@
 """Phase A: Bulk-migrate external image URLs in DB to local uploads.
 
-Scans sponsors, news posts, events, gallery_albums, gallery_photos, users,
-teams, tournaments, f1_challenges and downloads any external (http/https) image
-URL, stores it under the configured UPLOAD_DIR and rewrites the field to the local
-/api/static/uploads/{filename} URL.
+Scans all configured image reference fields and downloads any external
+(http/https) image URL, stores it under the configured UPLOAD_DIR and rewrites
+the field to the local /api/static/uploads/{filename} URL.
 
 Idempotent: skips URLs that already point at /api/static/uploads/.
 Safe: errors per row are logged and don't abort the whole run.
@@ -28,15 +27,19 @@ PUBLIC_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # (collection, list of fields, optional pointer to nested list of {url_field}, optional sub-doc field-name)
 TARGETS: list[tuple[str, list[str]]] = [
+    ("settings", ["logo_url", "mascot_url", "favicon_url", "avatar_url"]),
+    ("users", ["avatar_url", "banner_url"]),
+    ("teams", ["logo_url", "banner_url"]),
     ("sponsors", ["logo_url"]),
     ("news_posts", ["banner_url", "cover_url"]),
     ("events", ["banner_url", "cover_url"]),
-    ("gallery_albums", ["cover_url"]),
-    ("gallery_photos", ["image_url", "thumbnail_url"]),
-    ("users", ["avatar_url", "banner_url"]),
-    ("teams", ["logo_url", "banner_url"]),
+    ("games", ["cover_url", "logo_url"]),
     ("tournaments", ["banner_url", "cover_url"]),
     ("f1_challenges", ["banner_url", "cover_url"]),
+    ("f1_tracks", ["image_url"]),
+    ("gallery_albums", ["cover_url"]),
+    ("gallery_photos", ["image_url", "thumbnail_url"]),
+    ("member_benefits", ["image_url"]),
 ]
 
 LOCAL_PREFIX = "/api/static/uploads/"
