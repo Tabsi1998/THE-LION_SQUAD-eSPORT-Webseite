@@ -64,6 +64,10 @@ test.describe("live admin checks", () => {
     expect(adminMediaAfter.ok()).toBeTruthy();
     expect((await adminMediaAfter.json()).some((item) => item.filename === scopedBody.filename && item.media_scope === "admin")).toBeTruthy();
 
+    const personalMediaAfter = await request.get("/api/media?type=images");
+    expect(personalMediaAfter.ok()).toBeTruthy();
+    expect((await personalMediaAfter.json()).some((item) => item.filename === scopedBody.filename)).toBeFalsy();
+
     const deleted = await request.delete(`/api/admin/media/${body.filename}`);
     expect(deleted.ok()).toBeTruthy();
     const deletedScoped = await request.delete(`/api/admin/media/${scopedBody.filename}`);

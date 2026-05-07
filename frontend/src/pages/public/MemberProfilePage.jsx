@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Crown, Gamepad2, Monitor, User as UserIcon } from "lucide-react";
+import { ArrowLeft, Crown, ExternalLink, Gamepad2, Monitor, User as UserIcon } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
@@ -68,14 +68,7 @@ export default function MemberProfilePage() {
                   {(profile.level || profile.age) && <InfoLine label="Level" value={`Level ${profile.level || profile.age}`} />}
                   <InfoChips icon={Gamepad2} label="Games" values={profile.games} />
                   <InfoChips icon={Monitor} label="Plattformen" values={profile.platforms} />
-                  {profile.linked_account?.profile_url && (
-                    <div>
-                      <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Plattformkonto</div>
-                      <Link to={profile.linked_account.profile_url} className="mt-2 inline-flex items-center gap-2 text-[#29B6E8] hover:text-white text-sm font-bold">
-                        <UserIcon className="w-4 h-4" /> @{profile.linked_account.username}
-                      </Link>
-                    </div>
-                  )}
+                  <LinkedAccountCard account={profile.linked_account} />
                 </InfoPanel>
                 <Link to="/members" className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 border border-white/10 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white hover:bg-white/5">
                   <ArrowLeft className="w-4 h-4" /> Alle Mitglieder
@@ -86,6 +79,42 @@ export default function MemberProfilePage() {
         )}
       </section>
     </PublicLayout>
+  );
+}
+
+function LinkedAccountCard({ account }) {
+  if (!account?.profile_url) return null;
+  const level = account.achievement_level?.level || 1;
+  const progress = account.achievement_level?.progress || 0;
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Plattformkonto</div>
+      <Link
+        to={account.profile_url}
+        className="mt-2 group block border border-[#29B6E8]/30 bg-[#08151A] rounded-sm p-3 hover:border-[#29B6E8] hover:bg-[#0B1D24] transition"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-14 h-14 rounded-sm border border-white/10 bg-[#0A0A0A] overflow-hidden shrink-0">
+            {account.avatar_url ? (
+              <img src={resolveMediaUrl(account.avatar_url)} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-white/25"><UserIcon className="w-6 h-6" /></div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-heading font-black uppercase truncate text-white group-hover:text-[#29B6E8]">{account.display_name || account.username}</div>
+            <div className="text-xs text-white/45 truncate">@{account.username}</div>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700]">Level {level}</span>
+              <div className="h-1 flex-1 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-full bg-[#FFD700]" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          </div>
+          <ExternalLink className="w-4 h-4 text-white/35 group-hover:text-[#29B6E8] shrink-0" />
+        </div>
+      </Link>
+    </div>
   );
 }
 

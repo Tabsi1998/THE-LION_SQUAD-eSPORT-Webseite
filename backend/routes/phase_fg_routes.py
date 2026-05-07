@@ -28,6 +28,7 @@ from models import now_utc
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
 PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+ADMIN_MEDIA_OWNER_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
 IMAGE_REFERENCE_FIELDS = [
     ("settings", {"id": "branding"}, ["logo_url", "mascot_url", "favicon_url"]),
     ("settings", {"id": "discord"}, ["avatar_url"]),
@@ -58,6 +59,7 @@ async def _list_media_items(
     owner_id: str | None = None,
     include_untracked: bool = True,
     exclude_user_scope: bool = False,
+    user_scope_only: bool = False,
 ) -> list[dict]:
     if not UPLOAD_DIR.exists():
         return []
@@ -86,7 +88,12 @@ async def _list_media_items(
         if not include_untracked and not meta:
             continue
         media_scope = (meta.get("media_scope") or "legacy") if meta else "legacy"
-        if exclude_user_scope and meta and media_scope == "user":
+        is_user_media = media_scope == "user" or (
+            media_scope == "legacy" and meta and meta.get("owner_role") not in ADMIN_MEDIA_OWNER_ROLES
+        )
+        if user_scope_only and not is_user_media:
+            continue
+        if exclude_user_scope and is_user_media:
             continue
         stat = p.stat()
         items.append({
@@ -107,7 +114,7 @@ async def _list_media_items(
 @media_router.get("")
 async def list_media(me: dict = Depends(get_current_user)):
     """List uploaded images visible in the current user's media picker."""
-    return await _list_media_items(owner_id=me["id"], include_untracked=False)
+    return await _list_media_items(owner_id=me["id"], include_untracked=False, user_scope_only=True)
 
 
 @admin_media_router.get("")

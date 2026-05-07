@@ -6,6 +6,13 @@ import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Crown, Gamepad2, Monitor, Users as UsersIcon } from "lucide-react";
 
+function memberCardFrame(member) {
+  const achievementLevel = member.linked_account?.achievement_level?.level || 1;
+  if (achievementLevel >= 10) return "border-[#FFD700]/60 shadow-[0_0_0_1px_rgba(255,215,0,0.18),0_0_24px_rgba(255,215,0,0.10)]";
+  if (achievementLevel >= 5) return "border-[#29B6E8]/55 shadow-[0_0_0_1px_rgba(41,182,232,0.14)]";
+  return "border-white/10";
+}
+
 export default function MembersDirectoryPage() {
   const { isClubMember } = useAuth();
   const [members, setMembers] = useState([]);
@@ -51,7 +58,7 @@ export default function MembersDirectoryPage() {
                 key={m.slug}
                 to={`/members/${m.slug}`}
                 data-testid={`member-card-${m.slug}`}
-                className="group border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#101010] overflow-hidden transition"
+                className={`group border ${memberCardFrame(m)} hover:border-[#FFD700]/50 rounded-sm bg-[#101010] overflow-hidden transition`}
               >
                 <div className="relative min-h-[25rem] sm:min-h-[29rem] bg-[radial-gradient(circle_at_50%_18%,rgba(255,215,0,0.16),rgba(41,182,232,0.08)_34%,rgba(10,10,10,0)_68%)] overflow-hidden">
                   {m.photo_url ? (
@@ -85,7 +92,14 @@ export default function MembersDirectoryPage() {
                         <span className="line-clamp-1">{m.platforms.join(", ")}</span>
                       </div>
                     )}
-                    {(m.level || m.age) && <div className="text-[10px] text-[#FFD700]/80 uppercase tracking-widest font-bold">Level {m.level || m.age}</div>}
+                    <div className="flex items-center justify-between gap-2">
+                      {(m.level || m.age) && <div className="text-[10px] text-[#FFD700]/80 uppercase tracking-widest font-bold">Profil-Level {m.level || m.age}</div>}
+                      {m.linked_account?.achievement_level && (
+                        <div className="text-[10px] text-[#29B6E8] uppercase tracking-widest font-bold">
+                          Account-Level {m.linked_account.achievement_level.level}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </Link>

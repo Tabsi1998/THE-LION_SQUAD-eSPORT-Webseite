@@ -93,6 +93,25 @@ def _age_from_birth_date(value: str | date | None) -> int | None:
     return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
 
+def _achievement_level(points: int) -> dict:
+    points = max(int(points or 0), 0)
+    level = 1
+    while points >= (level * level * 100):
+        level += 1
+    current_floor = (level - 1) * (level - 1) * 100
+    next_floor = level * level * 100
+    span = max(next_floor - current_floor, 1)
+    progress = round(((points - current_floor) / span) * 100)
+    return {
+        "level": level,
+        "points": points,
+        "current_level_points": current_floor,
+        "next_level_points": next_floor,
+        "progress": max(0, min(progress, 100)),
+        "title": f"Level {level}",
+    }
+
+
 def _title_for_position(position: dict, person: dict | None = None) -> str:
     if person and person.get("gender") == "female" and position.get("title_female"):
         return position["title_female"]
@@ -164,6 +183,7 @@ def _public_account(user: dict | None, admin: bool = False) -> dict | None:
         "display_name": user.get("display_name"),
         "avatar_url": user.get("avatar_url"),
         "profile_url": f"/u/{user.get('username')}" if user.get("username") else None,
+        "achievement_level": user.get("achievement_level"),
     }
     if admin:
         out["email"] = user.get("email")
@@ -191,7 +211,24 @@ async def _account_map_for_profiles(db, rows: list[dict], public_only: bool = Tr
         "email": 1,
         "is_club_member": 1,
     }
-    return {user["id"]: user for user in await db.users.find(query, projection).to_list(2000)}
+    users = await db.users.find(query, projection).to_list(2000)
+    neg_codes = [g["code"] async for g in db.achievement_groups.find(
+        {"is_negative": True}, {"_id": 0, "code": 1}
+    )]
+    awards = await db.user_achievements.find(
+        {"user_id": {"$in": list(set(user_ids))}, "group_code": {"$nin": neg_codes}},
+        {"_id": 0, "user_id": 1, "tier_code": 1},
+    ).to_list(10000)
+    tier_codes = list({award.get("tier_code") for award in awards if award.get("tier_code")})
+    tiers = {tier["code"]: tier for tier in await db.achievements.find(
+        {"code": {"$in": tier_codes}}, {"_id": 0, "code": 1, "points": 1}
+    ).to_list(2000)} if tier_codes else {}
+    points_by_user: dict[str, int] = {}
+    for award in awards:
+        points_by_user[award["user_id"]] = points_by_user.get(award["user_id"], 0) + int(tiers.get(award.get("tier_code"), {}).get("points") or 0)
+    for user in users:
+        user["achievement_level"] = _achievement_level(points_by_user.get(user["id"], 0))
+    return {user["id"]: user for user in users}
 
 
 async def _attach_linked_accounts(db, rows: list[dict], items: list[dict], public_only: bool = True, admin: bool = False) -> list[dict]:
