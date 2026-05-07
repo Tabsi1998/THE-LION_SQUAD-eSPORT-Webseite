@@ -40,18 +40,6 @@ export default function CmsPage({ slug: forced }) {
           <p className="mt-3 text-white/60 text-lg max-w-2xl">{page.meta_description}</p>
         )}
         <div className="mt-10 prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(page.body_md || "") }} />
-        <style>{`
-          .prose-cms { color: rgba(255,255,255,0.78); line-height: 1.7; font-size: 15px; }
-          .prose-cms h1 { font-family: var(--font-heading, "Bebas Neue"), sans-serif; font-size: 2rem; text-transform: uppercase; letter-spacing: 0.03em; margin: 1.5em 0 0.5em; color: #fff; }
-          .prose-cms h2 { font-family: var(--font-heading, "Bebas Neue"), sans-serif; font-size: 1.5rem; text-transform: uppercase; letter-spacing: 0.04em; margin: 1.25em 0 0.5em; color: #fff; }
-          .prose-cms h3 { font-weight: 700; font-size: 1.15rem; margin: 1em 0 0.4em; color: #fff; }
-          .prose-cms p { margin-bottom: 1em; }
-          .prose-cms a { color: #29B6E8; text-decoration: underline; }
-          .prose-cms ul { padding-left: 1.25rem; margin-bottom: 1em; list-style-type: disc; }
-          .prose-cms ol { padding-left: 1.25rem; margin-bottom: 1em; list-style-type: decimal; }
-          .prose-cms strong { color: #fff; }
-          .prose-cms hr { border-color: rgba(255,255,255,0.1); margin: 2rem 0; }
-        `}</style>
       </article>
     </PublicLayout>
   );

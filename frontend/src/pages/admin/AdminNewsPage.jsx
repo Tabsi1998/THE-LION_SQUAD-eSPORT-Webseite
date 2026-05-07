@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { appendEmbedToken } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
@@ -177,9 +178,15 @@ function NewsModal({ post, meta, onClose, onSaved }) {
           <Field label="Titel"><Input value={form.title} onChange={(v) => { set("title", v); if (isNew && !form.slug) set("slug", slugFrom(v)); }} testId="news-title" required /></Field>
           <Field label="Slug"><Input value={form.slug} onChange={(v) => set("slug", slugFrom(v))} placeholder="kebab-case" testId="news-slug" required /></Field>
           <Field label="Kurzbeschreibung"><Input value={form.excerpt} onChange={(v) => set("excerpt", v)} testId="news-excerpt" /></Field>
-          <Field label="Inhalt (Markdown / Plaintext)">
-            <textarea value={form.content} onChange={(e) => set("content", e.target.value)} rows={10} required data-testid="news-content" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-mono text-sm" />
-            <div className="mt-1 text-[11px] text-white/40">Einbettungen werden als Karten gerendert, z.B. [[fastlap:slug]], [[tournament:slug]], [[event:slug]].</div>
+          <Field label="Inhalt">
+            <MarkdownEditor
+              value={form.content}
+              onChange={(v) => set("content", v)}
+              rows={12}
+              required
+              testId="news-content"
+              helperText="Markdown plus Einbettungen: [[fastlap:slug]], [[tournament:slug]], [[event:slug]]. HTML wird nicht roh gerendert."
+            />
           </Field>
           <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="news-banner" variant="wide" allowLibrary /></Field>
 

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Calendar, Flag, Trophy } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
+import { renderMarkdownLite } from "@/lib/markdownLite";
 
 const EMBED_RE = /\[\[\s*(event|events|turnier|turniere|tournament|tournaments|fastlap|fast-lap|f1)\s*:\s*([^\]\s]+)\s*\]\]/gi;
 
@@ -25,7 +26,7 @@ function embedMeta(kind, item) {
 
 function TextChunk({ text }) {
   if (!text) return null;
-  return <div className="whitespace-pre-line leading-relaxed">{text}</div>;
+  return <div className="prose-cms max-w-none" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(text) }} />;
 }
 
 function EmbedCard({ embed }) {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { appendEmbedToken } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
@@ -288,8 +289,14 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
             )}
           </div>
           <Field label="Programm / Tagesablauf">
-            <textarea value={form.program} onChange={(e) => set("program", e.target.value)} rows={4} placeholder="17:00 Einlass&#10;18:00 LAN-Setup&#10;19:30 Eröffnungsturnier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-mono text-sm" />
-            <div className="mt-1 text-[11px] text-white/40">Turniere/Fast-Laps können hier als Karten eingefügt werden.</div>
+            <MarkdownEditor
+              value={form.program}
+              onChange={(v) => set("program", v)}
+              rows={8}
+              testId="event-program"
+              placeholder={"17:00 Einlass\n18:00 LAN-Setup\n19:30 Eröffnungsturnier"}
+              helperText="Markdown plus Turnier-/Fast-Lap-Karten. HTML wird nicht roh gerendert."
+            />
           </Field>
           {(tournaments.length > 0 || f1Challenges.length > 0) && (
             <div className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A] space-y-3">

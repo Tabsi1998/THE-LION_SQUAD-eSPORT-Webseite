@@ -133,6 +133,63 @@ body {
 /* focus ring */
 :focus-visible { outline: none; box-shadow: 0 0 0 2px var(--tls-cyan); }
 
+.prose-cms {
+  color: rgba(255,255,255,0.78);
+  line-height: 1.7;
+  font-size: 15px;
+}
+.prose-cms h1 {
+  font-family: var(--font-heading, "Unbounded"), sans-serif;
+  font-size: 2rem;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  margin: 1.5em 0 0.5em;
+  color: #fff;
+}
+.prose-cms h2 {
+  font-family: var(--font-heading, "Unbounded"), sans-serif;
+  font-size: 1.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  margin: 1.25em 0 0.5em;
+  color: #fff;
+}
+.prose-cms h3 {
+  font-weight: 700;
+  font-size: 1.15rem;
+  margin: 1em 0 0.4em;
+  color: #fff;
+}
+.prose-cms p { margin-bottom: 1em; }
+.prose-cms a { color: #29B6E8; text-decoration: underline; }
+.prose-cms ul { padding-left: 1.25rem; margin-bottom: 1em; list-style-type: disc; }
+.prose-cms ol { padding-left: 1.25rem; margin-bottom: 1em; list-style-type: decimal; }
+.prose-cms li { margin: 0.25rem 0; }
+.prose-cms strong { color: #fff; }
+.prose-cms em { color: rgba(255,255,255,0.86); }
+.prose-cms blockquote {
+  margin: 1.25rem 0;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid #29B6E8;
+  background: rgba(41,182,232,0.08);
+  color: rgba(255,255,255,0.82);
+}
+.prose-cms code {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 2px;
+  padding: 0.1rem 0.3rem;
+  color: #fff;
+  font-size: 0.9em;
+}
+.prose-cms img {
+  max-width: 100%;
+  border-radius: 2px;
+  border: 1px solid rgba(255,255,255,0.1);
+  margin: 1rem 0;
+}
+.prose-cms hr { border-color: rgba(255,255,255,0.1); margin: 2rem 0; }
+
 /* Disable default number input spinner where not needed */
 input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-button {
   -webkit-appearance: none; margin: 0;

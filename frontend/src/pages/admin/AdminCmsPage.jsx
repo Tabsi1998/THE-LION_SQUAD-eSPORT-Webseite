@@ -6,8 +6,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { renderMarkdownLite } from "@/lib/markdownLite";
 import { toast } from "sonner";
 import { FileText, Mail, Save, Plus, Trash2, X, Eye, EyeOff } from "lucide-react";
 
@@ -126,24 +126,21 @@ function PageEditor({ page, onClose, onSaved }) {
           <h3 className="font-heading text-2xl font-black uppercase">{isNew ? "Neue Seite" : `Seite: /${page.slug}`}</h3>
           <button onClick={onClose} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
-        <div className="grid lg:grid-cols-2 gap-4">
-          <div className="space-y-3">
-            <Field label="Slug (URL-Pfad)"><input required disabled={!isNew} value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} data-testid="page-slug" className="input" placeholder="z. B. statuten" /></Field>
-            <Field label="Titel"><input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="page-title" className="input" /></Field>
-            <Field label="Meta-Description (SEO)"><input value={form.meta_description} onChange={(e) => setForm({ ...form, meta_description: e.target.value })} className="input" /></Field>
-            <Field label="Inhalt (Markdown-Light: # ## ### **bold** *italic* [Link](url) - Liste 1. Liste)">
-              <textarea rows={18} value={form.body_md} onChange={(e) => setForm({ ...form, body_md: e.target.value })} data-testid="page-body" className="input font-mono text-xs" />
-            </Field>
-            <label className="inline-flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={form.is_published} onChange={(e) => setForm({ ...form, is_published: e.target.checked })} className="accent-[#FFD700]" /> Veröffentlicht
-            </label>
-          </div>
-          <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 overflow-y-auto max-h-[70vh]">
-            <div className="text-[10px] uppercase tracking-widest text-white/40 mb-2">Vorschau</div>
-            <h2 className="font-heading text-2xl font-black uppercase mb-3">{form.title || "Titel…"}</h2>
-            <div className="prose-cms text-sm" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(form.body_md) }} />
-            <style>{`.prose-cms h1{font-size:1.25rem;font-weight:700;margin:1em 0 0.4em;color:#fff}.prose-cms h2{font-size:1.1rem;font-weight:700;margin:1em 0 0.3em;color:#fff}.prose-cms h3{font-weight:700;margin:0.8em 0 0.3em;color:#fff}.prose-cms p{margin-bottom:0.8em;color:rgba(255,255,255,.7)}.prose-cms a{color:#29B6E8;text-decoration:underline}.prose-cms ul{padding-left:1.25rem;list-style-type:disc}.prose-cms ol{padding-left:1.25rem;list-style-type:decimal}.prose-cms strong{color:#fff}`}</style>
-          </div>
+        <div className="space-y-3">
+          <Field label="Slug (URL-Pfad)"><input required disabled={!isNew} value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} data-testid="page-slug" className="input" placeholder="z. B. statuten" /></Field>
+          <Field label="Titel"><input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="page-title" className="input" /></Field>
+          <Field label="Meta-Description (SEO)"><input value={form.meta_description} onChange={(e) => setForm({ ...form, meta_description: e.target.value })} className="input" /></Field>
+          <Field label="Inhalt">
+            <MarkdownEditor
+              value={form.body_md}
+              onChange={(body_md) => setForm({ ...form, body_md })}
+              rows={18}
+              testId="page-body"
+            />
+          </Field>
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.is_published} onChange={(e) => setForm({ ...form, is_published: e.target.checked })} className="accent-[#FFD700]" /> Veröffentlicht
+          </label>
         </div>
         <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-white/10">
           <button onClick={onClose} className="px-4 py-2 text-sm text-white/60 hover:text-white">Abbrechen</button>

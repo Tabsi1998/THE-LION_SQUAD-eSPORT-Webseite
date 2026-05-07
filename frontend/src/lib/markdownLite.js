@@ -26,23 +26,29 @@ function sanitizeHref(rawHref) {
 
 function formatInlineText(rawText) {
   return escapeHtml(rawText)
+    .replace(/`(.+?)`/g, "<code>$1</code>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>");
 }
 
 function renderInline(rawText) {
-  const linkPattern = /\[([^\]\n]+)\]\(([^)\s]+)\)/g;
+  const linkPattern = /(!?)\[([^\]\n]+)\]\(([^)\s]+)\)/g;
   let html = "";
   let lastIndex = 0;
   let match;
 
   while ((match = linkPattern.exec(rawText)) !== null) {
     html += formatInlineText(rawText.slice(lastIndex, match.index));
-    const label = formatInlineText(match[1]);
-    const href = sanitizeHref(match[2]);
-    html += href
-      ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`
-      : label;
+    const isImage = match[1] === "!";
+    const label = formatInlineText(match[2]);
+    const href = sanitizeHref(match[3]);
+    if (href && isImage) {
+      html += `<img src="${escapeHtml(href)}" alt="${escapeHtml(match[2])}" loading="lazy"/>`;
+    } else if (href) {
+      html += `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+    } else {
+      html += label;
+    }
     lastIndex = match.index + match[0].length;
   }
 
@@ -85,6 +91,11 @@ export function renderMarkdownLite(md) {
         inList = "ul";
       }
       html += `<li>${renderInline(raw.replace(/^\s*[-*]\s+/, ""))}</li>`;
+      continue;
+    }
+    if (/^>\s?/.test(raw)) {
+      close();
+      html += `<blockquote>${renderInline(raw.replace(/^>\s?/, ""))}</blockquote>`;
       continue;
     }
     if (/^\s*\d+\.\s+/.test(raw)) {
