@@ -130,7 +130,7 @@ export function PublicLayout({ children }) {
                 )}
               </div>
               <div className="mt-8">
-                <SponsorTicker compact placement="footer" />
+                <SponsorTicker compact placement="all" />
               </div>
             </div>
           </div>
@@ -211,7 +211,7 @@ export function PublicLayout({ children }) {
               </ul>
             </div>
           </div>
-          <SponsorTicker compact placement="footer" className="mt-10 pt-8 border-t border-white/5" />
+          <SponsorTicker compact placement="all" className="mt-10 pt-8 border-t border-white/5" />
         </div>
         {/* Reihe 2 — Bottom Bar */}
         <div className="border-t border-white/5">
