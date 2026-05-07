@@ -39,6 +39,14 @@ export function CurrentEventHero() {
   const curP = item.participant_count || 0;
   const spotsLeft = maxP && curP < maxP ? maxP - curP : null;
   const startDate = item.start_date ? new Date(item.start_date) : null;
+  const phaseState = item.public_phase?.state || item.status;
+  const eyebrow = phaseState === "live"
+    ? "Läuft gerade"
+    : phaseState === "registration_open"
+      ? (kind === "f1" ? "Einreichung offen" : "Anmeldung offen")
+      : phaseState === "check_in"
+        ? "Check-in läuft"
+        : "Bald startend";
 
   return (
     <section className="relative overflow-hidden border-b border-white/10" data-testid="current-event-hero">
@@ -52,7 +60,7 @@ export function CurrentEventHero() {
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#FF3B30]/10 border border-[#FF3B30]/40 rounded-sm mb-4">
               <Flame className="w-3.5 h-3.5 text-[#FF3B30]" />
               <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#FF3B30]">
-                {item.status === "live" ? "Läuft gerade" : item.status === "registration_open" ? "Anmeldung offen" : item.status === "check_in" ? "Check-in läuft" : "Bald startend"}
+                {eyebrow}
               </span>
             </div>
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] inline-flex items-center gap-2">
@@ -77,7 +85,7 @@ export function CurrentEventHero() {
             </div>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link to={href} data-testid="hero-cta-primary" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
-                {item.status === "registration_open" ? "Jetzt anmelden" : "Details ansehen"} <ArrowRight className="w-4 h-4" />
+                {phaseState === "registration_open" ? "Jetzt anmelden" : "Details ansehen"} <ArrowRight className="w-4 h-4" />
               </Link>
               <PhaseBadge phase={item.public_phase} status={item.status} size="lg" />
             </div>
@@ -128,14 +136,14 @@ function Meta({ icon: Icon, label, highlight = false }) {
 }
 
 function pickFeatured(tournaments = [], challenges = []) {
-  const priority = { live: 0, check_in: 1, registration_open: 2, upcoming: 3, draft: 9, completed: 10, archived: 11 };
+  const priority = { live: 0, check_in: 1, registration_open: 2, announced: 3, scheduled: 3, upcoming: 3, draft: 9, completed: 10, archived: 11 };
   const rank = (s) => priority[s] ?? 5;
   const items = [
     ...tournaments.map((t) => ({ kind: "tournament", item: t })),
     ...challenges.map((c) => ({ kind: "f1", item: c })),
   ];
   items.sort((a, b) => {
-    const r = rank(a.item.status) - rank(b.item.status);
+    const r = rank(a.item.public_phase?.state || a.item.status) - rank(b.item.public_phase?.state || b.item.status);
     if (r !== 0) return r;
     const da = a.item.start_date ? new Date(a.item.start_date).getTime() : Infinity;
     const db = b.item.start_date ? new Date(b.item.start_date).getTime() : Infinity;
