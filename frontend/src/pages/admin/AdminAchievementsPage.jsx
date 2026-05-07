@@ -375,6 +375,7 @@ function AwardTab() {
   const [tiers, setTiers] = useState([]);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const selectedTier = tiers.find((t) => t.code === tierCode);
 
   const loadTiers = useCallback(() => api.get("/admin/achievements/tiers").then(({ data }) => setTiers(data)), []);
   useEffect(() => { loadTiers(); }, [loadTiers]);
@@ -386,6 +387,10 @@ function AwardTab() {
 
   const award = async () => {
     if (!selectedUser || !tierCode) { toast.error("Spieler & Stufe wählen."); return; }
+    if (selectedTier?.member_only && !selectedUser.is_club_member) {
+      toast.error("Dieses Achievement ist nur für aktive Vereinsmitglieder.");
+      return;
+    }
     setBusy(true);
     try {
       await api.post("/admin/achievements/award", { user_id: selectedUser.id, tier_code: tierCode, note });
@@ -410,6 +415,11 @@ function AwardTab() {
               <div className="min-w-0">
                 <div className="text-sm font-semibold truncate">{u.display_name || u.username}</div>
                 <div className="text-[10px] text-white/40">{u.email}</div>
+                {u.is_club_member && (
+                  <div className="mt-1 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-[#FFD700]">
+                    <Crown className="w-3 h-3" /> Vereinsmitglied
+                  </div>
+                )}
               </div>
             </button>
           ))}
@@ -422,9 +432,15 @@ function AwardTab() {
         <Field label="Achievement-Tier">
           <select value={tierCode} onChange={(e) => setTierCode(e.target.value)} data-testid="award-tier-select" className="input">
             <option value="">— wählen —</option>
-            {tiers.map(t => <option key={t.code} value={t.code}>{t.group_code} · {LEVEL_NAMES[t.level]} · {t.name}</option>)}
+            {tiers.map(t => <option key={t.code} value={t.code}>{t.member_only ? "[Verein] " : ""}{t.group_code} · {LEVEL_NAMES[t.level]} · {t.name}</option>)}
           </select>
         </Field>
+        {selectedTier?.member_only && (
+          <div className="mb-3 border border-[#FFD700]/30 bg-[#FFD700]/10 px-3 py-2 text-xs text-white/70">
+            <strong className="text-[#FFD700] uppercase tracking-widest">Vereins-Achievement</strong>
+            <span className="block mt-1">Kann nur aktiven oder Ehren-Mitgliedern vergeben werden.</span>
+          </div>
+        )}
         <Field label="Interne Notiz (Audit-Log)"><textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} data-testid="award-note" className="input" placeholder="z. B. Gamers Heaven 2026 Teilnehmer" /></Field>
         <button onClick={award} disabled={busy || !selectedUser || !tierCode} data-testid="award-submit" className="w-full mt-2 px-4 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center justify-center gap-2 disabled:opacity-40">
           <Award className="w-4 h-4" /> {busy ? "Vergebe…" : "Achievement vergeben"}

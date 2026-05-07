@@ -25,7 +25,7 @@ from typing import Optional, Literal
 from database import get_db
 from auth import get_optional_user, get_current_user, require_admin
 from badges import (
-    award_achievement, list_groups_for_user, list_user_awards,
+    award_achievement, can_award_tier_to_user, list_groups_for_user, list_user_awards,
     evaluate_user_progress, trigger_negative_incident, on_season_completed,
     NEGATIVE_INCIDENTS,
 )
@@ -238,8 +238,11 @@ async def admin_award(body: AwardBody, me: dict = Depends(require_admin())):
     db = get_db()
     if not await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1}):
         raise HTTPException(404, "Nutzer nicht gefunden.")
-    if not await db.achievements.find_one({"code": body.tier_code}):
+    tier = await db.achievements.find_one({"code": body.tier_code}, {"_id": 0})
+    if not tier:
         raise HTTPException(404, "Tier nicht gefunden.")
+    if not await can_award_tier_to_user(body.user_id, tier):
+        raise HTTPException(400, "Dieses Achievement ist nur für aktive Vereinsmitglieder.")
     awarded = await award_achievement(body.user_id, body.tier_code,
                                        context={"manual": True, "by": me["id"], "note": body.note},
                                        awarded_by=me["id"])
@@ -306,7 +309,18 @@ async def admin_search_users(q: str = "", me: dict = Depends(require_admin())):
     if q:
         rx = {"$regex": q.strip(), "$options": "i"}
         query = {"$or": [{"username": rx}, {"display_name": rx}, {"email": rx}]}
-    users = await db.users.find(query, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "email": 1}).limit(20).to_list(20)
+    users = await db.users.find(
+        query,
+        {
+            "_id": 0,
+            "id": 1,
+            "username": 1,
+            "display_name": 1,
+            "avatar_url": 1,
+            "email": 1,
+            "is_club_member": 1,
+        },
+    ).limit(20).to_list(20)
     return users
 
 

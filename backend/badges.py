@@ -22,6 +22,7 @@ from achievement_catalog import (
     ACHIEVEMENT_GROUPS, ACHIEVEMENT_TIERS, GROUP_BY_CODE, TIER_BY_CODE,
     CONDITION_KEY_STATUS,
 )
+from services.membership_service import get_membership, is_active_member
 
 logger = logging.getLogger("tls.achievements")
 
@@ -64,6 +65,15 @@ async def seed_badges():
 
 
 # ---------------- Award ----------------
+async def can_award_tier_to_user(user_id: str, tier: dict | None) -> bool:
+    """Return whether a tier can be awarded to the user under membership rules."""
+    if not tier:
+        return False
+    if not tier.get("member_only"):
+        return True
+    return is_active_member(await get_membership(user_id))
+
+
 async def award_achievement(user_id: str, tier_code: str, context: dict | None = None,
                              awarded_by: str | None = None) -> bool:
     db = get_db()
@@ -72,6 +82,8 @@ async def award_achievement(user_id: str, tier_code: str, context: dict | None =
         return False
     group = await db.achievement_groups.find_one({"code": tier["group_code"]}, {"_id": 0})
     if not group:
+        return False
+    if not await can_award_tier_to_user(user_id, tier):
         return False
     existing = await db.user_achievements.find_one({"user_id": user_id, "tier_code": tier_code})
     if existing:
@@ -429,11 +441,14 @@ async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
 async def evaluate_user_progress(user_id: str) -> int:
     db = get_db()
     counters = await compute_user_progress(user_id)
+    active_member = is_active_member(await get_membership(user_id))
     earned_codes = {a["tier_code"] async for a in db.user_achievements.find({"user_id": user_id})}
     new_count = 0
     tiers = await db.achievements.find({"manual_only": {"$ne": True}}, {"_id": 0}).to_list(2000)
     for t in tiers:
         if t["code"] in earned_codes:
+            continue
+        if t.get("member_only") and not active_member:
             continue
         ck = t.get("condition_key")
         target = t.get("progress_target") or 0
