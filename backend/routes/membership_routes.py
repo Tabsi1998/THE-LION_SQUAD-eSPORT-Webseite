@@ -26,6 +26,7 @@ class ClubMemberProfileCreate(BaseModel):
     cover_url: str | None = None
     bio: str | None = None
     birth_date: date | None = None
+    gender: str | None = None
     games: list[str] = []
     platforms: list[str] = []
     user_id: str | None = None
@@ -41,6 +42,7 @@ class ClubMemberProfileUpdate(BaseModel):
     cover_url: str | None = None
     bio: str | None = None
     birth_date: date | None = None
+    gender: str | None = None
     games: list[str] | None = None
     platforms: list[str] | None = None
     user_id: str | None = None
@@ -75,6 +77,11 @@ def _clean_list(values: list[str] | None) -> list[str]:
     return out[:20]
 
 
+def _clean_gender(value: str | None) -> str | None:
+    value = str(value or "").strip().lower()
+    return value if value in {"male", "female", "diverse"} else None
+
+
 def _age_from_birth_date(value: str | date | None) -> int | None:
     if not value:
         return None
@@ -97,6 +104,8 @@ def _public_profile(doc: dict, detail: bool = False) -> dict:
         "games": doc.get("games") or [],
         "platforms": doc.get("platforms") or [],
         "age": _age_from_birth_date(doc.get("birth_date")),
+        "level": _age_from_birth_date(doc.get("birth_date")),
+        "gender": doc.get("gender"),
         "order_index": doc.get("order_index") or 0,
     }
     if detail:
@@ -378,6 +387,7 @@ async def admin_create_member_profile(body: ClubMemberProfileCreate, me: dict = 
         "games": _clean_list(payload.get("games")),
         "platforms": _clean_list(payload.get("platforms")),
         "birth_date": payload.get("birth_date").isoformat() if payload.get("birth_date") else None,
+        "gender": _clean_gender(payload.get("gender")),
         "created_at": now_utc().isoformat(),
         "created_by": me["id"],
     }
@@ -395,7 +405,7 @@ async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUp
     if not existing:
         raise HTTPException(404, "Mitgliedsprofil nicht gefunden.")
     raw = body.model_dump(exclude_unset=True)
-    nullable = {"role_title", "photo_url", "cover_url", "bio", "birth_date", "user_id"}
+    nullable = {"role_title", "photo_url", "cover_url", "bio", "birth_date", "gender", "user_id"}
     update = {k: v for k, v in raw.items() if v is not None or k in nullable}
     if "display_name" in update:
         update["display_name"] = str(update["display_name"] or "").strip()
@@ -409,6 +419,8 @@ async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUp
         update["platforms"] = _clean_list(update["platforms"])
     if "birth_date" in update and update["birth_date"]:
         update["birth_date"] = update["birth_date"].isoformat()
+    if "gender" in update:
+        update["gender"] = _clean_gender(update.get("gender"))
     if not update:
         raise HTTPException(400, "Keine Änderungen.")
     update["updated_at"] = now_utc().isoformat()

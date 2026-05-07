@@ -120,6 +120,7 @@ async def register(body: UserRegister, request: Request, response: Response):
         "country": None, "state": None, "city": None,
         "first_name": None, "last_name": None, "nickname": None,
         "birth_date": body.birth_date,
+        "gender": body.gender,
         "favorite_games": [],
         "main_platform": None, "preferred_role": None, "input_device": None,
         "privacy_public_profile": True,

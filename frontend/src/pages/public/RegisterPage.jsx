@@ -9,7 +9,7 @@ export default function RegisterPage() {
   const nav = useNavigate();
   const [form, setForm] = useState({
     username: "", email: "", password: "", display_name: "",
-    discord_name: "", birth_date: "",
+    discord_name: "", birth_date: "", gender: "",
   });
   const [accept, setAccept] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -31,6 +31,7 @@ export default function RegisterPage() {
       display_name: form.display_name || null,
       discord_name: form.discord_name || null,
       birth_date: form.birth_date || null,
+      gender: form.gender || null,
       accept_privacy: true,
       accept_terms: true,
       newsletter_consent: newsletter,
@@ -58,6 +59,15 @@ export default function RegisterPage() {
             <Field label="Discord (optional)" value={form.discord_name} onChange={set("discord_name")} />
             <Field label="Geburtsdatum (optional)" type="date" value={form.birth_date} onChange={set("birth_date")} />
           </div>
+          <label className="block">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Geschlecht (optional)</div>
+            <select value={form.gender} onChange={set("gender")} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2.5 rounded-sm text-white focus:outline-none">
+              <option value="">Keine Angabe</option>
+              <option value="male">Maennlich</option>
+              <option value="female">Weiblich</option>
+              <option value="diverse">Divers</option>
+            </select>
+          </label>
           <div className="space-y-2.5 pt-2">
             <label className="flex items-start gap-2 text-sm text-white/70">
               <input type="checkbox" data-testid="register-accept" checked={accept} onChange={(e) => setAccept(e.target.checked)} className="mt-1 accent-[#29B6E8]" />

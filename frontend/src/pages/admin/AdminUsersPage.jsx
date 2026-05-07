@@ -128,7 +128,7 @@ export default function AdminUsersPage() {
 }
 
 function CreateUserModal({ onClose, onSaved, onCreated }) {
-  const [form, setForm] = useState({ username: "", display_name: "", email: "", role: "player", is_active: true, privacy_public_profile: true, send_invite: true });
+  const [form, setForm] = useState({ username: "", display_name: "", email: "", gender: "", role: "player", is_active: true, privacy_public_profile: true, send_invite: true });
   const [saving, setSaving] = useState(false);
   const [inviteUrl, setInviteUrl] = useState("");
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -137,7 +137,7 @@ function CreateUserModal({ onClose, onSaved, onCreated }) {
     e.preventDefault();
     setSaving(true);
     try {
-      const { data } = await api.post("/users", form);
+      const { data } = await api.post("/users", { ...form, gender: form.gender || null });
       Promise.resolve(onCreated?.()).catch(() => null);
       if (data.invite_url) {
         setInviteUrl(data.invite_url);
@@ -164,6 +164,14 @@ function CreateUserModal({ onClose, onSaved, onCreated }) {
           <Field label="Username"><Input value={form.username} onChange={(v) => set("username", v)} required testId="create-user-username" /></Field>
           <Field label="Display Name"><Input value={form.display_name} onChange={(v) => set("display_name", v)} testId="create-user-display" /></Field>
           <Field label="E-Mail"><Input type="email" value={form.email} onChange={(v) => set("email", v)} required testId="create-user-email" /></Field>
+          <Field label="Geschlecht">
+            <select value={form.gender || ""} onChange={(e) => set("gender", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+              <option value="">Keine Angabe</option>
+              <option value="male">Maennlich</option>
+              <option value="female">Weiblich</option>
+              <option value="diverse">Divers</option>
+            </select>
+          </Field>
           <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 p-3 rounded-sm text-sm text-white/70">
             Der Benutzer bekommt per E-Mail einen einmaligen Link und erstellt sein Passwort selbst.
           </div>

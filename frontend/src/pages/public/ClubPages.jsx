@@ -25,7 +25,7 @@ export function BoardPage() {
       .finally(() => setLoading(false));
   }, []);
   useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["board", "users"]);
+  useApiInvalidation(load, ["board", "users", "membership"]);
 
   return (
     <PublicLayout>
@@ -44,10 +44,22 @@ export function BoardPage() {
             Es sind noch keine Vorstandspositionen aktiv.
           </div>
         ) : (
-          <div className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" data-testid="board-grid">
-            {positions.map((p) => (
-              <BoardCard key={p.id} p={p} />
-            ))}
+          <div className="mt-10 space-y-8" data-testid="board-grid">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              {getCoreBoardPositions(positions).map((p) => (
+                <BoardRoleColumn key={p.id} p={p} />
+              ))}
+            </div>
+            {getSpecialBoardPositions(positions).length > 0 && (
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] mb-4">Sonderfunktionen</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {getSpecialBoardPositions(positions).map((p) => (
+                    <BoardCard key={p.id} p={p} compact />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -62,40 +74,111 @@ export function BoardPage() {
   );
 }
 
-function BoardCard({ p }) {
-  const u = p.user;
-  const d = p.deputy_user;
-  return (
-    <div className="border border-white/10 rounded-sm p-5 bg-[#121212] hover:border-[#FFD700]/40 transition" data-testid={`board-position-${p.slug}`}>
-      <Crown className="w-5 h-5 text-[#FFD700] mb-3" />
-      <div className="font-heading font-bold uppercase">{p.display_title}</div>
-      {p.description && <p className="mt-2 text-sm text-white/55">{p.description}</p>}
+function getCoreBoardPositions(positions) {
+  const priority = ["obmann", "kassier", "schriftfuehrer"];
+  return priority.map((slug) => positions.find((p) => p.slug === slug)).filter(Boolean);
+}
 
-      {u ? (
-        <Link to={`/u/${u.username}`} className="mt-4 flex items-center gap-3 group">
-          {u.avatar_url ? (
-            <img src={resolveMediaUrl(u.avatar_url)} alt="" className="w-10 h-10 rounded-full object-cover border border-white/10" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-[#0A0A0A] border border-white/10 flex items-center justify-center">
-              <UserIcon className="w-5 h-5 text-white/40" />
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <div className="font-bold text-white text-sm group-hover:text-[#FFD700] transition truncate">{u.display_name || u.username}</div>
-            <div className="text-[10px] text-white/40 uppercase tracking-widest">@{u.username}</div>
-          </div>
-          <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-[#FFD700] transition" />
-        </Link>
-      ) : (
-        <div className="mt-3 text-[10px] uppercase tracking-widest text-white/40">Position offen</div>
-      )}
-      {d && (
-        <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-widest text-white/40">Stv.:</span>
-          <Link to={`/u/${d.username}`} className="text-sm text-white/80 hover:text-[#FFD700] transition">{d.display_name || d.username}</Link>
-        </div>
+function getSpecialBoardPositions(positions) {
+  const core = new Set(["obmann", "kassier", "schriftfuehrer"]);
+  return positions.filter((p) => !core.has(p.slug));
+}
+
+function BoardRoleColumn({ p }) {
+  return (
+    <div className="space-y-3" data-testid={`board-position-${p.slug}`}>
+      <BoardCard p={p} featured />
+      {p.allow_deputy && (
+        <BoardDeputyCard position={p} />
       )}
     </div>
+  );
+}
+
+function BoardCard({ p, compact = false, featured = false }) {
+  const u = p.user;
+  return (
+    <div className={`border rounded-sm bg-[#121212] hover:border-[#FFD700]/40 transition overflow-hidden ${featured ? "border-[#FFD700]/30" : "border-white/10"} ${compact ? "p-5" : ""}`}>
+      {!compact && (
+        <div className="px-5 pt-5">
+          <Crown className="w-5 h-5 text-[#FFD700] mb-3" />
+          <div className="font-heading font-bold uppercase">{p.display_title}</div>
+          {p.description && <p className="mt-2 text-sm text-white/55">{p.description}</p>}
+        </div>
+      )}
+      {compact && (
+        <>
+          <Crown className="w-5 h-5 text-[#FFD700] mb-3" />
+          <div className="font-heading font-bold uppercase">{p.display_title}</div>
+          {p.description && <p className="mt-2 text-sm text-white/55">{p.description}</p>}
+        </>
+      )}
+
+      {u ? (
+        <Link to={u.profile_url || `/u/${u.username}`} className={`${compact ? "mt-4" : "mt-5"} flex ${compact ? "items-center gap-3" : "flex-col"} group`}>
+          {!compact && (
+            <div className="relative min-h-[17rem] bg-[radial-gradient(circle_at_50%_15%,rgba(255,215,0,0.14),rgba(10,10,10,0)_68%)] overflow-hidden">
+              {u.avatar_url ? (
+                <img src={resolveMediaUrl(u.avatar_url)} alt="" className="absolute inset-x-0 bottom-0 mx-auto h-[108%] w-full object-contain object-bottom group-hover:scale-[1.025] transition duration-500" />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <UserIcon className="w-12 h-12 text-white/20" />
+                </div>
+              )}
+              <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black via-black/70 to-transparent">
+                <div className="font-heading text-xl font-black text-white group-hover:text-[#FFD700] transition uppercase truncate">{u.display_name || u.username}</div>
+                {u.role_title && <div className="mt-1 text-[10px] uppercase tracking-widest text-white/45">{u.role_title}</div>}
+              </div>
+            </div>
+          )}
+          {compact && (
+            <>
+              {u.avatar_url ? (
+                <img src={resolveMediaUrl(u.avatar_url)} alt="" className="w-12 h-12 rounded-sm object-contain object-bottom bg-[#0A0A0A] border border-white/10" />
+              ) : (
+                <div className="w-12 h-12 rounded-sm bg-[#0A0A0A] border border-white/10 flex items-center justify-center">
+                  <UserIcon className="w-5 h-5 text-white/40" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-white text-sm group-hover:text-[#FFD700] transition truncate">{u.display_name || u.username}</div>
+                <div className="text-[10px] text-white/40 uppercase tracking-widest">{u.source === "member_profile" ? "Vereinsprofil" : `@${u.username}`}</div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-[#FFD700] transition" />
+            </>
+          )}
+        </Link>
+      ) : (
+        <div className={`${compact ? "mt-3" : "m-5"} text-[10px] uppercase tracking-widest text-white/40`}>Position offen</div>
+      )}
+    </div>
+  );
+}
+
+function BoardDeputyCard({ position }) {
+  const d = position.deputy_user;
+  const title = `${position.display_title || position.title_male}-Stv.`;
+  if (!d) {
+    return (
+      <div className="border border-dashed border-white/10 rounded-sm bg-[#0A0A0A] p-4 text-[10px] uppercase tracking-widest text-white/35">
+        {title} offen
+      </div>
+    );
+  }
+  return (
+    <Link to={d.profile_url || `/u/${d.username}`} className="group border border-white/10 rounded-sm bg-[#0A0A0A] p-4 flex items-center gap-3 hover:border-[#FFD700]/40 transition">
+      {d.avatar_url ? (
+        <img src={resolveMediaUrl(d.avatar_url)} alt="" className="w-14 h-16 rounded-sm object-contain object-bottom bg-black border border-white/10" />
+      ) : (
+        <div className="w-14 h-16 rounded-sm bg-black border border-white/10 flex items-center justify-center">
+          <UserIcon className="w-5 h-5 text-white/35" />
+        </div>
+      )}
+      <div className="min-w-0">
+        <div className="text-[10px] uppercase tracking-widest text-white/40">{title}</div>
+        <div className="mt-1 font-heading font-bold uppercase group-hover:text-[#FFD700] transition truncate">{d.display_name || d.username}</div>
+      </div>
+    </Link>
   );
 }
 

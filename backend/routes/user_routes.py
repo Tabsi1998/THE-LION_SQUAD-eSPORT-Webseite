@@ -41,7 +41,7 @@ def _achievement_level(points: int) -> dict:
 
 USER_NULLABLE_FIELDS = {
     "display_name", "avatar_url", "banner_url", "bio", "first_name", "last_name",
-    "nickname", "birth_date", "country", "state", "city", "favorite_games",
+    "nickname", "birth_date", "gender", "country", "state", "city", "favorite_games",
     "main_platform", "main_platforms", "preferred_role", "input_device",
     "input_devices", "gaming_subscriptions", "website", "game_ids", "discord_name",
     "discord_id", "switch_code", "steam_id", "epic_id", "psn_id", "xbox_id",
@@ -206,6 +206,7 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
         "email": email,
         "password_hash": "!pending_invite" if password_setup_required else hash_password(manual_password),
         "display_name": body.display_name or username,
+        "gender": body.gender,
         "role": body.role,
         "roles": [body.role],
         "user_type": "community_user",

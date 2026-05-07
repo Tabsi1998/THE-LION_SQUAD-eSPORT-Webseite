@@ -171,8 +171,8 @@ board_router = APIRouter(prefix="/api/board", tags=["board"])
 
 DEFAULT_BOARD_POSITIONS = [
     {"slug": "obmann", "title_male": "Obmann", "title_female": "Obfrau", "is_default": True, "allow_deputy": True, "order_index": 1, "description": "Vereinsleitung, Strategie, externe Vertretung."},
-    {"slug": "schriftfuehrer", "title_male": "Schriftführer", "title_female": "Schriftführerin", "is_default": True, "allow_deputy": True, "order_index": 2, "description": "Protokolle, Kommunikation, Vereinsregister."},
-    {"slug": "kassier", "title_male": "Kassier", "title_female": "Kassierin", "is_default": True, "allow_deputy": True, "order_index": 3, "description": "Finanzen, Mitgliedsbeiträge, Sponsoren-Abrechnung."},
+    {"slug": "kassier", "title_male": "Kassier", "title_female": "Kassierin", "is_default": True, "allow_deputy": True, "order_index": 2, "description": "Finanzen, Mitgliedsbeiträge, Sponsoren-Abrechnung."},
+    {"slug": "schriftfuehrer", "title_male": "Schriftführer", "title_female": "Schriftführerin", "is_default": True, "allow_deputy": True, "order_index": 3, "description": "Protokolle, Kommunikation, Vereinsregister."},
 ]
 
 
@@ -185,6 +185,8 @@ async def _ensure_default_board_positions():
                 "id": new_id(), "is_active": True, "user_id": None, "deputy_user_id": None,
                 "created_at": now_utc().isoformat(), **p,
             })
+        elif existing.get("order_index") != p["order_index"]:
+            await db.board_positions.update_one({"slug": p["slug"]}, {"$set": {"order_index": p["order_index"]}})
 
 
 class BoardPositionCreate(BaseModel):
@@ -214,6 +216,30 @@ def _slugify(value: str) -> str:
     return v or "position"
 
 
+def _board_person_from_profile(profile: dict) -> dict:
+    return {
+        "id": profile["id"],
+        "username": profile.get("slug"),
+        "slug": profile.get("slug"),
+        "display_name": profile.get("display_name"),
+        "avatar_url": profile.get("photo_url"),
+        "photo_url": profile.get("photo_url"),
+        "cover_url": profile.get("cover_url"),
+        "gender": profile.get("gender"),
+        "role_title": profile.get("role_title"),
+        "profile_url": f"/members/{profile.get('slug')}",
+        "source": "member_profile",
+    }
+
+
+def _board_person_from_user(user: dict) -> dict:
+    return {
+        **user,
+        "profile_url": f"/u/{user.get('username')}",
+        "source": "user",
+    }
+
+
 @board_router.get("")
 async def list_board_positions(active_only: bool = False, me=Depends(get_current_user_optional)):
     """Public list. By default returns active+inactive; ?active_only=true filters."""
@@ -221,16 +247,23 @@ async def list_board_positions(active_only: bool = False, me=Depends(get_current
     await _ensure_default_board_positions()
     q = {"is_active": True} if active_only else {}
     positions = await db.board_positions.find(q, {"_id": 0}).sort("order_index", 1).to_list(100)
-    user_ids = [p["user_id"] for p in positions if p.get("user_id")] + [p["deputy_user_id"] for p in positions if p.get("deputy_user_id")]
-    user_ids = list(set(filter(None, user_ids)))
-    users = {}
-    if user_ids:
-        async for u in db.users.find({"id": {"$in": user_ids}},
-                                       {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "gender": 1}):
-            users[u["id"]] = u
+    assignment_ids = [p["user_id"] for p in positions if p.get("user_id")] + [p["deputy_user_id"] for p in positions if p.get("deputy_user_id")]
+    assignment_ids = list(set(filter(None, assignment_ids)))
+    people = {}
+    if assignment_ids:
+        async for profile in db.club_member_profiles.find(
+            {"id": {"$in": assignment_ids}},
+            {"_id": 0, "id": 1, "slug": 1, "display_name": 1, "photo_url": 1, "cover_url": 1, "gender": 1, "role_title": 1},
+        ):
+            people[profile["id"]] = _board_person_from_profile(profile)
+        missing_ids = [pid for pid in assignment_ids if pid not in people]
+        if missing_ids:
+            async for u in db.users.find({"id": {"$in": missing_ids}},
+                                           {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "gender": 1}):
+                people[u["id"]] = _board_person_from_user(u)
     for p in positions:
-        u = users.get(p.get("user_id")) if p.get("user_id") else None
-        d = users.get(p.get("deputy_user_id")) if p.get("deputy_user_id") else None
+        u = people.get(p.get("user_id")) if p.get("user_id") else None
+        d = people.get(p.get("deputy_user_id")) if p.get("deputy_user_id") else None
         p["user"] = u
         p["deputy_user"] = d
         # Resolve display title based on gender
@@ -286,10 +319,28 @@ async def delete_position(pid: str, me: dict = Depends(require_admin())):
 
 @board_router.get("/assignable-users")
 async def list_assignable_users(me: dict = Depends(require_admin())):
-    """Returns club members + admins who can be assigned to a board position."""
+    """Returns editable club member profiles first, with legacy user accounts as fallback."""
     db = get_db()
-    cursor = db.users.find(
+    profiles = await db.club_member_profiles.find(
+        {"is_active": {"$ne": False}},
+        {"_id": 0, "id": 1, "slug": 1, "display_name": 1, "photo_url": 1, "cover_url": 1, "role_title": 1, "gender": 1, "user_id": 1},
+    ).sort([("order_index", 1), ("display_name", 1)]).to_list(500)
+    out = []
+    linked_user_ids = {p.get("user_id") for p in profiles if p.get("user_id")}
+    for p in profiles:
+        out.append({
+            **_board_person_from_profile(p),
+            "username": p.get("slug"),
+            "role": "club_member_profile",
+            "is_club_member": True,
+        })
+
+    legacy_users = await db.users.find(
         {"$or": [{"role": {"$in": ["superadmin", "admin", "moderator"]}}, {"is_club_member": True}]},
         {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1, "is_club_member": 1, "gender": 1},
-    ).sort("display_name", 1)
-    return await cursor.to_list(500)
+    ).sort("display_name", 1).to_list(500)
+    for u in legacy_users:
+        if u["id"] in linked_user_ids:
+            continue
+        out.append(_board_person_from_user(u))
+    return out

@@ -26,6 +26,7 @@ class UserRegister(BaseModel):
     password: str = Field(min_length=6, max_length=128)
     display_name: Optional[str] = None
     birth_date: Optional[str] = None  # ISO date string
+    gender: Optional[Literal["male", "female", "diverse"]] = None
     discord_name: Optional[str] = None
     accept_privacy: bool = Field(..., description="Must be explicitly true")
     accept_terms: bool = Field(..., description="Must be explicitly true")
@@ -42,6 +43,7 @@ class AdminUserCreate(BaseModel):
     email: EmailStr
     password: Optional[str] = Field(default=None, min_length=6, max_length=128)
     display_name: Optional[str] = None
+    gender: Optional[Literal["male", "female", "diverse"]] = None
     role: Role = "player"
     is_active: bool = True
     privacy_public_profile: bool = True
@@ -59,6 +61,7 @@ class UserUpdate(BaseModel):
     last_name: Optional[str] = None
     nickname: Optional[str] = None
     birth_date: Optional[str] = None
+    gender: Optional[Literal["male", "female", "diverse"]] = None
     country: Optional[str] = None
     state: Optional[str] = None
     city: Optional[str] = None

@@ -42,9 +42,9 @@ export default function MemberProfilePage() {
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/65 to-transparent" />
               <div className="relative z-10 min-h-[24rem] flex flex-col justify-end p-5 sm:p-8">
-                <div className="w-36 h-36 sm:w-44 sm:h-44 border-2 border-[#FFD700]/60 bg-[#0A0A0A] rounded-sm overflow-hidden mb-5">
+                <div className="w-36 h-48 sm:w-44 sm:h-56 border-2 border-[#FFD700]/60 bg-[#0A0A0A] rounded-sm overflow-hidden mb-5">
                   {profile.photo_url ? (
-                    <img src={resolveMediaUrl(profile.photo_url)} alt="" className="w-full h-full object-cover" />
+                    <img src={resolveMediaUrl(profile.photo_url)} alt="" className="w-full h-full object-contain object-bottom" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-white/20"><UserIcon className="w-12 h-12" /></div>
                   )}
@@ -65,7 +65,7 @@ export default function MemberProfilePage() {
               </div>
               <aside className="space-y-4">
                 <InfoPanel title="Profil">
-                  {profile.age && <InfoLine label="Alter" value={`${profile.age} Jahre`} />}
+                  {(profile.level || profile.age) && <InfoLine label="Level" value={`Level ${profile.level || profile.age}`} />}
                   <InfoChips icon={Gamepad2} label="Games" values={profile.games} />
                   <InfoChips icon={Monitor} label="Plattformen" values={profile.platforms} />
                 </InfoPanel>

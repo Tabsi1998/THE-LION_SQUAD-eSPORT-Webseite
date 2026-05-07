@@ -17,6 +17,7 @@ const emptyForm = {
   cover_url: "",
   bio: "",
   birth_date: "",
+  gender: "",
   games: "",
   platforms: "",
   order_index: 0,
@@ -44,6 +45,7 @@ function toForm(profile) {
     cover_url: profile.cover_url || "",
     bio: profile.bio || "",
     birth_date: profile.birth_date || "",
+    gender: profile.gender || "",
     games: listToText(profile.games),
     platforms: listToText(profile.platforms),
     order_index: profile.order_index || 0,
@@ -180,6 +182,7 @@ function ProfileModal({ entry, onClose, onSaved }) {
     cover_url: form.cover_url || null,
     bio: form.bio || "",
     birth_date: form.birth_date || null,
+    gender: form.gender || null,
     games: textToList(form.games),
     platforms: textToList(form.platforms),
     order_index: Number(form.order_index) || 0,
@@ -215,6 +218,12 @@ function ProfileModal({ entry, onClose, onSaved }) {
               <Field label="URL-Slug"><input value={form.slug} onChange={(e) => set("slug", e.target.value)} placeholder="wird aus Name erstellt" className="input font-mono" /></Field>
               <Field label="Rolle / Funktion"><input value={form.role_title} onChange={(e) => set("role_title", e.target.value)} placeholder="z.B. Fahrer, Moderator, Vorstand" className="input" /></Field>
               <Field label="Geburtsdatum"><input type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} className="input" /></Field>
+              <Field label="Geschlecht"><select value={form.gender || ""} onChange={(e) => set("gender", e.target.value)} className="input">
+                <option value="">Keine Angabe</option>
+                <option value="male">Maennlich</option>
+                <option value="female">Weiblich</option>
+                <option value="diverse">Divers</option>
+              </select></Field>
               <Field label="Games"><input value={form.games} onChange={(e) => set("games", e.target.value)} placeholder="F1 25, Valorant, Rocket League" className="input" /></Field>
               <Field label="Plattformen"><input value={form.platforms} onChange={(e) => set("platforms", e.target.value)} placeholder="PC, PS5, Xbox" className="input" /></Field>
             </div>

@@ -45,17 +45,17 @@ export default function MembersDirectoryPage() {
             <div className="text-sm mt-2">Sobald Admins Vereinsmitglieder freigeben, erscheinen sie hier.</div>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {members.map((m) => (
               <Link
                 key={m.slug}
                 to={`/members/${m.slug}`}
                 data-testid={`member-card-${m.slug}`}
-                className="group border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#121212] overflow-hidden transition"
+                className="group border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#101010] overflow-hidden transition"
               >
-                <div className="relative aspect-[4/3] bg-[#0A0A0A] overflow-hidden">
+                <div className="relative min-h-[25rem] sm:min-h-[29rem] bg-[radial-gradient(circle_at_50%_18%,rgba(255,215,0,0.16),rgba(41,182,232,0.08)_34%,rgba(10,10,10,0)_68%)] overflow-hidden">
                   {m.photo_url ? (
-                    <img src={resolveMediaUrl(m.photo_url)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                    <img src={resolveMediaUrl(m.photo_url)} alt="" className="absolute inset-x-0 bottom-0 mx-auto h-[108%] w-full object-contain object-bottom group-hover:scale-[1.025] transition duration-500" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-white/20">
                       <UsersIcon className="w-12 h-12" />
@@ -85,7 +85,7 @@ export default function MembersDirectoryPage() {
                         <span className="line-clamp-1">{m.platforms.join(", ")}</span>
                       </div>
                     )}
-                    {m.age && <div className="text-[10px] text-white/35 uppercase tracking-wider">{m.age} Jahre</div>}
+                    {(m.level || m.age) && <div className="text-[10px] text-[#FFD700]/80 uppercase tracking-widest font-bold">Level {m.level || m.age}</div>}
                   </div>
                 </div>
               </Link>

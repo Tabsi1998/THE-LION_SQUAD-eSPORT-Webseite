@@ -64,6 +64,13 @@ const VISIBILITY = [
   { k: "private", l: "Privat" },
 ];
 
+const GENDER_OPTIONS = [
+  ["", "Keine Angabe"],
+  ["male", "Maennlich"],
+  ["female", "Weiblich"],
+  ["diverse", "Divers"],
+];
+
 export default function ProfilePage() {
   const { user, refresh, isClubMember } = useAuth();
   const [params, setParams] = useSearchParams();
@@ -111,6 +118,7 @@ export default function ProfilePage() {
         nickname: user.nickname || "",
         bio: user.bio || "",
         birth_date: user.birth_date?.slice(0, 10) || "",
+        gender: user.gender || "",
         country: user.country || "",
         city: user.city || "",
         avatar_url: user.avatar_url || "",
@@ -167,6 +175,7 @@ export default function ProfilePage() {
     setSaving(true);
     try {
       const payload = { ...form };
+      if (!payload.gender) payload.gender = null;
       // normalize favorite_games csv -> array
       if (typeof payload.favorite_games === "string") {
         payload.favorite_games = payload.favorite_games
@@ -237,6 +246,11 @@ export default function ProfilePage() {
               </Field>
               <Row>
                 <Field label="Geburtsdatum"><input type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
+                <Field label="Geschlecht"><select value={form.gender || ""} onChange={(e) => set("gender", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white">
+                  {GENDER_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select></Field>
+              </Row>
+              <Row>
                 <Field label="Land"><Input value={form.country} onChange={(v) => set("country", v)} placeholder="AT, DE, CH" /></Field>
                 <Field label="Stadt"><Input value={form.city} onChange={(v) => set("city", v)} /></Field>
               </Row>

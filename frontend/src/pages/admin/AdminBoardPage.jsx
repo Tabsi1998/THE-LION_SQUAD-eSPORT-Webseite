@@ -46,7 +46,7 @@ export default function AdminBoardPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Phase D · Verein</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Vorstand</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">
-            Aktiviere/deaktiviere Positionen, weise Mitglieder zu und ergänze eigene Funktionen. Geschlechter-spezifischer Titel (Obmann/Obfrau) wird automatisch aus dem Profil-Geschlecht abgeleitet.
+            Aktiviere/deaktiviere Positionen, weise redaktionelle Vereinsmitglieder zu und ergänze eigene Funktionen. Geschlechter-spezifischer Titel (Obmann/Obfrau) wird automatisch aus dem Profil-Geschlecht abgeleitet.
           </p>
         </div>
         <button onClick={() => setCreating(true)} data-testid="board-new-btn" className="px-5 py-2.5 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><Plus className="w-4 h-4" /> Eigene Position</button>
@@ -59,7 +59,7 @@ export default function AdminBoardPage() {
               <tr>
                 <th className="text-left px-4 py-3 w-10"></th>
                 <th className="text-left px-4 py-3">Position</th>
-                <th className="text-left px-4 py-3">Zugewiesen</th>
+                <th className="text-left px-4 py-3">Vereinsmitglied</th>
                 <th className="text-left px-4 py-3">Stellvertreter</th>
                 <th className="text-left px-4 py-3">Aktiv</th>
                 <th className="text-right px-4 py-3">Aktionen</th>
@@ -81,14 +81,14 @@ export default function AdminBoardPage() {
                   <td className="px-4 py-3">
                     <select value={p.user_id || ""} onChange={(e) => assign(p, "user_id", e.target.value)} data-testid={`board-assign-${p.slug}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs min-w-[180px]">
                       <option value="">— offen —</option>
-                      {users.map((u) => <option key={u.id} value={u.id}>{u.display_name || u.username}</option>)}
+                      {users.map((u) => <option key={`${u.source || "user"}-${u.id}`} value={u.id}>{u.display_name || u.username}{u.source === "member_profile" ? " · Profil" : " · Account"}</option>)}
                     </select>
                   </td>
                   <td className="px-4 py-3">
                     {p.allow_deputy ? (
                       <select value={p.deputy_user_id || ""} onChange={(e) => assign(p, "deputy_user_id", e.target.value)} data-testid={`board-deputy-${p.slug}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs min-w-[180px]">
                         <option value="">— optional —</option>
-                        {users.map((u) => <option key={u.id} value={u.id}>{u.display_name || u.username}</option>)}
+                        {users.map((u) => <option key={`${u.source || "user"}-${u.id}`} value={u.id}>{u.display_name || u.username}{u.source === "member_profile" ? " · Profil" : " · Account"}</option>)}
                       </select>
                     ) : <span className="text-white/30 text-xs">—</span>}
                   </td>
