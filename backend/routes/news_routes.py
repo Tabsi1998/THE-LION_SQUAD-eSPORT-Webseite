@@ -134,7 +134,7 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
         p["linked_tournaments"] = await _filter_linked_items(items, user, is_staff, "tournament")
     if p.get("linked_f1_challenge_ids"):
         items = await db.f1_challenges.find(
-            {"id": {"$in": p["linked_f1_challenge_ids"]}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "status": 1, "visibility": 1},
+            {"id": {"$in": p["linked_f1_challenge_ids"]}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "status": 1, "visibility": 1, "registration_enabled": 1, "online_registration_enabled": 1, "registration_open_from": 1, "registration_open_until": 1},
         ).to_list(50)
         p["linked_f1_challenges"] = await _filter_linked_items(items, user, is_staff, "fastlap")
     if p.get("linked_team_ids"):

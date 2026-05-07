@@ -519,6 +519,7 @@ class F1ChallengeCreate(BaseModel):
     max_attempts: Optional[int] = None
     unlimited_attempts: bool = True
     registration_enabled: bool = True
+    online_registration_enabled: bool = False
     registration_open_from: Optional[datetime] = None
     registration_open_until: Optional[datetime] = None
     start_date: Optional[datetime] = None
@@ -554,6 +555,7 @@ class F1ChallengeUpdate(BaseModel):
     max_attempts: Optional[int] = None
     unlimited_attempts: Optional[bool] = None
     registration_enabled: Optional[bool] = None
+    online_registration_enabled: Optional[bool] = None
     registration_open_from: Optional[datetime] = None
     registration_open_until: Optional[datetime] = None
     start_date: Optional[datetime] = None

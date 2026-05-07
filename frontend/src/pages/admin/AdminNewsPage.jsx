@@ -5,6 +5,7 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { appendEmbedToken } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { toDateTimeLocalInput } from "@/lib/datetime";
 import { toast } from "sonner";
 import { Flag, Plus, Pin, Trash2, Save, X, Newspaper } from "lucide-react";
 
@@ -106,7 +107,7 @@ function NewsModal({ post, meta, onClose, onSaved }) {
     visibility: post.visibility || "public",
     published: post.published ?? true,
     pinned: post.pinned ?? false,
-    published_at: post.published_at ? post.published_at.slice(0, 16) : "",
+    published_at: toDateTimeLocalInput(post.published_at),
   });
   const [tournaments, setTournaments] = useState([]);
   const [events, setEvents] = useState([]);

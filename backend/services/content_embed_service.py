@@ -81,7 +81,7 @@ async def resolve_content_embeds(db: Any, text: str | None, user: dict | None = 
     if by_kind.get("fastlap"):
         docs = await db.f1_challenges.find(
             {"$or": [{"id": {"$in": by_kind["fastlap"]}}, {"slug": {"$in": by_kind["fastlap"]}}]},
-            {"_id": 0, "id": 1, "slug": 1, "title": 1, "description": 1, "start_date": 1, "end_date": 1, "registration_enabled": 1, "registration_open_from": 1, "registration_open_until": 1, "is_invite_only": 1, "status": 1, "banner_url": 1, "is_championship": 1, "visibility": 1},
+            {"_id": 0, "id": 1, "slug": 1, "title": 1, "description": 1, "start_date": 1, "end_date": 1, "registration_enabled": 1, "online_registration_enabled": 1, "registration_open_from": 1, "registration_open_until": 1, "is_invite_only": 1, "status": 1, "banner_url": 1, "is_championship": 1, "visibility": 1},
         ).to_list(100)
         for doc in docs:
             if await _can_show_embed("fastlap", doc, user):

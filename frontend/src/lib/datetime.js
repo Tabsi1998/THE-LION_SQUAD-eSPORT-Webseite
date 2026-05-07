@@ -29,15 +29,33 @@ export function fromDateTimeLocal(value) {
   return date.toISOString();
 }
 
+export function toDateTimeLocalInput(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (part) => String(part).padStart(2, "0");
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+  ].join("-") + `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 export function normalizeDateTimeFields(payload, fields) {
   fields.forEach((field) => {
     if (!payload[field]) {
-      delete payload[field];
+      if (Object.prototype.hasOwnProperty.call(payload, field)) {
+        payload[field] = null;
+      }
       return;
     }
     payload[field] = fromDateTimeLocal(payload[field]);
   });
   return payload;
+}
+
+export function hasOnlineRegistration(item) {
+  return item?.online_registration_enabled === true && item?.registration_enabled === true && !!(item.registration_open_from || item.registration_open_until);
 }
 
 export function getRegistrationState(item, noun = "Anmeldung") {

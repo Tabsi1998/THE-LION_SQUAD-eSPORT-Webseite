@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
-import { normalizeDateTimeFields } from "@/lib/datetime";
+import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { toast } from "sonner";
 import { Zap, RefreshCw, Eye } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -264,7 +264,7 @@ export default function AdminTournamentEditPage() {
 }
 
 function TournamentEditForm({ tournament, onSaved }) {
-  const dt = (v) => v ? String(v).slice(0, 16) : "";
+  const dt = toDateTimeLocalInput;
   const [f, setF] = useState({
     title: tournament.title || "",
     description: tournament.description || "",

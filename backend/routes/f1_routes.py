@@ -143,6 +143,12 @@ async def create_challenge(body: F1ChallengeCreate, me: dict = Depends(require_a
     doc = body.model_dump()
     doc["id"] = new_id()
     doc["status"] = doc.get("status") or "draft"
+    doc["online_registration_enabled"] = doc.get("registration_enabled") is True
+    if doc.get("online_registration_enabled") is not True:
+        doc["registration_enabled"] = False
+        doc["online_registration_enabled"] = False
+        doc["registration_open_from"] = None
+        doc["registration_open_until"] = None
     for k in ["registration_open_from", "registration_open_until", "start_date", "end_date"]:
         doc[k] = _iso(doc.get(k))
     doc["created_at"] = now_utc().isoformat()
@@ -167,6 +173,14 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
         "registration_open_from", "registration_open_until", "start_date", "end_date",
     }
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    if "registration_enabled" in updates:
+        updates["online_registration_enabled"] = updates.get("registration_enabled") is True
+    if updates.get("online_registration_enabled") is False:
+        updates["registration_enabled"] = False
+        updates["registration_open_from"] = None
+        updates["registration_open_until"] = None
+        if existing.get("status") in ("registration_open", "registration_closed"):
+            updates["status"] = "scheduled"
     for k in ["registration_open_from", "registration_open_until", "start_date", "end_date"]:
         if k in updates:
             updates[k] = _iso(updates.get(k))

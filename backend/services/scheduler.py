@@ -77,9 +77,12 @@ def _next_status(doc: dict, now: datetime, kind: str = "tournament") -> str | No
         reg_from = _parse_dt(doc.get("registration_opens_at"))
         reg_until = _parse_dt(doc.get("registration_closes_at"))
     else:
-        reg_enabled = doc.get("registration_enabled") is not False and not doc.get("is_invite_only")
         reg_from = _parse_dt(doc.get("registration_open_from"))
         reg_until = _parse_dt(doc.get("registration_open_until"))
+        if kind == "f1":
+            reg_enabled = doc.get("online_registration_enabled") is True and doc.get("registration_enabled") is True and bool(reg_from or reg_until)
+        else:
+            reg_enabled = doc.get("registration_enabled") is not False and not doc.get("is_invite_only")
     check_from = _parse_dt(doc.get("check_in_from"))
     check_until = _parse_dt(doc.get("check_in_until"))
     start = _parse_dt(doc.get("start_date"))

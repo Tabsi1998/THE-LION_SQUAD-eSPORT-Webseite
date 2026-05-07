@@ -5,6 +5,7 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { appendEmbedToken } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { toast } from "sonner";
 import { Flag, Plus, Save, X, Trash2, Calendar, Trophy } from "lucide-react";
 
@@ -127,11 +128,11 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
     description: event.description || "",
     event_type: event.event_type || "general",
     visibility: event.visibility || "public",
-    start_date: event.start_date?.slice(0, 16) || "",
-    end_date: event.end_date?.slice(0, 16) || "",
-    door_time: event.door_time?.slice(0, 16) || "",
-    registration_opens_at: event.registration_opens_at?.slice(0, 16) || "",
-    registration_closes_at: event.registration_closes_at?.slice(0, 16) || "",
+    start_date: toDateTimeLocalInput(event.start_date),
+    end_date: toDateTimeLocalInput(event.end_date),
+    door_time: toDateTimeLocalInput(event.door_time),
+    registration_opens_at: toDateTimeLocalInput(event.registration_opens_at),
+    registration_closes_at: toDateTimeLocalInput(event.registration_closes_at),
     has_registration: event.has_registration ?? false,
     registration_url: event.registration_url || "",
     location: event.location || "",
@@ -200,6 +201,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
     try {
       const payload = { ...form };
       Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
+      normalizeDateTimeFields(payload, ["start_date", "end_date", "door_time", "registration_opens_at", "registration_closes_at"]);
       if (payload.max_participants) payload.max_participants = parseInt(payload.max_participants);
       payload.sponsor_ids = payload.owned_by_club && payload.show_sponsors ? (payload.sponsor_ids || []) : [];
       let savedEvent;

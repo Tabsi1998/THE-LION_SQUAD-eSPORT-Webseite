@@ -23,11 +23,44 @@ def test_f1_without_online_registration_does_not_show_registration_open():
     assert phase["countdown_kind"] == "starts"
 
 
+def test_f1_registration_enabled_without_window_is_still_announced():
+    phase = derive_public_phase(
+        {
+            "status": "registration_open",
+            "registration_enabled": True,
+            "start_date": "2030-06-20T10:00:00+00:00",
+        },
+        "f1",
+        now=datetime(2030, 6, 1, tzinfo=timezone.utc),
+    )
+
+    assert phase["state"] == "announced"
+    assert phase["label"] == "Angekündigt"
+
+
+def test_f1_legacy_registration_dates_without_online_flag_are_announced():
+    phase = derive_public_phase(
+        {
+            "status": "registration_open",
+            "registration_enabled": True,
+            "registration_open_from": "2030-06-01T00:00:00+00:00",
+            "registration_open_until": "2030-06-10T00:00:00+00:00",
+            "start_date": "2030-06-20T10:00:00+00:00",
+        },
+        "f1",
+        now=datetime(2030, 6, 5, tzinfo=timezone.utc),
+    )
+
+    assert phase["state"] == "announced"
+    assert phase["label"] == "Angekündigt"
+
+
 def test_f1_with_online_registration_keeps_registration_open():
     phase = derive_public_phase(
         {
             "status": "registration_open",
             "registration_enabled": True,
+            "online_registration_enabled": True,
             "registration_open_from": "2030-06-01T00:00:00+00:00",
             "registration_open_until": "2030-06-10T00:00:00+00:00",
             "start_date": "2030-06-20T10:00:00+00:00",

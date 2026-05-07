@@ -5,7 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { Flag, Users, Clock, ChevronRight } from "lucide-react";
-import { formatDate, getRegistrationState } from "@/lib/datetime";
+import { formatDate, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 
 export default function F1ListPage() {
   const [list, setList] = useState([]);
@@ -41,7 +41,7 @@ export default function F1ListPage() {
 }
 
 function FastLapCard({ challenge: c }) {
-  const registration = c.registration_enabled !== false ? getRegistrationState(c, "Einreichung") : null;
+  const registration = hasOnlineRegistration(c) ? getRegistrationState(c, "Einreichung") : null;
   return (
     <Link
       to={`/fastlap/${c.slug || c.id}`}

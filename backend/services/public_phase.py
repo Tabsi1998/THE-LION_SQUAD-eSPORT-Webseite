@@ -68,9 +68,12 @@ def derive_public_phase(doc: dict, kind: str = "content", now: datetime | None =
         reg_until = parse_dt(doc.get("registration_closes_at"))
         start_target = parse_dt(doc.get("door_time")) or start
     else:
-        reg_enabled = doc.get("registration_enabled") is not False and not doc.get("is_invite_only")
         reg_from = parse_dt(doc.get("registration_open_from"))
         reg_until = parse_dt(doc.get("registration_open_until"))
+        if kind == "f1":
+            reg_enabled = doc.get("online_registration_enabled") is True and doc.get("registration_enabled") is True and bool(reg_from or reg_until)
+        else:
+            reg_enabled = doc.get("registration_enabled") is not False and not doc.get("is_invite_only")
         check_from = parse_dt(doc.get("check_in_from"))
         check_until = parse_dt(doc.get("check_in_until"))
         start_target = start

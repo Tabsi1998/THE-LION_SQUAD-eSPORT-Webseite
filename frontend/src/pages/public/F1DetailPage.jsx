@@ -8,7 +8,7 @@ import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Tv, Trophy, Flag, Download, FileDown, Calendar } from "lucide-react";
-import { formatDateTime, getRegistrationState } from "@/lib/datetime";
+import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 
 export default function F1DetailPage() {
@@ -56,7 +56,7 @@ export default function F1DetailPage() {
 
   if (!challenge) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE …</div></PublicLayout>;
 
-  const hasOnlineSubmission = challenge.registration_enabled !== false;
+  const hasOnlineSubmission = hasOnlineRegistration(challenge);
   const registration = hasOnlineSubmission ? getRegistrationState(challenge, "Einreichung") : null;
 
   return (

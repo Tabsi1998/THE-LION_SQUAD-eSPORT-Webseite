@@ -171,7 +171,7 @@ async def get_tournament(slug_or_id: str, user=Depends(get_optional_user)):
     if t.get("event_id"):
         t["related_f1_challenges"] = await db.f1_challenges.find(
             {"event_id": t["event_id"], "status": {"$ne": "draft"}},
-            {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "status": 1, "visibility": 1},
+            {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "status": 1, "visibility": 1, "registration_enabled": 1, "online_registration_enabled": 1, "registration_open_from": 1, "registration_open_until": 1},
         ).to_list(50)
         if not is_admin:
             visible_f1 = []

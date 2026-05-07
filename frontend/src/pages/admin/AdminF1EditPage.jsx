@@ -5,7 +5,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
-import { normalizeDateTimeFields } from "@/lib/datetime";
+import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { toast } from "sonner";
 import { Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -356,7 +356,8 @@ export default function AdminF1EditPage() {
 }
 
 function ChallengeSettingsForm({ challenge, onSaved }) {
-  const dt = (v) => v ? String(v).slice(0, 16) : "";
+  const dt = toDateTimeLocalInput;
+  const onlineRegistrationActive = challenge.online_registration_enabled === true && challenge.registration_enabled === true;
   const [form, setForm] = useState({
     title: challenge.title || "",
     description: challenge.description || "",
@@ -368,7 +369,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
     assists_allowed: challenge.assists_allowed || "",
     controller_type: challenge.controller_type || "",
     platform: challenge.platform || "",
-    registration_enabled: challenge.registration_enabled !== false,
+    registration_enabled: onlineRegistrationActive,
     registration_open_from: dt(challenge.registration_open_from),
     registration_open_until: dt(challenge.registration_open_until),
     start_date: dt(challenge.start_date),
@@ -388,6 +389,10 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
       const payload = { ...form };
       if (!payload.event_id) payload.event_id = null;
       if (payload.unlimited_attempts) payload.max_attempts = null;
+      if (!payload.registration_enabled) {
+        payload.registration_open_from = null;
+        payload.registration_open_until = null;
+      }
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
       await api.patch(`/f1/challenges/${challenge.id}`, payload);
       toast.success("Challenge gespeichert.");
