@@ -146,6 +146,11 @@ async def init_indexes():
     await db.club_member_profiles.create_index("slug", unique=True)
     await db.club_member_profiles.create_index("gamertag")
     await db.club_member_profiles.create_index("order_index")
+    await db.live_streams.create_index("user_id", unique=True)
+    await db.live_streams.create_index("twitch_login")
+    await db.twitch_stream_sessions.create_index("stream_id", unique=True)
+    await db.twitch_stream_sessions.create_index([("user_id", 1), ("started_at", -1)])
+    await db.twitch_stream_sessions.create_index("is_live")
 
 
 async def close_client():

@@ -451,7 +451,9 @@ async def get_public_profile(username: str):
     teams = []
     stats = {"tournaments": 0, "wins": 0, "top3": 0, "matches_played": 0, "matches_won": 0,
              "fast_laps": 0, "pole_positions": 0, "badges": len(badges), "points": total_points,
-             "level": achievement_level["level"]}
+             "level": achievement_level["level"],
+             "twitch_live_sessions": int(u.get("twitch_live_sessions_count") or 0),
+             "twitch_stream_minutes": int(u.get("twitch_stream_minutes") or 0)}
     if public:
         regs = await db.tournament_registrations.find({"user_id": user_id}, {"_id": 0}).to_list(200)
         t_ids = list({r["tournament_id"] for r in regs})

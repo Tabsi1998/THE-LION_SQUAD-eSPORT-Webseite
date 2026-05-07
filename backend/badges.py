@@ -282,6 +282,8 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
 
     # Phase E + Discord-Counter: discord_messages comes from manually maintained counter
     p["discord_messages"] = (user or {}).get("discord_messages_count", 0)
+    p["twitch_live_sessions"] = (user or {}).get("twitch_live_sessions_count", 0)
+    p["twitch_stream_minutes"] = (user or {}).get("twitch_stream_minutes", 0)
 
     for k in [
         "checkins_in_a_row", "fast_registrations", "clutch_count",
@@ -293,6 +295,7 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
         "offroad_count", "reverse_lap_count", "slowest_lap_count", "unproven_laps",
         "team_no_show_count", "team_kills", "team_late_count", "team_member_churn",
         "zero_eight_losses", "long_warmup_count", "long_break_count", "loss_streak",
+        "twitch_live_sessions", "twitch_stream_minutes",
     ]:
         p.setdefault(k, 0)
 

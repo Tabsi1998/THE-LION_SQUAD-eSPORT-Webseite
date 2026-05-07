@@ -177,6 +177,9 @@ export default function PublicProfilePage() {
               <div className="mt-6 grid grid-cols-3 md:grid-cols-6 gap-3">
                 <QuickStat icon={Zap} label="Level" value={level.level} color="#29B6E8" testId="profile-stat-level" />
                 <QuickStat icon={Medal} label="Achievements" value={achievementsData?.awards?.length || 0} testId="profile-stat-badges" />
+                {(twitchChannel || s.twitch_live_sessions > 0) && (
+                  <QuickStat icon={Radio} label="Streams" value={s.twitch_live_sessions || 0} color="#9146FF" testId="profile-stat-streams" />
+                )}
                 <QuickStat icon={Zap} label="Punkte" value={s.points || 0} color="#29B6E8" testId="profile-stat-points" />
                 <QuickStat icon={Trophy} label="Siege" value={s.wins || 0} color="#FFD700" testId="profile-stat-wins" />
                 <QuickStat icon={Medal} label="Podium" value={s.top3 || 0} color="#C0C0C0" testId="profile-stat-top3" />
@@ -273,6 +276,11 @@ export default function PublicProfilePage() {
                   <div className="mt-2 text-xs text-white/55">
                     <span className="text-[#FF3B30] font-bold uppercase tracking-widest">Jetzt live:</span> {liveStream.title || "Stream läuft"}
                     {liveStream.viewer_count ? ` · ${liveStream.viewer_count} Zuschauer` : ""}
+                  </div>
+                )}
+                {s.twitch_stream_minutes > 0 && (
+                  <div className="mt-1 text-[11px] text-white/35">
+                    Erkannte Streamzeit: {Math.round(s.twitch_stream_minutes / 60)} Stunden in {s.twitch_live_sessions || 0} Sessions.
                   </div>
                 )}
                 <p className="mt-1 text-[11px] text-white/35">

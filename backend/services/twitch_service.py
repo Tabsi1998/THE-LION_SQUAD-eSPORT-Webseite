@@ -76,6 +76,55 @@ def _chunks(seq: list, n: int) -> Iterable[list]:
         yield seq[i:i + n]
 
 
+def _parse_dt(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return None
+
+
+async def _evaluate_streamer(user_id: str):
+    try:
+        from badges import evaluate_user_progress
+        await evaluate_user_progress(user_id)
+    except Exception as exc:
+        logger.debug("[twitch] achievement evaluation failed for %s: %s", user_id, exc)
+
+
+async def _close_offline_streams(db, active_logins: set[str], now_dt: datetime):
+    offline = await db.live_streams.find(
+        {"twitch_login": {"$nin": list(active_logins)}}, {"_id": 0}
+    ).to_list(500)
+    for stream in offline:
+        started = _parse_dt(stream.get("started_at"))
+        duration_minutes = 0
+        if started:
+            duration_minutes = max(int((now_dt - started).total_seconds() // 60), 1)
+        stream_id = stream.get("stream_id")
+        if stream_id:
+            await db.twitch_stream_sessions.update_one(
+                {"stream_id": stream_id},
+                {"$set": {
+                    "ended_at": now_dt.isoformat(),
+                    "last_seen_at": now_dt.isoformat(),
+                    "duration_minutes": duration_minutes,
+                    "is_live": False,
+                }},
+                upsert=False,
+            )
+        if duration_minutes and stream.get("user_id"):
+            await db.users.update_one(
+                {"id": stream.get("user_id")},
+                {"$inc": {"twitch_stream_minutes": duration_minutes}},
+            )
+        if stream.get("user_id"):
+            await _evaluate_streamer(stream["user_id"])
+    await db.live_streams.delete_many({"twitch_login": {"$nin": list(active_logins)}})
+
+
 async def fetch_live_streams() -> dict:
     """Refresh `live_streams` collection. Returns summary dict."""
     creds = await _get_credentials()
@@ -90,7 +139,7 @@ async def fetch_live_streams() -> dict:
          "twitch_handle": 1, "twitch_channel": 1}
     ).to_list(2000)
     if not users:
-        await db.live_streams.delete_many({})
+        await _close_offline_streams(db, set(), datetime.now(timezone.utc))
         return {"ok": True, "live": 0, "checked": 0}
     by_login: dict[str, dict] = {}
     for u in users:
@@ -113,15 +162,56 @@ async def fetch_live_streams() -> dict:
                 continue
             all_streams.extend(r.json().get("data", []))
 
-    now = datetime.now(timezone.utc).isoformat()
+    now_dt = datetime.now(timezone.utc)
+    now = now_dt.isoformat()
     seen_logins = set()
     for s in all_streams:
         login = (s.get("user_login") or "").lower()
+        stream_id = s.get("id")
+        if not login or not stream_id:
+            continue
         seen_logins.add(login)
         u = by_login.get(login)
         if not u:
             continue
         thumb = (s.get("thumbnail_url") or "").replace("{width}", "640").replace("{height}", "360")
+        previous_session = await db.twitch_stream_sessions.find_one({"stream_id": stream_id}, {"viewer_count_peak": 1, "_id": 0}) or {}
+        new_session = not previous_session
+        session_doc = {
+            "stream_id": stream_id,
+            "user_id": u["id"],
+            "username": u["username"],
+            "display_name": u.get("display_name"),
+            "twitch_login": login,
+            "title": s.get("title"),
+            "game_name": s.get("game_name"),
+            "viewer_count_peak": int(s.get("viewer_count") or 0),
+            "thumbnail_url": thumb,
+            "started_at": s.get("started_at"),
+            "last_seen_at": now,
+            "stream_url": f"https://twitch.tv/{login}",
+            "is_live": True,
+        }
+        await db.twitch_stream_sessions.update_one(
+            {"stream_id": stream_id},
+            {
+                "$set": {
+                    **session_doc,
+                    "viewer_count_peak": max(
+                        int(s.get("viewer_count") or 0),
+                        int(previous_session.get("viewer_count_peak") or 0),
+                    ),
+                },
+                "$setOnInsert": {"created_at": now},
+            },
+            upsert=True,
+        )
+        if new_session:
+            await db.users.update_one(
+                {"id": u["id"]},
+                {"$inc": {"twitch_live_sessions_count": 1}, "$set": {"last_twitch_live_at": now}},
+            )
+            await _evaluate_streamer(u["id"])
         await db.live_streams.update_one(
             {"user_id": u["id"]},
             {"$set": {
@@ -130,7 +220,7 @@ async def fetch_live_streams() -> dict:
                 "display_name": u.get("display_name"),
                 "avatar_url": u.get("avatar_url"),
                 "twitch_login": login,
-                "stream_id": s.get("id"),
+                "stream_id": stream_id,
                 "title": s.get("title"),
                 "game_name": s.get("game_name"),
                 "viewer_count": s.get("viewer_count", 0),
@@ -143,7 +233,7 @@ async def fetch_live_streams() -> dict:
             upsert=True,
         )
     # Drop offline streams
-    await db.live_streams.delete_many({"twitch_login": {"$nin": list(seen_logins)}})
+    await _close_offline_streams(db, seen_logins, now_dt)
     return {"ok": True, "live": len(seen_logins), "checked": len(by_login), "updated_at": now}
 
 
