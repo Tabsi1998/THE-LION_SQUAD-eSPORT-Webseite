@@ -53,7 +53,7 @@ export default function MembersDirectoryPage() {
                 data-testid={`member-card-${m.slug}`}
                 className="group border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#121212] overflow-hidden transition"
               >
-                <div className="aspect-[4/3] bg-[#0A0A0A] overflow-hidden">
+                <div className="relative aspect-[4/3] bg-[#0A0A0A] overflow-hidden">
                   {m.photo_url ? (
                     <img src={resolveMediaUrl(m.photo_url)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                   ) : (
@@ -61,16 +61,18 @@ export default function MembersDirectoryPage() {
                       <UsersIcon className="w-12 h-12" />
                     </div>
                   )}
-                </div>
-                <div className="p-5">
-                  <div className="font-heading font-black text-white group-hover:text-[#FFD700] uppercase flex items-center gap-1.5">
-                    {m.display_name}
-                    <Crown className="w-3.5 h-3.5 text-[#FFD700]" />
+                  <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black via-black/70 to-transparent">
+                    <div className="font-heading font-black text-white group-hover:text-[#FFD700] uppercase flex items-center gap-1.5">
+                      {m.display_name}
+                      <Crown className="w-3.5 h-3.5 text-[#FFD700]" />
+                    </div>
+                    {m.role_title && (
+                      <div className="mt-1 text-[10px] uppercase tracking-widest text-[#FFD700]/85 font-bold">{m.role_title}</div>
+                    )}
                   </div>
-                  {m.role_title && (
-                    <div className="mt-1 text-[10px] uppercase tracking-widest text-[#FFD700]/80 font-bold">{m.role_title}</div>
-                  )}
-                  <div className="mt-4 space-y-2">
+                </div>
+                <div className="p-4">
+                  <div className="space-y-2">
                     {!!m.games?.length && (
                       <div className="flex items-start gap-2 text-xs text-white/55">
                         <Gamepad2 className="w-3.5 h-3.5 mt-0.5 text-[#29B6E8]" />

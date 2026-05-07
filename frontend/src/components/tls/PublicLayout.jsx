@@ -193,10 +193,11 @@ export function PublicLayout({ children }) {
             <div className="lg:col-span-2">
               <h4 className="font-heading font-bold text-white uppercase tracking-wider text-xs">Community</h4>
               <ul className="mt-3 space-y-2 text-sm text-white/60">
-                <li><Link to="/members" className="hover:text-[#29B6E8] transition">Vereinsmitglieder</Link></li>
+                <li><Link to="/community" className="hover:text-[#29B6E8] transition">Community-Übersicht</Link></li>
                 <li><Link to="/players" className="hover:text-[#29B6E8] transition">Community-Spieler</Link></li>
+                <li><Link to="/teams" className="hover:text-[#29B6E8] transition">Teams</Link></li>
+                <li><Link to="/members" className="hover:text-[#29B6E8] transition">Vereinsmitglieder</Link></li>
                 <li><Link to="/membership/join" className="hover:text-[#29B6E8] transition">Mitglied werden</Link></li>
-                <li><Link to="/news" className="hover:text-[#29B6E8] transition">News</Link></li>
               </ul>
             </div>
             <div className="lg:col-span-2">

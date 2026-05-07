@@ -76,6 +76,7 @@ import ContactPage from "@/pages/public/ContactPage";
 import SponsorsPage from "@/pages/public/SponsorsPage";
 import PartnersPage from "@/pages/public/PartnersPage";
 import PlayersPage from "@/pages/public/PlayersPage";
+import CommunityPage from "@/pages/public/CommunityPage";
 import MembersDirectoryPage from "@/pages/public/MembersDirectoryPage";
 import MemberProfilePage from "@/pages/public/MemberProfilePage";
 import JoinMembershipPage from "@/pages/public/JoinMembershipPage";
@@ -118,6 +119,7 @@ function App() {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/sponsors" element={<SponsorsPage />} />
           <Route path="/partners" element={<PartnersPage />} />
+          <Route path="/community" element={<CommunityPage />} />
           <Route path="/players" element={<PlayersPage />} />
           <Route path="/members" element={<MembersDirectoryPage />} />
           <Route path="/members/:slug" element={<MemberProfilePage />} />

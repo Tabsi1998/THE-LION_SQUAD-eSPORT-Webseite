@@ -40,8 +40,10 @@ export const NAV_STRUCTURE = [
   {
     label: "Community",
     children: [
-      { to: "/members", label: "Vereinsmitglieder" },
+      { to: "/community", label: "Übersicht" },
       { to: "/players", label: "Community-Spieler" },
+      { to: "/teams", label: "Teams" },
+      { to: "/members", label: "Vereinsmitglieder" },
       { to: "/membership/join", label: "Mitglied werden" },
     ],
   },

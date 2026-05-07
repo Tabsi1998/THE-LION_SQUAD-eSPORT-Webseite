@@ -171,8 +171,10 @@ DEFAULT_NAV = {
             {"key": "season", "to": "/seasons/current", "label": "Season Pass", "visible": True},
         ]},
         {"key": "community", "label": "Community", "visible": True, "order": 5, "children": [
-            {"key": "members", "to": "/members", "label": "Vereinsmitglieder", "visible": True},
+            {"key": "community_overview", "to": "/community", "label": "Übersicht", "visible": True},
             {"key": "players", "to": "/players", "label": "Community-Spieler", "visible": True},
+            {"key": "community_teams", "to": "/teams", "label": "Teams", "visible": True},
+            {"key": "members", "to": "/members", "label": "Vereinsmitglieder", "visible": True},
             {"key": "join", "to": "/membership/join", "label": "Mitglied werden", "visible": True},
         ]},
         {"key": "contact", "to": "/contact", "label": "Kontakt", "visible": True, "order": 6},
