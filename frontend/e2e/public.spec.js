@@ -34,3 +34,34 @@ test("verein and community navigation are separated", async ({ page, isMobile })
   await expect(page.getByTestId("nav-sub-community-spieler")).toBeVisible();
   await expect(page.getByTestId("nav-sub-teams")).toBeVisible();
 });
+
+test("club members render gamertag-first cards", async ({ page }) => {
+  await page.route("**/api/membership/profiles", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "member-1",
+          slug: "tabsi98",
+          display_name: "Fabian Tabelander",
+          gamertag: "Tabsi98",
+          real_name: "Fabian Tabelander",
+          role_title: "Obmann",
+          photo_url: "",
+          games: ["F1 25", "Mario Kart"],
+          platforms: ["PC", "PS5"],
+          level: 27,
+        },
+      ]),
+    });
+  });
+
+  await page.goto("/members");
+  await acceptCookies(page);
+
+  const card = page.getByTestId("member-card-tabsi98");
+  await expect(card).toBeVisible();
+  await expect(card.getByText("Tabsi98")).toBeVisible();
+  await expect(card.getByText("Fabian Tabelander")).toBeVisible();
+  await expect(card.getByText("Obmann")).toBeVisible();
+});

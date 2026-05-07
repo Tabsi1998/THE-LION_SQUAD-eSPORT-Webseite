@@ -77,22 +77,24 @@ function memberRealName(profile) {
 
 function MemberHero({ profile }) {
   return (
-    <div className="relative min-h-[24rem] overflow-hidden bg-[#101010] rounded-sm">
-      {(profile.cover_url || profile.photo_url) && (
-        <img src={resolveMediaUrl(profile.cover_url || profile.photo_url)} alt="" className="absolute inset-0 w-full h-full object-cover opacity-35" />
+    <div className="relative min-h-[25rem] overflow-visible bg-[#0D0D0D] rounded-sm">
+      {profile.cover_url && (
+        <img src={resolveMediaUrl(profile.cover_url)} alt="" className="absolute inset-0 w-full h-full object-cover opacity-32" />
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/65 to-transparent" />
-      <div className="relative z-10 min-h-[24rem] grid md:grid-cols-[17rem_1fr] gap-4 items-end p-5 sm:p-8">
-        <div className="relative h-72 md:h-80 flex items-end justify-center md:justify-start -mb-8 md:-mb-10">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,rgba(255,215,0,0.13),rgba(41,182,232,0.07)_36%,rgba(10,10,10,0)_70%)]" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/68 to-[#0A0A0A]/10" />
+      <div className="relative z-10 min-h-[25rem] grid md:grid-cols-[18rem_1fr] gap-4 items-end p-5 sm:p-8">
+        <div className="relative h-80 md:h-[22rem] flex items-end justify-center md:justify-start -mb-10 md:-mb-12">
+          <div className="absolute inset-x-8 bottom-5 h-10 bg-black/50 blur-2xl rounded-full" />
           {profile.photo_url ? (
-            <img src={resolveMediaUrl(profile.photo_url)} alt="" className="max-h-[115%] w-full object-contain object-bottom drop-shadow-[0_26px_44px_rgba(0,0,0,0.55)]" />
+            <img src={resolveMediaUrl(profile.photo_url)} alt="" className="relative z-10 max-h-[122%] w-full object-contain object-bottom drop-shadow-[0_30px_48px_rgba(0,0,0,0.62)]" />
           ) : (
-            <div className="w-44 h-56 flex items-center justify-center text-white/20"><UserIcon className="w-12 h-12" /></div>
+            <div className="relative z-10 w-44 h-56 flex items-center justify-center text-white/20"><UserIcon className="w-12 h-12" /></div>
           )}
         </div>
         <div className="pb-3 md:pb-8">
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Vereinsmitglied</span>
-          <h1 className="mt-2 font-heading text-5xl md:text-7xl font-black uppercase leading-none">{memberGamertag(profile)}</h1>
+          <h1 className="mt-2 font-heading text-5xl md:text-7xl font-black uppercase leading-none break-words">{memberGamertag(profile)}</h1>
           {memberRealName(profile) && <p className="mt-2 text-white/60 font-bold">{memberRealName(profile)}</p>}
           {profile.role_title && <p className="mt-2 text-[#FFD700] font-bold uppercase tracking-wider">{profile.role_title}</p>}
         </div>

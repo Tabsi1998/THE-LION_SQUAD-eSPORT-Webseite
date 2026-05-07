@@ -4,7 +4,7 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Crown, Gamepad2, Monitor, Users as UsersIcon } from "lucide-react";
+import { Crown, Gamepad2, Monitor, ArrowRight, Users as UsersIcon } from "lucide-react";
 
 function memberGamertag(member) {
   return member.gamertag || member.linked_account?.username || member.display_name;
@@ -54,37 +54,45 @@ export default function MembersDirectoryPage() {
             <div className="text-sm mt-2">Sobald Admins Vereinsmitglieder freigeben, erscheinen sie hier.</div>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12 pt-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16 pt-8">
             {members.map((m) => (
               <Link
                 key={m.slug}
                 to={`/members/${m.slug}`}
                 data-testid={`member-card-${m.slug}`}
-                className="group relative rounded-sm bg-[#101010] overflow-visible transition"
+                className="group relative block min-h-[30rem] sm:min-h-[33rem] overflow-visible"
               >
-                <div className="relative min-h-[25rem] sm:min-h-[29rem] bg-[radial-gradient(circle_at_50%_18%,rgba(255,215,0,0.14),rgba(41,182,232,0.07)_32%,rgba(10,10,10,0)_68%)] overflow-hidden">
+                <div className="absolute inset-x-4 top-10 bottom-20 bg-[radial-gradient(circle_at_50%_18%,rgba(255,215,0,0.16),rgba(41,182,232,0.08)_35%,rgba(10,10,10,0)_72%)] opacity-90 group-hover:opacity-100 transition" />
+                <div className="absolute inset-x-8 bottom-[5.4rem] h-10 bg-black/45 blur-2xl rounded-full" />
+                <div className="relative h-[24rem] sm:h-[27rem] overflow-visible">
                   {m.photo_url ? (
-                    <img src={resolveMediaUrl(m.photo_url)} alt="" className="absolute inset-x-0 -top-8 bottom-0 mx-auto h-[116%] w-[112%] object-contain object-bottom drop-shadow-[0_20px_34px_rgba(0,0,0,0.45)] group-hover:scale-[1.025] group-hover:-translate-y-1 transition duration-500" />
+                    <img
+                      src={resolveMediaUrl(m.photo_url)}
+                      alt=""
+                      className="absolute left-1/2 -top-10 bottom-0 z-10 h-[118%] w-auto max-w-[112%] -translate-x-1/2 object-contain object-bottom drop-shadow-[0_26px_42px_rgba(0,0,0,0.58)] group-hover:scale-[1.035] group-hover:-translate-y-2 transition duration-500"
+                    />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-white/20">
+                    <div className="absolute inset-0 z-10 flex items-center justify-center text-white/20">
                       <UsersIcon className="w-12 h-12" />
                     </div>
                   )}
-                  <div className="absolute inset-x-0 bottom-0 p-4 pt-16 bg-gradient-to-t from-black via-black/75 to-transparent">
-                    <div className="font-heading font-black text-2xl text-white group-hover:text-[#FFD700] uppercase flex items-center gap-1.5 leading-none">
-                      {memberGamertag(m)}
-                      <Crown className="w-3.5 h-3.5 text-[#FFD700]" />
-                    </div>
-                    {memberRealName(m) && (
-                      <div className="mt-1 text-xs text-white/55 truncate">{memberRealName(m)}</div>
-                    )}
-                    {m.role_title && (
-                      <div className="mt-1 text-[10px] uppercase tracking-widest text-[#FFD700]/85 font-bold">{m.role_title}</div>
-                    )}
-                  </div>
                 </div>
-                <div className="px-4 py-4 border-t border-white/5 bg-[#101010]">
-                  <div className="space-y-2">
+                <div className="relative z-20 -mt-14 mx-3 bg-gradient-to-t from-black via-black/90 to-black/55 px-4 py-4 shadow-[0_-18px_38px_rgba(0,0,0,0.55)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-heading font-black text-2xl md:text-[1.7rem] text-white group-hover:text-[#FFD700] uppercase leading-none truncate">
+                        {memberGamertag(m)}
+                      </div>
+                      {memberRealName(m) && (
+                        <div className="mt-1 text-xs font-semibold text-white/55 truncate">{memberRealName(m)}</div>
+                      )}
+                    </div>
+                    <Crown className="w-4 h-4 mt-1 text-[#FFD700] shrink-0" />
+                  </div>
+                  {m.role_title && (
+                    <div className="mt-2 text-[10px] uppercase tracking-widest text-[#FFD700]/90 font-bold">{m.role_title}</div>
+                  )}
+                  <div className="mt-4 space-y-2">
                     {!!m.games?.length && (
                       <div className="flex items-start gap-2 text-xs text-white/55">
                         <Gamepad2 className="w-3.5 h-3.5 mt-0.5 text-[#29B6E8]" />
@@ -97,14 +105,17 @@ export default function MembersDirectoryPage() {
                         <span className="line-clamp-1">{m.platforms.join(", ")}</span>
                       </div>
                     )}
-                    <div className="flex items-center justify-between gap-2">
-                      {(m.level || m.age) && <div className="text-[10px] text-[#FFD700]/80 uppercase tracking-widest font-bold">Profil-Level {m.level || m.age}</div>}
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      {(m.level || m.age) && <div className="text-[10px] text-[#FFD700]/80 uppercase tracking-widest font-bold">Level {m.level || m.age}</div>}
                       {m.linked_account?.achievement_level && (
                         <div className="text-[10px] text-[#29B6E8] uppercase tracking-widest font-bold">
                           Account-Level {m.linked_account.achievement_level.level}
                         </div>
                       )}
                     </div>
+                  </div>
+                  <div className="mt-4 inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-white/45 group-hover:text-[#FFD700] transition">
+                    Profil ansehen <ArrowRight className="w-3.5 h-3.5" />
                   </div>
                 </div>
               </Link>
