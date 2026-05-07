@@ -203,13 +203,13 @@ function ProfileModal({ entry, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 overflow-y-auto p-4">
-      <form onSubmit={submit} className="w-full max-w-4xl mx-auto my-4 bg-[#121212] border border-white/10 rounded-sm">
+      <form onSubmit={submit} className="w-full max-w-6xl mx-auto my-4 bg-[#121212] border border-white/10 rounded-sm shadow-2xl">
         <div className="flex items-center justify-between p-5 border-b border-white/10">
           <h2 className="font-heading font-black uppercase">{isEdit ? "Profil bearbeiten" : "Profil erstellen"}</h2>
           <button type="button" onClick={onClose} className="p-1 text-white/60 hover:text-white" aria-label="Schließen"><X className="w-5 h-5" /></button>
         </div>
-        <div className="p-5 grid lg:grid-cols-[1fr_18rem] gap-5">
-          <div className="space-y-4">
+        <div className="p-5 grid lg:grid-cols-[minmax(0,1fr)_19rem] gap-5">
+          <div className="space-y-4 min-w-0">
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label="Name"><input required value={form.display_name} onChange={(e) => set("display_name", e.target.value)} className="input" /></Field>
               <Field label="URL-Slug"><input value={form.slug} onChange={(e) => set("slug", e.target.value)} placeholder="wird aus Name erstellt" className="input font-mono" /></Field>
@@ -222,7 +222,7 @@ function ProfileModal({ entry, onClose, onSaved }) {
               <MarkdownEditor value={form.bio} onChange={(v) => set("bio", v)} rows={8} testId="club-member-bio" />
             </Field>
           </div>
-          <aside className="space-y-4">
+          <aside className="space-y-4 min-w-0">
             <ImageUpload value={form.photo_url} onChange={(v) => set("photo_url", v)} label="Profilbild" testId="club-member-photo" variant="wide" allowLibrary />
             <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Detail-Cover optional" testId="club-member-cover" variant="wide" allowLibrary />
             <Field label="Sortierung"><input type="number" value={form.order_index} onChange={(e) => set("order_index", e.target.value)} className="input" /></Field>

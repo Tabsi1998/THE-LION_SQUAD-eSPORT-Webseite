@@ -14,6 +14,25 @@ const tierSize = {
   bronze: "h-9",
 };
 
+function sponsorKey(sponsor) {
+  return [
+    sponsor.logo_url || "",
+    sponsor.link || "",
+    sponsor.name || "",
+  ].join("|").toLowerCase();
+}
+
+function uniqueLogoSponsors(sponsors) {
+  const seen = new Set();
+  return sponsors.filter((sponsor) => {
+    if (!sponsor.logo_url) return false;
+    const key = sponsorKey(sponsor);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function SponsorTicker({ className = "", compact = false, placement = "home" }) {
   const [sponsors, setSponsors] = useState([]);
   const load = useCallback(async () => {
@@ -24,9 +43,10 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
     load();
   }, [load]);
   useApiInvalidation(load, ["sponsors"]);
-  const logoSponsors = sponsors.filter((s) => s.logo_url);
+  const logoSponsors = uniqueLogoSponsors(sponsors);
   if (!logoSponsors.length) return null;
-  const items = [...logoSponsors, ...logoSponsors]; // duplicate for seamless loop
+  const shouldMarquee = logoSponsors.length >= (compact ? 4 : 3);
+  const items = shouldMarquee ? [...logoSponsors, ...logoSponsors] : logoSponsors;
   const speed = compact ? 34 : 48;
   return (
     <section className={`relative overflow-hidden ${compact ? "bg-transparent" : "border-y border-white/5 bg-[#070707]"} ${className}`} data-testid="sponsor-ticker">
@@ -37,8 +57,8 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
       )}
       <div className="relative overflow-hidden group">
         <div
-          className={`flex items-center whitespace-nowrap ${compact ? "gap-10 py-2" : "gap-16 py-5"}`}
-          style={{ animation: `tls-marquee ${speed}s linear infinite`, width: "max-content" }}
+          className={`flex items-center whitespace-nowrap ${compact ? "gap-10 py-2" : "gap-16 py-5"} ${shouldMarquee ? "" : "justify-center px-4"}`}
+          style={shouldMarquee ? { animation: `tls-marquee ${speed}s linear infinite`, width: "max-content" } : undefined}
         >
           {items.map((s, i) => (
             <a
@@ -72,7 +92,7 @@ export function SponsorGrid({ max = 4 }) {
     load();
   }, [load]);
   useApiInvalidation(load, ["sponsors"]);
-  const logoSponsors = sponsors.filter((s) => s.logo_url);
+  const logoSponsors = uniqueLogoSponsors(sponsors);
   if (!logoSponsors.length) return null;
   return (
     <div className="flex items-center gap-5" data-testid="sponsor-grid">
