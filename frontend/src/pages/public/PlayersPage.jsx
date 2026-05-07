@@ -5,6 +5,20 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Search, Crown } from "lucide-react";
 
+function accountLevelFrame(level) {
+  const value = Number(level || 1);
+  if (value >= 10) return "border-[#FFD700]/65 shadow-[0_0_0_1px_rgba(255,215,0,0.18),0_0_24px_rgba(255,215,0,0.10)]";
+  if (value >= 5) return "border-[#29B6E8]/60 shadow-[0_0_0_1px_rgba(41,182,232,0.14),0_0_18px_rgba(41,182,232,0.08)]";
+  return "border-white/10";
+}
+
+function accountAvatarFrame(level, isMember) {
+  const value = Number(level || 1);
+  if (value >= 10) return "border-[#FFD700]/70";
+  if (value >= 5) return "border-[#29B6E8]/65";
+  return isMember ? "border-[#FFD700]/50" : "border-white/15";
+}
+
 export default function PlayersPage() {
   const [list, setList] = useState([]);
   const [members, setMembers] = useState([]);
@@ -68,16 +82,17 @@ export default function PlayersPage() {
             <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {filtered.map((p) => {
                 const isMember = memberUsernames.has(p.username);
+                const accountLevel = p.achievement_level?.level || 1;
                 return (
                   <Link
                     key={p.username}
                     to={`/u/${p.username}`}
                     data-testid={`player-card-${p.username}`}
-                    className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] p-4 transition group"
+                    className={`border ${accountLevelFrame(accountLevel)} hover:border-[#29B6E8]/70 rounded-sm bg-[#121212] p-4 transition group`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <div className={`w-12 h-12 rounded-sm border ${isMember ? "border-[#FFD700]/50" : "border-white/15"} bg-[#0A0A0A] flex items-center justify-center overflow-hidden`}>
+                        <div className={`w-12 h-12 rounded-sm border ${accountAvatarFrame(accountLevel, isMember)} bg-[#0A0A0A] flex items-center justify-center overflow-hidden`}>
                           {p.avatar_url ? (
                             <img src={resolveMediaUrl(p.avatar_url)} alt={p.display_name} className="w-full h-full object-cover" />
                           ) : (

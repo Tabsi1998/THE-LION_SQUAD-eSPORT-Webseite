@@ -12,6 +12,13 @@ import {
   MapPin, Zap, TrendingUp, Lock, ExternalLink,
 } from "lucide-react";
 
+function accountLevelFrame(level) {
+  const value = Number(level || 1);
+  if (value >= 10) return "border-[#FFD700]/70 shadow-[0_0_0_1px_rgba(255,215,0,0.24),0_0_34px_rgba(255,215,0,0.14)]";
+  if (value >= 5) return "border-[#29B6E8]/70 shadow-[0_0_0_1px_rgba(41,182,232,0.18),0_0_26px_rgba(41,182,232,0.12)]";
+  return "border-[#29B6E8]/40";
+}
+
 export default function PublicProfilePage() {
   const { username } = useParams();
   const [profile, setProfile] = useState(null);
@@ -47,6 +54,7 @@ export default function PublicProfilePage() {
   const level = profile.achievement_level || { level: s.level || 1, progress: 0, points: s.points || 0, next_level_points: 100 };
   const isPrivate = profile.privacy_public_profile === false;
   const joinedDate = profile.created_at ? new Date(profile.created_at) : null;
+  const avatarFrame = accountLevelFrame(level.level);
 
   return (
     <PublicLayout>
@@ -61,9 +69,9 @@ export default function PublicProfilePage() {
           <div className="flex flex-col md:flex-row gap-8 items-start">
             <div className="shrink-0">
               {profile.avatar_url ? (
-                <img src={resolveMediaUrl(profile.avatar_url)} alt={profile.display_name} className="w-32 h-32 md:w-40 md:h-40 rounded-sm border-2 border-[#29B6E8]/40 object-cover" />
+                <img src={resolveMediaUrl(profile.avatar_url)} alt={profile.display_name} className={`w-32 h-32 md:w-40 md:h-40 rounded-sm border-2 ${avatarFrame} object-cover`} />
               ) : (
-                <div className="w-32 h-32 md:w-40 md:h-40 rounded-sm border-2 border-[#29B6E8]/40 bg-gradient-to-br from-[#29B6E8]/20 to-[#121212] flex items-center justify-center font-display font-black text-5xl text-[#29B6E8]">
+                <div className={`w-32 h-32 md:w-40 md:h-40 rounded-sm border-2 ${avatarFrame} bg-gradient-to-br from-[#29B6E8]/20 to-[#121212] flex items-center justify-center font-display font-black text-5xl text-[#29B6E8]`}>
                   {(profile.display_name || profile.username || "?").slice(0, 2).toUpperCase()}
                 </div>
               )}
