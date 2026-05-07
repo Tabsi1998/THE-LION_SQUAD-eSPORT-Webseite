@@ -327,14 +327,39 @@ async def list_mail_queue(status: Optional[str] = None, limit: int = 100,
     q = {}
     if status:
         q["status"] = status
-    jobs = await db.mail_jobs.find(q, {"_id": 0, "html": 0}).sort("created_at", -1).to_list(limit)
+    safe_limit = max(1, min(int(limit or 100), 500))
+    jobs = await db.mail_jobs.find(q, {"_id": 0, "html": 0}).sort("created_at", -1).to_list(safe_limit)
     return jobs
+
+
+@settings_router.get("/mail-queue/stats")
+async def mail_queue_statistics(me: dict = Depends(require_admin())):
+    from services.mail_queue import mail_queue_stats
+    return await mail_queue_stats()
 
 
 @settings_router.post("/mail-queue/process")
 async def process_queue_now(me: dict = Depends(require_admin())):
     from services.mail_queue import process_mail_queue
     return await process_mail_queue(batch=20)
+
+
+@settings_router.post("/mail-queue/recover")
+async def recover_mail_queue(me: dict = Depends(require_admin())):
+    from services.mail_queue import recover_stale_sending_jobs
+    return {"recovered": await recover_stale_sending_jobs()}
+
+
+@settings_router.post("/mail-queue/retry-failed")
+async def retry_failed_mail_jobs(me: dict = Depends(require_admin())):
+    from services.mail_queue import retry_failed_jobs
+    return {"queued": await retry_failed_jobs()}
+
+
+@settings_router.delete("/mail-queue/cleanup")
+async def cleanup_mail_queue(days: int = 30, me: dict = Depends(require_admin())):
+    from services.mail_queue import cleanup_sent_jobs
+    return {"deleted": await cleanup_sent_jobs(days=days)}
 
 
 @settings_router.post("/mail-queue/{job_id}/retry")

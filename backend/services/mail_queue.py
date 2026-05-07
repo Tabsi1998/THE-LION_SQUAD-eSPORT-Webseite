@@ -23,6 +23,8 @@ logger = logging.getLogger("tls.mailqueue")
 # Backoff schedule in minutes for retry attempts (1m, 5m, 30m, 2h, 12h)
 RETRY_BACKOFF_MIN = [1, 5, 30, 120, 720]
 MAX_ATTEMPTS = len(RETRY_BACKOFF_MIN) + 1
+SENDING_STALE_MINUTES = 15
+QUEUE_CLEANUP_SENT_DAYS = 30
 
 
 def resolve_smtp_security(port: int, raw_mode: str | None) -> str:
@@ -557,6 +559,81 @@ async def enqueue_mail(
     return {"ok": True, "id": job["id"]}
 
 
+async def recover_stale_sending_jobs() -> int:
+    """Move abandoned sending jobs back to pending.
+
+    This covers app restarts or worker crashes after a job was claimed but before
+    it was marked sent/failed. Attempts are kept so retry limits still apply.
+    """
+    db = get_db()
+    stale_before = (now_utc() - timedelta(minutes=SENDING_STALE_MINUTES)).isoformat()
+    res = await db.mail_jobs.update_many(
+        {"status": "sending", "updated_at": {"$lte": stale_before}},
+        {"$set": {
+            "status": "pending",
+            "next_attempt_at": now_utc().isoformat(),
+            "last_error": "Versand wurde unterbrochen und automatisch neu eingereiht.",
+            "updated_at": now_utc().isoformat(),
+        }},
+    )
+    return int(res.modified_count or 0)
+
+
+async def mail_queue_stats() -> dict:
+    db = get_db()
+    counts = {}
+    for status in ("pending", "sending", "sent", "failed", "skipped"):
+        counts[status] = await db.mail_jobs.count_documents({"status": status})
+    now_iso = now_utc().isoformat()
+    due_pending = await db.mail_jobs.count_documents({"status": "pending", "next_attempt_at": {"$lte": now_iso}})
+    stale_before = (now_utc() - timedelta(minutes=SENDING_STALE_MINUTES)).isoformat()
+    stale_sending = await db.mail_jobs.count_documents({"status": "sending", "updated_at": {"$lte": stale_before}})
+    latest_problem = await db.mail_jobs.find_one(
+        {"status": {"$in": ["failed", "skipped"]}},
+        {"_id": 0, "html": 0},
+        sort=[("updated_at", -1)],
+    )
+    next_pending = await db.mail_jobs.find_one(
+        {"status": "pending"},
+        {"_id": 0, "html": 0, "id": 1, "to": 1, "template_key": 1, "next_attempt_at": 1},
+        sort=[("next_attempt_at", 1)],
+    )
+    return {
+        "counts": counts,
+        "due_pending": due_pending,
+        "stale_sending": stale_sending,
+        "latest_problem": latest_problem,
+        "next_pending": next_pending,
+        "max_attempts": MAX_ATTEMPTS,
+        "stale_after_minutes": SENDING_STALE_MINUTES,
+    }
+
+
+async def retry_failed_jobs() -> int:
+    db = get_db()
+    res = await db.mail_jobs.update_many(
+        {"status": "failed"},
+        {"$set": {
+            "status": "pending",
+            "attempts": 0,
+            "next_attempt_at": now_utc().isoformat(),
+            "last_error": None,
+            "updated_at": now_utc().isoformat(),
+        }},
+    )
+    return int(res.modified_count or 0)
+
+
+async def cleanup_sent_jobs(days: int = QUEUE_CLEANUP_SENT_DAYS) -> int:
+    db = get_db()
+    cutoff = (now_utc() - timedelta(days=max(1, int(days)))).isoformat()
+    res = await db.mail_jobs.delete_many({
+        "status": {"$in": ["sent", "skipped"]},
+        "updated_at": {"$lte": cutoff},
+    })
+    return int(res.deleted_count or 0)
+
+
 async def _try_send_job(job: dict) -> None:
     db = get_db()
     cfg = await get_mail_settings()
@@ -631,6 +708,7 @@ async def _try_send_job(job: dict) -> None:
 
 async def process_mail_queue(batch: int = 10) -> dict:
     db = get_db()
+    recovered = await recover_stale_sending_jobs()
     now = now_utc().isoformat()
     cursor = db.mail_jobs.find(
         {"status": "pending", "next_attempt_at": {"$lte": now}}
@@ -640,17 +718,17 @@ async def process_mail_queue(batch: int = 10) -> dict:
     for job in jobs:
         # claim
         claimed = await db.mail_jobs.find_one_and_update(
-            {"id": job["id"], "status": "pending"},
+            {"id": job["id"], "status": "pending", "next_attempt_at": {"$lte": now}},
             {"$set": {"status": "sending", "updated_at": now_utc().isoformat()}},
         )
         if not claimed:
             continue
         try:
-            await _try_send_job(job)
+            await _try_send_job(claimed)
             sent += 1
         except Exception as exc:
             logger.exception(f"[mailqueue] dispatch crash: {exc}")
-    return {"processed": len(jobs), "sent": sent}
+    return {"processed": len(jobs), "sent": sent, "recovered": recovered}
 
 
 async def smtp_test(to: str) -> dict:

@@ -123,6 +123,7 @@ async def init_indexes():
     # Phase 8: Mail queue
     await db.mail_jobs.create_index("id", unique=True)
     await db.mail_jobs.create_index([("status", 1), ("next_attempt_at", 1)])
+    await db.mail_jobs.create_index([("status", 1), ("updated_at", 1)])
     await db.mail_jobs.create_index("dedupe_key")
     await db.mail_jobs.create_index("created_at")
     # Media ownership for user-facing media pickers

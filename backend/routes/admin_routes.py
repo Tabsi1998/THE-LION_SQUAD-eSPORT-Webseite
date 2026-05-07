@@ -65,9 +65,15 @@ async def system_status(me: dict = Depends(require_admin())):
         {"_id": 0, "created_at": 1, "status": 1, "error": 1, "event_key": 1},
         sort=[("created_at", -1)],
     )
-    queue_counts = {}
-    for status in ("pending", "sending", "sent", "failed", "skipped"):
-        queue_counts[status] = await db.mail_jobs.count_documents({"status": status})
+    try:
+        from services.mail_queue import mail_queue_stats
+        queue_stats = await mail_queue_stats()
+        queue_counts = queue_stats.get("counts", {})
+    except Exception:
+        queue_stats = {}
+        queue_counts = {}
+        for status in ("pending", "sending", "sent", "failed", "skipped"):
+            queue_counts[status] = await db.mail_jobs.count_documents({"status": status})
     try:
         from services.scheduler import get_scheduler_status
         scheduler = get_scheduler_status()
@@ -102,7 +108,7 @@ async def system_status(me: dict = Depends(require_admin())):
         },
         "uploads": uploads,
         "scheduler": scheduler,
-        "mail_queue": queue_counts,
+        "mail_queue": {**queue_counts, **{k: v for k, v in queue_stats.items() if k != "counts"}},
     }
 
 
