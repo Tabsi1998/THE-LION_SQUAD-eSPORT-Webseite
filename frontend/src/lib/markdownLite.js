@@ -27,6 +27,7 @@ function sanitizeHref(rawHref) {
 function formatInlineText(rawText) {
   return escapeHtml(rawText)
     .replace(/`(.+?)`/g, "<code>$1</code>")
+    .replace(/~~(.+?)~~/g, "<del>$1</del>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>");
 }
@@ -62,13 +63,66 @@ export function renderMarkdownLite(md) {
   const lines = String(md).split(/\r?\n/);
   let html = "";
   let inList = null;
+  let inCodeBlock = false;
+  let codeLines = [];
   const close = () => {
     if (!inList) return;
     html += inList === "ul" ? "</ul>" : "</ol>";
     inList = null;
   };
+  const closeCodeBlock = () => {
+    html += `<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`;
+    codeLines = [];
+    inCodeBlock = false;
+  };
+  const isTableDivider = (line) => /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
+  const isTableRow = (line) => line.includes("|") && !isTableDivider(line);
+  const parseTableCells = (line) =>
+    line
+      .trim()
+      .replace(/^\|/, "")
+      .replace(/\|$/, "")
+      .split("|")
+      .map((cell) => cell.trim());
 
-  for (const raw of lines) {
+  for (let i = 0; i < lines.length; i += 1) {
+    const raw = lines[i];
+    if (/^```/.test(raw.trim())) {
+      close();
+      if (inCodeBlock) closeCodeBlock();
+      else {
+        inCodeBlock = true;
+        codeLines = [];
+      }
+      continue;
+    }
+    if (inCodeBlock) {
+      codeLines.push(raw);
+      continue;
+    }
+    if (isTableRow(raw) && lines[i + 1] && isTableDivider(lines[i + 1])) {
+      close();
+      const headers = parseTableCells(raw);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && isTableRow(lines[i])) {
+        rows.push(parseTableCells(lines[i]));
+        i += 1;
+      }
+      i -= 1;
+      html += "<div class=\"prose-cms-table\"><table><thead><tr>";
+      html += headers.map((cell) => `<th>${renderInline(cell)}</th>`).join("");
+      html += "</tr></thead><tbody>";
+      rows.forEach((row) => {
+        html += "<tr>";
+        headers.forEach((_, index) => {
+          html += `<td>${renderInline(row[index] || "")}</td>`;
+        });
+        html += "</tr>";
+      });
+      html += "</tbody></table></div>";
+      continue;
+    }
     if (/^###\s+/.test(raw)) {
       close();
       html += `<h3>${renderInline(raw.replace(/^###\s+/, ""))}</h3>`;
@@ -120,6 +174,7 @@ export function renderMarkdownLite(md) {
     html += `<p>${renderInline(raw)}</p>`;
   }
 
+  if (inCodeBlock) closeCodeBlock();
   close();
   return html;
 }

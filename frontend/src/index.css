@@ -167,6 +167,7 @@ body {
 .prose-cms li { margin: 0.25rem 0; }
 .prose-cms strong { color: #fff; }
 .prose-cms em { color: rgba(255,255,255,0.86); }
+.prose-cms del { color: rgba(255,255,255,0.55); }
 .prose-cms blockquote {
   margin: 1.25rem 0;
   padding: 0.75rem 1rem;
@@ -182,11 +183,48 @@ body {
   color: #fff;
   font-size: 0.9em;
 }
+.prose-cms pre {
+  overflow-x: auto;
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+}
+.prose-cms pre code {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  white-space: pre;
+}
 .prose-cms img {
   max-width: 100%;
   border-radius: 2px;
   border: 1px solid rgba(255,255,255,0.1);
   margin: 1rem 0;
+}
+.prose-cms .prose-cms-table {
+  overflow-x: auto;
+  margin: 1.25rem 0;
+}
+.prose-cms table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 28rem;
+  font-size: 0.92em;
+}
+.prose-cms th,
+.prose-cms td {
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+.prose-cms th {
+  background: rgba(41,182,232,0.1);
+  color: #fff;
+  font-weight: 800;
 }
 .prose-cms hr { border-color: rgba(255,255,255,0.1); margin: 2rem 0; }
 
