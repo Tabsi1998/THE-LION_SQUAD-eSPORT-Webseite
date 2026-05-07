@@ -178,6 +178,8 @@ export function PublicLayout({ children }) {
                 <li><Link to="/about" className="hover:text-[#29B6E8] transition">Über uns</Link></li>
                 <li><Link to="/board" className="hover:text-[#29B6E8] transition">Vorstand</Link></li>
                 <li><Link to="/values" className="hover:text-[#29B6E8] transition">Werte &amp; Ziele</Link></li>
+                <li><Link to="/members" className="hover:text-[#29B6E8] transition">Vereinsmitglieder</Link></li>
+                <li><Link to="/membership/join" className="hover:text-[#29B6E8] transition">Mitglied werden</Link></li>
                 <li><Link to="/galerie" className="hover:text-[#29B6E8] transition">Galerie</Link></li>
               </ul>
             </div>
@@ -187,7 +189,7 @@ export function PublicLayout({ children }) {
                 <li><Link to="/tournaments" className="hover:text-[#29B6E8] transition">Turniere</Link></li>
                 <li><Link to="/fastlap" className="hover:text-[#29B6E8] transition">Fast Lap</Link></li>
                 <li><Link to="/events" className="hover:text-[#29B6E8] transition">Events</Link></li>
-                <li><Link to="/teams" className="hover:text-[#29B6E8] transition">Teams</Link></li>
+                <li><Link to="/seasons/current" className="hover:text-[#29B6E8] transition">Season Pass</Link></li>
               </ul>
             </div>
             <div className="lg:col-span-2">
@@ -196,8 +198,6 @@ export function PublicLayout({ children }) {
                 <li><Link to="/community" className="hover:text-[#29B6E8] transition">Community-Übersicht</Link></li>
                 <li><Link to="/players" className="hover:text-[#29B6E8] transition">Community-Spieler</Link></li>
                 <li><Link to="/teams" className="hover:text-[#29B6E8] transition">Teams</Link></li>
-                <li><Link to="/members" className="hover:text-[#29B6E8] transition">Vereinsmitglieder</Link></li>
-                <li><Link to="/membership/join" className="hover:text-[#29B6E8] transition">Mitglied werden</Link></li>
               </ul>
             </div>
             <div className="lg:col-span-2">

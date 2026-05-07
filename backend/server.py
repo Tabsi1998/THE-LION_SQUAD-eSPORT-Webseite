@@ -228,18 +228,26 @@ upload_dir.mkdir(parents=True, exist_ok=True)
 public_upload_dir = upload_dir / "public"
 public_upload_dir.mkdir(parents=True, exist_ok=True)
 PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+PUBLIC_IMAGE_MEDIA_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+}
 
 
 @app.get("/api/static/uploads/{filename}")
 async def public_upload(filename: str):
     if "/" in filename or "\\" in filename or ".." in filename or filename.startswith("."):
         raise HTTPException(status_code=400, detail="Invalid filename")
-    if pathlib.Path(filename).suffix.lower() not in PUBLIC_IMAGE_EXTS:
+    suffix = pathlib.Path(filename).suffix.lower()
+    if suffix not in PUBLIC_IMAGE_EXTS:
         raise HTTPException(status_code=404, detail="File not found")
     for base in (public_upload_dir, upload_dir):
         path = base / filename
         if path.exists() and path.is_file():
-            return FileResponse(path)
+            return FileResponse(path, media_type=PUBLIC_IMAGE_MEDIA_TYPES.get(suffix))
     raise HTTPException(status_code=404, detail="File not found")
 
 

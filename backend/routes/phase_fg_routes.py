@@ -162,23 +162,27 @@ DEFAULT_NAV = {
             {"key": "values", "to": "/values", "label": "Werte & Ziele", "visible": True},
             {"key": "partners", "to": "/partners", "label": "Partner", "visible": True},
             {"key": "sponsors", "to": "/sponsors", "label": "Sponsoren", "visible": True},
+            {"key": "members", "to": "/members", "label": "Vereinsmitglieder", "visible": True},
+            {"key": "join", "to": "/membership/join", "label": "Mitglied werden", "visible": True},
             {"key": "gallery", "to": "/galerie", "label": "Galerie", "visible": True},
         ]},
         {"key": "esports", "label": "eSports", "visible": True, "order": 4, "children": [
             {"key": "tournaments", "to": "/tournaments", "label": "Turniere", "visible": True},
             {"key": "fastlap", "to": "/fastlap", "label": "Fast Lap", "visible": True},
-            {"key": "teams", "to": "/teams", "label": "Teams", "visible": True},
             {"key": "season", "to": "/seasons/current", "label": "Season Pass", "visible": True},
         ]},
         {"key": "community", "label": "Community", "visible": True, "order": 5, "children": [
             {"key": "community_overview", "to": "/community", "label": "Übersicht", "visible": True},
             {"key": "players", "to": "/players", "label": "Community-Spieler", "visible": True},
             {"key": "community_teams", "to": "/teams", "label": "Teams", "visible": True},
-            {"key": "members", "to": "/members", "label": "Vereinsmitglieder", "visible": True},
-            {"key": "join", "to": "/membership/join", "label": "Mitglied werden", "visible": True},
         ]},
         {"key": "contact", "to": "/contact", "label": "Kontakt", "visible": True, "order": 6},
     ],
+}
+
+RETIRED_NAV_CHILD_KEYS = {
+    "esports": {"teams"},
+    "community": {"members", "join"},
 }
 
 
@@ -213,6 +217,7 @@ def _filter_visible(items: list[dict]) -> list[dict]:
 
 def _merge_nav_item(current: dict, default: dict) -> dict:
     merged = {**default, **current}
+    parent_key = default.get("key") or default.get("to") or default.get("label")
     default_children = default.get("children") or []
     current_children = current.get("children") or []
     if default_children:
@@ -221,7 +226,11 @@ def _merge_nav_item(current: dict, default: dict) -> dict:
         for child_default in default_children:
             key = child_default.get("key") or child_default.get("to") or child_default.get("label")
             merged_children.append(_merge_nav_item(current_by_key.pop(key, {}), child_default))
-        merged_children.extend(current_by_key.values())
+        retired = RETIRED_NAV_CHILD_KEYS.get(parent_key, set())
+        merged_children.extend(
+            child for key, child in current_by_key.items()
+            if key not in retired
+        )
         merged["children"] = merged_children
     else:
         merged.pop("children", None)

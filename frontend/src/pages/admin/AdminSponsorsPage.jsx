@@ -18,6 +18,7 @@ export default function AdminSponsorsPage() {
   const [migrating, setMigrating] = useState(false);
   const [auditing, setAuditing] = useState(false);
   const [normalizing, setNormalizing] = useState(false);
+  const [clearingMissing, setClearingMissing] = useState(false);
   const [imageAudit, setImageAudit] = useState(null);
 
   const load = useCallback(async () => {
@@ -71,6 +72,18 @@ export default function AdminSponsorsPage() {
     setNormalizing(false);
   };
 
+  const clearMissingImages = async () => {
+    if (!window.confirm("Kaputte Bild-Verknüpfungen leeren, wenn die lokale Datei nicht mehr existiert?")) return;
+    setClearingMissing(true);
+    try {
+      const { data } = await api.post("/uploads/clear-missing-image-refs");
+      setImageAudit(data);
+      toast.success(`${data.summary?.cleared_missing || 0} kaputte Bild-Verknüpfung(en) geleert.`);
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Bereinigung fehlgeschlagen."); }
+    setClearingMissing(false);
+  };
+
   return (
     <AdminLayout>
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
@@ -87,6 +100,9 @@ export default function AdminSponsorsPage() {
           </button>
           <button onClick={normalizeImages} disabled={normalizing} data-testid="sponsor-normalize-images-btn" className="px-4 py-2.5 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:border-[#29B6E8] hover:text-[#29B6E8] disabled:opacity-50 text-xs">
             {normalizing ? "Repariere…" : "URLs reparieren"}
+          </button>
+          <button onClick={clearMissingImages} disabled={clearingMissing} data-testid="sponsor-clear-missing-images-btn" className="px-4 py-2.5 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:border-[#FF3B30] hover:text-[#FF3B30] disabled:opacity-50 text-xs">
+            {clearingMissing ? "Bereinige…" : "Fehlende leeren"}
           </button>
           <button onClick={migrate} disabled={migrating} data-testid="sponsor-migrate-btn" className="px-4 py-2.5 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:border-[#29B6E8] hover:text-[#29B6E8] disabled:opacity-50 text-xs">
             <Upload className="w-4 h-4" /> {migrating ? "Migriere…" : "Bilder migrieren"}

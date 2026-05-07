@@ -87,7 +87,7 @@ def _iter_text_image_urls(value: str) -> list[str]:
     return urls
 
 
-async def audit_image_references(repair: bool = False) -> dict:
+async def audit_image_references(repair: bool = False, clear_missing: bool = False) -> dict:
     db = get_db()
     summary = {
         "scanned": 0,
@@ -96,6 +96,7 @@ async def audit_image_references(repair: bool = False) -> dict:
         "legacy_local": 0,
         "normalized": 0,
         "text_normalized": 0,
+        "cleared_missing": 0,
         "external": 0,
         "missing_file": 0,
         "invalid_local": 0,
@@ -151,6 +152,8 @@ async def audit_image_references(repair: bool = False) -> dict:
                     if not _file_exists(filename):
                         summary["missing_file"] += 1
                         add_example("missing_file", {**item, "normalized": upload_path})
+                        if clear_missing:
+                            updates[field] = None
                         continue
                     if value != upload_path:
                         summary["legacy_local"] += 1
@@ -166,7 +169,9 @@ async def audit_image_references(repair: bool = False) -> dict:
                 updates["updated_at"] = now_utc().isoformat()
                 query = {"id": doc["id"]} if doc.get("id") else {"_id": doc["_id"]}
                 await collection.update_one(query, {"$set": updates})
-                summary["normalized"] += len(updates) - 1
+                changed_fields = [k for k in updates.keys() if k != "updated_at"]
+                summary["cleared_missing"] += sum(1 for k in changed_fields if updates.get(k) is None)
+                summary["normalized"] += sum(1 for k in changed_fields if updates.get(k) is not None)
 
     for coll_name, fields in TEXT_TARGETS:
         collection = db[coll_name]
@@ -226,4 +231,4 @@ async def audit_image_references(repair: bool = False) -> dict:
                 await collection.update_one(query, {"$set": updates})
                 summary["text_normalized"] += len(updates) - 1
 
-    return {"ok": True, "repair": repair, "summary": summary, "examples": examples}
+    return {"ok": True, "repair": repair, "clear_missing": clear_missing, "summary": summary, "examples": examples}

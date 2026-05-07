@@ -268,6 +268,13 @@ async def normalize_image_urls(me: dict = Depends(require_admin())):
     return await audit_image_references(repair=True)
 
 
+@router.post("/clear-missing-image-refs")
+async def clear_missing_image_refs(me: dict = Depends(require_admin())):
+    """Clear direct image fields that point to missing local upload files."""
+    from services.media_audit import audit_image_references
+    return await audit_image_references(repair=True, clear_missing=True)
+
+
 _EXT_BY_MIME = {
     "application/pdf": ".pdf",
     "application/zip": ".zip", "application/x-zip-compressed": ".zip",
