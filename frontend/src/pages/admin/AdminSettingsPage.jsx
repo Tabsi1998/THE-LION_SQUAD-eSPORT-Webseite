@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { setCachedBranding } from "@/lib/brandingEvents";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload, useImageUploadBusy } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye } from "lucide-react";
+import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye, Search } from "lucide-react";
 
 const MAIL_TEMPLATE_LABELS = {
   user_invite: "Einladungsmail",
@@ -63,6 +63,10 @@ export default function AdminSettingsPage() {
     twitch_client_secret_masked: "", twitch_live_detection: true,
   });
   const [discord, setDiscord] = useState({ webhook_url: "", username: "", avatar_url: "", enabled: true, configured: false, webhook_url_masked: "", last_status: "", last_error: "", last_event_key: "", last_checked_at: "" });
+  const [discordCounters, setDiscordCounters] = useState([]);
+  const [discordCounterQuery, setDiscordCounterQuery] = useState("");
+  const [discordCounterValues, setDiscordCounterValues] = useState({});
+  const [savingDiscordCounter, setSavingDiscordCounter] = useState("");
   const [testEmail, setTestEmail] = useState("");
   const [logs, setLogs] = useState([]);
   const [systemStatus, setSystemStatus] = useState(null);
@@ -90,10 +94,11 @@ export default function AdminSettingsPage() {
       api.get("/settings/mail-queue?limit=100"),
       api.get("/admin/system-status"),
       api.get("/admin/streams/status"),
+      api.get("/admin/discord/counters?limit=50"),
     ]);
     if (seq !== loadSeqRef.current) return;
     const value = (i) => requests[i].status === "fulfilled" ? requests[i].value.data : null;
-    const e = value(0), b = value(1), d = value(2), l = value(3), sm = value(4), q = value(5), st = value(6), tw = value(7);
+    const e = value(0), b = value(1), d = value(2), l = value(3), sm = value(4), q = value(5), st = value(6), tw = value(7), dc = value(8);
     if (e) setEmail((prev) => ({ ...prev, ...e, resend_api_key: "" }));
     if (b && !brandDirtyRef.current) setBrand((prev) => ({ ...prev, ...b }));
     if (d && !discordDirtyRef.current) setDiscord((prev) => ({ ...prev, ...d, webhook_url: "" }));
@@ -102,6 +107,7 @@ export default function AdminSettingsPage() {
     if (q) setQueue(q);
     if (st) setSystemStatus(st);
     if (tw) setTwitchStatus(tw);
+    if (dc) setDiscordCounters(dc);
     if (requests.some((r) => r.status === "rejected")) {
       toast.error("Ein Teil der Einstellungen konnte nicht geladen werden. Die verfuegbaren Tabs bleiben nutzbar.");
     }
@@ -125,6 +131,18 @@ export default function AdminSettingsPage() {
     discordDirtyRef.current = true;
     setDiscord((prev) => ({ ...prev, [key]: value }));
   };
+
+  const loadDiscordCounters = useCallback((query = discordCounterQuery) => {
+    api.get(`/admin/discord/counters?q=${encodeURIComponent(query)}&limit=50`)
+      .then(({ data }) => setDiscordCounters(Array.isArray(data) ? data : []))
+      .catch(() => setDiscordCounters([]));
+  }, [discordCounterQuery]);
+
+  useEffect(() => {
+    if (tab !== "discord") return undefined;
+    const id = window.setTimeout(() => loadDiscordCounters(discordCounterQuery), 250);
+    return () => window.clearTimeout(id);
+  }, [tab, discordCounterQuery, loadDiscordCounters]);
 
   const refreshPublicBranding = async () => {
     try {
@@ -240,6 +258,30 @@ export default function AdminSettingsPage() {
       toast.success("Discord Webhook entfernt.");
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+  const changeDiscordCounter = async (user, delta) => {
+    if (!user?.id || savingDiscordCounter) return;
+    setSavingDiscordCounter(`${user.id}:delta`);
+    try {
+      await api.post(`/admin/discord/counter/${user.id}`, { delta });
+      toast.success(delta > 0 ? `+${delta} Discord-Aktivität gezählt.` : `${delta} Discord-Aktivität abgezogen.`);
+      loadDiscordCounters();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setSavingDiscordCounter(""); }
+  };
+  const setDiscordCounter = async (user) => {
+    const raw = discordCounterValues[user.id];
+    if (raw === undefined || raw === "") return toast.error("Zählerwert eingeben.");
+    const total = Number(raw);
+    if (!Number.isFinite(total) || total < 0) return toast.error("Zähler muss 0 oder höher sein.");
+    setSavingDiscordCounter(`${user.id}:set`);
+    try {
+      await api.put(`/admin/discord/counter/${user.id}`, { total: Math.round(total) });
+      toast.success("Discord-Zähler gespeichert.");
+      setDiscordCounterValues((prev) => ({ ...prev, [user.id]: "" }));
+      loadDiscordCounters();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setSavingDiscordCounter(""); }
   };
 
   const saveSmtp = async () => {
@@ -684,7 +726,7 @@ export default function AdminSettingsPage() {
       )}
 
       {tab === "discord" && (
-        <div className="max-w-2xl space-y-4">
+        <div className="max-w-4xl space-y-4">
           {discordNotConfigured && (
             <div className="flex items-start gap-3 border border-[#5865F2]/30 bg-[#5865F2]/10 rounded-sm p-4">
               <MessageSquare className="w-5 h-5 text-[#5865F2] shrink-0 mt-0.5" />
@@ -725,6 +767,54 @@ export default function AdminSettingsPage() {
             <button onClick={saveDiscord} disabled={imageUploadBusy || savingDiscord} data-testid="discord-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingDiscord ? "Speichere..." : "Speichern"}</button>
               <button onClick={sendDiscordTest} data-testid="discord-test" className="px-4 py-2 border border-[#5865F2] text-[#5865F2] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Test senden</button>
               {discord.configured && <button onClick={clearDiscordWebhook} data-testid="discord-clear" className="px-4 py-2 border border-[#FF3B30]/60 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm">Webhook entfernen</button>}
+            </div>
+          </div>
+          <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+              <div>
+                <div className="font-heading font-bold uppercase">Discord-Aktivität</div>
+                <p className="mt-1 text-xs text-white/45">Pflege Nachrichten-Zähler für `discord_active` Achievements. Später kann hier ein Bot/Import automatisch schreiben.</p>
+              </div>
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />
+                <input value={discordCounterQuery} onChange={(e) => setDiscordCounterQuery(e.target.value)} data-testid="discord-counter-search" placeholder="User, Name, Discord oder E-Mail" className="w-full bg-[#0A0A0A] border border-white/10 pl-9 pr-3 py-2 rounded-sm text-sm" />
+              </div>
+            </div>
+            <div className="border border-white/5 rounded-sm divide-y divide-white/5 overflow-hidden">
+              {discordCounters.map((user) => {
+                const total = user.discord_messages_count || 0;
+                return (
+                  <div key={user.id} className="grid lg:grid-cols-[minmax(0,1fr)_auto] gap-3 p-3 items-center">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {user.avatar_url ? (
+                        <img src={resolveMediaUrl(user.avatar_url)} alt="" className="w-10 h-10 rounded-sm object-cover border border-white/10" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-sm bg-[#0A0A0A] border border-white/10 flex items-center justify-center text-xs font-black text-white/40">
+                          {(user.display_name || user.username || "?").slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="font-bold truncate">{user.display_name || user.username}</div>
+                        <div className="text-xs text-white/40 truncate">@{user.username}{user.discord_name ? ` · ${user.discord_name}` : ""}</div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 justify-start lg:justify-end">
+                      <div className="px-3 py-2 border border-[#5865F2]/30 bg-[#5865F2]/10 text-[#b8c0ff] text-xs font-bold uppercase tracking-widest rounded-sm">
+                        {total.toLocaleString("de-DE")} Nachrichten
+                      </div>
+                      <button type="button" onClick={() => changeDiscordCounter(user, 1)} disabled={!!savingDiscordCounter} className="px-3 py-2 border border-white/10 hover:border-[#5865F2]/60 text-xs font-bold uppercase tracking-wider rounded-sm">+1</button>
+                      <button type="button" onClick={() => changeDiscordCounter(user, 10)} disabled={!!savingDiscordCounter} className="px-3 py-2 border border-white/10 hover:border-[#5865F2]/60 text-xs font-bold uppercase tracking-wider rounded-sm">+10</button>
+                      <input type="number" min="0" value={discordCounterValues[user.id] ?? ""} onChange={(e) => setDiscordCounterValues((prev) => ({ ...prev, [user.id]: e.target.value }))} data-testid={`discord-counter-total-${user.id}`} placeholder="Wert" className="w-24 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-xs" />
+                      <button type="button" onClick={() => setDiscordCounter(user)} disabled={!!savingDiscordCounter} data-testid={`discord-counter-save-${user.id}`} className="px-3 py-2 bg-[#5865F2] text-white text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">Setzen</button>
+                    </div>
+                  </div>
+                );
+              })}
+              {!discordCounters.length && (
+                <div className="px-4 py-10 text-center text-sm text-white/40">
+                  Keine Discord-Zähler gefunden. Suche nach einem Benutzer, um den ersten Wert zu setzen.
+                </div>
+              )}
             </div>
           </div>
         </div>

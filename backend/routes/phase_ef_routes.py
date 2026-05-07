@@ -262,6 +262,34 @@ class CounterBody(BaseModel):
     delta: int = Field(default=1, ge=-1000, le=10000)
 
 
+class CounterSetBody(BaseModel):
+    total: int = Field(default=0, ge=0, le=1000000)
+
+
+async def _evaluate_discord_counter(user_id: str):
+    try:
+        from badges import evaluate_user_progress
+        await evaluate_user_progress(user_id)
+    except Exception:
+        pass
+
+
+async def _discord_counter_projection(db, user_id: str):
+    return await db.users.find_one(
+        {"id": user_id},
+        {
+            "_id": 0,
+            "id": 1,
+            "username": 1,
+            "display_name": 1,
+            "email": 1,
+            "avatar_url": 1,
+            "discord_name": 1,
+            "discord_messages_count": 1,
+        },
+    )
+
+
 @admin_discord_router.post("/counter/{user_id}")
 async def admin_bump_counter(user_id: str, body: CounterBody, me: dict = Depends(require_admin())):
     db = get_db()
@@ -273,12 +301,10 @@ async def admin_bump_counter(user_id: str, body: CounterBody, me: dict = Depends
         return_document=True,
         projection={"_id": 0, "id": 1, "discord_messages_count": 1, "username": 1},
     )
-    # Re-evaluate so discord_active tiers may auto-award
-    try:
-        from badges import evaluate_user_progress
-        await evaluate_user_progress(user_id)
-    except Exception:
-        pass
+    if int(res.get("discord_messages_count") or 0) < 0:
+        await db.users.update_one({"id": user_id}, {"$set": {"discord_messages_count": 0}})
+        res["discord_messages_count"] = 0
+    await _evaluate_discord_counter(user_id)
     await db.audit_logs.insert_one({
         "id": new_id(),
         "action": "discord.counter_bump",
@@ -286,14 +312,48 @@ async def admin_bump_counter(user_id: str, body: CounterBody, me: dict = Depends
         "data": {"delta": body.delta, "new_total": res.get("discord_messages_count")},
         "created_at": now_utc().isoformat(),
     })
-    return res
+    return await _discord_counter_projection(db, user_id) or res
+
+
+@admin_discord_router.put("/counter/{user_id}")
+async def admin_set_counter(user_id: str, body: CounterSetBody, me: dict = Depends(require_admin())):
+    db = get_db()
+    if not await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(404, "Nutzer nicht gefunden.")
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"discord_messages_count": body.total, "updated_at": now_utc().isoformat()}},
+    )
+    await _evaluate_discord_counter(user_id)
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "discord.counter_set",
+        "actor_id": me["id"], "target_id": user_id,
+        "data": {"total": body.total},
+        "created_at": now_utc().isoformat(),
+    })
+    return await _discord_counter_projection(db, user_id)
 
 
 @admin_discord_router.get("/counters")
-async def admin_list_counters(me: dict = Depends(require_admin())):
+async def admin_list_counters(q: str = "", limit: int = 100, me: dict = Depends(require_admin())):
     db = get_db()
+    safe_limit = max(1, min(limit, 500))
+    query: dict = {"discord_messages_count": {"$gt": 0}}
+    if q.strip():
+        rx = {"$regex": q.strip(), "$options": "i"}
+        query = {"$or": [{"username": rx}, {"display_name": rx}, {"email": rx}, {"discord_name": rx}]}
     users = await db.users.find(
-        {"discord_messages_count": {"$gt": 0}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "discord_name": 1, "discord_messages_count": 1}
-    ).sort("discord_messages_count", -1).to_list(500)
+        query,
+        {
+            "_id": 0,
+            "id": 1,
+            "username": 1,
+            "display_name": 1,
+            "email": 1,
+            "avatar_url": 1,
+            "discord_name": 1,
+            "discord_messages_count": 1,
+        },
+    ).sort("discord_messages_count", -1).to_list(safe_limit)
     return users
