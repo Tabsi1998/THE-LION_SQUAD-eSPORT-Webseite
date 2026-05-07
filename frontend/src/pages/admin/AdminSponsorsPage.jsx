@@ -93,7 +93,7 @@ export default function AdminSponsorsPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Partner</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Sponsoren</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">
-            Standard: <strong className="text-[#29B6E8]">Hauptsponsor</strong>, <strong className="text-[#E5E4E2]">Platin</strong> und <strong className="text-[#FFD700]">Gold</strong> erscheinen auf Startseite + Footer · <strong>Silber</strong> im Footer · <strong>Bronze</strong> nur auf der Sponsorenseite. Die Häkchen im Formular überschreiben diesen Standard.
+            Sponsoren erscheinen auf Startseite, Footer oder Eventseiten nur, wenn der jeweilige Haken im Formular aktiv ist. Der Tier steuert nur Sortierung und Darstellung.
           </p>
         </div>
         <div className="flex gap-2">
@@ -188,9 +188,9 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
     link: sponsor?.link || "", description: sponsor?.description || "",
     tier: sponsor?.tier && ["main","platinum","gold","silver","bronze"].includes(sponsor.tier) ? sponsor.tier : "bronze",
     is_active: sponsor?.is_active !== false,
-    show_on_home: sponsor?.show_on_home,
-    show_on_footer: sponsor?.show_on_footer,
-    show_on_events: sponsor?.show_on_events,
+    show_on_home: sponsor?.show_on_home === true,
+    show_on_footer: sponsor?.show_on_footer === true,
+    show_on_events: sponsor?.show_on_events === true,
     event_ids: sponsor?.event_ids || [],
     order_index: sponsor?.order_index ?? 0,
   });
@@ -222,7 +222,7 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Tier</div>
-            <select value={form.tier} onChange={(e) => setForm((f) => ({ ...f, tier: e.target.value, show_on_home: undefined, show_on_footer: undefined, show_on_events: undefined }))} data-testid="sponsor-tier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+            <select value={form.tier} onChange={(e) => set("tier", e.target.value)} data-testid="sponsor-tier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
               {TIERS.map((t) => <option key={t} value={t}>{TIER_LABELS[t]}</option>)}
             </select>
           </label>
@@ -237,15 +237,15 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
             Aktiv
           </label>
           <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_home === true || (form.show_on_home === undefined && ["main", "platinum", "gold"].includes(form.tier))} onChange={(e) => set("show_on_home", e.target.checked)} data-testid="sponsor-show-home" className="accent-[#29B6E8]" />
+            <input type="checkbox" checked={form.show_on_home === true} onChange={(e) => set("show_on_home", e.target.checked)} data-testid="sponsor-show-home" className="accent-[#29B6E8]" />
             Auf Home
           </label>
           <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_footer === true || (form.show_on_footer === undefined && ["main", "platinum", "gold", "silver"].includes(form.tier))} onChange={(e) => set("show_on_footer", e.target.checked)} data-testid="sponsor-show-footer" className="accent-[#29B6E8]" />
+            <input type="checkbox" checked={form.show_on_footer === true} onChange={(e) => set("show_on_footer", e.target.checked)} data-testid="sponsor-show-footer" className="accent-[#29B6E8]" />
             Im Footer
           </label>
           <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_events === true || (form.show_on_events === undefined && ["main", "platinum", "gold"].includes(form.tier))} onChange={(e) => set("show_on_events", e.target.checked)} data-testid="sponsor-show-events" className="accent-[#FFD700]" />
+            <input type="checkbox" checked={form.show_on_events === true} onChange={(e) => set("show_on_events", e.target.checked)} data-testid="sponsor-show-events" className="accent-[#FFD700]" />
             Events
           </label>
         </div>

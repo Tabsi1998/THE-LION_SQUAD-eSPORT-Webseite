@@ -222,9 +222,12 @@ Wichtig:
 ## Sponsoren und Footer
 
 Sponsorenlogos werden im Admin gepflegt. Der Footer zeigt die Logos als Slider.
+Ein Sponsor erscheint dort aber nur, wenn im Sponsorformular `Im Footer` aktiv ist.
 
 Empfehlung:
 
+- Platzierungen bewusst setzen: `Auf Home`, `Im Footer`, `Events`.
+- Der Sponsor-Tier sortiert und beschreibt den Sponsor, schaltet aber keine Platzierung automatisch frei.
 - Keine Sponsorennamen im Footer erzwingen, wenn das Logo selbsterklaerend ist.
 - Doppelte Logos vermeiden.
 - Nur oeffentliche/aktive Sponsoren anzeigen.

@@ -256,15 +256,12 @@ async def news_meta():
 
 # ---------- Sponsors ----------
 
-# Tier hierarchy used for default placement & auto-flags.
-# 5 tiers: Hauptsponsor (main) → Platin → Gold → Silber → Bronze.
+# Tier hierarchy used for sorting only.
+# Placement is explicit: sponsors appear on home/footer/events only when the
+# corresponding admin checkbox is enabled.
 _TIER_ORDER = {"main": 0, "platinum": 1, "gold": 2, "silver": 3, "bronze": 4}
 _LEGACY_TIER_MAP = {"supporter": "bronze", "partner": "bronze"}
-_SPONSOR_PLACEMENT_DEFAULTS = {
-    "show_on_home": {"main", "platinum", "gold"},
-    "show_on_footer": {"main", "platinum", "gold", "silver"},
-    "show_on_events": {"main", "platinum", "gold"},
-}
+_SPONSOR_PLACEMENT_FIELDS = ("show_on_home", "show_on_footer", "show_on_events")
 
 
 def _normalize_tier(t: str | None) -> str:
@@ -275,20 +272,16 @@ def _normalize_tier(t: str | None) -> str:
 
 
 def _sponsor_effective_flag(doc: dict, field: str) -> bool:
-    tier = _normalize_tier(doc.get("tier"))
-    raw = doc.get(field)
-    if raw is None:
-        return tier in _SPONSOR_PLACEMENT_DEFAULTS[field]
-    return bool(raw)
+    return bool(doc.get(field))
 
 
 def _sponsor_defaults(doc: dict) -> dict:
     """Resolve auto-derived placement flags based on tier when not explicitly set."""
     tier = _normalize_tier(doc.get("tier"))
     doc["tier"] = tier
-    for field in _SPONSOR_PLACEMENT_DEFAULTS:
+    for field in _SPONSOR_PLACEMENT_FIELDS:
         if doc.get(field) is None:
-            doc[field] = _sponsor_effective_flag(doc, field)
+            doc[field] = False
     if doc.get("event_ids") is None:
         doc["event_ids"] = []
     if doc.get("is_active") is None:
@@ -349,14 +342,6 @@ async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(requi
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if not updates:
         return {"ok": True}
-    # When tier changes without explicit placement flags, recompute all defaults together.
-    placement_fields = set(_SPONSOR_PLACEMENT_DEFAULTS)
-    if "tier" in updates and not any(field in updates for field in placement_fields):
-        cur = await db.sponsors.find_one({"id": sid}, {"_id": 0}) or {}
-        merged = {**cur, **updates, **{field: None for field in placement_fields}}
-        merged = _sponsor_defaults(merged)
-        for field in placement_fields:
-            updates[field] = merged[field]
     updates["updated_at"] = now_utc().isoformat()
     res = await db.sponsors.update_one({"id": sid}, {"$set": updates})
     if res.matched_count == 0:

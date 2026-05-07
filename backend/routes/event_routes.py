@@ -13,7 +13,6 @@ from models import EventCreate, EventUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
-SPONSOR_EVENT_TIERS = {"main", "platinum", "gold"}
 LEGACY_SPONSOR_TIERS = {"supporter": "bronze", "partner": "bronze"}
 
 
@@ -57,10 +56,7 @@ def _normalize_sponsor_tier(tier: str | None) -> str:
 
 
 def _sponsor_show_on_events(sponsor: dict) -> bool:
-    raw = sponsor.get("show_on_events")
-    if raw is not None:
-        return bool(raw)
-    return _normalize_sponsor_tier(sponsor.get("tier")) in SPONSOR_EVENT_TIERS
+    return bool(sponsor.get("show_on_events"))
 
 
 def _event_phase(event: dict) -> dict:
@@ -82,6 +78,7 @@ async def _attach_event_sponsors(event: dict) -> None:
     if sponsor_ids:
         query["id"] = {"$in": sponsor_ids}
     sponsors = await db.sponsors.find(query, {"_id": 0}).to_list(100)
+    sponsors = [sponsor for sponsor in sponsors if _sponsor_show_on_events(sponsor)]
     if not sponsor_ids:
         filtered = []
         for sponsor in sponsors:
