@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatMemberSince, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { ClubMemberProfilesAdminContent } from "@/pages/admin/AdminClubMemberProfilesPage";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Crown, Search, X, Save } from "lucide-react";
@@ -57,6 +58,7 @@ export default function AdminMembersPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all"); // all | community | members | pending
   const [editing, setEditing] = useState(null); // {user, membership}
+  const [tab, setTab] = useState("status");
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`);
@@ -92,9 +94,35 @@ export default function AdminMembersPage() {
         <div>
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">VEREIN</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Mitgliederverwaltung</h1>
-          <p className="text-sm text-white/60 mt-1">Community-Spieler zu offiziellen Vereinsmitgliedern befördern, Status, Mitgliedsnummern und interne Rollen pflegen.</p>
+          <p className="text-sm text-white/60 mt-1">Mitgliedschaften, Mitgliedsnummern und die öffentliche Vereinsmitgliederseite an einem Ort pflegen.</p>
         </div>
       </div>
+
+      <div className="flex flex-wrap gap-2 mb-6 border-b border-white/10">
+        {[
+          { k: "status", l: "Mitgliedschaften" },
+          { k: "profiles", l: "Öffentliche Mitgliederseite" },
+        ].map((item) => (
+          <button
+            key={item.k}
+            type="button"
+            onClick={() => setTab(item.k)}
+            data-testid={`members-main-tab-${item.k}`}
+            className={`px-4 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition ${
+              tab === item.k
+                ? "border-[#FFD700] text-[#FFD700]"
+                : "border-transparent text-white/45 hover:text-white"
+            }`}
+          >
+            {item.l}
+          </button>
+        ))}
+      </div>
+
+      {tab === "profiles" ? (
+        <ClubMemberProfilesAdminContent />
+      ) : (
+        <>
 
       <div className="flex flex-col md:flex-row gap-3 mb-5">
         <div className="relative flex-1 max-w-md">
@@ -176,6 +204,8 @@ export default function AdminMembersPage() {
 
       {editing && (
         <EditModal entry={editing} meta={meta} onClose={() => setEditing(null)} onSave={save} />
+      )}
+        </>
       )}
     </AdminLayout>
   );

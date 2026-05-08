@@ -59,7 +59,7 @@ function toForm(profile) {
   };
 }
 
-export default function AdminClubMemberProfilesPage() {
+export function ClubMemberProfilesAdminContent() {
   const [profiles, setProfiles] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +104,7 @@ export default function AdminClubMemberProfilesPage() {
   };
 
   return (
-    <AdminLayout>
+    <>
       <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Öffentliche Seite</span>
@@ -183,6 +183,14 @@ export default function AdminClubMemberProfilesPage() {
           onSaved={() => { setEditing(null); load(); }}
         />
       )}
+    </>
+  );
+}
+
+export default function AdminClubMemberProfilesPage() {
+  return (
+    <AdminLayout>
+      <ClubMemberProfilesAdminContent />
     </AdminLayout>
   );
 }
