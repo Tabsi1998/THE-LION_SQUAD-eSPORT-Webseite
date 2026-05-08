@@ -37,7 +37,9 @@ export default function AdminStationsPage() {
   const loadMatches = useCallback(async () => {
     if (!activeTid) return;
     const { data } = await api.get(`/tournaments/${activeTid}/bracket`);
-    setMatches(data.matches || []);
+    const legacy = (data.matches || []).map((m) => ({ ...m, engine: "legacy" }));
+    const flexible = (data.matches_v2 || []).map((m) => ({ ...m, engine: "v2" }));
+    setMatches([...legacy, ...flexible]);
     setRegs(data.registrations || []);
   }, [activeTid]);
   useEffect(() => { loadMatches(); }, [loadMatches]);
@@ -104,6 +106,12 @@ export default function AdminStationsPage() {
 
   const nameOfMatch = (m) => {
     if (!m) return "—";
+    if (m.engine === "v2" || m.slots) {
+      const names = (m.slots || [])
+        .map((slot) => regById[slot.registration_id]?.display_name || slot.source?.raw || "TBD")
+        .slice(0, 4);
+      return `${m.match_key || "Heat"} · ${names.join(" / ")}`;
+    }
     const a = regById[m.participant_a_id]?.display_name || "TBD";
     const b = regById[m.participant_b_id]?.display_name || "TBD";
     return `${a} vs ${b}`;
@@ -137,7 +145,7 @@ export default function AdminStationsPage() {
             <div className="space-y-1.5 max-h-[360px] overflow-y-auto">
               {unassignedMatches.map((m) => (
                 <div key={m.id} data-testid={`match-unassigned-${m.id}`} className="p-2 border border-white/10 rounded-sm text-xs bg-[#0A0A0A] hover:border-[#29B6E8]/40">
-                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{m.round_name || `Runde ${m.round}`}</div>
+                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{m.engine === "v2" ? `${m.section || "Stage"} · ${m.round_name || `Runde ${m.round}`}` : (m.round_name || `Runde ${m.round}`)}</div>
                   <div className="text-white font-semibold mt-0.5 truncate">{nameOfMatch(m)}</div>
                 </div>
               ))}
@@ -167,7 +175,7 @@ export default function AdminStationsPage() {
                 {/* Current match */}
                 {s.current_match_id ? (
                   <div className="mt-3 p-2 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm">
-                    <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">Aktuell</div>
+                  <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{s.status === "reserved" ? "Reserviert" : "Aktuell"}</div>
                     <div className="text-sm text-white truncate">{nameOfMatch(matchById[s.current_match_id])}</div>
                     <button onClick={() => clearStation(s.id)} data-testid={`station-clear-${s.id}`} className="mt-1.5 text-[10px] text-[#FF3B30] font-bold uppercase tracking-widest hover:underline inline-flex items-center gap-1"><XIcon className="w-3 h-3" /> Freigeben</button>
                   </div>
@@ -198,7 +206,7 @@ export default function AdminStationsPage() {
             <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
               {unassignedMatches.map((m) => (
                 <button key={m.id} onClick={() => assign(assignFor.id, m.id)} data-testid={`assign-match-${m.id}`} className="w-full text-left p-2 border border-white/10 rounded-sm hover:border-[#29B6E8] hover:bg-[#29B6E8]/5 text-xs">
-                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{m.round_name || `Runde ${m.round}`}</div>
+                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{m.engine === "v2" ? `${m.section || "Stage"} · ${m.round_name || `Runde ${m.round}`}` : (m.round_name || `Runde ${m.round}`)}</div>
                   <div className="text-white font-semibold mt-0.5">{nameOfMatch(m)}</div>
                 </button>
               ))}

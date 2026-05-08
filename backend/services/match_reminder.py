@@ -18,6 +18,7 @@ LEAD_TIMES = [
     ("match_lead_2h", "2h", 120, 20),
     ("match_lead_30m", "30m", 30, 10),
     ("match_lead_10m", "10m", 10, 5),
+    ("match_lead_5m", "5m", 5, 3),
 ]
 
 
@@ -25,18 +26,26 @@ async def _participants_for_match(match: dict) -> list[dict]:
     """Resolve match participant registration ids to user objects."""
     db = get_db()
     out: list[dict] = []
+    seen_user_ids: set[str] = set()
+
+    def add_user(user: dict | None) -> None:
+        if not user or not user.get("id") or user["id"] in seen_user_ids:
+            return
+        seen_user_ids.add(user["id"])
+        out.append(user)
+
     for raw in participant_source_ids(match):
         # Try direct user
         u = await db.users.find_one({"id": raw}, {"id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1})
         if u:
-            out.append(u)
+            add_user(u)
             continue
         # Try via registration
         reg = await db.tournament_registrations.find_one({"id": raw}, {"_id": 0})
         if reg and reg.get("user_id"):
             u2 = await db.users.find_one({"id": reg["user_id"]}, {"id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1})
             if u2:
-                out.append(u2)
+                add_user(u2)
         elif reg and reg.get("team_id"):
             members = await db.team_members.find({"team_id": reg["team_id"]}, {"_id": 0, "user_id": 1}).to_list(20)
             uids = [m["user_id"] for m in members if m.get("user_id")]
@@ -45,8 +54,37 @@ async def _participants_for_match(match: dict) -> list[dict]:
                     {"id": {"$in": uids}},
                     {"id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1},
                 ).to_list(20)
-                out.extend(users)
+                for team_user in users:
+                    add_user(team_user)
     return out
+
+
+async def _station_label(match: dict) -> str:
+    station_id = match.get("station_id")
+    if not station_id:
+        return ""
+    db = get_db()
+    station = await db.stations.find_one({"id": station_id}, {"_id": 0, "name": 1, "device_type": 1, "notes": 1})
+    if not station:
+        return station_id
+    parts = [station.get("name") or station_id]
+    if station.get("device_type"):
+        parts.append(station["device_type"])
+    if station.get("notes"):
+        parts.append(station["notes"])
+    return " · ".join(parts)
+
+
+def _opponent_label(participants: list[dict], user: dict) -> str:
+    others = [p.get("display_name") or p.get("username") for p in participants if p.get("id") != user.get("id")]
+    others = [name for name in others if name]
+    if not others:
+        return "TBD"
+    if len(others) == 1:
+        return others[0]
+    if len(others) <= 3:
+        return ", ".join(others)
+    return f"{len(others)} Gegner"
 
 
 async def schedule_match_reminders() -> dict:
@@ -78,13 +116,13 @@ async def schedule_match_reminders() -> dict:
             t = await db.tournaments.find_one({"id": m.get("tournament_id")}, {"title": 1, "slug": 1}) or {}
             url = f"/matches/{m.get('id')}" if collection_name == "matches" else f"/tournaments/{t.get('slug') or m.get('tournament_id')}/bracket"
             when_str = scheduled.astimezone(timezone.utc).strftime("%d.%m. %H:%M UTC")
+            station = await _station_label(m)
 
             participants = await _participants_for_match(m)
             if len(participants) < 1:
                 continue
             for p in participants:
-                opp = next((q for q in participants if q.get("id") != p.get("id")), None)
-                opp_name = (opp or {}).get("display_name", "TBD")
+                opp_name = _opponent_label(participants, p)
                 for tpl_key, label, lead_min, window in LEAD_TIMES:
                     # Match this lead time? (within ±window)
                     if abs(diff_min - lead_min) > window:
@@ -99,6 +137,7 @@ async def schedule_match_reminders() -> dict:
                         opponent=opp_name,
                         when=when_str,
                         url=url,
+                        station=station,
                         dedupe_key=dedupe,
                     )
                     queued += 1

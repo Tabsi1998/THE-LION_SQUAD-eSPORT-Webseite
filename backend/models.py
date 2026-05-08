@@ -728,6 +728,7 @@ class StationUpdate(BaseModel):
     device_type: Optional[str] = None
     status: Optional[Literal["free", "busy", "broken", "reserved"]] = None
     current_match_id: Optional[str] = None
+    current_match_type: Optional[Literal["matches", "matches_v2"]] = None
     notes: Optional[str] = None
 
 

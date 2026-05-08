@@ -133,14 +133,28 @@ Naechster Schritt: Bracket-/Heat-Darstellung fuer Public/Admin und erste TV/Embe
 - Match-Reminder beruecksichtigen jetzt klassische Matches und `matches_v2`.
 - Doku beschreibt manuelle Teilnehmer, No-Show-Ersatz und Zeitplanung.
 
-Naechster Schritt: operative Turnierleitung mit Next-up/Station-Queue und besserer Korrektur-/Undo-Sicherheit fuer bereits gespielte Folgematches.
+### Step 11 erledigt: Operative Check-in- und Stations-Reminder
+
+- Neuer Scheduler-Job `tournament_reminders` prueft Check-in-Fenster alle 60 Sekunden.
+- Teilnehmer mit Status `approved` erhalten Check-in-Hinweise 10 Minuten vor Start, beim Start und 10 Minuten vor Ende.
+- Check-in-Reminder respektieren die persoenlichen Turnier-Update-Mail-Einstellungen.
+- Match-Reminder haben jetzt zusaetzlich eine 5-Minuten-Stufe.
+- Match-Reminder enthalten Stationsnamen, Geraetetyp und Notiz, wenn eine Station zugewiesen ist.
+- Match-Reminder de-duplizieren Teilnehmer sauber, auch bei Teams oder v2-Slots.
+- Stationen koennen jetzt klassischen Matches und v2-Heats zugewiesen werden.
+- Stations-Zuweisung reserviert eine Station standardmaessig, statt ein Match sofort als laufend zu markieren.
+- `start_now=true` bleibt als API-Option fuer direktes Starten vorhanden.
+- Admin-Stationsseite zeigt offene klassische Matches und v2-Heats in einer gemeinsamen Queue.
+- Doku beschreibt Check-in-Reminder, Match-Reminder und Stationen.
+
+Naechster Schritt: operative Turnierleitung mit Next-up/Station-Queue, Live-Callouts und besserer Korrektur-/Undo-Sicherheit fuer bereits gespielte Folgematches.
 
 ## Was wirklich noch fehlt
 
 - Korrekte Double-Elimination-Flows fuer 1v1 und FFA inklusive Loser-Bracket-Transfers.
-- Operatives Turnierleitungs-Dashboard: Check-in, Warteliste, No-Show, Stationen, Next-up, offene Ergebnisse.
+- Operatives Turnierleitungs-Dashboard: kombinierte Check-in/Warteliste/No-Show/Stationen/Next-up/offene-Ergebnisse-Ansicht.
 - TV-/Embed-Ansichten fuer Bracket, Stationen und Live-Eventbetrieb.
-- Benachrichtigungen fuer Match bereit, Station zugewiesen, Check-in offen und Ergebnis bestaetigt.
+- Benachrichtigungen fuer Match bereit, Station zugewiesen und Ergebnis bestaetigt.
 - Vollstaendige Downstream-Cascade/Undo fuer Ergebnis-Korrekturen, wenn Folge-Matches bereits gespielt wurden.
 - QR-/Vor-Ort-Check-in fuer Events und Turniere.
 - Feineres Rollenmodell fuer Event-Orga analog zu Turnier-Staff.

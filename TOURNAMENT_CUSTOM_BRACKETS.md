@@ -74,6 +74,28 @@ Heats koennen trotzdem separat geplant werden:
 - `duration_minutes` beschreibt die erwartete Dauer.
 - Der Reminder-Scheduler beruecksichtigt klassische Matches und v2-Heats.
 - Reminder werden nur an Teilnehmer mit Account/E-Mail gesendet.
+- Match-Reminder laufen bei 24h, 2h, 30m, 10m und 5m vor Matchstart.
+- Wenn eine Station zugewiesen ist, steht sie in der Match-Erinnerung.
+
+## Check-in-Reminder
+
+Der Scheduler verschickt operative Check-in-Hinweise an angemeldete, noch nicht
+eingecheckte Teilnehmer:
+
+- 10 Minuten bevor der Check-in startet.
+- Direkt wenn der Check-in offen ist.
+- 10 Minuten bevor der Check-in endet.
+
+Alle Check-in-Mails nutzen den Turnier-Link und respektieren die persoenlichen
+E-Mail-Einstellungen fuer Turnier-Updates.
+
+## Stationen
+
+Stationen werden im Adminbereich angelegt und koennen klassischen Matches sowie
+v2-Heats zugewiesen werden. Eine Zuweisung setzt die Station auf `reserved`; das
+Match bleibt geplant/bereit und kann dadurch schon vorab in Erinnerungen mit
+Station erscheinen. Wird `start_now=true` ueber die API genutzt, wird das Match
+direkt auf `in_progress` gesetzt.
 
 ## Schema-Grundidee
 

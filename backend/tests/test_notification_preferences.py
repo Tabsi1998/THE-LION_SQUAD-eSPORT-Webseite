@@ -28,6 +28,8 @@ def test_default_operational_mails_are_enabled():
     assert prefs["prize_updates"] is True
     assert prefs["birthday_greetings"] is True
     assert email_allowed(user, "match_lead_10m") is True
+    assert email_allowed(user, "match_lead_5m") is True
+    assert email_allowed(user, "checkin_closes_soon") is True
     assert email_allowed(user, "birthday_greeting") is True
 
 
