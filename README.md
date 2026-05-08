@@ -24,6 +24,7 @@ Dokumenten, Achievements, Kontaktformular, Mailversand und Discord-Integrationen
 - Profile mit Avatar, Banner, Bio, Social/Gaming-Daten, Sichtbarkeit und Achievements.
 - Adminbereich fuer Benutzer, Mitglieder, Mitgliedsantraege, Turniere, Fast Lap, Events, News, Sponsoren, Galerie, Dokumente, Board, Navigation, CMS und Systemeinstellungen.
 - Turnier- und Matchverwaltung mit Registrierungen, Check-in, Brackets, Ergebnissen und TV-Anzeigen.
+- Flexible Turnierstrukturen fuer Duel und FFA, Custom-Brackets, automatische Slot-Weiterleitung und Heat-Ergebnisse.
 - F1/Fast-Lap-Challenges mit Strecken, Zeiten, Strafen, Ranglisten und Display-Modus.
 - Zeitplanung fuer Turniere und Fast-Lap-Challenges: Registrierung/Einreichung oeffnet,
   Registrierung/Einreichung endet, Start/Ende, Status `scheduled`, `registration_open`,
@@ -52,6 +53,7 @@ OPERATIONS.md
 LIVE_TESTS.md
 BACKUP_RESTORE.md
 ROLE_AUDIT.md
+TOURNAMENT_CUSTOM_BRACKETS.md
 ```
 
 ## Schnellstart Produktion

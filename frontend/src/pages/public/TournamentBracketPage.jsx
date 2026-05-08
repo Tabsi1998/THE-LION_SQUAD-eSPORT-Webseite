@@ -44,7 +44,7 @@ export default function TournamentBracketPage() {
             <Tv className="w-4 h-4" /> TV Ansicht
           </Link>
         </div>
-        {data.matches.length === 0 ? (
+        {(data.matches?.length || 0) + (data.matches_v2?.length || 0) === 0 ? (
           <div className="border border-white/10 rounded-sm bg-[#121212] p-12 text-center">
             <div className="text-white/50 font-display tracking-widest">BRACKET WURDE NOCH NICHT GENERIERT</div>
           </div>

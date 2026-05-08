@@ -68,6 +68,48 @@ C=[W:A:1,W:A:2,W:B:1,W:B:2]
 [LB]
 # Round 1
 LA=[L:A:3,L:A:4,L:B:3,L:B:4]`;
+const MARIO_KART_32_SCHEMA = `[WB]
+# Round 1 (32 -> 16)
+A=[1,2,3,4]
+B=[5,6,7,8]
+C=[9,10,11,12]
+D=[13,14,15,16]
+E=[17,18,19,20]
+F=[21,22,23,24]
+G=[25,26,27,28]
+H=[29,30,31,32]
+
+# Round 2 (16 -> 8)
+I=[W:A:1,W:A:2,W:B:1,W:B:2]
+J=[W:C:1,W:C:2,W:D:1,W:D:2]
+K=[W:E:1,W:E:2,W:F:1,W:F:2]
+L=[W:G:1,W:G:2,W:H:1,W:H:2]
+
+# Round 3 (8 -> 4)
+M=[W:I:1,W:I:2,W:J:1,W:J:2]
+N=[W:K:1,W:K:2,W:L:1,W:L:2]
+
+# Winner Final
+O=[W:M:1,W:M:2,W:N:1,W:N:2]
+
+[LB]
+# Round 1 (16 -> 8)
+LA=[L:A:3,L:A:4,L:B:3,L:B:4]
+LB=[L:C:3,L:C:4,L:D:3,L:D:4]
+LC=[L:E:3,L:E:4,L:F:3,L:F:4]
+LD=[L:G:3,L:G:4,L:H:3,L:H:4]
+
+# Round 2 (8 -> 4)
+LE=[W:LA:1,W:LA:2,W:LB:1,W:LB:2]
+LF=[W:LC:1,W:LC:2,W:LD:1,W:LD:2]
+
+# Loser Final
+LG=[W:LE:1,W:LE:2,W:LF:1,W:LF:2]`;
+const STAGE_PRESETS = [
+  ["custom", "Eigenes Schema", null],
+  ["mk8_8", "Mario Kart 8 Spieler", DEFAULT_FFA_SCHEMA],
+  ["mk8_32", "Mario Kart 32 Spieler", MARIO_KART_32_SCHEMA],
+];
 
 export default function AdminTournamentEditPage() {
   const { isAdmin, isModerator } = useAuth();
@@ -204,7 +246,7 @@ export default function AdminTournamentEditPage() {
         proof_url: meta.proof_url || null,
         note: meta.note || null,
       });
-      toast.success("v2-Ergebnis gespeichert.");
+      toast.success("Ergebnis gespeichert.");
       load();
     } catch (e) {
       if (e.response?.status === 409 && !meta.force) {
@@ -216,7 +258,7 @@ export default function AdminTournamentEditPage() {
         });
         if (force) return updateMatchV2Result(match, results, { ...meta, force: true });
       }
-      toast.error(formatRequestError(e, "v2-Ergebnis konnte nicht gespeichert werden."));
+      toast.error(formatRequestError(e, "Ergebnis konnte nicht gespeichert werden."));
     }
   };
   const generateGroups = async () => {
@@ -246,6 +288,7 @@ export default function AdminTournamentEditPage() {
   };
 
   if (!t) return <AdminLayout><div className="p-10 text-white/40">Lade…</div></AdminLayout>;
+  const hasFlexibleStructure = stages.length > 0 || matchesV2.length > 0;
 
   return (
     <AdminLayout>
@@ -268,7 +311,7 @@ export default function AdminTournamentEditPage() {
               <div className="mt-1 text-[10px] text-white/40">Manuell nur für Ausnahmen; Zeitplan automatisiert.</div>
             </div>
           )}
-          {isAdmin && <button onClick={generate} data-testid="admin-tr-generate" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2">
+          {isAdmin && !hasFlexibleStructure && <button onClick={generate} data-testid="admin-tr-generate" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2">
             <Zap className="w-3.5 h-3.5" /> Bracket generieren
           </button>}
           {isAdmin && <button onClick={reset} data-testid="admin-tr-reset" className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-sm hover:border-[#FF3B30]/60 hover:text-[#FF3B30] inline-flex items-center gap-2">
@@ -289,14 +332,14 @@ export default function AdminTournamentEditPage() {
       </div>
 
       <div className="flex gap-2 mb-5 border-b border-white/10 overflow-x-auto">
-        {["participants", "bracket", "matches", "stages", ...(t.format === "groups" ? ["groups"] : []), ...(isAdmin ? ["staff"] : []), "edit"].map((s) => (
+        {["participants", "bracket", ...(hasFlexibleStructure ? [] : ["matches"]), "stages", ...(t.format === "groups" ? ["groups"] : []), ...(isAdmin ? ["staff"] : []), "edit"].map((s) => (
           <button
             key={s}
             data-testid={`admin-tr-tab-${s}`}
             onClick={() => setTab(s)}
             className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${tab === s ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}
           >
-            {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Bracket" : s === "matches" ? "Matches" : s === "stages" ? "Stages v2" : s === "groups" ? "Gruppen" : s === "staff" ? "Team" : "Bearbeiten"}
+            {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Bracket" : s === "matches" ? "Matches" : s === "stages" ? "Struktur" : s === "groups" ? "Gruppen" : s === "staff" ? "Team" : "Bearbeiten"}
           </button>
         ))}
       </div>
@@ -350,7 +393,7 @@ export default function AdminTournamentEditPage() {
 
       {tab === "bracket" && bracket && (
         <div className="bg-[#0A0A0A] rounded-sm p-4 border border-white/10">
-          {bracket.matches?.length === 0 ? (
+          {(bracket.matches?.length || 0) + (bracket.matches_v2?.length || 0) === 0 ? (
             <div className="text-center py-16 text-white/40 font-display tracking-widest">BRACKET NICHT GENERIERT</div>
           ) : (
             <BracketTree data={bracket} />
@@ -452,6 +495,19 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
   const confirm = useConfirm();
   const regById = Object.fromEntries((registrations || []).map((r) => [r.id, r]));
   const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
+  const applyPreset = (key) => {
+    const preset = STAGE_PRESETS.find(([value]) => value === key);
+    if (!preset?.[2]) return;
+    setForm((current) => ({
+      ...current,
+      match_type: "ffa",
+      stage_type: "ffa_custom_bracket",
+      match_size: 4,
+      min_players: 2,
+      qualifiers_per_match: 2,
+      schema: preset[2],
+    }));
+  };
   const createStage = async (e) => {
     e.preventDefault();
     try {
@@ -478,7 +534,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
   const removeStage = async (stage) => {
     if (!await confirm({
       title: "Stage löschen?",
-      description: "Alle v2-Matches und Reports dieser Stage werden gelöscht.",
+      description: "Alle Matches und Reports dieser Stage werden gelöscht.",
       confirmLabel: "Löschen",
       tone: "danger",
     })) return;
@@ -502,6 +558,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
           {createOpen && (
             <form onSubmit={createStage} className="border-t border-white/10 p-5 grid md:grid-cols-3 gap-3">
               <Fld label="Name" value={form.name} onChange={(v)=>set("name", v)} testId="stage-new-name" />
+              <SelectField label="Vorlage" value="custom" onChange={applyPreset} options={STAGE_PRESETS.map(([v, l]) => [v, l])} />
               <SelectField label="Match-Typ" value={form.match_type} onChange={(v)=>set("match_type", v)} options={STAGE_MATCH_TYPES} />
               <SelectField label="Stage-Typ" value={form.stage_type} onChange={(v)=>set("stage_type", v)} options={STAGE_TYPES} />
               <Fld label="Matchgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />
@@ -536,7 +593,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
         ))}
         {stages.length === 0 && (
           <div className="border border-white/10 bg-[#121212] rounded-sm p-10 text-center text-white/40">
-            Noch keine v2-Stages.
+            Noch keine Struktur.
           </div>
         )}
       </div>
@@ -558,6 +615,19 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
   });
   const confirm = useConfirm();
   const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
+  const applyPreset = (key) => {
+    const preset = STAGE_PRESETS.find(([value]) => value === key);
+    if (!preset?.[2]) return;
+    setForm((current) => ({
+      ...current,
+      match_type: "ffa",
+      stage_type: "ffa_custom_bracket",
+      match_size: 4,
+      min_players: 2,
+      qualifiers_per_match: 2,
+      schema: preset[2],
+    }));
+  };
   const save = async () => {
     try {
       await api.patch(`/tournaments/${tournamentId}/stages/${stage.id}`, {
@@ -585,13 +655,13 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
     try {
       const suffix = force ? "?force=true" : "";
       const { data } = await api.post(`/tournaments/${tournamentId}/stages/${stage.id}/generate${suffix}`);
-      toast.success(`${data.match_count} v2-Matches generiert.`);
+      toast.success(`${data.match_count} Matches generiert.`);
       onChanged();
     } catch (err) {
       if (err.response?.status === 409 && !force) {
         const ok = await confirm({
           title: "Stage neu generieren?",
-          description: "Vorhandene v2-Matches und Reports dieser Stage werden ersetzt.",
+          description: "Vorhandene Matches und Reports dieser Stage werden ersetzt.",
           confirmLabel: "Neu generieren",
           tone: "danger",
         });
@@ -633,6 +703,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
           <div className="space-y-3">
             <div className="grid sm:grid-cols-2 gap-3">
               <Fld label="Name" value={form.name} onChange={(v)=>set("name", v)} testId={`stage-name-${stage.id}`} />
+              <SelectField label="Vorlage anwenden" value="custom" onChange={applyPreset} options={STAGE_PRESETS.map(([v, l]) => [v, l])} />
               <SelectField label="Status" value={form.status} onChange={(v)=>set("status", v)} options={[["pending", "Pending"], ["ready", "Ready"], ["running", "Running"], ["completed", "Completed"], ["archived", "Archived"]]} />
               <SelectField label="Match-Typ" value={form.match_type} onChange={(v)=>set("match_type", v)} options={STAGE_MATCH_TYPES} />
               <SelectField label="Stage-Typ" value={form.stage_type} onChange={(v)=>set("stage_type", v)} options={STAGE_TYPES} />
@@ -657,7 +728,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
           ))}
           {matches.length === 0 && (
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-8 text-center text-white/40">
-              Keine v2-Matches generiert.
+              Keine Matches generiert.
             </div>
           )}
         </div>
@@ -751,7 +822,7 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
         </div>
       ))}
       <input value={note} onChange={(e)=>setNote(e.target.value)} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" placeholder="Notiz" />
-      <button type="button" onClick={save} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase">v2-Ergebnis speichern</button>
+      <button type="button" onClick={save} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase">Ergebnis speichern</button>
     </div>
   );
 }

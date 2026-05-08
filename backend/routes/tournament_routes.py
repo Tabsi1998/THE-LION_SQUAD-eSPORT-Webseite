@@ -965,6 +965,8 @@ async def get_bracket(tid: str, user=Depends(get_optional_user)):
     is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
     t["public_phase"] = derive_public_phase(t, "tournament")
     matches = await db.matches.find({"tournament_id": t["id"]}, {"_id": 0}).sort("round", 1).to_list(1000)
+    stages = await db.tournament_stages.find({"tournament_id": t["id"]}, {"_id": 0}).sort("number", 1).to_list(200)
+    matches_v2 = await db.matches_v2.find({"tournament_id": t["id"]}, {"_id": 0}).sort([("stage_number", 1), ("round", 1), ("order", 1)]).to_list(3000)
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     regs = [_public_registration(r, user, is_staff) for r in regs]
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
@@ -975,7 +977,69 @@ async def get_bracket(tid: str, user=Depends(get_optional_user)):
             u = users.get(r["user_id"]) or {}
             r["user"] = {"id": u.get("id"), "username": u.get("username"),
                          "display_name": u.get("display_name"), "avatar_url": u.get("avatar_url")}
-    return {"tournament": t, "matches": matches, "registrations": regs}
+    return {
+        "tournament": t,
+        "matches": matches,
+        "registrations": regs,
+        "stages": stages,
+        "matches_v2": matches_v2,
+        "engine": "stage" if stages or matches_v2 else "legacy",
+    }
+
+
+def _v2_standings(matches_v2: list[dict], regs: list[dict]) -> list[dict]:
+    rank_map = {
+        r["id"]: {
+            "registration_id": r["id"],
+            "display_name": r.get("display_name") or r.get("ingame_name") or r.get("user", {}).get("display_name"),
+            "played": 0,
+            "won": 0,
+            "top2": 0,
+            "lost": 0,
+            "points": 0,
+            "rank_sum": 0,
+            "furthest_round": 0,
+            "best_rank": None,
+        }
+        for r in regs
+    }
+    for match in matches_v2:
+        if match.get("status") not in {"completed", "forfeit"}:
+            continue
+        for result in match.get("results") or []:
+            rid = result.get("registration_id")
+            if rid not in rank_map:
+                continue
+            rank = int(result.get("rank") or 999)
+            row = rank_map[rid]
+            row["played"] += 1
+            row["rank_sum"] += rank
+            row["furthest_round"] = max(row["furthest_round"], int(match.get("round") or 0))
+            row["best_rank"] = rank if row["best_rank"] is None else min(row["best_rank"], rank)
+            if rank == 1:
+                row["won"] += 1
+            if rank <= 2:
+                row["top2"] += 1
+            else:
+                row["lost"] += 1
+            score = result.get("points")
+            if score is None:
+                score = result.get("score")
+            if isinstance(score, (int, float)):
+                row["points"] += score
+    rows = list(rank_map.values())
+    for row in rows:
+        row["avg_rank"] = round(row["rank_sum"] / row["played"], 2) if row["played"] else None
+    rows.sort(key=lambda row: (
+        row["furthest_round"],
+        row["won"],
+        row["top2"],
+        row["points"],
+        -(row["avg_rank"] or 999),
+    ), reverse=True)
+    for i, row in enumerate(rows, start=1):
+        row["rank"] = i
+    return rows
 
 
 @router.get("/{tid}/standings")
@@ -985,6 +1049,7 @@ async def standings(tid: str, user=Depends(get_optional_user)):
     t = await _get_visible_tournament(tid, user)
     is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
     matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(1000)
+    matches_v2 = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
     regs = [_public_registration(r, user, is_staff) for r in regs]
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
@@ -993,6 +1058,9 @@ async def standings(tid: str, user=Depends(get_optional_user)):
     for r in regs:
         u = users.get(r.get("user_id") or "", {})
         r["display_name"] = r.get("display_name") or u.get("display_name") or u.get("username")
+        r["user"] = {"id": u.get("id"), "username": u.get("username"), "display_name": u.get("display_name"), "avatar_url": u.get("avatar_url")}
+    if matches_v2:
+        return _v2_standings(matches_v2, regs)
     fmt = t.get("format")
     if fmt in ("round_robin", "league"):
         return compute_round_robin_standings(matches, regs)
