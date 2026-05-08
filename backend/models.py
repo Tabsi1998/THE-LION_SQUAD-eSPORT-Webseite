@@ -286,6 +286,8 @@ class EventCreate(BaseModel):
     registration_closes_at: Optional[datetime] = None
     has_registration: bool = False
     registration_url: Optional[str] = None
+    allow_companions: bool = False
+    max_companions_per_registration: int = Field(0, ge=0, le=20)
     location: Optional[str] = None
     address: Optional[str] = None
     postal_code: Optional[str] = None
@@ -321,6 +323,8 @@ class EventUpdate(BaseModel):
     registration_closes_at: Optional[datetime] = None
     has_registration: Optional[bool] = None
     registration_url: Optional[str] = None
+    allow_companions: Optional[bool] = None
+    max_companions_per_registration: Optional[int] = Field(default=None, ge=0, le=20)
     location: Optional[str] = None
     address: Optional[str] = None
     postal_code: Optional[str] = None
@@ -343,6 +347,21 @@ class EventUpdate(BaseModel):
     stream_platform: Optional[str] = None
     stream_url: Optional[str] = None
     status: Optional[EventStatus] = None
+
+
+EventRegistrationStatus = Literal["registered", "waitlist", "checked_in", "cancelled", "no_show"]
+
+
+class EventRegistrationCreate(BaseModel):
+    companion_count: int = Field(0, ge=0, le=20)
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+class EventRegistrationUpdate(BaseModel):
+    status: Optional[EventRegistrationStatus] = None
+    companion_count: Optional[int] = Field(default=None, ge=0, le=20)
+    note: Optional[str] = Field(default=None, max_length=500)
+    internal_note: Optional[str] = Field(default=None, max_length=1000)
 
 
 # ---------- Tournaments ----------

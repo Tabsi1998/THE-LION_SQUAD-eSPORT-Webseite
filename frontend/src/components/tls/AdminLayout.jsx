@@ -93,10 +93,11 @@ export function AdminLayout({ children }) {
             <button
               onClick={async () => { await logout(); nav("/"); }}
               data-testid="admin-logout"
-              className="p-2 text-white/60 hover:text-[#FF3B30]"
+              className="inline-flex items-center gap-1.5 px-2 py-2 text-[#FF3B30] border border-[#FF3B30]/30 hover:bg-[#FF3B30]/10 rounded-sm text-[10px] font-bold uppercase tracking-wider"
               aria-label="Logout"
             >
               <LogOut className="w-4 h-4" />
+              Logout
             </button>
           </div>
         </div>

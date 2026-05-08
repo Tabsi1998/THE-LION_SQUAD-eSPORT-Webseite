@@ -71,10 +71,11 @@ export function PublicLayout({ children }) {
                 <button
                   data-testid="nav-logout"
                   onClick={async () => { await logout(); nav("/"); }}
-                  className="p-2 text-white/60 hover:text-[#FF3B30] transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 border border-[#FF3B30]/35 text-[#FF3B30] hover:bg-[#FF3B30]/10 transition rounded-sm text-xs font-bold uppercase tracking-wider"
                   aria-label="Logout"
                 >
                   <LogOut className="w-4 h-4" />
+                  <span className="hidden sm:inline">Logout</span>
                 </button>
               </>
             ) : (
@@ -121,7 +122,16 @@ export function PublicLayout({ children }) {
                   </Link>
                 )}
                 {user ? (
-                  <Link to="/dashboard" onClick={closeMobile} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">Mein Bereich</Link>
+                  <>
+                    <Link to="/dashboard" onClick={closeMobile} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">Mein Bereich</Link>
+                    <button
+                      type="button"
+                      onClick={async () => { await logout(); closeMobile(); nav("/"); }}
+                      className="w-full text-left px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#FF3B30]"
+                    >
+                      <LogOut className="w-3.5 h-3.5 inline mr-1.5" /> Logout
+                    </button>
+                  </>
                 ) : (
                   <>
                     <Link to="/login" onClick={closeMobile} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">Login</Link>

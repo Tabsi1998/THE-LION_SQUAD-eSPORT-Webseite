@@ -3,17 +3,20 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from datetime import datetime, timezone
 from database import get_db
-from auth import require_admin, get_optional_user
+from auth import require_admin, get_optional_user, get_current_user
 from services.visibility import user_can_see
 from services.content_embed_service import resolve_content_embeds
 from services.public_phase import derive_public_phase
 from services.sponsor_utils import dedupe_public_sponsors
 from services.notification_preferences import enqueue_newsletter_for_item
-from models import EventCreate, EventUpdate, now_utc, new_id
+from models import EventCreate, EventUpdate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 LEGACY_SPONSOR_TIERS = {"supporter": "bronze", "partner": "bronze"}
+ACTIVE_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in"}
+PUBLIC_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in", "waitlist"}
+ADMIN_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in", "waitlist", "cancelled", "no_show"}
 
 
 async def _user_can_see(user: dict | None, visibility: str) -> bool:
@@ -68,6 +71,103 @@ def _published_now(post: dict) -> bool:
     return not published_at or published_at <= now_utc()
 
 
+async def _find_event(slug_or_id: str) -> dict | None:
+    db = get_db()
+    return await db.events.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+
+
+def _registration_seats(registration: dict) -> int:
+    try:
+        companion_count = int(registration.get("companion_count") or 0)
+    except (TypeError, ValueError):
+        companion_count = 0
+    return 1 + max(0, companion_count)
+
+
+def _public_event_registration(registration: dict, is_staff: bool = False) -> dict:
+    payload = {
+        "id": registration.get("id"),
+        "user_id": registration.get("user_id"),
+        "display_name": registration.get("display_name"),
+        "status": registration.get("status"),
+        "companion_count": int(registration.get("companion_count") or 0),
+        "seat_count": _registration_seats(registration),
+        "created_at": registration.get("created_at"),
+        "updated_at": registration.get("updated_at"),
+    }
+    if is_staff:
+        payload["email"] = registration.get("email")
+        payload["note"] = registration.get("note")
+        payload["internal_note"] = registration.get("internal_note")
+    return payload
+
+
+async def _event_registration_summary(event: dict, exclude_registration_id: str | None = None) -> dict:
+    db = get_db()
+    regs = await db.event_registrations.find({"event_id": event["id"]}, {"_id": 0}).to_list(2000)
+    if exclude_registration_id:
+        regs = [r for r in regs if r.get("id") != exclude_registration_id]
+    active = [r for r in regs if r.get("status") in ACTIVE_EVENT_REGISTRATION_STATUSES]
+    waitlist = [r for r in regs if r.get("status") == "waitlist"]
+    reserved_seats = sum(_registration_seats(r) for r in active)
+    waitlist_seats = sum(_registration_seats(r) for r in waitlist)
+    companion_count = sum(max(0, int(r.get("companion_count") or 0)) for r in active)
+    max_participants = event.get("max_participants")
+    spots_left = None
+    if max_participants:
+        spots_left = max(int(max_participants) - reserved_seats, 0)
+    return {
+        "registered_count": len(active),
+        "waitlist_count": len(waitlist),
+        "checked_in_count": len([r for r in regs if r.get("status") == "checked_in"]),
+        "no_show_count": len([r for r in regs if r.get("status") == "no_show"]),
+        "cancelled_count": len([r for r in regs if r.get("status") == "cancelled"]),
+        "reserved_seats": reserved_seats,
+        "waitlist_seats": waitlist_seats,
+        "companion_count": companion_count,
+        "spots_left": spots_left,
+        "max_participants": max_participants,
+    }
+
+
+def _event_registration_open(event: dict) -> bool:
+    return bool(event.get("has_registration") and derive_public_phase(event, "event").get("state") == "registration_open")
+
+
+def _validated_companion_count(event: dict, value: int | None) -> int:
+    companion_count = int(value or 0)
+    if companion_count < 0:
+        raise HTTPException(status_code=400, detail="Begleitpersonen duerfen nicht negativ sein")
+    max_companions = int(event.get("max_companions_per_registration") or 0)
+    if companion_count and not event.get("allow_companions"):
+        raise HTTPException(status_code=400, detail="Bei diesem Event sind keine Begleitpersonen aktiviert")
+    if companion_count > max_companions:
+        raise HTTPException(status_code=400, detail=f"Maximal {max_companions} Begleitpersonen erlaubt")
+    return companion_count
+
+
+async def _attach_event_registration_view(event: dict, user: dict | None) -> None:
+    db = get_db()
+    is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    event["own_registration"] = None
+    if user:
+        own = await db.event_registrations.find_one(
+            {"event_id": event["id"], "user_id": user["id"]},
+            {"_id": 0},
+        )
+        if own:
+            event["own_registration"] = _public_event_registration(own, is_staff=True)
+    if event.get("show_participants") or is_staff:
+        statuses = ADMIN_EVENT_REGISTRATION_STATUSES if is_staff else PUBLIC_EVENT_REGISTRATION_STATUSES
+        regs = await db.event_registrations.find(
+            {"event_id": event["id"], "status": {"$in": list(statuses)}},
+            {"_id": 0},
+        ).sort("created_at", 1).to_list(2000)
+        event["registrations"] = [_public_event_registration(r, is_staff=is_staff) for r in regs]
+    else:
+        event["registrations"] = []
+
+
 async def _attach_event_sponsors(event: dict) -> None:
     if event.get("owned_by_club") is False or event.get("show_sponsors") is False:
         event["sponsors"] = []
@@ -96,6 +196,21 @@ async def _attach_event_sponsors(event: dict) -> None:
 async def _decorate_event(event: dict, include_sponsors: bool = False) -> dict:
     event["public_phase"] = _event_phase(event)
     event["event_phase"] = event["public_phase"]
+    if event.get("has_registration"):
+        event["registration_summary"] = await _event_registration_summary(event)
+    else:
+        event["registration_summary"] = {
+            "registered_count": 0,
+            "waitlist_count": 0,
+            "checked_in_count": 0,
+            "no_show_count": 0,
+            "cancelled_count": 0,
+            "reserved_seats": 0,
+            "waitlist_seats": 0,
+            "companion_count": 0,
+            "spots_left": event.get("max_participants"),
+            "max_participants": event.get("max_participants"),
+        }
     if include_sponsors:
         await _attach_event_sponsors(event)
     return event
@@ -184,7 +299,7 @@ async def event_meta():
 @router.get("/{slug_or_id}")
 async def get_event(slug_or_id: str, user: dict | None = Depends(get_optional_user)):
     db = get_db()
-    event = await db.events.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    event = await _find_event(slug_or_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
     is_admin = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
@@ -222,7 +337,156 @@ async def get_event(slug_or_id: str, user: dict | None = Depends(get_optional_us
     ]
     event["content_embeds"] = await resolve_content_embeds(db, event.get("program"), user)
     await _decorate_event(event, include_sponsors=True)
+    await _attach_event_registration_view(event, user)
     return event
+
+
+@router.get("/{event_id}/registrations")
+async def list_event_registrations(event_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    event = await _find_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    regs = await db.event_registrations.find(
+        {"event_id": event["id"]},
+        {"_id": 0},
+    ).sort("created_at", 1).to_list(2000)
+    return {
+        "event": {"id": event["id"], "name": event.get("name"), "max_participants": event.get("max_participants")},
+        "summary": await _event_registration_summary(event),
+        "registrations": [_public_event_registration(r, is_staff=True) for r in regs],
+    }
+
+
+@router.post("/{event_id}/registrations")
+async def register_for_event(event_id: str, body: EventRegistrationCreate,
+                             me: dict = Depends(get_current_user)):
+    db = get_db()
+    event = await _find_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    if event.get("status") == "draft" and me.get("role") not in STAFF_ROLES:
+        raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    if not await _user_can_see(me, event.get("visibility") or "public"):
+        raise HTTPException(status_code=403, detail="Event ist nicht sichtbar")
+    if not _event_registration_open(event):
+        raise HTTPException(status_code=400, detail="Die Anmeldung ist aktuell nicht offen")
+
+    companion_count = _validated_companion_count(event, body.companion_count)
+    requested_seats = 1 + companion_count
+    existing = await db.event_registrations.find_one(
+        {"event_id": event["id"], "user_id": me["id"]},
+        {"_id": 0},
+    )
+    if existing and existing.get("status") not in {"cancelled", "no_show"}:
+        raise HTTPException(status_code=409, detail="Du bist fuer dieses Event bereits angemeldet")
+
+    summary = await _event_registration_summary(event, exclude_registration_id=existing.get("id") if existing else None)
+    status = "registered"
+    max_participants = event.get("max_participants")
+    if max_participants and summary["reserved_seats"] + requested_seats > int(max_participants):
+        status = "waitlist"
+
+    now = now_utc().isoformat()
+    doc = {
+        "event_id": event["id"],
+        "user_id": me["id"],
+        "display_name": me.get("display_name") or me.get("username"),
+        "email": me.get("email"),
+        "status": status,
+        "companion_count": companion_count,
+        "seat_count": requested_seats,
+        "note": body.note,
+        "updated_at": now,
+    }
+    if existing:
+        await db.event_registrations.update_one(
+            {"id": existing["id"]},
+            {"$set": doc},
+        )
+        doc = await db.event_registrations.find_one({"id": existing["id"]}, {"_id": 0})
+    else:
+        doc["id"] = new_id()
+        doc["created_at"] = now
+        await db.event_registrations.insert_one(doc)
+        doc.pop("_id", None)
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "event.registration.create",
+        "target_id": event["id"],
+        "actor_id": me["id"],
+        "data": {"registration_id": doc["id"], "status": status, "companion_count": companion_count},
+        "created_at": now,
+    })
+    return _public_event_registration(doc, is_staff=True)
+
+
+@router.delete("/{event_id}/registrations/me")
+async def cancel_my_event_registration(event_id: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    event = await _find_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    reg = await db.event_registrations.find_one(
+        {"event_id": event["id"], "user_id": me["id"]},
+        {"_id": 0},
+    )
+    if not reg:
+        raise HTTPException(status_code=404, detail="Anmeldung nicht gefunden")
+    now = now_utc().isoformat()
+    await db.event_registrations.update_one(
+        {"id": reg["id"]},
+        {"$set": {"status": "cancelled", "updated_at": now}},
+    )
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "event.registration.cancel",
+        "target_id": event["id"],
+        "actor_id": me["id"],
+        "data": {"registration_id": reg["id"]},
+        "created_at": now,
+    })
+    return {"ok": True}
+
+
+@router.patch("/{event_id}/registrations/{registration_id}")
+@router.put("/{event_id}/registrations/{registration_id}")
+async def update_event_registration(event_id: str, registration_id: str, body: EventRegistrationUpdate,
+                                    me: dict = Depends(require_admin())):
+    db = get_db()
+    event = await _find_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    current = await db.event_registrations.find_one(
+        {"id": registration_id, "event_id": event["id"]},
+        {"_id": 0},
+    )
+    if not current:
+        raise HTTPException(status_code=404, detail="Anmeldung nicht gefunden")
+    nullable = {"note", "internal_note"}
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None or k in nullable}
+    if "companion_count" in updates:
+        companion_count = _validated_companion_count(event, updates.get("companion_count"))
+        updates["companion_count"] = companion_count
+        updates["seat_count"] = 1 + companion_count
+    proposed = {**current, **updates}
+    proposed_status = proposed.get("status")
+    if proposed_status in ACTIVE_EVENT_REGISTRATION_STATUSES and event.get("max_participants"):
+        summary = await _event_registration_summary(event, exclude_registration_id=registration_id)
+        if summary["reserved_seats"] + _registration_seats(proposed) > int(event["max_participants"]):
+            raise HTTPException(status_code=400, detail="Kapazitaet waere ueberschritten")
+    updates["updated_at"] = now_utc().isoformat()
+    await db.event_registrations.update_one({"id": registration_id}, {"$set": updates})
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "event.registration.update",
+        "target_id": event["id"],
+        "actor_id": me["id"],
+        "data": {"registration_id": registration_id, "updates": {k: v for k, v in updates.items() if k != "updated_at"}},
+        "created_at": now_utc().isoformat(),
+    })
+    updated = await db.event_registrations.find_one({"id": registration_id}, {"_id": 0})
+    return _public_event_registration(updated, is_staff=True)
 
 
 @router.post("")
@@ -297,6 +561,7 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
 async def delete_event(event_id: str, me: dict = Depends(require_admin())):
     db = get_db()
     await db.events.delete_one({"id": event_id})
+    await db.event_registrations.delete_many({"event_id": event_id})
     await db.tournaments.update_many({"event_id": event_id}, {"$set": {"event_id": None, "updated_at": now_utc().isoformat()}})
     await db.f1_challenges.update_many({"event_id": event_id}, {"$set": {"event_id": None, "updated_at": now_utc().isoformat()}})
     await db.gallery_albums.update_many({"event_id": event_id}, {"$set": {"event_id": None, "updated_at": now_utc().isoformat()}})

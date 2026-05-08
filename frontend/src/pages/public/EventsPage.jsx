@@ -111,7 +111,12 @@ function EventCard({ e, meta }) {
         )}
         {e.max_participants && (
           <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/50">
-            <UsersIcon className="w-3 h-3" /> max. {e.max_participants}
+            <UsersIcon className="w-3 h-3" /> {e.registration_summary?.reserved_seats || 0}/{e.max_participants} Plätze
+          </div>
+        )}
+        {e.has_registration && !e.max_participants && (
+          <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/50">
+            <UsersIcon className="w-3 h-3" /> {e.registration_summary?.registered_count || 0} angemeldet
           </div>
         )}
         {e.description && <p className="mt-3 text-sm text-white/65 line-clamp-2 flex-1">{e.description}</p>}

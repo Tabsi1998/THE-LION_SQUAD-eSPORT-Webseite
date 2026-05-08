@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
@@ -9,7 +9,9 @@ import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { renderMarkdownLite } from "@/lib/markdownLite";
-import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
+import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag, UserPlus, CheckCircle, XCircle } from "lucide-react";
 
 const TYPE_LABELS = {
   club_evening: "Vereinsabend", lan_party: "LAN-Party", public_event: "Public Event",
@@ -50,13 +52,14 @@ function uniqueLogoSponsors(sponsors = []) {
 
 export default function EventDetailPage() {
   const { slug } = useParams();
+  const { user } = useAuth();
   const [e, setE] = useState(null);
   const [error, setError] = useState(null);
   const { hasConsent, openSettings } = useCookieConsent();
   useDocumentTitle(e?.name || "Event", e?.description || "Event von THE LION SQUAD eSports.");
 
   const load = useCallback(() => {
-    api.get(`/events/${slug}`).then(({ data }) => {
+    return api.get(`/events/${slug}`).then(({ data }) => {
       setE(data);
       setError(null);
     }).catch((err) => {
@@ -81,6 +84,7 @@ export default function EventDetailPage() {
   if (!e) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
 
   const eventSponsors = uniqueLogoSponsors(e.sponsors || []);
+  const organizerName = e.organizer_name || (e.owned_by_club ? "THE LION SQUAD - eSports" : "");
 
   return (
     <PublicLayout>
@@ -102,12 +106,13 @@ export default function EventDetailPage() {
             {(e.location || fullAddress(e)) && <span className="inline-flex min-w-0 items-center gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{[e.location, fullAddress(e)].filter(Boolean).join(", ")}</span></span>}
             {e.contact && <span className="inline-flex min-w-0 items-center gap-2"><Mail className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-all">{e.contact}</span></span>}
             {e.max_participants && <span className="inline-flex items-center gap-2"><Users className="w-4 h-4 text-[#9F7AEA] shrink-0" />max. {e.max_participants}</span>}
-            {e.organizer_name && (
+            {e.has_registration && e.registration_summary && <span className="inline-flex items-center gap-2"><UserPlus className="w-4 h-4 text-[#9F7AEA] shrink-0" />{e.registration_summary.reserved_seats || 0}{e.max_participants ? `/${e.max_participants}` : ""} Plätze reserviert</span>}
+            {organizerName && (
               e.organizer_url ? (
                 <a href={e.organizer_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-[#29B6E8] hover:underline">
-                  <ExternalLink className="w-4 h-4" /> {e.organizer_name}
+                  <ExternalLink className="w-4 h-4" /> {organizerName}
                 </a>
-              ) : <span className="inline-flex items-center gap-2">{e.organizer_name}</span>
+              ) : <span className="inline-flex items-center gap-2">{organizerName}</span>
             )}
           </div>
         </div>
@@ -117,20 +122,7 @@ export default function EventDetailPage() {
         {(e.has_registration || (e.show_map && mapEmbedUrl(e))) && (
           <div className="grid lg:grid-cols-2 gap-5 min-w-0">
             {e.has_registration && (
-              <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
-                <div className="text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">Anmeldung</div>
-                <h2 className="mt-2 font-heading text-2xl font-black uppercase">{e.registration_url ? "Registrierung möglich" : "Registrierung"}</h2>
-                <div className="mt-3 space-y-1 text-sm text-white/65">
-                  {e.registration_opens_at && <div>Öffnet: {new Date(e.registration_opens_at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
-                  {e.registration_closes_at && <div>Schließt: {new Date(e.registration_closes_at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
-                  {!e.registration_opens_at && !e.registration_closes_at && <div>Details zur Anmeldung werden beim Event gepflegt.</div>}
-                </div>
-                {e.registration_url && (
-                  <a href={e.registration_url} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-[#9F7AEA] text-black text-xs uppercase tracking-wider font-bold rounded-sm">
-                    Anmelden <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                )}
-              </div>
+              <EventRegistrationPanel event={e} user={user} onChanged={load} />
             )}
             {e.show_map && mapEmbedUrl(e) && hasConsent("external_media") && (
               <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
@@ -217,6 +209,146 @@ export default function EventDetailPage() {
         )}
       </div>
     </PublicLayout>
+  );
+}
+
+const EVENT_REGISTRATION_LABELS = {
+  registered: "Angemeldet",
+  waitlist: "Warteliste",
+  checked_in: "Eingecheckt",
+  cancelled: "Storniert",
+  no_show: "No-Show",
+};
+
+function EventRegistrationPanel({ event, user, onChanged }) {
+  const [companionCount, setCompanionCount] = useState(0);
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const summary = event.registration_summary || {};
+  const own = event.own_registration;
+  const activeOwn = own && !["cancelled", "no_show"].includes(own.status);
+  const phaseState = event.public_phase?.state || event.event_phase?.state || event.status;
+  const registrationOpen = phaseState === "registration_open";
+  const maxCompanions = event.allow_companions ? Number(event.max_companions_per_registration || 0) : 0;
+  const loginTarget = typeof window !== "undefined" ? `/login?next=${encodeURIComponent(window.location.pathname)}` : "/login";
+
+  useEffect(() => {
+    setCompanionCount(0);
+    setNote("");
+  }, [event.id]);
+
+  const register = async (ev) => {
+    ev.preventDefault();
+    setSaving(true);
+    try {
+      await api.post(`/events/${event.id}/registrations`, {
+        companion_count: Number(companionCount || 0),
+        note: note || null,
+      });
+      toast.success("Anmeldung gespeichert.");
+      await onChanged();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Anmeldung konnte nicht gespeichert werden."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancel = async () => {
+    setSaving(true);
+    try {
+      await api.delete(`/events/${event.id}/registrations/me`);
+      toast.success("Anmeldung storniert.");
+      await onChanged();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Anmeldung konnte nicht storniert werden."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
+      <div className="text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">Anmeldung</div>
+      <h2 className="mt-2 font-heading text-2xl font-black uppercase">{event.registration_url ? "Registrierung möglich" : "Event-Anmeldung"}</h2>
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <MiniStat label="Reserviert" value={`${summary.reserved_seats || 0}${event.max_participants ? `/${event.max_participants}` : ""}`} />
+        <MiniStat label="Anmeldungen" value={summary.registered_count || 0} />
+        <MiniStat label="Begleitp." value={summary.companion_count || 0} />
+      </div>
+      {!!summary.waitlist_count && (
+        <div className="mt-2 text-xs text-[#FFD700]">{summary.waitlist_count} Anmeldung(en) auf der Warteliste.</div>
+      )}
+      <div className="mt-4 space-y-1 text-sm text-white/65">
+        {event.registration_opens_at && <div>Öffnet: {new Date(event.registration_opens_at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
+        {event.registration_closes_at && <div>Schließt: {new Date(event.registration_closes_at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
+        {summary.spots_left != null && <div>Freie Plätze: {summary.spots_left}</div>}
+      </div>
+      {event.registration_url ? (
+        <a href={event.registration_url} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-[#9F7AEA] text-black text-xs uppercase tracking-wider font-bold rounded-sm">
+          Anmelden <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+      ) : activeOwn ? (
+        <div className="mt-5 border border-[#10B981]/30 bg-[#10B981]/10 rounded-sm p-4">
+          <div className="inline-flex items-center gap-2 text-[#10B981] text-sm font-bold uppercase tracking-wider">
+            <CheckCircle className="w-4 h-4" /> {EVENT_REGISTRATION_LABELS[own.status] || own.status}
+          </div>
+          <div className="mt-2 text-sm text-white/65">
+            {own.status === "waitlist"
+              ? `Du stehst mit ${own.seat_count || 1} Platz/Plätzen auf der Warteliste${own.companion_count ? `, davon ${own.companion_count} Begleitperson(en)` : ""}.`
+              : `${own.seat_count || 1} Platz/Plätze reserviert${own.companion_count ? `, davon ${own.companion_count} Begleitperson(en)` : ""}.`}
+          </div>
+          <button type="button" disabled={saving} onClick={cancel} className="mt-4 inline-flex items-center gap-2 px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
+            <XCircle className="w-3.5 h-3.5" /> Stornieren
+          </button>
+        </div>
+      ) : !registrationOpen ? (
+        <div className="mt-5 border border-white/10 rounded-sm p-4 text-sm text-white/55">Die Anmeldung ist aktuell nicht offen.</div>
+      ) : !user ? (
+        <Link to={loginTarget} className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-[#9F7AEA] text-black text-xs uppercase tracking-wider font-bold rounded-sm">
+          Einloggen zum Anmelden
+        </Link>
+      ) : (
+        <form onSubmit={register} className="mt-5 space-y-3">
+          {event.allow_companions && (
+            <label className="block">
+              <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Begleitpersonen</div>
+              <input type="number" min="0" max={maxCompanions} value={companionCount} onChange={(ev) => setCompanionCount(ev.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
+              <div className="mt-1 text-xs text-white/40">Maximal {maxCompanions} pro Anmeldung.</div>
+            </label>
+          )}
+          <label className="block">
+            <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Hinweis optional</div>
+            <textarea value={note} onChange={(ev) => setNote(ev.target.value)} rows={3} maxLength={500} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="z.B. komme etwas später" />
+          </label>
+          <button disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 bg-[#9F7AEA] text-black text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
+            <UserPlus className="w-3.5 h-3.5" /> {saving ? "Speichere..." : "Anmelden"}
+          </button>
+        </form>
+      )}
+      {!!event.registrations?.length && (
+        <div className="mt-6 border-t border-white/10 pt-4">
+          <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">Angemeldet</div>
+          <div className="space-y-1.5">
+            {event.registrations.slice(0, 12).map((registration) => (
+              <div key={registration.id} className="flex items-center justify-between gap-3 text-sm border border-white/5 bg-black/15 rounded-sm px-3 py-2">
+                <span className="truncate">{registration.display_name || "Teilnehmer"}</span>
+                <span className="text-xs text-white/45 shrink-0">{registration.seat_count || 1} Platz/Plätze</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MiniStat({ label, value }) {
+  return (
+    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
+      <div className="text-[10px] uppercase tracking-widest text-white/40">{label}</div>
+      <div className="mt-1 font-heading text-xl font-black">{value}</div>
+    </div>
   );
 }
 

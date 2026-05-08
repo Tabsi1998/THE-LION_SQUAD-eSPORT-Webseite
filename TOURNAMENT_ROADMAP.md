@@ -32,7 +32,32 @@ Stand: 2026-05-08
 - Cleanup beim Turnier- und User-Loeschen sowie TLS-Reset ergaenzt.
 - Unit-Tests fuer die neue Berechtigungslogik ergaenzt.
 
+### Step 3 erledigt: Event-Anmeldung und Orga-Basis
+
+- Logout-Button in Public- und Admin-Layout wieder klar sichtbar gemacht.
+- Interne Event-Anmeldung fuer angemeldete Nutzer ergaenzt.
+- Vereinsinterne Events funktionieren damit fuer aktive Vereinsmitglieder ohne externen Formular-Link.
+- Event-Kapazitaet zaehlt jetzt reservierte Plaetze statt nur Accounts.
+- Begleitpersonen sind pro Event aktivierbar und pro Anmeldung begrenzbar.
+- Warteliste wird automatisch genutzt, wenn die Kapazitaet ueberschritten wuerde.
+- Admin-Eventliste zeigt reservierte Plaetze, Anmeldungen und Begleitpersonen.
+- Admins koennen Event-Anmeldungen einsehen und Status auf angemeldet, Warteliste, eingecheckt, No-Show oder storniert setzen.
+- Eventseiten zeigen freie/reservierte Plaetze und die eigene Anmeldung.
+
 Naechster Schritt: Phase 2 vorbereitet einfuehren: `tournament_stages` und `matches_v2` parallel zum alten Modell, damit FFA/Custom-Brackets ohne Bruch der alten Turniere entstehen koennen.
+
+## Was wirklich noch fehlt
+
+- Neues Turniermodell: `tournament_stages`, `matches_v2`, Multi-Slot-Matches und Platzierungsresultate.
+- Schema-Parser fuer Custom-Brackets wie `[WB] A=[1,2,3,4]` und Referenzen `W:A:1`, `L:A:3`.
+- Echte FFA-Ergebnis-UI mit 3-8 Teilnehmern, Rangliste, Punkten, DNF/Forfeit und Proof.
+- Korrekte Double-Elimination-Flows fuer 1v1 und FFA inklusive Loser-Bracket-Transfers.
+- Operatives Turnierleitungs-Dashboard: Check-in, Warteliste, No-Show, Stationen, Next-up, offene Ergebnisse.
+- TV-/Embed-Ansichten fuer Bracket, Stationen und Live-Eventbetrieb.
+- Benachrichtigungen fuer Match bereit, Station zugewiesen, Check-in offen und Ergebnis bestaetigt.
+- Audit/Undo fuer Ergebnis-Korrekturen, wenn Folgematches bereits gestartet oder gespielt wurden.
+- QR-/Vor-Ort-Check-in fuer Events und Turniere.
+- Feineres Rollenmodell fuer Event-Orga analog zu Turnier-Staff.
 
 ## Kurzfazit
 
@@ -50,7 +75,8 @@ Fuer Mario Kart mit 4 Spielern pro Heat braucht es deshalb nicht nur einen neuen
 - `frontend/src/components/tls/BracketTree.jsx`: Darstellung gruppiert nach `bracket` und `round`, rendert aber ebenfalls nur zwei Teilnehmer pro Match.
 - `frontend/src/pages/admin/AdminTournamentEditPage.jsx`: Admins/Moderatoren koennen Ergebnisse eintragen, aber nur A/B-Score + Gewinner.
 - `frontend/src/pages/admin/AdminStationsPage.jsx`: Stationen und Match-Zuweisung sind vorhanden, aber noch keine Turnierleitungs-Queue mit Check-in-Status, Next-up und Heat-Management.
-- `backend/services/match_reminder.py`: nutzt noch alte Felder (`player1_id`, `player2_id`) statt `participant_a_id`, `participant_b_id`; Reminder duerften fuer neue Matches nicht korrekt greifen.
+- `backend/services/match_reminder.py`: nutzt aktuelle Match-Felder plus Legacy-Fallbacks.
+- `backend/routes/event_routes.py`: Events haben jetzt interne Anmeldung, Kapazitaetszaehlung, Begleitpersonen und Admin-Statuspflege.
 
 ## Externer Abgleich
 

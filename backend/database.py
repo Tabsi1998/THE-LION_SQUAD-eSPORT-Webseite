@@ -49,6 +49,9 @@ async def init_indexes():
     # Events
     await db.events.create_index("id", unique=True)
     await db.events.create_index("slug", unique=True)
+    await db.event_registrations.create_index("id", unique=True)
+    await db.event_registrations.create_index([("event_id", 1), ("user_id", 1)], unique=True)
+    await db.event_registrations.create_index([("event_id", 1), ("status", 1)])
     # F1
     await db.f1_challenges.create_index("id", unique=True)
     await db.f1_challenges.create_index("slug", unique=True)

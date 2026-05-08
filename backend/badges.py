@@ -244,7 +244,10 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     p["membership_days"] = membership_days
 
     if "event_registrations" in await db.list_collection_names():
-        p["events_attended"] = await db.event_registrations.count_documents({"user_id": user_id, "checked_in": True})
+        p["events_attended"] = await db.event_registrations.count_documents({
+            "user_id": user_id,
+            "$or": [{"status": "checked_in"}, {"checked_in": True}],
+        })
     else:
         p["events_attended"] = 0
 
