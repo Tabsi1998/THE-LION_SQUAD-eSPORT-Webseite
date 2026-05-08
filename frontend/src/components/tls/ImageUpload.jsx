@@ -204,6 +204,19 @@ function drawImageRectWithPadding(ctx, img, source, dest) {
   ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
+function imageDimensionsFromUrl(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => resolve({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
+    img.onerror = reject;
+    img.src = url;
+    if (img.complete && (img.naturalWidth || img.width)) {
+      resolve({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
+    }
+  });
+}
+
 async function loadImage(file) {
   const url = URL.createObjectURL(file);
   try {
@@ -372,7 +385,25 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     }
     if (browserCanOptimizeImages()) {
       const url = URL.createObjectURL(file);
-      setEditor({ file, url, rotation: 0, cropMode: variant === "square" ? "square" : "original", cropX: 0, cropY: 0, zoom: 1 });
+      try {
+        const dimensions = await imageDimensionsFromUrl(url);
+        if (!dimensions.width || !dimensions.height) throw new Error("Bildgröße konnte nicht gelesen werden.");
+        setEditor({
+          file,
+          url,
+          rotation: 0,
+          cropMode: variant === "square" ? "square" : "original",
+          cropX: 0,
+          cropY: 0,
+          zoom: 1,
+          naturalWidth: dimensions.width,
+          naturalHeight: dimensions.height,
+        });
+      } catch (error) {
+        URL.revokeObjectURL(url);
+        console.warn("[uploads] Bildvorschau konnte nicht geladen werden:", error);
+        await uploadFile(file);
+      }
       return;
     }
     await uploadFile(file);
@@ -484,7 +515,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
             </div>
             <div
               ref={cropBoxRef}
-              className={`relative mx-auto bg-[#050505] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center touch-none select-none ${editor.cropMode === "wide" ? "aspect-video" : editor.cropMode === "portrait" ? "aspect-[4/5] max-h-[60vh]" : editor.cropMode === "square" ? "aspect-square max-h-[60vh]" : "min-h-[280px] max-h-[55vh]"}`}
+              className={`relative mx-auto bg-[#050505] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center touch-none select-none w-full ${editor.cropMode === "wide" ? "aspect-video max-w-3xl" : editor.cropMode === "portrait" ? "aspect-[4/5] max-w-[48vh]" : editor.cropMode === "square" ? "aspect-square max-w-[60vh]" : "min-h-[280px] max-h-[55vh] max-w-3xl"}`}
               onPointerDown={(e) => {
                 if (editor.cropMode === "original") return;
                 e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -508,10 +539,17 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                 src={editor.url}
                 alt=""
                 draggable={false}
-                onLoad={(e) => setEditor((cur) => cur ? ({ ...cur, naturalWidth: e.currentTarget.naturalWidth, naturalHeight: e.currentTarget.naturalHeight }) : cur)}
+                onLoad={(e) => setEditor((cur) => cur ? ({ ...cur, naturalWidth: e.currentTarget.naturalWidth || cur.naturalWidth, naturalHeight: e.currentTarget.naturalHeight || cur.naturalHeight }) : cur)}
+                onError={() => toast.error("Bildvorschau konnte nicht geladen werden. Bitte anderes Bild probieren.")}
                 className={`${editor.cropMode === "original" ? "max-w-full max-h-[55vh] object-contain" : "absolute max-w-none cursor-grab active:cursor-grabbing"} transition-transform`}
                 style={editor.cropMode === "original" ? { transform: `rotate(${editor.rotation}deg)` } : editorImageStyle}
               />
+              {!editorSource && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/45">
+                  <ImageIcon className="w-8 h-8 animate-pulse" />
+                  <span className="text-[10px] uppercase tracking-widest font-bold">Lade Bildvorschau</span>
+                </div>
+              )}
             </div>
             {editor.cropMode !== "original" && (
               <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
