@@ -90,14 +90,14 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
 }
 
 /**
- * SponsorGrid — static grid (for Bracket TV footer — multiple logos side by side)
+ * SponsorGrid — static TV/display sponsor strip.
  */
-export function SponsorGrid({ max = 4 }) {
+export function SponsorGrid({ max = 4, placement = "tv" }) {
   const [sponsors, setSponsors] = useState([]);
   const load = useCallback(async () => {
-    try { const { data } = await api.get("/sponsors?placement=footer"); setSponsors(data || []); }
+    try { const { data } = await api.get(`/sponsors?placement=${placement}`); setSponsors(data || []); }
     catch { setSponsors([]); }
-  }, []);
+  }, [placement]);
   useEffect(() => {
     load();
   }, [load]);
@@ -108,7 +108,7 @@ export function SponsorGrid({ max = 4 }) {
     <div className="flex items-center gap-5" data-testid="sponsor-grid">
       {logoSponsors.slice(0, max).map((s) => (
         <a key={s.id} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" className="inline-flex items-center justify-center opacity-75 hover:opacity-100 transition" title={s.name}>
-          <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="h-7 max-w-36 w-auto" />
+          <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className={`${s.tier === "main" ? "h-9 max-w-44" : s.tier === "platinum" ? "h-8 max-w-40" : "h-7 max-w-36"} w-auto`} />
         </a>
       ))}
     </div>

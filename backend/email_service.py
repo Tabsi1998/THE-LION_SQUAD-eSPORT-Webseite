@@ -3,6 +3,7 @@ Logs all sends to the email_logs collection. Silent failure if no key configured
 import os
 import asyncio
 import logging
+import html as html_lib
 from typing import Optional
 from datetime import datetime, timezone
 
@@ -83,6 +84,64 @@ async def send_mail(to: str, subject: str, html: str, template_key: str = "custo
 
 # ---------- HTML Templates ----------
 BRAND_CYAN = "#29B6E8"
+
+
+async def _site_base_url() -> str:
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "domain": 1}) or {}
+    base = (os.environ.get("FRONTEND_URL") or branding.get("domain") or "https://lionsquad.at").strip().rstrip("/")
+    if base and not base.startswith(("http://", "https://")):
+        base = "https://" + base
+    return base or "https://lionsquad.at"
+
+
+def _absolute_public_url(value: str, base: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if raw.startswith(("http://", "https://")):
+        return raw
+    return f"{base}/{raw.lstrip('/')}"
+
+
+async def _email_sponsor_block() -> str:
+    db = get_db()
+    sponsors = await db.sponsors.find(
+        {"is_active": {"$ne": False}},
+        {"_id": 0, "name": 1, "logo_url": 1, "link": 1, "tier": 1, "order_index": 1, "show_in_emails": 1},
+    ).sort([("order_index", 1), ("name", 1)]).to_list(50)
+    sponsors = [
+        s for s in sponsors
+        if s.get("logo_url") and (s.get("show_in_emails") is True or (s.get("show_in_emails") is None and s.get("tier") == "main"))
+    ][:3]
+    if not sponsors:
+        return ""
+    base = await _site_base_url()
+    items = []
+    for sponsor in sponsors:
+        logo = html_lib.escape(_absolute_public_url(sponsor.get("logo_url"), base), quote=True)
+        name = html_lib.escape(sponsor.get("name") or "Sponsor")
+        link = html_lib.escape(_absolute_public_url(sponsor.get("link"), base), quote=True) if sponsor.get("link") else ""
+        image = f'<img src="{logo}" alt="{name}" style="display:block;max-width:190px;max-height:60px;width:auto;height:auto;margin:8px auto 0">'
+        if link:
+            image = f'<a href="{link}" style="text-decoration:none">{image}</a>'
+        items.append(f'<td align="center" style="padding:0 10px">{image}</td>')
+    return (
+        '<tr><td style="padding:18px 32px;border-top:1px solid #edf0f3;background:#fbfcfd">'
+        '<div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#6b7280;font-weight:700;text-align:center">Unterstützt von</div>'
+        f'<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:6px"><tr>{"".join(items)}</tr></table>'
+        '</td></tr>'
+    )
+
+
+async def _with_email_sponsors(html: str) -> str:
+    sponsor_html = await _email_sponsor_block()
+    if not sponsor_html:
+        return html
+    marker = '    <tr><td style="padding:16px 32px;border-top:1px solid #edf0f3;color:#6b7280;font-size:12px;line-height:1.5">'
+    if marker in html:
+        return html.replace(marker, sponsor_html + "\n" + marker, 1)
+    return html.replace("</table>\n</td></tr></table></body></html>", sponsor_html + "\n</table>\n</td></tr></table></body></html>", 1)
 
 
 def tpl_registration(display_name: str) -> tuple[str, str]:
@@ -388,6 +447,7 @@ async def send_template(
         subject, html = fn(**kwargs)
     except TypeError as e:
         return {"ok": False, "reason": f"template args error: {e}"}
+    html = await _with_email_sponsors(html)
     if queue:
         from services.mail_queue import enqueue_mail
         return await enqueue_mail(

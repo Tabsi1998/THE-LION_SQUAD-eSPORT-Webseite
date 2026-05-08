@@ -10,6 +10,13 @@ import { Plus, Trash2, Upload, Pencil, X as XIcon } from "lucide-react";
 const TIERS = ["main", "platinum", "gold", "silver", "bronze"];
 const TIER_LABELS = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const TIER_COLORS = { main: "text-[#29B6E8]", platinum: "text-[#E5E4E2]", gold: "text-[#FFD700]", silver: "text-white/80", bronze: "text-[#CD7F32]" };
+const TIER_DEFAULTS = {
+  main: { show_on_home: true, show_on_footer: true, show_on_events: false, show_on_tv: true, show_in_emails: true },
+  platinum: { show_on_home: true, show_on_footer: true, show_on_events: false, show_on_tv: true, show_in_emails: false },
+  gold: { show_on_home: false, show_on_footer: true, show_on_events: false, show_on_tv: false, show_in_emails: false },
+  silver: { show_on_home: false, show_on_footer: true, show_on_events: false, show_on_tv: false, show_in_emails: false },
+  bronze: { show_on_home: false, show_on_footer: false, show_on_events: false, show_on_tv: false, show_in_emails: false },
+};
 
 export default function AdminSponsorsPage() {
   const [list, setList] = useState([]);
@@ -93,7 +100,7 @@ export default function AdminSponsorsPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Partner</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Sponsoren</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">
-            Sponsoren erscheinen auf Startseite, Footer oder Eventseiten nur, wenn der jeweilige Haken im Formular aktiv ist. Der Tier steuert nur Sortierung und Darstellung.
+            Tier steuert Größe und Reihenfolge. Die Sichtbarkeit wird über die Haken gesetzt: Bronze nur Sponsoren-Seite, Silber/Gold Footer, Platin Home/Footer/TV, Hauptsponsor zusätzlich E-Mail.
           </p>
         </div>
         <div className="flex gap-2">
@@ -154,6 +161,8 @@ export default function AdminSponsorsPage() {
                     {s.show_on_home && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest">Home</span>}
                     {s.show_on_footer && <span className="text-[9px] px-1.5 py-0.5 bg-white/10 text-white/70 rounded-sm font-bold uppercase tracking-widest">Footer</span>}
                     {s.show_on_events && <span className="text-[9px] px-1.5 py-0.5 bg-[#FFD700]/15 text-[#FFD700] rounded-sm font-bold uppercase tracking-widest">Events</span>}
+                    {s.show_on_tv && <span className="text-[9px] px-1.5 py-0.5 bg-[#9F7AEA]/15 text-[#BFA6FF] rounded-sm font-bold uppercase tracking-widest">TV</span>}
+                    {s.show_in_emails && <span className="text-[9px] px-1.5 py-0.5 bg-[#18C29C]/15 text-[#18C29C] rounded-sm font-bold uppercase tracking-widest">E-Mail</span>}
                     {s.is_active === false && <span className="text-[9px] px-1.5 py-0.5 bg-[#FF3B30]/15 text-[#FF3B30] rounded-sm font-bold uppercase tracking-widest">Inaktiv</span>}
                   </div>
                 </div>
@@ -183,19 +192,37 @@ export default function AdminSponsorsPage() {
 }
 
 function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
+  const initialTier = sponsor?.tier && ["main","platinum","gold","silver","bronze"].includes(sponsor.tier) ? sponsor.tier : "bronze";
+  const initialDefaults = TIER_DEFAULTS[initialTier] || TIER_DEFAULTS.bronze;
   const [form, setForm] = useState({
     name: sponsor?.name || "", logo_url: sponsor?.logo_url || "",
     link: sponsor?.link || "", description: sponsor?.description || "",
-    tier: sponsor?.tier && ["main","platinum","gold","silver","bronze"].includes(sponsor.tier) ? sponsor.tier : "bronze",
+    tier: initialTier,
     is_active: sponsor?.is_active !== false,
-    show_on_home: sponsor?.show_on_home === true,
-    show_on_footer: sponsor?.show_on_footer === true,
-    show_on_events: sponsor?.show_on_events === true,
+    show_on_home: sponsor ? sponsor?.show_on_home === true : initialDefaults.show_on_home,
+    show_on_footer: sponsor ? sponsor?.show_on_footer === true : initialDefaults.show_on_footer,
+    show_on_events: sponsor ? sponsor?.show_on_events === true : initialDefaults.show_on_events,
+    show_on_tv: sponsor ? sponsor?.show_on_tv === true : initialDefaults.show_on_tv,
+    show_in_emails: sponsor ? sponsor?.show_in_emails === true : initialDefaults.show_in_emails,
     event_ids: sponsor?.event_ids || [],
     order_index: sponsor?.order_index ?? 0,
   });
   const [saving, setSaving] = useState(false);
+  const [placementsTouched, setPlacementsTouched] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setPlacement = (k, v) => {
+    setPlacementsTouched(true);
+    set(k, v);
+  };
+  const applyTierDefaults = (tier = form.tier) => {
+    const defaults = TIER_DEFAULTS[tier] || TIER_DEFAULTS.bronze;
+    setForm((f) => ({ ...f, ...defaults }));
+    setPlacementsTouched(false);
+  };
+  const setTier = (tier) => {
+    const defaults = TIER_DEFAULTS[tier] || TIER_DEFAULTS.bronze;
+    setForm((f) => ({ ...f, tier, ...(!placementsTouched ? defaults : {}) }));
+  };
 
   const save = async (e) => {
     e.preventDefault();
@@ -211,7 +238,7 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <form onSubmit={save} className="bg-[#121212] border border-white/10 rounded-sm max-w-lg w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+      <form onSubmit={save} className="bg-[#121212] border border-white/10 rounded-sm max-w-2xl w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="font-heading text-xl font-bold uppercase">{sponsor ? "Sponsor bearbeiten" : "Neuer Sponsor"}</h3>
           <button type="button" onClick={onClose} className="text-white/40 hover:text-white"><XIcon className="w-4 h-4" /></button>
@@ -222,7 +249,7 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Tier</div>
-            <select value={form.tier} onChange={(e) => set("tier", e.target.value)} data-testid="sponsor-tier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+            <select value={form.tier} onChange={(e) => setTier(e.target.value)} data-testid="sponsor-tier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
               {TIERS.map((t) => <option key={t} value={t}>{TIER_LABELS[t]}</option>)}
             </select>
           </label>
@@ -231,23 +258,42 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
             <input type="number" value={form.order_index ?? 0} onChange={(e) => set("order_index", parseInt(e.target.value, 10) || 0)} data-testid="sponsor-order" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           </label>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+        <div className="border border-white/10 rounded-sm p-3 bg-[#0A0A0A]">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Sichtbarkeit</div>
+              <p className="text-[10px] text-white/40 mt-1">Haken entscheiden live. Tier-Standard ist nur eine schnelle Vorlage.</p>
+            </div>
+            <button type="button" onClick={() => applyTierDefaults()} className="px-3 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10">
+              Tier-Standard
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
           <label className="inline-flex items-center gap-2">
             <input type="checkbox" checked={form.is_active !== false} onChange={(e) => set("is_active", e.target.checked)} data-testid="sponsor-active" className="accent-[#29B6E8]" />
             Aktiv
           </label>
           <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_home === true} onChange={(e) => set("show_on_home", e.target.checked)} data-testid="sponsor-show-home" className="accent-[#29B6E8]" />
+            <input type="checkbox" checked={form.show_on_home === true} onChange={(e) => setPlacement("show_on_home", e.target.checked)} data-testid="sponsor-show-home" className="accent-[#29B6E8]" />
             Auf Home
           </label>
           <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_footer === true} onChange={(e) => set("show_on_footer", e.target.checked)} data-testid="sponsor-show-footer" className="accent-[#29B6E8]" />
+            <input type="checkbox" checked={form.show_on_footer === true} onChange={(e) => setPlacement("show_on_footer", e.target.checked)} data-testid="sponsor-show-footer" className="accent-[#29B6E8]" />
             Im Footer
           </label>
           <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_events === true} onChange={(e) => set("show_on_events", e.target.checked)} data-testid="sponsor-show-events" className="accent-[#FFD700]" />
+            <input type="checkbox" checked={form.show_on_events === true} onChange={(e) => setPlacement("show_on_events", e.target.checked)} data-testid="sponsor-show-events" className="accent-[#FFD700]" />
             Events
           </label>
+          <label className="inline-flex items-center gap-2">
+            <input type="checkbox" checked={form.show_on_tv === true} onChange={(e) => setPlacement("show_on_tv", e.target.checked)} data-testid="sponsor-show-tv" className="accent-[#9F7AEA]" />
+            TV / Anzeige
+          </label>
+          <label className="inline-flex items-center gap-2">
+            <input type="checkbox" checked={form.show_in_emails === true} onChange={(e) => setPlacement("show_in_emails", e.target.checked)} data-testid="sponsor-show-emails" className="accent-[#18C29C]" />
+            E-Mails
+          </label>
+          </div>
         </div>
         {events.length > 0 && (
           <div className="border border-white/10 rounded-sm p-3 bg-[#0A0A0A]">
@@ -265,7 +311,7 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
                 </label>
               ))}
             </div>
-            <p className="mt-2 text-[10px] text-white/40">Leer lassen = Sponsor darf bei allen eigenen Events genutzt werden.</p>
+            <p className="mt-2 text-[10px] text-white/40">Nur relevant, wenn „Events” aktiv ist. Leer lassen = bei allen eigenen Events erlaubt.</p>
           </div>
         )}
         <label className="block">

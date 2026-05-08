@@ -2,8 +2,8 @@
 
 Tests cover:
 - Galerie: /api/gallery returns list (was a 404-misroute before)
-- Sponsors: tier system, placement filters (home / footer / all)
-- Sponsor auto-defaults: gold→home+footer, bronze→nowhere
+- Sponsors: tier system, placement filters (home / footer / tv / all)
+- Sponsor auto-defaults: gold→footer, platinum/main→home+footer+tv, bronze→nowhere
 - Profile: input_devices/main_platforms/gaming_subscriptions multi-select fields persist
 - Public profile: show_twitch_embed flag is exposed
 - Image migration endpoint exists and returns a summary
@@ -22,12 +22,12 @@ def test_sponsor_tier_system(admin_client, base_url):
         if s.get("name", "").startswith("PHASE_A_"):
             admin_client.delete(f"{base_url}/api/sponsors/{s['id']}")
 
-    # Create gold (auto: home+footer=true)
+    # Create gold (auto: footer=true, home=false)
     r = admin_client.post(f"{base_url}/api/sponsors", json={"name": "PHASE_A_GOLD", "tier": "gold"})
     assert r.status_code == 200
     g = r.json()
     assert g["tier"] == "gold"
-    assert g["show_on_home"] is True
+    assert g["show_on_home"] is False
     assert g["show_on_footer"] is True
 
     # Bronze (auto: home=false, footer=false)
@@ -46,7 +46,7 @@ def test_sponsor_tier_system(admin_client, base_url):
     # Placement filters
     home = admin_client.get(f"{base_url}/api/sponsors?placement=home").json()
     home_names = {x["name"] for x in home}
-    assert "PHASE_A_GOLD" in home_names
+    assert "PHASE_A_GOLD" not in home_names
     assert "PHASE_A_BRONZE" not in home_names
     assert "PHASE_A_SILVER" not in home_names
 
@@ -56,10 +56,11 @@ def test_sponsor_tier_system(admin_client, base_url):
     assert "PHASE_A_SILVER" in footer_names
     assert "PHASE_A_BRONZE" not in footer_names
 
-    # Patch tier from bronze → gold should update placement defaults
-    r = admin_client.patch(f"{base_url}/api/sponsors/{b['id']}", json={"tier": "gold"})
+    # API updates keep placement flags explicit; admin UI can send tier defaults.
+    r = admin_client.patch(f"{base_url}/api/sponsors/{b['id']}", json={"tier": "platinum", "show_on_home": True, "show_on_footer": True, "show_on_tv": True})
     assert r.status_code == 200
     assert r.json()["show_on_home"] is True
+    assert r.json()["show_on_tv"] is True
 
     # Cleanup
     for sp in (g, s, b):

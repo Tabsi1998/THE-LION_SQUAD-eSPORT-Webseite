@@ -8,6 +8,27 @@ import { Star } from "lucide-react";
 
 const tierLabel = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const tierColor = { main: "#29B6E8", platinum: "#E5E4E2", gold: "#FFD700", silver: "#C0C0C0", bronze: "#CD7F32" };
+const tierGrid = {
+  main: "md:grid-cols-1",
+  platinum: "md:grid-cols-2",
+  gold: "sm:grid-cols-2 md:grid-cols-3",
+  silver: "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
+  bronze: "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5",
+};
+const tierCard = {
+  main: "p-9 min-h-72 border-[#29B6E8]/25 bg-[#071114]",
+  platinum: "p-8 min-h-64 border-white/15 bg-[#111111]",
+  gold: "p-7 min-h-56 border-[#FFD700]/15 bg-[#101010]",
+  silver: "p-5 min-h-44",
+  bronze: "p-4 min-h-36",
+};
+const tierLogo = {
+  main: "h-52 md:h-60",
+  platinum: "h-44",
+  gold: "h-36",
+  silver: "h-28",
+  bronze: "h-24",
+};
 
 export default function SponsorsPage() {
   useDocumentTitle("Sponsoren", "Sponsoren und Unterstützer von THE LION SQUAD eSports.");
@@ -55,7 +76,7 @@ export default function SponsorsPage() {
                 <h2 className="font-heading text-xl font-black uppercase tracking-wider">{tierLabel[t] || t}</h2>
                 <div className="flex-1 border-t border-white/10" />
               </div>
-              <div className={`grid gap-4 ${(t === "main" || t === "platinum") ? "md:grid-cols-2" : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
+              <div className={`grid gap-4 ${tierGrid[t] || tierGrid.bronze}`}>
                 {grouped[t].map((s) => (
                   <a
                     key={s.id}
@@ -64,9 +85,9 @@ export default function SponsorsPage() {
                     rel="noreferrer"
                     aria-label={s.name}
                     data-testid={`sponsor-${s.id}`}
-                    className={`border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#101010] transition group flex items-center justify-center ${(t === "main" || t === "platinum") ? "p-7 min-h-60" : "p-5 min-h-44"}`}
+                    className={`border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#101010] transition group flex items-center justify-center ${tierCard[t] || tierCard.bronze}`}
                   >
-                    <div className={`${t === "main" || t === "platinum" ? "h-44" : "h-28"} w-full flex items-center justify-center overflow-hidden`}>
+                    <div className={`${tierLogo[t] || tierLogo.bronze} w-full flex items-center justify-center overflow-hidden`}>
                       {s.logo_url ? (
                         <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="w-full h-full object-contain" />
                       ) : (

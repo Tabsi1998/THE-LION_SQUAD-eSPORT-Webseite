@@ -180,6 +180,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
   }, [event?.id, tournaments, f1Challenges]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const eventSponsorOptions = sponsors.filter((s) => s.is_active !== false && s.show_on_events === true);
   const insertProgramEmbed = (kind, item) => {
     setForm((f) => ({ ...f, program: appendEmbedToken(f.program, kind, item) }));
     if (kind === "tournament" && !relatedTournamentIds.includes(item.id)) setRelatedTournamentIds((ids) => [...ids, item.id]);
@@ -383,11 +384,11 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
               Sponsoren beim Event anzeigen
             </label>
           </div>
-          {form.owned_by_club && form.show_sponsors && sponsors.length > 0 && (
+          {form.owned_by_club && form.show_sponsors && eventSponsorOptions.length > 0 && (
             <div className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A]">
               <div className="text-[11px] uppercase tracking-widest font-bold text-white/60 mb-3">Event-Sponsoren</div>
               <div className="grid sm:grid-cols-2 gap-2">
-                {sponsors.filter((s) => s.is_active !== false).map((s) => (
+                {eventSponsorOptions.map((s) => (
                   <label key={s.id} className="flex items-center gap-2 text-sm text-white/75">
                     <input
                       type="checkbox"
@@ -399,7 +400,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
                   </label>
                 ))}
               </div>
-              <p className="mt-2 text-[11px] text-white/40">Leer lassen, um automatisch Sponsoren mit Event-Platzierung zu zeigen.</p>
+              <p className="mt-2 text-[11px] text-white/40">Hier erscheinen nur Sponsoren mit aktivem Events-Haken. Leer lassen = alle Event-Sponsoren ohne Event-Einschränkung.</p>
             </div>
           )}
         </div>

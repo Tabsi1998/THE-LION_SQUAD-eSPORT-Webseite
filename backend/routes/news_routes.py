@@ -256,12 +256,16 @@ async def news_meta():
 
 # ---------- Sponsors ----------
 
-# Tier hierarchy used for sorting only.
-# Placement is explicit: sponsors appear on home/footer/events only when the
-# corresponding admin checkbox is enabled.
 _TIER_ORDER = {"main": 0, "platinum": 1, "gold": 2, "silver": 3, "bronze": 4}
 _LEGACY_TIER_MAP = {"supporter": "bronze", "partner": "bronze"}
-_SPONSOR_PLACEMENT_FIELDS = ("show_on_home", "show_on_footer", "show_on_events")
+_SPONSOR_PLACEMENT_FIELDS = ("show_on_home", "show_on_footer", "show_on_events", "show_on_tv", "show_in_emails")
+_TIER_PLACEMENT_DEFAULTS = {
+    "main": {"show_on_home": True, "show_on_footer": True, "show_on_events": False, "show_on_tv": True, "show_in_emails": True},
+    "platinum": {"show_on_home": True, "show_on_footer": True, "show_on_events": False, "show_on_tv": True, "show_in_emails": False},
+    "gold": {"show_on_home": False, "show_on_footer": True, "show_on_events": False, "show_on_tv": False, "show_in_emails": False},
+    "silver": {"show_on_home": False, "show_on_footer": True, "show_on_events": False, "show_on_tv": False, "show_in_emails": False},
+    "bronze": {"show_on_home": False, "show_on_footer": False, "show_on_events": False, "show_on_tv": False, "show_in_emails": False},
+}
 
 
 def _normalize_tier(t: str | None) -> str:
@@ -276,12 +280,13 @@ def _sponsor_effective_flag(doc: dict, field: str) -> bool:
 
 
 def _sponsor_defaults(doc: dict) -> dict:
-    """Resolve auto-derived placement flags based on tier when not explicitly set."""
+    """Resolve tier-based placement suggestions when fields are missing."""
     tier = _normalize_tier(doc.get("tier"))
     doc["tier"] = tier
+    defaults = _TIER_PLACEMENT_DEFAULTS.get(tier, _TIER_PLACEMENT_DEFAULTS["bronze"])
     for field in _SPONSOR_PLACEMENT_FIELDS:
         if doc.get(field) is None:
-            doc[field] = False
+            doc[field] = defaults[field]
     if doc.get("event_ids") is None:
         doc["event_ids"] = []
     if doc.get("is_active") is None:
@@ -291,8 +296,7 @@ def _sponsor_defaults(doc: dict) -> dict:
 
 @router.get("/sponsors")
 async def list_sponsors(placement: Optional[str] = None):
-    """Public list. ?placement=home → only sponsors with show_on_home,
-    ?placement=footer → only show_on_footer, ?placement=all → everything."""
+    """Public list. ?placement=home/footer/events/tv/emails filters by enabled placement."""
     db = get_db()
     q = {"is_active": {"$ne": False}}
     sp = await db.sponsors.find(q, {"_id": 0}).to_list(500)
@@ -306,6 +310,10 @@ async def list_sponsors(placement: Optional[str] = None):
         sp = [s for s in sp if s["show_on_footer"]]
     elif placement == "events":
         sp = [s for s in sp if s["show_on_events"]]
+    elif placement == "tv":
+        sp = [s for s in sp if s["show_on_tv"]]
+    elif placement == "emails":
+        sp = [s for s in sp if s["show_in_emails"]]
     # Sort by tier then order_index
     sp.sort(key=lambda s: (_TIER_ORDER.get(s["tier"], 99), s.get("order_index") or 0, s.get("name") or ""))
     return dedupe_public_sponsors(sp)
@@ -346,7 +354,8 @@ async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(requi
     res = await db.sponsors.update_one({"id": sid}, {"$set": updates})
     if res.matched_count == 0:
         raise HTTPException(404, "Sponsor nicht gefunden.")
-    return await db.sponsors.find_one({"id": sid}, {"_id": 0})
+    saved = await db.sponsors.find_one({"id": sid}, {"_id": 0})
+    return _sponsor_defaults(saved) if saved else {"ok": True}
 
 
 @router.delete("/sponsors/{sid}")
