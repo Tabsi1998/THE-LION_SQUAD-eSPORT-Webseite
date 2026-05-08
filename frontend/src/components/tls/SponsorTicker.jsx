@@ -52,7 +52,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
   useApiInvalidation(load, ["sponsors"]);
   const logoSponsors = uniqueLogoSponsors(sponsors);
   if (!logoSponsors.length) return null;
-  const shouldMarquee = logoSponsors.length >= (compact ? 2 : 3);
+  const shouldMarquee = logoSponsors.length >= (compact ? 6 : 3);
   const items = shouldMarquee ? [...logoSponsors, ...logoSponsors] : logoSponsors;
   const speed = compact ? Math.max(24, logoSponsors.length * 8) : 48;
   return (
@@ -67,7 +67,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
         style={shouldMarquee ? { maskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)" } : undefined}
       >
         <div
-          className={`flex items-center whitespace-nowrap ${compact ? "gap-12 py-2" : "gap-16 py-5"} ${shouldMarquee ? "group-hover:[animation-play-state:paused]" : "justify-center px-4"}`}
+          className={`flex items-center ${compact ? "gap-8 md:gap-12 py-2" : "gap-16 py-5"} ${shouldMarquee ? "whitespace-nowrap group-hover:[animation-play-state:paused]" : "justify-center flex-wrap px-4"}`}
           style={shouldMarquee ? { animation: `tls-marquee ${speed}s linear infinite`, width: "max-content" } : undefined}
         >
           {items.map((s, i) => (

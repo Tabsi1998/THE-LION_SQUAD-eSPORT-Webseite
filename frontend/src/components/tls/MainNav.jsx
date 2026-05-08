@@ -71,6 +71,29 @@ function navTestId(label) {
   return label.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
+const NAV_CACHE_KEY = "tls-public-nav-v1";
+
+function normalizeNavItems(items) {
+  if (!Array.isArray(items) || !items.length) return NAV_STRUCTURE;
+  return [...items]
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .map((item) => ({
+      ...item,
+      children: item.children?.length
+        ? [...item.children].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        : item.children,
+    }));
+}
+
+function cachedNavItems() {
+  if (typeof window === "undefined") return NAV_STRUCTURE;
+  try {
+    return normalizeNavItems(JSON.parse(window.localStorage.getItem(NAV_CACHE_KEY) || "null"));
+  } catch {
+    return NAV_STRUCTURE;
+  }
+}
+
 // --- Desktop Dropdown ---
 function NavDropdown({ item, isClubMember }) {
   const [open, setOpen] = useState(false);
@@ -88,12 +111,12 @@ function NavDropdown({ item, isClubMember }) {
         type="button"
         data-testid={`nav-${item.label.toLowerCase()}`}
         aria-expanded={open}
-        className={`px-4 py-2 text-sm font-semibold uppercase tracking-wider transition rounded-sm inline-flex items-center gap-1 ${
+        className={`px-4 py-2 text-sm font-semibold uppercase tracking-wider transition rounded-sm inline-flex items-center gap-1.5 ${
           isActive ? "text-[#29B6E8]" : "text-white/70 hover:text-white"
         }`}
       >
-        {item.label}
-        <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} />
+        <span>{item.label}</span>
+        <ChevronDown data-testid={`nav-${item.label.toLowerCase()}-chevron`} className={`w-3.5 h-3.5 shrink-0 opacity-80 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <div
@@ -156,7 +179,7 @@ function MobileAccordion({ item, isClubMember, onClose }) {
         className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold uppercase tracking-wider rounded-sm text-white/80 hover:text-white`}
       >
         {item.label}
-        <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown data-testid={`mobile-nav-${item.label.toLowerCase()}-chevron`} className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <div className="ml-3 border-l border-white/10 pl-2 mt-1 space-y-0.5">
@@ -182,15 +205,19 @@ function MobileAccordion({ item, isClubMember, onClose }) {
 }
 
 function usePublicNavItems() {
-  const [items, setItems] = useState(NAV_STRUCTURE);
+  const [items, setItems] = useState(cachedNavItems);
 
   const load = useCallback(async () => {
     try {
       const { data } = await api.get("/nav");
       const next = Array.isArray(data?.items) ? data.items : data;
-      setItems(Array.isArray(next) && next.length ? next : NAV_STRUCTURE);
+      const normalized = normalizeNavItems(next);
+      setItems(normalized);
+      try {
+        window.localStorage.setItem(NAV_CACHE_KEY, JSON.stringify(normalized));
+      } catch {}
     } catch {
-      setItems(NAV_STRUCTURE);
+      setItems(cachedNavItems());
     }
   }, []);
 
