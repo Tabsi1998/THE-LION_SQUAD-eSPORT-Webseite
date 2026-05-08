@@ -464,6 +464,27 @@ class RegistrationUpdate(BaseModel):
     ingame_name: Optional[str] = None
 
 
+TournamentStaffRole = Literal["organizer", "referee", "scorekeeper", "station_manager", "stream_operator"]
+TournamentStaffScope = Literal["tournament", "stage", "group", "station", "match"]
+
+
+class TournamentStaffAssignmentCreate(BaseModel):
+    user_id: str
+    role: TournamentStaffRole
+    scope: TournamentStaffScope = "tournament"
+    scope_id: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: bool = True
+
+
+class TournamentStaffAssignmentUpdate(BaseModel):
+    role: Optional[TournamentStaffRole] = None
+    scope: Optional[TournamentStaffScope] = None
+    scope_id: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
 # ---------- Matches ----------
 MatchStatus = Literal[
     "pending", "ready", "scheduled", "in_progress",

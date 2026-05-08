@@ -15,7 +15,7 @@ export function ProtectedRoute({ children, requireAdmin = false, requireMember =
   if (requireAdmin && !["tournament_admin", "club_admin", "superadmin"].includes(user.role)) {
     return <Navigate to="/dashboard" replace />;
   }
-  if (requireModerator && !["moderator", "tournament_admin", "club_admin", "superadmin"].includes(user.role)) {
+  if (requireModerator && !user.is_tournament_staff && !["moderator", "tournament_admin", "club_admin", "superadmin"].includes(user.role)) {
     return <Navigate to="/dashboard" replace />;
   }
   if (requireMember && !user.is_club_member && !["tournament_admin", "club_admin", "superadmin"].includes(user.role)) {

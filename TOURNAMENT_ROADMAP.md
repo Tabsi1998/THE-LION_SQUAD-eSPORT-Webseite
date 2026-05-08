@@ -18,7 +18,21 @@ Stand: 2026-05-08
 - Audit-Logs fuer Bracket-Generierung, Bracket-Reset und Check-in-Aktionen ergaenzt.
 - Lokale Unit-Tests fuer Match-Regeln ergaenzt.
 
-Naechster Schritt: Phase 1 mit echten Turnier-Zuweisungen fuer Referee/Scorekeeper/Station Manager, damit normale Accounts gezielt Ergebnisse und Check-ins pflegen koennen, ohne globale Moderatorrechte zu bekommen.
+### Step 2 erledigt: Phase-1-Zuweisungen
+
+- Neue Collection/Indizes fuer `tournament_staff_assignments` ergaenzt.
+- Rollenmodell fuer `organizer`, `referee`, `scorekeeper`, `station_manager` und `stream_operator` angelegt.
+- Scopes fuer ganzes Turnier, Stage, Gruppe, Station und Match vorbereitet.
+- Berechtigungsservice ergaenzt, der globale Admin-/Moderatorrollen von turnierspezifischen Zuweisungen trennt.
+- Zugewiesene Personen koennen private/draft Turniere ihres Scopes sehen.
+- Ergebnis-/Forfeit-Aktionen akzeptieren jetzt zugewiesene Organizer/Referees/Scorekeeper.
+- Staff-Check-in akzeptiert Organizer/Referees/Scorekeeper/Station Manager.
+- Station-Zuweisung/Freigabe akzeptiert Organizer/Referees/Station Manager.
+- Admin-Turnieransicht hat den Tab "Team" fuer Zuweisungen, Aktiv/Pausiert und Entfernen.
+- Cleanup beim Turnier- und User-Loeschen sowie TLS-Reset ergaenzt.
+- Unit-Tests fuer die neue Berechtigungslogik ergaenzt.
+
+Naechster Schritt: Phase 2 vorbereitet einfuehren: `tournament_stages` und `matches_v2` parallel zum alten Modell, damit FFA/Custom-Brackets ohne Bruch der alten Turniere entstehen koennen.
 
 ## Kurzfazit
 

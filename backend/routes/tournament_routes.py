@@ -3,11 +3,19 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from datetime import datetime, timezone
 from database import get_db
-from auth import get_current_user, require_admin, require_role, get_optional_user
+from auth import get_current_user, require_admin, get_optional_user
 from services.visibility import user_can_see
 from services.public_phase import derive_public_phase
+from services.tournament_permissions import (
+    CHECKIN_STAFF_ROLES,
+    READ_STAFF_ROLES,
+    assigned_tournament_ids,
+    has_tournament_staff_permission,
+    require_tournament_staff_permission,
+)
 from models import (
     TournamentCreate, TournamentUpdate, RegistrationCreate, RegistrationUpdate,
+    TournamentStaffAssignmentCreate, TournamentStaffAssignmentUpdate,
     now_utc, new_id,
 )
 from bracket_engine import generate_bracket, compute_round_robin_standings
@@ -44,17 +52,22 @@ def _is_staff(user: dict | None) -> bool:
     return bool(user and user.get("role") in STAFF_ROLES)
 
 
+async def _is_tournament_staff(tid: str, user: dict | None, roles: set[str] | None = None) -> bool:
+    return await has_tournament_staff_permission(user, tid, roles or READ_STAFF_ROLES)
+
+
 async def _get_visible_tournament(tid: str, user: dict | None) -> dict:
     db = get_db()
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     is_staff = _is_staff(user)
-    if t.get("status") == "draft" and not is_staff:
+    is_assigned = await _is_tournament_staff(tid, user)
+    if t.get("status") == "draft" and not (is_staff or is_assigned):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if t.get("is_public") is False and not is_staff:
+    if t.get("is_public") is False and not (is_staff or is_assigned):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if not await user_can_see(user, t.get("visibility") or "public"):
+    if not (is_staff or is_assigned) and not await user_can_see(user, t.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Turnier ist nicht sichtbar")
     return t
 
@@ -173,11 +186,15 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
                            user=Depends(get_optional_user)):
     db = get_db()
     is_admin = user and user.get("role") in STAFF_ROLES
+    assigned_ids = await assigned_tournament_ids(user)
     q = {}
     if status:
         q["status"] = status
     elif not is_admin:
-        q["status"] = {"$ne": "draft"}
+        if assigned_ids:
+            q["$or"] = [{"status": {"$ne": "draft"}}, {"id": {"$in": assigned_ids}}]
+        else:
+            q["status"] = {"$ne": "draft"}
     if game_id:
         q["game_id"] = game_id
     if event_id:
@@ -186,7 +203,9 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     if not is_admin:
         visible = []
         for t in tournaments:
-            if t.get("is_public") is not False and await user_can_see(user, t.get("visibility") or "public"):
+            if t.get("id") in assigned_ids:
+                visible.append(t)
+            elif t.get("is_public") is not False and await user_can_see(user, t.get("visibility") or "public"):
                 visible.append(t)
         tournaments = visible
     for t in tournaments:
@@ -201,11 +220,12 @@ async def get_tournament(slug_or_id: str, user=Depends(get_optional_user)):
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     is_admin = user and user.get("role") in STAFF_ROLES
-    if t.get("status") == "draft" and not is_admin:
+    is_assigned = await _is_tournament_staff(t["id"], user)
+    if t.get("status") == "draft" and not (is_admin or is_assigned):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if not is_admin and t.get("is_public") is False:
+    if not (is_admin or is_assigned) and t.get("is_public") is False:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if not await user_can_see(user, t.get("visibility") or "public"):
+    if not (is_admin or is_assigned) and not await user_can_see(user, t.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Turnier ist nicht sichtbar")
     await _enrich_tournament(t, user)
     if t.get("event_id"):
@@ -281,6 +301,7 @@ async def delete_tournament(tid: str, me: dict = Depends(require_admin())):
     tid = await _resolve_tid(tid)
     await db.tournaments.delete_one({"id": tid})
     await db.tournament_registrations.delete_many({"tournament_id": tid})
+    await db.tournament_staff_assignments.delete_many({"tournament_id": tid})
     await db.matches.delete_many({"tournament_id": tid})
     return {"ok": True}
 
@@ -291,7 +312,7 @@ async def list_registrations(tid: str, user=Depends(get_optional_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
     t_doc = await _get_visible_tournament(tid, user)
-    is_staff = _is_staff(user)
+    is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
     if not is_staff and t_doc.get("show_participants") is False:
         regs = [r for r in regs if user and r.get("user_id") == user.get("id")]
@@ -390,7 +411,7 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
 
 @router.post("/{tid}/registrations/{reg_id}/checkin")
 async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
-                                         me: dict = Depends(require_role("moderator"))):
+                                         me: dict = Depends(get_current_user)):
     """Operational check-in control for tournament staff.
 
     This is intentionally narrower than the generic registration update route:
@@ -399,6 +420,7 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
     """
     db = get_db()
     tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, CHECKIN_STAFF_ROLES)
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
     if not reg:
         raise HTTPException(status_code=404, detail="Anmeldung nicht gefunden")
@@ -435,6 +457,132 @@ async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_curr
     if reg["user_id"] != me["id"] and me["role"] not in ("moderator", "tournament_admin", "club_admin", "superadmin"):
         raise HTTPException(status_code=403)
     await db.tournament_registrations.delete_one({"id": reg_id})
+    return {"ok": True}
+
+
+# --- Tournament staff assignments ---
+async def _enrich_staff_assignments(assignments: list[dict]) -> list[dict]:
+    db = get_db()
+    user_ids = list({a.get("user_id") for a in assignments if a.get("user_id")})
+    users = {u["id"]: u for u in await db.users.find(
+        {"id": {"$in": user_ids}},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "email": 1, "role": 1},
+    ).to_list(500)}
+    for assignment in assignments:
+        u = users.get(assignment.get("user_id")) or {}
+        assignment["user"] = {
+            "id": u.get("id"),
+            "username": u.get("username"),
+            "display_name": u.get("display_name"),
+            "avatar_url": u.get("avatar_url"),
+            "email": u.get("email"),
+            "role": u.get("role"),
+        }
+    return assignments
+
+
+@router.get("/{tid}/staff")
+async def list_tournament_staff(tid: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES)
+    assignments = await db.tournament_staff_assignments.find(
+        {"tournament_id": tid},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(500)
+    return await _enrich_staff_assignments(assignments)
+
+
+@router.post("/{tid}/staff")
+async def create_tournament_staff(tid: str, body: TournamentStaffAssignmentCreate,
+                                  me: dict = Depends(require_admin())):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    if not await db.users.find_one({"id": body.user_id}, {"id": 1}):
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    scope = body.scope or "tournament"
+    scope_id = body.scope_id if scope != "tournament" else None
+    existing = await db.tournament_staff_assignments.find_one({
+        "tournament_id": tid,
+        "user_id": body.user_id,
+        "role": body.role,
+        "scope": scope,
+        "scope_id": scope_id,
+    })
+    if existing:
+        raise HTTPException(status_code=409, detail="Diese Zuweisung existiert bereits")
+    doc = body.model_dump()
+    doc["id"] = new_id()
+    doc["tournament_id"] = tid
+    doc["scope"] = scope
+    doc["scope_id"] = scope_id
+    doc["created_at"] = now_utc().isoformat()
+    doc["updated_at"] = now_utc().isoformat()
+    doc["created_by"] = me["id"]
+    await db.tournament_staff_assignments.insert_one(doc)
+    await _audit_tournament_action(
+        db,
+        "tournament.staff.create",
+        me.get("id"),
+        tid,
+        {"assignment_id": doc["id"], "user_id": doc["user_id"], "role": doc["role"], "scope": doc["scope"], "scope_id": doc.get("scope_id")},
+    )
+    doc.pop("_id", None)
+    return (await _enrich_staff_assignments([doc]))[0]
+
+
+@router.patch("/{tid}/staff/{assignment_id}")
+@router.put("/{tid}/staff/{assignment_id}")
+async def update_tournament_staff(tid: str, assignment_id: str, body: TournamentStaffAssignmentUpdate,
+                                  me: dict = Depends(require_admin())):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    current = await db.tournament_staff_assignments.find_one({"id": assignment_id, "tournament_id": tid}, {"_id": 0})
+    if not current:
+        raise HTTPException(status_code=404, detail="Zuweisung nicht gefunden")
+    nullable = {"scope_id", "notes"}
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None or k in nullable}
+    if updates.get("scope") == "tournament":
+        updates["scope_id"] = None
+    proposed = {**current, **updates}
+    duplicate = await db.tournament_staff_assignments.find_one({
+        "id": {"$ne": assignment_id},
+        "tournament_id": tid,
+        "user_id": proposed.get("user_id"),
+        "role": proposed.get("role"),
+        "scope": proposed.get("scope") or "tournament",
+        "scope_id": proposed.get("scope_id") if (proposed.get("scope") or "tournament") != "tournament" else None,
+    })
+    if duplicate:
+        raise HTTPException(status_code=409, detail="Diese Zuweisung existiert bereits")
+    updates["updated_at"] = now_utc().isoformat()
+    await db.tournament_staff_assignments.update_one({"id": assignment_id}, {"$set": updates})
+    await _audit_tournament_action(
+        db,
+        "tournament.staff.update",
+        me.get("id"),
+        tid,
+        {"assignment_id": assignment_id, "updates": {k: v for k, v in updates.items() if k != "updated_at"}},
+    )
+    updated = await db.tournament_staff_assignments.find_one({"id": assignment_id}, {"_id": 0})
+    return (await _enrich_staff_assignments([updated]))[0]
+
+
+@router.delete("/{tid}/staff/{assignment_id}")
+async def delete_tournament_staff(tid: str, assignment_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    current = await db.tournament_staff_assignments.find_one({"id": assignment_id, "tournament_id": tid}, {"_id": 0})
+    if not current:
+        raise HTTPException(status_code=404, detail="Zuweisung nicht gefunden")
+    await db.tournament_staff_assignments.delete_one({"id": assignment_id})
+    await _audit_tournament_action(
+        db,
+        "tournament.staff.delete",
+        me.get("id"),
+        tid,
+        {"assignment_id": assignment_id, "user_id": current.get("user_id"), "role": current.get("role")},
+    )
     return {"ok": True}
 
 
@@ -624,7 +772,7 @@ async def get_bracket(tid: str, user=Depends(get_optional_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
     t = await _get_visible_tournament(tid, user)
-    is_staff = _is_staff(user)
+    is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
     t["public_phase"] = derive_public_phase(t, "tournament")
     matches = await db.matches.find({"tournament_id": t["id"]}, {"_id": 0}).sort("round", 1).to_list(1000)
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
@@ -645,7 +793,7 @@ async def standings(tid: str, user=Depends(get_optional_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
     t = await _get_visible_tournament(tid, user)
-    is_staff = _is_staff(user)
+    is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
     matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(1000)
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
     regs = [_public_registration(r, user, is_staff) for r in regs]

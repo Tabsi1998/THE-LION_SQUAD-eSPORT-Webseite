@@ -741,6 +741,7 @@ async def delete_user(user_id: str, me: dict = Depends(require_super())):
     await db.user_socials.delete_many({"user_id": user_id})
     await db.user_achievements.delete_many({"user_id": user_id})
     await db.tournament_registrations.delete_many({"user_id": user_id})
+    await db.tournament_staff_assignments.delete_many({"user_id": user_id})
     if reg_ids:
         for field in ("participant_a_id", "participant_b_id", "winner_id", "loser_id"):
             await db.matches.update_many(

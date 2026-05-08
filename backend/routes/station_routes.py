@@ -1,10 +1,12 @@
 """Station routes."""
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
-from auth import require_admin
+from auth import get_current_user, require_admin
 from models import StationCreate, StationUpdate, now_utc, new_id
+from services.tournament_permissions import is_global_tournament_admin, require_tournament_staff_permission
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
+STATION_ASSIGN_ROLES = {"organizer", "referee", "station_manager"}
 
 
 @router.get("")
@@ -44,8 +46,15 @@ async def update_station(sid: str, body: StationUpdate, me: dict = Depends(requi
 
 
 @router.post("/{sid}/assign/{match_id}")
-async def assign_match(sid: str, match_id: str, me: dict = Depends(require_admin())):
+async def assign_match(sid: str, match_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
+    station = await db.stations.find_one({"id": sid}, {"_id": 0})
+    if not station:
+        raise HTTPException(status_code=404, detail="Station nicht gefunden")
+    match = await db.matches.find_one({"id": match_id}, {"_id": 0})
+    if not match:
+        raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    await require_tournament_staff_permission(me, match["tournament_id"], STATION_ASSIGN_ROLES)
     await db.stations.update_one({"id": sid}, {"$set": {
         "current_match_id": match_id, "status": "busy", "updated_at": now_utc().isoformat()}})
     await db.matches.update_one({"id": match_id}, {"$set": {
@@ -54,11 +63,20 @@ async def assign_match(sid: str, match_id: str, me: dict = Depends(require_admin
 
 
 @router.post("/{sid}/clear")
-async def clear_station(sid: str, me: dict = Depends(require_admin())):
+async def clear_station(sid: str, me: dict = Depends(get_current_user)):
     db = get_db()
     s = await db.stations.find_one({"id": sid})
+    if not s:
+        raise HTTPException(status_code=404, detail="Station nicht gefunden")
     if s and s.get("current_match_id"):
+        match = await db.matches.find_one({"id": s["current_match_id"]}, {"_id": 0})
+        if match:
+            await require_tournament_staff_permission(me, match["tournament_id"], STATION_ASSIGN_ROLES)
+        elif not is_global_tournament_admin(me):
+            raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Station")
         await db.matches.update_one({"id": s["current_match_id"]}, {"$set": {"station_id": None}})
+    elif not is_global_tournament_admin(me):
+        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Station")
     await db.stations.update_one({"id": sid}, {"$set": {
         "current_match_id": None, "status": "free", "updated_at": now_utc().isoformat()}})
     return {"ok": True}

@@ -167,6 +167,13 @@ async def get_current_user(request: Request) -> dict:
         user["user_type"] = "club_member"
     elif not user.get("user_type"):
         user["user_type"] = "community_user"
+    user["is_tournament_staff"] = bool(
+        user.get("role") in {"moderator", "tournament_admin", "club_admin", "superadmin"}
+        or await db.tournament_staff_assignments.count_documents({
+            "user_id": user["id"],
+            "is_active": {"$ne": False},
+        })
+    )
     return user
 
 
