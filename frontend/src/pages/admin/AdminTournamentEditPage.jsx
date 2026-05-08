@@ -1118,6 +1118,7 @@ function TournamentEditForm({ tournament, onSaved }) {
     try {
       const payload = { ...f };
       if (!payload.event_id) payload.event_id = null;
+      if (!payload.stream_platform) payload.stream_platform = null;
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
       ["team_size", "max_participants", "min_participants", "best_of", "match_duration_minutes"].forEach((key) => {
         if (payload[key] !== "" && payload[key] != null) payload[key] = Number(payload[key]);

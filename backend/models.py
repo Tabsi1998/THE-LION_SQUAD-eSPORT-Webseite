@@ -1,5 +1,5 @@
 """Pydantic v2 models for THE LION SQUAD eSports."""
-from pydantic import BaseModel, Field, EmailStr, ConfigDict
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator
 from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime, timezone, date
 import uuid
@@ -380,6 +380,12 @@ TeamMode = Literal["solo", "duo", "team", "squad"]
 StreamPlatform = Literal["twitch", "youtube", "kick", "custom"]
 
 
+def _empty_stream_platform_to_none(value):
+    if value == "":
+        return None
+    return value
+
+
 class TournamentCreate(BaseModel):
     title: str
     slug: str
@@ -427,6 +433,8 @@ class TournamentCreate(BaseModel):
     # Optional initial status — admin can publish straight to 'scheduled'.
     status: Optional[TournamentStatus] = None
 
+    _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
+
 
 class TournamentUpdate(BaseModel):
     title: Optional[str] = None
@@ -471,6 +479,8 @@ class TournamentUpdate(BaseModel):
     show_chat: Optional[bool] = None
     season_weight: Optional[float] = None
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None
+
+    _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
 
 
 class RegistrationCreate(BaseModel):
@@ -662,6 +672,8 @@ class F1ChallengeCreate(BaseModel):
     visibility: Literal["public", "community", "members", "internal"] = "public"
     status: Optional[TournamentStatus] = None
 
+    _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
+
 
 class F1ChallengeUpdate(BaseModel):
     title: Optional[str] = None
@@ -694,6 +706,8 @@ class F1ChallengeUpdate(BaseModel):
     show_chat: Optional[bool] = None
     season_weight: Optional[float] = None
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None
+
+    _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
 
 
 class F1LapTimeCreate(BaseModel):
