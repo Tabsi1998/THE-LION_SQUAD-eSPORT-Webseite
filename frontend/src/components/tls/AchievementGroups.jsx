@@ -30,7 +30,19 @@ const CATEGORY_META = {
   negative:   { label: "Fun / Negative", icon: "AlertTriangle", accent: "#FF3B30" },
 };
 
+const SPECIAL_ACCENTS = [
+  "#FF3B30", "#9146FF", "#29B6E8", "#FFD700", "#00FF88", "#FF8A3D", "#E4405F",
+];
+
 function pascal(s) { return s.split("-").map(w => w.charAt(0).toUpperCase()+w.slice(1)).join(""); }
+
+function groupAccent(group) {
+  if (group.category !== "special") return group.accent_color || "#29B6E8";
+  const seed = String(group.code || group.name || "special").split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return group.accent_color && group.accent_color !== "#FF3B30"
+    ? group.accent_color
+    : SPECIAL_ACCENTS[seed % SPECIAL_ACCENTS.length];
+}
 
 export function AchievementGroupsView({ groups = [], emptyText = "Noch keine Achievements freigeschaltet.", earnedOnly = false }) {
   const visibleGroups = earnedOnly
@@ -88,9 +100,10 @@ function GroupCard({ group, earnedOnly = false }) {
   const highest = earnedTiers[0]; // top tier achieved
   const nextLocked = earnedOnly ? null : lockedTiers[0];
   const hasAny = earnedTiers.length > 0;
-  const accent = group.accent_color || "#29B6E8";
+  const accent = groupAccent(group);
   const isNegative = Boolean(group.is_negative || group.category === "negative");
   const prestige = hasAny && !isNegative && highest?.level >= 4;
+  const lockedPulse = !earnedOnly && !hasAny && !isNegative;
 
   return (
     <motion.div
@@ -98,8 +111,16 @@ function GroupCard({ group, earnedOnly = false }) {
       data-testid={`achievement-group-${group.code}`}
       className={`border rounded-sm bg-[#0F0F10] transition-all ${hasAny ? "border-white/15" : "border-white/5 opacity-80"} ${isNegative ? "bg-[#120A0A]" : ""}`}
       style={hasAny ? { boxShadow: `inset 0 0 0 1px ${accent}22` } : undefined}
-      animate={prestige ? { boxShadow: [`inset 0 0 0 1px ${accent}22`, `inset 0 0 0 1px ${accent}55, 0 0 22px ${accent}18`, `inset 0 0 0 1px ${accent}22`] } : undefined}
-      transition={prestige ? { duration: 3.2, repeat: Infinity, ease: "easeInOut" } : undefined}
+      animate={prestige
+        ? { boxShadow: [`inset 0 0 0 1px ${accent}22`, `inset 0 0 0 1px ${accent}55, 0 0 22px ${accent}18`, `inset 0 0 0 1px ${accent}22`] }
+        : lockedPulse
+          ? { borderColor: ["rgba(255,255,255,0.05)", `${accent}33`, "rgba(255,255,255,0.05)"] }
+          : undefined}
+      transition={prestige
+        ? { duration: 3.2, repeat: Infinity, ease: "easeInOut" }
+        : lockedPulse
+          ? { duration: 5.5, repeat: Infinity, ease: "easeInOut" }
+          : undefined}
     >
       {/* Header — tap to expand */}
       <button
@@ -180,8 +201,16 @@ function TierRow({ tier, accent, isNegative = false }) {
       data-testid={`achievement-tier-${tier.code}`}
       className={`flex items-center gap-3 p-2 rounded-sm border transition ${tier.earned ? "border-white/10 bg-white/[0.02]" : "border-white/5 opacity-60"}`}
       style={tier.earned ? { boxShadow: `inset 2px 0 0 ${lvl.color}` } : undefined}
-      animate={tier.earned && tier.level >= 4 && !isNegative ? { borderColor: [`${lvl.color}22`, `${lvl.color}66`, `${lvl.color}22`] } : undefined}
-      transition={tier.earned && tier.level >= 4 && !isNegative ? { duration: 2.8, repeat: Infinity, ease: "easeInOut" } : undefined}
+      animate={tier.earned && tier.level >= 4 && !isNegative
+        ? { borderColor: [`${lvl.color}22`, `${lvl.color}66`, `${lvl.color}22`] }
+        : !tier.earned && !isNegative
+          ? { borderColor: ["rgba(255,255,255,0.05)", `${accent}2b`, "rgba(255,255,255,0.05)"] }
+          : undefined}
+      transition={tier.earned && tier.level >= 4 && !isNegative
+        ? { duration: 2.8, repeat: Infinity, ease: "easeInOut" }
+        : !tier.earned && !isNegative
+          ? { duration: 6, repeat: Infinity, ease: "easeInOut" }
+          : undefined}
     >
       <div
         className="w-8 h-8 rounded-sm flex items-center justify-center border shrink-0"

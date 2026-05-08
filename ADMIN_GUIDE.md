@@ -175,7 +175,23 @@ Aktuell ist das ein manueller Counter:
 - `+1`, `+10` oder festen Wert setzen
 - danach werden `discord_active` Achievements automatisch neu bewertet
 
-Spaeter kann ein echter Discord-Bot diesen Counter automatisch aktualisieren.
+Fuer echte automatische Discord-Aktivitaet reicht ein normaler eingehender Webhook nicht.
+Ein Webhook kann Nachrichten in Discord posten, aber keine User-Nachrichten im Server zaehlen.
+Dafuer braucht es einen Discord-Bot mit Gateway-Verbindung, mindestens Guild-/Message-Events
+und je nach Auswertung den Message-Content-Intent.
+
+Sinnvolle Ausbaustufe:
+
+- Bot liest `MESSAGE_CREATE` Events im Vereinsserver.
+- Bot kennt die Zuordnung `discord_id` -> Plattformkonto.
+- Bot sendet Zaehler-Updates an die Website-API oder schreibt direkt in die DB.
+- Website wertet danach `discord_messages_count` aus und vergibt `discord_active` Achievements.
+
+Offizielle Discord-Doku:
+
+- https://docs.discord.com/developers/events/gateway-events
+- https://docs.discord.com/developers/events/overview
+- https://docs.discord.com/developers/platform/webhooks
 
 ## Twitch
 
@@ -219,15 +235,21 @@ Wichtig:
 - Dann soll die Challenge als angekuendigt/live/abgeschlossen erscheinen.
 - Top 3 und Leaderboard sind wichtiger als ein klassischer Check-in.
 
-## Sponsoren und Footer
+## Sponsoren
 
-Sponsorenlogos werden im Admin gepflegt. Der Footer zeigt die Logos als Slider.
-Ein Sponsor erscheint dort aber nur, wenn im Sponsorformular `Im Footer` aktiv ist.
+Sponsorenlogos werden im Admin gepflegt. Die Sponsoren-Seite zeigt alle aktiven
+Sponsoren nach Tier. Footer, Home, Events, TV-Anzeigen und E-Mails nutzen eigene
+Haken im Sponsorformular.
 
 Empfehlung:
 
-- Platzierungen bewusst setzen: `Auf Home`, `Im Footer`, `Events`.
-- Der Sponsor-Tier sortiert und beschreibt den Sponsor, schaltet aber keine Platzierung automatisch frei.
+- `Bronze`: nur Sponsoren-Seite.
+- `Silber`: Sponsoren-Seite und Footer.
+- `Gold`: Sponsoren-Seite groesser als Silber/Bronze und Footer.
+- `Platin`: Sponsoren-Seite groesser als Gold, Home, Footer und TV-Anzeigen.
+- `Hauptsponsor`: alles wie Platin plus E-Mail-Einbindung.
+- `Events` bewusst pro Sponsor aktivieren. Optional koennen einzelne Events eingeschraenkt werden.
+- Der Button `Tier-Standard` setzt diese Empfehlung im Formular, die Haken bleiben aber manuell steuerbar.
 - Keine Sponsorennamen im Footer erzwingen, wenn das Logo selbsterklaerend ist.
 - Doppelte Logos vermeiden.
 - Nur oeffentliche/aktive Sponsoren anzeigen.

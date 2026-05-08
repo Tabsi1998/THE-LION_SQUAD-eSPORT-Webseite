@@ -340,7 +340,7 @@ Typische Bereiche:
 
 ## Discord
 
-Discord wird ueber Webhooks angebunden.
+Discord-Benachrichtigungen werden ueber Webhooks angebunden.
 
 Im Adminbereich:
 
@@ -354,6 +354,10 @@ Erlaubt sind Discord Webhook URLs im Format:
 ```text
 https://discord.com/api/webhooks/...
 ```
+
+Wichtig: Webhooks senden nur Nachrichten in Discord. Fuer automatische
+Discord-Aktivitaet/Achievements braucht es spaeter einen echten Discord-Bot
+mit Gateway-Events, der `discord_messages_count` pro verknuepftem Konto aktualisiert.
 
 ## Rechtliches
 

@@ -758,6 +758,57 @@ for _group in ACHIEVEMENT_GROUPS:
             "description": "Archivierte System-Group. Nicht im öffentlichen Katalog anzeigen.",
         })
 
+SPECIAL_GROUP_POLISH = {
+    "ehrenloewe": {
+        "name": "Ehrenlöwe",
+        "accent_color": "#FFD700",
+        "description": "Hall of Fame: besondere Ehrung durch den Vorstand.",
+    },
+    "gamers_heaven": {
+        "name": "Gamers Heaven",
+        "accent_color": "#29B6E8",
+        "description": "Besondere Auszeichnung rund um Gamers-Heaven-Events.",
+    },
+    "lan_founder": {
+        "name": "LAN-Pionier",
+        "accent_color": "#FF8A3D",
+        "description": "Bei einer prägenden LAN-Phase des Vereins dabei gewesen.",
+    },
+    "beta_tester": {
+        "name": "Plattform-Pionier",
+        "accent_color": "#A855F7",
+        "description": "Hat die Plattform vor oder während wichtiger Releases getestet.",
+    },
+    "streamer_verified": {
+        "name": "Offizieller Streamer",
+        "accent_color": "#9146FF",
+        "description": "Verifizierter Streamer mit gepflegter Twitch-Verknüpfung.",
+    },
+    "sponsor_friend": {
+        "name": "Partner-Freund",
+        "accent_color": "#00FF88",
+        "description": "Besondere Unterstützung für Verein, Partner oder Sponsorenaktionen.",
+    },
+    "tutorial": {
+        "name": "Onboarding",
+        "accent_color": "#29B6E8",
+        "description": "Wichtige Einstiegsschritte und Plattform-Einführung abgeschlossen.",
+    },
+    "creator_spirit": {
+        "name": "Creator-Spirit",
+        "accent_color": "#E4405F",
+        "description": "Clips, Highlights und Content für Community und Außenauftritt.",
+    },
+    "mentor_path": {
+        "name": "Mentorenpfad",
+        "accent_color": "#00FF88",
+        "description": "Begleitet neue Spieler und stärkt die Community.",
+    },
+}
+for _group in ACHIEVEMENT_GROUPS:
+    if _group["code"] in SPECIAL_GROUP_POLISH:
+        _group.update(SPECIAL_GROUP_POLISH[_group["code"]])
+
 # Anything that is not wired to live/counter data is made manual instead of
 # showing as a grey planned goal. Manual awards still fully work through admin.
 for _tier in ACHIEVEMENT_TIERS:
@@ -768,6 +819,21 @@ for _tier in ACHIEVEMENT_TIERS:
         _tier["progress_target"] = None
         if "manuell" not in (_tier.get("description") or "").lower():
             _tier["description"] = f"{_tier.get('description') or 'Besondere Situation.'} Wird vom Team manuell vergeben."
+
+SPECIAL_TIER_POLISH = {
+    "lan_founder_p": ("LAN-Pionier", "Bei einer prägenden LAN-Phase des Vereins live dabei gewesen."),
+    "beta_tester_p": ("Plattform-Pionier", "Hat die Plattform vor oder während wichtiger Releases getestet."),
+    "streamer_verified_p": ("Offizieller Streamer", "Vom Team als offizieller Streamer bestätigt."),
+    "sponsor_friend_p": ("Partner-Freund", "Für besondere Unterstützung rund um Partner oder Sponsorenaktionen gewürdigt."),
+    "creator_highlight_maker": ("Highlight-Maker", "Mehrere starke Highlights für Community oder Socials geliefert."),
+    "creator_storyteller": ("Storyteller", "Ein Event, Turnier oder Vereinsmoment kreativ begleitet."),
+    "creator_media_mvp": ("Media-MVP", "Prägt die Außendarstellung des Vereins sichtbar mit."),
+    "mentor_welcome": ("Willkommenshelfer", "Neuen Spielern den Einstieg erleichtert."),
+    "mentor_squad_anchor": ("Squad-Anker", "Regelmäßig für andere da und verlässlich im Support."),
+}
+for _tier in ACHIEVEMENT_TIERS:
+    if _tier["code"] in SPECIAL_TIER_POLISH:
+        _tier["name"], _tier["description"] = SPECIAL_TIER_POLISH[_tier["code"]]
 
 # Negative/fun awards are secret, but should still feel rewarding once earned.
 for _group in ACHIEVEMENT_GROUPS:
