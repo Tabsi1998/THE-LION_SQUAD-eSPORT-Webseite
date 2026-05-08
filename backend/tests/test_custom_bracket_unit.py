@@ -74,5 +74,7 @@ def test_v2_generator_builds_slots_and_advancement():
     assert by_key["C"]["status"] == "pending"
     assert by_key["A"]["slots"][0]["registration_id"] == "r1"
     assert by_key["A"]["slots"][3]["registration_id"] == "r4"
+    assert by_key["A"]["settings"]["match_size"] == 4
+    assert by_key["A"]["settings"]["min_players"] == 2
     assert {entry["to_match_key"] for entry in by_key["A"]["advancement"]} == {"C", "LA"}
     assert {entry["flow"] for entry in by_key["A"]["advancement"]} == {"W", "L"}

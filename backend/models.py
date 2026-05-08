@@ -551,6 +551,23 @@ class MatchScoreReport(BaseModel):
     note: Optional[str] = None
 
 
+class MatchV2ResultEntry(BaseModel):
+    registration_id: str
+    rank: int = Field(ge=1)
+    score: Optional[float] = None
+    points: Optional[float] = None
+    time_ms: Optional[int] = Field(default=None, ge=0)
+    dnf: bool = False
+    forfeit: bool = False
+    note: Optional[str] = None
+
+
+class MatchV2ResultSubmit(BaseModel):
+    results: List[MatchV2ResultEntry] = Field(min_length=1)
+    proof_url: Optional[str] = None
+    note: Optional[str] = None
+
+
 class MatchUpdate(BaseModel):
     status: Optional[MatchStatus] = None
     score_a: Optional[int] = None

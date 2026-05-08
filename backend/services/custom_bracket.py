@@ -253,6 +253,8 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
             "results": [],
             "advancement": [],
             "settings": {
+                "min_players": min_players,
+                "match_size": len(slots),
                 "qualifiers_per_match": qualifiers_per_match,
                 "score_type": settings.get("score_type") or "points",
                 "calculation": settings.get("calculation") or "points",

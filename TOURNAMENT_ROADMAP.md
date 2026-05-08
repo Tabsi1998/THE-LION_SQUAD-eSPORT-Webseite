@@ -66,18 +66,31 @@ Stand: 2026-05-08
 - Erster `matches_v2`-Generator erstellt Multi-Slot-Matches mit Seed-Belegung, Status und Advancement-Graph.
 - Neuer Admin-Endpunkt `POST /api/tournaments/{tid}/stages/{stage_id}/generate` erzeugt Stage-Matches aus der Stage-Config und schuetzt vorhandene Matches per `force=true`.
 
-Naechster Schritt: v2-Ergebnis-Endpoint fuer FFA-Platzierungslisten, der `results[]` validiert und Zielslots aus `advancement` automatisch fuellt.
+### Step 6 erledigt: v2-Ergebnis-Engine und Advancement
+
+- Neue v2-Ergebnis-Modelle fuer Platzierungslisten ergaenzt.
+- Neuer API-Bereich `POST /api/matches-v2/{match_id}/result` fuer Staff-Ergebniserfassung.
+- Neuer API-Bereich `GET /api/matches-v2/{match_id}` fuer einzelne v2-Matches.
+- Berechtigungen nutzen Turnier-, Stage- und Match-Scopes fuer Organizer/Referee/Scorekeeper.
+- Ergebnislisten muessen alle belegten Slots enthalten.
+- Teilnehmer, doppelte Ranks, doppelte Registrierungen und nicht fortlaufende Platzierungen werden validiert.
+- Ergebnisse werden in `matches_v2.results` gespeichert und parallel als `match_reports_v2` protokolliert.
+- Advancement fuellt Zielslots aus `W/L/R`-Rank-Referenzen automatisch.
+- Folgematches wechseln automatisch auf `ready`, wenn alle Pflichtslots gefuellt sind.
+- Korrekturen schuetzen belegte Downstream-Slots und brauchen bewusst `force=true`.
+- Audit-Log fuer v2-Ergebnisuebernahme ergaenzt.
+
+Naechster Schritt: Admin-UI fuer Stages und FFA-Ergebnislisten bauen, damit Custom-Schema, Generate und Platzierungsresultate bedienbar werden.
 
 ## Was wirklich noch fehlt
 
 - Neues Turniermodell: `tournament_stages`, `matches_v2`, Multi-Slot-Matches und Platzierungsresultate.
-- v2-Ergebnis-Engine fuer Platzierungsresultate, Slot-Advancement und Downstream-Korrekturen.
 - Echte FFA-Ergebnis-UI mit 3-8 Teilnehmern, Rangliste, Punkten, DNF/Forfeit und Proof.
 - Korrekte Double-Elimination-Flows fuer 1v1 und FFA inklusive Loser-Bracket-Transfers.
 - Operatives Turnierleitungs-Dashboard: Check-in, Warteliste, No-Show, Stationen, Next-up, offene Ergebnisse.
 - TV-/Embed-Ansichten fuer Bracket, Stationen und Live-Eventbetrieb.
 - Benachrichtigungen fuer Match bereit, Station zugewiesen, Check-in offen und Ergebnis bestaetigt.
-- Audit/Undo fuer Ergebnis-Korrekturen, wenn Folgematches bereits gestartet oder gespielt wurden.
+- Vollstaendige Downstream-Cascade/Undo fuer Ergebnis-Korrekturen, wenn Folge-Matches bereits gespielt wurden.
 - QR-/Vor-Ort-Check-in fuer Events und Turniere.
 - Feineres Rollenmodell fuer Event-Orga analog zu Turnier-Staff.
 - Admin-UI fuer Stage-Konfiguration, Schema-Eingabe, Validierungsfehler und Generate/Regenerate.
@@ -95,6 +108,8 @@ Fuer Mario Kart mit 4 Spielern pro Heat braucht es deshalb nicht nur einen neuen
 - `backend/bracket_extensions.py`: Swiss und Groups sind als separate Generatoren vorhanden, aber ebenfalls duel-/2-Spieler-orientiert.
 - `backend/routes/tournament_routes.py`: Check-in, Registrierung, Bracket-Generierung, Swiss-Runden und Gruppen-Generierung sind vorhanden.
 - `backend/routes/match_routes.py`: Score-Reporting, Dispute und Forfeit sind vorhanden, aber auf zwei Parteien optimiert.
+- `backend/routes/match_v2_routes.py`: v2-Matches koennen gelesen und FFA-/Multi-Slot-Ergebnisse durch Staff gespeichert werden.
+- `backend/services/match_v2_results.py`: validiert Platzierungslisten und fuellt Advancement-Zielslots in Folgematches.
 - `frontend/src/components/tls/BracketTree.jsx`: Darstellung gruppiert nach `bracket` und `round`, rendert aber ebenfalls nur zwei Teilnehmer pro Match.
 - `frontend/src/pages/admin/AdminTournamentEditPage.jsx`: Admins/Moderatoren koennen Ergebnisse eintragen, aber nur A/B-Score + Gewinner.
 - `frontend/src/pages/admin/AdminStationsPage.jsx`: Stationen und Match-Zuweisung sind vorhanden, aber noch keine Turnierleitungs-Queue mit Check-in-Status, Next-up und Heat-Management.
