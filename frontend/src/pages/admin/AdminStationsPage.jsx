@@ -4,13 +4,14 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { formatBracketSection, formatDeviceType, formatMatchStatus } from "@/lib/tournamentLabels";
 import { Plus, Trash2, Link as LinkIcon, X as XIcon } from "lucide-react";
 import { toast } from "sonner";
 
 const DEVICES = [
   ["switch", "Switch"], ["switch2", "Switch 2"], ["pc", "PC"],
-  ["racing_rig", "Racing Rig"], ["beamer", "Beamer"],
-  ["stream_setup", "Stream"], ["admin_desk", "Admin Desk"],
+  ["racing_rig", "Renn-Setup"], ["beamer", "Beamer"],
+  ["stream_setup", "Übertragungsplatz"], ["admin_desk", "Orga-Tisch"],
 ];
 const STATUSES = ["free", "busy", "broken", "reserved"];
 
@@ -67,25 +68,25 @@ export default function AdminStationsPage() {
   const del = async (id) => {
     if (!await confirm({
       title: "Station löschen?",
-      description: "Die Station wird entfernt und kann danach nicht mehr für Matches zugewiesen werden.",
+      description: "Die Station wird entfernt und kann danach nicht mehr für Spiele zugewiesen werden.",
       confirmLabel: "Löschen",
     })) return;
     try {
       await api.delete(`/stations/${id}`);
-      toast.success("Station geloescht.");
+      toast.success("Station gelöscht.");
       load();
     } catch (e) {
-      toast.error(formatRequestError(e, "Station konnte nicht geloescht werden."));
+      toast.error(formatRequestError(e, "Station konnte nicht gelöscht werden."));
     }
   };
   const assign = async (sid, mid) => {
     try {
       await api.post(`/stations/${sid}/assign/${mid}`);
-      toast.success("Match zugewiesen.");
+      toast.success("Spiel zugewiesen.");
       setAssignFor(null);
       load(); loadMatches();
     } catch (e) {
-      toast.error(formatRequestError(e, "Match konnte nicht zugewiesen werden."));
+      toast.error(formatRequestError(e, "Spiel konnte nicht zugewiesen werden."));
     }
   };
   const clearStation = async (sid) => {
@@ -108,19 +109,19 @@ export default function AdminStationsPage() {
     if (!m) return "—";
     if (m.engine === "v2" || m.slots) {
       const names = (m.slots || [])
-        .map((slot) => regById[slot.registration_id]?.display_name || slot.source?.raw || "TBD")
+        .map((slot) => regById[slot.registration_id]?.display_name || slot.source?.raw || "Offen")
         .slice(0, 4);
-      return `${m.match_key || "Heat"} · ${names.join(" / ")}`;
+      return `${m.match_key || "Durchgang"} · ${names.join(" / ")}`;
     }
-    const a = regById[m.participant_a_id]?.display_name || "TBD";
-    const b = regById[m.participant_b_id]?.display_name || "TBD";
-    return `${a} vs ${b}`;
+    const a = regById[m.participant_a_id]?.display_name || "Offen";
+    const b = regById[m.participant_b_id]?.display_name || "Offen";
+    return `${a} gegen ${b}`;
   };
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Event Setup</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Stationen &amp; Match-Zuweisung</h1>
+      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Event-Einrichtung</span>
+      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Stationen &amp; Spiel-Zuweisung</h1>
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* LEFT: Create form + unassigned matches queue */}
@@ -137,7 +138,7 @@ export default function AdminStationsPage() {
 
           <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Offene Matches</div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Offene Spiele</div>
             </div>
             <select value={activeTid} onChange={(e) => setActiveTid(e.target.value)} data-testid="station-tournament-select" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm mb-3">
               {tournaments.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
@@ -145,11 +146,11 @@ export default function AdminStationsPage() {
             <div className="space-y-1.5 max-h-[360px] overflow-y-auto">
               {unassignedMatches.map((m) => (
                 <div key={m.id} data-testid={`match-unassigned-${m.id}`} className="p-2 border border-white/10 rounded-sm text-xs bg-[#0A0A0A] hover:border-[#29B6E8]/40">
-                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{m.engine === "v2" ? `${m.section || "Stage"} · ${m.round_name || `Runde ${m.round}`}` : (m.round_name || `Runde ${m.round}`)}</div>
+                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{m.engine === "v2" ? `${formatBracketSection(m.section || "MAIN")} · ${m.round_name || `Runde ${m.round}`}` : (m.round_name || `Runde ${m.round}`)}</div>
                   <div className="text-white font-semibold mt-0.5 truncate">{nameOfMatch(m)}</div>
                 </div>
               ))}
-              {unassignedMatches.length === 0 && <div className="text-white/40 text-xs text-center py-6">Keine offenen Matches</div>}
+              {unassignedMatches.length === 0 && <div className="text-white/40 text-xs text-center py-6">Keine offenen Spiele</div>}
             </div>
           </div>
         </div>
@@ -161,7 +162,7 @@ export default function AdminStationsPage() {
               <div key={s.id} className={`border rounded-sm bg-[#121212] p-4 ${s.status === "busy" ? "border-[#FF3B30]/30" : "border-white/10"}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{s.device_type}</div>
+                    <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{formatDeviceType(s.device_type)}</div>
                     <div className="font-heading text-lg font-bold">{s.name}</div>
                   </div>
                   <button onClick={() => del(s.id)} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
@@ -169,7 +170,7 @@ export default function AdminStationsPage() {
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <StatusBadge status={s.status} />
                   <select value={s.status} onChange={(e) => updateStatus(s.id, e.target.value)} data-testid={`station-status-${s.id}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs">
-                    {STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
+                    {STATUSES.map((st) => <option key={st} value={st}>{formatMatchStatus(st)}</option>)}
                   </select>
                 </div>
                 {/* Current match */}
@@ -181,7 +182,7 @@ export default function AdminStationsPage() {
                   </div>
                 ) : (
                   <button onClick={() => setAssignFor(s)} data-testid={`station-assign-${s.id}`} className="mt-3 w-full py-2 border border-dashed border-white/20 rounded-sm text-xs text-white/60 hover:text-[#29B6E8] hover:border-[#29B6E8] inline-flex items-center justify-center gap-2">
-                    <LinkIcon className="w-3.5 h-3.5" /> Match zuweisen
+                    <LinkIcon className="w-3.5 h-3.5" /> Spiel zuweisen
                   </button>
                 )}
                 {s.notes && <div className="mt-2 text-white/50 text-xs">{s.notes}</div>}
@@ -206,11 +207,11 @@ export default function AdminStationsPage() {
             <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
               {unassignedMatches.map((m) => (
                 <button key={m.id} onClick={() => assign(assignFor.id, m.id)} data-testid={`assign-match-${m.id}`} className="w-full text-left p-2 border border-white/10 rounded-sm hover:border-[#29B6E8] hover:bg-[#29B6E8]/5 text-xs">
-                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{m.engine === "v2" ? `${m.section || "Stage"} · ${m.round_name || `Runde ${m.round}`}` : (m.round_name || `Runde ${m.round}`)}</div>
+                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{m.engine === "v2" ? `${formatBracketSection(m.section || "MAIN")} · ${m.round_name || `Runde ${m.round}`}` : (m.round_name || `Runde ${m.round}`)}</div>
                   <div className="text-white font-semibold mt-0.5">{nameOfMatch(m)}</div>
                 </button>
               ))}
-              {unassignedMatches.length === 0 && <div className="text-white/40 text-xs text-center py-6">Keine offenen Matches</div>}
+              {unassignedMatches.length === 0 && <div className="text-white/40 text-xs text-center py-6">Keine offenen Spiele</div>}
             </div>
           </div>
         </div>

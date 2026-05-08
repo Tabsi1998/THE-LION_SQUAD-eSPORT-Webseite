@@ -60,7 +60,7 @@ export default function SeasonPage() {
           <section className="mb-8">
             <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
               <div>
-                <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#FFD700]">Leaderboard</div>
+                <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#FFD700]">Rangliste</div>
                 <h2 className="mt-1 font-heading text-2xl md:text-3xl font-black uppercase">Top Fahrer & Spieler</h2>
               </div>
               <div className="text-xs text-white/45">{totalStarts} gewertete Starts</div>

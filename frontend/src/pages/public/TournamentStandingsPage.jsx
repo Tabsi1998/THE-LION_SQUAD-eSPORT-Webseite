@@ -30,15 +30,15 @@ export default function TournamentStandingsPage() {
     <PublicLayout>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Link to={`/tournaments/${t.slug}`} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← {t.title}</Link>
-        <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Standings</h1>
+        <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Rangliste</h1>
         <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
               <tr>
                 <th className="text-left px-4 py-3 w-14">#</th>
                 <th className="text-left px-4 py-3">Spieler</th>
-                <th className="text-right px-4 py-3">W</th>
-                <th className="text-right px-4 py-3">L</th>
+                <th className="text-right px-4 py-3">S</th>
+                <th className="text-right px-4 py-3">N</th>
                 <th className="text-right px-4 py-3">Punkte</th>
               </tr>
             </thead>

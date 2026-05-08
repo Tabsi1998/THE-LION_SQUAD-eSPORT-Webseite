@@ -43,7 +43,7 @@ def test_custom_schema_parser_accepts_seed_and_rank_sources():
 
 
 def test_custom_schema_rejects_unknown_references():
-    with pytest.raises(BracketSchemaError, match="unbekanntes Match"):
+    with pytest.raises(BracketSchemaError, match="unbekanntes Spiel"):
         parse_custom_bracket_schema("[WB]\nA=[W:Z:1,1]\n")
 
 

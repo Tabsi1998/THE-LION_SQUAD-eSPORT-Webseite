@@ -293,7 +293,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
             <Field label="Ende"><input type="datetime-local" value={form.end_date} onChange={(e) => set("end_date", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
             <Field label="Einlass / Türöffnung"><input type="datetime-local" value={form.door_time} onChange={(e) => set("door_time", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
             <Field label="Max. Teilnehmer"><input type="number" value={form.max_participants} onChange={(e) => set("max_participants", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-            <Field label="Ort / Location"><Input value={form.location} onChange={(v) => set("location", v)} placeholder="Innsbruck" /></Field>
+            <Field label="Ort"><Input value={form.location} onChange={(v) => set("location", v)} placeholder="Innsbruck" /></Field>
             <Field label="Adresse"><Input value={form.address} onChange={(v) => set("address", v)} placeholder="Maria-Theresien-Str. 1" /></Field>
             <Field label="PLZ"><Input value={form.postal_code} onChange={(v) => set("postal_code", v)} placeholder="6020" /></Field>
             <Field label="Stadt"><Input value={form.city} onChange={(v) => set("city", v)} placeholder="Innsbruck" /></Field>
@@ -381,7 +381,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
                   <option value="twitch">Twitch</option>
                   <option value="youtube">YouTube</option>
                   <option value="kick">Kick</option>
-                  <option value="custom">Custom</option>
+                  <option value="custom">Eigenes Format</option>
                 </select>
                 <Input value={form.stream_url} onChange={(v) => set("stream_url", v)} placeholder="Stream URL / Channel" />
               </div>
@@ -485,7 +485,7 @@ const EVENT_REGISTRATION_STATUSES = [
   ["registered", "Angemeldet"],
   ["waitlist", "Warteliste"],
   ["checked_in", "Eingecheckt"],
-  ["no_show", "No-Show"],
+  ["no_show", "Nicht erschienen"],
   ["cancelled", "Storniert"],
 ];
 

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { formatTournamentFormat } from "@/lib/tournamentLabels";
 
 export default function AdminTournamentsPage() {
   const { isAdmin } = useAuth();
@@ -33,15 +34,15 @@ export default function AdminTournamentsPage() {
   const del = async (id) => {
     if (!await confirm({
       title: "Turnier löschen?",
-      description: "Das Turnier wird dauerhaft gelöscht. Teilnehmer, Bracket und öffentliche Detailseite sind danach nicht mehr verfügbar.",
+      description: "Das Turnier wird dauerhaft gelöscht. Teilnehmer, Turnierbaum und öffentliche Detailseite sind danach nicht mehr verfügbar.",
       confirmLabel: "Löschen",
     })) return;
     try {
       await api.delete(`/tournaments/${id}`);
-      toast.success("Turnier geloescht.");
+      toast.success("Turnier gelöscht.");
       load();
     } catch (e) {
-      toast.error(formatRequestError(e, "Turnier konnte nicht geloescht werden."));
+      toast.error(formatRequestError(e, "Turnier konnte nicht gelöscht werden."));
     }
   };
 
@@ -78,7 +79,7 @@ export default function AdminTournamentsPage() {
                   <Link to={`/admin/tournaments/${t.id}`} className="font-semibold hover:text-[#29B6E8]">{t.title}</Link>
                 </td>
                 <td className="px-4 py-3 text-white/70">{t.game?.name || "—"}</td>
-                <td className="px-4 py-3 text-white/70">{t.format?.replace("_", " ")}</td>
+                <td className="px-4 py-3 text-white/70">{formatTournamentFormat(t.format)}</td>
                 <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
                 <td className="px-4 py-3 text-right">{t.participant_count}/{t.max_participants}</td>
                 <td className="px-4 py-3 text-right">

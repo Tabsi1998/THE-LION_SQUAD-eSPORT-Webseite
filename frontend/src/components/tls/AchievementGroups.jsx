@@ -22,7 +22,7 @@ const LEVEL_META = {
 };
 
 const CATEGORY_META = {
-  match:      { label: "Match",      icon: "Swords",    accent: "#29B6E8" },
+  match:      { label: "Spiel",      icon: "Swords",    accent: "#29B6E8" },
   tournament: { label: "Turnier",    icon: "Trophy",    accent: "#FFD700" },
   fastlap:    { label: "Fast Lap",   icon: "Flag",      accent: "#A855F7" },
   club:       { label: "Verein",     icon: "Crown",     accent: "#FFD700" },

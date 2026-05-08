@@ -87,7 +87,7 @@ export default function CurrentSeasonRedirect() {
             <Trophy className="w-10 h-10 mx-auto text-white/20 mb-4" />
             <h2 className="font-heading text-2xl font-black uppercase">Noch keine Season aktiv</h2>
             <p className="mt-3 text-white/55 max-w-xl mx-auto">
-              Lege im Admin-Bereich eine Season an und setze sie auf aktiv. Danach zeigt der Season Pass automatisch Leaderboard, Punkte und Top-Spieler.
+              Lege im Admin-Bereich eine Saison an und setze sie auf aktiv. Danach zeigt der Saisonpass automatisch Rangliste, Punkte und Top-Spieler.
             </p>
           </div>
         )}

@@ -37,25 +37,25 @@ export default function AdminWidgetsPage() {
 
   const copy = () => {
     navigator.clipboard.writeText(iframe);
-    toast.success("iframe kopiert.");
+    toast.success("Einbettungscode kopiert.");
   };
 
   const options = selType === "bracket" ? tournaments : challenges;
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Embeds</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Widgets & iframes</h1>
+      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Einbettungen</span>
+      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Widgets & Einbettungen</h1>
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
-          <Select label="Typ" value={selType} onChange={(v)=>{ setSelType(v); setSelId(""); setSelTrack(""); }} options={[["bracket","Bracket"],["f1","Fast-Lap Leaderboard"]]} testId="widget-type"/>
+          <Select label="Typ" value={selType} onChange={(v)=>{ setSelType(v); setSelId(""); setSelTrack(""); }} options={[["bracket","Turnierbaum"],["f1","Fast-Lap-Rangliste"]]} testId="widget-type"/>
           <Select label="Quelle" value={selId} onChange={(v)=>{ setSelId(v); setSelTrack(""); }} options={[["","— auswählen —"],...options.map(o=>[o.id, o.title])]} testId="widget-source"/>
           {selType === "f1" && tracks.length > 0 && (
             <Select label="Strecke" value={selTrack} onChange={setSelTrack} options={[["","Automatisch rotieren"],...tracks.map(t=>[t.id, t.name])]} testId="widget-track"/>
           )}
           <Field label="Höhe (px)" type="number" value={height} onChange={(v)=>setHeight(Number(v)||600)} testId="widget-height"/>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">iframe Code</div>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Einbettungscode</div>
             <textarea readOnly value={iframe} rows={5} data-testid="widget-iframe" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-xs font-mono"/>
           </div>
           <div className="flex gap-2">

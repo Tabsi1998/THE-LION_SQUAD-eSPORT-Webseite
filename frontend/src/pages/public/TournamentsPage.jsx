@@ -34,9 +34,9 @@ export default function TournamentsPage() {
     <PublicLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
         <div className="mb-10">
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Tournaments</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Turniere</span>
           <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">Alle Turniere</h1>
-          <p className="mt-3 text-white/60 max-w-xl">Online und Offline. Einzelspieler, Teams und FFA. Vom kleinen Cup bis zur Saison-Liga.</p>
+          <p className="mt-3 text-white/60 max-w-xl">Online und vor Ort. Einzelspieler, Teams und Mehrspieler. Vom kleinen Pokal bis zur Saison-Liga.</p>
         </div>
         <div className="flex flex-wrap gap-2 mb-8">
           {filters.map((f) => (

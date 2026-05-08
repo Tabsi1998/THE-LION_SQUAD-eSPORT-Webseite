@@ -13,6 +13,7 @@ import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { formatDateTime, getRegistrationState } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
+import { formatTeamMode, formatTournamentFormat } from "@/lib/tournamentLabels";
 
 export default function TournamentDetailPage() {
   const { slug } = useParams();
@@ -92,7 +93,7 @@ export default function TournamentDetailPage() {
           <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "eSports", to: "/tournaments" }, { label: "Turniere", to: "/tournaments" }, { label: t.title }]} className="mb-4" />
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <PhaseBadge phase={t.public_phase} status={t.status} size="lg" />
-            <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1">{t.format?.replace("_", " ")}</span>
+            <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1">{formatTournamentFormat(t.format)}</span>
             {t.game && <span className="text-white/60 text-sm">· {t.game.name}</span>}
           </div>
           <h1 data-testid="tournament-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{t.title}</h1>
@@ -102,7 +103,7 @@ export default function TournamentDetailPage() {
             <InfoTile icon={Calendar} label="Start" value={formatDateTime(t.start_date)} />
             <InfoTile icon={Users} label="Teilnehmer" value={`${t.participant_count}/${t.max_participants}`} />
             <InfoTile icon={Gamepad2} label="Plattform" value={t.platform || "—"} />
-            <InfoTile icon={Trophy} label="Format" value={t.format?.replace("_", " ")} />
+            <InfoTile icon={Trophy} label="Format" value={formatTournamentFormat(t.format)} />
           </div>
 
           <div className={`mt-5 border rounded-sm px-4 py-3 text-sm max-w-3xl ${
@@ -148,10 +149,10 @@ export default function TournamentDetailPage() {
             )}
             {myReg && <StatusBadge status={myReg.status} size="lg" />}
             <Link to={`/tournaments/${t.slug || t.id}/bracket`} data-testid="tournament-bracket-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
-              Bracket ansehen
+              Turnierbaum ansehen
             </Link>
             <Link to={`/tournaments/${t.slug || t.id}/standings`} data-testid="tournament-standings-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
-              Standings
+              Rangliste
             </Link>
             {t.stream_link && (
               <a href={t.stream_link} target="_blank" rel="noreferrer" data-testid="tournament-stream-link" className="px-6 py-3 border border-[#FF3B30]/40 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FF3B30]/10 transition inline-flex items-center gap-2">
@@ -211,13 +212,13 @@ export default function TournamentDetailPage() {
           </section>
         </div>
         <aside className="space-y-4">
-          {t.location && <InfoRow icon={MapPin} label="Location" value={t.location} />}
+          {t.location && <InfoRow icon={MapPin} label="Ort" value={t.location} />}
           {t.registration_open_from && <InfoRow icon={Calendar} label="Anmeldung öffnet" value={formatDateTime(t.registration_open_from)} />}
           {t.registration_open_until && <InfoRow icon={Calendar} label="Anmeldung endet" value={formatDateTime(t.registration_open_until)} />}
           {t.check_in_from && <InfoRow icon={Calendar} label="Check-in öffnet" value={formatDateTime(t.check_in_from)} />}
           {t.check_in_until && <InfoRow icon={Calendar} label="Check-in endet" value={formatDateTime(t.check_in_until)} />}
           {t.best_of > 1 && <InfoRow icon={Trophy} label="Best of" value={t.best_of} />}
-          <InfoRow icon={Users} label="Modus" value={t.team_mode} />
+          <InfoRow icon={Users} label="Modus" value={formatTeamMode(t.team_mode)} />
           {t.discord_link && <a href={t.discord_link} target="_blank" rel="noreferrer" className="block px-4 py-3 border border-white/10 rounded-sm text-center text-sm font-bold uppercase tracking-wider hover:border-[#29B6E8]/60 hover:text-[#29B6E8]">Discord</a>}
         </aside>
       </div>

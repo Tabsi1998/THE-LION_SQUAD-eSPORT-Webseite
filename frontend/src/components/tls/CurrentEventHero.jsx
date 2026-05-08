@@ -5,6 +5,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { motion } from "framer-motion";
 import { Calendar, Users, MapPin, ArrowRight, Flame, Flag, Trophy } from "lucide-react";
 import { PhaseBadge } from "./PhaseBadge";
+import { formatTournamentFormat } from "@/lib/tournamentLabels";
 
 /**
  * CurrentEventHero — Prominent hero card on home.
@@ -64,7 +65,7 @@ export function CurrentEventHero() {
               </span>
             </div>
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] inline-flex items-center gap-2">
-              {kind === "f1" ? <><Flag className="w-3 h-3" /> Fast Lap Challenge</> : <><Trophy className="w-3 h-3" /> Featured Tournament</>}
+              {kind === "f1" ? <><Flag className="w-3 h-3" /> Fast-Lap-Challenge</> : <><Trophy className="w-3 h-3" /> Ausgewähltes Turnier</>}
             </span>
             <h2 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase leading-[0.95] tracking-tight">
               {item.title}
@@ -115,7 +116,7 @@ export function CurrentEventHero() {
               <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-xs">
                 <span className="text-[10px] uppercase tracking-widest text-white/40">{kind === "f1" ? "Modus" : "Format"}</span>
                 <span className="font-heading font-bold uppercase text-[#29B6E8]">
-                  {kind === "f1" ? (item.is_championship ? "Championship" : "Single Day") : (item.format || "").replace("_", " ")}
+                  {kind === "f1" ? (item.is_championship ? "Meisterschaft" : "Einzeltag") : formatTournamentFormat(item.format)}
                 </span>
               </div>
             </div>

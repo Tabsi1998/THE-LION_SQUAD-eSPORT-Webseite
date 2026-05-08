@@ -4,6 +4,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
 import { toast } from "sonner";
 import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
@@ -59,7 +60,7 @@ export default function AdminGamesPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Games</span>
+      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Spiele</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Spiele</h1>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -194,13 +195,13 @@ function EditGameModal({ game, onClose, onSaved }) {
           <div className="grid md:grid-cols-2 gap-3">
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_solo} onChange={(e) => set("supports_solo", e.target.checked)} className="accent-[#29B6E8]" /> Solo</label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_teams} onChange={(e) => set("supports_teams", e.target.checked)} className="accent-[#29B6E8]" /> Teams</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_ffa} onChange={(e) => set("supports_ffa", e.target.checked)} className="accent-[#29B6E8]" /> Free-for-all</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_time_trial} onChange={(e) => set("supports_time_trial", e.target.checked)} className="accent-[#29B6E8]" /> Time Trial</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_grand_prix} onChange={(e) => set("supports_grand_prix", e.target.checked)} className="accent-[#29B6E8]" /> Grand Prix</label>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_ffa} onChange={(e) => set("supports_ffa", e.target.checked)} className="accent-[#29B6E8]" /> Mehrspieler frei</label>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_time_trial} onChange={(e) => set("supports_time_trial", e.target.checked)} className="accent-[#29B6E8]" /> Zeitfahren</label>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_grand_prix} onChange={(e) => set("supports_grand_prix", e.target.checked)} className="accent-[#29B6E8]" /> Rennserie</label>
             <Input placeholder="Teamgroesse Standard" value={form.default_team_size} onChange={(v) => set("default_team_size", v)} testId="game-edit-team-size" />
           </div>
           <select value={form.default_format} onChange={(e) => set("default_format", e.target.value)} data-testid="game-edit-format" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-            {["single_elim", "double_elim", "round_robin", "swiss", "groups", "time_trial", "grand_prix"].map((f) => <option key={f} value={f}>{f}</option>)}
+            {TOURNAMENT_FORMAT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </div>
         <div className="flex justify-end gap-2 p-5 border-t border-white/10">

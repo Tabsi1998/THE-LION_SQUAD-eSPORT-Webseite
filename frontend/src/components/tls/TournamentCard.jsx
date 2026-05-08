@@ -3,6 +3,7 @@ import { PhaseBadge } from "./PhaseBadge";
 import { Calendar, Users, Trophy } from "lucide-react";
 import { formatDate, getRegistrationState } from "@/lib/datetime";
 import { resolveMediaUrl } from "@/lib/api";
+import { formatTournamentFormat } from "@/lib/tournamentLabels";
 
 export function TournamentCard({ tournament, index = 0 }) {
   const t = tournament;
@@ -28,7 +29,7 @@ export function TournamentCard({ tournament, index = 0 }) {
         </div>
         <div className="absolute top-3 right-3">
           <span className="text-[10px] font-bold uppercase tracking-wider text-[#29B6E8] bg-[#29B6E8]/10 border border-[#29B6E8]/30 px-2 py-1 rounded-sm">
-            {t.format?.replace("_", " ")}
+            {formatTournamentFormat(t.format)}
           </span>
         </div>
       </div>

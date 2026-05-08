@@ -74,9 +74,9 @@ export default function DashboardPage() {
 
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 border border-white/10 rounded-sm bg-[#121212] p-5">
-            <h2 className="font-heading text-xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#29B6E8]" /> Nächste Matches</h2>
+            <h2 className="font-heading text-xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#29B6E8]" /> Nächste Spiele</h2>
             <div className="space-y-3">
-              {matches.length === 0 && <div className="text-sm text-white/40">Keine geplanten Matches.</div>}
+              {matches.length === 0 && <div className="text-sm text-white/40">Keine geplanten Spiele.</div>}
               {matches.map((m) => (
                 <Link
                   key={m.id}

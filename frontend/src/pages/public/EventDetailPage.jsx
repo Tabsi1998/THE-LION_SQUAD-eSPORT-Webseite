@@ -9,6 +9,7 @@ import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { renderMarkdownLite } from "@/lib/markdownLite";
+import { formatTournamentFormat } from "@/lib/tournamentLabels";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag, UserPlus, CheckCircle, XCircle } from "lucide-react";
@@ -217,7 +218,7 @@ const EVENT_REGISTRATION_LABELS = {
   waitlist: "Warteliste",
   checked_in: "Eingecheckt",
   cancelled: "Storniert",
-  no_show: "No-Show",
+  no_show: "Nicht erschienen",
 };
 
 function EventRegistrationPanel({ event, user, onChanged }) {
@@ -379,17 +380,17 @@ function EventTournamentEmbed({ tournament }) {
         <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#FFD700] transition break-words">{tournament.title}</h3>
         <div className="mt-2 flex flex-wrap gap-3 text-xs text-white/55">
           {tournament.game?.name && <span>{tournament.game.name}</span>}
-          {tournament.format && <span>{tournament.format.replace("_", " ")}</span>}
+          {tournament.format && <span>{formatTournamentFormat(tournament.format)}</span>}
           {Number.isFinite(tournament.participant_count) && <span>{tournament.participant_count}/{tournament.max_participants} Teilnehmer</span>}
         </div>
       </Link>
       <div className="border-t border-white/10 p-5">
         <div className="flex items-center justify-between gap-3 mb-3 min-w-0">
-          <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">Bracket-Vorschau</div>
+          <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">Turnierbaum-Vorschau</div>
           <Link to={`/tournaments/${tournament.slug || tournament.id}/bracket`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">Öffnen</Link>
         </div>
         {!loaded ? (
-          <div className="text-sm text-white/40 py-4">Lade Bracket…</div>
+          <div className="text-sm text-white/40 py-4">Lade Turnierbaum…</div>
         ) : matches.length ? (
           <div className="space-y-2">
             {matches.map((match) => (
@@ -404,7 +405,7 @@ function EventTournamentEmbed({ tournament }) {
             ))}
           </div>
         ) : (
-          <div className="text-sm text-white/45 border border-dashed border-white/10 rounded-sm p-4">Bracket wurde noch nicht generiert.</div>
+          <div className="text-sm text-white/45 border border-dashed border-white/10 rounded-sm p-4">Turnierbaum wurde noch nicht generiert.</div>
         )}
       </div>
     </div>
@@ -440,7 +441,7 @@ function EventFastLapEmbed({ challenge }) {
       <div className="border-t border-white/10 p-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3 min-w-0">
           <div className="text-[10px] uppercase tracking-widest font-bold text-white/45 break-words">Top 3{board?.track?.name ? ` · ${board.track.name}` : ""}</div>
-          <Link to={`/fastlap/${challenge.slug || challenge.id}`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">Leaderboard</Link>
+          <Link to={`/fastlap/${challenge.slug || challenge.id}`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">Rangliste</Link>
         </div>
         {!loaded ? (
           <div className="text-sm text-white/40 py-4">Lade Zeiten…</div>
@@ -466,6 +467,6 @@ function EventFastLapEmbed({ challenge }) {
 
 function registrationName(regMap, id) {
   const reg = regMap.get(id);
-  if (!id) return "TBD";
-  return reg?.display_name || reg?.user?.display_name || reg?.ingame_name || "TBD";
+  if (!id) return "Offen";
+  return reg?.display_name || reg?.user?.display_name || reg?.ingame_name || "Offen";
 }

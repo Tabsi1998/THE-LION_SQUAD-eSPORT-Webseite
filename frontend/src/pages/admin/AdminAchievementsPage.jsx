@@ -18,7 +18,7 @@ import {
 const LEVEL_NAMES = { 1: "Bronze", 2: "Silber", 3: "Gold", 4: "Platin", 5: "Special" };
 const LEVEL_COLORS = { 1: "#CD7F32", 2: "#C0C0C0", 3: "#FFD700", 4: "#29B6E8", 5: "#FF3B30" };
 const CATEGORIES = [
-  { value: "match", label: "Match" },
+  { value: "match", label: "Spiel" },
   { value: "tournament", label: "Turnier" },
   { value: "fastlap", label: "Fast Lap" },
   { value: "club", label: "Verein" },
@@ -127,7 +127,7 @@ function GroupsTab() {
                   <td className="px-4 py-3 text-[10px] uppercase tracking-widest space-x-2">
                     {g.is_special && <span className="text-[#FFD700]">Special</span>}
                     {g.is_negative && <span className="text-[#FF3B30]">Negative</span>}
-                    {g.is_admin_created && <span className="text-[#29B6E8]">Custom</span>}
+                    {g.is_admin_created && <span className="text-[#29B6E8]">Eigen</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => setEditing(g)} className="text-[#29B6E8] hover:underline mr-3 text-xs">Bearbeiten</button>

@@ -6,20 +6,8 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields } from "@/lib/datetime";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
 import { toast } from "sonner";
-
-const FORMATS = [
-  ["single_elim", "Single Elimination"],
-  ["double_elim", "Double Elimination"],
-  ["round_robin", "Round Robin"],
-  ["swiss", "Swiss (Struktur, Matches manuell)"],
-  ["groups", "Group Stage"],
-  ["ffa", "Free For All"],
-  ["battle_royale", "Battle Royale"],
-  ["league", "Liga"],
-  ["time_trial", "Time Trial"],
-  ["grand_prix", "Grand Prix"],
-];
 
 const CREATE_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -131,7 +119,7 @@ export default function AdminTournamentNewPage() {
         </div>
         <Row>
           <Select label="Spiel *" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, g.name])]} required testId="new-tr-game" />
-          <Select label="Format" value={form.format} onChange={(v) => set("format", v)} options={FORMATS} testId="new-tr-format" />
+          <Select label="Format" value={form.format} onChange={(v) => set("format", v)} options={TOURNAMENT_FORMAT_OPTIONS} testId="new-tr-format" />
         </Row>
         <Row>
           <Field label="Plattform" value={form.platform} onChange={(v) => set("platform", v)} placeholder="z.B. Nintendo Switch" testId="new-tr-platform" />
@@ -151,7 +139,7 @@ export default function AdminTournamentNewPage() {
         </Row>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.bronze_match} onChange={(e) => set("bronze_match", e.target.checked)} data-testid="new-tr-bronze" className="accent-[#29B6E8]" />
-          <span>Bronze Match (Platz 3 ermitteln)</span>
+          <span>Spiel um Platz 3 ermitteln</span>
         </label>
         <Textarea label="Regeln" value={form.rules} onChange={(v) => set("rules", v)} testId="new-tr-rules" />
 
@@ -189,18 +177,18 @@ export default function AdminTournamentNewPage() {
 
         {/* Streaming + Links */}
         <div className="border border-[#9146FF]/20 bg-[#9146FF]/5 rounded-sm p-4 space-y-3">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#9146FF]">Streaming &amp; Links</div>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-[#9146FF]">Streaming &amp; Verweise</div>
           <Row>
-            <Field label="Twitch Channel" value={form.twitch_channel} onChange={(v) => set("twitch_channel", v)} testId="new-tr-twitch" placeholder="the_lion_squad_esports" />
-            <Field label="Location" value={form.location} onChange={(v) => set("location", v)} testId="new-tr-location" placeholder="z.B. Gamers Heaven · Bregenz" />
+            <Field label="Twitch-Kanal" value={form.twitch_channel} onChange={(v) => set("twitch_channel", v)} testId="new-tr-twitch" placeholder="the_lion_squad_esports" />
+            <Field label="Ort" value={form.location} onChange={(v) => set("location", v)} testId="new-tr-location" placeholder="z.B. Gamers Heaven · Bregenz" />
           </Row>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={form.twitch_enabled} onChange={(e) => set("twitch_enabled", e.target.checked)} data-testid="new-tr-twitch-enabled" className="accent-[#9146FF]" />
             <span>Twitch-Player auf Turnierseite einbetten</span>
           </label>
           <Row>
-            <Field label="Externer Stream-Link" value={form.stream_link} onChange={(v) => set("stream_link", v)} testId="new-tr-stream" placeholder="https://…" />
-            <Field label="Discord Invite" value={form.discord_link} onChange={(v) => set("discord_link", v)} testId="new-tr-discord" placeholder="https://discord.com/invite/…" />
+            <Field label="Externer Stream-Verweis" value={form.stream_link} onChange={(v) => set("stream_link", v)} testId="new-tr-stream" placeholder="https://…" />
+            <Field label="Discord-Einladung" value={form.discord_link} onChange={(v) => set("discord_link", v)} testId="new-tr-discord" placeholder="https://discord.com/invite/…" />
           </Row>
         </div>
         <button disabled={saving} data-testid="new-tr-submit" className="px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50">

@@ -5,6 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { formatTournamentFormat } from "@/lib/tournamentLabels";
 import { Tv } from "lucide-react";
 
 export default function TournamentBracketPage() {
@@ -25,7 +26,7 @@ export default function TournamentBracketPage() {
 
   useApiInvalidation(load, ["tournaments", "matches"]);
 
-  if (!data) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE BRACKET …</div></PublicLayout>;
+  if (!data) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE TURNIERBAUM …</div></PublicLayout>;
   const t = data.tournament;
 
   return (
@@ -37,16 +38,16 @@ export default function TournamentBracketPage() {
             <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">{t.title}</h1>
             <div className="mt-2 flex gap-2 items-center">
               <PhaseBadge phase={t.public_phase} status={t.status} />
-              <span className="text-white/40 text-sm">{t.format?.replace("_", " ")}</span>
+              <span className="text-white/40 text-sm">{formatTournamentFormat(t.format)}</span>
             </div>
           </div>
           <Link to={`/display/bracket/${t.id}`} target="_blank" data-testid="bracket-tv-link" className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10 text-sm">
-            <Tv className="w-4 h-4" /> TV Ansicht
+            <Tv className="w-4 h-4" /> TV-/Beamer-Ansicht
           </Link>
         </div>
         {(data.matches?.length || 0) + (data.matches_v2?.length || 0) === 0 ? (
           <div className="border border-white/10 rounded-sm bg-[#121212] p-12 text-center">
-            <div className="text-white/50 font-display tracking-widest">BRACKET WURDE NOCH NICHT GENERIERT</div>
+            <div className="text-white/50 font-display tracking-widest">TURNIERBAUM WURDE NOCH NICHT GENERIERT</div>
           </div>
         ) : (
           <BracketTree data={data} />

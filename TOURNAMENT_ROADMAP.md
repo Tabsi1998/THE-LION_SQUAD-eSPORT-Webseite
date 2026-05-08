@@ -1,4 +1,4 @@
-# Tournament Roadmap
+# Turnier-Roadmap
 
 Stand: 2026-05-08
 
@@ -147,13 +147,25 @@ Naechster Schritt: Bracket-/Heat-Darstellung fuer Public/Admin und erste TV/Embe
 - Admin-Stationsseite zeigt offene klassische Matches und v2-Heats in einer gemeinsamen Queue.
 - Doku beschreibt Check-in-Reminder, Match-Reminder und Stationen.
 
+### Step 12 erledigt: Deutsche Turnieroberflaeche und TV-tauglicher Turnierbaum
+
+- Sichtbare Turnier-, Struktur-, Stations- und Teilnehmerlabels wurden auf Deutsch umgestellt.
+- Rohe Werte wie `single_elim`, `ffa_custom_bracket`, `pending`, `checked_in` und `no_show` werden in den wichtigen Turnieransichten durch deutsche Anzeigen ersetzt.
+- Public-Turnierdetail, Turnierkarten, Turnierbaumseite, Rangliste, Admin-Turnierseite, Stationsseite und Einbettungsseite nutzen deutsche Begriffe.
+- Der flexible Schema-Parser erkennt jetzt `# Runde 1` zusaetzlich zu `# Round 1`.
+- Automatisch erzeugte freie 1v1-Baeume schreiben deutsche Rundennamen.
+- Die Turnierbaum-TV-Seite ist jetzt eine feste Vollbildansicht ohne manuelles Scrollen.
+- TV rotiert automatisch durch sinnvolle Ausschnitte nach Bereich/Runde, z.B. Siegerbaum Runde 1 Teil 1/2, Hoffnungsbaum Runde 2.
+- Mobile Turnierbaumansichten stapeln Runden lesbar statt horizontalen Pflichtscroll zu erzwingen.
+- `TOURNAMENT_CUSTOM_BRACKETS.md` wurde fuer deutsche Admin-Begriffe, deutsche Rundennamen und den aktuellen Workflow aktualisiert.
+
 Naechster Schritt: operative Turnierleitung mit Next-up/Station-Queue, Live-Callouts und besserer Korrektur-/Undo-Sicherheit fuer bereits gespielte Folgematches.
 
 ## Was wirklich noch fehlt
 
 - Korrekte Double-Elimination-Flows fuer 1v1 und FFA inklusive Loser-Bracket-Transfers.
 - Operatives Turnierleitungs-Dashboard: kombinierte Check-in/Warteliste/No-Show/Stationen/Next-up/offene-Ergebnisse-Ansicht.
-- TV-/Embed-Ansichten fuer Bracket, Stationen und Live-Eventbetrieb.
+- Station-/Live-TV und Embed-Ausbau; Bracket-TV hat jetzt eine erste scrollfreie Rundensicht.
 - Benachrichtigungen fuer Match bereit, Station zugewiesen und Ergebnis bestaetigt.
 - Vollstaendige Downstream-Cascade/Undo fuer Ergebnis-Korrekturen, wenn Folge-Matches bereits gespielt wurden.
 - QR-/Vor-Ort-Check-in fuer Events und Turniere.

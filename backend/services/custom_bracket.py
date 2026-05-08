@@ -23,7 +23,7 @@ from typing import Any
 ASSIGNMENT_RE = re.compile(r"^(?P<key>[A-Za-z0-9_.-]+)\s*=\s*\[(?P<slots>.*)\]\s*$")
 SECTION_RE = re.compile(r"^\[(?P<section>[A-Za-z0-9_. -]+)\]\s*$")
 SOURCE_RE = re.compile(r"^(?P<flow>[WLR]):(?P<match>[A-Za-z0-9_.-]+):(?P<rank>[1-9][0-9]*)$")
-ROUND_RE = re.compile(r"\bround\s+([0-9]+)\b", re.IGNORECASE)
+ROUND_RE = re.compile(r"\b(?:round|runde)\s+([0-9]+)\b", re.IGNORECASE)
 
 
 class BracketSchemaError(ValueError):
@@ -61,7 +61,7 @@ def _parse_source(raw: str) -> dict[str, Any]:
     if token.isdigit():
         seed = int(token)
         if seed <= 0:
-            raise BracketSchemaError(f"Seed muss groesser 0 sein: {token}")
+            raise BracketSchemaError(f"Setzplatz muss groesser 0 sein: {token}")
         return {"type": "seed", "seed": seed, "raw": token}
     match = SOURCE_RE.match(token)
     if not match:
@@ -111,11 +111,11 @@ def parse_custom_bracket_schema(schema: str) -> list[BracketMatchSpec]:
             raise BracketSchemaError(f"Zeile {line_no}: erwartet MATCH=[...]")
         key = assignment.group("key").strip()
         if key in seen:
-            raise BracketSchemaError(f"Match-Key doppelt vergeben: {key}")
+            raise BracketSchemaError(f"Spiel-Key doppelt vergeben: {key}")
         seen.add(key)
         slot_raw = assignment.group("slots").strip()
         if not slot_raw:
-            raise BracketSchemaError(f"Match {key} hat keine Slots")
+            raise BracketSchemaError(f"Spiel {key} hat keine Spielplätze")
         sources = [_parse_source(part) for part in slot_raw.split(",")]
         matches.append(BracketMatchSpec(
             key=key,
@@ -127,7 +127,7 @@ def parse_custom_bracket_schema(schema: str) -> list[BracketMatchSpec]:
         ))
 
     if not matches:
-        raise BracketSchemaError("Schema enthaelt keine Matches")
+        raise BracketSchemaError("Schema enthaelt keine Spiele")
     _validate_references(matches)
     return matches
 
@@ -140,9 +140,9 @@ def _validate_references(matches: list[BracketMatchSpec]) -> None:
                 continue
             ref = source["match_key"]
             if ref not in by_key:
-                raise BracketSchemaError(f"Match {match.key} referenziert unbekanntes Match {ref}")
+                raise BracketSchemaError(f"Spiel {match.key} referenziert unbekanntes Spiel {ref}")
             if ref == match.key:
-                raise BracketSchemaError(f"Match {match.key} referenziert sich selbst")
+                raise BracketSchemaError(f"Spiel {match.key} referenziert sich selbst")
 
     visiting: set[str] = set()
     visited: set[str] = set()
@@ -151,7 +151,7 @@ def _validate_references(matches: list[BracketMatchSpec]) -> None:
         if key in visited:
             return
         if key in visiting:
-            raise BracketSchemaError(f"Zyklische Referenz im Schema bei Match {key}")
+            raise BracketSchemaError(f"Zyklische Referenz im Schema bei Spiel {key}")
         visiting.add(key)
         for source in by_key[key].sources:
             if source.get("type") == "rank":
@@ -228,7 +228,7 @@ def _auto_single_elim_schema(slot_count: int) -> str:
     next_key_index = 0
     round_num = 1
     while len(sources) > 1:
-        lines.append(f"# Round {round_num}")
+        lines.append(f"# Runde {round_num}")
         next_sources = []
         for idx in range(0, len(sources), 2):
             key = _match_key(next_key_index)
@@ -361,7 +361,7 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
             "match_key": spec.key,
             "section": spec.section,
             "round": rounds[spec.key],
-            "round_name": spec.round_name_hint or f"Round {rounds[spec.key]}",
+            "round_name": spec.round_name_hint or f"Runde {rounds[spec.key]}",
             "order": spec.order,
             "slots": slots,
             "results": [],

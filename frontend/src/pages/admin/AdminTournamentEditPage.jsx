@@ -12,6 +12,18 @@ import { Zap, RefreshCw, Eye } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
+import {
+  REGISTRATION_STATUS_OPTIONS,
+  STAFF_ROLE_OPTIONS,
+  STAFF_SCOPE_OPTIONS,
+  STAGE_STATUS_OPTIONS,
+  formatBracketSection,
+  formatMatchStatus,
+  formatMatchType,
+  formatRegistrationStatus,
+  formatStageType,
+  formatTournamentFormat,
+} from "@/lib/tournamentLabels";
 
 const TOURNAMENT_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -28,47 +40,47 @@ const TOURNAMENT_STATUS_OPTIONS = [
 ];
 
 const TOURNAMENT_FORMAT_OPTIONS = [
-  ["single_elim", "Single Elimination"],
-  ["double_elim", "Double Elimination"],
-  ["round_robin", "Round Robin"],
-  ["swiss", "Swiss"],
+  ["single_elim", "Einzelausscheidung"],
+  ["double_elim", "Doppelausscheidung"],
+  ["round_robin", "Jeder gegen jeden"],
+  ["swiss", "Schweizer System"],
   ["groups", "Gruppen"],
-  ["ffa", "Free For All"],
-  ["battle_royale", "Battle Royale"],
+  ["ffa", "Mehrspieler frei"],
+  ["battle_royale", "Überlebensmodus"],
   ["league", "Liga"],
-  ["time_trial", "Time Trial"],
-  ["grand_prix", "Grand Prix"],
+  ["time_trial", "Zeitfahren"],
+  ["grand_prix", "Rennserie"],
 ];
 
 const TEAM_MODE_OPTIONS = [["solo", "Solo"], ["duo", "Duo"], ["team", "Team"], ["squad", "Squad"]];
 const SEEDING_OPTIONS = [["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]];
 const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
-const STREAM_PLATFORM_OPTIONS = [["", "—"], ["twitch", "Twitch"], ["youtube", "YouTube"], ["kick", "Kick"], ["custom", "Custom"]];
+const STREAM_PLATFORM_OPTIONS = [["", "—"], ["twitch", "Twitch"], ["youtube", "YouTube"], ["kick", "Kick"], ["custom", "Eigene Plattform"]];
 const STAGE_TYPES = [
-  ["single_elimination", "Single Elimination"],
-  ["double_elimination", "Double Elimination"],
-  ["custom_bracket", "Custom Bracket"],
-  ["round_robin_groups", "Round-robin Gruppen"],
-  ["swiss", "Swiss"],
+  ["single_elimination", "Einzelausscheidung"],
+  ["double_elimination", "Doppelausscheidung"],
+  ["custom_bracket", "Freier Turnierbaum"],
+  ["round_robin_groups", "Jeder-gegen-jeden-Gruppen"],
+  ["swiss", "Schweizer System"],
   ["league", "Liga"],
-  ["simple", "Simple"],
-  ["ffa_single_elimination", "FFA Single Elim"],
-  ["ffa_custom_bracket", "FFA Custom Bracket"],
-  ["ffa_league", "FFA Liga"],
+  ["simple", "Einzelrunde"],
+  ["ffa_single_elimination", "Mehrspieler-Einzelausscheidung"],
+  ["ffa_custom_bracket", "Mehrspieler freier Turnierbaum"],
+  ["ffa_league", "Mehrspieler-Liga"],
 ];
 const DEFAULT_FFA_SCHEMA = `[WB]
-# Round 1
+# Runde 1
 A=[1,2,3,4]
 B=[5,6,7,8]
 
-# Round 2
+# Runde 2
 C=[W:A:1,W:A:2,W:B:1,W:B:2]
 
 [LB]
-# Round 1
+# Runde 1
 LA=[L:A:3,L:A:4,L:B:3,L:B:4]`;
 const MARIO_KART_32_SCHEMA = `[WB]
-# Round 1 (32 -> 16)
+# Runde 1 (32 -> 16)
 A=[1,2,3,4]
 B=[5,6,7,8]
 C=[9,10,11,12]
@@ -78,31 +90,31 @@ F=[21,22,23,24]
 G=[25,26,27,28]
 H=[29,30,31,32]
 
-# Round 2 (16 -> 8)
+# Runde 2 (16 -> 8)
 I=[W:A:1,W:A:2,W:B:1,W:B:2]
 J=[W:C:1,W:C:2,W:D:1,W:D:2]
 K=[W:E:1,W:E:2,W:F:1,W:F:2]
 L=[W:G:1,W:G:2,W:H:1,W:H:2]
 
-# Round 3 (8 -> 4)
+# Runde 3 (8 -> 4)
 M=[W:I:1,W:I:2,W:J:1,W:J:2]
 N=[W:K:1,W:K:2,W:L:1,W:L:2]
 
-# Winner Final
+# Sieger-Finale
 O=[W:M:1,W:M:2,W:N:1,W:N:2]
 
 [LB]
-# Round 1 (16 -> 8)
+# Runde 1 (16 -> 8)
 LA=[L:A:3,L:A:4,L:B:3,L:B:4]
 LB=[L:C:3,L:C:4,L:D:3,L:D:4]
 LC=[L:E:3,L:E:4,L:F:3,L:F:4]
 LD=[L:G:3,L:G:4,L:H:3,L:H:4]
 
-# Round 2 (8 -> 4)
+# Runde 2 (8 -> 4)
 LE=[W:LA:1,W:LA:2,W:LB:1,W:LB:2]
 LF=[W:LC:1,W:LC:2,W:LD:1,W:LD:2]
 
-# Loser Final
+# Hoffnungs-Finale
 LG=[W:LE:1,W:LE:2,W:LF:1,W:LF:2]`;
 const STAGE_PRESETS = [
   ["custom", "Eigenes Schema", null],
@@ -220,13 +232,13 @@ export default function AdminTournamentEditPage() {
       if (force) params.set("force", "true");
       const suffix = params.toString() ? `?${params.toString()}` : "";
       const { data } = await api.post(`/tournaments/${id}/generate-bracket${suffix}`);
-      toast.success(data.preview ? `Vorschau mit ${data.match_count} Matches generiert.` : `Bracket mit ${data.match_count} Matches generiert.`);
+      toast.success(data.preview ? `Vorschau mit ${data.match_count} Spielen generiert.` : `Turnierbaum mit ${data.match_count} Spielen generiert.`);
       load();
     } catch (e) {
       if (e.response?.status === 409 && !force) {
         const ok = await confirm({
-          title: "Bracket neu generieren?",
-          description: "Vorhandene echte Matches werden ersetzt. Eine reine Vorschau kann direkt überschrieben werden.",
+          title: "Turnierbaum neu generieren?",
+          description: "Vorhandene echte Spiele werden ersetzt. Eine reine Vorschau kann direkt überschrieben werden.",
           confirmLabel: "Neu generieren",
           tone: "danger",
         });
@@ -237,34 +249,34 @@ export default function AdminTournamentEditPage() {
   };
   const reset = async () => {
     if (!await confirm({
-      title: "Bracket zurücksetzen?",
-      description: "Alle generierten Bracket-Daten werden zurückgesetzt. Diese Aktion ist für laufende Turniere kritisch.",
+      title: "Turnierbaum zurücksetzen?",
+      description: "Alle generierten Turnierbaum-Daten werden zurückgesetzt. Diese Aktion ist für laufende Turniere kritisch.",
       confirmLabel: "Zurücksetzen",
     })) return;
     try {
       await api.post(`/tournaments/${id}/reset-bracket`);
-      toast.success("Bracket zurückgesetzt.");
+      toast.success("Turnierbaum zurückgesetzt.");
       load();
     } catch (e) {
       if (e.response?.status === 409) {
         const force = await confirm({
-          title: "Laufendes Bracket wirklich zurücksetzen?",
-          description: "Das Turnier ist live oder bereits beendet. Beim Fortfahren werden alle Matches endgültig gelöscht.",
+          title: "Laufenden Turnierbaum wirklich zurücksetzen?",
+          description: "Das Turnier ist live oder bereits beendet. Beim Fortfahren werden alle Spiele endgültig gelöscht.",
           confirmLabel: "Trotzdem zurücksetzen",
           tone: "danger",
         });
         if (!force) return;
         try {
           await api.post(`/tournaments/${id}/reset-bracket?force=true`);
-          toast.success("Bracket zurückgesetzt.");
+          toast.success("Turnierbaum zurückgesetzt.");
           load();
           return;
         } catch (inner) {
-          toast.error(formatRequestError(inner, "Bracket konnte nicht zurueckgesetzt werden."));
+          toast.error(formatRequestError(inner, "Turnierbaum konnte nicht zurückgesetzt werden."));
           return;
         }
       }
-      toast.error(formatRequestError(e, "Bracket konnte nicht zurueckgesetzt werden."));
+      toast.error(formatRequestError(e, "Turnierbaum konnte nicht zurückgesetzt werden."));
     }
   };
   const setRegStatus = async (rid, status) => {
@@ -278,7 +290,7 @@ export default function AdminTournamentEditPage() {
   const setRegCheckinStatus = async (rid, status) => {
     try {
       await api.post(`/tournaments/${id}/registrations/${rid}/checkin`, { status });
-      toast.success(status === "checked_in" ? "Check-in gesetzt." : status === "no_show" ? "No-Show gesetzt." : "Check-in zurückgenommen.");
+      toast.success(status === "checked_in" ? "Check-in gesetzt." : status === "no_show" ? "Nicht erschienen gesetzt." : "Check-in zurückgenommen.");
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Check-in konnte nicht gespeichert werden."));
@@ -299,7 +311,7 @@ export default function AdminTournamentEditPage() {
       };
       const { data } = await api.post(`/tournaments/${id}/registrations`, payload);
       const replacement = data.replacement;
-      toast.success(replacement ? `Teilnehmer hinzugefügt und ${replacement.legacy_matches + replacement.v2_matches} Match-Slots ersetzt.` : "Teilnehmer hinzugefügt.");
+      toast.success(replacement ? `Teilnehmer hinzugefügt und ${replacement.legacy_matches + replacement.v2_matches} Spielplätze ersetzt.` : "Teilnehmer hinzugefügt.");
       setParticipantForm({ user_id: "", display_name: "", ingame_name: "", discord: "", status: "approved", seed: "", replace_registration_id: "" });
       load();
     } catch (err) {
@@ -309,7 +321,7 @@ export default function AdminTournamentEditPage() {
   const setTournStatus = async (status) => {
     try {
       await api.post(`/tournaments/${id}/status`, { status });
-      toast.success(`Status: ${status}`);
+      toast.success(`Status: ${TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status}`);
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Turnierstatus konnte nicht gespeichert werden."));
@@ -336,10 +348,10 @@ export default function AdminTournamentEditPage() {
       };
       if (scheduledAt && ["pending", "ready", "preview"].includes(match.status)) body.status = "scheduled";
       await api.patch(`/matches/${match.id}`, body);
-      toast.success("Match-Zeit gespeichert.");
+      toast.success("Spielzeit gespeichert.");
       load();
     } catch (err) {
-      toast.error(formatRequestError(err, "Match-Zeit konnte nicht gespeichert werden."));
+      toast.error(formatRequestError(err, "Spielzeit konnte nicht gespeichert werden."));
     }
   };
   const updateMatchV2Schedule = async (match, payload) => {
@@ -348,10 +360,10 @@ export default function AdminTournamentEditPage() {
         scheduled_at: payload.scheduled_at ? fromDateTimeLocal(payload.scheduled_at) : null,
         duration_minutes: payload.duration_minutes === "" ? null : Number(payload.duration_minutes),
       });
-      toast.success("Match-Zeit gespeichert.");
+      toast.success("Spielzeit gespeichert.");
       load();
     } catch (err) {
-      toast.error(formatRequestError(err, "Match-Zeit konnte nicht gespeichert werden."));
+      toast.error(formatRequestError(err, "Spielzeit konnte nicht gespeichert werden."));
     }
   };
   const updateMatchV2Result = async (match, results, meta = {}) => {
@@ -396,7 +408,7 @@ export default function AdminTournamentEditPage() {
     }
     try {
       const { data } = await api.post(`/tournaments/${id}/groups/generate`, { group_count: groupCount });
-      toast.success(`${data.group_count} Gruppen mit ${data.match_count} Matches`);
+      toast.success(`${data.group_count} Gruppen mit ${data.match_count} Spielen`);
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Gruppen konnten nicht generiert werden."));
@@ -414,8 +426,8 @@ export default function AdminTournamentEditPage() {
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">{t.title}</h1>
           <div className="mt-2 flex items-center gap-3 flex-wrap">
             <StatusBadge status={t.status} />
-            <span className="text-white/60 text-sm">{t.format?.replace("_", " ")}</span>
-            <Link to={`/tournaments/${t.slug || t.id}`} target="_blank" className="text-[#29B6E8] text-xs uppercase tracking-wider font-bold hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Public Seite</Link>
+            <span className="text-white/60 text-sm">{formatTournamentFormat(t.format)}</span>
+            <Link to={`/tournaments/${t.slug || t.id}`} target="_blank" className="text-[#29B6E8] text-xs uppercase tracking-wider font-bold hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Öffentliche Seite</Link>
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -431,13 +443,13 @@ export default function AdminTournamentEditPage() {
             <Eye className="w-3.5 h-3.5" /> Vorschau
           </button>}
           {isModerator && !hasFlexibleStructure && <button onClick={() => generateLegacyBracket({ preview: false })} data-testid="admin-tr-generate" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2">
-            <Zap className="w-3.5 h-3.5" /> Bracket generieren
+            <Zap className="w-3.5 h-3.5" /> Turnierbaum generieren
           </button>}
           {isModerator && <button onClick={reset} data-testid="admin-tr-reset" className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-sm hover:border-[#FF3B30]/60 hover:text-[#FF3B30] inline-flex items-center gap-2">
-            <RefreshCw className="w-3.5 h-3.5" /> Reset
+            <RefreshCw className="w-3.5 h-3.5" /> Zurücksetzen
           </button>}
           {isAdmin && t.format === "swiss" && (
-            <button onClick={async()=>{ try{ const {data} = await api.post(`/tournaments/${id}/swiss/next-round`); toast.success(`Runde ${data.round} mit ${data.match_count} Matches generiert`); load(); }catch(e){ toast.error(formatRequestError(e, "Swiss-Runde konnte nicht generiert werden.")); } }} data-testid="admin-tr-swiss-next" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Swiss Runde</button>
+            <button onClick={async()=>{ try{ const {data} = await api.post(`/tournaments/${id}/swiss/next-round`); toast.success(`Runde ${data.round} mit ${data.match_count} Spielen generiert`); load(); }catch(e){ toast.error(formatRequestError(e, "Schweizer Runde konnte nicht generiert werden.")); } }} data-testid="admin-tr-swiss-next" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Schweizer Runde</button>
           )}
           {isAdmin && t.format === "groups" && (
             <button onClick={generateGroups} data-testid="admin-tr-groups" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Gruppen generieren</button>
@@ -445,7 +457,7 @@ export default function AdminTournamentEditPage() {
           <div className="flex gap-1">
             <a href={`${API}/exports/tournaments/${t.id}/participants.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF Teilnehmer</a>
             <a href={`${API}/exports/tournaments/${t.id}/checkin.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF Check-in</a>
-            <a href={`${API}/exports/tournaments/${t.id}/matches.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF Matches</a>
+            <a href={`${API}/exports/tournaments/${t.id}/matches.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF Spiele</a>
           </div>
         </div>
       </div>
@@ -458,7 +470,7 @@ export default function AdminTournamentEditPage() {
             onClick={() => setTab(s)}
             className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${tab === s ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}
           >
-            {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Bracket" : s === "matches" ? "Matches" : s === "stages" ? "Struktur" : s === "groups" ? "Gruppen" : s === "staff" ? "Team" : "Bearbeiten"}
+            {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Turnierbaum" : s === "matches" ? "Spiele" : s === "stages" ? "Struktur" : s === "groups" ? "Gruppen" : s === "staff" ? "Team" : "Bearbeiten"}
           </button>
         ))}
       </div>
@@ -497,7 +509,7 @@ export default function AdminTournamentEditPage() {
                     <div className="flex flex-wrap justify-end gap-2">
                       {isAdmin && (
                         <select value={r.status} onChange={(e) => setRegStatus(r.id, e.target.value)} data-testid={`admin-reg-status-${r.id}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 text-xs rounded-sm">
-                          {["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"].map((s) => <option key={s} value={s}>{s}</option>)}
+                          {["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"].map((s) => <option key={s} value={s}>{formatRegistrationStatus(s)}</option>)}
                         </select>
                       )}
                       {isModerator && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
@@ -507,7 +519,7 @@ export default function AdminTournamentEditPage() {
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "approved")} className="px-2 py-1 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Auschecken</button>
                       )}
                       {isModerator && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
-                        <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">No-Show</button>
+                        <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                       )}
                     </div>
                   </td>
@@ -524,7 +536,7 @@ export default function AdminTournamentEditPage() {
       {tab === "bracket" && bracket && (
         <div className="bg-[#0A0A0A] rounded-sm p-4 border border-white/10">
           {(bracket.matches?.length || 0) + (bracket.matches_v2?.length || 0) === 0 ? (
-            <div className="text-center py-16 text-white/40 font-display tracking-widest">BRACKET NICHT GENERIERT</div>
+            <div className="text-center py-16 text-white/40 font-display tracking-widest">TURNIERBAUM NICHT GENERIERT</div>
           ) : (
             <BracketTree data={bracket} />
           )}
@@ -540,7 +552,7 @@ export default function AdminTournamentEditPage() {
                 <th className="text-left px-4 py-3">Runde</th>
                 <th className="text-left px-4 py-3">Teilnehmer A</th>
                 <th className="text-left px-4 py-3">Teilnehmer B</th>
-                <th className="text-center px-4 py-3">Score</th>
+                <th className="text-center px-4 py-3">Ergebnis</th>
                 <th className="text-left px-4 py-3">Status</th>
                 <th className="text-right px-4 py-3">Aktion</th>
               </tr>
@@ -552,8 +564,8 @@ export default function AdminTournamentEditPage() {
                 return (
                   <tr key={m.id}>
                     <td className="px-4 py-3 text-white/70">{m.round_name || m.round}</td>
-                    <td className="px-4 py-3">{a?.display_name || "TBD"}</td>
-                    <td className="px-4 py-3">{b?.display_name || "TBD"}</td>
+                    <td className="px-4 py-3">{a?.display_name || "Offen"}</td>
+                    <td className="px-4 py-3">{b?.display_name || "Offen"}</td>
                     <td className="px-4 py-3 text-center font-display font-bold">{m.score_a} : {m.score_b}</td>
                     <td className="px-4 py-3"><StatusBadge status={m.status} /></td>
                     <td className="px-4 py-3 text-right">
@@ -632,13 +644,13 @@ function ParticipantAddForm({ form, users, noShowRegistrations, onChange, onSubm
         <button type="submit" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs">Hinzufügen</button>
       </div>
       <div className="grid md:grid-cols-3 gap-3">
-        <SelectField label="Account" value={form.user_id} onChange={(v)=>onChange("user_id", v)} options={userOptions} />
-        <Fld label="Display Name" value={form.display_name} onChange={(v)=>onChange("display_name", v)} testId="participant-add-display" />
-        <Fld label="Ingame Name" value={form.ingame_name} onChange={(v)=>onChange("ingame_name", v)} testId="participant-add-ingame" />
+        <SelectField label="Konto" value={form.user_id} onChange={(v)=>onChange("user_id", v)} options={userOptions} />
+        <Fld label="Anzeigename" value={form.display_name} onChange={(v)=>onChange("display_name", v)} testId="participant-add-display" />
+        <Fld label="Spielname" value={form.ingame_name} onChange={(v)=>onChange("ingame_name", v)} testId="participant-add-ingame" />
         <Fld label="Discord" value={form.discord} onChange={(v)=>onChange("discord", v)} testId="participant-add-discord" />
-        <SelectField label="Status" value={form.status} onChange={(v)=>onChange("status", v)} options={[["approved", "Approved"], ["checked_in", "Checked-in"], ["pending", "Pending"], ["waitlist", "Waitlist"]]} />
-        <Fld label="Seed" type="number" value={form.seed} onChange={(v)=>onChange("seed", v)} testId="participant-add-seed" />
-        <SelectField label="Ersetzt No-Show" value={form.replace_registration_id} onChange={(v)=>onChange("replace_registration_id", v)} options={replaceOptions} />
+        <SelectField label="Status" value={form.status} onChange={(v)=>onChange("status", v)} options={REGISTRATION_STATUS_OPTIONS} />
+        <Fld label="Setzplatz" type="number" value={form.seed} onChange={(v)=>onChange("seed", v)} testId="participant-add-seed" />
+        <SelectField label="Ersetzt Nicht-Erschienen" value={form.replace_registration_id} onChange={(v)=>onChange("replace_registration_id", v)} options={replaceOptions} />
       </div>
     </form>
   );
@@ -647,7 +659,7 @@ function ParticipantAddForm({ form, users, noShowRegistrations, onChange, onSubm
 function TournamentStagesPanel({ tournamentId, stages, matches, registrations, isAdmin, isModerator, onChanged, onSaveResult, onSaveMatchMeta }) {
   const [createOpen, setCreateOpen] = useState(stages.length === 0);
   const [form, setForm] = useState({
-    name: "Stage 1",
+    name: "Phase 1",
     match_type: "ffa",
     stage_type: "ffa_custom_bracket",
     match_size: 4,
@@ -679,7 +691,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
     e.preventDefault();
     try {
       await api.post(`/tournaments/${tournamentId}/stages`, {
-        name: form.name || "Stage",
+        name: form.name || "Phase",
         match_type: form.match_type,
         stage_type: form.stage_type,
         settings: {
@@ -692,26 +704,26 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
           calculation: "points",
         },
       });
-      toast.success("Stage angelegt.");
+      toast.success("Phase angelegt.");
       setCreateOpen(false);
       onChanged();
     } catch (err) {
-      toast.error(formatRequestError(err, "Stage konnte nicht angelegt werden."));
+      toast.error(formatRequestError(err, "Phase konnte nicht angelegt werden."));
     }
   };
   const removeStage = async (stage) => {
     if (!await confirm({
-      title: "Stage löschen?",
-      description: "Alle Matches und Reports dieser Stage werden gelöscht.",
+      title: "Phase löschen?",
+      description: "Alle Spiele und Berichte dieser Phase werden gelöscht.",
       confirmLabel: "Löschen",
       tone: "danger",
     })) return;
     try {
       await api.delete(`/tournaments/${tournamentId}/stages/${stage.id}`);
-      toast.success("Stage gelöscht.");
+      toast.success("Phase gelöscht.");
       onChanged();
     } catch (err) {
-      toast.error(formatRequestError(err, "Stage konnte nicht gelöscht werden."));
+      toast.error(formatRequestError(err, "Phase konnte nicht gelöscht werden."));
     }
   };
 
@@ -720,7 +732,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
       {isAdmin && (
         <div className="border border-white/10 bg-[#121212] rounded-sm">
           <button type="button" onClick={() => setCreateOpen((v) => !v)} className="w-full flex items-center justify-between px-5 py-4 text-left">
-            <span className="font-heading font-bold uppercase">Stage anlegen</span>
+            <span className="font-heading font-bold uppercase">Phase anlegen</span>
             <span className="text-[#29B6E8] text-xl leading-none">{createOpen ? "−" : "+"}</span>
           </button>
           {createOpen && (
@@ -729,13 +741,13 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
               <SelectField label="Vorlage" value="custom" onChange={applyPreset} options={STAGE_PRESETS.map(([v, l]) => [v, l])} />
               <SelectField label="Struktur-Typ" value={form.stage_type} onChange={setStageType} options={STAGE_TYPES} />
               <div className="block">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Match-Typ</div>
-                <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{form.match_type === "ffa" ? "FFA" : "Duel"}</div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spieltyp</div>
+                <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{formatMatchType(form.match_type)}</div>
               </div>
-              {config.showMatchSize && <Fld label="Matchgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />}
+              {config.showMatchSize && <Fld label="Spielgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />}
               {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId="stage-new-min" />}
               {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId="stage-new-qualifiers" />}
-              <Fld label="Matchdauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId="stage-new-duration" />
+              <Fld label="Spieldauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId="stage-new-duration" />
               {config.showSchema ? (
                 <label className="md:col-span-3 block">
                   <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
@@ -743,11 +755,11 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
                 </label>
               ) : (
                 <div className="md:col-span-3 text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-                  Dieser Struktur-Typ braucht hier keine Custom-Schema-Eingabe. Für komplett freie Turnierbäume nutze Custom Bracket oder FFA Custom Bracket.
+                  Dieser Struktur-Typ braucht hier keine freie Schema-Eingabe. Für komplett freie Turnierbäume nutze einen freien Turnierbaum.
                 </div>
               )}
               <div className="md:col-span-3">
-                <button className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm">Stage speichern</button>
+                <button className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm">Phase speichern</button>
               </div>
             </form>
           )}
@@ -814,7 +826,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
   const save = async () => {
     try {
       await api.patch(`/tournaments/${tournamentId}/stages/${stage.id}`, {
-        name: form.name || "Stage",
+        name: form.name || "Phase",
         match_type: form.match_type,
         stage_type: form.stage_type,
         status: form.status,
@@ -829,15 +841,15 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
           calculation: settings.calculation || "points",
         },
       });
-      toast.success("Stage gespeichert.");
+      toast.success("Phase gespeichert.");
       onChanged();
     } catch (err) {
-      toast.error(formatRequestError(err, "Stage konnte nicht gespeichert werden."));
+      toast.error(formatRequestError(err, "Phase konnte nicht gespeichert werden."));
     }
   };
   const generate = async ({ preview = false, force = false } = {}) => {
     if (!config.canGenerate) {
-      toast.error("Für diesen Struktur-Typ ist aktuell noch kein automatischer Generator aktiv. Nutze Custom Bracket oder eine Vorlage.");
+      toast.error("Für diesen Struktur-Typ ist aktuell noch kein automatischer Generator aktiv. Nutze einen freien Turnierbaum oder eine Vorlage.");
       return;
     }
     try {
@@ -846,19 +858,19 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
       if (preview) params.set("preview", "true");
       const suffix = params.toString() ? `?${params.toString()}` : "";
       const { data } = await api.post(`/tournaments/${tournamentId}/stages/${stage.id}/generate${suffix}`);
-      toast.success(data.preview ? `${data.match_count} Vorschau-Matches generiert.` : `${data.match_count} Matches mit Teilnehmern generiert.`);
+      toast.success(data.preview ? `${data.match_count} Vorschau-Spiele generiert.` : `${data.match_count} Spiele mit Teilnehmern generiert.`);
       onChanged();
     } catch (err) {
       if (err.response?.status === 409 && !force) {
         const ok = await confirm({
-          title: "Stage neu generieren?",
-          description: "Vorhandene Matches und Reports dieser Stage werden ersetzt.",
+          title: "Phase neu generieren?",
+          description: "Vorhandene Spiele und Berichte dieser Phase werden ersetzt.",
           confirmLabel: "Neu generieren",
           tone: "danger",
         });
         if (ok) return generate({ preview, force: true });
       }
-      toast.error(formatRequestError(err, "Stage konnte nicht generiert werden."));
+      toast.error(formatRequestError(err, "Phase konnte nicht generiert werden."));
     }
   };
   const statusCounts = matches.reduce((acc, m) => {
@@ -870,16 +882,16 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
     <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
       <div className="p-5 border-b border-white/10 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">Stage #{stage.number || "—"}</div>
+          <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">Phase #{stage.number || "—"}</div>
           <h2 className="font-heading text-xl font-bold uppercase mt-1">{stage.name}</h2>
           <div className="mt-2 flex flex-wrap gap-2 text-xs text-white/50">
-            <span>{stage.match_type}</span>
+            <span>{formatMatchType(stage.match_type)}</span>
             <span>·</span>
-            <span>{stage.stage_type}</span>
+            <span>{formatStageType(stage.stage_type)}</span>
             <span>·</span>
-            <span>{matches.length} Matches</span>
+            <span>{matches.length} Spiele</span>
             {matches.some((m) => m.is_preview) && <span>· Vorschau ohne Teilnehmer</span>}
-            {Object.entries(statusCounts).map(([status, count]) => <span key={status}>· {count} {status}</span>)}
+            {Object.entries(statusCounts).map(([status, count]) => <span key={status}>· {count} {formatMatchStatus(status)}</span>)}
           </div>
         </div>
         {isModerator && (
@@ -897,16 +909,16 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
             <div className="grid sm:grid-cols-2 gap-3">
               <Fld label="Name" value={form.name} onChange={(v)=>set("name", v)} testId={`stage-name-${stage.id}`} />
               <SelectField label="Vorlage anwenden" value="custom" onChange={applyPreset} options={STAGE_PRESETS.map(([v, l]) => [v, l])} />
-              <SelectField label="Status" value={form.status} onChange={(v)=>set("status", v)} options={[["pending", "Pending"], ["ready", "Ready"], ["running", "Running"], ["completed", "Completed"], ["archived", "Archived"]]} />
+              <SelectField label="Status" value={form.status} onChange={(v)=>set("status", v)} options={STAGE_STATUS_OPTIONS} />
               <SelectField label="Struktur-Typ" value={form.stage_type} onChange={setStageType} options={STAGE_TYPES} />
               <div className="block">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Match-Typ</div>
-                <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{form.match_type === "ffa" ? "FFA" : "Duel"}</div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spieltyp</div>
+                <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{formatMatchType(form.match_type)}</div>
               </div>
-              {config.showMatchSize && <Fld label="Matchgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId={`stage-size-${stage.id}`} />}
+              {config.showMatchSize && <Fld label="Spielgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId={`stage-size-${stage.id}`} />}
               {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId={`stage-min-${stage.id}`} />}
               {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId={`stage-qualifiers-${stage.id}`} />}
-              <Fld label="Matchdauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId={`stage-duration-${stage.id}`} />
+              <Fld label="Spieldauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId={`stage-duration-${stage.id}`} />
             </div>
             {config.showSchema ? (
               <label className="block">
@@ -915,7 +927,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
               </label>
             ) : (
               <div className="text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-                Für diesen Struktur-Typ sind keine Custom-Schema-Felder nötig. Nutze eine Custom-Bracket-Struktur, wenn du den Baum frei definieren willst.
+                Für diesen Struktur-Typ sind keine freien Schema-Felder nötig. Nutze eine freie Turnierbaum-Struktur, wenn du den Baum komplett selbst definieren willst.
               </div>
             )}
           </div>
@@ -933,7 +945,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
           ))}
           {matches.length === 0 && (
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-8 text-center text-white/40">
-              Keine Matches generiert.
+              Keine Spiele generiert.
             </div>
           )}
         </div>
@@ -946,13 +958,13 @@ function MatchV2Card({ match, regById, canEdit, onSaveResult, onSaveMatchMeta })
   const filledSlots = (match.slots || []).filter((slot) => slot.status === "filled" && slot.registration_id);
   const labelFor = (registrationId) => {
     const reg = regById[registrationId];
-    return reg?.display_name || reg?.ingame_name || reg?.user?.display_name || registrationId || "TBD";
+    return reg?.display_name || reg?.ingame_name || reg?.user?.display_name || registrationId || "Offen";
   };
   return (
     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-white/40">{match.section} · {match.round_name}</div>
+          <div className="text-[10px] uppercase tracking-widest text-white/40">{formatBracketSection(match.section)} · {match.round_name}</div>
           <div className="font-heading font-bold uppercase">{match.match_key}</div>
         </div>
         <StatusBadge status={match.status || "pending"} />
@@ -960,7 +972,7 @@ function MatchV2Card({ match, regById, canEdit, onSaveResult, onSaveMatchMeta })
       <div className="mt-3 grid sm:grid-cols-2 gap-2">
         {(match.slots || []).map((slot) => (
           <div key={slot.slot} className={`px-3 py-2 rounded-sm border text-sm ${slot.status === "filled" ? "border-[#29B6E8]/30 bg-[#29B6E8]/5" : "border-white/10 bg-[#121212]"}`}>
-            <span className="text-white/40 mr-2">#{slot.slot}</span>{slot.registration_id ? labelFor(slot.registration_id) : slot.source?.raw || "TBD"}
+            <span className="text-white/40 mr-2">#{slot.slot}</span>{slot.registration_id ? labelFor(slot.registration_id) : slot.source?.raw || "Offen"}
           </div>
         ))}
       </div>
@@ -1020,11 +1032,11 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
     <div className="mt-4 border-t border-white/10 pt-3 space-y-2">
       {rows.map((row) => (
         <div key={row.registration_id} className="grid grid-cols-12 gap-2 items-center">
-          <div className="col-span-5 text-xs truncate">{labelFor(row.registration_id)}</div>
-          <input type="number" min="1" value={row.rank} onChange={(e)=>update(row.registration_id, { rank: e.target.value })} className="col-span-2 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Rank" />
-          <input type="number" min="0" value={row.score} onChange={(e)=>update(row.registration_id, { score: e.target.value })} className="col-span-3 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Score" />
-          <label className="col-span-1 text-[10px] text-white/60"><input type="checkbox" checked={row.dnf} onChange={(e)=>update(row.registration_id, { dnf: e.target.checked })} className="accent-[#29B6E8]" /> DNF</label>
-          <label className="col-span-1 text-[10px] text-white/60"><input type="checkbox" checked={row.forfeit} onChange={(e)=>update(row.registration_id, { forfeit: e.target.checked })} className="accent-[#FF3B30]" /> FF</label>
+          <div className="col-span-3 text-xs truncate">{labelFor(row.registration_id)}</div>
+          <input type="number" min="1" value={row.rank} onChange={(e)=>update(row.registration_id, { rank: e.target.value })} className="col-span-2 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Platz" />
+          <input type="number" min="0" value={row.score} onChange={(e)=>update(row.registration_id, { score: e.target.value })} className="col-span-3 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Punkte" />
+          <label className="col-span-2 text-[10px] text-white/60 truncate"><input type="checkbox" checked={row.dnf} onChange={(e)=>update(row.registration_id, { dnf: e.target.checked })} className="accent-[#29B6E8]" /> Nicht beendet</label>
+          <label className="col-span-2 text-[10px] text-white/60 truncate"><input type="checkbox" checked={row.forfeit} onChange={(e)=>update(row.registration_id, { forfeit: e.target.checked })} className="accent-[#FF3B30]" /> Wertung</label>
         </div>
       ))}
       <input value={note} onChange={(e)=>setNote(e.target.value)} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" placeholder="Notiz" />
@@ -1042,7 +1054,7 @@ function MatchScheduleControls({ match, onSave }) {
   }, [match.id, match.scheduled_at, match.duration_minutes, match.updated_at, match.settings?.duration_minutes]);
   return (
     <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
-      <input type="datetime-local" value={scheduledAt} onChange={(e)=>setScheduledAt(e.target.value)} className="bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs col-span-2" aria-label="Match-Zeit" />
+      <input type="datetime-local" value={scheduledAt} onChange={(e)=>setScheduledAt(e.target.value)} className="bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs col-span-2" aria-label="Spielzeit" />
       <input type="number" min="1" value={duration} onChange={(e)=>setDuration(e.target.value)} className="bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" placeholder="Min." aria-label="Dauer Minuten" />
       <button type="button" onClick={() => onSave(match, { scheduled_at: scheduledAt, duration_minutes: duration })} className="px-2 py-1 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Zeit speichern</button>
     </div>
@@ -1161,11 +1173,11 @@ function TournamentEditForm({ tournament, onSaved }) {
           <Fld label="Min Teilnehmer" type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>
           <Fld label="Max Teilnehmer" type="number" value={f.max_participants} onChange={(v)=>set("max_participants",v)} testId="tr-edit-max"/>
           <Fld label="Best of" type="number" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"/>
-          <Fld label="Matchdauer Min." type="number" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"/>
+          <Fld label="Spieldauer Min." type="number" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"/>
           <Fld label="Season Gewicht" type="number" value={f.season_weight} onChange={(v)=>set("season_weight",v)} testId="tr-edit-season-weight"/>
         </div>
         <div className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.bronze_match} onChange={(e)=>set("bronze_match",e.target.checked)} className="accent-[#29B6E8]"/><span>Bronze Match</span></label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.bronze_match} onChange={(e)=>set("bronze_match",e.target.checked)} className="accent-[#29B6E8]"/><span>Spiel um Platz 3</span></label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.substitutes_allowed} onChange={(e)=>set("substitutes_allowed",e.target.checked)} className="accent-[#29B6E8]"/><span>Ersatzspieler erlauben</span></label>
         </div>
       </div>
@@ -1174,15 +1186,15 @@ function TournamentEditForm({ tournament, onSaved }) {
       <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} />
       <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
       <div className="border border-[#9146FF]/20 bg-[#9146FF]/5 rounded-sm p-5 space-y-3">
-        <div className="text-[11px] font-bold uppercase tracking-widest text-[#9146FF]">Streaming & Links</div>
+        <div className="text-[11px] font-bold uppercase tracking-widest text-[#9146FF]">Streaming & Verweise</div>
         <div className="grid md:grid-cols-2 gap-3">
-          <Fld label="Location" value={f.location} onChange={(v)=>set("location",v)} testId="tr-edit-location"/>
-          <Fld label="Discord Link" value={f.discord_link} onChange={(v)=>set("discord_link",v)} testId="tr-edit-discord"/>
-          <Fld label="Legacy Stream Link" value={f.stream_link} onChange={(v)=>set("stream_link",v)} testId="tr-edit-stream"/>
-          <Fld label="Twitch Channel" value={f.twitch_channel} onChange={(v)=>set("twitch_channel",v)} testId="tr-edit-twitch"/>
-          <SelectField label="Stream Plattform" value={f.stream_platform} onChange={(v)=>set("stream_platform",v)} options={STREAM_PLATFORM_OPTIONS} />
-          <Fld label="Stream URL" value={f.stream_url} onChange={(v)=>set("stream_url",v)} testId="tr-edit-stream-url"/>
-          <Fld label="Stream Titel" value={f.stream_title} onChange={(v)=>set("stream_title",v)} testId="tr-edit-stream-title"/>
+          <Fld label="Ort" value={f.location} onChange={(v)=>set("location",v)} testId="tr-edit-location"/>
+          <Fld label="Discord-Verweis" value={f.discord_link} onChange={(v)=>set("discord_link",v)} testId="tr-edit-discord"/>
+          <Fld label="Alter Stream-Verweis" value={f.stream_link} onChange={(v)=>set("stream_link",v)} testId="tr-edit-stream"/>
+          <Fld label="Twitch-Kanal" value={f.twitch_channel} onChange={(v)=>set("twitch_channel",v)} testId="tr-edit-twitch"/>
+          <SelectField label="Stream-Plattform" value={f.stream_platform} onChange={(v)=>set("stream_platform",v)} options={STREAM_PLATFORM_OPTIONS} />
+          <Fld label="Stream-URL" value={f.stream_url} onChange={(v)=>set("stream_url",v)} testId="tr-edit-stream-url"/>
+          <Fld label="Stream-Titel" value={f.stream_title} onChange={(v)=>set("stream_title",v)} testId="tr-edit-stream-title"/>
         </div>
         <div className="flex flex-wrap gap-4">
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.twitch_enabled} onChange={(e)=>set("twitch_enabled",e.target.checked)} className="accent-[#9146FF]"/><span>Twitch einbetten</span></label>
@@ -1216,22 +1228,6 @@ function SelectField({ label, value, onChange, options }) {
     </label>
   );
 }
-
-const STAFF_ROLES = [
-  ["organizer", "Organisator"],
-  ["referee", "Referee"],
-  ["scorekeeper", "Scorekeeper"],
-  ["station_manager", "Station Manager"],
-  ["stream_operator", "Stream Operator"],
-];
-
-const STAFF_SCOPES = [
-  ["tournament", "Ganzes Turnier"],
-  ["stage", "Stage"],
-  ["group", "Gruppe"],
-  ["station", "Station"],
-  ["match", "Match"],
-];
 
 function TournamentStaffPanel({ tournamentId, staff, users, onChanged }) {
   const [form, setForm] = useState({ user_id: "", role: "scorekeeper", scope: "tournament", scope_id: "", notes: "" });
@@ -1285,8 +1281,8 @@ function TournamentStaffPanel({ tournamentId, staff, users, onChanged }) {
       toast.error(formatRequestError(e, "Zuweisung konnte nicht aktualisiert werden."));
     }
   };
-  const roleLabel = (role) => STAFF_ROLES.find(([v]) => v === role)?.[1] || role;
-  const scopeLabel = (scope) => STAFF_SCOPES.find(([v]) => v === scope)?.[1] || scope;
+  const roleLabel = (role) => STAFF_ROLE_OPTIONS.find(([v]) => v === role)?.[1] || role;
+  const scopeLabel = (scope) => STAFF_SCOPE_OPTIONS.find(([v]) => v === scope)?.[1] || scope;
   const userLabel = (u) => `${u.display_name || u.username || u.email || u.id}${u.email ? ` · ${u.email}` : ""}`;
 
   return (
@@ -1306,18 +1302,18 @@ function TournamentStaffPanel({ tournamentId, staff, users, onChanged }) {
         <label className="block">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Rolle</div>
           <select value={form.role} onChange={(e) => set("role", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-            {STAFF_ROLES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            {STAFF_ROLE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </label>
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Scope</div>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Bereich</div>
             <select value={form.scope} onChange={(e) => set("scope", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-              {STAFF_SCOPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              {STAFF_SCOPE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </label>
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Scope-ID</div>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Bereich-ID</div>
             <input value={form.scope_id} disabled={form.scope === "tournament"} onChange={(e) => set("scope_id", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm disabled:opacity-40" placeholder="optional" />
           </label>
         </div>
@@ -1336,7 +1332,7 @@ function TournamentStaffPanel({ tournamentId, staff, users, onChanged }) {
               <tr>
                 <th className="text-left px-4 py-3">Nutzer</th>
                 <th className="text-left px-4 py-3">Rolle</th>
-                <th className="text-left px-4 py-3">Scope</th>
+                <th className="text-left px-4 py-3">Bereich</th>
                 <th className="text-left px-4 py-3">Status</th>
                 <th className="text-right px-4 py-3">Aktion</th>
               </tr>
@@ -1387,9 +1383,9 @@ function MatchResultControls({ match, a, b, onSave }) {
       : "";
   return (
     <div className="flex flex-wrap items-center justify-end gap-1">
-      <input type="number" min="0" value={scoreA} onChange={(e)=>setScoreA(e.target.value)} className="w-14 bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Score A" />
+      <input type="number" min="0" value={scoreA} onChange={(e)=>setScoreA(e.target.value)} className="w-14 bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Punkte A" />
       <span className="text-white/40">:</span>
-      <input type="number" min="0" value={scoreB} onChange={(e)=>setScoreB(e.target.value)} className="w-14 bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Score B" />
+      <input type="number" min="0" value={scoreB} onChange={(e)=>setScoreB(e.target.value)} className="w-14 bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Punkte B" />
       <select value={winnerId} onChange={(e)=>onSave(match, scoreA, scoreB, e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs max-w-[150px]" aria-label="Gewinner">
         <option value="">Gewinner wählen</option>
         <option value={a.id}>{a.display_name || "A"}</option>

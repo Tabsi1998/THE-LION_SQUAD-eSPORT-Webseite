@@ -251,7 +251,7 @@ export function PrivacyPage() {
           <li>Accountdaten: Benutzername, Anzeigename, E-Mail-Adresse, Passwort-Hash, Rollen, Login-Status.</li>
           <li>Profildaten: Avatar, Banner, Bio, Geburtsdatum, Ort, Land, Social- und Gaming-Handles.</li>
           <li>Mitgliedschaftsdaten: Antrag, Status, Mitgliedsnummer, Eintrittsdatum, Funktion, Verlauf.</li>
-          <li>Turnier- und Eventdaten: Anmeldungen, Check-ins, Teams, Matches, Ergebnisse, F1-Zeiten, Preise, Strafen.</li>
+          <li>Turnier- und Eventdaten: Anmeldungen, Check-ins, Teams, Spiele, Ergebnisse, F1-Zeiten, Preise, Strafen.</li>
           <li>Zahlungs- und Nachweisdaten, sofern bei kostenpflichtigen Turnieren oder Mitgliedschaft erforderlich.</li>
           <li>Kommunikationsdaten: Kontaktformular, E-Mails, Systemnachrichten, Discord-Benachrichtigungen.</li>
           <li>Technische Daten: IP-Adresse, Zeitpunkte, Browser-/Request-Daten, Sicherheits- und Fehlerlogs.</li>
@@ -296,7 +296,7 @@ export function PrivacyPage() {
           verarbeitet.
         </p>
         <p>
-          Wenn Discord-Webhooks aktiviert sind, können Ereignisse wie Turniere, Matches,
+          Wenn Discord-Webhooks aktiviert sind, können Ereignisse wie Turniere, Spiele,
           Achievements oder Tests in einen konfigurierten Discord-Kanal übermittelt werden.
         </p>
       </Section>

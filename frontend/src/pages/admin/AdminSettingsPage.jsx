@@ -16,7 +16,7 @@ const MAIL_TEMPLATE_LABELS = {
   registration_approved: "Anmeldung bestätigt",
   registration_rejected: "Anmeldung abgelehnt",
   checkin_reminder: "Check-in-Erinnerung",
-  match_reminder: "Match-Erinnerung",
+  match_reminder: "Spiel-Erinnerung",
   score_reported: "Ergebnis gemeldet",
   dispute_opened: "Dispute eröffnet",
   dispute_resolved: "Dispute entschieden",
@@ -477,7 +477,7 @@ export default function AdminSettingsPage() {
               <AlertTriangle className="w-5 h-5 text-[#FFD700] shrink-0 mt-0.5" />
               <div className="text-sm">
                 <div className="font-bold text-[#FFD700] uppercase tracking-wider text-xs">Kein Resend API Key hinterlegt</div>
-                <p className="text-white/70 mt-1">Alle E-Mails (Anmeldungen, Passwort-Reset, Check-in-Reminder, Match-Nachrichten) werden aktuell übersprungen. Hole dir einen kostenlosen Key auf <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">resend.com/api-keys</a> und trage ihn unten ein.</p>
+                <p className="text-white/70 mt-1">Alle E-Mails (Anmeldungen, Passwort-Reset, Check-in-Erinnerungen, Spiel-Nachrichten) werden aktuell übersprungen. Hole dir einen kostenlosen Key auf <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">resend.com/api-keys</a> und trage ihn unten ein.</p>
               </div>
             </div>
           )}
@@ -991,7 +991,7 @@ export default function AdminSettingsPage() {
               <MessageSquare className="w-5 h-5 text-[#5865F2] shrink-0 mt-0.5" />
               <div className="text-sm">
                 <div className="font-bold text-[#5865F2] uppercase tracking-wider text-xs">Kein Webhook konfiguriert</div>
-                <p className="text-white/70 mt-1">Erstelle in deinem Discord-Server einen Webhook (Server-Einstellungen → Integrationen → Webhooks → Neuer Webhook), kopiere die URL und füge sie unten ein. Damit werden Turniere, Matches und F1-Ergebnisse automatisch im Channel gepostet.</p>
+                <p className="text-white/70 mt-1">Erstelle in deinem Discord-Server einen Webhook (Server-Einstellungen → Integrationen → Webhooks → Neuer Webhook), kopiere die URL und füge sie unten ein. Damit werden Turniere, Spiele und F1-Ergebnisse automatisch im Kanal gepostet.</p>
               </div>
             </div>
           )}

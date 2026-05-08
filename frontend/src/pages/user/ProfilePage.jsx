@@ -72,7 +72,7 @@ const GENDER_OPTIONS = [
 ];
 
 const EMAIL_PREFERENCES = [
-  { k: "match_reminders", l: "Match-Erinnerungen", d: "Startzeiten, Match-Hub und Check-in-nahe Hinweise.", defaultOn: true },
+  { k: "match_reminders", l: "Spiel-Erinnerungen", d: "Startzeiten, Spiel-Hub und Check-in-nahe Hinweise.", defaultOn: true },
   { k: "tournament_updates", l: "Turnier-Updates", d: "Anmeldung, Status, Ergebnisse und wichtige Turnierinfos.", defaultOn: true },
   { k: "prize_updates", l: "Gewinne & Abholung", d: "Gewinn bereit, übergeben oder Frist abgelaufen.", defaultOn: true },
   { k: "membership_updates", l: "Vereinsmitgliedschaft", d: "Bewerbung, Mitgliedsstatus und Vereinsvorteile.", defaultOn: true },
@@ -84,8 +84,8 @@ const ACHIEVEMENT_ACTIONS = {
   profile_completion: "Profil weiter ausfüllen",
   tournaments_joined: "Bei Turnieren mitmachen",
   tournaments_won: "Turniere gewinnen",
-  matches_played: "Matches spielen",
-  matches_won: "Matches gewinnen",
+  matches_played: "Spiele spielen",
+  matches_won: "Spiele gewinnen",
   f1_laps_submitted: "Fast-Lap-Zeiten einreichen",
   f1_podiums: "Fast-Lap-Podium holen",
   f1_wins: "Fast-Lap-Challenge gewinnen",

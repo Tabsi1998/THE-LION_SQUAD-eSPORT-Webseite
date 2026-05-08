@@ -40,7 +40,7 @@ export default function MatchHubPage() {
     if (!disputeReason.trim()) { toast.error("Bitte Grund angeben."); return; }
     try {
       await api.post(`/matches/${m.id}/dispute`, { reason: disputeReason });
-      toast.success("Dispute erstellt.");
+      toast.success("Klärfall erstellt.");
       setDisputeReason("");
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
@@ -56,7 +56,7 @@ export default function MatchHubPage() {
           <StatusBadge status={m.status} size="lg" />
           <span className="text-sm text-white/60">{m.round_name} · Best of {m.best_of}</span>
         </div>
-        <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Match Hub</h1>
+        <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Spiel-Hub</h1>
 
         <div className="mt-8 grid grid-cols-2 gap-4 items-center">
           <SideCard side="A" reg={a} score={m.score_a} isWinner={m.winner_id === m.participant_a_id} />
@@ -72,11 +72,11 @@ export default function MatchHubPage() {
               <input type="number" value={scoreB} onChange={(e) => setScoreB(e.target.value)} data-testid="match-score-b" className="w-24 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display text-2xl font-bold text-center" />
               <button onClick={reportScore} data-testid="match-report-btn" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2]">Melden</button>
             </div>
-            <p className="mt-3 text-xs text-white/50">Wenn beide Seiten das gleiche Ergebnis melden, wird das Match automatisch bestätigt. Bei Widerspruch kann ein Admin entscheiden.</p>
+            <p className="mt-3 text-xs text-white/50">Wenn beide Seiten das gleiche Ergebnis melden, wird das Spiel automatisch bestätigt. Bei Widerspruch kann ein Admin entscheiden.</p>
 
             <div className="mt-6 border-t border-white/5 pt-5">
-              <input type="text" placeholder="Dispute Grund" value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} data-testid="match-dispute-input" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-              <button onClick={raiseDispute} data-testid="match-dispute-btn" className="mt-2 px-4 py-2 border border-[#FF3B30]/40 text-[#FF3B30] font-bold text-sm uppercase tracking-wider rounded-sm hover:bg-[#FF3B30]/10">Dispute melden</button>
+              <input type="text" placeholder="Grund für Klärung" value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} data-testid="match-dispute-input" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <button onClick={raiseDispute} data-testid="match-dispute-btn" className="mt-2 px-4 py-2 border border-[#FF3B30]/40 text-[#FF3B30] font-bold text-sm uppercase tracking-wider rounded-sm hover:bg-[#FF3B30]/10">Klärung melden</button>
             </div>
           </div>
         )}
@@ -103,7 +103,7 @@ function SideCard({ side, reg, score, isWinner }) {
   return (
     <div className={`border rounded-sm p-6 bg-[#121212] ${isWinner ? "border-[#29B6E8] shadow-[0_0_16px_rgba(41,182,232,0.25)]" : "border-white/10"}`}>
       <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">Seite {side}</div>
-      <div className="mt-2 font-heading text-xl font-bold truncate">{reg?.display_name || reg?.ingame_name || reg?.user?.display_name || "TBD"}</div>
+      <div className="mt-2 font-heading text-xl font-bold truncate">{reg?.display_name || reg?.ingame_name || reg?.user?.display_name || "Offen"}</div>
       <div className={`mt-3 font-display text-5xl font-bold ${isWinner ? "text-[#29B6E8]" : "text-white/70"}`}>{score ?? 0}</div>
     </div>
   );

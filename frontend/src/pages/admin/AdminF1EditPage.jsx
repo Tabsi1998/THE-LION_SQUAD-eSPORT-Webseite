@@ -348,7 +348,7 @@ export default function AdminF1EditPage() {
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={!!editTime.is_invalid} onChange={(e) => setEditTime({ ...editTime, is_invalid: e.target.checked })} data-testid="f1-edit-time-invalid" className="accent-[#29B6E8]" />
-              <span>Als ungültig markieren (zählt nicht für Leaderboard)</span>
+              <span>Als ungültig markieren (zählt nicht für Rangliste)</span>
             </label>
             <div className="flex gap-2 pt-2">
               <button onClick={saveEdit} data-testid="f1-edit-time-save" className="flex-1 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
