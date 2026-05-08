@@ -1,9 +1,10 @@
 """Phase 8: APScheduler-based background tasks.
 
-Runs three jobs in the FastAPI process:
+Runs recurring jobs in the FastAPI process:
   - mail_queue every 30 seconds
   - match_reminders every 5 minutes
   - prize_expiry every 60 minutes
+  - birthday_greetings every 6 hours
 
 Designed to be safe-by-default: every job catches its own exceptions so the
 scheduler never crashes the app.
@@ -48,6 +49,16 @@ async def _safe_prize_expiry():
             logger.info(f"[scheduler] prize_expiry expired={n}")
     except Exception as exc:
         logger.exception(f"[scheduler] prize_expiry crash: {exc}")
+
+
+async def _safe_birthday_greetings():
+    try:
+        from services.birthday_mailer import queue_birthday_greetings
+        res = await queue_birthday_greetings()
+        if res.get("queued") or res.get("deduped"):
+            logger.info(f"[scheduler] birthday_greetings {res}")
+    except Exception as exc:
+        logger.exception(f"[scheduler] birthday_greetings crash: {exc}")
 
 
 async def _safe_twitch_poll():
@@ -143,13 +154,15 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_prize_expiry, IntervalTrigger(minutes=60), id="prize_expiry",
                   max_instances=1, coalesce=True)
+    sched.add_job(_safe_birthday_greetings, IntervalTrigger(hours=6), id="birthday_greetings",
+                  max_instances=1, coalesce=True)
     sched.add_job(_safe_twitch_poll, IntervalTrigger(seconds=90), id="twitch_poll",
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_status_transitions, IntervalTrigger(seconds=60), id="status_transitions",
                   max_instances=1, coalesce=True)
     sched.start()
     _scheduler = sched
-    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · prize_expiry 60m · twitch 90s)")
+    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · prize_expiry 60m · birthday 6h · twitch 90s)")
     return sched
 
 

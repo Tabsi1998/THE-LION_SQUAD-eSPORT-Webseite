@@ -54,12 +54,24 @@ Stand: 2026-05-08
 - Stage-Endpoints angelegt: Stages listen, erstellen, bearbeiten und loeschen.
 - `matches_v2` kann pro Turnier/Stage gelesen werden, noch ohne Generator.
 
-Naechster Schritt: Schema-Parser fuer Custom-Brackets und erster v2-Generator, der aus einer Stage-Konfiguration `matches_v2` mit Slots und Advancement erzeugt.
+### Step 5 erledigt: Geburtstagsmail und Custom-Bracket-v2-Generator
+
+- Neuer optionaler Mail-Kanal `birthday_greetings` ergaenzt.
+- Profil-E-Mail-Einstellungen zeigen Geburtstagsmails als deaktivierbare Kategorie.
+- Geburtstagsmail-Template `birthday_greeting` ergaenzt.
+- Scheduler-Job fuer Geburtstagsgruesse laeuft alle 6 Stunden und nutzt Jahres-Dedupe pro User.
+- 29.-Februar-Geburtstage werden in Nicht-Schaltjahren am 28. Februar behandelt.
+- Custom-Bracket-Parser fuer Sections, Seeds und Rang-Referenzen (`W:A:1`, `L:A:3`, `R:A:1`) angelegt.
+- Parser validiert doppelte Match-Keys, unbekannte Referenzen, Self-Refs und Zyklen.
+- Erster `matches_v2`-Generator erstellt Multi-Slot-Matches mit Seed-Belegung, Status und Advancement-Graph.
+- Neuer Admin-Endpunkt `POST /api/tournaments/{tid}/stages/{stage_id}/generate` erzeugt Stage-Matches aus der Stage-Config und schuetzt vorhandene Matches per `force=true`.
+
+Naechster Schritt: v2-Ergebnis-Endpoint fuer FFA-Platzierungslisten, der `results[]` validiert und Zielslots aus `advancement` automatisch fuellt.
 
 ## Was wirklich noch fehlt
 
 - Neues Turniermodell: `tournament_stages`, `matches_v2`, Multi-Slot-Matches und Platzierungsresultate.
-- Schema-Parser fuer Custom-Brackets wie `[WB] A=[1,2,3,4]` und Referenzen `W:A:1`, `L:A:3`.
+- v2-Ergebnis-Engine fuer Platzierungsresultate, Slot-Advancement und Downstream-Korrekturen.
 - Echte FFA-Ergebnis-UI mit 3-8 Teilnehmern, Rangliste, Punkten, DNF/Forfeit und Proof.
 - Korrekte Double-Elimination-Flows fuer 1v1 und FFA inklusive Loser-Bracket-Transfers.
 - Operatives Turnierleitungs-Dashboard: Check-in, Warteliste, No-Show, Stationen, Next-up, offene Ergebnisse.
@@ -68,6 +80,7 @@ Naechster Schritt: Schema-Parser fuer Custom-Brackets und erster v2-Generator, d
 - Audit/Undo fuer Ergebnis-Korrekturen, wenn Folgematches bereits gestartet oder gespielt wurden.
 - QR-/Vor-Ort-Check-in fuer Events und Turniere.
 - Feineres Rollenmodell fuer Event-Orga analog zu Turnier-Staff.
+- Admin-UI fuer Stage-Konfiguration, Schema-Eingabe, Validierungsfehler und Generate/Regenerate.
 
 ## Kurzfazit
 

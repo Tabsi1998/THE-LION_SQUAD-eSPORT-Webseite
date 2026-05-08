@@ -31,6 +31,11 @@ OPTIONAL_EMAIL_PREFERENCES = {
         "description": "Bewerbung, Mitgliedsstatus und Vereinsvorteile.",
         "default": True,
     },
+    "birthday_greetings": {
+        "label": "Geburtstagsgruß",
+        "description": "Einmal im Jahr eine Geburtstagsmail vom Verein.",
+        "default": True,
+    },
     "news_events": {
         "label": "News & Events",
         "description": "Neue Vereinsnews, neue Events und wichtige Ankündigungen.",
@@ -62,6 +67,7 @@ TEMPLATE_CATEGORY = {
     "membership_blocked": "membership_updates",
     "membership_approve": "membership_updates",
     "membership_reject": "membership_updates",
+    "birthday_greeting": "birthday_greetings",
     "newsletter_news": "news_events",
     "newsletter_event": "news_events",
 }

@@ -364,6 +364,22 @@ def tpl_newsletter_event(display_name: str, title: str, when: str = "", location
     return f"Neues Event: {title}", _wrap("Neues Event", body, "Event ansehen", url)
 
 
+def tpl_birthday_greeting(display_name: str, preferences_url: str = "") -> tuple[str, str]:
+    body = (
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        "<p>alles Gute zum Geburtstag und einen starken Tag wünscht dir "
+        "THE LION SQUAD eSports.</p>"
+        "<p>Danke, dass du Teil unserer Community bist.</p>"
+    )
+    if preferences_url:
+        body += (
+            '<p style="font-size:12px;color:#6b7280">'
+            f'Geburtstagsmails kannst du jederzeit in deinen <a href="{preferences_url}">'
+            "E-Mail-Einstellungen</a> deaktivieren.</p>"
+        )
+    return "Alles Gute zum Geburtstag", _wrap("Alles Gute zum Geburtstag", body)
+
+
 def _wrap(title: str, body_html: str, cta_label: Optional[str] = None, cta_url: Optional[str] = None) -> str:
     """Neutral transactional email layout tuned for inbox placement."""
     cta = ""
@@ -441,6 +457,7 @@ async def send_template(
         "membership_activated": tpl_membership_activated,
         "membership_deactivated": tpl_membership_deactivated,
         "membership_blocked": tpl_membership_blocked,
+        "birthday_greeting": tpl_birthday_greeting,
         "newsletter_news": tpl_newsletter_news,
         "newsletter_event": tpl_newsletter_event,
     }

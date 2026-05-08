@@ -13,6 +13,7 @@ from services.tournament_permissions import (
     has_tournament_staff_permission,
     require_tournament_staff_permission,
 )
+from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from models import (
     TournamentCreate, TournamentUpdate, RegistrationCreate, RegistrationUpdate,
     TournamentStaffAssignmentCreate, TournamentStaffAssignmentUpdate,
@@ -716,6 +717,60 @@ async def list_tournament_matches_v2(tid: str, stage_id: str | None = None,
         q["stage_id"] = stage_id
     matches = await db.matches_v2.find(q, {"_id": 0}).sort([("round", 1), ("match_key", 1)]).to_list(2000)
     return matches
+
+
+@router.post("/{tid}/stages/{stage_id}/generate")
+async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool = False,
+                                            me: dict = Depends(require_admin())):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
+    if not stage:
+        raise HTTPException(status_code=404, detail="Stage nicht gefunden")
+    existing = await db.matches_v2.count_documents({"stage_id": stage_id})
+    if existing and not force:
+        raise HTTPException(
+            status_code=409,
+            detail="Stage hat bereits Matches. Mit force=true neu generieren.",
+        )
+    registrations = await db.tournament_registrations.find(
+        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+        {"_id": 0},
+    ).to_list(5000)
+    try:
+        matches = build_matches_v2_from_schema(tournament, stage, registrations)
+    except BracketSchemaError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not matches:
+        raise HTTPException(status_code=400, detail="Schema erzeugt keine Matches")
+
+    if existing:
+        match_ids = await db.matches_v2.distinct("id", {"stage_id": stage_id})
+        if match_ids:
+            await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
+        await db.matches_v2.delete_many({"stage_id": stage_id})
+    await db.matches_v2.insert_many(matches)
+    await db.tournament_stages.update_one(
+        {"id": stage_id},
+        {"$set": {"status": "ready", "updated_at": now_utc().isoformat()}},
+    )
+    await _audit_tournament_action(
+        db,
+        "tournament.stage.generate",
+        me.get("id"),
+        tid,
+        {
+            "stage_id": stage_id,
+            "match_count": len(matches),
+            "force": force,
+            "stage_type": stage.get("stage_type"),
+            "match_type": stage.get("match_type"),
+        },
+    )
+    return {"ok": True, "stage_id": stage_id, "match_count": len(matches)}
 
 
 @router.post("/{tid}/checkin")
