@@ -106,6 +106,19 @@ Naechster Schritt: Bracket-/Heat-Darstellung fuer Public/Admin und erste TV/Embe
 - Standings beruecksichtigen flexible Multi-Slot-Ergebnisse mit Wins, Top2, Punkten und durchschnittlichem Rank.
 - `TOURNAMENT_CUSTOM_BRACKETS.md` dokumentiert Schema-Syntax, Slot-Referenzen, Validierung, Seeding und Eventtag-Workflow.
 
+### Step 9 erledigt: Struktur-Preview und kontextbezogene Konfiguration
+
+- Stages koennen als Vorschau ohne Teilnehmer generiert werden.
+- Vorschau-Brackets zeigen den kompletten maximalen Baum mit Seed-Platzhaltern.
+- Eine Vorschau kann spaeter mit echten approved/checked-in Teilnehmern ohne Force ersetzt werden.
+- Echte bereits gespielte/generated Brackets bleiben weiter gegen versehentliches Ueberschreiben geschuetzt.
+- Struktur-UI blendet Felder nach Struktur-Typ ein und aus.
+- Match-Typ wird aus dem Struktur-Typ automatisch abgeleitet.
+- Schema-Feld erscheint nur bei Custom-Brackets.
+- Matchgroesse, Mindestspieler und Qualifizierte erscheinen nur bei FFA/Custom-Konfigurationen.
+- Separate Aktionen fuer `Vorschau` und `Mit Teilnehmern generieren` ergaenzt.
+- Doku beschreibt Vorschau vs. echtes Bracket.
+
 Naechster Schritt: operative Turnierleitung mit Next-up/Station-Queue und besserer Korrektur-/Undo-Sicherheit fuer bereits gespielte Folgematches.
 
 ## Was wirklich noch fehlt

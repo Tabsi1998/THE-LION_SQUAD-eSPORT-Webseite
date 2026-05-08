@@ -78,3 +78,22 @@ def test_v2_generator_builds_slots_and_advancement():
     assert by_key["A"]["settings"]["min_players"] == 2
     assert {entry["to_match_key"] for entry in by_key["A"]["advancement"]} == {"C", "LA"}
     assert {entry["flow"] for entry in by_key["A"]["advancement"]} == {"W", "L"}
+
+
+def test_v2_generator_can_build_preview_without_registrations():
+    tournament = {"id": "t1", "seeding_mode": "manual"}
+    stage = {
+        "id": "s1",
+        "number": 1,
+        "stage_type": "ffa_custom_bracket",
+        "match_type": "ffa",
+        "settings": {"schema": "[WB]\nA=[1,2,3,4]", "qualifiers_per_match": 2},
+    }
+
+    matches = build_matches_v2_from_schema(tournament, stage, [], preview=True)
+
+    assert len(matches) == 1
+    assert matches[0]["is_preview"] is True
+    assert matches[0]["generation_mode"] == "preview"
+    assert matches[0]["status"] == "preview"
+    assert {slot["status"] for slot in matches[0]["slots"]} == {"preview"}

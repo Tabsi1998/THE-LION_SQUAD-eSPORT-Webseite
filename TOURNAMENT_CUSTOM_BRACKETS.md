@@ -18,11 +18,31 @@ bestehende einfache 1v1-Turniere.
    - `Matchgroesse`: z.B. `4` fuer Mario Kart.
    - `Qualifizierte`: z.B. `2`, wenn Platz 1 und 2 weiterkommen.
 5. `Stage speichern`.
-6. `Generate` klicken.
-7. Im selben Tab Ergebnisse je Match eintragen: Rank, Score, DNF, Forfeit.
+6. Optional `Vorschau` klicken. Dadurch wird der komplette Baum ohne Teilnehmer
+   erzeugt, damit man Struktur, Runden und maximale Kapazitaet vorab zeigen kann.
+7. Kurz vor Start oder nach Check-in `Mit Teilnehmern generieren` klicken. Eine
+   reine Vorschau wird dabei automatisch ersetzt.
+8. Im selben Tab Ergebnisse je Match eintragen: Rank, Score, DNF, Forfeit.
 
 Wenn ein Ergebnis Folgematches aendert, die bereits gefuellt sind, fragt die UI
 bewusst nach einer Force-Korrektur. Das verhindert versehentliches Ueberschreiben.
+
+## Vorschau vs. echtes Bracket
+
+Die Vorschau ist fuer Planung und Vorstellung gedacht:
+
+- Sie nutzt das Schema, aber keine echten Teilnehmer.
+- Seeds werden als Platzhalter angezeigt.
+- Es werden keine Ergebnisse erfasst.
+- Sie kann vor dem Turnier beliebig neu erzeugt werden.
+
+Das echte Bracket wird mit Teilnehmern erzeugt:
+
+- Es nutzt approved/checked-in Anmeldungen.
+- Seeds werden mit echten Registrierungen belegt.
+- Ergebnisse fuellen Folgematches automatisch.
+- Wenn bereits echte Matches oder Reports existieren, ist zum Ersetzen bewusst
+  `force=true` bzw. die Sicherheitsabfrage in der UI noetig.
 
 ## Schema-Grundidee
 

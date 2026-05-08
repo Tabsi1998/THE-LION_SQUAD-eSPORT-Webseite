@@ -194,7 +194,7 @@ def _ordered_registrations(registrations: list[dict], seeding_mode: str) -> list
     return regs
 
 
-def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: list[dict]) -> list[dict]:
+def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: list[dict], preview: bool = False) -> list[dict]:
     settings = stage.get("settings") or {}
     schema = settings.get("schema") or settings.get("custom_schema") or settings.get("bracket_schema")
     specs = parse_custom_bracket_schema(schema)
@@ -230,7 +230,7 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
                     slot["status"] = "filled"
                     filled_count += 1
                 else:
-                    slot["status"] = "bye"
+                    slot["status"] = "preview" if preview else "bye"
             elif source.get("type") == "bye":
                 slot["status"] = "bye"
             else:
@@ -259,7 +259,9 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
                 "score_type": settings.get("score_type") or "points",
                 "calculation": settings.get("calculation") or "points",
             },
-            "status": "ready" if not has_ref and filled_count >= min_players else "pending",
+            "status": "preview" if preview else ("ready" if not has_ref and filled_count >= min_players else "pending"),
+            "is_preview": bool(preview),
+            "generation_mode": "preview" if preview else "seeded",
             "scheduled_at": None,
             "station_id": None,
             "created_at": now,

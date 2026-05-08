@@ -44,7 +44,6 @@ const TEAM_MODE_OPTIONS = [["solo", "Solo"], ["duo", "Duo"], ["team", "Team"], [
 const SEEDING_OPTIONS = [["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]];
 const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
 const STREAM_PLATFORM_OPTIONS = [["", "—"], ["twitch", "Twitch"], ["youtube", "YouTube"], ["kick", "Kick"], ["custom", "Custom"]];
-const STAGE_MATCH_TYPES = [["duel", "Duel"], ["ffa", "FFA"]];
 const STAGE_TYPES = [
   ["single_elimination", "Single Elimination"],
   ["double_elimination", "Double Elimination"],
@@ -110,6 +109,42 @@ const STAGE_PRESETS = [
   ["mk8_8", "Mario Kart 8 Spieler", DEFAULT_FFA_SCHEMA],
   ["mk8_32", "Mario Kart 32 Spieler", MARIO_KART_32_SCHEMA],
 ];
+const CUSTOM_STAGE_TYPES = new Set(["custom_bracket", "ffa_custom_bracket"]);
+const FFA_STAGE_TYPES = new Set(["simple", "ffa_single_elimination", "ffa_custom_bracket", "ffa_league"]);
+
+function matchTypeForStage(stageType) {
+  return FFA_STAGE_TYPES.has(stageType) ? "ffa" : "duel";
+}
+
+function stageConfigFor(form) {
+  const stageType = form.stage_type || "ffa_custom_bracket";
+  const matchType = form.match_type || matchTypeForStage(stageType);
+  const custom = CUSTOM_STAGE_TYPES.has(stageType);
+  const ffa = matchType === "ffa" || FFA_STAGE_TYPES.has(stageType);
+  return {
+    custom,
+    ffa,
+    showMatchSize: ffa,
+    showMinPlayers: ffa,
+    showQualifiers: ffa,
+    showSchema: custom,
+    canGenerate: custom,
+  };
+}
+
+function applyStageType(current, stageType) {
+  const matchType = matchTypeForStage(stageType);
+  const custom = CUSTOM_STAGE_TYPES.has(stageType);
+  return {
+    ...current,
+    stage_type: stageType,
+    match_type: matchType,
+    match_size: matchType === "ffa" ? (current.match_size || 4) : 2,
+    min_players: matchType === "ffa" ? (current.min_players || 2) : 2,
+    qualifiers_per_match: matchType === "ffa" ? (current.qualifiers_per_match || 2) : 1,
+    schema: custom ? current.schema : "",
+  };
+}
 
 export default function AdminTournamentEditPage() {
   const { isAdmin, isModerator } = useAuth();
@@ -494,7 +529,9 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
   });
   const confirm = useConfirm();
   const regById = Object.fromEntries((registrations || []).map((r) => [r.id, r]));
+  const config = stageConfigFor(form);
   const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
+  const setStageType = (stageType) => setForm((current) => applyStageType(current, stageType));
   const applyPreset = (key) => {
     const preset = STAGE_PRESETS.find(([value]) => value === key);
     if (!preset?.[2]) return;
@@ -559,15 +596,24 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
             <form onSubmit={createStage} className="border-t border-white/10 p-5 grid md:grid-cols-3 gap-3">
               <Fld label="Name" value={form.name} onChange={(v)=>set("name", v)} testId="stage-new-name" />
               <SelectField label="Vorlage" value="custom" onChange={applyPreset} options={STAGE_PRESETS.map(([v, l]) => [v, l])} />
-              <SelectField label="Match-Typ" value={form.match_type} onChange={(v)=>set("match_type", v)} options={STAGE_MATCH_TYPES} />
-              <SelectField label="Stage-Typ" value={form.stage_type} onChange={(v)=>set("stage_type", v)} options={STAGE_TYPES} />
-              <Fld label="Matchgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />
-              <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId="stage-new-min" />
-              <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId="stage-new-qualifiers" />
-              <label className="md:col-span-3 block">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
-                <textarea value={form.schema} onChange={(e)=>set("schema", e.target.value)} rows={8} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" data-testid="stage-new-schema" />
-              </label>
+              <SelectField label="Struktur-Typ" value={form.stage_type} onChange={setStageType} options={STAGE_TYPES} />
+              <div className="block">
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Match-Typ</div>
+                <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{form.match_type === "ffa" ? "FFA" : "Duel"}</div>
+              </div>
+              {config.showMatchSize && <Fld label="Matchgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />}
+              {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId="stage-new-min" />}
+              {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId="stage-new-qualifiers" />}
+              {config.showSchema ? (
+                <label className="md:col-span-3 block">
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
+                  <textarea value={form.schema} onChange={(e)=>set("schema", e.target.value)} rows={8} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" data-testid="stage-new-schema" />
+                </label>
+              ) : (
+                <div className="md:col-span-3 text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
+                  Dieser Struktur-Typ braucht hier keine Custom-Schema-Eingabe. Für komplett freie Turnierbäume nutze Custom Bracket oder FFA Custom Bracket.
+                </div>
+              )}
               <div className="md:col-span-3">
                 <button className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm">Stage speichern</button>
               </div>
@@ -614,7 +660,9 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
     schema: settings.schema || "",
   });
   const confirm = useConfirm();
+  const config = stageConfigFor(form);
   const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
+  const setStageType = (stageType) => setForm((current) => applyStageType(current, stageType));
   const applyPreset = (key) => {
     const preset = STAGE_PRESETS.find(([value]) => value === key);
     if (!preset?.[2]) return;
@@ -651,11 +699,18 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
       toast.error(formatRequestError(err, "Stage konnte nicht gespeichert werden."));
     }
   };
-  const generate = async (force = false) => {
+  const generate = async ({ preview = false, force = false } = {}) => {
+    if (!config.canGenerate) {
+      toast.error("Für diesen Struktur-Typ ist aktuell noch kein automatischer Generator aktiv. Nutze Custom Bracket oder eine Vorlage.");
+      return;
+    }
     try {
-      const suffix = force ? "?force=true" : "";
+      const params = new URLSearchParams();
+      if (force) params.set("force", "true");
+      if (preview) params.set("preview", "true");
+      const suffix = params.toString() ? `?${params.toString()}` : "";
       const { data } = await api.post(`/tournaments/${tournamentId}/stages/${stage.id}/generate${suffix}`);
-      toast.success(`${data.match_count} Matches generiert.`);
+      toast.success(data.preview ? `${data.match_count} Vorschau-Matches generiert.` : `${data.match_count} Matches mit Teilnehmern generiert.`);
       onChanged();
     } catch (err) {
       if (err.response?.status === 409 && !force) {
@@ -665,7 +720,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
           confirmLabel: "Neu generieren",
           tone: "danger",
         });
-        if (ok) return generate(true);
+        if (ok) return generate({ preview, force: true });
       }
       toast.error(formatRequestError(err, "Stage konnte nicht generiert werden."));
     }
@@ -687,12 +742,14 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
             <span>{stage.stage_type}</span>
             <span>·</span>
             <span>{matches.length} Matches</span>
+            {matches.some((m) => m.is_preview) && <span>· Vorschau ohne Teilnehmer</span>}
             {Object.entries(statusCounts).map(([status, count]) => <span key={status}>· {count} {status}</span>)}
           </div>
         </div>
         {isAdmin && (
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => generate(false)} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm uppercase tracking-wider text-xs font-bold">Generate</button>
+            <button type="button" onClick={() => generate({ preview: true })} disabled={!config.canGenerate} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Vorschau</button>
+            <button type="button" onClick={() => generate({ preview: false })} disabled={!config.canGenerate} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Mit Teilnehmern generieren</button>
             <button type="button" onClick={save} className="px-3 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-xs font-bold">Speichern</button>
             <button type="button" onClick={onDelete} className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm uppercase tracking-wider text-xs font-bold">Löschen</button>
           </div>
@@ -705,15 +762,25 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
               <Fld label="Name" value={form.name} onChange={(v)=>set("name", v)} testId={`stage-name-${stage.id}`} />
               <SelectField label="Vorlage anwenden" value="custom" onChange={applyPreset} options={STAGE_PRESETS.map(([v, l]) => [v, l])} />
               <SelectField label="Status" value={form.status} onChange={(v)=>set("status", v)} options={[["pending", "Pending"], ["ready", "Ready"], ["running", "Running"], ["completed", "Completed"], ["archived", "Archived"]]} />
-              <SelectField label="Match-Typ" value={form.match_type} onChange={(v)=>set("match_type", v)} options={STAGE_MATCH_TYPES} />
-              <SelectField label="Stage-Typ" value={form.stage_type} onChange={(v)=>set("stage_type", v)} options={STAGE_TYPES} />
-              <Fld label="Matchgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId={`stage-size-${stage.id}`} />
-              <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId={`stage-qualifiers-${stage.id}`} />
+              <SelectField label="Struktur-Typ" value={form.stage_type} onChange={setStageType} options={STAGE_TYPES} />
+              <div className="block">
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Match-Typ</div>
+                <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{form.match_type === "ffa" ? "FFA" : "Duel"}</div>
+              </div>
+              {config.showMatchSize && <Fld label="Matchgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId={`stage-size-${stage.id}`} />}
+              {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId={`stage-min-${stage.id}`} />}
+              {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId={`stage-qualifiers-${stage.id}`} />}
             </div>
-            <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
-              <textarea value={form.schema} onChange={(e)=>set("schema", e.target.value)} rows={12} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" data-testid={`stage-schema-${stage.id}`} />
-            </label>
+            {config.showSchema ? (
+              <label className="block">
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
+                <textarea value={form.schema} onChange={(e)=>set("schema", e.target.value)} rows={12} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" data-testid={`stage-schema-${stage.id}`} />
+              </label>
+            ) : (
+              <div className="text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
+                Für diesen Struktur-Typ sind keine Custom-Schema-Felder nötig. Nutze eine Custom-Bracket-Struktur, wenn du den Baum frei definieren willst.
+              </div>
+            )}
           </div>
         )}
         <div className="space-y-3">

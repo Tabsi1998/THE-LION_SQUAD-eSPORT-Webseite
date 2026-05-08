@@ -724,6 +724,7 @@ async def list_tournament_matches_v2(tid: str, stage_id: str | None = None,
 
 @router.post("/{tid}/stages/{stage_id}/generate")
 async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool = False,
+                                            preview: bool = False,
                                             me: dict = Depends(require_admin())):
     db = get_db()
     tid = await _resolve_tid(tid)
@@ -733,18 +734,22 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
     stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not stage:
         raise HTTPException(status_code=404, detail="Stage nicht gefunden")
-    existing = await db.matches_v2.count_documents({"stage_id": stage_id})
-    if existing and not force:
+    existing_matches = await db.matches_v2.find({"stage_id": stage_id}, {"_id": 0}).to_list(3000)
+    existing = len(existing_matches)
+    can_replace_preview = bool(existing_matches) and all(m.get("is_preview") for m in existing_matches)
+    if existing and not force and not can_replace_preview:
         raise HTTPException(
             status_code=409,
             detail="Stage hat bereits Matches. Mit force=true neu generieren.",
         )
-    registrations = await db.tournament_registrations.find(
-        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
-        {"_id": 0},
-    ).to_list(5000)
+    registrations = []
+    if not preview:
+        registrations = await db.tournament_registrations.find(
+            {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+            {"_id": 0},
+        ).to_list(5000)
     try:
-        matches = build_matches_v2_from_schema(tournament, stage, registrations)
+        matches = build_matches_v2_from_schema(tournament, stage, registrations, preview=preview)
     except BracketSchemaError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if not matches:
@@ -758,7 +763,7 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
     await db.matches_v2.insert_many(matches)
     await db.tournament_stages.update_one(
         {"id": stage_id},
-        {"$set": {"status": "ready", "updated_at": now_utc().isoformat()}},
+        {"$set": {"status": "pending" if preview else "ready", "updated_at": now_utc().isoformat()}},
     )
     await _audit_tournament_action(
         db,
@@ -769,11 +774,12 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
             "stage_id": stage_id,
             "match_count": len(matches),
             "force": force,
+            "preview": preview,
             "stage_type": stage.get("stage_type"),
             "match_type": stage.get("match_type"),
         },
     )
-    return {"ok": True, "stage_id": stage_id, "match_count": len(matches)}
+    return {"ok": True, "stage_id": stage_id, "match_count": len(matches), "preview": preview}
 
 
 @router.post("/{tid}/checkin")
