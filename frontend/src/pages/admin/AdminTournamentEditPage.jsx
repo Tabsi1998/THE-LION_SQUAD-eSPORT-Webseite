@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Zap, RefreshCw, Eye } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 
 const TOURNAMENT_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -34,6 +35,8 @@ export default function AdminTournamentEditPage() {
   const [bracket, setBracket] = useState(null);
   const [tab, setTab] = useState("participants");
   const [groups, setGroups] = useState([]);
+  const confirm = useConfirm();
+  const prompt = usePrompt();
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/tournaments/${id}`);
@@ -59,7 +62,11 @@ export default function AdminTournamentEditPage() {
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const reset = async () => {
-    if (!confirm("Bracket wirklich zurücksetzen?")) return;
+    if (!await confirm({
+      title: "Bracket zurücksetzen?",
+      description: "Alle generierten Bracket-Daten werden zurückgesetzt. Diese Aktion ist für laufende Turniere kritisch.",
+      confirmLabel: "Zurücksetzen",
+    })) return;
     try {
       await api.post(`/tournaments/${id}/reset-bracket`);
       toast.success("Bracket zurückgesetzt.");
@@ -97,6 +104,31 @@ export default function AdminTournamentEditPage() {
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
+  const generateGroups = async () => {
+    const gc = await prompt({
+      title: "Gruppen generieren",
+      description: "Wie viele Gruppen sollen erstellt werden?",
+      defaultValue: "4",
+      placeholder: "4",
+      confirmLabel: "Generieren",
+      tone: "info",
+      multiline: false,
+      required: true,
+    });
+    if (!gc) return;
+    const groupCount = parseInt(gc, 10);
+    if (!Number.isFinite(groupCount) || groupCount < 1) {
+      toast.error("Bitte eine gültige Gruppenanzahl eingeben.");
+      return;
+    }
+    try {
+      const { data } = await api.post(`/tournaments/${id}/groups/generate`, { group_count: groupCount });
+      toast.success(`${data.group_count} Gruppen mit ${data.match_count} Matches`);
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Gruppen konnten nicht generiert werden."));
+    }
+  };
 
   if (!t) return <AdminLayout><div className="p-10 text-white/40">Lade…</div></AdminLayout>;
 
@@ -131,7 +163,7 @@ export default function AdminTournamentEditPage() {
             <button onClick={async()=>{ try{ const {data} = await api.post(`/tournaments/${id}/swiss/next-round`); toast.success(`Runde ${data.round} mit ${data.match_count} Matches generiert`); load(); }catch(e){ toast.error(formatRequestError(e, "Swiss-Runde konnte nicht generiert werden.")); } }} data-testid="admin-tr-swiss-next" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Swiss Runde</button>
           )}
           {isAdmin && t.format === "groups" && (
-            <button onClick={async()=>{ const gc = prompt("Wie viele Gruppen?", "4"); if(!gc) return; try{ const {data} = await api.post(`/tournaments/${id}/groups/generate`,{group_count: parseInt(gc)}); toast.success(`${data.group_count} Gruppen mit ${data.match_count} Matches`); load(); }catch(e){ toast.error(formatRequestError(e, "Gruppen konnten nicht generiert werden.")); } }} data-testid="admin-tr-groups" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Gruppen generieren</button>
+            <button onClick={generateGroups} data-testid="admin-tr-groups" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Gruppen generieren</button>
           )}
           <div className="flex gap-1">
             <a href={`${API}/exports/tournaments/${t.id}/participants.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF Teilnehmer</a>

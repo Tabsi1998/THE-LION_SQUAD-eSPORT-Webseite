@@ -23,6 +23,28 @@ def test_admin_media_list(admin_token):
     assert isinstance(r.json(), list)
 
 
+def test_admin_media_list_usage_fields(admin_token):
+    r = requests.get(f"{API}/admin/media?include_usage=true", headers={"Authorization": f"Bearer {admin_token}"}, timeout=15)
+    assert r.status_code == 200, r.text
+    rows = r.json()
+    assert isinstance(rows, list)
+    if rows:
+        assert "tracked" in rows[0]
+        assert "usage_count" in rows[0]
+        assert "is_unused" in rows[0]
+        assert isinstance(rows[0].get("references"), list)
+
+
+def test_admin_media_audit(admin_token):
+    r = requests.get(f"{API}/admin/media/audit", headers={"Authorization": f"Bearer {admin_token}"}, timeout=20)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert "total" in body
+    assert "by_scope" in body and isinstance(body["by_scope"], dict)
+    assert "reference_summary" in body and isinstance(body["reference_summary"], dict)
+
+
 def test_admin_media_traversal_protection(admin_token):
     r = requests.delete(
         f"{API}/admin/media/..%2Fevil",

@@ -3,6 +3,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { Plus, Trash2, Link as LinkIcon, X as XIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,6 +22,7 @@ export default function AdminStationsPage() {
   const [regs, setRegs] = useState([]);
   const [form, setForm] = useState({ name: "", device_type: "switch", notes: "" });
   const [assignFor, setAssignFor] = useState(null); // station object for assignment dialog
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const { data } = await api.get("/stations");
@@ -61,7 +63,11 @@ export default function AdminStationsPage() {
     }
   };
   const del = async (id) => {
-    if (!confirm("Station löschen?")) return;
+    if (!await confirm({
+      title: "Station löschen?",
+      description: "Die Station wird entfernt und kann danach nicht mehr für Matches zugewiesen werden.",
+      confirmLabel: "Löschen",
+    })) return;
     try {
       await api.delete(`/stations/${id}`);
       toast.success("Station geloescht.");

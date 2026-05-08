@@ -7,10 +7,12 @@ import { Plus, Trash2, Play, Pause } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 
 export default function AdminTournamentsPage() {
   const { isAdmin } = useAuth();
   const [list, setList] = useState([]);
+  const confirm = useConfirm();
   const load = useCallback(async () => {
     const { data } = await api.get("/tournaments");
     setList(data);
@@ -29,7 +31,11 @@ export default function AdminTournamentsPage() {
   };
 
   const del = async (id) => {
-    if (!confirm("Turnier wirklich löschen?")) return;
+    if (!await confirm({
+      title: "Turnier löschen?",
+      description: "Das Turnier wird dauerhaft gelöscht. Teilnehmer, Bracket und öffentliche Detailseite sind danach nicht mehr verfügbar.",
+      confirmLabel: "Löschen",
+    })) return;
     try {
       await api.delete(`/tournaments/${id}`);
       toast.success("Turnier geloescht.");

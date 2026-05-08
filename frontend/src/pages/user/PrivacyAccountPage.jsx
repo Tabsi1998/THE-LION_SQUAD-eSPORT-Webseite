@@ -5,11 +5,13 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Download, AlertTriangle } from "lucide-react";
+import { usePrompt } from "@/components/tls/ConfirmDialog";
 
 export default function PrivacyAccountPage() {
   const { user, logout } = useAuth();
   const nav = useNavigate();
   const [busy, setBusy] = useState(false);
+  const prompt = usePrompt();
 
   const exportData = async () => {
     setBusy(true);
@@ -27,7 +29,14 @@ export default function PrivacyAccountPage() {
   };
 
   const anonymize = async () => {
-    const answer = prompt('Willst du deinen Account wirklich unwiderruflich anonymisieren? Tippe "LÖSCHEN" um zu bestätigen.');
+    const answer = await prompt({
+      title: "Account anonymisieren?",
+      description: 'Diese Aktion ist unwiderruflich. Tippe "LÖSCHEN", um die Anonymisierung zu bestätigen.',
+      placeholder: "LÖSCHEN",
+      confirmLabel: "Anonymisieren",
+      multiline: false,
+      required: true,
+    });
     if (answer !== "LÖSCHEN") return;
     setBusy(true);
     try {

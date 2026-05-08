@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 
 const F1_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -36,6 +37,7 @@ export default function AdminF1EditPage() {
   const [editTrack, setEditTrack] = useState(null);
   const [newTime, setNewTime] = useState({ user_id: "", time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "" });
   const [editTime, setEditTime] = useState(null);
+  const confirm = useConfirm();
   const setNewTrackField = (k, v) => setNewTrack((track) => ({ ...track, [k]: v }));
   const setEditTrackField = (k, v) => setEditTrack((track) => ({ ...(track || {}), [k]: v }));
 
@@ -70,7 +72,11 @@ export default function AdminF1EditPage() {
   };
 
   const delTrack = async (tid) => {
-    if (!confirm("Strecke und Zeiten löschen?")) return;
+    if (!await confirm({
+      title: "Strecke löschen?",
+      description: "Die Strecke und alle zugehörigen Zeiten werden dauerhaft gelöscht.",
+      confirmLabel: "Löschen",
+    })) return;
     try {
       await api.delete(`/f1/tracks/${tid}`);
       toast.success("Strecke geloescht.");

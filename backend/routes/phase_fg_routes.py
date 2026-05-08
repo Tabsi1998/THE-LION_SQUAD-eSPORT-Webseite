@@ -16,6 +16,7 @@ import re
 from pathlib import Path
 from typing import Any
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
@@ -49,10 +50,99 @@ IMAGE_REFERENCE_FIELDS = [
     ("club_member_profiles", {}, ["photo_url", "cover_url"]),
 ]
 
+TEXT_IMAGE_REFERENCE_FIELDS = [
+    ("cms_pages", ["body_md"]),
+    ("news_posts", ["content"]),
+    ("events", ["description", "program"]),
+    ("tournaments", ["description"]),
+    ("f1_challenges", ["description"]),
+    ("club_member_profiles", ["bio"]),
+]
+
+TEXT_IMAGE_RE = re.compile(
+    r"!\[[^\]\n]*\]\((?P<md>[^)\s]+)\)|<img\b[^>]*\bsrc=[\"'](?P<html>[^\"']+)[\"']",
+    re.IGNORECASE,
+)
+
 
 # ============= Media Browser =============
 media_router = APIRouter(prefix="/api/media", tags=["media"])
 admin_media_router = APIRouter(prefix="/api/admin/media", tags=["cms-admin"])
+
+
+def _filename_from_media_value(value: Any) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    if raw.startswith(("http://", "https://")):
+        raw = urlparse(raw).path or raw
+    if not (
+        raw.startswith("/api/static/uploads/")
+        or raw.startswith("/static/uploads/")
+        or raw.startswith("/uploads/")
+        or raw.startswith("api/static/uploads/")
+        or raw.startswith("static/uploads/")
+        or raw.startswith("uploads/")
+    ):
+        return None
+    name = Path(raw).name
+    if not name or name.startswith(".") or Path(name).suffix.lower() not in PUBLIC_IMAGE_EXTS:
+        return None
+    return name
+
+
+def _iter_text_media_values(value: Any) -> list[str]:
+    if not isinstance(value, str) or not value:
+        return []
+    out: list[str] = []
+    for match in TEXT_IMAGE_RE.finditer(value):
+        url = match.group("md") or match.group("html")
+        if url:
+            out.append(url)
+    return out
+
+
+async def _collect_media_usage(filenames: set[str]) -> dict[str, list[dict[str, Any]]]:
+    if not filenames:
+        return {}
+    db = get_db()
+    usage: dict[str, list[dict[str, Any]]] = {name: [] for name in filenames}
+
+    def add_ref(filename: str | None, ref: dict[str, Any]) -> None:
+        if filename in usage and len(usage[filename]) < 20:
+            usage[filename].append(ref)
+
+    for collection, base_filter, fields in IMAGE_REFERENCE_FIELDS:
+        col = getattr(db, collection)
+        projection = {"_id": 0, "id": 1, "slug": 1, "name": 1, "title": 1, **{field: 1 for field in fields}}
+        async for doc in col.find(base_filter, projection):
+            doc_id = doc.get("id") or doc.get("slug")
+            for field in fields:
+                filename = _filename_from_media_value(doc.get(field))
+                add_ref(filename, {
+                    "collection": collection,
+                    "id": doc_id,
+                    "field": field,
+                    "label": doc.get("title") or doc.get("name") or doc_id,
+                })
+
+    for collection, fields in TEXT_IMAGE_REFERENCE_FIELDS:
+        col = getattr(db, collection)
+        projection = {"_id": 0, "id": 1, "slug": 1, "name": 1, "title": 1, **{field: 1 for field in fields}}
+        async for doc in col.find({}, projection):
+            doc_id = doc.get("id") or doc.get("slug")
+            for field in fields:
+                for value in _iter_text_media_values(doc.get(field)):
+                    filename = _filename_from_media_value(value)
+                    add_ref(filename, {
+                        "collection": collection,
+                        "id": doc_id,
+                        "field": field,
+                        "label": doc.get("title") or doc.get("name") or doc_id,
+                        "text_reference": True,
+                    })
+
+    return usage
 
 
 async def _list_media_items(
@@ -60,6 +150,7 @@ async def _list_media_items(
     include_untracked: bool = True,
     exclude_user_scope: bool = False,
     user_scope_only: bool = False,
+    include_usage: bool = False,
 ) -> list[dict]:
     if not UPLOAD_DIR.exists():
         return []
@@ -72,6 +163,7 @@ async def _list_media_items(
         if not p.name.startswith(".") and p.suffix.lower() in PUBLIC_IMAGE_EXTS
     ]
     filenames = [p.name for p in candidates]
+    usage = await _collect_media_usage(set(filenames)) if include_usage else {}
     media_meta: dict[str, dict[str, Any]] = {}
     if filenames:
         db = get_db()
@@ -96,6 +188,7 @@ async def _list_media_items(
         if exclude_user_scope and is_user_media:
             continue
         stat = p.stat()
+        refs = usage.get(p.name) or []
         items.append({
             "filename": p.name,
             "url": f"/api/static/uploads/{p.name}",
@@ -107,6 +200,10 @@ async def _list_media_items(
             "media_scope": media_scope,
             "original_filename": meta.get("original_filename") if meta else None,
             "created_at": meta.get("created_at") if meta else None,
+            "tracked": bool(meta),
+            "usage_count": len(refs) if include_usage else None,
+            "references": refs[:6],
+            "is_unused": (len(refs) == 0) if include_usage else None,
         })
     return items[:500]
 
@@ -118,9 +215,48 @@ async def list_media(me: dict = Depends(get_current_user)):
 
 
 @admin_media_router.get("")
-async def admin_list_media(include_user_uploads: bool = False, me: dict = Depends(require_admin())):
+async def admin_list_media(include_user_uploads: bool = False, include_usage: bool = False, me: dict = Depends(require_admin())):
     """List CMS/admin files in the upload directory with metadata."""
-    return await _list_media_items(exclude_user_scope=not include_user_uploads)
+    return await _list_media_items(exclude_user_scope=not include_user_uploads, include_usage=include_usage)
+
+
+@admin_media_router.get("/audit")
+async def admin_media_audit(me: dict = Depends(require_admin())):
+    """Return media-library health information for the admin media dashboard."""
+    items = await _list_media_items(exclude_user_scope=False, include_usage=True)
+    db = get_db()
+    by_scope: dict[str, int] = {}
+    total_size = 0
+    for item in items:
+        by_scope[item.get("media_scope") or "legacy"] = by_scope.get(item.get("media_scope") or "legacy", 0) + 1
+        total_size += int(item.get("size") or 0)
+
+    missing_meta_count = 0
+    missing_meta: list[dict[str, Any]] = []
+    async for row in db.media_uploads.find({}, {"_id": 0, "filename": 1, "url": 1, "media_scope": 1, "owner_id": 1, "created_at": 1}).sort("created_at", -1).limit(5000):
+        filename = row.get("filename") or _filename_from_media_value(row.get("url"))
+        if not filename:
+            continue
+        if not (PUBLIC_UPLOAD_DIR / filename).is_file() and not (UPLOAD_DIR / filename).is_file():
+            missing_meta_count += 1
+            if len(missing_meta) < 20:
+                missing_meta.append(row)
+
+    from services.media_audit import audit_image_references
+    reference_audit = await audit_image_references(repair=False)
+    return {
+        "ok": True,
+        "total": len(items),
+        "total_size": total_size,
+        "by_scope": by_scope,
+        "unused": sum(1 for item in items if item.get("is_unused")),
+        "untracked": sum(1 for item in items if not item.get("tracked")),
+        "metadata_missing_files": missing_meta_count,
+        "metadata_missing_examples": missing_meta,
+        "reference_summary": reference_audit.get("summary") or {},
+        "reference_examples": reference_audit.get("examples") or {},
+        "recent_uploads": sorted(items, key=lambda item: item.get("created_at") or item.get("mtime") or "", reverse=True)[:10],
+    }
 
 
 async def _clear_media_references(url: str) -> int:
@@ -154,7 +290,8 @@ async def admin_delete_media(filename: str, me: dict = Depends(require_admin()))
     except OSError as e:
         raise HTTPException(500, f"Löschen fehlgeschlagen: {e}")
     cleared_refs = await _clear_media_references(f"/api/static/uploads/{filename}")
-    return {"ok": True, "cleared_references": cleared_refs}
+    meta = await get_db().media_uploads.delete_many({"filename": filename})
+    return {"ok": True, "cleared_references": cleared_refs, "deleted_metadata": meta.deleted_count}
 
 
 # ============= Navigation Editor =============

@@ -15,6 +15,17 @@ import {
 
 const BACKEND = API_BASE;
 const IMG_EXT = new Set(["png", "jpg", "jpeg", "webp", "gif", "svg", "avif"]);
+const MEDIA_SCOPE_LABELS = {
+  all: "Alle",
+  admin: "Admin/CMS",
+  sponsor: "Sponsor",
+  branding: "Branding",
+  gallery: "Galerie",
+  user: "User",
+  legacy: "Legacy",
+  unused: "Ungenutzt",
+  untracked: "Ungetrackt",
+};
 
 const fmtBytes = (n) => {
   if (n < 1024) return `${n} B`;
@@ -41,9 +52,12 @@ export default function AdminMediaPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [scopeFilter, setScopeFilter] = useState("all");
+  const [includeUserUploads, setIncludeUserUploads] = useState(false);
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [mediaAudit, setMediaAudit] = useState(null);
   const [scopeAudit, setScopeAudit] = useState(null);
   const [auditingScopes, setAuditingScopes] = useState(false);
   const [repairingScopes, setRepairingScopes] = useState(false);
@@ -52,13 +66,18 @@ export default function AdminMediaPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/admin/media");
-      setItems(data);
+      const [mediaRes, auditRes] = await Promise.allSettled([
+        api.get(`/admin/media?include_user_uploads=${includeUserUploads ? "true" : "false"}&include_usage=true`),
+        api.get("/admin/media/audit"),
+      ]);
+      if (mediaRes.status === "fulfilled") setItems(mediaRes.value.data);
+      else toast.error(formatApiError(mediaRes.reason?.response?.data?.detail) || "Fehler beim Laden");
+      if (auditRes.status === "fulfilled") setMediaAudit(auditRes.value.data);
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail) || "Fehler beim Laden");
     }
     setLoading(false);
-  }, []);
+  }, [includeUserUploads]);
 
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["admin/media", "media", "uploads"]);
@@ -67,10 +86,14 @@ export default function AdminMediaPage() {
     return items.filter((it) => {
       if (filter === "images" && !IMG_EXT.has(it.ext)) return false;
       if (filter === "files" && IMG_EXT.has(it.ext)) return false;
-      if (q && !it.filename.toLowerCase().includes(q.toLowerCase())) return false;
+      if (scopeFilter === "unused" && !it.is_unused) return false;
+      else if (scopeFilter === "untracked" && it.tracked) return false;
+      else if (!["all", "unused", "untracked"].includes(scopeFilter) && it.media_scope !== scopeFilter) return false;
+      const search = `${it.filename || ""} ${it.original_filename || ""}`.toLowerCase();
+      if (q && !search.includes(q.toLowerCase())) return false;
       return true;
     });
-  }, [items, filter, q]);
+  }, [items, filter, scopeFilter, q]);
 
   const totalSize = useMemo(
     () => items.reduce((s, it) => s + (it.size || 0), 0),
@@ -183,6 +206,26 @@ export default function AdminMediaPage() {
             </button>
           ))}
         </div>
+        <select
+          value={scopeFilter}
+          onChange={(e) => setScopeFilter(e.target.value)}
+          data-testid="media-scope-filter"
+          className="bg-[#121212] border border-white/10 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider text-white"
+        >
+          {Object.entries(MEDIA_SCOPE_LABELS).map(([key, label]) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
+        </select>
+        <label className="h-[34px] inline-flex items-center gap-2 border border-white/10 bg-[#121212] rounded-sm px-3 text-xs font-bold uppercase tracking-wider text-white/70">
+          <input
+            type="checkbox"
+            checked={includeUserUploads}
+            onChange={(e) => setIncludeUserUploads(e.target.checked)}
+            data-testid="media-include-users"
+            className="accent-[#29B6E8]"
+          />
+          User-Medien
+        </label>
         <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-md">
           <Search className="w-4 h-4 text-white/40" />
           <input
@@ -224,6 +267,46 @@ export default function AdminMediaPage() {
           {filtered.length} / {items.length} · {fmtBytes(totalSize)} gesamt
         </span>
       </div>
+
+      {mediaAudit && (
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+          {[
+            ["Dateien", mediaAudit.total || 0, "text-white"],
+            ["Ungenutzt", mediaAudit.unused || 0, mediaAudit.unused ? "text-[#FFD700]" : "text-white"],
+            ["Ungetrackt", mediaAudit.untracked || 0, mediaAudit.untracked ? "text-[#FFD700]" : "text-white"],
+            ["Defekte Metadaten", mediaAudit.metadata_missing_files || 0, mediaAudit.metadata_missing_files ? "text-[#FF3B30]" : "text-white"],
+            ["Fehlende Referenzen", mediaAudit.reference_summary?.missing_file || 0, mediaAudit.reference_summary?.missing_file ? "text-[#FF3B30]" : "text-white"],
+          ].map(([label, value, color]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => {
+                if (label === "Ungenutzt") setScopeFilter("unused");
+                if (label === "Ungetrackt") setScopeFilter("untracked");
+              }}
+              className="border border-white/10 bg-[#121212] rounded-sm p-3 text-left hover:border-white/25"
+            >
+              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</div>
+              <div className={`font-heading text-2xl font-black mt-1 tabular-nums ${color}`}>{value}</div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {mediaAudit?.by_scope && (
+        <div className="mt-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-widest font-bold text-white/50">
+          {Object.entries(mediaAudit.by_scope).map(([scope, count]) => (
+            <button
+              key={scope}
+              type="button"
+              onClick={() => setScopeFilter(scope)}
+              className={`border rounded-sm px-2.5 py-1.5 ${scopeFilter === scope ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 hover:border-white/25"}`}
+            >
+              {MEDIA_SCOPE_LABELS[scope] || scope}: {count}
+            </button>
+          ))}
+        </div>
+      )}
 
       {scopeAudit?.summary && (
         <div className="mt-4 border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
@@ -294,7 +377,12 @@ export default function AdminMediaPage() {
                   </div>
                   <div className="p-2">
                     <div className="text-[11px] font-mono text-white/70 truncate">{it.filename}</div>
-                    <div className="text-[10px] text-white/40">{fmtBytes(it.size)}</div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      <span className="text-[9px] uppercase tracking-wider border border-white/10 px-1.5 py-0.5 text-white/45">{MEDIA_SCOPE_LABELS[it.media_scope] || it.media_scope || "Legacy"}</span>
+                      {it.is_unused && <span className="text-[9px] uppercase tracking-wider border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">ungenutzt</span>}
+                      {!it.tracked && <span className="text-[9px] uppercase tracking-wider border border-[#FF3B30]/30 px-1.5 py-0.5 text-[#FF3B30]">ungetrackt</span>}
+                    </div>
+                    <div className="text-[10px] text-white/40 mt-1">{fmtBytes(it.size)} · {it.usage_count || 0}x genutzt</div>
                   </div>
                 </div>
               );
@@ -363,11 +451,39 @@ function MediaDetailModal({ item, onClose, onCopy, onDelete }) {
             <div className="uppercase text-[10px] text-white/40 tracking-widest">Geändert</div>
             <div className="text-white/80">{new Date(item.mtime).toLocaleString("de-DE")}</div>
           </div>
+          <div>
+            <div className="uppercase text-[10px] text-white/40 tracking-widest">Scope</div>
+            <div className="text-white/80">{MEDIA_SCOPE_LABELS[item.media_scope] || item.media_scope || "Legacy"}</div>
+          </div>
+          <div>
+            <div className="uppercase text-[10px] text-white/40 tracking-widest">Nutzung</div>
+            <div className="text-white/80">{item.usage_count || 0} Referenz(en){item.tracked ? "" : " · ungetrackt"}</div>
+          </div>
+          {item.original_filename && (
+            <div className="col-span-2">
+              <div className="uppercase text-[10px] text-white/40 tracking-widest">Originalname</div>
+              <div className="text-white/80 font-mono break-all">{item.original_filename}</div>
+            </div>
+          )}
           <div className="col-span-2">
             <div className="uppercase text-[10px] text-white/40 tracking-widest">URL</div>
             <code className="text-white/80 font-mono text-[11px] break-all">{fullUrl}</code>
           </div>
         </div>
+
+        {(item.references || []).length > 0 && (
+          <div className="mt-4 border border-white/10 rounded-sm p-3">
+            <div className="uppercase text-[10px] text-white/40 tracking-widest font-bold mb-2">Verwendet in</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {item.references.map((ref, idx) => (
+                <div key={`${ref.collection}-${ref.id}-${ref.field}-${idx}`} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
+                  <div className="font-bold text-white/75">{ref.label || ref.id || ref.collection}</div>
+                  <div className="text-white/40 font-mono break-all">{ref.collection}.{ref.field}{ref.text_reference ? " · Text" : ""}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-white/10">
           <button

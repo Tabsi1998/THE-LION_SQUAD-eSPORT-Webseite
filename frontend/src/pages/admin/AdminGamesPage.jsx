@@ -3,6 +3,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
@@ -21,6 +22,7 @@ export default function AdminGamesPage() {
   const [list, setList] = useState([]);
   const [form, setForm] = useState({ name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "", player_id_fields: [] });
   const [editing, setEditing] = useState(null);
+  const confirm = useConfirm();
   const load = useCallback(async () => { const { data } = await api.get("/games"); setList(data); }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["games"]);
@@ -41,7 +43,11 @@ export default function AdminGamesPage() {
   };
 
   const del = async (id) => {
-    if (!confirm("Spiel löschen?")) return;
+    if (!await confirm({
+      title: "Spiel löschen?",
+      description: "Das Spiel wird dauerhaft entfernt. Bestehende Verknüpfungen können danach unvollständig sein.",
+      confirmLabel: "Löschen",
+    })) return;
     try {
       await api.delete(`/games/${id}`);
       toast.success("Spiel geloescht.");
