@@ -168,7 +168,7 @@ def _format_de_datetime(value: Any) -> str:
         return ""
 
 
-async def enqueue_newsletter_for_item(kind: str, item: dict) -> dict:
+async def enqueue_newsletter_for_item(kind: str, item: dict, dedupe_suffix: str = "") -> dict:
     """Queue opt-in newsletter mails for a published news post or announced event."""
     if kind not in {"news", "event"}:
         return {"queued": 0, "reason": "unsupported_kind"}
@@ -185,6 +185,7 @@ async def enqueue_newsletter_for_item(kind: str, item: dict) -> dict:
         return {"queued": 0, "reason": "no_recipients"}
 
     base = await _site_base_url()
+    preferences_url = f"{base}/profile?tab=privacy"
     slug_or_id = item.get("slug") or item.get("id")
     if kind == "news":
         template_key = "newsletter_news"
@@ -194,6 +195,7 @@ async def enqueue_newsletter_for_item(kind: str, item: dict) -> dict:
             "title": title,
             "excerpt": item.get("excerpt") or "",
             "url": url,
+            "preferences_url": preferences_url,
         }
     else:
         template_key = "newsletter_event"
@@ -204,6 +206,7 @@ async def enqueue_newsletter_for_item(kind: str, item: dict) -> dict:
             "when": _format_de_datetime(item.get("start_date")),
             "location": item.get("location") or item.get("city") or "",
             "url": url,
+            "preferences_url": preferences_url,
         }
 
     queued = 0
@@ -216,11 +219,12 @@ async def enqueue_newsletter_for_item(kind: str, item: dict) -> dict:
             template_key,
             user["email"],
             display_name=display_name,
-            dedupe_key=f"{template_key}:{item.get('id')}:{user['id']}",
+            dedupe_key=f"{template_key}:{item.get('id')}:{user['id']}{dedupe_suffix}",
             mail_meta={
                 "kind": "newsletter",
                 "source_type": kind,
                 "source_id": item.get("id"),
+                "manual": bool(dedupe_suffix),
                 "user_id": user["id"],
             },
             **common_kwargs,

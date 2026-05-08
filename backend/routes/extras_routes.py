@@ -82,6 +82,25 @@ class TestEmailBody(BaseModel):
     to: EmailStr
 
 
+class NewsletterTriggerBody(BaseModel):
+    kind: Literal["news", "event"]
+    id: str
+    force: bool = False
+
+
+async def _newsletter_source(kind: str, source_id: str) -> dict:
+    db = get_db()
+    if kind == "news":
+        item = await db.news_posts.find_one({"$or": [{"id": source_id}, {"slug": source_id}]}, {"_id": 0})
+    elif kind == "event":
+        item = await db.events.find_one({"$or": [{"id": source_id}, {"slug": source_id}]}, {"_id": 0})
+    else:
+        item = None
+    if not item:
+        raise HTTPException(404, "Newsletter-Quelle nicht gefunden.")
+    return item
+
+
 class DiscordSettings(BaseModel):
     webhook_url: Optional[str] = None
     clear_webhook: Optional[bool] = None
@@ -242,6 +261,68 @@ async def update_email_settings(body: EmailSettings, me: dict = Depends(require_
 async def send_test(body: TestEmailBody, me: dict = Depends(require_admin())):
     res = await send_template("test", body.to, branding="THE LION SQUAD", queue=False)
     return res
+
+
+@settings_router.post("/newsletter/preview")
+async def newsletter_preview(body: NewsletterTriggerBody, me: dict = Depends(require_admin())):
+    from services.notification_preferences import newsletter_recipients
+    item = await _newsletter_source(body.kind, body.id)
+    visibility = item.get("visibility") or "public"
+    recipients = await newsletter_recipients(visibility)
+    return {
+        "kind": body.kind,
+        "source_id": item.get("id"),
+        "title": item.get("title") or item.get("name"),
+        "visibility": visibility,
+        "already_sent_at": item.get("newsletter_sent_at"),
+        "already_sent_count": item.get("newsletter_sent_count") or 0,
+        "recipients": len(recipients),
+        "sample": [
+            {
+                "id": u.get("id"),
+                "email": u.get("email"),
+                "display_name": u.get("display_name") or u.get("username"),
+            }
+            for u in recipients[:10]
+        ],
+    }
+
+
+@settings_router.post("/newsletter/send")
+async def newsletter_send(body: NewsletterTriggerBody, me: dict = Depends(require_admin())):
+    db = get_db()
+    from services.notification_preferences import enqueue_newsletter_for_item
+    item = await _newsletter_source(body.kind, body.id)
+    if item.get("newsletter_sent_at") and not body.force:
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": "already_sent",
+            "queued": 0,
+            "sent_at": item.get("newsletter_sent_at"),
+            "sent_count": item.get("newsletter_sent_count") or 0,
+        }
+    suffix = f":manual:{now_utc().isoformat()}" if body.force else ""
+    result = await enqueue_newsletter_for_item(body.kind, item, dedupe_suffix=suffix)
+    queued = int(result.get("queued") or 0)
+    collection = db.news_posts if body.kind == "news" else db.events
+    await collection.update_one(
+        {"id": item.get("id")},
+        {"$set": {
+            "newsletter_sent_at": now_utc().isoformat(),
+            "newsletter_sent_count": queued,
+            "newsletter_sent_by": me["id"],
+        }},
+    )
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "newsletter.manual_send",
+        "actor_id": me["id"],
+        "target_id": item.get("id"),
+        "data": {"kind": body.kind, "queued": queued, "force": body.force},
+        "created_at": now_utc().isoformat(),
+    })
+    return {"ok": True, **result}
 
 
 # ---------- Phase 8: SMTP & Mail Queue ----------

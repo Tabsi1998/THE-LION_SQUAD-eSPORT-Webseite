@@ -343,20 +343,24 @@ def tpl_membership_blocked(display_name: str) -> tuple[str, str]:
     )
 
 
-def tpl_newsletter_news(display_name: str, title: str, excerpt: str = "", url: str = "") -> tuple[str, str]:
+def tpl_newsletter_news(display_name: str, title: str, excerpt: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
     body = f"<p>Hallo {display_name or 'Löwe'},</p><p>es gibt neue Vereinsnews:</p><p><strong>{title}</strong></p>"
     if excerpt:
         body += f"<p>{excerpt}</p>"
+    if preferences_url:
+        body += f'<p style="font-size:12px;color:#6b7280">Newsletter abbestellen oder Kategorien ändern: <a href="{preferences_url}">E-Mail-Einstellungen öffnen</a>.</p>'
     return f"Neue Vereinsnews: {title}", _wrap("Neue Vereinsnews", body, "News lesen", url)
 
 
-def tpl_newsletter_event(display_name: str, title: str, when: str = "", location: str = "", url: str = "") -> tuple[str, str]:
+def tpl_newsletter_event(display_name: str, title: str, when: str = "", location: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
     facts = ""
     if when:
         facts += f"<p><strong>Datum:</strong> {when}</p>"
     if location:
         facts += f"<p><strong>Ort:</strong> {location}</p>"
     body = f"<p>Hallo {display_name or 'Löwe'},</p><p>ein neues Event wurde veröffentlicht:</p><p><strong>{title}</strong></p>{facts}"
+    if preferences_url:
+        body += f'<p style="font-size:12px;color:#6b7280">Newsletter abbestellen oder Kategorien ändern: <a href="{preferences_url}">E-Mail-Einstellungen öffnen</a>.</p>'
     return f"Neues Event: {title}", _wrap("Neues Event", body, "Event ansehen", url)
 
 
