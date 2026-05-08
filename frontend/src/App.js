@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/tls/ProtectedRoute";
 import { BrandingHead } from "@/components/tls/BrandingHead";
 import { ApiInvalidationBridge } from "@/components/tls/ApiInvalidationBridge";
+import { ScrollManager } from "@/components/tls/ScrollManager";
 import { CookieConsentProvider } from "@/components/tls/CookieConsent";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 
@@ -116,6 +117,7 @@ function App() {
           <ConfirmDialogProvider>
             <BrandingHead />
             <ApiInvalidationBridge />
+            <ScrollManager />
             <Toaster theme="dark" position="top-right" richColors />
             <Suspense fallback={<RouteFallback />}>
             <Routes>
