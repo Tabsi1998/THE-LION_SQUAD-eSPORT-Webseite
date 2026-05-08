@@ -54,47 +54,54 @@ async def schedule_match_reminders() -> dict:
     db = get_db()
     now = now_utc()
     horizon = now + timedelta(hours=25)
-    cursor = db.matches.find({
-        "scheduled_at": {"$gte": now.isoformat(), "$lte": horizon.isoformat()},
-        "status": {"$in": ["pending", "scheduled", "ready", "in_progress"]},
-    })
+    queries = [
+        ("matches", db.matches.find({
+            "scheduled_at": {"$gte": now.isoformat(), "$lte": horizon.isoformat()},
+            "status": {"$in": ["pending", "scheduled", "ready", "in_progress"]},
+        })),
+        ("matches_v2", db.matches_v2.find({
+            "scheduled_at": {"$gte": now.isoformat(), "$lte": horizon.isoformat()},
+            "status": {"$in": ["pending", "scheduled", "ready", "in_progress"]},
+        })),
+    ]
     queued = 0
-    async for m in cursor:
-        try:
-            scheduled = datetime.fromisoformat(m["scheduled_at"].replace("Z", "+00:00"))
-        except Exception:
-            continue
-        if scheduled.tzinfo is None:
-            scheduled = scheduled.replace(tzinfo=timezone.utc)
-        diff_min = (scheduled - now).total_seconds() / 60
-        # Tournament + opponent context
-        t = await db.tournaments.find_one({"id": m.get("tournament_id")}, {"title": 1, "slug": 1}) or {}
-        url = f"/matches/{m.get('id')}"
-        when_str = scheduled.astimezone(timezone.utc).strftime("%d.%m. %H:%M UTC")
+    for collection_name, cursor in queries:
+        async for m in cursor:
+            try:
+                scheduled = datetime.fromisoformat(m["scheduled_at"].replace("Z", "+00:00"))
+            except Exception:
+                continue
+            if scheduled.tzinfo is None:
+                scheduled = scheduled.replace(tzinfo=timezone.utc)
+            diff_min = (scheduled - now).total_seconds() / 60
+            # Tournament + opponent context
+            t = await db.tournaments.find_one({"id": m.get("tournament_id")}, {"title": 1, "slug": 1}) or {}
+            url = f"/matches/{m.get('id')}" if collection_name == "matches" else f"/tournaments/{t.get('slug') or m.get('tournament_id')}/bracket"
+            when_str = scheduled.astimezone(timezone.utc).strftime("%d.%m. %H:%M UTC")
 
-        participants = await _participants_for_match(m)
-        if len(participants) < 1:
-            continue
-        for p in participants:
-            opp = next((q for q in participants if q.get("id") != p.get("id")), None)
-            opp_name = (opp or {}).get("display_name", "TBD")
-            for tpl_key, label, lead_min, window in LEAD_TIMES:
-                # Match this lead time? (within ±window)
-                if abs(diff_min - lead_min) > window:
-                    continue
-                if not p.get("email"):
-                    continue
-                from services.notification_preferences import send_user_template
-                dedupe = f"match_reminder:{m.get('id')}:{p.get('id')}:{label}"
-                await send_user_template(
-                    p, tpl_key,
-                    tournament_title=t.get("title", "Turnier"),
-                    opponent=opp_name,
-                    when=when_str,
-                    url=url,
-                    dedupe_key=dedupe,
-                )
-                queued += 1
+            participants = await _participants_for_match(m)
+            if len(participants) < 1:
+                continue
+            for p in participants:
+                opp = next((q for q in participants if q.get("id") != p.get("id")), None)
+                opp_name = (opp or {}).get("display_name", "TBD")
+                for tpl_key, label, lead_min, window in LEAD_TIMES:
+                    # Match this lead time? (within ±window)
+                    if abs(diff_min - lead_min) > window:
+                        continue
+                    if not p.get("email"):
+                        continue
+                    from services.notification_preferences import send_user_template
+                    dedupe = f"match_reminder:{m.get('id')}:{p.get('id')}:{label}"
+                    await send_user_template(
+                        p, tpl_key,
+                        tournament_title=t.get("title", "Turnier"),
+                        opponent=opp_name,
+                        when=when_str,
+                        url=url,
+                        dedupe_key=dedupe,
+                    )
+                    queued += 1
     if queued:
         logger.info(f"[match-reminders] queued {queued} mails")
     return {"queued": queued}

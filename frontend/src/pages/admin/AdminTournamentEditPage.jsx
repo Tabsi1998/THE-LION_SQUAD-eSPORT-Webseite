@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
-import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
+import { fromDateTimeLocal, normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { toast } from "sonner";
 import { Zap, RefreshCw, Eye } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -110,6 +110,7 @@ const STAGE_PRESETS = [
   ["mk8_32", "Mario Kart 32 Spieler", MARIO_KART_32_SCHEMA],
 ];
 const CUSTOM_STAGE_TYPES = new Set(["custom_bracket", "ffa_custom_bracket"]);
+const AUTO_STAGE_TYPES = new Set(["single_elimination", "custom_bracket", "ffa_custom_bracket"]);
 const FFA_STAGE_TYPES = new Set(["simple", "ffa_single_elimination", "ffa_custom_bracket", "ffa_league"]);
 
 function matchTypeForStage(stageType) {
@@ -128,7 +129,7 @@ function stageConfigFor(form) {
     showMinPlayers: ffa,
     showQualifiers: ffa,
     showSchema: custom,
-    canGenerate: custom,
+    canGenerate: AUTO_STAGE_TYPES.has(stageType),
   };
 }
 
@@ -158,6 +159,15 @@ export default function AdminTournamentEditPage() {
   const [users, setUsers] = useState([]);
   const [stages, setStages] = useState([]);
   const [matchesV2, setMatchesV2] = useState([]);
+  const [participantForm, setParticipantForm] = useState({
+    user_id: "",
+    display_name: "",
+    ingame_name: "",
+    discord: "",
+    status: "approved",
+    seed: "",
+    replace_registration_id: "",
+  });
   const confirm = useConfirm();
   const prompt = usePrompt();
 
@@ -190,18 +200,40 @@ export default function AdminTournamentEditPage() {
       ]);
       setStaff(s || []);
       setUsers(u || []);
+    } else if (isModerator) {
+      try {
+        const { data: u } = await api.get(`/tournaments/${id}/assignable-users`);
+        setUsers(u || []);
+      } catch {
+        setUsers([]);
+      }
     }
-  }, [id, isAdmin]);
+  }, [id, isAdmin, isModerator]);
 
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["tournaments", "matches", "stations"]);
 
-  const generate = async () => {
+  const generateLegacyBracket = async ({ preview = false, force = false } = {}) => {
     try {
-      const { data } = await api.post(`/tournaments/${id}/generate-bracket`);
-      toast.success(`Bracket mit ${data.match_count} Matches generiert.`);
+      const params = new URLSearchParams();
+      if (preview) params.set("preview", "true");
+      if (force) params.set("force", "true");
+      const suffix = params.toString() ? `?${params.toString()}` : "";
+      const { data } = await api.post(`/tournaments/${id}/generate-bracket${suffix}`);
+      toast.success(data.preview ? `Vorschau mit ${data.match_count} Matches generiert.` : `Bracket mit ${data.match_count} Matches generiert.`);
       load();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    } catch (e) {
+      if (e.response?.status === 409 && !force) {
+        const ok = await confirm({
+          title: "Bracket neu generieren?",
+          description: "Vorhandene echte Matches werden ersetzt. Eine reine Vorschau kann direkt überschrieben werden.",
+          confirmLabel: "Neu generieren",
+          tone: "danger",
+        });
+        if (ok) return generateLegacyBracket({ preview, force: true });
+      }
+      toast.error(formatApiError(e.response?.data?.detail));
+    }
   };
   const reset = async () => {
     if (!await confirm({
@@ -252,6 +284,28 @@ export default function AdminTournamentEditPage() {
       toast.error(formatRequestError(e, "Check-in konnte nicht gespeichert werden."));
     }
   };
+  const setParticipantField = (key, value) => setParticipantForm((current) => ({ ...current, [key]: value }));
+  const addParticipant = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        user_id: participantForm.user_id || null,
+        display_name: participantForm.display_name || null,
+        ingame_name: participantForm.ingame_name || null,
+        discord: participantForm.discord || null,
+        status: participantForm.status || "approved",
+        seed: participantForm.seed === "" ? null : Number(participantForm.seed),
+        replace_registration_id: participantForm.replace_registration_id || null,
+      };
+      const { data } = await api.post(`/tournaments/${id}/registrations`, payload);
+      const replacement = data.replacement;
+      toast.success(replacement ? `Teilnehmer hinzugefügt und ${replacement.legacy_matches + replacement.v2_matches} Match-Slots ersetzt.` : "Teilnehmer hinzugefügt.");
+      setParticipantForm({ user_id: "", display_name: "", ingame_name: "", discord: "", status: "approved", seed: "", replace_registration_id: "" });
+      load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Teilnehmer konnte nicht hinzugefügt werden."));
+    }
+  };
   const setTournStatus = async (status) => {
     try {
       await api.post(`/tournaments/${id}/status`, { status });
@@ -272,6 +326,33 @@ export default function AdminTournamentEditPage() {
       toast.success("Ergebnis gespeichert.");
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+  const updateMatchSchedule = async (match, payload) => {
+    try {
+      const scheduledAt = payload.scheduled_at ? fromDateTimeLocal(payload.scheduled_at) : null;
+      const body = {
+        scheduled_at: scheduledAt,
+        duration_minutes: payload.duration_minutes === "" ? null : Number(payload.duration_minutes),
+      };
+      if (scheduledAt && ["pending", "ready", "preview"].includes(match.status)) body.status = "scheduled";
+      await api.patch(`/matches/${match.id}`, body);
+      toast.success("Match-Zeit gespeichert.");
+      load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Match-Zeit konnte nicht gespeichert werden."));
+    }
+  };
+  const updateMatchV2Schedule = async (match, payload) => {
+    try {
+      await api.patch(`/matches-v2/${match.id}`, {
+        scheduled_at: payload.scheduled_at ? fromDateTimeLocal(payload.scheduled_at) : null,
+        duration_minutes: payload.duration_minutes === "" ? null : Number(payload.duration_minutes),
+      });
+      toast.success("Match-Zeit gespeichert.");
+      load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Match-Zeit konnte nicht gespeichert werden."));
+    }
   };
   const updateMatchV2Result = async (match, results, meta = {}) => {
     try {
@@ -346,10 +427,13 @@ export default function AdminTournamentEditPage() {
               <div className="mt-1 text-[10px] text-white/40">Manuell nur für Ausnahmen; Zeitplan automatisiert.</div>
             </div>
           )}
-          {isAdmin && !hasFlexibleStructure && <button onClick={generate} data-testid="admin-tr-generate" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2">
+          {isModerator && !hasFlexibleStructure && <button onClick={() => generateLegacyBracket({ preview: true })} data-testid="admin-tr-preview" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
+            <Eye className="w-3.5 h-3.5" /> Vorschau
+          </button>}
+          {isModerator && !hasFlexibleStructure && <button onClick={() => generateLegacyBracket({ preview: false })} data-testid="admin-tr-generate" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2">
             <Zap className="w-3.5 h-3.5" /> Bracket generieren
           </button>}
-          {isAdmin && <button onClick={reset} data-testid="admin-tr-reset" className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-sm hover:border-[#FF3B30]/60 hover:text-[#FF3B30] inline-flex items-center gap-2">
+          {isModerator && <button onClick={reset} data-testid="admin-tr-reset" className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-sm hover:border-[#FF3B30]/60 hover:text-[#FF3B30] inline-flex items-center gap-2">
             <RefreshCw className="w-3.5 h-3.5" /> Reset
           </button>}
           {isAdmin && t.format === "swiss" && (
@@ -380,6 +464,16 @@ export default function AdminTournamentEditPage() {
       </div>
 
       {tab === "participants" && (
+        <div className="space-y-4">
+        {isModerator && (
+          <ParticipantAddForm
+            form={participantForm}
+            users={users}
+            noShowRegistrations={regs.filter((r) => r.status === "no_show")}
+            onChange={setParticipantField}
+            onSubmit={addParticipant}
+          />
+        )}
         <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
@@ -424,6 +518,7 @@ export default function AdminTournamentEditPage() {
           </table>
           </div>
         </div>
+        </div>
       )}
 
       {tab === "bracket" && bracket && (
@@ -466,6 +561,7 @@ export default function AdminTournamentEditPage() {
                         {isModerator && a && b && (
                           <MatchResultControls match={m} a={a} b={b} onSave={updateMatchResult} />
                         )}
+                        {isModerator && <MatchScheduleControls match={m} onSave={updateMatchSchedule} />}
                         <Link to={`/matches/${m.id}`} className="text-[#29B6E8] text-xs font-bold uppercase hover:text-white">Öffnen →</Link>
                       </div>
                     </td>
@@ -487,6 +583,7 @@ export default function AdminTournamentEditPage() {
           isModerator={isModerator}
           onChanged={load}
           onSaveResult={updateMatchV2Result}
+          onSaveMatchMeta={updateMatchV2Schedule}
         />
       )}
       {tab === "edit" && (
@@ -516,7 +613,38 @@ export default function AdminTournamentEditPage() {
   );
 }
 
-function TournamentStagesPanel({ tournamentId, stages, matches, registrations, isAdmin, isModerator, onChanged, onSaveResult }) {
+function ParticipantAddForm({ form, users, noShowRegistrations, onChange, onSubmit }) {
+  const userOptions = [
+    ["", "Gast/manuell"],
+    ...(users || []).map((u) => [u.id, `${u.display_name || u.username || u.email}${u.email ? ` · ${u.email}` : ""}`]),
+  ];
+  const replaceOptions = [
+    ["", "Kein Ersatz"],
+    ...(noShowRegistrations || []).map((r) => [r.id, r.display_name || r.ingame_name || r.user?.display_name || r.id]),
+  ];
+  return (
+    <form onSubmit={onSubmit} className="border border-white/10 rounded-sm bg-[#121212] p-5 space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Teilnehmer hinzufügen</div>
+          <div className="text-xs text-white/45 mt-1">Account bevorzugt, Gast nur für Sonderfälle.</div>
+        </div>
+        <button type="submit" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs">Hinzufügen</button>
+      </div>
+      <div className="grid md:grid-cols-3 gap-3">
+        <SelectField label="Account" value={form.user_id} onChange={(v)=>onChange("user_id", v)} options={userOptions} />
+        <Fld label="Display Name" value={form.display_name} onChange={(v)=>onChange("display_name", v)} testId="participant-add-display" />
+        <Fld label="Ingame Name" value={form.ingame_name} onChange={(v)=>onChange("ingame_name", v)} testId="participant-add-ingame" />
+        <Fld label="Discord" value={form.discord} onChange={(v)=>onChange("discord", v)} testId="participant-add-discord" />
+        <SelectField label="Status" value={form.status} onChange={(v)=>onChange("status", v)} options={[["approved", "Approved"], ["checked_in", "Checked-in"], ["pending", "Pending"], ["waitlist", "Waitlist"]]} />
+        <Fld label="Seed" type="number" value={form.seed} onChange={(v)=>onChange("seed", v)} testId="participant-add-seed" />
+        <SelectField label="Ersetzt No-Show" value={form.replace_registration_id} onChange={(v)=>onChange("replace_registration_id", v)} options={replaceOptions} />
+      </div>
+    </form>
+  );
+}
+
+function TournamentStagesPanel({ tournamentId, stages, matches, registrations, isAdmin, isModerator, onChanged, onSaveResult, onSaveMatchMeta }) {
   const [createOpen, setCreateOpen] = useState(stages.length === 0);
   const [form, setForm] = useState({
     name: "Stage 1",
@@ -525,6 +653,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
     match_size: 4,
     min_players: 2,
     qualifiers_per_match: 2,
+    duration_minutes: 30,
     schema: DEFAULT_FFA_SCHEMA,
   });
   const confirm = useConfirm();
@@ -541,8 +670,9 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
       stage_type: "ffa_custom_bracket",
       match_size: 4,
       min_players: 2,
-      qualifiers_per_match: 2,
-      schema: preset[2],
+          qualifiers_per_match: 2,
+          duration_minutes: current.duration_minutes || 30,
+          schema: preset[2],
     }));
   };
   const createStage = async (e) => {
@@ -556,6 +686,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
           match_size: Number(form.match_size) || 4,
           min_players: Number(form.min_players) || 2,
           qualifiers_per_match: Number(form.qualifiers_per_match) || 1,
+          duration_minutes: Number(form.duration_minutes) || 30,
           schema: form.schema || "",
           score_type: "points",
           calculation: "points",
@@ -604,6 +735,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
               {config.showMatchSize && <Fld label="Matchgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />}
               {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId="stage-new-min" />}
               {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId="stage-new-qualifiers" />}
+              <Fld label="Matchdauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId="stage-new-duration" />
               {config.showSchema ? (
                 <label className="md:col-span-3 block">
                   <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
@@ -635,6 +767,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
             onChanged={onChanged}
             onDelete={() => removeStage(stage)}
             onSaveResult={onSaveResult}
+            onSaveMatchMeta={onSaveMatchMeta}
           />
         ))}
         {stages.length === 0 && (
@@ -647,7 +780,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
   );
 }
 
-function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator, onChanged, onDelete, onSaveResult }) {
+function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator, onChanged, onDelete, onSaveResult, onSaveMatchMeta }) {
   const settings = stage.settings || {};
   const [form, setForm] = useState({
     name: stage.name || "",
@@ -657,6 +790,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
     match_size: settings.match_size || 4,
     min_players: settings.min_players || 2,
     qualifiers_per_match: settings.qualifiers_per_match || 2,
+    duration_minutes: settings.duration_minutes || stage.duration_minutes || 30,
     schema: settings.schema || "",
   });
   const confirm = useConfirm();
@@ -673,6 +807,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
       match_size: 4,
       min_players: 2,
       qualifiers_per_match: 2,
+      duration_minutes: current.duration_minutes || 30,
       schema: preset[2],
     }));
   };
@@ -688,6 +823,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
           match_size: Number(form.match_size) || 4,
           min_players: Number(form.min_players) || 2,
           qualifiers_per_match: Number(form.qualifiers_per_match) || 1,
+          duration_minutes: Number(form.duration_minutes) || 30,
           schema: form.schema || "",
           score_type: settings.score_type || "points",
           calculation: settings.calculation || "points",
@@ -746,12 +882,12 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
             {Object.entries(statusCounts).map(([status, count]) => <span key={status}>· {count} {status}</span>)}
           </div>
         </div>
-        {isAdmin && (
+        {isModerator && (
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => generate({ preview: true })} disabled={!config.canGenerate} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Vorschau</button>
             <button type="button" onClick={() => generate({ preview: false })} disabled={!config.canGenerate} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Mit Teilnehmern generieren</button>
-            <button type="button" onClick={save} className="px-3 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-xs font-bold">Speichern</button>
-            <button type="button" onClick={onDelete} className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm uppercase tracking-wider text-xs font-bold">Löschen</button>
+            {isAdmin && <button type="button" onClick={save} className="px-3 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-xs font-bold">Speichern</button>}
+            {isAdmin && <button type="button" onClick={onDelete} className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm uppercase tracking-wider text-xs font-bold">Löschen</button>}
           </div>
         )}
       </div>
@@ -770,6 +906,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
               {config.showMatchSize && <Fld label="Matchgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId={`stage-size-${stage.id}`} />}
               {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId={`stage-min-${stage.id}`} />}
               {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId={`stage-qualifiers-${stage.id}`} />}
+              <Fld label="Matchdauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId={`stage-duration-${stage.id}`} />
             </div>
             {config.showSchema ? (
               <label className="block">
@@ -791,6 +928,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
               regById={regById}
               canEdit={isModerator}
               onSaveResult={onSaveResult}
+              onSaveMatchMeta={onSaveMatchMeta}
             />
           ))}
           {matches.length === 0 && (
@@ -804,7 +942,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
   );
 }
 
-function MatchV2Card({ match, regById, canEdit, onSaveResult }) {
+function MatchV2Card({ match, regById, canEdit, onSaveResult, onSaveMatchMeta }) {
   const filledSlots = (match.slots || []).filter((slot) => slot.status === "filled" && slot.registration_id);
   const labelFor = (registrationId) => {
     const reg = regById[registrationId];
@@ -836,6 +974,7 @@ function MatchV2Card({ match, regById, canEdit, onSaveResult }) {
           ))}
         </div>
       )}
+      {canEdit && <MatchScheduleControls match={match} onSave={onSaveMatchMeta} />}
       {canEdit && filledSlots.length > 0 && (
         <MatchV2ResultControls match={match} filledSlots={filledSlots} labelFor={labelFor} onSaveResult={onSaveResult} />
       )}
@@ -894,6 +1033,22 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
   );
 }
 
+function MatchScheduleControls({ match, onSave }) {
+  const [scheduledAt, setScheduledAt] = useState(toDateTimeLocalInput(match.scheduled_at));
+  const [duration, setDuration] = useState(match.duration_minutes ?? match.settings?.duration_minutes ?? "");
+  useEffect(() => {
+    setScheduledAt(toDateTimeLocalInput(match.scheduled_at));
+    setDuration(match.duration_minutes ?? match.settings?.duration_minutes ?? "");
+  }, [match.id, match.scheduled_at, match.duration_minutes, match.updated_at, match.settings?.duration_minutes]);
+  return (
+    <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
+      <input type="datetime-local" value={scheduledAt} onChange={(e)=>setScheduledAt(e.target.value)} className="bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs col-span-2" aria-label="Match-Zeit" />
+      <input type="number" min="1" value={duration} onChange={(e)=>setDuration(e.target.value)} className="bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" placeholder="Min." aria-label="Dauer Minuten" />
+      <button type="button" onClick={() => onSave(match, { scheduled_at: scheduledAt, duration_minutes: duration })} className="px-2 py-1 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Zeit speichern</button>
+    </div>
+  );
+}
+
 function TournamentEditForm({ tournament, onSaved }) {
   const dt = toDateTimeLocalInput;
   const [games, setGames] = useState([]);
@@ -928,6 +1083,7 @@ function TournamentEditForm({ tournament, onSaved }) {
     max_participants: tournament.max_participants || 16,
     min_participants: tournament.min_participants || 2,
     best_of: tournament.best_of || 1,
+    match_duration_minutes: tournament.match_duration_minutes || 30,
     bronze_match: !!tournament.bronze_match,
     seeding_mode: tournament.seeding_mode || "random",
     is_public: tournament.is_public !== false,
@@ -951,7 +1107,7 @@ function TournamentEditForm({ tournament, onSaved }) {
       const payload = { ...f };
       if (!payload.event_id) payload.event_id = null;
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
-      ["team_size", "max_participants", "min_participants", "best_of"].forEach((key) => {
+      ["team_size", "max_participants", "min_participants", "best_of", "match_duration_minutes"].forEach((key) => {
         if (payload[key] !== "" && payload[key] != null) payload[key] = Number(payload[key]);
       });
       payload.season_weight = Number(payload.season_weight || 0);
@@ -1005,6 +1161,7 @@ function TournamentEditForm({ tournament, onSaved }) {
           <Fld label="Min Teilnehmer" type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>
           <Fld label="Max Teilnehmer" type="number" value={f.max_participants} onChange={(v)=>set("max_participants",v)} testId="tr-edit-max"/>
           <Fld label="Best of" type="number" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"/>
+          <Fld label="Matchdauer Min." type="number" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"/>
           <Fld label="Season Gewicht" type="number" value={f.season_weight} onChange={(v)=>set("season_weight",v)} testId="tr-edit-season-weight"/>
         </div>
         <div className="flex flex-wrap gap-4">

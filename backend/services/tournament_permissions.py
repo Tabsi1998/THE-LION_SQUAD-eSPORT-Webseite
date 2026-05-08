@@ -9,6 +9,8 @@ GLOBAL_TOURNAMENT_ADMIN_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 RESULT_STAFF_ROLES = {"organizer", "referee", "scorekeeper"}
 CHECKIN_STAFF_ROLES = {"organizer", "referee", "scorekeeper", "station_manager"}
 READ_STAFF_ROLES = {"organizer", "referee", "scorekeeper", "station_manager", "stream_operator"}
+STRUCTURE_STAFF_ROLES = {"organizer", "referee"}
+PARTICIPANT_STAFF_ROLES = {"organizer", "referee", "scorekeeper"}
 
 
 def is_global_tournament_staff(user: dict | None) -> bool:

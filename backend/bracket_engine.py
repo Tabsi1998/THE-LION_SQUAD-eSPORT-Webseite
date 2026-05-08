@@ -35,7 +35,8 @@ def _make_match(tournament_id: str, round_num: int, round_name: str, bracket: st
                 match_index: int, best_of: int = 1,
                 p_a: Optional[str] = None, p_b: Optional[str] = None,
                 next_match_id: Optional[str] = None, next_slot: Optional[str] = None,
-                next_loser_match_id: Optional[str] = None, next_loser_slot: Optional[str] = None) -> dict:
+                next_loser_match_id: Optional[str] = None, next_loser_slot: Optional[str] = None,
+                duration_minutes: Optional[int] = None) -> dict:
     return {
         "id": new_id(),
         "tournament_id": tournament_id,
@@ -51,6 +52,7 @@ def _make_match(tournament_id: str, round_num: int, round_name: str, bracket: st
         "loser_id": None,
         "status": "pending",
         "scheduled_at": None,
+        "duration_minutes": duration_minutes,
         "station_id": None,
         "best_of": best_of,
         "map": None,
@@ -61,6 +63,8 @@ def _make_match(tournament_id: str, round_num: int, round_name: str, bracket: st
         "reports": [],
         "disputes": [],
         "admin_note": None,
+        "is_preview": False,
+        "generation_mode": "seeded",
         "created_at": now_utc().isoformat(),
         "updated_at": now_utc().isoformat(),
     }
@@ -68,7 +72,8 @@ def _make_match(tournament_id: str, round_num: int, round_name: str, bracket: st
 
 def generate_single_elimination(tournament_id: str, registrations: List[dict],
                                  best_of: int = 1, bronze_match: bool = False,
-                                 seeding_mode: str = "random") -> List[dict]:
+                                 seeding_mode: str = "random",
+                                 duration_minutes: Optional[int] = None) -> List[dict]:
     regs = _participant_list(registrations, seeding_mode)
     n = len(regs)
     if n < 2:
@@ -89,7 +94,8 @@ def generate_single_elimination(tournament_id: str, registrations: List[dict],
         round_name = _round_name(r, rounds)
         ms = []
         for i in range(cnt):
-            ms.append(_make_match(tournament_id, r + 1, round_name, "winner", i, best_of=best_of))
+            ms.append(_make_match(tournament_id, r + 1, round_name, "winner", i, best_of=best_of,
+                                  duration_minutes=duration_minutes))
         round_matches.append(ms)
 
     # Link round r match -> round r+1
@@ -121,7 +127,8 @@ def generate_single_elimination(tournament_id: str, registrations: List[dict],
 
     # Bronze match (3rd place) - losers of semis
     if bronze_match and rounds >= 2:
-        bronze = _make_match(tournament_id, rounds, "Bronze Match", "bronze", 0, best_of=best_of)
+        bronze = _make_match(tournament_id, rounds, "Bronze Match", "bronze", 0, best_of=best_of,
+                             duration_minutes=duration_minutes)
         all_matches.append(bronze)
 
     return all_matches
@@ -172,7 +179,8 @@ def _propagate_winner(match: dict, round_matches: List[List[dict]]):
 
 
 def generate_double_elimination(tournament_id: str, registrations: List[dict],
-                                 best_of: int = 1, seeding_mode: str = "random") -> List[dict]:
+                                 best_of: int = 1, seeding_mode: str = "random",
+                                 duration_minutes: Optional[int] = None) -> List[dict]:
     """Simplified double elim: generate WB as single elim, LB and Grand Final as 'pending'."""
     regs = _participant_list(registrations, seeding_mode)
     n = len(regs)
@@ -180,7 +188,8 @@ def generate_double_elimination(tournament_id: str, registrations: List[dict],
         return []
     # Winner Bracket
     wb = generate_single_elimination(tournament_id, registrations, best_of=best_of,
-                                      bronze_match=False, seeding_mode=seeding_mode)
+                                      bronze_match=False, seeding_mode=seeding_mode,
+                                      duration_minutes=duration_minutes)
     for m in wb:
         m["bracket"] = "winner"
     bracket_size = _next_power_of_two(n)
@@ -203,20 +212,24 @@ def generate_double_elimination(tournament_id: str, registrations: List[dict],
     for r, sz in enumerate(sizes):
         row = []
         for i in range(sz):
-            m = _make_match(tournament_id, r + 1, f"LB Runde {r + 1}", "loser", i, best_of=best_of)
+            m = _make_match(tournament_id, r + 1, f"LB Runde {r + 1}", "loser", i,
+                            best_of=best_of, duration_minutes=duration_minutes)
             row.append(m)
             lb_all.append(m)
         lb_matches.append(row)
 
     # Grand final (2 matches with potential reset)
-    gf1 = _make_match(tournament_id, wb_rounds + 1, "Grand Final", "grand_final", 0, best_of=best_of)
-    gf2 = _make_match(tournament_id, wb_rounds + 2, "Grand Final Reset", "grand_final", 1, best_of=best_of)
+    gf1 = _make_match(tournament_id, wb_rounds + 1, "Grand Final", "grand_final", 0,
+                      best_of=best_of, duration_minutes=duration_minutes)
+    gf2 = _make_match(tournament_id, wb_rounds + 2, "Grand Final Reset", "grand_final", 1,
+                      best_of=best_of, duration_minutes=duration_minutes)
 
     return wb + lb_all + [gf1, gf2]
 
 
 def generate_round_robin(tournament_id: str, registrations: List[dict],
-                         best_of: int = 1, double_round: bool = False) -> List[dict]:
+                         best_of: int = 1, double_round: bool = False,
+                         duration_minutes: Optional[int] = None) -> List[dict]:
     regs = _participant_list(registrations, "manual")
     n = len(regs)
     if n < 2:
@@ -238,7 +251,8 @@ def generate_round_robin(tournament_id: str, registrations: List[dict],
             if a is None or b is None:
                 continue
             m = _make_match(tournament_id, round_num + 1, f"Spieltag {round_num + 1}",
-                            "round_robin", match_index, best_of=best_of, p_a=a, p_b=b)
+                            "round_robin", match_index, best_of=best_of, p_a=a, p_b=b,
+                            duration_minutes=duration_minutes)
             m["status"] = "ready"
             matches.append(m)
             match_index += 1
@@ -251,30 +265,43 @@ def generate_round_robin(tournament_id: str, registrations: List[dict],
             m = _make_match(tournament_id, m_orig["round"] + rounds_count,
                             f"Rückspiel {m_orig['round']}", "round_robin",
                             match_index, best_of=best_of,
-                            p_a=m_orig["participant_b_id"], p_b=m_orig["participant_a_id"])
+                            p_a=m_orig["participant_b_id"], p_b=m_orig["participant_a_id"],
+                            duration_minutes=duration_minutes)
             m["status"] = "ready"
             matches.append(m)
             match_index += 1
     return matches
 
 
-def generate_bracket(tournament: dict, registrations: List[dict]) -> List[dict]:
+def generate_bracket(tournament: dict, registrations: List[dict], preview: bool = False) -> List[dict]:
     fmt = tournament.get("format", "single_elim")
     best_of = tournament.get("best_of", 1)
     bronze = tournament.get("bronze_match", False)
     seeding = tournament.get("seeding_mode", "random")
+    duration_minutes = tournament.get("match_duration_minutes") or 30
     tid = tournament["id"]
     if fmt == "single_elim":
-        return generate_single_elimination(tid, registrations, best_of, bronze, seeding)
-    if fmt == "double_elim":
-        return generate_double_elimination(tid, registrations, best_of, seeding)
-    if fmt == "round_robin":
-        return generate_round_robin(tid, registrations, best_of, False)
-    if fmt == "league":
-        return generate_round_robin(tid, registrations, best_of, True)
+        matches = generate_single_elimination(tid, registrations, best_of, bronze, seeding, duration_minutes)
+    elif fmt == "double_elim":
+        matches = generate_double_elimination(tid, registrations, best_of, seeding, duration_minutes)
+    elif fmt == "round_robin":
+        matches = generate_round_robin(tid, registrations, best_of, False, duration_minutes)
+    elif fmt == "league":
+        matches = generate_round_robin(tid, registrations, best_of, True, duration_minutes)
+    else:
+        matches = []
     # For other formats (swiss, groups, ffa, battle_royale, time_trial, grand_prix) we don't
     # auto-generate matches. time_trial / grand_prix flow via F1 lap times.
-    return []
+    if preview:
+        for match in matches:
+            match["status"] = "preview"
+            match["winner_id"] = None
+            match["loser_id"] = None
+            match["score_a"] = 0
+            match["score_b"] = 0
+            match["is_preview"] = True
+            match["generation_mode"] = "preview"
+    return matches
 
 
 def advance_match_winner(match: dict, all_matches: List[dict]) -> List[dict]:

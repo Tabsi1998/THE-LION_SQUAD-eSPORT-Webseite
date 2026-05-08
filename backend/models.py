@@ -407,6 +407,7 @@ class TournamentCreate(BaseModel):
     prize_places: Optional[List[dict]] = None  # [{"place":1,"label":"1. Platz","value":"…"}]
     best_of: int = 1
     bronze_match: bool = False
+    match_duration_minutes: int = 30
     stream_link: Optional[str] = None
     twitch_channel: Optional[str] = None
     twitch_enabled: bool = False
@@ -455,6 +456,7 @@ class TournamentUpdate(BaseModel):
     prize_places: Optional[List[dict]] = None
     best_of: Optional[int] = None
     bronze_match: Optional[bool] = None
+    match_duration_minutes: Optional[int] = None
     stream_link: Optional[str] = None
     twitch_channel: Optional[str] = None
     twitch_enabled: Optional[bool] = None
@@ -486,6 +488,20 @@ class RegistrationUpdate(BaseModel):
     status: Optional[Literal["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"]] = None
     seed: Optional[int] = None
     ingame_name: Optional[str] = None
+
+
+class RegistrationAdminCreate(BaseModel):
+    user_id: Optional[str] = None
+    team_id: Optional[str] = None
+    display_name: Optional[str] = None
+    ingame_name: Optional[str] = None
+    discord: Optional[str] = None
+    platform_id: Optional[str] = None
+    player_ids: Optional[Dict[str, str]] = None
+    notes: Optional[str] = None
+    status: Literal["pending", "approved", "waitlist", "checked_in"] = "approved"
+    seed: Optional[int] = None
+    replace_registration_id: Optional[str] = None
 
 
 TournamentStaffRole = Literal["organizer", "referee", "scorekeeper", "station_manager", "stream_operator"]
@@ -578,6 +594,17 @@ class MatchUpdate(BaseModel):
     admin_note: Optional[str] = None
     map: Optional[str] = None
     best_of: Optional[int] = None
+    duration_minutes: Optional[int] = None
+
+
+class MatchV2Update(BaseModel):
+    status: Optional[MatchStatus] = None
+    scheduled_at: Optional[datetime] = None
+    station_id: Optional[str] = None
+    admin_note: Optional[str] = None
+    map: Optional[str] = None
+    best_of: Optional[int] = None
+    duration_minutes: Optional[int] = None
 
 
 class MatchDispute(BaseModel):

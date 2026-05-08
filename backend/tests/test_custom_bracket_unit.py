@@ -97,3 +97,28 @@ def test_v2_generator_can_build_preview_without_registrations():
     assert matches[0]["generation_mode"] == "preview"
     assert matches[0]["status"] == "preview"
     assert {slot["status"] for slot in matches[0]["slots"]} == {"preview"}
+
+
+def test_v2_generator_builds_auto_single_elim_schema_and_byes():
+    tournament = {"id": "t1", "seeding_mode": "manual", "max_participants": 4, "match_duration_minutes": 9}
+    stage = {
+        "id": "s1",
+        "number": 1,
+        "stage_type": "single_elimination",
+        "match_type": "duel",
+        "settings": {},
+    }
+    registrations = [
+        {"id": "r1", "user_id": "u1", "status": "approved", "seed": 1},
+        {"id": "r2", "user_id": "u2", "status": "approved", "seed": 2},
+        {"id": "r3", "user_id": "u3", "status": "approved", "seed": 3},
+    ]
+
+    matches = build_matches_v2_from_schema(tournament, stage, registrations)
+    by_key = {match["match_key"]: match for match in matches}
+
+    assert len(matches) == 3
+    assert by_key["A"]["status"] == "completed"
+    assert by_key["A"]["results"][0]["registration_id"] == "r1"
+    assert by_key["C"]["slots"][0]["registration_id"] == "r1"
+    assert all(match["duration_minutes"] == 9 for match in matches)

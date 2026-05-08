@@ -14,9 +14,11 @@ bestehende einfache 1v1-Turniere.
 3. Vorlage waehlen, z.B. `Mario Kart 8 Spieler` oder `Mario Kart 32 Spieler`.
 4. Werte pruefen:
    - `Match-Typ`: `FFA` fuer 3+ Spieler pro Match, `Duel` fuer 1v1.
-   - `Stage-Typ`: fuer frei konfigurierbare Baeume meistens `FFA Custom Bracket`.
+   - `Stage-Typ`: `Single Elimination` fuer normalen 1v1-Baum ohne Schema,
+     fuer frei konfigurierbare Baeume meistens `FFA Custom Bracket`.
    - `Matchgroesse`: z.B. `4` fuer Mario Kart.
    - `Qualifizierte`: z.B. `2`, wenn Platz 1 und 2 weiterkommen.
+   - `Matchdauer Min.`: Standarddauer je Match/Heat fuer Zeitplan und Reminder.
 5. `Stage speichern`.
 6. Optional `Vorschau` klicken. Dadurch wird der komplette Baum ohne Teilnehmer
    erzeugt, damit man Struktur, Runden und maximale Kapazitaet vorab zeigen kann.
@@ -43,6 +45,35 @@ Das echte Bracket wird mit Teilnehmern erzeugt:
 - Ergebnisse fuellen Folgematches automatisch.
 - Wenn bereits echte Matches oder Reports existieren, ist zum Ersetzen bewusst
   `force=true` bzw. die Sicherheitsabfrage in der UI noetig.
+
+Klassische 1v1-Turniere ohne Stage koennen im Turnierkopf ebenfalls per
+`Vorschau` oder `Bracket generieren` erzeugt werden. Beim Statuswechsel auf
+`Live` wird ein noch fehlendes klassisches Bracket automatisch erzeugt; eine
+reine Vorschau wird dabei ersetzt.
+
+## Manuelle Teilnehmer und No-Show-Ersatz
+
+Im Admin-Tab `Teilnehmer` kann Turnierleitung Teilnehmer manuell hinzufuegen:
+
+- bevorzugt mit Account-Auswahl, damit Check-in, Match-Hub und E-Mail-Reminder
+  funktionieren;
+- als Gast/manuell nur fuer Sonderfaelle vor Ort;
+- optional mit Seed und Startstatus;
+- optional als Ersatz fuer eine `No-Show`-Anmeldung.
+
+Wenn beim Hinzufuegen `Ersetzt No-Show` gewaehlt wird, markiert das System die
+alte Anmeldung als `no_show` und ersetzt offene Match-Slots durch den neuen
+Teilnehmer. Abgeschlossene Matches werden nicht automatisch umgeschrieben.
+
+## Match-Zeitplanung und Reminder
+
+Turniere und Stages haben eine Standarddauer in Minuten. Einzelne Matches oder
+Heats koennen trotzdem separat geplant werden:
+
+- `scheduled_at` legt fest, wann das Match starten soll.
+- `duration_minutes` beschreibt die erwartete Dauer.
+- Der Reminder-Scheduler beruecksichtigt klassische Matches und v2-Heats.
+- Reminder werden nur an Teilnehmer mit Account/E-Mail gesendet.
 
 ## Schema-Grundidee
 

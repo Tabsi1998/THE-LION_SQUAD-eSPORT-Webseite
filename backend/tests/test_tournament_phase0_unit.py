@@ -37,4 +37,11 @@ def test_participant_source_ids_include_current_and_legacy_without_duplicates():
         "participant_b_id": "reg-b",
         "player1_id": "reg-a",
         "p2_registration_id": "legacy-b",
-    }) == ["reg-a", "reg-b", "legacy-b"]
+        "slots": [{"registration_id": "v2-a"}, {"registration_id": "reg-a"}],
+    }) == ["reg-a", "reg-b", "legacy-b", "v2-a"]
+
+
+def test_participant_source_ids_include_v2_slots():
+    assert participant_source_ids({
+        "slots": [{"registration_id": "v2-a"}, {"registration_id": "v2-b"}],
+    }) == ["v2-a", "v2-b"]

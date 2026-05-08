@@ -119,11 +119,24 @@ Naechster Schritt: Bracket-/Heat-Darstellung fuer Public/Admin und erste TV/Embe
 - Separate Aktionen fuer `Vorschau` und `Mit Teilnehmern generieren` ergaenzt.
 - Doku beschreibt Vorschau vs. echtes Bracket.
 
+### Step 10 erledigt: Single-Elim-Preview, manuelle Teilnehmer und Match-Zeitplanung
+
+- Klassische Single-Elimination-Turniere koennen jetzt im Turnierkopf als Vorschau ohne Teilnehmer generiert werden.
+- Klassische Vorschauen nutzen Seed-Platzhalter und koennen spaeter mit echten Teilnehmern ersetzt werden.
+- Beim Statuswechsel auf `Live` wird ein fehlendes klassisches Bracket automatisch erzeugt; eine reine Vorschau wird ersetzt.
+- Stage-Typ `Single Elimination` kann jetzt ohne Custom-Schema automatisch einen v2-Baum erzeugen.
+- v2-Single-Elim behandelt Freilose als Auto-Advance und fuellt Folgematches.
+- Turnierleitung kann im Teilnehmer-Tab Teilnehmer manuell hinzufuegen, bevorzugt mit Account, optional als Gast.
+- Manuelles Hinzufuegen kann eine `No-Show`-Anmeldung in offenen Match-Slots ersetzen.
+- Turniere, Stages und einzelne Matches/Heats haben eine Matchdauer in Minuten.
+- Match-Zeitplanung ist in Admin-Matches und v2-Heats pflegbar.
+- Match-Reminder beruecksichtigen jetzt klassische Matches und `matches_v2`.
+- Doku beschreibt manuelle Teilnehmer, No-Show-Ersatz und Zeitplanung.
+
 Naechster Schritt: operative Turnierleitung mit Next-up/Station-Queue und besserer Korrektur-/Undo-Sicherheit fuer bereits gespielte Folgematches.
 
 ## Was wirklich noch fehlt
 
-- Neues Turniermodell: `tournament_stages`, `matches_v2`, Multi-Slot-Matches und Platzierungsresultate.
 - Korrekte Double-Elimination-Flows fuer 1v1 und FFA inklusive Loser-Bracket-Transfers.
 - Operatives Turnierleitungs-Dashboard: Check-in, Warteliste, No-Show, Stationen, Next-up, offene Ergebnisse.
 - TV-/Embed-Ansichten fuer Bracket, Stationen und Live-Eventbetrieb.
@@ -148,10 +161,10 @@ Fuer Mario Kart mit 4 Spielern pro Heat braucht es deshalb nicht nur einen neuen
 - `backend/routes/match_routes.py`: Score-Reporting, Dispute und Forfeit sind vorhanden, aber auf zwei Parteien optimiert.
 - `backend/routes/match_v2_routes.py`: v2-Matches koennen gelesen und FFA-/Multi-Slot-Ergebnisse durch Staff gespeichert werden.
 - `backend/services/match_v2_results.py`: validiert Platzierungslisten und fuellt Advancement-Zielslots in Folgematches.
-- `frontend/src/components/tls/BracketTree.jsx`: Darstellung gruppiert nach `bracket` und `round`, rendert aber ebenfalls nur zwei Teilnehmer pro Match.
-- `frontend/src/pages/admin/AdminTournamentEditPage.jsx`: Admins koennen v2-Stages konfigurieren/generieren; Staff kann FFA-Platzierungen erfassen. Die alte Matchliste bleibt A/B-orientiert.
+- `frontend/src/components/tls/BracketTree.jsx`: Darstellung rendert Legacy-1v1-Baeume und flexible v2-Heat-Baeume.
+- `frontend/src/pages/admin/AdminTournamentEditPage.jsx`: Admins koennen v2-Stages konfigurieren/generieren; Staff kann Teilnehmer manuell pflegen, Vorschauen/Generierung ausloesen, Zeiten setzen und FFA-Platzierungen erfassen.
 - `frontend/src/pages/admin/AdminStationsPage.jsx`: Stationen und Match-Zuweisung sind vorhanden, aber noch keine Turnierleitungs-Queue mit Check-in-Status, Next-up und Heat-Management.
-- `backend/services/match_reminder.py`: nutzt aktuelle Match-Felder plus Legacy-Fallbacks.
+- `backend/services/match_reminder.py`: nutzt aktuelle Match-Felder, v2-Slots und Legacy-Fallbacks.
 - `backend/routes/event_routes.py`: Events haben jetzt interne Anmeldung, Kapazitaetszaehlung, Begleitpersonen und Admin-Statuspflege.
 
 ## Externer Abgleich

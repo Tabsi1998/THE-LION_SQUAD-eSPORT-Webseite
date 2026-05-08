@@ -16,6 +16,11 @@ def participant_source_ids(match: dict) -> list[str]:
         match.get("p1_registration_id"),
         match.get("p2_registration_id"),
     ]
+    raw_ids.extend(
+        slot.get("registration_id")
+        for slot in (match.get("slots") or [])
+        if slot.get("registration_id")
+    )
     out = []
     seen = set()
     for raw in raw_ids:

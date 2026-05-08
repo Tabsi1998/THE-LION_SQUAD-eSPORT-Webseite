@@ -14,6 +14,7 @@ from __future__ import annotations
 import random
 import re
 import uuid
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -194,9 +195,122 @@ def _ordered_registrations(registrations: list[dict], seeding_mode: str) -> list
     return regs
 
 
-def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: list[dict], preview: bool = False) -> list[dict]:
+def _next_power_of_two(n: int) -> int:
+    return 1 if n <= 1 else 2 ** math.ceil(math.log2(n))
+
+
+def _seed_positions(size: int) -> list[int]:
+    if size == 1:
+        return [1]
+    prev = _seed_positions(size // 2)
+    result = []
+    for seed in prev:
+        result.append(seed)
+        result.append(size + 1 - seed)
+    return result
+
+
+def _match_key(index: int) -> str:
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    key = ""
+    value = index
+    while True:
+        key = alphabet[value % 26] + key
+        value = value // 26 - 1
+        if value < 0:
+            return key
+
+
+def _auto_single_elim_schema(slot_count: int) -> str:
+    bracket_size = _next_power_of_two(max(2, slot_count))
+    sources = [str(seed) for seed in _seed_positions(bracket_size)]
+    lines = ["[WB]"]
+    next_key_index = 0
+    round_num = 1
+    while len(sources) > 1:
+        lines.append(f"# Round {round_num}")
+        next_sources = []
+        for idx in range(0, len(sources), 2):
+            key = _match_key(next_key_index)
+            next_key_index += 1
+            lines.append(f"{key}=[{sources[idx]},{sources[idx + 1]}]")
+            next_sources.append(f"W:{key}:1")
+        sources = next_sources
+        round_num += 1
+    return "\n".join(lines)
+
+
+def _resolve_schema(tournament: dict, stage: dict, registrations: list[dict], preview: bool) -> str | None:
     settings = stage.get("settings") or {}
     schema = settings.get("schema") or settings.get("custom_schema") or settings.get("bracket_schema")
+    if schema:
+        return schema
+    if (stage.get("stage_type") or "") == "single_elimination":
+        size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
+        return _auto_single_elim_schema(size)
+    return None
+
+
+def _ready_status_for_slots(slots: list[dict], min_players: int) -> str:
+    filled = sum(1 for slot in slots if slot.get("status") == "filled" and slot.get("registration_id"))
+    has_pending_ref = any(
+        slot.get("status") == "pending" and (slot.get("source") or {}).get("type") == "rank"
+        for slot in slots
+    )
+    return "ready" if not has_pending_ref and filled >= min_players else "pending"
+
+
+def _apply_auto_byes(docs: list[dict]) -> None:
+    by_id = {doc["id"]: doc for doc in docs}
+    for doc in sorted(docs, key=lambda item: (item.get("round") or 0, item.get("order") or 0)):
+        if doc.get("is_preview") or doc.get("match_type") != "duel" or doc.get("status") == "completed":
+            continue
+        slots = doc.get("slots") or []
+        filled = [slot for slot in slots if slot.get("status") == "filled" and slot.get("registration_id")]
+        unresolved = [slot for slot in slots if slot.get("status") == "pending"]
+        if len(filled) != 1 or unresolved or not any(slot.get("status") == "bye" for slot in slots):
+            continue
+        winner = filled[0]
+        now = _now_utc().isoformat()
+        doc["results"] = [{
+            "registration_id": winner.get("registration_id"),
+            "user_id": winner.get("user_id"),
+            "slot": winner.get("slot"),
+            "rank": 1,
+            "score": None,
+            "points": None,
+            "time_ms": None,
+            "dnf": False,
+            "forfeit": False,
+            "note": "Auto-Advance durch Bye",
+            "reported_by": "system",
+            "reported_at": now,
+        }]
+        doc["status"] = "completed"
+        doc["result_meta"] = {"source": "auto_bye", "updated_at": now}
+        doc["updated_at"] = now
+        for advancement in doc.get("advancement") or []:
+            if advancement.get("rank") != 1:
+                continue
+            target = by_id.get(advancement.get("to_match_id"))
+            if not target:
+                continue
+            target_slot = next(
+                (slot for slot in (target.get("slots") or []) if slot.get("slot") == advancement.get("to_slot")),
+                None,
+            )
+            if not target_slot:
+                continue
+            target_slot["registration_id"] = winner.get("registration_id")
+            target_slot["user_id"] = winner.get("user_id")
+            target_slot["status"] = "filled"
+            target["status"] = _ready_status_for_slots(target.get("slots") or [], int((target.get("settings") or {}).get("min_players") or 2))
+            target["updated_at"] = now
+
+
+def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: list[dict], preview: bool = False) -> list[dict]:
+    settings = stage.get("settings") or {}
+    schema = _resolve_schema(tournament, stage, registrations, preview)
     specs = parse_custom_bracket_schema(schema)
     rounds = infer_rounds(specs)
     ordered_regs = _ordered_registrations(registrations, tournament.get("seeding_mode") or "random")
@@ -258,11 +372,13 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
                 "qualifiers_per_match": qualifiers_per_match,
                 "score_type": settings.get("score_type") or "points",
                 "calculation": settings.get("calculation") or "points",
+                "duration_minutes": int(settings.get("duration_minutes") or tournament.get("match_duration_minutes") or 30),
             },
             "status": "preview" if preview else ("ready" if not has_ref and filled_count >= min_players else "pending"),
             "is_preview": bool(preview),
             "generation_mode": "preview" if preview else "seeded",
             "scheduled_at": None,
+            "duration_minutes": int(settings.get("duration_minutes") or tournament.get("match_duration_minutes") or 30),
             "station_id": None,
             "created_at": now,
             "updated_at": now,
@@ -285,5 +401,8 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
                 "to_match_id": doc["id"],
                 "to_slot": slot["slot"],
             })
+
+    if not preview:
+        _apply_auto_byes(docs)
 
     return sorted(docs, key=lambda m: (m["round"], m["order"]))

@@ -2,13 +2,16 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from datetime import datetime, timezone
+import math
 from database import get_db
 from auth import get_current_user, require_admin, get_optional_user
 from services.visibility import user_can_see
 from services.public_phase import derive_public_phase
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
+    PARTICIPANT_STAFF_ROLES,
     READ_STAFF_ROLES,
+    STRUCTURE_STAFF_ROLES,
     assigned_tournament_ids,
     has_tournament_staff_permission,
     require_tournament_staff_permission,
@@ -16,6 +19,7 @@ from services.tournament_permissions import (
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from models import (
     TournamentCreate, TournamentUpdate, RegistrationCreate, RegistrationUpdate,
+    RegistrationAdminCreate,
     TournamentStaffAssignmentCreate, TournamentStaffAssignmentUpdate,
     TournamentStageCreate, TournamentStageUpdate,
     now_utc, new_id,
@@ -28,6 +32,29 @@ from bracket_extensions import (
 router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 REGISTRATION_CHECKIN_STATUSES = {"approved", "checked_in", "no_show"}
+
+
+def _next_power_of_two(n: int) -> int:
+    return 1 if n <= 1 else 2 ** math.ceil(math.log2(n))
+
+
+def _preview_seed_reg(seed: int, tid: str) -> dict:
+    return {
+        "id": f"preview-seed-{seed}",
+        "tournament_id": tid,
+        "user_id": None,
+        "team_id": None,
+        "status": "preview",
+        "display_name": f"Seed {seed}",
+        "ingame_name": f"Seed {seed}",
+        "seed": seed,
+        "is_preview": True,
+    }
+
+
+def _preview_registrations_for_tournament(t: dict) -> list[dict]:
+    count = _next_power_of_two(max(2, int(t.get("max_participants") or 2)))
+    return [_preview_seed_reg(seed, t["id"]) for seed in range(1, count + 1)]
 
 
 def _iso(dt):
@@ -126,6 +153,123 @@ async def _audit_tournament_action(db, action: str, actor_id: str | None,
         "data": data or {},
         "created_at": now_utc().isoformat(),
     })
+
+
+async def _generate_legacy_bracket_docs(db, tournament: dict, actor_id: str | None,
+                                        preview: bool = False, force: bool = False,
+                                        set_live: bool = False) -> dict:
+    tid = tournament["id"]
+    existing_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    can_replace_preview = bool(existing_matches) and all(m.get("is_preview") for m in existing_matches)
+    if existing_matches and not force and not can_replace_preview:
+        raise HTTPException(status_code=409, detail="Bracket hat bereits Matches. Mit force=true neu generieren.")
+
+    if preview:
+        registrations = _preview_registrations_for_tournament(tournament)
+    else:
+        registrations = await db.tournament_registrations.find(
+            {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+            {"_id": 0},
+        ).to_list(5000)
+        if len(registrations) < 2:
+            raise HTTPException(status_code=400, detail="Mindestens 2 Teilnehmer benötigt")
+
+    matches = generate_bracket(tournament, registrations, preview=preview)
+    if not matches:
+        raise HTTPException(status_code=400, detail="Für dieses Format ist kein automatischer Bracket-Generator aktiv.")
+
+    if existing_matches:
+        await db.matches.delete_many({"tournament_id": tid})
+    await db.matches.insert_many(matches)
+    if set_live and not preview:
+        await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live", "updated_at": now_utc().isoformat()}})
+    await _audit_tournament_action(
+        db,
+        "tournament.bracket.generate",
+        actor_id,
+        tid,
+        {
+            "match_count": len(matches),
+            "format": tournament.get("format"),
+            "participant_count": len(registrations),
+            "preview": preview,
+            "force": force,
+        },
+    )
+    return {"ok": True, "match_count": len(matches), "preview": preview}
+
+
+async def _replace_registration_in_open_matches(db, tid: str, old_reg_id: str, new_reg: dict,
+                                                actor_id: str | None) -> dict:
+    new_reg_id = new_reg["id"]
+    legacy_matches = await db.matches.find({
+        "tournament_id": tid,
+        "$or": [{"participant_a_id": old_reg_id}, {"participant_b_id": old_reg_id}],
+    }, {"_id": 0}).to_list(1000)
+    v2_matches = await db.matches_v2.find({
+        "tournament_id": tid,
+        "slots.registration_id": old_reg_id,
+    }, {"_id": 0}).to_list(1000)
+    blocked = [
+        m.get("id") for m in [*legacy_matches, *v2_matches]
+        if m.get("status") in {"completed", "forfeit"}
+    ]
+    if blocked:
+        raise HTTPException(
+            status_code=409,
+            detail="Teilnehmer kommt bereits in abgeschlossenen Matches vor. Erst Bracket korrigieren oder neu generieren.",
+        )
+
+    now = now_utc().isoformat()
+    legacy_count = 0
+    for match in legacy_matches:
+        update = {"updated_at": now}
+        if match.get("participant_a_id") == old_reg_id:
+            update["participant_a_id"] = new_reg_id
+        if match.get("participant_b_id") == old_reg_id:
+            update["participant_b_id"] = new_reg_id
+        if match.get("winner_id") == old_reg_id:
+            update["winner_id"] = None
+        if match.get("loser_id") == old_reg_id:
+            update["loser_id"] = None
+        next_a = update.get("participant_a_id", match.get("participant_a_id"))
+        next_b = update.get("participant_b_id", match.get("participant_b_id"))
+        if next_a and next_b and match.get("status") in {"pending", "preview"}:
+            update["status"] = "ready"
+        await db.matches.update_one({"id": match["id"]}, {"$set": update})
+        legacy_count += 1
+
+    v2_count = 0
+    for match in v2_matches:
+        slots = []
+        changed = False
+        for slot in match.get("slots") or []:
+            slot = dict(slot)
+            if slot.get("registration_id") == old_reg_id:
+                slot["registration_id"] = new_reg_id
+                slot["user_id"] = new_reg.get("user_id")
+                slot["status"] = "filled"
+                changed = True
+            slots.append(slot)
+        if not changed:
+            continue
+        filled = sum(1 for slot in slots if slot.get("status") == "filled" and slot.get("registration_id"))
+        min_players = int((match.get("settings") or {}).get("min_players") or 2)
+        status = "ready" if filled >= min_players and match.get("status") in {"pending", "preview"} else match.get("status")
+        await db.matches_v2.update_one(
+            {"id": match["id"]},
+            {"$set": {"slots": slots, "status": status, "updated_at": now}},
+        )
+        v2_count += 1
+
+    await _audit_tournament_action(
+        db,
+        "tournament.registration.replace_slots",
+        actor_id,
+        tid,
+        {"old_registration_id": old_reg_id, "new_registration_id": new_reg_id, "legacy_matches": legacy_count, "v2_matches": v2_count},
+    )
+    return {"legacy_matches": legacy_count, "v2_matches": v2_count}
 
 
 async def _apply_late_checkin_hooks(db, tid: str, user_id: str) -> None:
@@ -359,6 +503,26 @@ async def list_registrations(tid: str, user=Depends(get_optional_user)):
     return regs
 
 
+@router.get("/{tid}/assignable-users")
+async def list_assignable_tournament_users(tid: str, q: str | None = None, limit: int = 200,
+                                           me: dict = Depends(get_current_user)):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
+    query = {"is_banned": {"$ne": True}}
+    if q:
+        query["$or"] = [
+            {"username": {"$regex": q, "$options": "i"}},
+            {"display_name": {"$regex": q, "$options": "i"}},
+            {"email": {"$regex": q, "$options": "i"}},
+        ]
+    users = await db.users.find(
+        query,
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1, "avatar_url": 1, "role": 1},
+    ).sort("display_name", 1).to_list(max(1, min(int(limit or 200), 500)))
+    return users
+
+
 @router.post("/{tid}/register")
 async def register_for_tournament(tid: str, body: RegistrationCreate,
                                    me: dict = Depends(get_current_user)):
@@ -419,16 +583,110 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
     return reg
 
 
+@router.post("/{tid}/registrations")
+async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
+                                    me: dict = Depends(get_current_user)):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+
+    payload = body.model_dump()
+    user = None
+    if payload.get("user_id"):
+        user = await db.users.find_one({"id": payload["user_id"]}, {"_id": 0, "password_hash": 0})
+        if not user:
+            raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+        existing = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": payload["user_id"]}, {"id": 1})
+        if existing:
+            raise HTTPException(status_code=409, detail="Dieser Nutzer ist bereits angemeldet")
+
+    display_name = (
+        (payload.get("display_name") or "").strip()
+        or (payload.get("ingame_name") or "").strip()
+        or ((user or {}).get("display_name") or (user or {}).get("username") or "").strip()
+    )
+    if not display_name:
+        raise HTTPException(status_code=400, detail="Display-Name oder Account ist erforderlich")
+    old_reg_id = payload.get("replace_registration_id")
+    old = None
+    if old_reg_id:
+        old = await db.tournament_registrations.find_one({"id": old_reg_id, "tournament_id": tid}, {"_id": 0})
+        if not old:
+            raise HTTPException(status_code=404, detail="Zu ersetzende Anmeldung nicht gefunden")
+        legacy_blocked = await db.matches.count_documents({
+            "tournament_id": tid,
+            "status": {"$in": ["completed", "forfeit"]},
+            "$or": [{"participant_a_id": old_reg_id}, {"participant_b_id": old_reg_id}],
+        })
+        v2_blocked = await db.matches_v2.count_documents({
+            "tournament_id": tid,
+            "status": {"$in": ["completed", "forfeit"]},
+            "slots.registration_id": old_reg_id,
+        })
+        if legacy_blocked or v2_blocked:
+            raise HTTPException(
+                status_code=409,
+                detail="Teilnehmer kommt bereits in abgeschlossenen Matches vor. Erst Bracket korrigieren oder neu generieren.",
+            )
+
+    reg = {
+        "id": new_id(),
+        "tournament_id": tid,
+        "user_id": (user or {}).get("id"),
+        "team_id": payload.get("team_id"),
+        "status": payload.get("status") or "approved",
+        "ingame_name": (payload.get("ingame_name") or display_name).strip(),
+        "discord": payload.get("discord") or (user or {}).get("discord_name"),
+        "platform_id": payload.get("platform_id"),
+        "player_ids": payload.get("player_ids") or {},
+        "notes": payload.get("notes"),
+        "accepted_rules": True,
+        "accepted_privacy": True,
+        "seed": payload.get("seed"),
+        "display_name": display_name,
+        "source": "staff_add",
+        "is_guest": not bool(user),
+        "created_by": me.get("id"),
+        "created_at": now_utc().isoformat(),
+        "updated_at": now_utc().isoformat(),
+    }
+    await db.tournament_registrations.insert_one(reg)
+
+    replacement = None
+    if old_reg_id:
+        await db.tournament_registrations.update_one(
+            {"id": old_reg_id},
+            {"$set": {"status": "no_show", "updated_at": now_utc().isoformat()}},
+        )
+        replacement = await _replace_registration_in_open_matches(db, tid, old_reg_id, reg, me.get("id"))
+
+    await _audit_tournament_action(
+        db,
+        "tournament.registration.staff_add",
+        me.get("id"),
+        tid,
+        {"registration_id": reg["id"], "user_id": reg.get("user_id"), "is_guest": reg["is_guest"], "replace_registration_id": old_reg_id},
+    )
+    reg.pop("_id", None)
+    return {"registration": reg, "replacement": replacement}
+
+
 @router.put("/{tid}/registrations/{reg_id}")
 @router.patch("/{tid}/registrations/{reg_id}")
 async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
-                               me: dict = Depends(require_admin())):
+                               me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     updates["updated_at"] = now_utc().isoformat()
-    await db.tournament_registrations.update_one({"id": reg_id}, {"$set": updates})
-    reg = await db.tournament_registrations.find_one({"id": reg_id}, {"_id": 0})
+    await db.tournament_registrations.update_one({"id": reg_id, "tournament_id": tid}, {"$set": updates})
+    reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
+    if not reg:
+        raise HTTPException(status_code=404, detail="Anmeldung nicht gefunden")
     return reg
 
 
@@ -474,10 +732,11 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
 @router.delete("/{tid}/registrations/{reg_id}")
 async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
-    reg = await db.tournament_registrations.find_one({"id": reg_id})
+    tid = await _resolve_tid(tid)
+    reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid})
     if not reg:
         raise HTTPException(status_code=404)
-    if reg["user_id"] != me["id"] and me["role"] not in ("moderator", "tournament_admin", "club_admin", "superadmin"):
+    if reg.get("user_id") != me["id"] and not await has_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES):
         raise HTTPException(status_code=403)
     await db.tournament_registrations.delete_one({"id": reg_id})
     return {"ok": True}
@@ -624,9 +883,10 @@ async def list_tournament_stages(tid: str, user=Depends(get_optional_user)):
 
 @router.post("/{tid}/stages")
 async def create_tournament_stage(tid: str, body: TournamentStageCreate,
-                                  me: dict = Depends(require_admin())):
+                                  me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     doc = body.model_dump()
     if doc.get("number") is None:
         last = await db.tournament_stages.find(
@@ -660,9 +920,10 @@ async def create_tournament_stage(tid: str, body: TournamentStageCreate,
 @router.patch("/{tid}/stages/{stage_id}")
 @router.put("/{tid}/stages/{stage_id}")
 async def update_tournament_stage(tid: str, stage_id: str, body: TournamentStageUpdate,
-                                  me: dict = Depends(require_admin())):
+                                  me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     current = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not current:
         raise HTTPException(status_code=404, detail="Stage nicht gefunden")
@@ -688,9 +949,10 @@ async def update_tournament_stage(tid: str, stage_id: str, body: TournamentStage
 
 
 @router.delete("/{tid}/stages/{stage_id}")
-async def delete_tournament_stage(tid: str, stage_id: str, me: dict = Depends(require_admin())):
+async def delete_tournament_stage(tid: str, stage_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not stage:
         raise HTTPException(status_code=404, detail="Stage nicht gefunden")
@@ -725,9 +987,10 @@ async def list_tournament_matches_v2(tid: str, stage_id: str | None = None,
 @router.post("/{tid}/stages/{stage_id}/generate")
 async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool = False,
                                             preview: bool = False,
-                                            me: dict = Depends(require_admin())):
+                                            me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
@@ -808,38 +1071,22 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
 
 # --- Bracket generation ---
 @router.post("/{tid}/generate-bracket")
-async def generate(tid: str, me: dict = Depends(require_admin())):
+async def generate(tid: str, preview: bool = False, force: bool = False,
+                   me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    t = await db.tournaments.find_one({"id": tid})
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    regs = await db.tournament_registrations.find(
-        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
-        {"_id": 0},
-    ).to_list(500)
-    if len(regs) < 2:
-        raise HTTPException(status_code=400, detail="Mindestens 2 Teilnehmer benötigt")
-    # Clear existing matches
-    await db.matches.delete_many({"tournament_id": tid})
-    matches = generate_bracket(t, regs)
-    if matches:
-        await db.matches.insert_many(matches)
-    await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live", "updated_at": now_utc().isoformat()}})
-    await _audit_tournament_action(
-        db,
-        "tournament.bracket.generate",
-        me.get("id"),
-        tid,
-        {"match_count": len(matches), "format": t.get("format"), "participant_count": len(regs)},
-    )
-    return {"ok": True, "match_count": len(matches)}
+    return await _generate_legacy_bracket_docs(db, t, me.get("id"), preview=preview, force=force, set_live=not preview)
 
 
 @router.post("/{tid}/reset-bracket")
-async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(require_admin())):
+async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
@@ -876,6 +1123,25 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
     prev = t.get("status")
     await db.tournaments.update_one({"id": tid}, {"$set": {"status": status, "updated_at": now_utc().isoformat()}})
+    auto_generated_bracket = None
+    if status == "live":
+        try:
+            stage_count = await db.tournament_stages.count_documents({"tournament_id": tid})
+            v2_count = await db.matches_v2.count_documents({"tournament_id": tid})
+            legacy_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+            can_auto_replace = bool(legacy_matches) and all(m.get("is_preview") for m in legacy_matches)
+            if stage_count == 0 and v2_count == 0 and (not legacy_matches or can_auto_replace):
+                fresh_t = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or t
+                auto_generated_bracket = await _generate_legacy_bracket_docs(
+                    db,
+                    fresh_t,
+                    me.get("id"),
+                    preview=False,
+                    force=can_auto_replace,
+                    set_live=False,
+                )
+        except HTTPException:
+            auto_generated_bracket = None
 
     # ---------- Season Points + Badges on results_published ----------
     if prev != status and status == "results_published":
@@ -960,7 +1226,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
             )
         except Exception:
             pass
-    return {"ok": True}
+    return {"ok": True, "auto_generated_bracket": auto_generated_bracket}
 
 
 @router.get("/{tid}/bracket")
@@ -975,6 +1241,16 @@ async def get_bracket(tid: str, user=Depends(get_optional_user)):
     matches_v2 = await db.matches_v2.find({"tournament_id": t["id"]}, {"_id": 0}).sort([("stage_number", 1), ("round", 1), ("order", 1)]).to_list(3000)
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     regs = [_public_registration(r, user, is_staff) for r in regs]
+    known_reg_ids = {r.get("id") for r in regs}
+    preview_ids = sorted({
+        pid
+        for match in matches
+        for pid in (match.get("participant_a_id"), match.get("participant_b_id"))
+        if isinstance(pid, str) and pid.startswith("preview-seed-") and pid not in known_reg_ids
+    }, key=lambda value: int(value.rsplit("-", 1)[-1]) if value.rsplit("-", 1)[-1].isdigit() else 999999)
+    for pid in preview_ids:
+        seed = int(pid.rsplit("-", 1)[-1]) if pid.rsplit("-", 1)[-1].isdigit() else len(regs) + 1
+        regs.append(_preview_seed_reg(seed, t["id"]))
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0}).to_list(500)}
