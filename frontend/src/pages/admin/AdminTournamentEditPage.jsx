@@ -44,6 +44,30 @@ const TEAM_MODE_OPTIONS = [["solo", "Solo"], ["duo", "Duo"], ["team", "Team"], [
 const SEEDING_OPTIONS = [["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]];
 const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
 const STREAM_PLATFORM_OPTIONS = [["", "—"], ["twitch", "Twitch"], ["youtube", "YouTube"], ["kick", "Kick"], ["custom", "Custom"]];
+const STAGE_MATCH_TYPES = [["duel", "Duel"], ["ffa", "FFA"]];
+const STAGE_TYPES = [
+  ["single_elimination", "Single Elimination"],
+  ["double_elimination", "Double Elimination"],
+  ["custom_bracket", "Custom Bracket"],
+  ["round_robin_groups", "Round-robin Gruppen"],
+  ["swiss", "Swiss"],
+  ["league", "Liga"],
+  ["simple", "Simple"],
+  ["ffa_single_elimination", "FFA Single Elim"],
+  ["ffa_custom_bracket", "FFA Custom Bracket"],
+  ["ffa_league", "FFA Liga"],
+];
+const DEFAULT_FFA_SCHEMA = `[WB]
+# Round 1
+A=[1,2,3,4]
+B=[5,6,7,8]
+
+# Round 2
+C=[W:A:1,W:A:2,W:B:1,W:B:2]
+
+[LB]
+# Round 1
+LA=[L:A:3,L:A:4,L:B:3,L:B:4]`;
 
 export default function AdminTournamentEditPage() {
   const { isAdmin, isModerator } = useAuth();
@@ -55,6 +79,8 @@ export default function AdminTournamentEditPage() {
   const [groups, setGroups] = useState([]);
   const [staff, setStaff] = useState([]);
   const [users, setUsers] = useState([]);
+  const [stages, setStages] = useState([]);
+  const [matchesV2, setMatchesV2] = useState([]);
   const confirm = useConfirm();
   const prompt = usePrompt();
 
@@ -65,6 +91,17 @@ export default function AdminTournamentEditPage() {
     setRegs(r);
     const { data: b } = await api.get(`/tournaments/${id}/bracket`);
     setBracket(b);
+    try {
+      const [{ data: st }, { data: mv2 }] = await Promise.all([
+        api.get(`/tournaments/${id}/stages`),
+        api.get(`/tournaments/${id}/matches-v2`),
+      ]);
+      setStages(st || []);
+      setMatchesV2(mv2 || []);
+    } catch {
+      setStages([]);
+      setMatchesV2([]);
+    }
     if (data.format === "groups") {
       try { const { data: g } = await api.get(`/tournaments/${id}/groups`); setGroups(g || []); }
       catch { setGroups([]); }
@@ -159,6 +196,29 @@ export default function AdminTournamentEditPage() {
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
+  const updateMatchV2Result = async (match, results, meta = {}) => {
+    try {
+      const suffix = meta.force ? "?force=true" : "";
+      await api.post(`/matches-v2/${match.id}/result${suffix}`, {
+        results,
+        proof_url: meta.proof_url || null,
+        note: meta.note || null,
+      });
+      toast.success("v2-Ergebnis gespeichert.");
+      load();
+    } catch (e) {
+      if (e.response?.status === 409 && !meta.force) {
+        const force = await confirm({
+          title: "Folgeslots überschreiben?",
+          description: "Dieses Ergebnis würde bereits gefüllte Folgematches ändern.",
+          confirmLabel: "Mit force speichern",
+          tone: "danger",
+        });
+        if (force) return updateMatchV2Result(match, results, { ...meta, force: true });
+      }
+      toast.error(formatRequestError(e, "v2-Ergebnis konnte nicht gespeichert werden."));
+    }
+  };
   const generateGroups = async () => {
     const gc = await prompt({
       title: "Gruppen generieren",
@@ -229,14 +289,14 @@ export default function AdminTournamentEditPage() {
       </div>
 
       <div className="flex gap-2 mb-5 border-b border-white/10 overflow-x-auto">
-        {["participants", "bracket", "matches", ...(t.format === "groups" ? ["groups"] : []), ...(isAdmin ? ["staff"] : []), "edit"].map((s) => (
+        {["participants", "bracket", "matches", "stages", ...(t.format === "groups" ? ["groups"] : []), ...(isAdmin ? ["staff"] : []), "edit"].map((s) => (
           <button
             key={s}
             data-testid={`admin-tr-tab-${s}`}
             onClick={() => setTab(s)}
             className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${tab === s ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}
           >
-            {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Bracket" : s === "matches" ? "Matches" : s === "groups" ? "Gruppen" : s === "staff" ? "Team" : "Bearbeiten"}
+            {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Bracket" : s === "matches" ? "Matches" : s === "stages" ? "Stages v2" : s === "groups" ? "Gruppen" : s === "staff" ? "Team" : "Bearbeiten"}
           </button>
         ))}
       </div>
@@ -339,6 +399,18 @@ export default function AdminTournamentEditPage() {
           </div>
         </div>
       )}
+      {tab === "stages" && (
+        <TournamentStagesPanel
+          tournamentId={t.id}
+          stages={stages}
+          matches={matchesV2}
+          registrations={regs}
+          isAdmin={isAdmin}
+          isModerator={isModerator}
+          onChanged={load}
+          onSaveResult={updateMatchV2Result}
+        />
+      )}
       {tab === "edit" && (
         <TournamentEditForm key={t.updated_at || t.id} tournament={t} onSaved={load} />
       )}
@@ -363,6 +435,324 @@ export default function AdminTournamentEditPage() {
         </div>
       )}
     </AdminLayout>
+  );
+}
+
+function TournamentStagesPanel({ tournamentId, stages, matches, registrations, isAdmin, isModerator, onChanged, onSaveResult }) {
+  const [createOpen, setCreateOpen] = useState(stages.length === 0);
+  const [form, setForm] = useState({
+    name: "Stage 1",
+    match_type: "ffa",
+    stage_type: "ffa_custom_bracket",
+    match_size: 4,
+    min_players: 2,
+    qualifiers_per_match: 2,
+    schema: DEFAULT_FFA_SCHEMA,
+  });
+  const confirm = useConfirm();
+  const regById = Object.fromEntries((registrations || []).map((r) => [r.id, r]));
+  const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
+  const createStage = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post(`/tournaments/${tournamentId}/stages`, {
+        name: form.name || "Stage",
+        match_type: form.match_type,
+        stage_type: form.stage_type,
+        settings: {
+          match_size: Number(form.match_size) || 4,
+          min_players: Number(form.min_players) || 2,
+          qualifiers_per_match: Number(form.qualifiers_per_match) || 1,
+          schema: form.schema || "",
+          score_type: "points",
+          calculation: "points",
+        },
+      });
+      toast.success("Stage angelegt.");
+      setCreateOpen(false);
+      onChanged();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Stage konnte nicht angelegt werden."));
+    }
+  };
+  const removeStage = async (stage) => {
+    if (!await confirm({
+      title: "Stage löschen?",
+      description: "Alle v2-Matches und Reports dieser Stage werden gelöscht.",
+      confirmLabel: "Löschen",
+      tone: "danger",
+    })) return;
+    try {
+      await api.delete(`/tournaments/${tournamentId}/stages/${stage.id}`);
+      toast.success("Stage gelöscht.");
+      onChanged();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Stage konnte nicht gelöscht werden."));
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      {isAdmin && (
+        <div className="border border-white/10 bg-[#121212] rounded-sm">
+          <button type="button" onClick={() => setCreateOpen((v) => !v)} className="w-full flex items-center justify-between px-5 py-4 text-left">
+            <span className="font-heading font-bold uppercase">Stage anlegen</span>
+            <span className="text-[#29B6E8] text-xl leading-none">{createOpen ? "−" : "+"}</span>
+          </button>
+          {createOpen && (
+            <form onSubmit={createStage} className="border-t border-white/10 p-5 grid md:grid-cols-3 gap-3">
+              <Fld label="Name" value={form.name} onChange={(v)=>set("name", v)} testId="stage-new-name" />
+              <SelectField label="Match-Typ" value={form.match_type} onChange={(v)=>set("match_type", v)} options={STAGE_MATCH_TYPES} />
+              <SelectField label="Stage-Typ" value={form.stage_type} onChange={(v)=>set("stage_type", v)} options={STAGE_TYPES} />
+              <Fld label="Matchgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />
+              <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId="stage-new-min" />
+              <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId="stage-new-qualifiers" />
+              <label className="md:col-span-3 block">
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
+                <textarea value={form.schema} onChange={(e)=>set("schema", e.target.value)} rows={8} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" data-testid="stage-new-schema" />
+              </label>
+              <div className="md:col-span-3">
+                <button className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm">Stage speichern</button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {stages.map((stage) => (
+          <StageCard
+            key={stage.id}
+            tournamentId={tournamentId}
+            stage={stage}
+            matches={matches.filter((m) => m.stage_id === stage.id)}
+            regById={regById}
+            isAdmin={isAdmin}
+            isModerator={isModerator}
+            onChanged={onChanged}
+            onDelete={() => removeStage(stage)}
+            onSaveResult={onSaveResult}
+          />
+        ))}
+        {stages.length === 0 && (
+          <div className="border border-white/10 bg-[#121212] rounded-sm p-10 text-center text-white/40">
+            Noch keine v2-Stages.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator, onChanged, onDelete, onSaveResult }) {
+  const settings = stage.settings || {};
+  const [form, setForm] = useState({
+    name: stage.name || "",
+    match_type: stage.match_type || "ffa",
+    stage_type: stage.stage_type || "ffa_custom_bracket",
+    status: stage.status || "pending",
+    match_size: settings.match_size || 4,
+    min_players: settings.min_players || 2,
+    qualifiers_per_match: settings.qualifiers_per_match || 2,
+    schema: settings.schema || "",
+  });
+  const confirm = useConfirm();
+  const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
+  const save = async () => {
+    try {
+      await api.patch(`/tournaments/${tournamentId}/stages/${stage.id}`, {
+        name: form.name || "Stage",
+        match_type: form.match_type,
+        stage_type: form.stage_type,
+        status: form.status,
+        settings: {
+          ...settings,
+          match_size: Number(form.match_size) || 4,
+          min_players: Number(form.min_players) || 2,
+          qualifiers_per_match: Number(form.qualifiers_per_match) || 1,
+          schema: form.schema || "",
+          score_type: settings.score_type || "points",
+          calculation: settings.calculation || "points",
+        },
+      });
+      toast.success("Stage gespeichert.");
+      onChanged();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Stage konnte nicht gespeichert werden."));
+    }
+  };
+  const generate = async (force = false) => {
+    try {
+      const suffix = force ? "?force=true" : "";
+      const { data } = await api.post(`/tournaments/${tournamentId}/stages/${stage.id}/generate${suffix}`);
+      toast.success(`${data.match_count} v2-Matches generiert.`);
+      onChanged();
+    } catch (err) {
+      if (err.response?.status === 409 && !force) {
+        const ok = await confirm({
+          title: "Stage neu generieren?",
+          description: "Vorhandene v2-Matches und Reports dieser Stage werden ersetzt.",
+          confirmLabel: "Neu generieren",
+          tone: "danger",
+        });
+        if (ok) return generate(true);
+      }
+      toast.error(formatRequestError(err, "Stage konnte nicht generiert werden."));
+    }
+  };
+  const statusCounts = matches.reduce((acc, m) => {
+    acc[m.status || "pending"] = (acc[m.status || "pending"] || 0) + 1;
+    return acc;
+  }, {});
+
+  return (
+    <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
+      <div className="p-5 border-b border-white/10 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">Stage #{stage.number || "—"}</div>
+          <h2 className="font-heading text-xl font-bold uppercase mt-1">{stage.name}</h2>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs text-white/50">
+            <span>{stage.match_type}</span>
+            <span>·</span>
+            <span>{stage.stage_type}</span>
+            <span>·</span>
+            <span>{matches.length} Matches</span>
+            {Object.entries(statusCounts).map(([status, count]) => <span key={status}>· {count} {status}</span>)}
+          </div>
+        </div>
+        {isAdmin && (
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => generate(false)} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm uppercase tracking-wider text-xs font-bold">Generate</button>
+            <button type="button" onClick={save} className="px-3 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-xs font-bold">Speichern</button>
+            <button type="button" onClick={onDelete} className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm uppercase tracking-wider text-xs font-bold">Löschen</button>
+          </div>
+        )}
+      </div>
+      <div className="grid lg:grid-cols-2 gap-5 p-5">
+        {isAdmin && (
+          <div className="space-y-3">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Fld label="Name" value={form.name} onChange={(v)=>set("name", v)} testId={`stage-name-${stage.id}`} />
+              <SelectField label="Status" value={form.status} onChange={(v)=>set("status", v)} options={[["pending", "Pending"], ["ready", "Ready"], ["running", "Running"], ["completed", "Completed"], ["archived", "Archived"]]} />
+              <SelectField label="Match-Typ" value={form.match_type} onChange={(v)=>set("match_type", v)} options={STAGE_MATCH_TYPES} />
+              <SelectField label="Stage-Typ" value={form.stage_type} onChange={(v)=>set("stage_type", v)} options={STAGE_TYPES} />
+              <Fld label="Matchgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId={`stage-size-${stage.id}`} />
+              <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId={`stage-qualifiers-${stage.id}`} />
+            </div>
+            <label className="block">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
+              <textarea value={form.schema} onChange={(e)=>set("schema", e.target.value)} rows={12} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" data-testid={`stage-schema-${stage.id}`} />
+            </label>
+          </div>
+        )}
+        <div className="space-y-3">
+          {matches.map((match) => (
+            <MatchV2Card
+              key={match.id}
+              match={match}
+              regById={regById}
+              canEdit={isModerator}
+              onSaveResult={onSaveResult}
+            />
+          ))}
+          {matches.length === 0 && (
+            <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-8 text-center text-white/40">
+              Keine v2-Matches generiert.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MatchV2Card({ match, regById, canEdit, onSaveResult }) {
+  const filledSlots = (match.slots || []).filter((slot) => slot.status === "filled" && slot.registration_id);
+  const labelFor = (registrationId) => {
+    const reg = regById[registrationId];
+    return reg?.display_name || reg?.ingame_name || reg?.user?.display_name || registrationId || "TBD";
+  };
+  return (
+    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-white/40">{match.section} · {match.round_name}</div>
+          <div className="font-heading font-bold uppercase">{match.match_key}</div>
+        </div>
+        <StatusBadge status={match.status || "pending"} />
+      </div>
+      <div className="mt-3 grid sm:grid-cols-2 gap-2">
+        {(match.slots || []).map((slot) => (
+          <div key={slot.slot} className={`px-3 py-2 rounded-sm border text-sm ${slot.status === "filled" ? "border-[#29B6E8]/30 bg-[#29B6E8]/5" : "border-white/10 bg-[#121212]"}`}>
+            <span className="text-white/40 mr-2">#{slot.slot}</span>{slot.registration_id ? labelFor(slot.registration_id) : slot.source?.raw || "TBD"}
+          </div>
+        ))}
+      </div>
+      {match.results?.length > 0 && (
+        <div className="mt-3 grid sm:grid-cols-2 gap-2 text-xs">
+          {match.results.map((result) => (
+            <div key={result.registration_id} className="flex items-center justify-between bg-[#121212] border border-white/10 px-3 py-2 rounded-sm">
+              <span>{result.rank}. {labelFor(result.registration_id)}</span>
+              <span className="font-display text-white/70">{result.score ?? result.points ?? "—"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {canEdit && filledSlots.length > 0 && (
+        <MatchV2ResultControls match={match} filledSlots={filledSlots} labelFor={labelFor} onSaveResult={onSaveResult} />
+      )}
+    </div>
+  );
+}
+
+function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
+  const initialRows = () => {
+    const existing = (match.results || []).length
+      ? [...match.results].sort((a, b) => (a.rank || 0) - (b.rank || 0))
+      : filledSlots.map((slot, index) => ({ registration_id: slot.registration_id, rank: index + 1, score: "", dnf: false, forfeit: false, note: "" }));
+    const byReg = Object.fromEntries(existing.map((row) => [row.registration_id, row]));
+    return filledSlots.map((slot, index) => ({
+      registration_id: slot.registration_id,
+      rank: byReg[slot.registration_id]?.rank || index + 1,
+      score: byReg[slot.registration_id]?.score ?? byReg[slot.registration_id]?.points ?? "",
+      dnf: !!byReg[slot.registration_id]?.dnf,
+      forfeit: !!byReg[slot.registration_id]?.forfeit,
+      note: byReg[slot.registration_id]?.note || "",
+    }));
+  };
+  const [rows, setRows] = useState(initialRows);
+  const [note, setNote] = useState(match.result_meta?.note || "");
+  useEffect(() => {
+    setRows(initialRows());
+    setNote(match.result_meta?.note || "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [match.id, match.updated_at, filledSlots.length]);
+  const update = (registrationId, patch) => setRows((current) => current.map((row) => row.registration_id === registrationId ? { ...row, ...patch } : row));
+  const save = () => {
+    const results = rows.map((row) => ({
+      registration_id: row.registration_id,
+      rank: Number(row.rank) || 1,
+      score: row.score === "" ? null : Number(row.score),
+      dnf: !!row.dnf,
+      forfeit: !!row.forfeit,
+      note: row.note || null,
+    }));
+    onSaveResult(match, results, { note });
+  };
+  return (
+    <div className="mt-4 border-t border-white/10 pt-3 space-y-2">
+      {rows.map((row) => (
+        <div key={row.registration_id} className="grid grid-cols-12 gap-2 items-center">
+          <div className="col-span-5 text-xs truncate">{labelFor(row.registration_id)}</div>
+          <input type="number" min="1" value={row.rank} onChange={(e)=>update(row.registration_id, { rank: e.target.value })} className="col-span-2 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Rank" />
+          <input type="number" min="0" value={row.score} onChange={(e)=>update(row.registration_id, { score: e.target.value })} className="col-span-3 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Score" />
+          <label className="col-span-1 text-[10px] text-white/60"><input type="checkbox" checked={row.dnf} onChange={(e)=>update(row.registration_id, { dnf: e.target.checked })} className="accent-[#29B6E8]" /> DNF</label>
+          <label className="col-span-1 text-[10px] text-white/60"><input type="checkbox" checked={row.forfeit} onChange={(e)=>update(row.registration_id, { forfeit: e.target.checked })} className="accent-[#FF3B30]" /> FF</label>
+        </div>
+      ))}
+      <input value={note} onChange={(e)=>setNote(e.target.value)} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" placeholder="Notiz" />
+      <button type="button" onClick={save} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase">v2-Ergebnis speichern</button>
+    </div>
   );
 }
 

@@ -70,7 +70,7 @@ async def _visible_event_summary(event_id: str, user: dict | None, include_draft
     )
     if not event:
         return None
-    if event.get("status") == "draft" and not (include_draft and _is_staff(user)):
+    if event.get("status") == "draft" and not _is_staff(user):
         return None
     if not await user_can_see(user, event.get("visibility") or "public"):
         return None
@@ -83,7 +83,7 @@ async def _get_visible_challenge(slug_or_id: str, user: dict | None = None, incl
     c = await db.f1_challenges.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not c:
         raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
-    if c.get("status") == "draft" and not (include_draft and _is_staff(user)):
+    if c.get("status") == "draft" and not _is_staff(user):
         raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
     if not await user_can_see(user, c.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Challenge ist nicht sichtbar")

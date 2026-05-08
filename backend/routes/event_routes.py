@@ -25,10 +25,11 @@ async def _user_can_see(user: dict | None, visibility: str) -> bool:
 
 async def _filter_related(items: list[dict], user: dict | None, kind: str) -> list[dict]:
     out: list[dict] = []
+    is_staff = bool(user and user.get("role") in STAFF_ROLES)
     for item in items:
-        if item.get("status") == "draft":
+        if item.get("status") == "draft" and not is_staff:
             continue
-        if kind == "tournament" and item.get("is_public") is False:
+        if kind == "tournament" and item.get("is_public") is False and not is_staff:
             continue
         if await _user_can_see(user, item.get("visibility") or "public"):
             phase_kind = "f1" if kind == "fastlap" else kind
@@ -305,7 +306,7 @@ async def get_event(slug_or_id: str, include_draft: bool = False, user: dict | N
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
     is_admin = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
-    if event.get("status") == "draft" and not (include_draft and is_admin):
+    if event.get("status") == "draft" and not is_admin:
         raise HTTPException(404, "Event nicht gefunden.")
     if not await _user_can_see(user, event.get("visibility") or "public"):
         raise HTTPException(403, "Event ist nicht sichtbar.")

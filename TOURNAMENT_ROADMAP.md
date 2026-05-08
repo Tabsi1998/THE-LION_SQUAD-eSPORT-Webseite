@@ -82,10 +82,23 @@ Stand: 2026-05-08
 
 Naechster Schritt: Admin-UI fuer Stages und FFA-Ergebnislisten bauen, damit Custom-Schema, Generate und Platzierungsresultate bedienbar werden.
 
+### Step 7 erledigt: Admin-v2-Stage-UI und Draft-Preview
+
+- Entwuerfe bleiben in Public-Listen fuer Besucher unsichtbar.
+- Detailseiten fuer Turniere, Events und F1-Challenges geben Entwuerfe fuer Admins/Staff wieder frei, damit Public-Preview/Vorstellung moeglich ist.
+- Admin-Turnieransicht hat einen neuen Tab `Stages v2`.
+- Admins koennen v2-Stages anlegen, bearbeiten, loeschen und aus dem Custom-Schema generieren.
+- Stage-Konfiguration enthaelt Match-Typ, Stage-Typ, Matchgroesse, Qualifizierte und Schema.
+- v2-Matches werden pro Stage mit Slots, Status und vorhandenen Ergebnissen angezeigt.
+- Referees/Scorekeeper/Admins koennen FFA-/Multi-Slot-Platzierungen mit Rank, Score, DNF und Forfeit erfassen.
+- Bei Downstream-Konflikten fragt die UI bewusst nach `force=true`.
+
+Naechster Schritt: v2-Bracket-/Heat-Darstellung fuer Public/Admin und erste TV/Embed-Ansicht fuer FFA-Matches.
+
 ## Was wirklich noch fehlt
 
 - Neues Turniermodell: `tournament_stages`, `matches_v2`, Multi-Slot-Matches und Platzierungsresultate.
-- Echte FFA-Ergebnis-UI mit 3-8 Teilnehmern, Rangliste, Punkten, DNF/Forfeit und Proof.
+- Public/Admin-v2-Bracketdarstellung fuer FFA-Heats, WB/LB/GF und Match-Status.
 - Korrekte Double-Elimination-Flows fuer 1v1 und FFA inklusive Loser-Bracket-Transfers.
 - Operatives Turnierleitungs-Dashboard: Check-in, Warteliste, No-Show, Stationen, Next-up, offene Ergebnisse.
 - TV-/Embed-Ansichten fuer Bracket, Stationen und Live-Eventbetrieb.
@@ -93,7 +106,7 @@ Naechster Schritt: Admin-UI fuer Stages und FFA-Ergebnislisten bauen, damit Cust
 - Vollstaendige Downstream-Cascade/Undo fuer Ergebnis-Korrekturen, wenn Folge-Matches bereits gespielt wurden.
 - QR-/Vor-Ort-Check-in fuer Events und Turniere.
 - Feineres Rollenmodell fuer Event-Orga analog zu Turnier-Staff.
-- Admin-UI fuer Stage-Konfiguration, Schema-Eingabe, Validierungsfehler und Generate/Regenerate.
+- Preset-Bibliothek fuer Mario Kart, Smash, F1 und weitere Formate.
 
 ## Kurzfazit
 
@@ -111,7 +124,7 @@ Fuer Mario Kart mit 4 Spielern pro Heat braucht es deshalb nicht nur einen neuen
 - `backend/routes/match_v2_routes.py`: v2-Matches koennen gelesen und FFA-/Multi-Slot-Ergebnisse durch Staff gespeichert werden.
 - `backend/services/match_v2_results.py`: validiert Platzierungslisten und fuellt Advancement-Zielslots in Folgematches.
 - `frontend/src/components/tls/BracketTree.jsx`: Darstellung gruppiert nach `bracket` und `round`, rendert aber ebenfalls nur zwei Teilnehmer pro Match.
-- `frontend/src/pages/admin/AdminTournamentEditPage.jsx`: Admins/Moderatoren koennen Ergebnisse eintragen, aber nur A/B-Score + Gewinner.
+- `frontend/src/pages/admin/AdminTournamentEditPage.jsx`: Admins koennen v2-Stages konfigurieren/generieren; Staff kann FFA-Platzierungen erfassen. Die alte Matchliste bleibt A/B-orientiert.
 - `frontend/src/pages/admin/AdminStationsPage.jsx`: Stationen und Match-Zuweisung sind vorhanden, aber noch keine Turnierleitungs-Queue mit Check-in-Status, Next-up und Heat-Management.
 - `backend/services/match_reminder.py`: nutzt aktuelle Match-Felder plus Legacy-Fallbacks.
 - `backend/routes/event_routes.py`: Events haben jetzt interne Anmeldung, Kapazitaetszaehlung, Begleitpersonen und Admin-Statuspflege.

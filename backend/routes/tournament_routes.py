@@ -230,7 +230,7 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, user=Depe
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     is_admin = user and user.get("role") in STAFF_ROLES
     is_assigned = await _is_tournament_staff(t["id"], user)
-    if t.get("status") == "draft" and not (include_draft and (is_admin or is_assigned)):
+    if t.get("status") == "draft" and not (is_admin or is_assigned):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if not (is_admin or is_assigned) and t.get("is_public") is False:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
@@ -238,8 +238,11 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, user=Depe
         raise HTTPException(status_code=403, detail="Turnier ist nicht sichtbar")
     await _enrich_tournament(t, user)
     if t.get("event_id"):
+        related_f1_query = {"event_id": t["event_id"]}
+        if not is_admin:
+            related_f1_query["status"] = {"$ne": "draft"}
         t["related_f1_challenges"] = await db.f1_challenges.find(
-            {"event_id": t["event_id"], "status": {"$ne": "draft"}},
+            related_f1_query,
             {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "status": 1, "visibility": 1, "registration_enabled": 1, "online_registration_enabled": 1, "registration_open_from": 1, "registration_open_until": 1},
         ).to_list(50)
         if not is_admin:
