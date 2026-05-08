@@ -311,6 +311,8 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
 export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", endpoint = "/uploads/image", maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB, allowLibrary = false, mediaScope, libraryEndpoint }) {
   const fileRef = useRef(null);
   const cropBoxRef = useRef(null);
+  const previewCanvasRef = useRef(null);
+  const previewImageRef = useRef(null);
   const effectiveMediaScope = mediaScope || defaultMediaScope();
   const effectiveLibraryEndpoint = libraryEndpoint || defaultLibraryEndpoint();
   const [uploading, setUploading] = useState(false);
@@ -320,6 +322,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
   const [editor, setEditor] = useState(null);
   const [drag, setDrag] = useState(null);
   const [cropBox, setCropBox] = useState({ width: 0, height: 0 });
+  const [previewReady, setPreviewReady] = useState(false);
 
   useEffect(() => {
     if (!editor || !cropBoxRef.current) return undefined;
@@ -342,6 +345,8 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
       if (cur?.url) URL.revokeObjectURL(cur.url);
       return null;
     });
+    previewImageRef.current = null;
+    setPreviewReady(false);
     if (fileRef.current) fileRef.current.value = "";
   }, []);
 
@@ -429,15 +434,78 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
   const editorSource = editor?.naturalWidth && editor?.naturalHeight
     ? calculateCropSourceRect(editor.naturalWidth, editor.naturalHeight, editor)
     : null;
-  const editorImageStyle = editorSource && cropBox.width && cropBox.height
-    ? {
-        width: `${(editor.naturalWidth / editorSource.width) * cropBox.width}px`,
-        height: `${(editor.naturalHeight / editorSource.height) * cropBox.height}px`,
-        left: `${(-editorSource.x / editorSource.width) * cropBox.width}px`,
-        top: `${(-editorSource.y / editorSource.height) * cropBox.height}px`,
-        transform: `rotate(${editor.rotation}deg)`,
-      }
-    : {};
+  useEffect(() => {
+    if (!editor?.url) {
+      previewImageRef.current = null;
+      setPreviewReady(false);
+      return undefined;
+    }
+    let active = true;
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      if (!active) return;
+      previewImageRef.current = img;
+      setPreviewReady(true);
+    };
+    img.onerror = () => {
+      if (!active) return;
+      previewImageRef.current = null;
+      setPreviewReady(false);
+      toast.error("Bildvorschau konnte nicht geladen werden. Bitte anderes Bild probieren.");
+    };
+    setPreviewReady(false);
+    img.src = editor.url;
+    if (img.complete && (img.naturalWidth || img.width)) {
+      previewImageRef.current = img;
+      setPreviewReady(true);
+    }
+    return () => {
+      active = false;
+    };
+  }, [editor?.url]);
+
+  useEffect(() => {
+    const canvas = previewCanvasRef.current;
+    const img = previewImageRef.current;
+    if (!canvas || !img || !editorSource || !cropBox.width || !cropBox.height) return;
+    const width = Math.max(1, Math.round(cropBox.width));
+    const height = Math.max(1, Math.round(cropBox.height));
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = "#050505";
+    ctx.fillRect(0, 0, width, height);
+    ctx.save();
+    ctx.translate(width / 2, height / 2);
+    const rotation = normalizeRotation(editor.rotation || 0);
+    if (rotation) ctx.rotate((rotation * Math.PI) / 180);
+    const rotated = rotation === 90 || rotation === 270;
+    const sourceAspect = rotated ? editorSource.height / editorSource.width : editorSource.width / editorSource.height;
+    const boxAspect = width / height;
+    let destW = width;
+    let destH = height;
+    if (editor.cropMode === "original") {
+      if (boxAspect > sourceAspect) destW = destH * sourceAspect;
+      else destH = destW / sourceAspect;
+      if (rotated) [destW, destH] = [destH, destW];
+    } else if (rotated) {
+      [destW, destH] = [height, width];
+    }
+    drawImageRectWithPadding(ctx, img, editorSource, {
+      x: -destW / 2,
+      y: -destH / 2,
+      width: destW,
+      height: destH,
+    });
+    ctx.restore();
+  }, [editor, editorSource, cropBox, previewReady]);
   const previewClass = variant === "wide"
     ? "aspect-[16/9] w-full"
     : "w-20 h-20";
@@ -535,16 +603,12 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
               onPointerUp={() => setDrag(null)}
               onPointerCancel={() => setDrag(null)}
             >
-              <img
-                src={editor.url}
-                alt=""
-                draggable={false}
-                onLoad={(e) => setEditor((cur) => cur ? ({ ...cur, naturalWidth: e.currentTarget.naturalWidth || cur.naturalWidth, naturalHeight: e.currentTarget.naturalHeight || cur.naturalHeight }) : cur)}
-                onError={() => toast.error("Bildvorschau konnte nicht geladen werden. Bitte anderes Bild probieren.")}
-                className={`${editor.cropMode === "original" ? "max-w-full max-h-[55vh] object-contain" : "absolute max-w-none cursor-grab active:cursor-grabbing"} transition-transform`}
-                style={editor.cropMode === "original" ? { transform: `rotate(${editor.rotation}deg)` } : editorImageStyle}
+              <canvas
+                ref={previewCanvasRef}
+                className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"
+                aria-label="Bildvorschau"
               />
-              {!editorSource && (
+              {(!editorSource || !previewReady) && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/45">
                   <ImageIcon className="w-8 h-8 animate-pulse" />
                   <span className="text-[10px] uppercase tracking-widest font-bold">Lade Bildvorschau</span>
