@@ -204,6 +204,20 @@ function drawImageRectWithPadding(ctx, img, source, dest) {
   ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
+function drawTransparencyGrid(ctx, width, height) {
+  const cell = 16;
+  ctx.save();
+  ctx.fillStyle = "#171717";
+  ctx.fillRect(0, 0, width, height);
+  for (let y = 0; y < height; y += cell) {
+    for (let x = 0; x < width; x += cell) {
+      ctx.fillStyle = ((x / cell + y / cell) % 2 === 0) ? "#262626" : "#101010";
+      ctx.fillRect(x, y, cell, cell);
+    }
+  }
+  ctx.restore();
+}
+
 function imageDimensionsFromUrl(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -480,8 +494,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = "#050505";
-    ctx.fillRect(0, 0, width, height);
+    drawTransparencyGrid(ctx, width, height);
     ctx.save();
     ctx.translate(width / 2, height / 2);
     const rotation = normalizeRotation(editor.rotation || 0);
@@ -583,7 +596,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
             </div>
             <div
               ref={cropBoxRef}
-              className={`relative mx-auto bg-[#050505] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center touch-none select-none w-full ${editor.cropMode === "wide" ? "aspect-video max-w-3xl" : editor.cropMode === "portrait" ? "aspect-[4/5] max-w-[48vh]" : editor.cropMode === "square" ? "aspect-square max-w-[60vh]" : "min-h-[280px] max-h-[55vh] max-w-3xl"}`}
+              className={`relative mx-auto bg-[#171717] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center touch-none select-none w-full ${editor.cropMode === "wide" ? "aspect-video max-w-3xl" : editor.cropMode === "portrait" ? "aspect-[4/5] max-w-[48vh]" : editor.cropMode === "square" ? "aspect-square max-w-[60vh]" : "min-h-[280px] max-h-[55vh] max-w-3xl"}`}
               onPointerDown={(e) => {
                 if (editor.cropMode === "original") return;
                 e.currentTarget.setPointerCapture?.(e.pointerId);

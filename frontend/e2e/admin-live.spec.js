@@ -81,6 +81,23 @@ test.describe("live admin checks", () => {
     await expect(page.getByRole("button", { name: /^html übernehmen$/i })).toBeVisible();
   });
 
+  test("profile image editor renders selected image instead of black preview", async ({ page }) => {
+    await page.goto("/profile");
+    await page.getByTestId("profile-avatar-file").setInputFiles({
+      name: "tls-editor-smoke.png",
+      mimeType: "image/png",
+      buffer: createSmokePng(),
+    });
+    await expect(page.getByText("Bild bearbeiten")).toBeVisible();
+    const canvas = page.locator('canvas[aria-label="Bildvorschau"]').first();
+    await expect(canvas).toBeVisible();
+    await expect.poll(async () => canvas.evaluate((node) => {
+      const ctx = node.getContext("2d");
+      const data = ctx.getImageData(Math.floor(node.width / 2), Math.floor(node.height / 2), 1, 1).data;
+      return Array.from(data).join(",");
+    })).toBe("41,182,232,255");
+  });
+
   test("image upload API accepts, serves and deletes a smoke image", async ({ request }) => {
     const login = await request.post("/api/auth/login", { data: { email, password } });
     expect(login.ok()).toBeTruthy();
