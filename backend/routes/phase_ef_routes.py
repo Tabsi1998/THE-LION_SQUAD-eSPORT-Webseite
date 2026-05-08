@@ -34,7 +34,38 @@ streams_router = APIRouter(prefix="/api/streams", tags=["streams"])
 async def list_live_streams():
     db = get_db()
     streams = await db.live_streams.find({}, {"_id": 0}).sort("viewer_count", -1).to_list(50)
-    return streams
+    user_ids = sorted({stream.get("user_id") for stream in streams if stream.get("user_id")})
+    if not user_ids:
+        return []
+
+    member_profiles = await db.club_member_profiles.find(
+        {"user_id": {"$in": user_ids}, "is_active": {"$ne": False}},
+        {
+            "_id": 0,
+            "id": 1,
+            "user_id": 1,
+            "slug": 1,
+            "display_name": 1,
+            "gamertag": 1,
+            "photo_url": 1,
+        },
+    ).to_list(2000)
+    profile_by_user = {profile.get("user_id"): profile for profile in member_profiles if profile.get("user_id")}
+
+    linked_streams = []
+    for stream in streams:
+        profile = profile_by_user.get(stream.get("user_id"))
+        if not profile:
+            continue
+        stream["member_profile"] = {
+            "id": profile.get("id"),
+            "slug": profile.get("slug"),
+            "display_name": profile.get("display_name"),
+            "gamertag": profile.get("gamertag"),
+            "photo_url": profile.get("photo_url"),
+        }
+        linked_streams.append(stream)
+    return linked_streams
 
 
 admin_streams_router = APIRouter(prefix="/api/admin/streams", tags=["streams-admin"])
