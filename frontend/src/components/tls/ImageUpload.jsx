@@ -153,6 +153,57 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function cropAspectForMode(mode) {
+  if (mode === "square") return 1;
+  if (mode === "portrait") return 4 / 5;
+  if (mode === "wide") return 16 / 9;
+  return null;
+}
+
+function calculateCropSourceRect(width, height, editOptions = null) {
+  const cropMode = editOptions?.cropMode || "original";
+  const cropAspect = cropAspectForMode(cropMode);
+  const zoom = clamp(Number(editOptions?.zoom || 1), 0.55, 3);
+  let sourceW = width;
+  let sourceH = height;
+  if (cropAspect) {
+    const sourceAspect = sourceW / sourceH;
+    if (sourceAspect > cropAspect) {
+      sourceW = sourceH * cropAspect;
+    } else {
+      sourceH = sourceW / cropAspect;
+    }
+    sourceW = Math.max(1, sourceW / zoom);
+    sourceH = Math.max(1, sourceH / zoom);
+  }
+
+  const baseX = (width - sourceW) / 2;
+  const baseY = (height - sourceH) / 2;
+  const maxOffsetX = Math.abs(baseX);
+  const maxOffsetY = Math.abs(baseY);
+  return {
+    x: Math.round(baseX + clamp(Number(editOptions?.cropX || 0), -1, 1) * maxOffsetX),
+    y: Math.round(baseY + clamp(Number(editOptions?.cropY || 0), -1, 1) * maxOffsetY),
+    width: Math.max(1, Math.round(sourceW)),
+    height: Math.max(1, Math.round(sourceH)),
+  };
+}
+
+function drawImageRectWithPadding(ctx, img, source, dest) {
+  const sx = clamp(source.x, 0, img.naturalWidth);
+  const sy = clamp(source.y, 0, img.naturalHeight);
+  const right = clamp(source.x + source.width, 0, img.naturalWidth);
+  const bottom = clamp(source.y + source.height, 0, img.naturalHeight);
+  const sw = Math.max(0, right - sx);
+  const sh = Math.max(0, bottom - sy);
+  if (!sw || !sh) return;
+  const dx = dest.x + ((sx - source.x) / source.width) * dest.width;
+  const dy = dest.y + ((sy - source.y) / source.height) * dest.height;
+  const dw = (sw / source.width) * dest.width;
+  const dh = (sh / source.height) * dest.height;
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+}
+
 async function loadImage(file) {
   const url = URL.createObjectURL(file);
   try {
@@ -190,36 +241,16 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
     const { img } = imageData;
     const rotation = normalizeRotation(editOptions?.rotation || 0);
     const cropMode = editOptions?.cropMode || "original";
-    const cropAspect = cropMode === "square" ? 1 : cropMode === "wide" ? 16 / 9 : null;
-    const zoom = clamp(Number(editOptions?.zoom || 1), 1, 3);
-    let sourceX = 0;
-    let sourceY = 0;
-    let sourceW = img.naturalWidth;
-    let sourceH = img.naturalHeight;
-    if (cropAspect) {
-      const sourceAspect = sourceW / sourceH;
-      if (sourceAspect > cropAspect) {
-        sourceW = Math.round(sourceH * cropAspect);
-        sourceX = Math.round((img.naturalWidth - sourceW) / 2);
-      } else {
-        sourceH = Math.round(sourceW / cropAspect);
-        sourceY = Math.round((img.naturalHeight - sourceH) / 2);
-      }
-      sourceW = Math.max(1, Math.round(sourceW / zoom));
-      sourceH = Math.max(1, Math.round(sourceH / zoom));
-      const maxX = Math.max(0, Math.round((img.naturalWidth - sourceW) / 2));
-      const maxY = Math.max(0, Math.round((img.naturalHeight - sourceH) / 2));
-      sourceX = Math.round(maxX + clamp(Number(editOptions?.cropX || 0), -1, 1) * maxX);
-      sourceY = Math.round(maxY + clamp(Number(editOptions?.cropY || 0), -1, 1) * maxY);
-    }
+    const zoom = clamp(Number(editOptions?.zoom || 1), 0.55, 3);
+    const source = calculateCropSourceRect(img.naturalWidth, img.naturalHeight, editOptions);
     const needsEdit = rotation !== 0 || cropMode !== "original" || zoom !== 1;
-    const needsResize = sourceW > IMAGE_MAX_DIMENSION || sourceH > IMAGE_MAX_DIMENSION;
+    const needsResize = source.width > IMAGE_MAX_DIMENSION || source.height > IMAGE_MAX_DIMENSION;
     const needsCompression = needsEdit || file.size > triggerBytes || file.size > maxBytes || needsResize;
     if (!needsCompression) return file;
 
-    const scale = Math.min(1, IMAGE_MAX_DIMENSION / sourceW, IMAGE_MAX_DIMENSION / sourceH);
-    const width = Math.max(1, Math.round(sourceW * scale));
-    const height = Math.max(1, Math.round(sourceH * scale));
+    const scale = Math.min(1, IMAGE_MAX_DIMENSION / source.width, IMAGE_MAX_DIMENSION / source.height);
+    const width = Math.max(1, Math.round(source.width * scale));
+    const height = Math.max(1, Math.round(source.height * scale));
     const rotated = rotation === 90 || rotation === 270;
     const canvas = document.createElement("canvas");
     canvas.width = rotated ? height : width;
@@ -229,7 +260,7 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     if (rotation) ctx.rotate((rotation * Math.PI) / 180);
-    ctx.drawImage(img, sourceX, sourceY, sourceW, sourceH, -width / 2, -height / 2, width, height);
+    drawImageRectWithPadding(ctx, img, source, { x: -width / 2, y: -height / 2, width, height });
     ctx.restore();
 
     let bestBlob = null;
@@ -240,7 +271,7 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
       if (blob.size <= targetBytes) break;
     }
     if (!bestBlob) return file;
-    if (file.size <= maxBytes && bestBlob.size >= file.size) return file;
+    if (!needsEdit && file.size <= maxBytes && bestBlob.size >= file.size) return file;
     const baseName = (file.name || "bild").replace(/\.[^/.]+$/, "") || "bild";
     return new File([bestBlob], `${baseName}.webp`, { type: "image/webp", lastModified: Date.now() });
   } catch (error) {
@@ -266,6 +297,7 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
  */
 export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", endpoint = "/uploads/image", maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB, allowLibrary = false, mediaScope, libraryEndpoint }) {
   const fileRef = useRef(null);
+  const cropBoxRef = useRef(null);
   const effectiveMediaScope = mediaScope || defaultMediaScope();
   const effectiveLibraryEndpoint = libraryEndpoint || defaultLibraryEndpoint();
   const [uploading, setUploading] = useState(false);
@@ -274,6 +306,23 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [editor, setEditor] = useState(null);
   const [drag, setDrag] = useState(null);
+  const [cropBox, setCropBox] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    if (!editor || !cropBoxRef.current) return undefined;
+    const update = () => {
+      const rect = cropBoxRef.current?.getBoundingClientRect();
+      if (rect) setCropBox({ width: rect.width, height: rect.height });
+    };
+    update();
+    const resizeObserver = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    resizeObserver?.observe(cropBoxRef.current);
+    window.addEventListener("resize", update);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [editor]);
 
   const closeEditor = useCallback(() => {
     setEditor((cur) => {
@@ -346,6 +395,18 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     return undefined;
   }, ["media", "uploads"]);
 
+  const editorSource = editor?.naturalWidth && editor?.naturalHeight
+    ? calculateCropSourceRect(editor.naturalWidth, editor.naturalHeight, editor)
+    : null;
+  const editorImageStyle = editorSource && cropBox.width && cropBox.height
+    ? {
+        width: `${(editor.naturalWidth / editorSource.width) * cropBox.width}px`,
+        height: `${(editor.naturalHeight / editorSource.height) * cropBox.height}px`,
+        left: `${(-editorSource.x / editorSource.width) * cropBox.width}px`,
+        top: `${(-editorSource.y / editorSource.height) * cropBox.height}px`,
+        transform: `rotate(${editor.rotation}deg)`,
+      }
+    : {};
   const previewClass = variant === "wide"
     ? "aspect-[16/9] w-full"
     : "w-20 h-20";
@@ -422,7 +483,8 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
               <button type="button" onClick={closeEditor} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
             <div
-              className={`mx-auto bg-[#050505] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center touch-none select-none ${editor.cropMode === "wide" ? "aspect-video" : editor.cropMode === "square" ? "aspect-square max-h-[55vh]" : "min-h-[280px] max-h-[55vh]"}`}
+              ref={cropBoxRef}
+              className={`relative mx-auto bg-[#050505] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center touch-none select-none ${editor.cropMode === "wide" ? "aspect-video" : editor.cropMode === "portrait" ? "aspect-[4/5] max-h-[60vh]" : editor.cropMode === "square" ? "aspect-square max-h-[60vh]" : "min-h-[280px] max-h-[55vh]"}`}
               onPointerDown={(e) => {
                 if (editor.cropMode === "original") return;
                 e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -430,8 +492,9 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
               }}
               onPointerMove={(e) => {
                 if (!drag || editor.cropMode === "original") return;
-                const dx = (e.clientX - drag.x) / 180;
-                const dy = (e.clientY - drag.y) / 180;
+                const rect = e.currentTarget.getBoundingClientRect();
+                const dx = ((e.clientX - drag.x) / Math.max(160, rect.width)) * 2;
+                const dy = ((e.clientY - drag.y) / Math.max(160, rect.height)) * 2;
                 setEditor((cur) => ({
                   ...cur,
                   cropX: clamp(drag.cropX - dx, -1, 1),
@@ -445,19 +508,24 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                 src={editor.url}
                 alt=""
                 draggable={false}
-                className={`${editor.cropMode === "original" ? "max-w-full max-h-[55vh] object-contain" : "w-full h-full object-cover cursor-grab active:cursor-grabbing"} transition-transform`}
-                style={{
-                  transform: editor.cropMode === "original"
-                    ? `rotate(${editor.rotation}deg)`
-                    : `translate(${-(editor.cropX || 0) * 28}%, ${-(editor.cropY || 0) * 28}%) rotate(${editor.rotation}deg) scale(${editor.zoom || 1})`,
-                }}
+                onLoad={(e) => setEditor((cur) => cur ? ({ ...cur, naturalWidth: e.currentTarget.naturalWidth, naturalHeight: e.currentTarget.naturalHeight }) : cur)}
+                className={`${editor.cropMode === "original" ? "max-w-full max-h-[55vh] object-contain" : "absolute max-w-none cursor-grab active:cursor-grabbing"} transition-transform`}
+                style={editor.cropMode === "original" ? { transform: `rotate(${editor.rotation}deg)` } : editorImageStyle}
               />
             </div>
+            {editor.cropMode !== "original" && (
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
+                <span>Ziehen zum Verschieben</span>
+                <span>·</span>
+                <span>Zoom unter 100% erzeugt Rand statt harten Anschnitt</span>
+              </div>
+            )}
             <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
               <div className="flex flex-wrap gap-2">
                 {[
                   ["original", "Original"],
                   ["square", "1:1"],
+                  ["portrait", "4:5"],
                   ["wide", "16:9"],
                 ].map(([mode, text]) => (
                   <button
@@ -480,14 +548,52 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                     Zoom
                     <input
                       type="range"
-                      min="1"
+                      min="0.55"
                       max="3"
                       step="0.05"
                       value={editor.zoom || 1}
                       onChange={(e) => setEditor((cur) => ({ ...cur, zoom: Number(e.target.value), cropX: clamp(cur.cropX || 0, -1, 1), cropY: clamp(cur.cropY || 0, -1, 1) }))}
                       className="w-28 accent-[#29B6E8]"
                     />
+                    <span className="tabular-nums text-white/45">{Math.round((editor.zoom || 1) * 100)}%</span>
                   </label>
+                )}
+                {editor.cropMode !== "original" && (
+                  <>
+                    <label className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 rounded-sm text-xs text-white/70">
+                      X
+                      <input
+                        type="range"
+                        min="-1"
+                        max="1"
+                        step="0.01"
+                        value={editor.cropX || 0}
+                        onChange={(e) => setEditor((cur) => ({ ...cur, cropX: Number(e.target.value) }))}
+                        className="w-24 accent-[#29B6E8]"
+                      />
+                    </label>
+                    <label className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 rounded-sm text-xs text-white/70">
+                      Y
+                      <input
+                        type="range"
+                        min="-1"
+                        max="1"
+                        step="0.01"
+                        value={editor.cropY || 0}
+                        onChange={(e) => setEditor((cur) => ({ ...cur, cropY: Number(e.target.value) }))}
+                        className="w-24 accent-[#29B6E8]"
+                      />
+                    </label>
+                    <button type="button" onClick={() => setEditor((cur) => ({ ...cur, cropY: -1 }))} className="inline-flex items-center px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm text-xs font-bold uppercase tracking-wider">
+                      Oben
+                    </button>
+                    <button type="button" onClick={() => setEditor((cur) => ({ ...cur, cropX: 0, cropY: 0 }))} className="inline-flex items-center px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm text-xs font-bold uppercase tracking-wider">
+                      Mitte
+                    </button>
+                    <button type="button" onClick={() => setEditor((cur) => ({ ...cur, zoom: 0.75, cropX: 0, cropY: 0 }))} className="inline-flex items-center px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm text-xs font-bold uppercase tracking-wider">
+                      Mehr Rand
+                    </button>
+                  </>
                 )}
               </div>
               <button
