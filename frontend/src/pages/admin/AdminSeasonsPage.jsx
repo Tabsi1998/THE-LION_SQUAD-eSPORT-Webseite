@@ -88,8 +88,8 @@ export default function AdminSeasonsPage() {
   const load = useCallback(async () => {
     const [s, t, c] = await Promise.all([
       api.get("/seasons"),
-      api.get("/tournaments"),
-      api.get("/f1/challenges"),
+      api.get("/tournaments?include_drafts=true"),
+      api.get("/f1/challenges?include_drafts=true"),
     ]);
     setList(s.data);
     setTournaments(t.data);

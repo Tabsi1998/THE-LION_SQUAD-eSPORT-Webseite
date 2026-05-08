@@ -32,7 +32,7 @@ export default function AdminF1NewPage() {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
-    api.get("/events").then(({ data }) => setEvents(data || [])).catch(() => {});
+    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(() => {});
   }, []);
 
   const submit = async (e) => {

@@ -14,7 +14,7 @@ export default function AdminTournamentsPage() {
   const [list, setList] = useState([]);
   const confirm = useConfirm();
   const load = useCallback(async () => {
-    const { data } = await api.get("/tournaments");
+    const { data } = await api.get("/tournaments?include_drafts=true");
     setList(data);
   }, []);
   useEffect(() => { load(); }, [load]);

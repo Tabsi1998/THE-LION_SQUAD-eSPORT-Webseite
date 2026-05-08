@@ -10,7 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 export default function AdminF1Page() {
   const { isAdmin } = useAuth();
   const [list, setList] = useState([]);
-  const load = useCallback(() => api.get("/f1/challenges").then(({ data }) => setList(data)), []);
+  const load = useCallback(() => api.get("/f1/challenges?include_drafts=true").then(({ data }) => setList(data)), []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["f1"]);
   return (

@@ -26,14 +26,14 @@ export default function AdminEventsPage() {
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
-    const { data } = await api.get("/events");
+    const { data } = await api.get("/events?include_drafts=true");
     setList(data);
   }, []);
   const loadRelations = useCallback(async () => {
     Promise.allSettled([
       api.get("/sponsors/admin"),
-      api.get("/tournaments"),
-      api.get("/f1/challenges"),
+      api.get("/tournaments?include_drafts=true"),
+      api.get("/f1/challenges?include_drafts=true"),
     ]).then(([s, t, f]) => {
       if (s.status === "fulfilled") setSponsors(s.value.data || []);
       if (t.status === "fulfilled") setTournaments(t.value.data || []);

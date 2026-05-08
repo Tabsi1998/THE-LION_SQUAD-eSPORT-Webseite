@@ -27,7 +27,7 @@ export default function AdminStationsPage() {
   const load = useCallback(async () => {
     const { data } = await api.get("/stations");
     setList(data);
-    const { data: t } = await api.get("/tournaments");
+    const { data: t } = await api.get("/tournaments?include_drafts=true");
     setTournaments(t);
     setActiveTid((current) => current || t?.[0]?.id || "");
   }, []);

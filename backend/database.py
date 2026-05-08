@@ -91,6 +91,13 @@ async def init_indexes():
     await db.tournament_staff_assignments.create_index("tournament_id")
     await db.tournament_staff_assignments.create_index([("tournament_id", 1), ("user_id", 1), ("role", 1), ("scope", 1), ("scope_id", 1)])
     await db.tournament_staff_assignments.create_index("user_id")
+    await db.tournament_stages.create_index("id", unique=True)
+    await db.tournament_stages.create_index([("tournament_id", 1), ("number", 1)])
+    await db.matches_v2.create_index("id", unique=True)
+    await db.matches_v2.create_index([("tournament_id", 1), ("stage_id", 1)])
+    await db.matches_v2.create_index([("stage_id", 1), ("match_key", 1)])
+    await db.match_reports_v2.create_index("id", unique=True)
+    await db.match_reports_v2.create_index("match_id")
     # Membership / club system
     await db.memberships.create_index("user_id", unique=True)
     await db.memberships.create_index("member_number", unique=True, sparse=True)

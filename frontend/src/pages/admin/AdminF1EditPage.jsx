@@ -42,7 +42,7 @@ export default function AdminF1EditPage() {
   const setEditTrackField = (k, v) => setEditTrack((track) => ({ ...(track || {}), [k]: v }));
 
   const load = useCallback(async () => {
-    const { data: c } = await api.get(`/f1/challenges/${id}`);
+    const { data: c } = await api.get(`/f1/challenges/${id}?include_draft=true`);
     setChallenge(c);
     setTracks(c.tracks || []);
     setActiveTrack((current) => (c.tracks || []).some((track) => track.id === current) ? current : c.tracks?.[0]?.id || null);
@@ -387,7 +387,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
-    api.get("/events").then(({ data }) => setEvents(data || [])).catch(() => {});
+    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(() => {});
   }, []);
 
   const save = async () => {

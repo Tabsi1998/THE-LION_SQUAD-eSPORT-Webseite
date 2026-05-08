@@ -15,8 +15,8 @@ export default function AdminWidgetsPage() {
   const [height, setHeight] = useState(600);
 
   const loadSources = useCallback(() => {
-    api.get("/tournaments").then(({ data }) => setTournaments(data));
-    api.get("/f1/challenges").then(({ data }) => setChallenges(data));
+    api.get("/tournaments?include_drafts=true").then(({ data }) => setTournaments(data));
+    api.get("/f1/challenges?include_drafts=true").then(({ data }) => setChallenges(data));
   }, []);
   useEffect(() => { loadSources(); }, [loadSources]);
   useApiInvalidation(loadSources, ["tournaments", "f1"]);
@@ -25,7 +25,7 @@ export default function AdminWidgetsPage() {
     setTracks([]);
     setSelTrack("");
     if (selType !== "f1" || !selId) return;
-    api.get(`/f1/challenges/${selId}`).then(({ data }) => setTracks(data.tracks || [])).catch(() => setTracks([]));
+    api.get(`/f1/challenges/${selId}?include_draft=true`).then(({ data }) => setTracks(data.tracks || [])).catch(() => setTracks([]));
   }, [selType, selId]);
 
   const path = selType === "bracket" ? `/display/bracket/${selId}`

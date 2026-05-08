@@ -55,7 +55,7 @@ export default function AdminTournamentNewPage() {
 
   const loadSources = useCallback(() => {
     api.get("/games").then(({ data }) => setGames(data));
-    api.get("/events").then(({ data }) => setEvents(data));
+    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data));
   }, []);
   useEffect(() => { loadSources(); }, [loadSources]);
   useApiInvalidation(loadSources, ["games", "events"]);

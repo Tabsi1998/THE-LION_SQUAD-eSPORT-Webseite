@@ -67,7 +67,7 @@ export default function AdminSponsorsPage() {
   const load = useCallback(async () => {
     const { data } = await api.get("/sponsors/admin");
     setList(data);
-    api.get("/events").then(({ data }) => setEvents(data || [])).catch(() => {});
+    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["sponsors", "uploads"]);

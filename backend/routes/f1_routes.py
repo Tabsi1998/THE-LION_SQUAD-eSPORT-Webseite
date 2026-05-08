@@ -61,7 +61,7 @@ def _is_staff(user: dict | None) -> bool:
     return bool(user and user.get("role") in STAFF_ROLES)
 
 
-async def _visible_event_summary(event_id: str, user: dict | None) -> dict | None:
+async def _visible_event_summary(event_id: str, user: dict | None, include_draft: bool = False) -> dict | None:
     db = get_db()
     user = _auth_user(user)
     event = await db.events.find_one(
@@ -70,20 +70,20 @@ async def _visible_event_summary(event_id: str, user: dict | None) -> dict | Non
     )
     if not event:
         return None
-    if event.get("status") == "draft" and not _is_staff(user):
+    if event.get("status") == "draft" and not (include_draft and _is_staff(user)):
         return None
     if not await user_can_see(user, event.get("visibility") or "public"):
         return None
     return event
 
 
-async def _get_visible_challenge(slug_or_id: str, user: dict | None = None) -> dict:
+async def _get_visible_challenge(slug_or_id: str, user: dict | None = None, include_draft: bool = False) -> dict:
     db = get_db()
     user = _auth_user(user)
     c = await db.f1_challenges.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not c:
         raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
-    if c.get("status") == "draft" and not _is_staff(user):
+    if c.get("status") == "draft" and not (include_draft and _is_staff(user)):
         raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
     if not await user_can_see(user, c.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Challenge ist nicht sichtbar")
@@ -101,13 +101,15 @@ def _ms_to_time_str(ms: int) -> str:
 
 
 @router.get("/challenges")
-async def list_challenges(status: str | None = None, limit: int = 100, user=Depends(get_optional_user)):
+async def list_challenges(status: str | None = None, limit: int = 100, include_drafts: bool = False, user=Depends(get_optional_user)):
     db = get_db()
     is_staff = _is_staff(user)
     q = {}
     if status:
+        if status == "draft" and not (include_drafts and is_staff):
+            return []
         q["status"] = status
-    elif not is_staff:
+    elif not (include_drafts and is_staff):
         q["status"] = {"$ne": "draft"}
     challenges = await db.f1_challenges.find(q, {"_id": 0}).sort("created_at", -1).to_list(limit)
     visible = []
@@ -122,9 +124,9 @@ async def list_challenges(status: str | None = None, limit: int = 100, user=Depe
 
 
 @router.get("/challenges/{slug_or_id}")
-async def get_challenge(slug_or_id: str, user=Depends(get_optional_user)):
+async def get_challenge(slug_or_id: str, include_draft: bool = False, user=Depends(get_optional_user)):
     db = get_db()
-    c = await _get_visible_challenge(slug_or_id, user)
+    c = await _get_visible_challenge(slug_or_id, user, include_draft=include_draft)
     tracks = await db.f1_tracks.find({"challenge_id": c["id"]}, {"_id": 0}).sort("order_index", 1).to_list(100)
     c["tracks"] = tracks
     c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", {"challenge_id": c["id"]}))

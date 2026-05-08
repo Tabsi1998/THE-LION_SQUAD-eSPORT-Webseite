@@ -121,9 +121,9 @@ function NewsModal({ post, meta, onClose, onSaved }) {
 
   useEffect(() => {
     Promise.allSettled([
-      api.get("/tournaments"),
-      api.get("/events"),
-      api.get("/f1/challenges"),
+      api.get("/tournaments?include_drafts=true"),
+      api.get("/events?include_drafts=true"),
+      api.get("/f1/challenges?include_drafts=true"),
     ]).then(([t, e, f]) => {
       if (t.status === "fulfilled") setTournaments(t.value.data);
       if (e.status === "fulfilled") setEvents(e.value.data);

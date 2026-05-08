@@ -429,11 +429,16 @@ class TournamentCreate(BaseModel):
 
 class TournamentUpdate(BaseModel):
     title: Optional[str] = None
+    slug: Optional[str] = None
     description: Optional[str] = None
+    game_id: Optional[str] = None
+    platform: Optional[str] = None
+    event_id: Optional[str] = None
     format: Optional[TournamentFormat] = None
     status: Optional[TournamentStatus] = None
     team_mode: Optional[TeamMode] = None
     team_size: Optional[int] = None
+    substitutes_allowed: Optional[bool] = None
     max_participants: Optional[int] = None
     min_participants: Optional[int] = None
     registration_enabled: Optional[bool] = None
@@ -502,6 +507,34 @@ class TournamentStaffAssignmentUpdate(BaseModel):
     scope_id: Optional[str] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
+
+
+# ---------- Tournament v2 groundwork ----------
+StageMatchType = Literal["duel", "ffa"]
+StageType = Literal[
+    "single_elimination", "double_elimination", "custom_bracket",
+    "round_robin_groups", "swiss", "league", "simple",
+    "ffa_single_elimination", "ffa_custom_bracket", "ffa_league",
+]
+TournamentStageStatus = Literal["pending", "ready", "running", "completed", "archived"]
+
+
+class TournamentStageCreate(BaseModel):
+    name: str = "Stage 1"
+    number: Optional[int] = None
+    match_type: StageMatchType = "duel"
+    stage_type: StageType = "single_elimination"
+    settings: Dict[str, Any] = Field(default_factory=dict)
+    status: TournamentStageStatus = "pending"
+
+
+class TournamentStageUpdate(BaseModel):
+    name: Optional[str] = None
+    number: Optional[int] = None
+    match_type: Optional[StageMatchType] = None
+    stage_type: Optional[StageType] = None
+    settings: Optional[Dict[str, Any]] = None
+    status: Optional[TournamentStageStatus] = None
 
 
 # ---------- Matches ----------

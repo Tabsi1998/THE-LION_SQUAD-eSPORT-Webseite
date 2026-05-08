@@ -9,7 +9,6 @@ from services.public_phase import derive_public_phase
 
 
 EMBED_RE = re.compile(r"\[\[\s*(event|events|turnier|turniere|tournament|tournaments|fastlap|fast-lap|f1)\s*:\s*([^\]\s]+)\s*\]\]", re.IGNORECASE)
-STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 
 
 def normalize_embed_kind(kind: str) -> str:
@@ -37,10 +36,9 @@ def extract_content_refs(text: str | None) -> list[dict[str, str]]:
 
 
 async def _can_show_embed(kind: str, doc: dict[str, Any], user: dict | None) -> bool:
-    is_staff = bool(user and user.get("role") in STAFF_ROLES)
-    if kind in {"event", "tournament", "fastlap"} and doc.get("status") == "draft" and not is_staff:
+    if kind in {"event", "tournament", "fastlap"} and doc.get("status") == "draft":
         return False
-    if kind == "tournament" and doc.get("is_public") is False and not is_staff:
+    if kind == "tournament" and doc.get("is_public") is False:
         return False
     return await user_can_see(user, doc.get("visibility") or "public")
 

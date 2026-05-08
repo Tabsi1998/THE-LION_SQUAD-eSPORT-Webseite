@@ -129,7 +129,7 @@ export default function AdminSettingsPage() {
   const loadNewsletterSources = useCallback(async () => {
     const [newsRes, eventsRes] = await Promise.allSettled([
       api.get("/admin/news"),
-      api.get("/events"),
+      api.get("/events?include_drafts=true"),
     ]);
     const news = newsRes.status === "fulfilled" && Array.isArray(newsRes.value.data) ? newsRes.value.data : [];
     const events = eventsRes.status === "fulfilled" && Array.isArray(eventsRes.value.data) ? eventsRes.value.data : [];

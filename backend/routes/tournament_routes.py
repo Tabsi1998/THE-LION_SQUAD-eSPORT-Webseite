@@ -16,6 +16,7 @@ from services.tournament_permissions import (
 from models import (
     TournamentCreate, TournamentUpdate, RegistrationCreate, RegistrationUpdate,
     TournamentStaffAssignmentCreate, TournamentStaffAssignmentUpdate,
+    TournamentStageCreate, TournamentStageUpdate,
     now_utc, new_id,
 )
 from bracket_engine import generate_bracket, compute_round_robin_standings
@@ -155,14 +156,13 @@ async def _apply_checked_in_badges(user_id: str, tid: str) -> None:
 
 async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
     db = get_db()
-    is_staff = _is_staff(user)
     t["public_phase"] = derive_public_phase(t, "tournament")
     if t.get("game_id"):
         g = await db.games.find_one({"id": t["game_id"]}, {"_id": 0})
         t["game"] = g
     if t.get("event_id"):
         e = await db.events.find_one({"id": t["event_id"]}, {"_id": 0, "tournaments": 0, "f1_challenges": 0})
-        if e and (is_staff or e.get("status") != "draft") and await user_can_see(user, e.get("visibility") or "public"):
+        if e and e.get("status") != "draft" and await user_can_see(user, e.get("visibility") or "public"):
             t["event"] = e
     t["participant_count"] = await db.tournament_registrations.count_documents(
         {"tournament_id": t["id"], "status": {"$in": ["approved", "checked_in"]}})
@@ -183,18 +183,24 @@ async def _resolve_tid(slug_or_id: str) -> str:
 @router.get("")
 async def list_tournaments(status: str | None = None, game_id: str | None = None,
                            event_id: str | None = None, limit: int = 100,
+                           include_drafts: bool = False,
                            user=Depends(get_optional_user)):
     db = get_db()
     is_admin = user and user.get("role") in STAFF_ROLES
     assigned_ids = await assigned_tournament_ids(user)
+    can_include_drafts = bool(include_drafts and (is_admin or assigned_ids))
     q = {}
     if status:
+        if status == "draft" and not can_include_drafts:
+            return []
         q["status"] = status
-    elif not is_admin:
-        if assigned_ids:
-            q["$or"] = [{"status": {"$ne": "draft"}}, {"id": {"$in": assigned_ids}}]
-        else:
-            q["status"] = {"$ne": "draft"}
+    elif include_drafts and is_admin:
+        pass
+    elif include_drafts and assigned_ids:
+        q["$or"] = [{"status": {"$ne": "draft"}}, {"id": {"$in": assigned_ids}}]
+    else:
+        q["status"] = {"$ne": "draft"}
+    assigned_visible_ids = assigned_ids if include_drafts else []
     if game_id:
         q["game_id"] = game_id
     if event_id:
@@ -203,8 +209,10 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     if not is_admin:
         visible = []
         for t in tournaments:
-            if t.get("id") in assigned_ids:
+            if t.get("id") in assigned_visible_ids:
                 visible.append(t)
+            elif t.get("status") == "draft":
+                continue
             elif t.get("is_public") is not False and await user_can_see(user, t.get("visibility") or "public"):
                 visible.append(t)
         tournaments = visible
@@ -214,14 +222,14 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
 
 
 @router.get("/{slug_or_id}")
-async def get_tournament(slug_or_id: str, user=Depends(get_optional_user)):
+async def get_tournament(slug_or_id: str, include_draft: bool = False, user=Depends(get_optional_user)):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     is_admin = user and user.get("role") in STAFF_ROLES
     is_assigned = await _is_tournament_staff(t["id"], user)
-    if t.get("status") == "draft" and not (is_admin or is_assigned):
+    if t.get("status") == "draft" and not (include_draft and (is_admin or is_assigned)):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if not (is_admin or is_assigned) and t.get("is_public") is False:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
@@ -276,6 +284,12 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
 async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends(require_admin())):
     db = get_db()
     tid = await _resolve_tid(tid)
+    if body.slug:
+        duplicate = await db.tournaments.find_one({"slug": body.slug, "id": {"$ne": tid}}, {"id": 1})
+        if duplicate:
+            raise HTTPException(status_code=409, detail="Slug bereits vergeben")
+    if body.game_id and not await db.games.find_one({"id": body.game_id}, {"id": 1}):
+        raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
     raw_updates = body.model_dump(exclude_unset=True)
     nullable_fields = {
         "description", "platform", "event_id", "registration_open_from",
@@ -299,9 +313,14 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
 async def delete_tournament(tid: str, me: dict = Depends(require_admin())):
     db = get_db()
     tid = await _resolve_tid(tid)
+    v2_match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
     await db.tournaments.delete_one({"id": tid})
     await db.tournament_registrations.delete_many({"tournament_id": tid})
     await db.tournament_staff_assignments.delete_many({"tournament_id": tid})
+    await db.tournament_stages.delete_many({"tournament_id": tid})
+    await db.matches_v2.delete_many({"tournament_id": tid})
+    if v2_match_ids:
+        await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
     await db.matches.delete_many({"tournament_id": tid})
     return {"ok": True}
 
@@ -584,6 +603,119 @@ async def delete_tournament_staff(tid: str, assignment_id: str, me: dict = Depen
         {"assignment_id": assignment_id, "user_id": current.get("user_id"), "role": current.get("role")},
     )
     return {"ok": True}
+
+
+# --- Tournament v2 stage groundwork ---
+@router.get("/{tid}/stages")
+async def list_tournament_stages(tid: str, user=Depends(get_optional_user)):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await _get_visible_tournament(tid, user)
+    stages = await db.tournament_stages.find(
+        {"tournament_id": tid},
+        {"_id": 0},
+    ).sort("number", 1).to_list(200)
+    return stages
+
+
+@router.post("/{tid}/stages")
+async def create_tournament_stage(tid: str, body: TournamentStageCreate,
+                                  me: dict = Depends(require_admin())):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    doc = body.model_dump()
+    if doc.get("number") is None:
+        last = await db.tournament_stages.find(
+            {"tournament_id": tid},
+            {"_id": 0, "number": 1},
+        ).sort("number", -1).to_list(1)
+        doc["number"] = int((last[0].get("number") if last else 0) or 0) + 1
+    duplicate = await db.tournament_stages.find_one(
+        {"tournament_id": tid, "number": doc["number"]},
+        {"id": 1},
+    )
+    if duplicate:
+        raise HTTPException(status_code=409, detail="Stage-Nummer existiert bereits")
+    doc["id"] = new_id()
+    doc["tournament_id"] = tid
+    doc["created_at"] = now_utc().isoformat()
+    doc["updated_at"] = doc["created_at"]
+    doc["created_by"] = me["id"]
+    await db.tournament_stages.insert_one(doc)
+    await _audit_tournament_action(
+        db,
+        "tournament.stage.create",
+        me.get("id"),
+        tid,
+        {"stage_id": doc["id"], "stage_type": doc["stage_type"], "match_type": doc["match_type"]},
+    )
+    doc.pop("_id", None)
+    return doc
+
+
+@router.patch("/{tid}/stages/{stage_id}")
+@router.put("/{tid}/stages/{stage_id}")
+async def update_tournament_stage(tid: str, stage_id: str, body: TournamentStageUpdate,
+                                  me: dict = Depends(require_admin())):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    current = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
+    if not current:
+        raise HTTPException(status_code=404, detail="Stage nicht gefunden")
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    if "number" in updates:
+        duplicate = await db.tournament_stages.find_one(
+            {"id": {"$ne": stage_id}, "tournament_id": tid, "number": updates["number"]},
+            {"id": 1},
+        )
+        if duplicate:
+            raise HTTPException(status_code=409, detail="Stage-Nummer existiert bereits")
+    updates["updated_at"] = now_utc().isoformat()
+    await db.tournament_stages.update_one({"id": stage_id}, {"$set": updates})
+    await _audit_tournament_action(
+        db,
+        "tournament.stage.update",
+        me.get("id"),
+        tid,
+        {"stage_id": stage_id, "updates": {k: v for k, v in updates.items() if k != "updated_at"}},
+    )
+    updated = await db.tournament_stages.find_one({"id": stage_id}, {"_id": 0})
+    return updated
+
+
+@router.delete("/{tid}/stages/{stage_id}")
+async def delete_tournament_stage(tid: str, stage_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
+    if not stage:
+        raise HTTPException(status_code=404, detail="Stage nicht gefunden")
+    match_ids = await db.matches_v2.distinct("id", {"stage_id": stage_id})
+    await db.tournament_stages.delete_one({"id": stage_id})
+    await db.matches_v2.delete_many({"stage_id": stage_id})
+    if match_ids:
+        await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
+    await _audit_tournament_action(
+        db,
+        "tournament.stage.delete",
+        me.get("id"),
+        tid,
+        {"stage_id": stage_id, "match_count": len(match_ids)},
+    )
+    return {"ok": True}
+
+
+@router.get("/{tid}/matches-v2")
+async def list_tournament_matches_v2(tid: str, stage_id: str | None = None,
+                                     user=Depends(get_optional_user)):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await _get_visible_tournament(tid, user)
+    q = {"tournament_id": tid}
+    if stage_id:
+        q["stage_id"] = stage_id
+    matches = await db.matches_v2.find(q, {"_id": 0}).sort([("round", 1), ("match_key", 1)]).to_list(2000)
+    return matches
 
 
 @router.post("/{tid}/checkin")

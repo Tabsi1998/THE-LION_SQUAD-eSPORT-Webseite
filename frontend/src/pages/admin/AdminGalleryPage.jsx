@@ -21,7 +21,7 @@ export default function AdminGalleryPage() {
 
   useEffect(() => {
     load();
-    api.get("/events").then(({ data }) => setEvents(data)).catch(() => {});
+    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data)).catch(() => {});
   }, [load]);
   useApiInvalidation(load, ["gallery"]);
 

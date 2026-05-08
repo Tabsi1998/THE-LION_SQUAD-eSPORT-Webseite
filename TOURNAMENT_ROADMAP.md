@@ -44,7 +44,17 @@ Stand: 2026-05-08
 - Admins koennen Event-Anmeldungen einsehen und Status auf angemeldet, Warteliste, eingecheckt, No-Show oder storniert setzen.
 - Eventseiten zeigen freie/reservierte Plaetze und die eigene Anmeldung.
 
-Naechster Schritt: Phase 2 vorbereitet einfuehren: `tournament_stages` und `matches_v2` parallel zum alten Modell, damit FFA/Custom-Brackets ohne Bruch der alten Turniere entstehen koennen.
+### Step 4 erledigt: Draft-Workflow und Phase-2-Basis
+
+- Public- und Admin-Listen fuer Events, Turniere und F1 getrennt: Entwuerfe werden auf der normalen Webseite standardmaessig nicht mehr ausgeliefert, auch wenn ein Admin eingeloggt ist.
+- Admin-Seiten laden Entwuerfe explizit mit `include_drafts=true` bzw. `include_draft=true`.
+- Turnier-Bearbeitung erweitert: Slug, Spiel, Event-Zuordnung, Plattform, Status, Sichtbarkeit, Format, Modus, Seeding, Min/Max, Teamgroesse, Ersatzspieler, Streamdaten und Season-Gewicht sind nachtraeglich pflegbar.
+- Backend-Update fuer Turniere akzeptiert jetzt `slug`, `game_id`, `platform`, `event_id` und `substitutes_allowed` mit Validierung fuer Slug-Duplikate und Spiel.
+- Phase-2-Collections vorbereitet: `tournament_stages`, `matches_v2`, `match_reports_v2`.
+- Stage-Endpoints angelegt: Stages listen, erstellen, bearbeiten und loeschen.
+- `matches_v2` kann pro Turnier/Stage gelesen werden, noch ohne Generator.
+
+Naechster Schritt: Schema-Parser fuer Custom-Brackets und erster v2-Generator, der aus einer Stage-Konfiguration `matches_v2` mit Slots und Advancement erzeugt.
 
 ## Was wirklich noch fehlt
 

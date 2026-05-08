@@ -24,12 +24,11 @@ async def _user_can_see(user: dict | None, visibility: str) -> bool:
 
 
 async def _filter_related(items: list[dict], user: dict | None, kind: str) -> list[dict]:
-    is_staff = bool(user and user.get("role") in STAFF_ROLES)
     out: list[dict] = []
     for item in items:
-        if not is_staff and item.get("status") == "draft":
+        if item.get("status") == "draft":
             continue
-        if kind == "tournament" and not is_staff and item.get("is_public") is False:
+        if kind == "tournament" and item.get("is_public") is False:
             continue
         if await _user_can_see(user, item.get("visibility") or "public"):
             phase_kind = "f1" if kind == "fastlap" else kind
@@ -221,15 +220,18 @@ async def list_events(
     status: Optional[str] = None,
     event_type: Optional[str] = None,
     upcoming: bool = False,
+    include_drafts: bool = False,
     user: dict | None = Depends(get_optional_user),
 ):
     db = get_db()
     is_admin = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
     q: dict = {}
     if status:
+        if status == "draft" and not (include_drafts and is_admin):
+            return []
         q["status"] = status
-    elif not is_admin:
-        # Hide drafts from non-admins
+    elif not (include_drafts and is_admin):
+        # Public views hide drafts even when an admin is logged in.
         q["status"] = {"$ne": "draft"}
     if event_type:
         q["event_type"] = event_type
@@ -297,13 +299,13 @@ async def event_meta():
 
 
 @router.get("/{slug_or_id}")
-async def get_event(slug_or_id: str, user: dict | None = Depends(get_optional_user)):
+async def get_event(slug_or_id: str, include_draft: bool = False, user: dict | None = Depends(get_optional_user)):
     db = get_db()
     event = await _find_event(slug_or_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
     is_admin = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
-    if event.get("status") == "draft" and not is_admin:
+    if event.get("status") == "draft" and not (include_draft and is_admin):
         raise HTTPException(404, "Event nicht gefunden.")
     if not await _user_can_see(user, event.get("visibility") or "public"):
         raise HTTPException(403, "Event ist nicht sichtbar.")

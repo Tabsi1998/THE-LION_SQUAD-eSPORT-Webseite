@@ -27,6 +27,24 @@ const TOURNAMENT_STATUS_OPTIONS = [
   ["cancelled", "Abgesagt"],
 ];
 
+const TOURNAMENT_FORMAT_OPTIONS = [
+  ["single_elim", "Single Elimination"],
+  ["double_elim", "Double Elimination"],
+  ["round_robin", "Round Robin"],
+  ["swiss", "Swiss"],
+  ["groups", "Gruppen"],
+  ["ffa", "Free For All"],
+  ["battle_royale", "Battle Royale"],
+  ["league", "Liga"],
+  ["time_trial", "Time Trial"],
+  ["grand_prix", "Grand Prix"],
+];
+
+const TEAM_MODE_OPTIONS = [["solo", "Solo"], ["duo", "Duo"], ["team", "Team"], ["squad", "Squad"]];
+const SEEDING_OPTIONS = [["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]];
+const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
+const STREAM_PLATFORM_OPTIONS = [["", "—"], ["twitch", "Twitch"], ["youtube", "YouTube"], ["kick", "Kick"], ["custom", "Custom"]];
+
 export default function AdminTournamentEditPage() {
   const { isAdmin, isModerator } = useAuth();
   const { id } = useParams();
@@ -41,7 +59,7 @@ export default function AdminTournamentEditPage() {
   const prompt = usePrompt();
 
   const load = useCallback(async () => {
-    const { data } = await api.get(`/tournaments/${id}`);
+    const { data } = await api.get(`/tournaments/${id}?include_draft=true`);
     setT(data);
     const { data: r } = await api.get(`/tournaments/${id}/registrations`);
     setRegs(r);
@@ -350,9 +368,20 @@ export default function AdminTournamentEditPage() {
 
 function TournamentEditForm({ tournament, onSaved }) {
   const dt = toDateTimeLocalInput;
+  const [games, setGames] = useState([]);
+  const [events, setEvents] = useState([]);
   const [f, setF] = useState({
     title: tournament.title || "",
+    slug: tournament.slug || "",
     description: tournament.description || "",
+    game_id: tournament.game_id || "",
+    platform: tournament.platform || "",
+    event_id: tournament.event_id || "",
+    format: tournament.format || "single_elim",
+    status: tournament.status || "draft",
+    team_mode: tournament.team_mode || "solo",
+    team_size: tournament.team_size || 1,
+    substitutes_allowed: !!tournament.substitutes_allowed,
     rules: tournament.rules || "",
     prize_pool: tournament.prize_pool || "",
     prize_places: tournament.prize_places || [],
@@ -369,15 +398,35 @@ function TournamentEditForm({ tournament, onSaved }) {
     start_date: dt(tournament.start_date),
     end_date: dt(tournament.end_date),
     max_participants: tournament.max_participants || 16,
+    min_participants: tournament.min_participants || 2,
     best_of: tournament.best_of || 1,
     bronze_match: !!tournament.bronze_match,
+    seeding_mode: tournament.seeding_mode || "random",
     is_public: tournament.is_public !== false,
+    visibility: tournament.visibility || "public",
+    twitch_channel: tournament.twitch_channel || "",
+    twitch_enabled: !!tournament.twitch_enabled,
+    has_live_stream: !!tournament.has_live_stream,
+    stream_platform: tournament.stream_platform || "",
+    stream_url: tournament.stream_url || "",
+    stream_title: tournament.stream_title || "",
+    show_chat: !!tournament.show_chat,
+    season_weight: tournament.season_weight ?? 2,
   });
+  useEffect(() => {
+    api.get("/games").then(({ data }) => setGames(data || [])).catch(() => setGames([]));
+    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(() => setEvents([]));
+  }, []);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const save = async () => {
     try {
       const payload = { ...f };
+      if (!payload.event_id) payload.event_id = null;
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
+      ["team_size", "max_participants", "min_participants", "best_of"].forEach((key) => {
+        if (payload[key] !== "" && payload[key] != null) payload[key] = Number(payload[key]);
+      });
+      payload.season_weight = Number(payload.season_weight || 0);
       payload.prize_places = (payload.prize_places || [])
         .filter((p) => p.value && String(p.value).trim())
         .map((p) => ({ place: p.place === "last" ? "last" : Number(p.place) || 0, label: p.label || (p.place === "last" ? "Letzter Platz" : `Platz ${p.place}`), value: p.value }));
@@ -388,10 +437,21 @@ function TournamentEditForm({ tournament, onSaved }) {
     } catch (e) { toast.error(formatRequestError(e, "Turnier konnte nicht gespeichert werden.", { title: f.title })); }
   };
   return (
-    <div className="max-w-2xl space-y-3 border border-white/10 bg-[#121212] rounded-sm p-5">
-      <Fld label="Titel" value={f.title} onChange={(v)=>set("title",v)} testId="tr-edit-title"/>
+    <div className="max-w-4xl space-y-5">
+      <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
+        <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Basis</div>
+        <div className="grid md:grid-cols-2 gap-3">
+          <Fld label="Titel" value={f.title} onChange={(v)=>set("title",v)} testId="tr-edit-title"/>
+          <Fld label="Slug / URL" value={f.slug} onChange={(v)=>set("slug", slugify(v))} testId="tr-edit-slug"/>
+          <SelectField label="Spiel" value={f.game_id} onChange={(v)=>set("game_id",v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, g.name])]} />
+          <Fld label="Plattform" value={f.platform} onChange={(v)=>set("platform",v)} testId="tr-edit-platform"/>
+          <SelectField label="Event" value={f.event_id || ""} onChange={(v)=>set("event_id",v)} options={[["", "— keins —"], ...events.map((e) => [e.id, e.name])]} />
+          <SelectField label="Status" value={f.status} onChange={(v)=>set("status",v)} options={TOURNAMENT_STATUS_OPTIONS} />
+          <SelectField label="Sichtbarkeit" value={f.visibility} onChange={(v)=>set("visibility",v)} options={VISIBILITY_OPTIONS} />
+          <label className="flex items-center gap-2 text-sm self-end pb-2"><input type="checkbox" checked={f.is_public} onChange={(e)=>set("is_public",e.target.checked)} className="accent-[#29B6E8]"/><span>Auf Public-Seiten sichtbar, sobald nicht Entwurf</span></label>
+        </div>
+      </div>
       <ImageUpload value={f.banner_url} onChange={(v)=>set("banner_url",v)} label="Turnier-Banner" testId="tr-edit-banner-upload" variant="wide" allowLibrary />
-      <Fld label="Location" value={f.location} onChange={(v)=>set("location",v)} testId="tr-edit-location"/>
       <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
         <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeitplan & Anmeldung</div>
         <div className="grid md:grid-cols-2 gap-3">
@@ -407,20 +467,68 @@ function TournamentEditForm({ tournament, onSaved }) {
           <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.is_invite_only} onChange={(e)=>set("is_invite_only",e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Nur Einladung/manuelle Teilnehmer</span></label>
         </div>
       </div>
-      <Fld label="Stream Link" value={f.stream_link} onChange={(v)=>set("stream_link",v)} testId="tr-edit-stream"/>
-      <Fld label="Discord Link" value={f.discord_link} onChange={(v)=>set("discord_link",v)} testId="tr-edit-discord"/>
-      <div className="grid grid-cols-2 gap-3">
-        <Fld label="Max Teilnehmer" type="number" value={f.max_participants} onChange={(v)=>set("max_participants",Number(v))} testId="tr-edit-max"/>
-        <Fld label="Best of" type="number" value={f.best_of} onChange={(v)=>set("best_of",Number(v))} testId="tr-edit-bo"/>
+      <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
+        <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Struktur</div>
+        <div className="grid md:grid-cols-3 gap-3">
+          <SelectField label="Format" value={f.format} onChange={(v)=>set("format",v)} options={TOURNAMENT_FORMAT_OPTIONS} />
+          <SelectField label="Modus" value={f.team_mode} onChange={(v)=>set("team_mode",v)} options={TEAM_MODE_OPTIONS} />
+          <SelectField label="Seeding" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} />
+          <Fld label="Teamgröße" type="number" value={f.team_size} onChange={(v)=>set("team_size",v)} testId="tr-edit-team-size"/>
+          <Fld label="Min Teilnehmer" type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>
+          <Fld label="Max Teilnehmer" type="number" value={f.max_participants} onChange={(v)=>set("max_participants",v)} testId="tr-edit-max"/>
+          <Fld label="Best of" type="number" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"/>
+          <Fld label="Season Gewicht" type="number" value={f.season_weight} onChange={(v)=>set("season_weight",v)} testId="tr-edit-season-weight"/>
+        </div>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.bronze_match} onChange={(e)=>set("bronze_match",e.target.checked)} className="accent-[#29B6E8]"/><span>Bronze Match</span></label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.substitutes_allowed} onChange={(e)=>set("substitutes_allowed",e.target.checked)} className="accent-[#29B6E8]"/><span>Ersatzspieler erlauben</span></label>
+        </div>
       </div>
       <Txt label="Beschreibung" value={f.description} onChange={(v)=>set("description",v)} testId="tr-edit-desc"/>
       <Txt label="Regeln" value={f.rules} onChange={(v)=>set("rules",v)} testId="tr-edit-rules"/>
       <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} />
       <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.bronze_match} onChange={(e)=>set("bronze_match",e.target.checked)} className="accent-[#29B6E8]"/><span>Bronze Match</span></label>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_public} onChange={(e)=>set("is_public",e.target.checked)} className="accent-[#29B6E8]"/><span>Öffentlich</span></label>
+      <div className="border border-[#9146FF]/20 bg-[#9146FF]/5 rounded-sm p-5 space-y-3">
+        <div className="text-[11px] font-bold uppercase tracking-widest text-[#9146FF]">Streaming & Links</div>
+        <div className="grid md:grid-cols-2 gap-3">
+          <Fld label="Location" value={f.location} onChange={(v)=>set("location",v)} testId="tr-edit-location"/>
+          <Fld label="Discord Link" value={f.discord_link} onChange={(v)=>set("discord_link",v)} testId="tr-edit-discord"/>
+          <Fld label="Legacy Stream Link" value={f.stream_link} onChange={(v)=>set("stream_link",v)} testId="tr-edit-stream"/>
+          <Fld label="Twitch Channel" value={f.twitch_channel} onChange={(v)=>set("twitch_channel",v)} testId="tr-edit-twitch"/>
+          <SelectField label="Stream Plattform" value={f.stream_platform} onChange={(v)=>set("stream_platform",v)} options={STREAM_PLATFORM_OPTIONS} />
+          <Fld label="Stream URL" value={f.stream_url} onChange={(v)=>set("stream_url",v)} testId="tr-edit-stream-url"/>
+          <Fld label="Stream Titel" value={f.stream_title} onChange={(v)=>set("stream_title",v)} testId="tr-edit-stream-title"/>
+        </div>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.twitch_enabled} onChange={(e)=>set("twitch_enabled",e.target.checked)} className="accent-[#9146FF]"/><span>Twitch einbetten</span></label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.has_live_stream} onChange={(e)=>set("has_live_stream",e.target.checked)} className="accent-[#9146FF]"/><span>Live-Stream aktiv</span></label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.show_chat} onChange={(e)=>set("show_chat",e.target.checked)} className="accent-[#9146FF]"/><span>Chat anzeigen</span></label>
+        </div>
+      </div>
       <button onClick={save} data-testid="tr-edit-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
     </div>
+  );
+}
+
+function slugify(value) {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ß/g, "ss")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 80);
+}
+
+function SelectField({ label, value, onChange, options }) {
+  return (
+    <label className="block">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <select value={value || ""} onChange={(e) => onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white">
+        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+    </label>
   );
 }
 
