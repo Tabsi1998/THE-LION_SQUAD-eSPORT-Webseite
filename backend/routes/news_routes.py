@@ -259,6 +259,7 @@ async def news_meta():
 _TIER_ORDER = {"main": 0, "platinum": 1, "gold": 2, "silver": 3, "bronze": 4}
 _LEGACY_TIER_MAP = {"supporter": "bronze", "partner": "bronze"}
 _SPONSOR_PLACEMENT_FIELDS = ("show_on_home", "show_on_footer", "show_on_events", "show_on_tv", "show_in_emails")
+_SPONSOR_CONTRACT_STATUSES = {"planned", "active", "paused", "expired", "cancelled"}
 _TIER_PLACEMENT_DEFAULTS = {
     "main": {"show_on_home": True, "show_on_footer": True, "show_on_events": False, "show_on_tv": True, "show_in_emails": True},
     "platinum": {"show_on_home": True, "show_on_footer": True, "show_on_events": False, "show_on_tv": True, "show_in_emails": False},
@@ -279,10 +280,47 @@ def _sponsor_effective_flag(doc: dict, field: str) -> bool:
     return bool(doc.get(field))
 
 
+def _today_iso() -> str:
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def _clean_date(value) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    return raw[:10]
+
+
+def _sponsor_effective_status(doc: dict) -> str:
+    if doc.get("is_active") is False:
+        return "inactive"
+    status = str(doc.get("contract_status") or "active").strip().lower()
+    if status not in _SPONSOR_CONTRACT_STATUSES:
+        status = "active"
+    if status in {"paused", "cancelled"}:
+        return status
+    today = _today_iso()
+    start = _clean_date(doc.get("contract_start"))
+    end = _clean_date(doc.get("contract_end"))
+    if start and start > today:
+        return "planned"
+    if end and end < today:
+        return "expired"
+    return "active" if status in {"active", "expired", "planned"} else status
+
+
+def _sponsor_is_public_active(doc: dict) -> bool:
+    return _sponsor_effective_status(doc) == "active"
+
+
 def _sponsor_defaults(doc: dict) -> dict:
     """Resolve tier-based placement suggestions when fields are missing."""
     tier = _normalize_tier(doc.get("tier"))
     doc["tier"] = tier
+    status = str(doc.get("contract_status") or "active").strip().lower()
+    doc["contract_status"] = status if status in _SPONSOR_CONTRACT_STATUSES else "active"
+    doc["contract_start"] = _clean_date(doc.get("contract_start"))
+    doc["contract_end"] = _clean_date(doc.get("contract_end"))
     defaults = _TIER_PLACEMENT_DEFAULTS.get(tier, _TIER_PLACEMENT_DEFAULTS["bronze"])
     for field in _SPONSOR_PLACEMENT_FIELDS:
         if doc.get(field) is None:
@@ -291,6 +329,8 @@ def _sponsor_defaults(doc: dict) -> dict:
         doc["event_ids"] = []
     if doc.get("is_active") is None:
         doc["is_active"] = True
+    doc["effective_status"] = _sponsor_effective_status(doc)
+    doc["is_currently_visible"] = _sponsor_is_public_active(doc)
     return doc
 
 
@@ -303,6 +343,7 @@ async def list_sponsors(placement: Optional[str] = None):
     # Normalize legacy tiers in-flight
     for s in sp:
         _sponsor_defaults(s)
+    sp = [s for s in sp if _sponsor_is_public_active(s)]
     # Apply placement filter
     if placement == "home":
         sp = [s for s in sp if s["show_on_home"]]
@@ -345,7 +386,11 @@ async def create_sponsor(body: SponsorCreate, me: dict = Depends(require_admin()
 @router.patch("/sponsors/{sid}")
 async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(require_admin())):
     db = get_db()
-    nullable_fields = {"logo_url", "link", "description", "event_ids"}
+    nullable_fields = {
+        "logo_url", "link", "description", "event_ids",
+        "contract_start", "contract_end", "contact_name", "contact_email",
+        "contact_phone", "internal_notes",
+    }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if not updates:

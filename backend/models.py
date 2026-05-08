@@ -656,6 +656,7 @@ class NewsUpdate(BaseModel):
 
 
 SponsorTier = Literal["main", "platinum", "gold", "silver", "bronze"]
+SponsorContractStatus = Literal["planned", "active", "paused", "expired", "cancelled"]
 
 
 class SponsorCreate(BaseModel):
@@ -665,6 +666,13 @@ class SponsorCreate(BaseModel):
     description: Optional[str] = None
     tier: SponsorTier = "bronze"
     is_active: bool = True
+    contract_status: SponsorContractStatus = "active"
+    contract_start: Optional[str] = None
+    contract_end: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    internal_notes: Optional[str] = None
     show_on_home: Optional[bool] = None
     show_on_footer: Optional[bool] = None
     show_on_events: Optional[bool] = None
@@ -681,6 +689,13 @@ class SponsorUpdate(BaseModel):
     description: Optional[str] = None
     tier: Optional[SponsorTier] = None
     is_active: Optional[bool] = None
+    contract_status: Optional[SponsorContractStatus] = None
+    contract_start: Optional[str] = None
+    contract_end: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    internal_notes: Optional[str] = None
     show_on_home: Optional[bool] = None
     show_on_footer: Optional[bool] = None
     show_on_events: Optional[bool] = None

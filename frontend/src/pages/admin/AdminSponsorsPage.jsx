@@ -10,6 +10,16 @@ import { Plus, Trash2, Upload, Pencil, X as XIcon } from "lucide-react";
 const TIERS = ["main", "platinum", "gold", "silver", "bronze"];
 const TIER_LABELS = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const TIER_COLORS = { main: "text-[#29B6E8]", platinum: "text-[#E5E4E2]", gold: "text-[#FFD700]", silver: "text-white/80", bronze: "text-[#CD7F32]" };
+const CONTRACT_STATUSES = ["active", "planned", "paused", "expired", "cancelled"];
+const CONTRACT_LABELS = { active: "Aktiv", planned: "Geplant", paused: "Pausiert", expired: "Abgelaufen", cancelled: "Gekündigt", inactive: "Inaktiv" };
+const STATUS_CLASSES = {
+  active: "bg-[#00FF88]/10 text-[#00FF88]",
+  planned: "bg-[#29B6E8]/10 text-[#29B6E8]",
+  paused: "bg-[#FFD700]/10 text-[#FFD700]",
+  expired: "bg-white/10 text-white/60",
+  cancelled: "bg-[#FF3B30]/10 text-[#FF3B30]",
+  inactive: "bg-[#FF3B30]/10 text-[#FF3B30]",
+};
 const TIER_DEFAULTS = {
   main: { show_on_home: true, show_on_footer: true, show_on_events: false, show_on_tv: true, show_in_emails: true },
   platinum: { show_on_home: true, show_on_footer: true, show_on_events: false, show_on_tv: true, show_in_emails: false },
@@ -17,6 +27,30 @@ const TIER_DEFAULTS = {
   silver: { show_on_home: false, show_on_footer: true, show_on_events: false, show_on_tv: false, show_in_emails: false },
   bronze: { show_on_home: false, show_on_footer: false, show_on_events: false, show_on_tv: false, show_in_emails: false },
 };
+
+const PLACEMENT_LABELS = [
+  ["show_on_home", "Home"],
+  ["show_on_footer", "Footer"],
+  ["show_on_events", "Events"],
+  ["show_on_tv", "TV"],
+  ["show_in_emails", "E-Mail"],
+];
+
+function effectiveSponsorStatus(sponsor) {
+  if (sponsor?.effective_status) return sponsor.effective_status;
+  if (sponsor?.is_active === false) return "inactive";
+  const status = sponsor?.contract_status || "active";
+  if (status === "paused" || status === "cancelled") return status;
+  const today = new Date().toISOString().slice(0, 10);
+  if (sponsor?.contract_start && sponsor.contract_start > today) return "planned";
+  if (sponsor?.contract_end && sponsor.contract_end < today) return "expired";
+  return status === "expired" || status === "planned" ? "active" : status;
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  return String(value).slice(0, 10).split("-").reverse().join(".");
+}
 
 export default function AdminSponsorsPage() {
   const [list, setList] = useState([]);
@@ -100,7 +134,7 @@ export default function AdminSponsorsPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Partner</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Sponsoren</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">
-            Tier steuert Größe und Reihenfolge. Die Sichtbarkeit wird über die Haken gesetzt: Bronze nur Sponsoren-Seite, Silber/Gold Footer, Platin Home/Footer/TV, Hauptsponsor zusätzlich E-Mail.
+            Tier steuert Größe und Reihenfolge. Vertragsstatus und Laufzeit entscheiden, ob ein Sponsor öffentlich ausgespielt wird; die Haken entscheiden die Platzierungen.
           </p>
         </div>
         <div className="flex gap-2">
@@ -158,6 +192,9 @@ export default function AdminSponsorsPage() {
                   <div className={`text-[10px] uppercase tracking-widest font-bold ${TIER_COLORS[s.tier] || "text-white/60"}`}>{TIER_LABELS[s.tier] || s.tier || "—"}</div>
                   <div className="font-heading text-lg font-bold truncate">{s.name}</div>
                   <div className="flex gap-1 mt-1 flex-wrap">
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-widest ${STATUS_CLASSES[effectiveSponsorStatus(s)] || STATUS_CLASSES.inactive}`}>
+                      {CONTRACT_LABELS[effectiveSponsorStatus(s)] || effectiveSponsorStatus(s)}
+                    </span>
                     {s.show_on_home && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest">Home</span>}
                     {s.show_on_footer && <span className="text-[9px] px-1.5 py-0.5 bg-white/10 text-white/70 rounded-sm font-bold uppercase tracking-widest">Footer</span>}
                     {s.show_on_events && <span className="text-[9px] px-1.5 py-0.5 bg-[#FFD700]/15 text-[#FFD700] rounded-sm font-bold uppercase tracking-widest">Events</span>}
@@ -172,6 +209,14 @@ export default function AdminSponsorsPage() {
                 <button onClick={() => del(s.id)} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
+            {(s.contract_start || s.contract_end || s.contact_name) && (
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-white/45">
+                {(s.contract_start || s.contract_end) && (
+                  <div>Vertrag: {formatDate(s.contract_start) || "offen"} bis {formatDate(s.contract_end) || "offen"}</div>
+                )}
+                {s.contact_name && <div>Ansprechpartner: {s.contact_name}</div>}
+              </div>
+            )}
             {s.description && <p className="mt-3 text-sm text-white/60 line-clamp-2">{s.description}</p>}
             {s.link && <a href={s.link} target="_blank" rel="noreferrer" className="mt-3 block text-xs text-[#29B6E8] hover:underline truncate">{s.link}</a>}
           </div>
@@ -199,6 +244,13 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
     link: sponsor?.link || "", description: sponsor?.description || "",
     tier: initialTier,
     is_active: sponsor?.is_active !== false,
+    contract_status: sponsor?.contract_status || "active",
+    contract_start: sponsor?.contract_start || "",
+    contract_end: sponsor?.contract_end || "",
+    contact_name: sponsor?.contact_name || "",
+    contact_email: sponsor?.contact_email || "",
+    contact_phone: sponsor?.contact_phone || "",
+    internal_notes: sponsor?.internal_notes || "",
     show_on_home: sponsor ? sponsor?.show_on_home === true : initialDefaults.show_on_home,
     show_on_footer: sponsor ? sponsor?.show_on_footer === true : initialDefaults.show_on_footer,
     show_on_events: sponsor ? sponsor?.show_on_events === true : initialDefaults.show_on_events,
@@ -258,6 +310,21 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
             <input type="number" value={form.order_index ?? 0} onChange={(e) => set("order_index", parseInt(e.target.value, 10) || 0)} data-testid="sponsor-order" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           </label>
         </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <label className="block">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Vertragsstatus</div>
+            <select value={form.contract_status} onChange={(e) => set("contract_status", e.target.value)} data-testid="sponsor-contract-status" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+              {CONTRACT_STATUSES.map((status) => <option key={status} value={status}>{CONTRACT_LABELS[status]}</option>)}
+            </select>
+          </label>
+          <Field label="Start" type="date" value={form.contract_start} onChange={(v) => set("contract_start", v)} testId="sponsor-contract-start" />
+          <Field label="Ende" type="date" value={form.contract_end} onChange={(v) => set("contract_end", v)} testId="sponsor-contract-end" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Field label="Ansprechpartner" value={form.contact_name} onChange={(v) => set("contact_name", v)} testId="sponsor-contact-name" />
+          <Field label="Kontakt E-Mail" type="email" value={form.contact_email} onChange={(v) => set("contact_email", v)} testId="sponsor-contact-email" />
+          <Field label="Telefon" value={form.contact_phone} onChange={(v) => set("contact_phone", v)} testId="sponsor-contact-phone" />
+        </div>
         <div className="border border-white/10 rounded-sm p-3 bg-[#0A0A0A]">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div>
@@ -314,9 +381,14 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
             <p className="mt-2 text-[10px] text-white/40">Nur relevant, wenn „Events” aktiv ist. Leer lassen = bei allen eigenen Events erlaubt.</p>
           </div>
         )}
+        <SponsorPlacementPreview sponsor={form} />
         <label className="block">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Beschreibung</div>
           <textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} data-testid="sponsor-description" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+        </label>
+        <label className="block">
+          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Interne Notizen</div>
+          <textarea rows={2} value={form.internal_notes} onChange={(e) => set("internal_notes", e.target.value)} data-testid="sponsor-internal-notes" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
         </label>
         <div className="flex gap-2 pt-2">
           <button type="submit" disabled={saving} data-testid="sponsor-save" className="flex-1 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
@@ -329,11 +401,39 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
   );
 }
 
-function Field({ label, value, onChange, required, placeholder, testId }) {
+function SponsorPlacementPreview({ sponsor }) {
+  const status = effectiveSponsorStatus(sponsor);
+  const enabled = PLACEMENT_LABELS.filter(([key]) => sponsor[key] === true);
+  const visible = sponsor.is_active !== false && status === "active";
+  return (
+    <div className="border border-white/10 rounded-sm bg-[#080808] p-3" data-testid="sponsor-placement-preview">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Vorschau Ausspielung</div>
+          <p className="mt-1 text-[10px] text-white/40">
+            Öffentlich sichtbar nur bei aktivem Vertrag innerhalb der Laufzeit.
+          </p>
+        </div>
+        <span className={`text-[9px] px-2 py-1 rounded-sm font-bold uppercase tracking-widest ${visible ? STATUS_CLASSES.active : STATUS_CLASSES[status] || STATUS_CLASSES.inactive}`}>
+          {visible ? "Wird ausgespielt" : "Nicht öffentlich"}
+        </span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {enabled.length ? enabled.map(([key, label]) => (
+          <span key={key} className="text-[10px] px-2 py-1 border border-white/10 text-white/70 rounded-sm uppercase tracking-wider font-bold">{label}</span>
+        )) : (
+          <span className="text-xs text-white/35">Keine Platzierung aktiv.</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, required, placeholder, testId, type = "text" }) {
   return (
     <label className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <input value={value || ""} onChange={(e) => onChange(e.target.value)} required={required} placeholder={placeholder} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+      <input type={type} value={value || ""} onChange={(e) => onChange(e.target.value)} required={required} placeholder={placeholder} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
     </label>
   );
 }
