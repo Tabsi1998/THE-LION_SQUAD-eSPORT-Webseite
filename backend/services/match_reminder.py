@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from database import get_db
+from match_rules import participant_source_ids
 from models import now_utc
 
 logger = logging.getLogger("tls.match_reminders")
@@ -21,14 +22,10 @@ LEAD_TIMES = [
 
 
 async def _participants_for_match(match: dict) -> list[dict]:
-    """Resolve match.player1_id / player2_id (or registration ids) → user objects."""
+    """Resolve match participant registration ids to user objects."""
     db = get_db()
     out: list[dict] = []
-    p1 = match.get("player1_id") or match.get("p1_registration_id")
-    p2 = match.get("player2_id") or match.get("p2_registration_id")
-    for raw in (p1, p2):
-        if not raw:
-            continue
+    for raw in participant_source_ids(match):
         # Try direct user
         u = await db.users.find_one({"id": raw}, {"id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1})
         if u:
@@ -72,7 +69,7 @@ async def schedule_match_reminders() -> dict:
         diff_min = (scheduled - now).total_seconds() / 60
         # Tournament + opponent context
         t = await db.tournaments.find_one({"id": m.get("tournament_id")}, {"title": 1, "slug": 1}) or {}
-        url = f"/match/{m.get('id')}"
+        url = f"/matches/{m.get('id')}"
         when_str = scheduled.astimezone(timezone.utc).strftime("%d.%m. %H:%M UTC")
 
         participants = await _participants_for_match(m)

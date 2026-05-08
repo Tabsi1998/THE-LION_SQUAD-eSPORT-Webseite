@@ -13,6 +13,7 @@ const STATUS_MAP = {
   rejected: { label: "ABGELEHNT", cls: "bg-[#FF3B30]/15 text-[#FF3B30] border-[#FF3B30]/40" },
   waitlist: { label: "WARTELISTE", cls: "bg-[#FFD700]/10 text-[#FFD700] border-[#FFD700]/40" },
   checked_in: { label: "CHECKED IN", cls: "bg-[#29B6E8]/15 text-[#29B6E8] border-[#29B6E8]/40" },
+  no_show: { label: "NO-SHOW", cls: "bg-[#FF3B30]/15 text-[#FF3B30] border-[#FF3B30]/40" },
   disputed: { label: "DISPUTE", cls: "bg-[#FF3B30]/20 text-[#FF3B30] border-[#FF3B30]/50" },
   ready: { label: "BEREIT", cls: "bg-[#29B6E8]/15 text-[#29B6E8] border-[#29B6E8]/40" },
   scheduled: { label: "ANGEKÜNDIGT", cls: "bg-[#29B6E8]/10 text-[#29B6E8] border-[#29B6E8]/40" },

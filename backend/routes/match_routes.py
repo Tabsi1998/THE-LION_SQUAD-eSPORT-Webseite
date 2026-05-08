@@ -5,6 +5,7 @@ from auth import get_current_user, require_admin, require_role, get_optional_use
 from services.visibility import user_can_see
 from models import MatchUpdate, MatchScoreReport, MatchDispute, now_utc, new_id
 from bracket_engine import advance_match_winner
+from match_rules import loser_for_winner, match_allows_draw, validate_winner_id
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
@@ -114,11 +115,20 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(requ
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if "scheduled_at" in updates:
         updates["scheduled_at"] = updates["scheduled_at"].isoformat() if updates["scheduled_at"] else None
-    # If winner_id changed, determine loser + status
-    if "winner_id" in updates and updates["winner_id"]:
-        w = updates["winner_id"]
-        updates["loser_id"] = m.get("participant_a_id") if w == m.get("participant_b_id") else m.get("participant_b_id")
-        updates["status"] = "completed"
+    if "winner_id" in updates:
+        validate_winner_id(m, updates.get("winner_id"))
+        updates["loser_id"] = loser_for_winner(m, updates.get("winner_id"))
+        if updates.get("winner_id"):
+            updates["status"] = "completed"
+    final_status = updates.get("status", m.get("status"))
+    final_winner = updates.get("winner_id", m.get("winner_id"))
+    if final_status == "completed" and not final_winner and not match_allows_draw(m):
+        raise HTTPException(status_code=400, detail="Dieses Match braucht einen Gewinner")
+    if final_status == "completed" and final_winner:
+        validate_winner_id(m, final_winner)
+        updates["loser_id"] = loser_for_winner(m, final_winner)
+    if not final_winner and "winner_id" in updates:
+        updates["loser_id"] = None
     updates["updated_at"] = now_utc().isoformat()
     await db.matches.update_one({"id": match_id}, {"$set": updates})
     m = await db.matches.find_one({"id": match_id})
@@ -202,17 +212,26 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
                 winner = m.get("participant_a_id")
             elif body.score_b > body.score_a:
                 winner = m.get("participant_b_id")
-            await db.matches.update_one({"id": match_id}, {"$set": {
-                "score_a": body.score_a, "score_b": body.score_b,
-                "winner_id": winner,
-                "loser_id": m.get("participant_b_id") if winner == m.get("participant_a_id") else m.get("participant_a_id"),
-                "status": "completed", "updated_at": now_utc().isoformat(),
-            }})
-            # Advance bracket
-            m = await db.matches.find_one({"id": match_id})
-            all_matches = await db.matches.find({"tournament_id": m["tournament_id"]}).to_list(2000)
-            for um in advance_match_winner(m, all_matches):
-                await db.matches.update_one({"id": um["id"]}, {"$set": um})
+            if not winner and not match_allows_draw(m):
+                await db.matches.update_one({"id": match_id}, {"$set": {
+                    "score_a": body.score_a, "score_b": body.score_b,
+                    "winner_id": None, "loser_id": None,
+                    "status": "disputed",
+                    "admin_note": m.get("admin_note") or "Unentschieden gemeldet; Gewinnerentscheidung erforderlich.",
+                    "updated_at": now_utc().isoformat(),
+                }})
+            else:
+                await db.matches.update_one({"id": match_id}, {"$set": {
+                    "score_a": body.score_a, "score_b": body.score_b,
+                    "winner_id": winner,
+                    "loser_id": loser_for_winner(m, winner),
+                    "status": "completed", "updated_at": now_utc().isoformat(),
+                }})
+                # Advance bracket
+                m = await db.matches.find_one({"id": match_id})
+                all_matches = await db.matches.find({"tournament_id": m["tournament_id"]}).to_list(2000)
+                for um in advance_match_winner(m, all_matches):
+                    await db.matches.update_one({"id": um["id"]}, {"$set": um})
     m = await db.matches.find_one({"id": match_id}, {"_id": 0})
     return m
 
@@ -258,7 +277,8 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(require_role("mo
             detail="Bei einem Forfeit ist eine Begründung (mind. 5 Zeichen) Pflicht.",
         )
     winner_id = body.get("winner_id")
-    loser_id = m.get("participant_a_id") if winner_id == m.get("participant_b_id") else m.get("participant_b_id")
+    validate_winner_id(m, winner_id)
+    loser_id = loser_for_winner(m, winner_id)
     await db.matches.update_one({"id": match_id}, {"$set": {
         "winner_id": winner_id, "loser_id": loser_id,
         "status": "forfeit",

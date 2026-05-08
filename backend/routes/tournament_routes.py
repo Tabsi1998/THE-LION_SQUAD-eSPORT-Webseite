@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from datetime import datetime, timezone
 from database import get_db
-from auth import get_current_user, require_admin, get_optional_user
+from auth import get_current_user, require_admin, require_role, get_optional_user
 from services.visibility import user_can_see
 from services.public_phase import derive_public_phase
 from models import (
@@ -17,6 +17,7 @@ from bracket_extensions import (
 
 router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+REGISTRATION_CHECKIN_STATUSES = {"approved", "checked_in", "no_show"}
 
 
 def _iso(dt):
@@ -98,6 +99,45 @@ def _required_game_fields(game: dict | None) -> list[dict]:
         if isinstance(field, dict) and field.get("required") is not False and field.get("key"):
             fields.append(field)
     return fields
+
+
+async def _audit_tournament_action(db, action: str, actor_id: str | None,
+                                   target_id: str, data: dict | None = None) -> None:
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": action,
+        "target_id": target_id,
+        "actor_id": actor_id,
+        "data": data or {},
+        "created_at": now_utc().isoformat(),
+    })
+
+
+async def _apply_late_checkin_hooks(db, tid: str, user_id: str) -> None:
+    try:
+        t = await db.tournaments.find_one({"id": tid}, {"_id": 0, "start_date": 1, "check_in_until": 1})
+        if t:
+            now = now_utc()
+            cutoff = t.get("check_in_until") or t.get("start_date")
+            if cutoff:
+                cutoff_dt = datetime.fromisoformat(cutoff.replace("Z", "+00:00"))
+                if cutoff_dt.tzinfo is None:
+                    cutoff_dt = cutoff_dt.replace(tzinfo=timezone.utc)
+                if now > cutoff_dt:
+                    from badges import trigger_negative_incident
+                    await trigger_negative_incident(user_id, "afk",
+                        {"tournament_id": tid, "reason": "late_checkin",
+                         "minutes_late": int((now - cutoff_dt).total_seconds() / 60)})
+    except Exception:
+        pass
+
+
+async def _apply_checked_in_badges(user_id: str, tid: str) -> None:
+    try:
+        from badges import on_checked_in
+        await on_checked_in(user_id, tid)
+    except Exception:
+        pass
 
 
 async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
@@ -348,6 +388,44 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     return reg
 
 
+@router.post("/{tid}/registrations/{reg_id}/checkin")
+async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
+                                         me: dict = Depends(require_role("moderator"))):
+    """Operational check-in control for tournament staff.
+
+    This is intentionally narrower than the generic registration update route:
+    staff can mark a player as checked in, checked out/approved, or no-show
+    without receiving full tournament-admin rights.
+    """
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
+    if not reg:
+        raise HTTPException(status_code=404, detail="Anmeldung nicht gefunden")
+    status = body.get("status")
+    if status not in REGISTRATION_CHECKIN_STATUSES:
+        raise HTTPException(status_code=400, detail="Ungültiger Check-in-Status")
+    if reg.get("status") in ("rejected", "waitlist") and status == "checked_in":
+        raise HTTPException(status_code=400, detail="Diese Anmeldung kann nicht eingecheckt werden")
+
+    await db.tournament_registrations.update_one(
+        {"id": reg_id},
+        {"$set": {"status": status, "updated_at": now_utc().isoformat()}},
+    )
+    if status == "checked_in" and reg.get("user_id"):
+        await _apply_late_checkin_hooks(db, tid, reg["user_id"])
+        await _apply_checked_in_badges(reg["user_id"], tid)
+    await _audit_tournament_action(
+        db,
+        "tournament.registration.checkin_status",
+        me.get("id"),
+        tid,
+        {"registration_id": reg_id, "from_status": reg.get("status"), "to_status": status},
+    )
+    updated = await db.tournament_registrations.find_one({"id": reg_id}, {"_id": 0})
+    return updated
+
+
 @router.delete("/{tid}/registrations/{reg_id}")
 async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
@@ -372,28 +450,15 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
     await db.tournament_registrations.update_one(
         {"id": reg["id"]}, {"$set": {"status": "checked_in", "updated_at": now_utc().isoformat()}})
     # Phase B v4.1: late check-in detection (check-in after start_date) → neg_late_checkin
-    try:
-        t = await db.tournaments.find_one({"id": tid}, {"_id": 0, "start_date": 1, "check_in_until": 1})
-        if t:
-            now = now_utc()
-            cutoff = t.get("check_in_until") or t.get("start_date")
-            if cutoff:
-                from datetime import datetime, timezone
-                cutoff_dt = datetime.fromisoformat(cutoff.replace("Z", "+00:00"))
-                if cutoff_dt.tzinfo is None:
-                    cutoff_dt = cutoff_dt.replace(tzinfo=timezone.utc)
-                if now > cutoff_dt:
-                    from badges import trigger_negative_incident
-                    await trigger_negative_incident(me["id"], "afk",
-                        {"tournament_id": tid, "reason": "late_checkin",
-                         "minutes_late": int((now - cutoff_dt).total_seconds() / 60)})
-    except Exception:
-        pass
-    try:
-        from badges import on_checked_in
-        await on_checked_in(me["id"], tid)
-    except Exception:
-        pass
+    await _apply_late_checkin_hooks(db, tid, me["id"])
+    await _apply_checked_in_badges(me["id"], tid)
+    await _audit_tournament_action(
+        db,
+        "tournament.registration.self_checkin",
+        me.get("id"),
+        tid,
+        {"registration_id": reg["id"], "from_status": reg.get("status"), "to_status": "checked_in"},
+    )
     return {"ok": True}
 
 
@@ -417,15 +482,38 @@ async def generate(tid: str, me: dict = Depends(require_admin())):
     if matches:
         await db.matches.insert_many(matches)
     await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live", "updated_at": now_utc().isoformat()}})
+    await _audit_tournament_action(
+        db,
+        "tournament.bracket.generate",
+        me.get("id"),
+        tid,
+        {"match_count": len(matches), "format": t.get("format"), "participant_count": len(regs)},
+    )
     return {"ok": True, "match_count": len(matches)}
 
 
 @router.post("/{tid}/reset-bracket")
-async def reset_bracket(tid: str, me: dict = Depends(require_admin())):
+async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(require_admin())):
     db = get_db()
     tid = await _resolve_tid(tid)
+    t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not t:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if t.get("status") in ("live", "completed", "results_published") and not force:
+        raise HTTPException(
+            status_code=409,
+            detail="Bracket-Reset fuer laufende oder beendete Turniere braucht force=true",
+        )
+    match_count = await db.matches.count_documents({"tournament_id": tid})
     await db.matches.delete_many({"tournament_id": tid})
     await db.tournaments.update_one({"id": tid}, {"$set": {"status": "draft", "updated_at": now_utc().isoformat()}})
+    await _audit_tournament_action(
+        db,
+        "tournament.bracket.reset",
+        me.get("id"),
+        tid,
+        {"previous_status": t.get("status"), "match_count": match_count, "force": force},
+    )
     return {"ok": True}
 
 

@@ -72,6 +72,24 @@ export default function AdminTournamentEditPage() {
       toast.success("Bracket zurückgesetzt.");
       load();
     } catch (e) {
+      if (e.response?.status === 409) {
+        const force = await confirm({
+          title: "Laufendes Bracket wirklich zurücksetzen?",
+          description: "Das Turnier ist live oder bereits beendet. Beim Fortfahren werden alle Matches endgültig gelöscht.",
+          confirmLabel: "Trotzdem zurücksetzen",
+          tone: "danger",
+        });
+        if (!force) return;
+        try {
+          await api.post(`/tournaments/${id}/reset-bracket?force=true`);
+          toast.success("Bracket zurückgesetzt.");
+          load();
+          return;
+        } catch (inner) {
+          toast.error(formatRequestError(inner, "Bracket konnte nicht zurueckgesetzt werden."));
+          return;
+        }
+      }
       toast.error(formatRequestError(e, "Bracket konnte nicht zurueckgesetzt werden."));
     }
   };
@@ -81,6 +99,15 @@ export default function AdminTournamentEditPage() {
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Teilnehmerstatus konnte nicht gespeichert werden."));
+    }
+  };
+  const setRegCheckinStatus = async (rid, status) => {
+    try {
+      await api.post(`/tournaments/${id}/registrations/${rid}/checkin`, { status });
+      toast.success(status === "checked_in" ? "Check-in gesetzt." : status === "no_show" ? "No-Show gesetzt." : "Check-in zurückgenommen.");
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Check-in konnte nicht gespeichert werden."));
     }
   };
   const setTournStatus = async (status) => {
@@ -207,9 +234,22 @@ export default function AdminTournamentEditPage() {
                   <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
                   <td className="px-4 py-3 text-white/60">{r.discord || "—"}</td>
                   <td className="px-4 py-3 text-right">
-                    <select value={r.status} onChange={(e) => setRegStatus(r.id, e.target.value)} data-testid={`admin-reg-status-${r.id}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 text-xs rounded-sm">
-                      {["pending", "approved", "rejected", "waitlist", "checked_in"].map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {isAdmin && (
+                        <select value={r.status} onChange={(e) => setRegStatus(r.id, e.target.value)} data-testid={`admin-reg-status-${r.id}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 text-xs rounded-sm">
+                          {["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"].map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      )}
+                      {isModerator && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
+                        <button type="button" onClick={() => setRegCheckinStatus(r.id, "checked_in")} className="px-2 py-1 border border-[#00FF88]/40 text-[#00FF88] rounded-sm text-[10px] font-bold uppercase">Check-in</button>
+                      )}
+                      {isModerator && r.status === "checked_in" && (
+                        <button type="button" onClick={() => setRegCheckinStatus(r.id, "approved")} className="px-2 py-1 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Auschecken</button>
+                      )}
+                      {isModerator && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
+                        <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">No-Show</button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -459,7 +459,7 @@ class RegistrationCreate(BaseModel):
 
 
 class RegistrationUpdate(BaseModel):
-    status: Optional[Literal["pending", "approved", "rejected", "waitlist", "checked_in"]] = None
+    status: Optional[Literal["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"]] = None
     seed: Optional[int] = None
     ingame_name: Optional[str] = None
 
