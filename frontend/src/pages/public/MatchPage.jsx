@@ -15,6 +15,40 @@ const scheduleLabels = {
   escalated: "Turnierleitung nötig",
 };
 
+function legacyMatchPage(match) {
+  const tournament = match.tournament || { id: match.tournament_id, slug: match.tournament_slug, title: "Turnier" };
+  const participants = [
+    match.participant_a && {
+      slot: 1,
+      status: match.participant_a_id ? "filled" : "pending",
+      registration_id: match.participant_a_id,
+      display_name: match.participant_a.display_name || match.participant_a.ingame_name,
+      team: match.participant_a.team,
+      user: match.participant_a.user,
+    },
+    match.participant_b && {
+      slot: 2,
+      status: match.participant_b_id ? "filled" : "pending",
+      registration_id: match.participant_b_id,
+      display_name: match.participant_b.display_name || match.participant_b.ingame_name,
+      team: match.participant_b.team,
+      user: match.participant_b.user,
+    },
+  ].filter(Boolean);
+  return {
+    engine: "legacy",
+    match,
+    tournament,
+    stage: null,
+    participants,
+    schedule_proposals: [],
+    can_act: false,
+    acting_registration_id: null,
+    matchday: match.round,
+    matchday_label: match.round_name || (match.round ? `Runde ${match.round}` : "Match"),
+  };
+}
+
 function formatDateTime(value) {
   if (!value) return "Noch kein Termin";
   return new Date(value).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
@@ -47,13 +81,21 @@ export default function MatchPage() {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [{ data: page }, { data: messages }] = await Promise.all([
-      api.get(`/matches-v2/${id}/page`),
-      api.get(`/matches-v2/${id}/chat`),
-    ]);
-    setData(page);
-    setChat(messages || []);
-    setProposalAt(toLocalInput(page.match?.scheduled_at));
+    try {
+      const [{ data: page }, { data: messages }] = await Promise.all([
+        api.get(`/matches-v2/${id}/page`),
+        api.get(`/matches-v2/${id}/chat`),
+      ]);
+      setData({ ...page, engine: "v2" });
+      setChat(messages || []);
+      setProposalAt(toLocalInput(page.match?.scheduled_at));
+    } catch (err) {
+      const { data: legacy } = await api.get(`/matches/${id}`);
+      const page = legacyMatchPage(legacy);
+      setData(page);
+      setChat([]);
+      setProposalAt(toLocalInput(page.match?.scheduled_at));
+    }
   }, [id]);
 
   useEffect(() => { load().catch(() => setData(null)); }, [load]);
@@ -117,6 +159,7 @@ export default function MatchPage() {
   }
 
   const match = data.match || {};
+  const isV2 = data.engine !== "legacy";
   const latestProposal = (data.schedule_proposals || []).find((p) => p.status === "pending");
 
   return (
@@ -130,7 +173,7 @@ export default function MatchPage() {
           </div>
           <div className="border border-white/10 bg-[#121212] rounded-sm px-4 py-3 min-w-[16rem]">
             <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Terminstatus</div>
-            <div className="mt-1 font-heading font-black uppercase text-[#FFD700]">{scheduleLabels[match.schedule_status] || "Noch offen"}</div>
+            <div className="mt-1 font-heading font-black uppercase text-[#FFD700]">{scheduleLabels[match.schedule_status] || (isV2 ? "Noch offen" : "Klassisches Match")}</div>
             <div className="mt-1 text-sm text-white/65">{formatDateTime(match.scheduled_at)}</div>
           </div>
         </div>
@@ -152,7 +195,9 @@ export default function MatchPage() {
 
             <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
               <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Terminabstimmung</h2>
-              {data.can_act ? (
+              {!isV2 ? (
+                <p className="mt-3 text-sm text-white/50">Dieses ältere Match nutzt die einheitliche Match-URL. Terminabstimmung und Matchchat laufen bei neu generierten V2-/Liga-Matches.</p>
+              ) : data.can_act ? (
                 <form onSubmit={propose} className="mt-4 grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
                   <Field label="Vorschlag">
                     <input type="datetime-local" value={proposalAt} onChange={(e) => setProposalAt(e.target.value)} className="input" />
@@ -166,7 +211,7 @@ export default function MatchPage() {
                 <p className="mt-3 text-sm text-white/50">Terminänderungen können Teilnehmer, Team-Captains und Turnierleitung einreichen.</p>
               )}
 
-              <div className="mt-5 space-y-3">
+              {isV2 && <div className="mt-5 space-y-3">
                 {(data.schedule_proposals || []).map((p) => (
                   <div key={p.id} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
                     <div className="flex items-start justify-between gap-3">
@@ -192,7 +237,7 @@ export default function MatchPage() {
                   </div>
                 ))}
                 {!latestProposal && (data.schedule_proposals || []).length === 0 && <div className="text-sm text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
-              </div>
+              </div>}
             </div>
           </div>
 
@@ -207,7 +252,9 @@ export default function MatchPage() {
               ))}
               {chat.length === 0 && <div className="text-sm text-white/40">Noch keine Nachrichten.</div>}
             </div>
-            {user && data.can_act ? (
+            {!isV2 ? (
+              <p className="mt-4 text-xs text-white/45">Matchchat ist für neue V2-/Liga-Matches aktiv.</p>
+            ) : user && data.can_act ? (
               <form onSubmit={sendMessage} className="mt-4 flex gap-2">
                 <input value={message} onChange={(e) => setMessage(e.target.value)} className="input flex-1" placeholder="Nachricht schreiben" />
                 <button className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm"><Send className="w-4 h-4" /></button>
