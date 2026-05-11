@@ -194,19 +194,19 @@ function useHomeStructuredData(state) {
 
 function FeaturedNews({ news }) {
   return (
-    <Link to={`/news/${news.slug}`} data-testid={`home-featured-news-${news.slug}`} className="lg:col-span-7 group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#111] overflow-hidden grid md:grid-cols-2 transition min-w-0">
-      <div className="aspect-video md:aspect-auto bg-[#070707] overflow-hidden">
+    <Link to={`/news/${news.slug}`} data-testid={`home-featured-news-${news.slug}`} className="lg:col-span-8 group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#111] overflow-hidden grid md:grid-cols-[minmax(0,1.05fr)_minmax(18rem,0.95fr)] transition min-w-0">
+      <div className="aspect-[16/10] md:aspect-auto bg-[#070707] overflow-hidden">
         {news.banner_url ? (
-          <img src={resolveMediaUrl(news.banner_url)} alt="" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition duration-500" />
+          <img src={resolveMediaUrl(news.banner_url)} alt="" className="w-full h-full object-cover object-center opacity-90 group-hover:scale-105 transition duration-500" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-[#29B6E8]/20 via-[#101010] to-black" />
         )}
       </div>
-      <div className="p-6 flex flex-col justify-center min-w-0">
+      <div className="p-5 md:p-6 flex flex-col justify-center min-w-0">
         <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
           <Newspaper className="w-3 h-3" /> Neueste News {news.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
         </div>
-        <h2 className="mt-3 font-heading text-3xl md:text-4xl font-black uppercase leading-tight group-hover:text-[#29B6E8] transition break-words">{news.title}</h2>
+        <h2 className="mt-3 font-heading text-2xl md:text-3xl xl:text-4xl font-black uppercase leading-[1.03] group-hover:text-[#29B6E8] transition break-words line-clamp-6">{news.title}</h2>
         {news.excerpt && <p className="mt-3 text-white/65 line-clamp-3">{news.excerpt}</p>}
         <span className="mt-5 inline-flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-white/55 group-hover:text-[#29B6E8]">
           Lesen <ArrowRight className="w-3.5 h-3.5" />
@@ -225,7 +225,7 @@ function NextUp({ items, wide = false }) {
     </div>
   );
   return (
-    <div className={`${wide ? "lg:col-span-12" : "lg:col-span-5"} border border-white/10 rounded-sm bg-[#111] p-5 min-w-0`}>
+    <div className={`${wide ? "lg:col-span-12" : "lg:col-span-4"} border border-white/10 rounded-sm bg-[#111] p-5 min-w-0`}>
       <div className="flex items-center justify-between gap-3 min-w-0">
         <div className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700]">Nächste Termine</div>
         <Link to="/events" className="shrink-0 text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-[#29B6E8]">Alle Events</Link>
@@ -235,10 +235,10 @@ function NextUp({ items, wide = false }) {
           <Link key={`${item.kind}-${item.id}`} to={item.url} className="flex flex-col sm:flex-row sm:items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm p-3 bg-black/20 transition min-w-0">
             <KindIcon kind={item.kind} />
             <div className="min-w-0 flex-1">
-              <div className="font-heading font-bold truncate">{item.label}</div>
+              <div className="font-heading font-bold leading-tight line-clamp-2">{item.label}</div>
               {item.start_date && <div className="text-xs text-white/45">{new Date(item.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
             </div>
-            {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} className="self-start sm:self-center sm:max-w-[45%]" />}
+            {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} className="self-start sm:self-center sm:max-w-[48%]" />}
           </Link>
         ))}
       </div>
@@ -295,7 +295,7 @@ function NewsCard({ news, featured = false }) {
           {news.category}
           {news.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
         </div>
-        <h3 className={`mt-2 font-heading font-black uppercase line-clamp-2 group-hover:text-[#29B6E8] transition ${featured ? "text-2xl" : ""}`}>{news.title}</h3>
+        <h3 className={`mt-2 font-heading font-black uppercase leading-tight break-words line-clamp-3 group-hover:text-[#29B6E8] transition ${featured ? "text-xl md:text-2xl" : ""}`}>{news.title}</h3>
         {(news.published_at || news.created_at) && <div className="mt-2 text-[11px] text-white/40">{new Date(news.published_at || news.created_at).toLocaleDateString("de-DE", { dateStyle: "medium" })}</div>}
         {news.excerpt && <p className="mt-2 text-xs text-white/60 line-clamp-3">{news.excerpt}</p>}
       </div>

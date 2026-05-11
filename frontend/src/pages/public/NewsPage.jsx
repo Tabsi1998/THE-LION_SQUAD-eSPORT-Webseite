@@ -126,7 +126,7 @@ function NewsCard({ n, featured = false }) {
           {VIcon && <VIcon className="w-3 h-3 text-[#FFD700]" />}
           <span className="text-white/30 ml-auto">{new Date(n.published_at || n.created_at).toLocaleDateString("de-DE")}</span>
         </div>
-        <h3 className={`mt-2 font-heading font-black ${featured ? "text-2xl" : "text-lg"} group-hover:text-[#29B6E8] transition`}>
+        <h3 className={`mt-2 font-heading font-black leading-tight break-words line-clamp-3 ${featured ? "text-xl md:text-2xl" : "text-lg"} group-hover:text-[#29B6E8] transition`}>
           {n.title}
         </h3>
         {n.excerpt && <p className="mt-2 text-sm text-white/65 line-clamp-3 flex-1">{n.excerpt}</p>}

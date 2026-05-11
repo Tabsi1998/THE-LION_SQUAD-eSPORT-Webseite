@@ -52,7 +52,7 @@ export default function NewsDetailPage() {
           {post.pinned && <span className="inline-flex items-center gap-1 text-[#FFD700]"><Pin className="w-3 h-3" /> Angepinnt</span>}
           <span className="text-white/40 ml-auto">{new Date(post.published_at || post.created_at).toLocaleDateString("de-DE", { dateStyle: "long" })}</span>
         </div>
-        <h1 className="mt-3 font-heading text-3xl md:text-5xl font-black uppercase leading-tight">{post.title}</h1>
+        <h1 className="mt-3 font-heading text-3xl md:text-5xl font-black uppercase leading-tight break-words">{post.title}</h1>
         {post.excerpt && <p className="mt-4 text-lg text-white/70">{post.excerpt}</p>}
         {post.author_name && <div className="mt-3 text-xs text-white/50">Von <strong className="text-white/80">{post.author_name}</strong></div>}
         {post.banner_url && (
