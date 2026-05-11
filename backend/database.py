@@ -38,6 +38,8 @@ async def init_indexes():
     # Games
     await db.games.create_index("id", unique=True)
     await db.games.create_index("slug", unique=True)
+    await db.games.create_index("parent_game_id")
+    await db.games.create_index("identity_source_game_id")
     # Tournaments
     await db.tournaments.create_index("id", unique=True)
     await db.tournaments.create_index("slug", unique=True)

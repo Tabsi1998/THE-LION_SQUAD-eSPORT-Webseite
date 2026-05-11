@@ -7,11 +7,55 @@ from models import GameCreate, GameUpdate, now_utc, new_id
 router = APIRouter(prefix="/api/games", tags=["games"])
 
 
+def _effective_identity_source(game: dict, by_id: dict[str, dict]) -> dict:
+    if game.get("identity_source_game_id"):
+        return by_id.get(game["identity_source_game_id"]) or game
+    if game.get("inherit_player_ids") is not False and game.get("parent_game_id"):
+        return by_id.get(game["parent_game_id"]) or game
+    return game
+
+
+def _merge_player_id_fields(source: dict, game: dict) -> list[dict]:
+    merged: list[dict] = []
+    seen = set()
+    for field in (source.get("player_id_fields") or []) + (game.get("player_id_fields") or []):
+        if not isinstance(field, dict) or not field.get("key") or field["key"] in seen:
+            continue
+        seen.add(field["key"])
+        merged.append(field)
+    return merged
+
+
+def _enrich_games(games: list[dict]) -> list[dict]:
+    by_id = {game.get("id"): game for game in games if game.get("id")}
+    for game in games:
+        parent = by_id.get(game.get("parent_game_id"))
+        source = _effective_identity_source(game, by_id)
+        if parent:
+            game["parent_game"] = {
+                "id": parent.get("id"),
+                "name": parent.get("name"),
+                "slug": parent.get("slug"),
+                "short_name": parent.get("short_name"),
+            }
+        if source and source.get("id") != game.get("id"):
+            game["identity_source_game"] = {
+                "id": source.get("id"),
+                "name": source.get("name"),
+                "slug": source.get("slug"),
+                "short_name": source.get("short_name"),
+            }
+        game["identity_game_slug"] = source.get("slug") or game.get("slug")
+        game["identity_game_name"] = source.get("name") or game.get("name")
+        game["effective_player_id_fields"] = _merge_player_id_fields(source, game)
+    return games
+
+
 @router.get("")
 async def list_games():
     db = get_db()
     games = await db.games.find({}, {"_id": 0}).sort("name", 1).to_list(200)
-    return games
+    return _enrich_games(games)
 
 
 @router.get("/{slug_or_id}")
@@ -20,7 +64,9 @@ async def get_game(slug_or_id: str):
     game = await db.games.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not game:
         raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
-    return game
+    games = await db.games.find({}, {"_id": 0}).to_list(200)
+    enriched = _enrich_games(games)
+    return next((row for row in enriched if row.get("id") == game.get("id")), game)
 
 
 @router.post("")
@@ -31,6 +77,10 @@ async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
         raise HTTPException(status_code=409, detail="Slug bereits vergeben")
     doc = body.model_dump()
     doc["slug"] = slug
+    if doc.get("parent_game_id") and not await db.games.find_one({"id": doc["parent_game_id"]}, {"id": 1}):
+        raise HTTPException(status_code=404, detail="Hauptspiel nicht gefunden")
+    if doc.get("identity_source_game_id") and not await db.games.find_one({"id": doc["identity_source_game_id"]}, {"id": 1}):
+        raise HTTPException(status_code=404, detail="ID-Quelle nicht gefunden")
     doc["id"] = new_id()
     doc["created_at"] = now_utc().isoformat()
     doc["updated_at"] = now_utc().isoformat()
@@ -43,7 +93,7 @@ async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
 @router.patch("/{game_id}")
 async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require_admin())):
     db = get_db()
-    nullable_fields = {"short_name", "logo_url", "cover_url", "genre"}
+    nullable_fields = {"short_name", "logo_url", "cover_url", "genre", "parent_game_id", "identity_source_game_id"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if "slug" in updates:
@@ -51,6 +101,16 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
         existing = await db.games.find_one({"slug": updates["slug"], "id": {"$ne": game_id}}, {"_id": 0, "id": 1})
         if existing:
             raise HTTPException(status_code=409, detail="Slug bereits vergeben")
+    if updates.get("parent_game_id"):
+        if updates["parent_game_id"] == game_id:
+            raise HTTPException(status_code=400, detail="Ein Spiel kann nicht sein eigenes Hauptspiel sein")
+        if not await db.games.find_one({"id": updates["parent_game_id"]}, {"id": 1}):
+            raise HTTPException(status_code=404, detail="Hauptspiel nicht gefunden")
+    if updates.get("identity_source_game_id"):
+        if updates["identity_source_game_id"] == game_id:
+            raise HTTPException(status_code=400, detail="Ein Spiel kann nicht seine eigene externe ID-Quelle sein")
+        if not await db.games.find_one({"id": updates["identity_source_game_id"]}, {"id": 1}):
+            raise HTTPException(status_code=404, detail="ID-Quelle nicht gefunden")
     updates["updated_at"] = now_utc().isoformat()
     await db.games.update_one({"id": game_id}, {"$set": updates})
     game = await db.games.find_one({"id": game_id}, {"_id": 0})

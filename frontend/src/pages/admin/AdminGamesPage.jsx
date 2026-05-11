@@ -18,10 +18,21 @@ const slugFrom = (txt) => (txt || "")
     .slice(0, 80);
 
 const fieldKeyFrom = (txt) => slugFrom(txt).replace(/-/g, "_");
+const GAME_KIND_OPTIONS = [
+  ["standalone", "Einzelspiel"],
+  ["series", "Hauptspiel / Serie"],
+  ["edition", "Spielversion / Saisonspiel"],
+];
+
+const emptyGameForm = {
+  name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "",
+  kind: "standalone", parent_game_id: "", identity_source_game_id: "", inherit_player_ids: true,
+  player_id_fields: [],
+};
 
 export default function AdminGamesPage() {
   const [list, setList] = useState([]);
-  const [form, setForm] = useState({ name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "", player_id_fields: [] });
+  const [form, setForm] = useState(emptyGameForm);
   const [editing, setEditing] = useState(null);
   const confirm = useConfirm();
   const load = useCallback(async () => { const { data } = await api.get("/games"); setList(data); }, []);
@@ -33,12 +44,11 @@ export default function AdminGamesPage() {
     e.preventDefault();
     try {
       await api.post("/games", {
-        ...form,
+        ...gamePayload(form),
         platforms: form.platforms ? form.platforms.split(",").map((s) => s.trim()) : [],
-        player_id_fields: normalizePlayerIdFields(form.player_id_fields),
       });
       toast.success("Spiel erstellt.");
-      setForm({ name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "", player_id_fields: [] });
+      setForm(emptyGameForm);
       load();
     } catch (err) { toast.error(formatRequestError(err, "Spiel konnte nicht erstellt werden.", { slug: form.slug, name: form.name })); }
   };
@@ -68,6 +78,17 @@ export default function AdminGamesPage() {
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Neues Spiel</div>
           <Input placeholder="Name" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v, slug: f.slug || slugFrom(v) }))} required testId="game-name" />
           <Input placeholder="Slug" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} required testId="game-slug" />
+          <Select value={form.kind} onChange={(v) => set("kind", v)} options={GAME_KIND_OPTIONS} testId="game-kind" />
+          {form.kind === "edition" && (
+            <>
+              <Select value={form.parent_game_id} onChange={(v) => set("parent_game_id", v)} options={[["", "Hauptspiel wählen"], ...list.map((g) => [g.id, g.name])]} testId="game-parent" />
+              <Select value={form.identity_source_game_id} onChange={(v) => set("identity_source_game_id", v)} options={[["", "ID-Quelle: automatisch Hauptspiel"], ...list.map((g) => [g.id, `ID von ${g.name}`])]} testId="game-identity-source" />
+              <label className="flex items-start gap-2 text-xs text-white/65 border border-white/10 rounded-sm p-3 bg-[#0A0A0A]">
+                <input type="checkbox" checked={form.inherit_player_ids !== false} onChange={(e) => set("inherit_player_ids", e.target.checked)} className="accent-[#29B6E8] mt-0.5" />
+                Spieler-IDs vom Hauptspiel verwenden, solange keine eigene ID-Quelle gesetzt ist.
+              </label>
+            </>
+          )}
           <Input placeholder="Kurzname (z.B. MK8DX)" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-short" />
           <Input placeholder="Genre" value={form.genre} onChange={(v) => set("genre", v)} testId="game-genre" />
           <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-platforms" />
@@ -81,14 +102,14 @@ export default function AdminGamesPage() {
         <div className="lg:col-span-2 border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
-              <tr><th className="text-left px-4 py-3">Name</th><th className="text-left px-4 py-3">Slug</th><th className="text-left px-4 py-3">Genre</th><th></th></tr>
+              <tr><th className="text-left px-4 py-3">Name</th><th className="text-left px-4 py-3">Typ</th><th className="text-left px-4 py-3">ID-Quelle</th><th></th></tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {list.map((g) => (
                 <tr key={g.id}>
                   <td className="px-4 py-3">{g.name}</td>
-                  <td className="px-4 py-3 text-white/60">{g.slug}</td>
-                  <td className="px-4 py-3 text-white/60">{g.genre || "—"}</td>
+                  <td className="px-4 py-3 text-white/60">{GAME_KIND_OPTIONS.find(([v]) => v === (g.kind || "standalone"))?.[1] || "Einzelspiel"}</td>
+                  <td className="px-4 py-3 text-white/60">{g.identity_source_game?.name || (g.inherit_player_ids !== false && g.parent_game?.name) || "Eigene IDs"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-2">
                       <button onClick={() => setEditing(toForm(g))} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Spiel bearbeiten" data-testid={`game-edit-${g.slug}`}>
@@ -105,7 +126,7 @@ export default function AdminGamesPage() {
           </table>
         </div>
       </div>
-      {editing && <EditGameModal game={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+      {editing && <EditGameModal game={editing} games={list} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </AdminLayout>
   );
 }
@@ -114,11 +135,23 @@ function Input({ value, onChange, placeholder, required, testId }) {
   return <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required={required} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white focus:outline-none text-sm" />;
 }
 
+function Select({ value, onChange, options, testId }) {
+  return (
+    <select value={value || ""} onChange={(e) => onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white focus:outline-none text-sm">
+      {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+    </select>
+  );
+}
+
 function toForm(game) {
   return {
     id: game.id,
     name: game.name || "",
     slug: game.slug || "",
+    kind: game.kind || "standalone",
+    parent_game_id: game.parent_game_id || "",
+    identity_source_game_id: game.identity_source_game_id || "",
+    inherit_player_ids: game.inherit_player_ids !== false,
     short_name: game.short_name || "",
     genre: game.genre || "",
     platforms: (game.platforms || []).join(", "),
@@ -147,16 +180,20 @@ function normalizePlayerIdFields(fields = []) {
 }
 
 function gamePayload(form) {
+  const isEdition = form.kind === "edition";
   return {
     ...form,
     slug: slugFrom(form.slug),
+    parent_game_id: isEdition ? (form.parent_game_id || null) : null,
+    identity_source_game_id: isEdition ? (form.identity_source_game_id || null) : null,
+    inherit_player_ids: form.inherit_player_ids !== false,
     platforms: form.platforms ? form.platforms.split(",").map((s) => s.trim()).filter(Boolean) : [],
     default_team_size: Number(form.default_team_size) || 1,
     player_id_fields: normalizePlayerIdFields(form.player_id_fields),
   };
 }
 
-function EditGameModal({ game, onClose, onSaved }) {
+function EditGameModal({ game, games, onClose, onSaved }) {
   const [form, setForm] = useState(game);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -185,9 +222,20 @@ function EditGameModal({ game, onClose, onSaved }) {
           <div className="grid md:grid-cols-2 gap-3">
             <Input placeholder="Name" value={form.name} onChange={(v) => { set("name", v); if (!form.slug) set("slug", slugFrom(v)); }} required testId="game-edit-name" />
             <Input placeholder="Slug" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} required testId="game-edit-slug" />
+            <Select value={form.kind} onChange={(v) => set("kind", v)} options={GAME_KIND_OPTIONS} testId="game-edit-kind" />
             <Input placeholder="Kurzname" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-edit-short" />
             <Input placeholder="Genre" value={form.genre} onChange={(v) => set("genre", v)} testId="game-edit-genre" />
           </div>
+          {form.kind === "edition" && (
+            <div className="grid md:grid-cols-2 gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
+              <Select value={form.parent_game_id} onChange={(v) => set("parent_game_id", v)} options={[["", "Hauptspiel wählen"], ...games.filter((g) => g.id !== form.id).map((g) => [g.id, g.name])]} testId="game-edit-parent" />
+              <Select value={form.identity_source_game_id} onChange={(v) => set("identity_source_game_id", v)} options={[["", "ID-Quelle: automatisch Hauptspiel"], ...games.filter((g) => g.id !== form.id).map((g) => [g.id, `ID von ${g.name}`])]} testId="game-edit-identity-source" />
+              <label className="md:col-span-2 flex items-start gap-2 text-xs text-white/65">
+                <input type="checkbox" checked={form.inherit_player_ids !== false} onChange={(e) => set("inherit_player_ids", e.target.checked)} className="accent-[#29B6E8] mt-0.5" />
+                Spieler-IDs vom Hauptspiel verwenden, solange keine eigene ID-Quelle gesetzt ist.
+              </label>
+            </div>
+          )}
           <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-edit-platforms" />
           <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="game-edit-logo" variant="square" allowLibrary />
           <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Cover" testId="game-edit-cover" variant="wide" allowLibrary />

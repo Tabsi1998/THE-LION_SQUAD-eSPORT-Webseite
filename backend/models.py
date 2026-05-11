@@ -224,9 +224,16 @@ class TeamUpdate(BaseModel):
 
 
 # ---------- Games ----------
+GameKind = Literal["standalone", "series", "edition"]
+
+
 class GameCreate(BaseModel):
     name: str
     slug: str
+    kind: GameKind = "standalone"
+    parent_game_id: Optional[str] = None
+    identity_source_game_id: Optional[str] = None
+    inherit_player_ids: bool = True
     short_name: Optional[str] = None
     logo_url: Optional[str] = None
     cover_url: Optional[str] = None
@@ -245,6 +252,10 @@ class GameCreate(BaseModel):
 class GameUpdate(BaseModel):
     name: Optional[str] = None
     slug: Optional[str] = None
+    kind: Optional[GameKind] = None
+    parent_game_id: Optional[str] = None
+    identity_source_game_id: Optional[str] = None
+    inherit_player_ids: Optional[bool] = None
     short_name: Optional[str] = None
     logo_url: Optional[str] = None
     cover_url: Optional[str] = None

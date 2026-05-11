@@ -261,6 +261,25 @@ export default function ProfilePage() {
     ...f,
     notification_preferences: { ...(f.notification_preferences || {}), [field]: enabled },
   }));
+  const gameIdGroups = (() => {
+    const groups = new Map();
+    games.forEach((game) => {
+      const fields = game.effective_player_id_fields || game.player_id_fields || [];
+      if (!fields.length) return;
+      const sourceSlug = game.identity_game_slug || game.slug;
+      const sourceName = game.identity_game_name || game.name;
+      const key = `${sourceSlug}:${fields.map((field) => field.key).join("|")}`;
+      const existing = groups.get(key) || {
+        slug: sourceSlug,
+        title: sourceName,
+        games: [],
+        fields,
+      };
+      existing.games.push(game.name);
+      groups.set(key, existing);
+    });
+    return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title));
+  })();
   const notificationEnabled = (field) => {
     if (field === "news_events" && !form.newsletter_consent) return false;
     const pref = form.notification_preferences || {};
@@ -392,19 +411,20 @@ export default function ProfilePage() {
                 <MultiSelect options={SUBSCRIPTIONS} value={form.gaming_subscriptions} onChange={(v) => set("gaming_subscriptions", v)} testId="profile-subs" />
               </Field>
               <Field label="Bevorzugte Rolle"><Input value={form.preferred_role} onChange={(v) => set("preferred_role", v)} placeholder="z.B. IGL, Support, Driver" /></Field>
-              {games.some((g) => g.player_id_fields?.length) && (
+              {gameIdGroups.length > 0 && (
                 <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-5 space-y-4">
                   <div>
                     <h3 className="font-heading font-black uppercase">Spiel-IDs</h3>
-                    <p className="text-xs text-white/50 mt-1">Diese IDs können bei Turnieren als Pflichtfelder verlangt werden. Sichtbar sind sie nicht automatisch öffentlich.</p>
+                    <p className="text-xs text-white/50 mt-1">IDs können für Hauptspiele gelten und automatisch bei passenden Spielversionen verwendet werden, z.B. Activision ID für Call of Duty und BO6/BO7.</p>
                   </div>
-                  {games.filter((g) => g.player_id_fields?.length).map((game) => (
-                    <div key={game.id} className="border-t border-white/10 pt-4 first:border-t-0 first:pt-0">
-                      <div className="text-[11px] uppercase tracking-widest font-bold text-[#29B6E8] mb-3">{game.name}</div>
+                  {gameIdGroups.map((group) => (
+                    <div key={group.slug} className="border-t border-white/10 pt-4 first:border-t-0 first:pt-0">
+                      <div className="text-[11px] uppercase tracking-widest font-bold text-[#29B6E8] mb-1">{group.title}</div>
+                      {group.games.length > 1 && <div className="text-[10px] text-white/40 mb-3">Gilt für: {group.games.join(", ")}</div>}
                       <Row>
-                        {game.player_id_fields.map((field) => (
+                        {group.fields.map((field) => (
                           <Field key={field.key} label={`${field.label}${field.required !== false ? " *" : ""}`}>
-                            <Input value={form.game_ids?.[game.slug]?.[field.key] || ""} onChange={(v) => setGameId(game.slug, field.key, v)} placeholder={field.help_text || field.label} />
+                            <Input value={form.game_ids?.[group.slug]?.[field.key] || ""} onChange={(v) => setGameId(group.slug, field.key, v)} placeholder={field.help_text || field.label} />
                           </Field>
                         ))}
                       </Row>

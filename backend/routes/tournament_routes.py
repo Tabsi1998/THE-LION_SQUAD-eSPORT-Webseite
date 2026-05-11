@@ -234,10 +234,32 @@ def _registration_error(t: dict) -> str | None:
 
 def _required_game_fields(game: dict | None) -> list[dict]:
     fields = []
-    for field in (game or {}).get("player_id_fields") or []:
+    for field in (game or {}).get("effective_player_id_fields") or (game or {}).get("player_id_fields") or []:
         if isinstance(field, dict) and field.get("required") is not False and field.get("key"):
             fields.append(field)
     return fields
+
+
+async def _enrich_game_identity(db, game: dict | None) -> dict | None:
+    if not game:
+        return None
+    source = game
+    source_id = game.get("identity_source_game_id")
+    if not source_id and game.get("inherit_player_ids") is not False:
+        source_id = game.get("parent_game_id")
+    if source_id:
+        source = await db.games.find_one({"id": source_id}, {"_id": 0}) or game
+    seen = set()
+    fields = []
+    for field in (source.get("player_id_fields") or []) + (game.get("player_id_fields") or []):
+        if not isinstance(field, dict) or not field.get("key") or field["key"] in seen:
+            continue
+        seen.add(field["key"])
+        fields.append(field)
+    game["identity_game_slug"] = source.get("slug") or game.get("slug")
+    game["identity_game_name"] = source.get("name") or game.get("name")
+    game["effective_player_id_fields"] = fields
+    return game
 
 
 async def _audit_tournament_action(db, action: str, actor_id: str | None,
@@ -401,7 +423,7 @@ async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
     t["public_phase"] = derive_public_phase(t, "tournament")
     if t.get("game_id"):
         g = await db.games.find_one({"id": t["game_id"]}, {"_id": 0})
-        t["game"] = g
+        t["game"] = await _enrich_game_identity(db, g)
     if t.get("event_id"):
         e = await db.events.find_one({"id": t["event_id"]}, {"_id": 0, "tournaments": 0, "f1_challenges": 0})
         if e and e.get("status") != "draft" and await user_can_see(user, e.get("visibility") or "public"):
@@ -694,9 +716,13 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
     if existing:
         raise HTTPException(status_code=409, detail="Bereits angemeldet")
     game = await db.games.find_one({"id": t.get("game_id")}, {"_id": 0}) if t.get("game_id") else None
+    game = await _enrich_game_identity(db, game)
     submitted_ids = body.player_ids or {}
-    profile_game_ids = ((me.get("game_ids") or {}).get(game.get("slug")) if game else {}) or {}
-    player_ids = {**profile_game_ids, **submitted_ids}
+    profile_ids = me.get("game_ids") or {}
+    source_slug = game.get("identity_game_slug") if game else None
+    profile_source_ids = (profile_ids.get(source_slug) if source_slug else {}) or {}
+    profile_game_ids = (profile_ids.get(game.get("slug")) if game else {}) or {}
+    player_ids = {**profile_source_ids, **profile_game_ids, **submitted_ids}
     missing = [
         field.get("label") or field.get("key")
         for field in _required_game_fields(game)

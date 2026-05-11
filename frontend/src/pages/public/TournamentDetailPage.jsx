@@ -63,7 +63,7 @@ export default function TournamentDetailPage() {
 
   const handleRegister = async () => {
     if (!user) { nav(`/login?next=/tournaments/${slug}`); return; }
-    if (t.game?.player_id_fields?.length) {
+    if ((t.game?.effective_player_id_fields || t.game?.player_id_fields || []).length) {
       setRegisterModal(true);
       return;
     }
@@ -348,8 +348,12 @@ function TournamentChat({ tournament, user }) {
 
 function RegistrationModal({ tournament, user, loading, onClose, onSubmit }) {
   const game = tournament.game || {};
-  const fields = game.player_id_fields || [];
-  const initial = { ...((user?.game_ids || {})[game.slug] || {}) };
+  const fields = game.effective_player_id_fields || game.player_id_fields || [];
+  const sourceSlug = game.identity_game_slug || game.slug;
+  const initial = {
+    ...((user?.game_ids || {})[sourceSlug] || {}),
+    ...((user?.game_ids || {})[game.slug] || {}),
+  };
   const [playerIds, setPlayerIds] = useState(initial);
   const set = (key, value) => setPlayerIds((cur) => ({ ...cur, [key]: value }));
   const submit = (e) => {
@@ -362,7 +366,7 @@ function RegistrationModal({ tournament, user, loading, onClose, onSubmit }) {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="font-heading text-xl font-black uppercase">Turnier-Anmeldung</h3>
-            <p className="text-xs text-white/50 mt-1">{game.name} benötigt zusätzliche Spieler-IDs.</p>
+            <p className="text-xs text-white/50 mt-1">{game.name} benötigt Spieler-IDs{sourceSlug !== game.slug ? ` aus ${game.identity_game_name || "dem Hauptspiel"}` : ""}.</p>
           </div>
           <button type="button" onClick={onClose} className="text-white/45 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
