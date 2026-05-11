@@ -196,9 +196,9 @@ function ReferenceForm({ reference, games, memberProfiles, onClose, onSaved }) {
       ...form,
       lineup: lineupText.split(",").map((name) => name.trim()).filter(Boolean),
       member_profile_ids: form.member_profile_ids || [],
-      placement: form.placement === "" ? null : Number(form.placement),
-      participant_count: form.participant_count === "" ? null : Number(form.participant_count),
-      team_count: form.team_count === "" ? null : Number(form.team_count),
+      placement: positiveNumberOrNull(form.placement),
+      participant_count: positiveNumberOrNull(form.participant_count),
+      team_count: positiveNumberOrNull(form.team_count),
       order_index: Number(form.order_index) || 0,
       game_id: form.game_id || null,
     };
@@ -312,6 +312,12 @@ function MemberPicker({ profiles, selectedIds, frozenMembers, onToggle }) {
 
 function memberName(profile) {
   return profile?.gamertag || profile?.display_name || profile?.real_name || profile?.linked_account?.display_name || profile?.linked_account?.username || "Unbekannt";
+}
+
+function positiveNumberOrNull(value) {
+  if (value === "" || value == null) return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 1 ? number : null;
 }
 
 function Field({ label, value, onChange, required, placeholder, type = "text" }) {
