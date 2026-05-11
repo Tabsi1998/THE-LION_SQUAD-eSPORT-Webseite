@@ -52,7 +52,7 @@ const TOURNAMENT_FORMAT_OPTIONS = [
   ["grand_prix", "Rennserie"],
 ];
 
-const TEAM_MODE_OPTIONS = [["solo", "Solo"], ["duo", "Duo"], ["team", "Team"], ["squad", "Squad"]];
+const TEAM_MODE_OPTIONS = [["solo", "Einzelspieler"], ["duo", "Duo-Team"], ["team", "Team"], ["squad", "Squad / Gruppe"]];
 const SEEDING_OPTIONS = [["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]];
 const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
 const STREAM_PLATFORM_OPTIONS = [["", "—"], ["twitch", "Twitch"], ["youtube", "YouTube"], ["kick", "Kick"], ["custom", "Eigene Plattform"]];
@@ -171,8 +171,10 @@ export default function AdminTournamentEditPage() {
   const [users, setUsers] = useState([]);
   const [stages, setStages] = useState([]);
   const [matchesV2, setMatchesV2] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [participantForm, setParticipantForm] = useState({
     user_id: "",
+    team_id: "",
     display_name: "",
     ingame_name: "",
     discord: "",
@@ -206,18 +208,25 @@ export default function AdminTournamentEditPage() {
       catch { setGroups([]); }
     }
     if (isAdmin) {
-      const [{ data: s }, { data: u }] = await Promise.all([
+      const [{ data: s }, { data: u }, { data: teamRows }] = await Promise.all([
         api.get(`/tournaments/${id}/staff`),
         api.get("/users"),
+        api.get("/teams"),
       ]);
       setStaff(s || []);
       setUsers(u || []);
+      setTeams(teamRows || []);
     } else if (isModerator) {
       try {
-        const { data: u } = await api.get(`/tournaments/${id}/assignable-users`);
+        const [{ data: u }, { data: teamRows }] = await Promise.all([
+          api.get(`/tournaments/${id}/assignable-users`),
+          api.get("/teams"),
+        ]);
         setUsers(u || []);
+        setTeams(teamRows || []);
       } catch {
         setUsers([]);
+        setTeams([]);
       }
     }
   }, [id, isAdmin, isModerator]);
@@ -302,6 +311,7 @@ export default function AdminTournamentEditPage() {
     try {
       const payload = {
         user_id: participantForm.user_id || null,
+        team_id: participantForm.team_id || null,
         display_name: participantForm.display_name || null,
         ingame_name: participantForm.ingame_name || null,
         discord: participantForm.discord || null,
@@ -312,7 +322,7 @@ export default function AdminTournamentEditPage() {
       const { data } = await api.post(`/tournaments/${id}/registrations`, payload);
       const replacement = data.replacement;
       toast.success(replacement ? `Teilnehmer hinzugefügt und ${replacement.legacy_matches + replacement.v2_matches} Spielplätze ersetzt.` : "Teilnehmer hinzugefügt.");
-      setParticipantForm({ user_id: "", display_name: "", ingame_name: "", discord: "", status: "approved", seed: "", replace_registration_id: "" });
+      setParticipantForm({ user_id: "", team_id: "", display_name: "", ingame_name: "", discord: "", status: "approved", seed: "", replace_registration_id: "" });
       load();
     } catch (err) {
       toast.error(formatRequestError(err, "Teilnehmer konnte nicht hinzugefügt werden."));
@@ -480,7 +490,9 @@ export default function AdminTournamentEditPage() {
         {isModerator && (
           <ParticipantAddForm
             form={participantForm}
+            tournament={t}
             users={users}
+            teams={teams}
             noShowRegistrations={regs.filter((r) => r.status === "no_show")}
             onChange={setParticipantField}
             onSubmit={addParticipant}
@@ -625,10 +637,15 @@ export default function AdminTournamentEditPage() {
   );
 }
 
-function ParticipantAddForm({ form, users, noShowRegistrations, onChange, onSubmit }) {
+function ParticipantAddForm({ form, tournament, users, teams, noShowRegistrations, onChange, onSubmit }) {
+  const isTeamTournament = (tournament?.team_mode || "solo") !== "solo";
   const userOptions = [
     ["", "Gast/manuell"],
     ...(users || []).map((u) => [u.id, `${u.display_name || u.username || u.email}${u.email ? ` · ${u.email}` : ""}`]),
+  ];
+  const teamOptions = [
+    ["", "— Team auswählen —"],
+    ...(teams || []).map((team) => [team.id, `[${team.tag}] ${team.name}`]),
   ];
   const replaceOptions = [
     ["", "Kein Ersatz"],
@@ -638,13 +655,17 @@ function ParticipantAddForm({ form, users, noShowRegistrations, onChange, onSubm
     <form onSubmit={onSubmit} className="border border-white/10 rounded-sm bg-[#121212] p-5 space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Teilnehmer hinzufügen</div>
-          <div className="text-xs text-white/45 mt-1">Account bevorzugt, Gast nur für Sonderfälle.</div>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">{isTeamTournament ? "Team hinzufügen" : "Teilnehmer hinzufügen"}</div>
+          <div className="text-xs text-white/45 mt-1">{isTeamTournament ? "Bei Team-Turnieren zählt jedes Team als Startplatz." : "Account bevorzugt, Gast nur für Sonderfälle."}</div>
         </div>
         <button type="submit" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs">Hinzufügen</button>
       </div>
       <div className="grid md:grid-cols-3 gap-3">
-        <SelectField label="Konto" value={form.user_id} onChange={(v)=>onChange("user_id", v)} options={userOptions} />
+        {isTeamTournament ? (
+          <SelectField label="Team" value={form.team_id} onChange={(v)=>onChange("team_id", v)} options={teamOptions} />
+        ) : (
+          <SelectField label="Konto" value={form.user_id} onChange={(v)=>onChange("user_id", v)} options={userOptions} />
+        )}
         <Fld label="Anzeigename" value={form.display_name} onChange={(v)=>onChange("display_name", v)} testId="participant-add-display" />
         <Fld label="Spielname" value={form.ingame_name} onChange={(v)=>onChange("ingame_name", v)} testId="participant-add-ingame" />
         <Fld label="Discord" value={form.discord} onChange={(v)=>onChange("discord", v)} testId="participant-add-discord" />
@@ -1220,13 +1241,16 @@ function TournamentEditForm({ tournament, onSaved }) {
       </div>
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
         <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Struktur</div>
+        <p className="text-xs text-white/50">
+          Teilnahme legt fest, wer sich anmelden darf: Einzelspieler melden sich selbst an, bei Duo/Team/Squad meldet ein Team-Leader oder Co-Leader das Team an.
+        </p>
         <div className="grid md:grid-cols-3 gap-3">
           <SelectField label="Format" value={f.format} onChange={(v)=>set("format",v)} options={TOURNAMENT_FORMAT_OPTIONS} />
-          <SelectField label="Modus" value={f.team_mode} onChange={(v)=>set("team_mode",v)} options={TEAM_MODE_OPTIONS} />
+          <SelectField label="Teilnahme" value={f.team_mode} onChange={(v)=>set("team_mode",v)} options={TEAM_MODE_OPTIONS} />
           <SelectField label="Seeding" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} />
-          <Fld label="Teamgröße" type="number" value={f.team_size} onChange={(v)=>set("team_size",v)} testId="tr-edit-team-size"/>
-          <Fld label="Min Teilnehmer" type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>
-          <Fld label="Max Teilnehmer" type="number" value={f.max_participants} onChange={(v)=>set("max_participants",v)} testId="tr-edit-max"/>
+          {f.team_mode !== "solo" && <Fld label="Spieler pro Team" type="number" value={f.team_size} onChange={(v)=>set("team_size",v)} testId="tr-edit-team-size"/>}
+          <Fld label={f.team_mode === "solo" ? "Min Spieler" : "Min Teams"} type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>
+          <Fld label={f.team_mode === "solo" ? "Max Spieler" : "Max Teams"} type="number" value={f.max_participants} onChange={(v)=>set("max_participants",v)} testId="tr-edit-max"/>
           <Fld label="Best of" type="number" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"/>
           <Fld label="Spieldauer Min." type="number" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"/>
           <Fld label="Season Gewicht" type="number" value={f.season_weight} onChange={(v)=>set("season_weight",v)} testId="tr-edit-season-weight"/>

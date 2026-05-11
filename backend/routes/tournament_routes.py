@@ -217,6 +217,41 @@ def _public_registration(reg: dict, user: dict | None, is_staff: bool) -> dict:
     return out
 
 
+def _is_team_tournament(tournament: dict) -> bool:
+    return (tournament.get("team_mode") or "solo") != "solo"
+
+
+def _can_register_team(team: dict, user: dict) -> bool:
+    return (
+        team.get("leader_id") == user["id"]
+        or user["id"] in (team.get("co_leader_ids") or [])
+        or user.get("role") in STAFF_ROLES
+    )
+
+
+async def _validate_registration_actor(db, tournament: dict, body: RegistrationCreate, user: dict) -> dict | None:
+    if not _is_team_tournament(tournament):
+        if body.team_id:
+            raise HTTPException(status_code=400, detail="Dieses Turnier ist als Einzelspieler-Turnier eingestellt")
+        return None
+    if not body.team_id:
+        raise HTTPException(status_code=400, detail="Für dieses Turnier muss ein Team ausgewählt werden")
+    team = await db.teams.find_one({"id": body.team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_register_team(team, user):
+        raise HTTPException(status_code=403, detail="Nur Team-Leader oder Co-Leader dürfen ein Team anmelden")
+    if user["id"] not in (team.get("member_ids") or []):
+        raise HTTPException(status_code=403, detail="Du bist kein Mitglied dieses Teams")
+    existing_team = await db.tournament_registrations.find_one(
+        {"tournament_id": tournament["id"], "team_id": team["id"]},
+        {"id": 1},
+    )
+    if existing_team:
+        raise HTTPException(status_code=409, detail="Dieses Team ist bereits angemeldet")
+    return team
+
+
 def _registration_error(t: dict) -> str | None:
     if t.get("registration_enabled") is False or t.get("is_invite_only"):
         return "Anmeldung für dieses Turnier ist deaktiviert"
@@ -661,8 +696,18 @@ async def list_registrations(tid: str, user=Depends(get_optional_user)):
     t_doc = await _get_visible_tournament(tid, user)
     is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+    user_team_ids = set()
+    if user:
+        user_team_ids = {
+            row.get("team_id")
+            for row in await db.team_members.find({"user_id": user["id"]}, {"_id": 0, "team_id": 1}).to_list(100)
+            if row.get("team_id")
+        }
     if not is_staff and t_doc.get("show_participants") is False:
-        regs = [r for r in regs if user and r.get("user_id") == user.get("id")]
+        regs = [
+            r for r in regs
+            if user and (r.get("user_id") == user.get("id") or r.get("team_id") in user_team_ids)
+        ]
     regs = [_public_registration(r, user, is_staff) for r in regs]
     # enrich user + team
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
@@ -680,6 +725,8 @@ async def list_registrations(tid: str, user=Depends(get_optional_user)):
             t = teams.get(r["team_id"]) or {}
             r["team"] = {"id": t.get("id"), "name": t.get("name"), "tag": t.get("tag"),
                          "logo_url": t.get("logo_url")}
+            if user and r.get("team_id") in user_team_ids:
+                r["is_mine"] = True
     return regs
 
 
@@ -715,6 +762,7 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
     existing = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": me["id"]})
     if existing:
         raise HTTPException(status_code=409, detail="Bereits angemeldet")
+    team = await _validate_registration_actor(db, t, body, me)
     game = await db.games.find_one({"id": t.get("game_id")}, {"_id": 0}) if t.get("game_id") else None
     game = await _enrich_game_identity(db, game)
     submitted_ids = body.player_ids or {}
@@ -740,9 +788,9 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
         "id": new_id(),
         "tournament_id": tid,
         "user_id": me["id"],
-        "team_id": body.team_id,
+        "team_id": team.get("id") if team else None,
         "status": "approved",  # auto-approve by default; admin can flip to manual flow
-        "ingame_name": body.ingame_name or me.get("display_name") or me.get("username"),
+        "ingame_name": body.ingame_name or (team.get("name") if team else None) or me.get("display_name") or me.get("username"),
         "discord": body.discord or me.get("discord_name"),
         "platform_id": body.platform_id,
         "player_ids": player_ids,
@@ -750,7 +798,9 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
         "accepted_rules": body.accept_rules,
         "accepted_privacy": body.accept_privacy,
         "seed": None,
-        "display_name": me.get("display_name") or me.get("username"),
+        "display_name": (f"[{team.get('tag')}] {team.get('name')}" if team and team.get("tag") else (team.get("name") if team else None)) or me.get("display_name") or me.get("username"),
+        "registration_type": "team" if team else "solo",
+        "registered_by": me["id"],
         "created_at": now_utc().isoformat(),
         "updated_at": now_utc().isoformat(),
     }
@@ -786,10 +836,23 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
         existing = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": payload["user_id"]}, {"id": 1})
         if existing:
             raise HTTPException(status_code=409, detail="Dieser Nutzer ist bereits angemeldet")
+    team = None
+    if payload.get("team_id"):
+        team = await db.teams.find_one({"id": payload["team_id"]}, {"_id": 0})
+        if not team:
+            raise HTTPException(status_code=404, detail="Team nicht gefunden")
+        existing_team = await db.tournament_registrations.find_one({"tournament_id": tid, "team_id": payload["team_id"]}, {"id": 1})
+        if existing_team:
+            raise HTTPException(status_code=409, detail="Dieses Team ist bereits angemeldet")
+    if _is_team_tournament(tournament) and not team:
+        raise HTTPException(status_code=400, detail="Dieses Turnier erwartet eine Team-Anmeldung")
+    if not _is_team_tournament(tournament) and team:
+        raise HTTPException(status_code=400, detail="Dieses Turnier ist als Einzelspieler-Turnier eingestellt")
 
     display_name = (
         (payload.get("display_name") or "").strip()
         or (payload.get("ingame_name") or "").strip()
+        or (f"[{team.get('tag')}] {team.get('name')}" if team and team.get("tag") else (team or {}).get("name") or "")
         or ((user or {}).get("display_name") or (user or {}).get("username") or "").strip()
     )
     if not display_name:
@@ -831,8 +894,10 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
         "accepted_privacy": True,
         "seed": payload.get("seed"),
         "display_name": display_name,
+        "registration_type": "team" if team else "solo",
+        "registered_by": me.get("id"),
         "source": "staff_add",
-        "is_guest": not bool(user),
+        "is_guest": not bool(user or team),
         "created_by": me.get("id"),
         "created_at": now_utc().isoformat(),
         "updated_at": now_utc().isoformat(),
@@ -1234,6 +1299,26 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
     reg = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": me["id"]})
+    if not reg:
+        team_ids = [
+            row.get("team_id")
+            for row in await db.team_members.find({"user_id": me["id"]}, {"_id": 0, "team_id": 1}).to_list(100)
+            if row.get("team_id")
+        ]
+        if team_ids:
+            teams = await db.teams.find(
+                {
+                    "id": {"$in": team_ids},
+                    "$or": [{"leader_id": me["id"]}, {"co_leader_ids": me["id"]}],
+                },
+                {"_id": 0, "id": 1},
+            ).to_list(100)
+            manageable_team_ids = [team["id"] for team in teams]
+            if manageable_team_ids:
+                reg = await db.tournament_registrations.find_one({
+                    "tournament_id": tid,
+                    "team_id": {"$in": manageable_team_ids},
+                })
     if not reg:
         raise HTTPException(status_code=404, detail="Keine Anmeldung gefunden")
     if reg["status"] not in ("approved", "checked_in"):

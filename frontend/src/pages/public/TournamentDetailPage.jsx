@@ -24,15 +24,22 @@ export default function TournamentDetailPage() {
   const [t, setT] = useState(null);
   const [regs, setRegs] = useState([]);
   const [myReg, setMyReg] = useState(null);
+  const [myTeams, setMyTeams] = useState([]);
   const [loading, setLoading] = useState(false);
   const [registerModal, setRegisterModal] = useState(false);
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/tournaments/${slug}`);
     setT(data);
-    const { data: r } = await api.get(`/tournaments/${data.id}/registrations`);
+    const [{ data: r }, teamsResponse] = await Promise.all([
+      api.get(`/tournaments/${data.id}/registrations`),
+      user ? api.get("/teams/my").catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+    ]);
+    const teams = teamsResponse.data || [];
     setRegs(r);
-    setMyReg(user ? r.find((x) => x.user_id === user.id) || null : null);
+    setMyTeams(teams);
+    const teamIds = new Set(teams.map((team) => team.id));
+    setMyReg(user ? r.find((x) => x.user_id === user.id || x.is_mine || (x.team_id && teamIds.has(x.team_id))) || null : null);
   }, [slug, user]);
 
   useEffect(() => {
@@ -43,11 +50,12 @@ export default function TournamentDetailPage() {
 
   useApiInvalidation(load, ["tournaments"]);
 
-  const submitRegistration = async (playerIds = {}) => {
+  const submitRegistration = async ({ playerIds = {}, teamId = null } = {}) => {
     if (!user) { nav(`/login?next=/tournaments/${slug}`); return; }
     setLoading(true);
     try {
       await api.post(`/tournaments/${t.id}/register`, {
+        team_id: teamId,
         ingame_name: user.display_name || user.username,
         discord: user.discord_name,
         player_ids: playerIds,
@@ -63,11 +71,12 @@ export default function TournamentDetailPage() {
 
   const handleRegister = async () => {
     if (!user) { nav(`/login?next=/tournaments/${slug}`); return; }
-    if ((t.game?.effective_player_id_fields || t.game?.player_id_fields || []).length) {
+    const needsTeam = (t.team_mode || "solo") !== "solo";
+    if (needsTeam || (t.game?.effective_player_id_fields || t.game?.player_id_fields || []).length) {
       setRegisterModal(true);
       return;
     }
-    await submitRegistration();
+    await submitRegistration({});
   };
 
   const handleCheckin = async () => {
@@ -81,6 +90,9 @@ export default function TournamentDetailPage() {
   if (!t) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE …</div></PublicLayout>;
 
   const registration = getRegistrationState(t, "Anmeldung");
+  const isTeamTournament = (t.team_mode || "solo") !== "solo";
+  const myRegTeam = myReg?.team_id ? myTeams.find((team) => team.id === myReg.team_id) : null;
+  const canCheckIn = !!myReg && (!myReg.team_id || myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role));
 
   return (
     <PublicLayout>
@@ -103,7 +115,7 @@ export default function TournamentDetailPage() {
 
           <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
             <InfoTile icon={Calendar} label="Start" value={formatDateTime(t.start_date)} />
-            <InfoTile icon={Users} label="Teilnehmer" value={`${t.participant_count}/${t.max_participants}`} />
+            <InfoTile icon={Users} label={isTeamTournament ? "Teams" : "Teilnehmer"} value={`${t.participant_count}/${t.max_participants}`} />
             <InfoTile icon={Gamepad2} label="Plattform" value={t.platform || "—"} />
             <InfoTile icon={Trophy} label="Format" value={formatTournamentFormat(t.format)} />
           </div>
@@ -132,7 +144,7 @@ export default function TournamentDetailPage() {
                 disabled={loading}
                 className="px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition"
               >
-                {loading ? "Wird gesendet…" : "Jetzt anmelden"}
+                {loading ? "Wird gesendet…" : (isTeamTournament ? "Team anmelden" : "Jetzt anmelden")}
               </button>
             )}
             {!registration.canRegister && !myReg && (
@@ -144,7 +156,7 @@ export default function TournamentDetailPage() {
                 {registration.label}
               </button>
             )}
-            {myReg && myReg.status === "approved" && t.status === "check_in" && (
+            {canCheckIn && myReg.status === "approved" && t.status === "check_in" && (
               <button onClick={handleCheckin} data-testid="tournament-checkin-btn" className="px-6 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#EAC200] transition">
                 Check-in
               </button>
@@ -232,6 +244,7 @@ export default function TournamentDetailPage() {
         <RegistrationModal
           tournament={t}
           user={user}
+          myTeams={myTeams}
           loading={loading}
           onClose={() => setRegisterModal(false)}
           onSubmit={submitRegistration}
@@ -349,19 +362,22 @@ function TournamentChat({ tournament, user }) {
   );
 }
 
-function RegistrationModal({ tournament, user, loading, onClose, onSubmit }) {
+function RegistrationModal({ tournament, user, myTeams = [], loading, onClose, onSubmit }) {
   const game = tournament.game || {};
   const fields = game.effective_player_id_fields || game.player_id_fields || [];
   const sourceSlug = game.identity_game_slug || game.slug;
+  const needsTeam = (tournament.team_mode || "solo") !== "solo";
+  const manageableTeams = myTeams.filter((team) => team.can_manage || ["leader", "co_leader"].includes(team.my_role));
   const initial = {
     ...((user?.game_ids || {})[sourceSlug] || {}),
     ...((user?.game_ids || {})[game.slug] || {}),
   };
   const [playerIds, setPlayerIds] = useState(initial);
+  const [teamId, setTeamId] = useState(manageableTeams[0]?.id || "");
   const set = (key, value) => setPlayerIds((cur) => ({ ...cur, [key]: value }));
   const submit = (e) => {
     e.preventDefault();
-    onSubmit(playerIds);
+    onSubmit({ playerIds, teamId: needsTeam ? teamId : null });
   };
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -369,10 +385,30 @@ function RegistrationModal({ tournament, user, loading, onClose, onSubmit }) {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="font-heading text-xl font-black uppercase">Turnier-Anmeldung</h3>
-            <p className="text-xs text-white/50 mt-1">{game.name} benötigt Spieler-IDs{sourceSlug !== game.slug ? ` aus ${game.identity_game_name || "dem Hauptspiel"}` : ""}.</p>
+            <p className="text-xs text-white/50 mt-1">
+              {needsTeam
+                ? "Wähle das Team aus, das du als Leader oder Co-Leader anmelden möchtest."
+                : `${game.name} benötigt Spieler-IDs${sourceSlug !== game.slug ? ` aus ${game.identity_game_name || "dem Hauptspiel"}` : ""}.`}
+            </p>
           </div>
           <button type="button" onClick={onClose} className="text-white/45 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
+        {needsTeam && (
+          <label className="block">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Team *</div>
+            <select
+              value={teamId}
+              onChange={(e) => setTeamId(e.target.value)}
+              required
+              className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"
+            >
+              {manageableTeams.map((team) => <option key={team.id} value={team.id}>[{team.tag}] {team.name}</option>)}
+            </select>
+            {manageableTeams.length === 0 && (
+              <div className="mt-2 text-xs text-[#FF3B30]">Du bist aktuell bei keinem Team als Leader oder Co-Leader eingetragen.</div>
+            )}
+          </label>
+        )}
         {fields.map((field) => (
           <label key={field.key} className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{field.label}{field.required !== false ? " *" : ""}</div>
@@ -387,7 +423,7 @@ function RegistrationModal({ tournament, user, loading, onClose, onSubmit }) {
         ))}
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 border border-white/15 text-white/70 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
-          <button disabled={loading} className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
+          <button disabled={loading || (needsTeam && !teamId)} className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
             {loading ? "Sendet…" : "Anmelden"}
           </button>
         </div>

@@ -155,10 +155,10 @@ export const DEVICE_TYPE_LABELS = {
 };
 
 export const TEAM_MODE_LABELS = {
-  solo: "Solo",
-  duo: "Duo",
+  solo: "Einzelspieler",
+  duo: "Duo-Team",
   team: "Team",
-  squad: "Gruppe",
+  squad: "Squad / Gruppe",
 };
 
 function fallbackLabel(value) {
