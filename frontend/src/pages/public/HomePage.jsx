@@ -88,9 +88,9 @@ export default function HomePage() {
 
       {state && (primaryNews || timeline.length > 0) && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid lg:grid-cols-12 gap-5 min-w-0">
+          <div className="space-y-5 min-w-0">
             {primaryNews && <FeaturedNews news={primaryNews} />}
-            <NextUp items={timeline} wide={!primaryNews} />
+            <NextUp items={timeline} wide />
           </div>
         </section>
       )}
@@ -194,21 +194,21 @@ function useHomeStructuredData(state) {
 
 function FeaturedNews({ news }) {
   return (
-    <Link to={`/news/${news.slug}`} data-testid={`home-featured-news-${news.slug}`} className="lg:col-span-8 group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#111] overflow-hidden grid md:grid-cols-[minmax(0,1.05fr)_minmax(18rem,0.95fr)] transition min-w-0">
-      <div className="aspect-[16/10] md:aspect-auto bg-[#070707] overflow-hidden">
+    <Link to={`/news/${news.slug}`} data-testid={`home-featured-news-${news.slug}`} className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#111] overflow-hidden grid lg:grid-cols-[minmax(0,0.95fr)_minmax(28rem,1.05fr)] transition min-w-0">
+      <div className="aspect-[16/9] lg:aspect-auto bg-[#070707] overflow-hidden">
         {news.banner_url ? (
           <img src={resolveMediaUrl(news.banner_url)} alt="" className="w-full h-full object-cover object-center opacity-90 group-hover:scale-105 transition duration-500" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-[#29B6E8]/20 via-[#101010] to-black" />
         )}
       </div>
-      <div className="p-5 md:p-6 flex flex-col justify-center min-w-0">
+      <div className="p-5 md:p-8 lg:p-10 flex flex-col justify-center min-w-0">
         <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
           <Newspaper className="w-3 h-3" /> Neueste News {news.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
         </div>
-        <h2 className="mt-3 font-heading text-2xl md:text-3xl xl:text-4xl font-black uppercase leading-[1.03] group-hover:text-[#29B6E8] transition break-words line-clamp-6">{news.title}</h2>
-        {news.excerpt && <p className="mt-3 text-white/65 line-clamp-3">{news.excerpt}</p>}
-        <span className="mt-5 inline-flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-white/55 group-hover:text-[#29B6E8]">
+        <h2 className="mt-3 max-w-3xl font-heading text-2xl md:text-3xl xl:text-[2.65rem] font-black uppercase leading-[1.02] group-hover:text-[#29B6E8] transition break-words line-clamp-4">{news.title}</h2>
+        {news.excerpt && <p className="mt-4 max-w-2xl text-white/65 text-sm md:text-base leading-relaxed line-clamp-3">{news.excerpt}</p>}
+        <span className="mt-6 inline-flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-white/55 group-hover:text-[#29B6E8]">
           Lesen <ArrowRight className="w-3.5 h-3.5" />
         </span>
       </div>
@@ -218,27 +218,31 @@ function FeaturedNews({ news }) {
 
 function NextUp({ items, wide = false }) {
   if (!items.length) return (
-    <div className={`${wide ? "lg:col-span-12" : "lg:col-span-5"} border border-dashed border-white/15 rounded-sm p-6 text-white/45 min-w-0`}>
+    <div className="border border-dashed border-white/15 rounded-sm p-6 text-white/45 min-w-0">
       <div className="text-[10px] uppercase tracking-widest font-bold text-white/40">Nächster Termin</div>
       <div className="mt-3 font-heading text-xl font-black uppercase">Aktuell nichts geplant</div>
       <p className="mt-2 text-sm">Sobald News, Events, Turniere oder Fast-Laps gepflegt werden, erscheint hier automatisch der nächste relevante Eintrag.</p>
     </div>
   );
   return (
-    <div className={`${wide ? "lg:col-span-12" : "lg:col-span-4"} border border-white/10 rounded-sm bg-[#111] p-5 min-w-0`}>
+    <div className="border border-white/10 rounded-sm bg-[#111] p-5 min-w-0">
       <div className="flex items-center justify-between gap-3 min-w-0">
         <div className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700]">Nächste Termine</div>
         <Link to="/events" className="shrink-0 text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-[#29B6E8]">Alle Events</Link>
       </div>
-      <div className="mt-4 space-y-3">
+      <div className={`mt-4 ${wide ? "grid md:grid-cols-2 xl:grid-cols-5 gap-3" : "space-y-3"}`}>
         {items.map((item) => (
-          <Link key={`${item.kind}-${item.id}`} to={item.url} className="flex flex-col sm:flex-row sm:items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm p-3 bg-black/20 transition min-w-0">
-            <KindIcon kind={item.kind} />
-            <div className="min-w-0 flex-1">
-              <div className="font-heading font-bold leading-tight line-clamp-2">{item.label}</div>
-              {item.start_date && <div className="text-xs text-white/45">{new Date(item.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
+          <Link key={`${item.kind}-${item.id}`} to={item.url} className={`flex gap-3 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm p-3 bg-black/20 transition min-w-0 ${wide ? "flex-col items-start min-h-32" : "flex-col sm:flex-row sm:items-center"}`}>
+            <div className="flex items-center gap-3 min-w-0 w-full">
+              <KindIcon kind={item.kind} />
+              <div className="min-w-0 flex-1">
+                <div className="font-heading font-bold leading-tight line-clamp-2">{item.label}</div>
+              </div>
             </div>
-            {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} className="self-start sm:self-center sm:max-w-[48%]" />}
+            <div className="w-full flex flex-col gap-2">
+              {item.start_date && <div className="text-xs text-white/45">{new Date(item.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
+              {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} className="self-start max-w-full" />}
+            </div>
           </Link>
         ))}
       </div>
