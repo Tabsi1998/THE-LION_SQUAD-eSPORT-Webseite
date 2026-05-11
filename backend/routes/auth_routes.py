@@ -105,7 +105,7 @@ async def register(body: UserRegister, request: Request, response: Response):
         "email": email,
         "username": username,
         "password_hash": hash_password(body.password),
-        "display_name": body.display_name or username,
+        "display_name": username,
         "avatar_url": None, "banner_url": None,
         "role": "player",
         "roles": ["player"],

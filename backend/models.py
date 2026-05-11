@@ -769,6 +769,7 @@ class NewsCreate(BaseModel):
     linked_tournament_ids: List[str] = []
     linked_f1_challenge_ids: List[str] = []
     linked_team_ids: List[str] = []
+    mentioned_user_ids: List[str] = []
 
 
 class NewsUpdate(BaseModel):
@@ -785,6 +786,7 @@ class NewsUpdate(BaseModel):
     linked_tournament_ids: Optional[List[str]] = None
     linked_f1_challenge_ids: Optional[List[str]] = None
     linked_team_ids: Optional[List[str]] = None
+    mentioned_user_ids: Optional[List[str]] = None
 
 
 SponsorTier = Literal["main", "platinum", "gold", "silver", "bronze"]

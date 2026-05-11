@@ -62,6 +62,29 @@ export default function NewsDetailPage() {
         )}
         <RichContent text={post.content} embeds={post.content_embeds || []} className="mt-8 prose prose-invert max-w-none text-white/85" />
 
+        {post.mentioned_users?.length > 0 && (
+          <div className="mt-10 border-t border-white/10 pt-8">
+            <h2 className="font-heading text-xl font-black uppercase mb-4">Markierte Personen</h2>
+            <div className="flex flex-wrap gap-3">
+              {post.mentioned_users.map((user) => (
+                <Link key={user.id} to={`/u/${user.username}`} className="inline-flex items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 bg-[#121212] rounded-sm px-3 py-2 transition">
+                  <span className="w-9 h-9 rounded-sm bg-[#0A0A0A] border border-white/10 overflow-hidden flex items-center justify-center">
+                    {user.avatar_url ? (
+                      <img src={resolveMediaUrl(user.avatar_url)} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <Users className="w-4 h-4 text-white/35" />
+                    )}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold truncate">{user.display_name || user.username}</span>
+                    <span className="block text-xs text-white/45 truncate">@{user.username}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         {(post.linked_events?.length || post.linked_tournaments?.length || post.linked_f1_challenges?.length || post.linked_teams?.length) && (
           <div className="mt-10 border-t border-white/10 pt-8">
             <h2 className="font-heading text-xl font-black uppercase mb-4">Verknüpft</h2>

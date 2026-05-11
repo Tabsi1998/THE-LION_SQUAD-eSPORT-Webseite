@@ -32,12 +32,14 @@ import {
   Table,
   Trash2,
   Underline as UnderlineIcon,
+  Upload,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
+import { prepareImageForUpload } from "@/components/tls/ImageUpload";
 
 function normalizeMarkdown(value) {
   return String(value || "")
@@ -149,6 +151,16 @@ function defaultLibraryEndpoint() {
     : "/media?type=images";
 }
 
+function defaultMediaScope() {
+  return typeof window !== "undefined" && window.location.pathname.startsWith("/admin") ? "admin" : "user";
+}
+
+function endpointWithMediaScope(endpoint, scope) {
+  if (!scope || scope === "user") return endpoint;
+  const separator = endpoint.includes("?") ? "&" : "?";
+  return `${endpoint}${separator}media_scope=${encodeURIComponent(scope)}`;
+}
+
 function ToolButton({ active, label, onClick, icon: Icon, disabled = false }) {
   return (
     <button
@@ -205,12 +217,16 @@ export function MarkdownEditor({
   helperText = "WYSIWYG-Editor mit Markdown-Speicherung, HTML-Import, Tabellen und Medienbibliothek.",
   required = false,
   libraryEndpoint,
+  uploadEndpoint = "/uploads/image",
+  mediaScope,
 }) {
   const [mode, setMode] = useState("visual");
   const [htmlInput, setHtmlInput] = useState("");
   const [mediaOpen, setMediaOpen] = useState(false);
   const [mediaLoading, setMediaLoading] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   const [media, setMedia] = useState([]);
+  const imageInputRef = useRef(null);
   const prompt = usePrompt();
   const syncingRef = useRef(false);
   const preview = useMemo(() => renderMarkdownLite(value), [value]);
@@ -295,6 +311,26 @@ export function MarkdownEditor({
     editor.chain().focus().setImage({ src: src.trim(), alt: "Bild" }).run();
   };
 
+  const uploadImageFile = async (file) => {
+    if (!editor || !file) return;
+    setImageUploading(true);
+    try {
+      const uploadFile = await prepareImageForUpload(file);
+      const fd = new FormData();
+      fd.append("file", uploadFile);
+      const scope = mediaScope || defaultMediaScope();
+      const { data } = await api.post(endpointWithMediaScope(uploadEndpoint, scope), fd);
+      editor.chain().focus().setImage({ src: data.url, alt: file.name || "Bild" }).run();
+      toast.success("Bild hochgeladen und eingefügt.");
+    } catch (error) {
+      const detail = error.response?.data?.detail;
+      toast.error(detail ? formatApiError(detail) : error.message || "Bild konnte nicht hochgeladen werden.");
+    } finally {
+      if (imageInputRef.current) imageInputRef.current.value = "";
+      setImageUploading(false);
+    }
+  };
+
   const openMedia = async () => {
     setMediaOpen(true);
     setMediaLoading(true);
@@ -333,8 +369,8 @@ export function MarkdownEditor({
   return (
     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm overflow-hidden" data-testid={testId} data-markdown-editor={testId || "default"}>
       <div className="border-b border-white/10 bg-[#121212]">
-        <div className="flex items-center justify-between gap-2 px-2 py-2">
-          <div className="flex gap-1 overflow-x-auto pb-1 sm:pb-0">
+        <div className="flex flex-col gap-2 px-2 py-2 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-wrap gap-1 min-w-0">
             <ToolButton label="Überschrift 1" icon={Heading1} active={editor?.isActive("heading", { level: 1 })} onClick={() => run((c) => c.toggleHeading({ level: 1 }))} />
             <ToolButton label="Überschrift 2" icon={Heading2} active={editor?.isActive("heading", { level: 2 })} onClick={() => run((c) => c.toggleHeading({ level: 2 }))} />
             <ToolButton label="Überschrift 3" icon={Heading3} active={editor?.isActive("heading", { level: 3 })} onClick={() => run((c) => c.toggleHeading({ level: 3 }))} />
@@ -350,13 +386,14 @@ export function MarkdownEditor({
             <ToolButton label="Trennlinie" icon={Minus} onClick={() => run((c) => c.setHorizontalRule())} />
             <ToolButton label="Link" icon={LinkIcon} active={editor?.isActive("link")} onClick={setLink} />
             <ToolButton label="Bild-URL" icon={Image} active={editor?.isActive("image")} onClick={setImageUrl} />
+            <ToolButton label="Bild hochladen" icon={Upload} disabled={imageUploading} onClick={() => imageInputRef.current?.click()} />
             <ToolButton label="Bild aus Medienbibliothek" icon={Images} onClick={openMedia} />
             <ToolButton label="Tabelle einfügen" icon={Table} active={tableActive} onClick={() => run((c) => c.insertTable({ rows: 3, cols: 2, withHeaderRow: true }))} />
             <ToolButton label="Zeile hinzufügen" icon={Rows3} disabled={!tableActive} onClick={() => run((c) => c.addRowAfter())} />
             <ToolButton label="Spalte hinzufügen" icon={PanelTop} disabled={!tableActive} onClick={() => run((c) => c.addColumnAfter())} />
             <ToolButton label="Tabelle löschen" icon={Trash2} disabled={!tableActive} onClick={() => run((c) => c.deleteTable())} />
           </div>
-          <div className="inline-flex border border-white/10 rounded-sm overflow-hidden shrink-0">
+          <div className="grid grid-cols-2 sm:grid-cols-4 border border-white/10 rounded-sm overflow-hidden shrink-0 lg:self-start">
             {[
               ["visual", PenLine, "Editor"],
               ["markdown", Code, "Markdown"],
@@ -367,12 +404,19 @@ export function MarkdownEditor({
                 key={key}
                 type="button"
                 onClick={() => setMode(key)}
-                className={`px-3 py-2 text-[10px] uppercase tracking-wider font-bold inline-flex items-center gap-1.5 ${mode === key ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
+                className={`px-3 py-2 text-[10px] uppercase tracking-wider font-bold inline-flex items-center justify-center gap-1.5 ${mode === key ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
               >
                 <Icon className="w-3 h-3" /> {label}
               </button>
             ))}
           </div>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={(event) => uploadImageFile(event.target.files?.[0])}
+          />
         </div>
       </div>
 

@@ -8,7 +8,7 @@ import { appendEmbedToken } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toDateTimeLocalInput } from "@/lib/datetime";
 import { toast } from "sonner";
-import { Flag, Plus, Pin, Trash2, Save, X, Newspaper } from "lucide-react";
+import { AtSign, Flag, Plus, Pin, Trash2, Save, Search, X, Newspaper } from "lucide-react";
 
 export default function AdminNewsPage() {
   const [list, setList] = useState([]);
@@ -114,9 +114,12 @@ function NewsModal({ post, meta, onClose, onSaved }) {
   const [tournaments, setTournaments] = useState([]);
   const [events, setEvents] = useState([]);
   const [f1Challenges, setF1Challenges] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [userQuery, setUserQuery] = useState("");
   const [linkedT, setLinkedT] = useState(post.linked_tournament_ids || []);
   const [linkedE, setLinkedE] = useState(post.linked_event_ids || []);
   const [linkedF, setLinkedF] = useState(post.linked_f1_challenge_ids || []);
+  const [mentionedUserIds, setMentionedUserIds] = useState(post.mentioned_user_ids || []);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -124,10 +127,12 @@ function NewsModal({ post, meta, onClose, onSaved }) {
       api.get("/tournaments?include_drafts=true"),
       api.get("/events?include_drafts=true"),
       api.get("/f1/challenges?include_drafts=true"),
-    ]).then(([t, e, f]) => {
+      api.get("/users"),
+    ]).then(([t, e, f, u]) => {
       if (t.status === "fulfilled") setTournaments(t.value.data);
       if (e.status === "fulfilled") setEvents(e.value.data);
       if (f.status === "fulfilled") setF1Challenges(f.value.data);
+      if (u.status === "fulfilled") setUsers(u.value.data || []);
     });
   }, []);
 
@@ -138,6 +143,18 @@ function NewsModal({ post, meta, onClose, onSaved }) {
     if (kind === "tournament") setLinkedT((ids) => (ids.includes(item.id) ? ids : [...ids, item.id]));
     if (kind === "fastlap") setLinkedF((ids) => (ids.includes(item.id) ? ids : [...ids, item.id]));
   };
+  const userLabel = (user) => user?.display_name || user?.username || "Benutzer";
+  const safeMentionLabel = (user) => userLabel(user).replace(/[\[\]\n\r]/g, "").trim() || user.username;
+  const insertMention = (user) => {
+    const mention = `[@${safeMentionLabel(user)}](/u/${encodeURIComponent(user.username)})`;
+    setForm((f) => {
+      const prefix = String(f.content || "").trimEnd();
+      return { ...f, content: `${prefix}${prefix ? "\n\n" : ""}${mention}` };
+    });
+    setMentionedUserIds((ids) => (ids.includes(user.id) ? ids : [...ids, user.id]));
+    setUserQuery("");
+  };
+  const removeMention = (userId) => setMentionedUserIds((ids) => ids.filter((id) => id !== userId));
   const slugFrom = (txt) => (txt || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -151,7 +168,7 @@ function NewsModal({ post, meta, onClose, onSaved }) {
     ev.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form, linked_tournament_ids: linkedT, linked_event_ids: linkedE, linked_f1_challenge_ids: linkedF };
+      const payload = { ...form, linked_tournament_ids: linkedT, linked_event_ids: linkedE, linked_f1_challenge_ids: linkedF, mentioned_user_ids: mentionedUserIds };
       // Convert datetime-local back to ISO with seconds + UTC marker
       if (payload.published_at) {
         const d = new Date(payload.published_at);
@@ -170,14 +187,24 @@ function NewsModal({ post, meta, onClose, onSaved }) {
     setSaving(false);
   };
 
+  const selectedUsers = mentionedUserIds.map((id) => users.find((user) => user.id === id)).filter(Boolean);
+  const userNeedle = userQuery.trim().toLowerCase();
+  const userMatches = userNeedle.length >= 2
+    ? users
+      .filter((user) => user.is_active !== false && user.is_banned !== true && user.privacy_public_profile !== false)
+      .filter((user) => !mentionedUserIds.includes(user.id))
+      .filter((user) => `${user.username || ""} ${user.display_name || ""} ${user.email || ""}`.toLowerCase().includes(userNeedle))
+      .slice(0, 8)
+    : [];
+
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="w-full max-w-2xl bg-[#121212] border border-white/10 rounded-sm">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 overflow-y-auto p-2 sm:p-4">
+      <form onSubmit={submit} className="w-full max-w-5xl mx-auto my-2 sm:my-6 bg-[#121212] border border-white/10 rounded-sm">
         <div className="flex items-center justify-between p-5 border-b border-white/10">
           <h2 className="font-heading font-black uppercase">{isNew ? "Neuer Beitrag" : "Beitrag bearbeiten"}</h2>
           <button type="button" onClick={onClose} className="text-white/60 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
-        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+        <div className="p-4 sm:p-5 space-y-4">
           <Field label="Titel"><Input value={form.title} onChange={(v) => { set("title", v); if (isNew && !form.slug) set("slug", slugFrom(v)); }} testId="news-title" required /></Field>
           <Field label="Slug"><Input value={form.slug} onChange={(v) => set("slug", slugFrom(v))} placeholder="kebab-case" testId="news-slug" required /></Field>
           <Field label="Kurzbeschreibung"><Input value={form.excerpt} onChange={(v) => set("excerpt", v)} testId="news-excerpt" /></Field>
@@ -190,6 +217,50 @@ function NewsModal({ post, meta, onClose, onSaved }) {
               testId="news-content"
               helperText="Markdown plus Einbettungen: [[fastlap:slug]], [[tournament:slug]], [[event:slug]]. HTML wird nicht roh gerendert."
             />
+          </Field>
+          <Field label="Benutzer markieren">
+            <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3 space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />
+                <input
+                  value={userQuery}
+                  onChange={(e) => setUserQuery(e.target.value)}
+                  placeholder="Username oder Anzeigename suchen"
+                  className="w-full bg-[#121212] border border-white/10 pl-9 pr-3 py-2 rounded-sm text-sm focus:outline-none focus:border-[#29B6E8]"
+                />
+              </div>
+              {selectedUsers.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {selectedUsers.map((user) => (
+                    <span key={user.id} className="inline-flex items-center gap-1.5 px-2 py-1 border border-[#29B6E8]/30 text-[#29B6E8] rounded-sm text-xs">
+                      <AtSign className="w-3 h-3" /> {userLabel(user)}
+                      <button type="button" onClick={() => removeMention(user.id)} className="text-white/45 hover:text-[#FF3B30]" aria-label={`${userLabel(user)} entfernen`}>
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {userMatches.length > 0 && (
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {userMatches.map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => insertMention(user)}
+                      className="min-w-0 flex items-center gap-2 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm px-3 py-2 text-left text-sm"
+                    >
+                      <AtSign className="w-4 h-4 text-[#29B6E8] shrink-0" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-white">{userLabel(user)}</span>
+                        <span className="block truncate text-xs text-white/40">@{user.username}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p className="text-[11px] text-white/40">Ein Klick fügt einen Profil-Link in den Text ein und merkt die Person für die News-Seite vor. Angezeigt werden aktive öffentliche Profile.</p>
+            </div>
           </Field>
           <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="news-banner" variant="wide" allowLibrary /></Field>
 
@@ -256,10 +327,10 @@ function NewsModal({ post, meta, onClose, onSaved }) {
 
 function Field({ label, children }) {
   return (
-    <label className="block">
+    <div className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
       {children}
-    </label>
+    </div>
   );
 }
 function Input({ value, onChange, placeholder, testId, required }) {

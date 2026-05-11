@@ -224,5 +224,5 @@ function TemplateEditor({ template, onClose, onSaved }) {
 }
 
 function Field({ label, children }) {
-  return <label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>{children}</label>;
+  return <div className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>{children}</div>;
 }

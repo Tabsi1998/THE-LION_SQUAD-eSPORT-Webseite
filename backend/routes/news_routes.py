@@ -143,6 +143,19 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
         p["linked_teams"] = await db.teams.find(
             {"id": {"$in": p["linked_team_ids"]}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "logo_url": 1},
         ).to_list(50)
+    if p.get("mentioned_user_ids"):
+        users = await db.users.find(
+            {
+                "id": {"$in": p["mentioned_user_ids"]},
+                "is_active": True,
+                "is_banned": {"$ne": True},
+                "privacy_public_profile": True,
+            },
+            {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
+        ).to_list(50)
+        user_order = {user_id: index for index, user_id in enumerate(p["mentioned_user_ids"])}
+        users.sort(key=lambda user: user_order.get(user["id"], 999))
+        p["mentioned_users"] = users
     p["content_embeds"] = await resolve_content_embeds(db, p.get("content"), user)
     return p
 

@@ -220,9 +220,9 @@ function Select({ label, value, onChange, options, required, testId }) {
 }
 function Textarea({ label, value, onChange, testId }) {
   return (
-    <label className="block">
+    <div className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
       <MarkdownEditor value={value || ""} onChange={onChange} rows={5} testId={testId} />
-    </label>
+    </div>
   );
 }

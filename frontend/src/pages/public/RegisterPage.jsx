@@ -8,7 +8,7 @@ export default function RegisterPage() {
   const { register } = useAuth();
   const nav = useNavigate();
   const [form, setForm] = useState({
-    username: "", email: "", password: "", display_name: "",
+    username: "", email: "", password: "",
     discord_name: "", birth_date: "", gender: "",
   });
   const [accept, setAccept] = useState(false);
@@ -28,7 +28,6 @@ export default function RegisterPage() {
       username: form.username,
       email: form.email,
       password: form.password,
-      display_name: form.display_name || null,
       discord_name: form.discord_name || null,
       birth_date: form.birth_date || null,
       gender: form.gender || null,
@@ -51,8 +50,7 @@ export default function RegisterPage() {
         <h1 className="font-heading text-2xl font-black uppercase text-center">Account erstellen</h1>
         <p className="text-sm text-white/60 text-center mt-1">Werde Teil der THE LION SQUAD Community.</p>
         <form onSubmit={submit} className="mt-8 space-y-4">
-          <Field label="Username *" value={form.username} onChange={set("username")} required testId="register-username" />
-          <Field label="Display Name" value={form.display_name} onChange={set("display_name")} testId="register-display" />
+          <Field label="Benutzername *" value={form.username} onChange={set("username")} required testId="register-username" />
           <Field label="E-Mail *" type="email" value={form.email} onChange={set("email")} required testId="register-email" />
           <Field label="Passwort *" type="password" value={form.password} onChange={set("password")} required testId="register-password" />
           <div className="grid sm:grid-cols-2 gap-4">
