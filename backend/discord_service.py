@@ -2,6 +2,7 @@
 Silent failure if not configured."""
 import asyncio
 import logging
+import os
 import httpx
 from urllib.parse import urlparse
 from database import get_db
@@ -19,6 +20,46 @@ def is_valid_discord_webhook_url(url: str) -> bool:
     return len(parts) >= 4 and parts[0] == "api" and parts[1] == "webhooks"
 
 
+def _normalize_base_url(value: str | None) -> str:
+    base = (value or "").strip().rstrip("/")
+    if not base:
+        return ""
+    if not base.startswith(("http://", "https://")):
+        base = f"https://{base}"
+    return base
+
+
+async def _public_base_url() -> str:
+    env_base = _normalize_base_url(os.getenv("PUBLIC_BASE_URL") or os.getenv("FRONTEND_URL"))
+    if env_base:
+        return env_base
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "domain": 1}) or {}
+    return _normalize_base_url(branding.get("domain"))
+
+
+async def _public_avatar_url(value: str | None) -> str | None:
+    avatar_url = (value or "").strip()
+    if not avatar_url:
+        return None
+    parsed = urlparse(avatar_url)
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        return avatar_url
+    if parsed.scheme:
+        return None
+    base = await _public_base_url()
+    if not base:
+        return None
+    raw_path = avatar_url.lstrip("/")
+    if raw_path.startswith("api/static/"):
+        path = f"/{raw_path}"
+    elif raw_path.startswith("uploads/"):
+        path = f"/api/static/{raw_path}"
+    else:
+        path = f"/api/static/uploads/{raw_path}"
+    return f"{base}{path}"
+
+
 async def _get_discord_config() -> dict:
     db = get_db()
     s = await db.settings.find_one({"id": "discord"}) or {}
@@ -27,7 +68,7 @@ async def _get_discord_config() -> dict:
         "webhook_url": webhook_url,
         "enabled": bool(s.get("enabled", True) and webhook_url),
         "username": s.get("username") or "THE LION SQUAD",
-        "avatar_url": s.get("avatar_url") or None,
+        "avatar_url": await _public_avatar_url(s.get("avatar_url")),
     }
 
 

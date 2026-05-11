@@ -822,11 +822,26 @@ async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
 
 @season_router.get("/{slug_or_id}/standings")
 async def season_standings(slug_or_id: str):
-    """Aggregate standings over all tournaments + F1 challenges in the season."""
+    """Aggregate standings over all season point sources."""
     db = get_db()
     s = await db.seasons.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not s:
         raise HTTPException(status_code=404, detail="Saison nicht gefunden")
+    if await db.season_points.count_documents({"season_id": s["id"]}):
+        from services.season_service import aggregate_leaderboard
+        rows = await aggregate_leaderboard(season_id=s["id"], limit=500)
+        standings = []
+        for index, row in enumerate(rows):
+            standings.append({
+                **row,
+                "user_id": row.get("id"),
+                "display_name": row.get("display_name") or row.get("username") or "—",
+                "points": row.get("total_points", 0),
+                "events_count": row.get("events", 0),
+                "wins": row.get("wins", 0),
+                "rank": index + 1,
+            })
+        return {"season": s, "standings": standings}
     points_system = s.get("points_per_position", [25, 18, 15, 12, 10, 8, 6, 4, 2, 1])
     per_user_points: dict = {}  # user_id -> {points, events_points_list, wins}
 

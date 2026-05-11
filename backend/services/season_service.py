@@ -224,6 +224,7 @@ async def aggregate_leaderboard(
             "total": {"$sum": "$total_points"},
             "raw": {"$sum": "$raw_points"},
             "events": {"$sum": 1},
+            "wins": {"$sum": {"$cond": [{"$eq": ["$rank", 1]}, 1, 0]}},
         }},
         {"$sort": {"total": -1}},
         {"$limit": limit * 2 if (only_members or only_community or rookie_only) else limit},
@@ -241,7 +242,8 @@ async def aggregate_leaderboard(
             if not team:
                 continue
             out.append({**team, "total_points": round(r["total"], 1),
-                        "raw_points": round(r["raw"], 1), "events": r["events"]})
+                        "raw_points": round(r["raw"], 1), "events": r["events"],
+                        "wins": r.get("wins", 0)})
         return out[:limit]
 
     user_ids = [r["_id"] for r in rows]
@@ -270,7 +272,8 @@ async def aggregate_leaderboard(
             except (ValueError, TypeError):
                 continue
         out.append({**u, "total_points": round(r["total"], 1),
-                    "raw_points": round(r["raw"], 1), "events": r["events"]})
+                    "raw_points": round(r["raw"], 1), "events": r["events"],
+                    "wins": r.get("wins", 0)})
         if len(out) >= limit:
             break
     return out

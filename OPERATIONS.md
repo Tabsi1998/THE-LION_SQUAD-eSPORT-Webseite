@@ -147,6 +147,9 @@ Webhook-Fehler sieht man unter:
 - Backend-Logs
 
 Der Webhook muss eine gueltige Discord-Webhook-URL sein.
+Wenn als Discord-Avatar ein Upload wie `/api/static/uploads/...` genutzt wird,
+muss `FRONTEND_URL`, `PUBLIC_BASE_URL` oder die Branding-Domain auf die oeffentliche
+HTTPS-Adresse zeigen. Discord akzeptiert keine rein lokalen Pfade.
 
 ## Twitch
 

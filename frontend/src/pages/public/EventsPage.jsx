@@ -5,6 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { plainTextPreview } from "@/lib/textPreview";
 import { Calendar, MapPin, Users as UsersIcon, Crown, Lock } from "lucide-react";
 
 const VIS_ICON = { members: Crown, internal: Lock };
@@ -76,6 +77,7 @@ export default function EventsPage() {
 function EventCard({ e, meta }) {
   const VIcon = VIS_ICON[e.visibility];
   const typeLabel = meta.types.find((t) => t.k === e.event_type)?.l || e.event_type;
+  const descriptionPreview = plainTextPreview(e.description);
   return (
     <Link
       to={`/events/${e.slug}`}
@@ -119,7 +121,7 @@ function EventCard({ e, meta }) {
             <UsersIcon className="w-3 h-3" /> {e.registration_summary?.registered_count || 0} angemeldet
           </div>
         )}
-        {e.description && <p className="mt-3 text-sm text-white/65 line-clamp-2 flex-1">{e.description}</p>}
+        {descriptionPreview && <p className="mt-3 text-sm text-white/65 line-clamp-2 flex-1">{descriptionPreview}</p>}
       </div>
     </Link>
   );

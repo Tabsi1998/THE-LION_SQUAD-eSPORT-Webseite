@@ -4,6 +4,7 @@ Runs recurring jobs in the FastAPI process:
   - mail_queue every 30 seconds
   - match_reminders every 5 minutes
   - tournament_reminders every 60 seconds
+  - scheduled_news every 60 seconds
   - prize_expiry every 60 minutes
   - birthday_greetings every 6 hours
 
@@ -50,6 +51,16 @@ async def _safe_tournament_reminders():
             logger.info(f"[scheduler] tournament_reminders {res}")
     except Exception as exc:
         logger.exception(f"[scheduler] tournament_reminders crash: {exc}")
+
+
+async def _safe_scheduled_news():
+    try:
+        from services.news_publish import finalize_due_news
+        res = await finalize_due_news()
+        if res.get("processed") or res.get("newsletter_queued") or res.get("mentions"):
+            logger.info(f"[scheduler] scheduled_news {res}")
+    except Exception as exc:
+        logger.exception(f"[scheduler] scheduled_news crash: {exc}")
 
 
 async def _safe_prize_expiry():
@@ -165,6 +176,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_tournament_reminders, IntervalTrigger(seconds=60), id="tournament_reminders",
                   max_instances=1, coalesce=True)
+    sched.add_job(_safe_scheduled_news, IntervalTrigger(seconds=60), id="scheduled_news",
+                  max_instances=1, coalesce=True)
     sched.add_job(_safe_prize_expiry, IntervalTrigger(minutes=60), id="prize_expiry",
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_birthday_greetings, IntervalTrigger(hours=6), id="birthday_greetings",
@@ -175,7 +188,7 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.start()
     _scheduler = sched
-    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · prize_expiry 60m · birthday 6h · twitch 90s)")
+    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · birthday 6h · twitch 90s)")
     return sched
 
 

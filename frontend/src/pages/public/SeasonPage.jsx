@@ -27,7 +27,7 @@ export default function SeasonPage() {
   const standings = data.standings || [];
   const topThree = standings.slice(0, 3);
   const totalPoints = standings.reduce((sum, row) => sum + Number(row.points || 0), 0);
-  const totalStarts = standings.reduce((sum, row) => sum + Number(row.events_count || 0), 0);
+  const totalRatings = standings.reduce((sum, row) => sum + Number(row.events_count || 0), 0);
   const tournamentCount = s.tournament_ids?.length || 0;
   const fastLapCount = s.f1_challenge_ids?.length || 0;
   return (
@@ -47,10 +47,10 @@ export default function SeasonPage() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <StatCard icon={Users} label="Spieler" value={standings.length} />
+              <StatCard icon={Users} label="Teilnehmer" value={standings.length} />
               <StatCard icon={BarChart3} label="Punkte" value={totalPoints} />
               <StatCard icon={Trophy} label="Turniere" value={tournamentCount} />
-              <StatCard icon={Flag} label="Fast Laps" value={fastLapCount} />
+              <StatCard icon={Flag} label="Challenges" value={fastLapCount} />
             </div>
           </div>
         </div>
@@ -61,9 +61,9 @@ export default function SeasonPage() {
             <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
               <div>
                 <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#FFD700]">Rangliste</div>
-                <h2 className="mt-1 font-heading text-2xl md:text-3xl font-black uppercase">Top Fahrer & Spieler</h2>
+                <h2 className="mt-1 font-heading text-2xl md:text-3xl font-black uppercase">Top Teilnehmer</h2>
               </div>
-              <div className="text-xs text-white/45">{totalStarts} gewertete Starts</div>
+              <div className="text-xs text-white/45">{totalRatings} Wertungen</div>
             </div>
             <div className="grid md:grid-cols-3 gap-3">
               {topThree.map((row) => <PodiumCard key={row.user_id} row={row} />)}
@@ -78,7 +78,7 @@ export default function SeasonPage() {
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm min-w-[720px]">
               <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
-                <tr><th className="text-left px-4 py-3 w-14">#</th><th className="text-left px-4 py-3">Spieler</th><th className="text-right px-4 py-3">Starts</th><th className="text-right px-4 py-3">Siege</th><th className="text-right px-4 py-3 font-display">Punkte</th></tr>
+                <tr><th className="text-left px-4 py-3 w-14">#</th><th className="text-left px-4 py-3">Teilnehmer</th><th className="text-right px-4 py-3">Wertungen</th><th className="text-right px-4 py-3">Erfolge</th><th className="text-right px-4 py-3 font-display">Punkte</th></tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {standings.map((r)=>(
@@ -103,7 +103,7 @@ export default function SeasonPage() {
                 <PlayerIdentity row={r} />
                 <div className="ml-auto text-right">
                   <div className="font-display text-2xl font-black text-[#29B6E8]">{r.points}</div>
-                  <div className="text-[10px] uppercase tracking-widest text-white/40">{r.events_count} Starts · {r.wins} Siege</div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/40">{r.events_count} Wertungen · {r.wins} Erfolge</div>
                 </div>
               </div>
             ))}
@@ -111,7 +111,7 @@ export default function SeasonPage() {
           </div>
         </div>
         <section className="mt-8 grid md:grid-cols-2 gap-4">
-          <InfoPanel icon={Award} title="Punktewertung" text={`Punkte werden aus verknüpften Turnieren und Fast-Lap-Challenges berechnet. Formel: ${(s.points_per_position || []).join(", ") || "25, 18, 15, 12, 10, 8, 6, 4, 2, 1"}.`} />
+          <InfoPanel icon={Award} title="Punktewertung" text={`Punkte werden aus verknüpften Turnieren, Challenges, Achievements und manuellen Wertungen berechnet. Formel: ${(s.points_per_position || []).join(", ") || "25, 18, 15, 12, 10, 8, 6, 4, 2, 1"}.`} />
           <InfoPanel icon={Medal} title="Streichresultate" text={s.drop_worst ? `${s.drop_worst} schlechteste Resultat(e) werden nicht in die Gesamtpunkte gerechnet.` : "Alle gewerteten Resultate zählen in die Gesamtwertung."} />
         </section>
       </div>
@@ -155,8 +155,8 @@ function PodiumCard({ row }) {
       </div>
       <div className="mt-5 grid grid-cols-3 gap-2 text-center">
         <MiniStat label="Punkte" value={row.points} />
-        <MiniStat label="Starts" value={row.events_count} />
-        <MiniStat label="Siege" value={row.wins} />
+        <MiniStat label="Wertungen" value={row.events_count} />
+        <MiniStat label="Erfolge" value={row.wins} />
       </div>
     </>
   );

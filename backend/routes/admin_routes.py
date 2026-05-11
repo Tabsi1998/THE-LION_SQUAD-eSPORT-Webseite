@@ -56,7 +56,10 @@ async def system_status(me: dict = Depends(require_admin())):
     mail = await db.settings.find_one({"id": "mail"}, {"_id": 0}) or {}
     discord = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
     latest_mail_error = await db.email_logs.find_one(
-        {"status": {"$in": ["failed", "skipped"]}},
+        {
+            "status": {"$in": ["failed", "skipped"]},
+            "$or": [{"channel": {"$exists": False}}, {"channel": {"$ne": "discord"}}],
+        },
         {"_id": 0, "created_at": 1, "status": 1, "error": 1, "template_key": 1, "event_key": 1, "channel": 1},
         sort=[("created_at", -1)],
     )
