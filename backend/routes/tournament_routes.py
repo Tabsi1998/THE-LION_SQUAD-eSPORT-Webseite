@@ -649,6 +649,11 @@ async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = 
     }
     await db.tournament_chat_messages.insert_one(doc)
     await _notify_tournament_mentions(db, tournament, me, doc)
+    try:
+        from badges import evaluate_user_progress
+        await evaluate_user_progress(me["id"])
+    except Exception:
+        pass
     doc.pop("_id", None)
     doc["author"] = {
         "id": me.get("id"),

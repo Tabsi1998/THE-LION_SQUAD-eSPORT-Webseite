@@ -470,6 +470,11 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, me: dict = Depen
         "updated_at": now_iso,
     }
     await db.match_chat_messages.insert_one(doc)
+    try:
+        from badges import evaluate_user_progress
+        await evaluate_user_progress(me["id"])
+    except Exception:
+        pass
     doc.pop("_id", None)
     doc["author"] = {
         "id": me.get("id"),

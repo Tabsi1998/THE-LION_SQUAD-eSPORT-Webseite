@@ -271,5 +271,10 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, me: dict 
             "recipient_id": recipient["id"],
         },
     )
+    try:
+        from badges import evaluate_user_progress
+        await evaluate_user_progress(me["id"])
+    except Exception:
+        pass
     doc.pop("_id", None)
     return _public_message(doc, {me["id"]: me, recipient["id"]: recipient})

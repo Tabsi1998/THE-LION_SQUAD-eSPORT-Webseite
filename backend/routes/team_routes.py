@@ -331,6 +331,11 @@ async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(
     }
     await db.team_chat_messages.insert_one(message)
     await _notify_team_mentions(db, team, me, message)
+    try:
+        from badges import evaluate_user_progress
+        await evaluate_user_progress(me["id"])
+    except Exception:
+        pass
     message.pop("_id", None)
     enriched = await _enrich_team_chat([message])
     return enriched[0]
