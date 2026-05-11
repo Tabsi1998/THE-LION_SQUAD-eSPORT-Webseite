@@ -1012,5 +1012,48 @@ def _add_generated_tiers():
 
 _add_generated_tiers()
 
+ACHIEVEMENT_GROUPS_COMMUNITY_EXPANSION = [
+    {"code": "social_network", "name": "Vernetzt", "category": "club", "icon": "user-plus",
+     "accent_color": "#00FF88", "description": "Freundschaften und direkte Community-Kontakte auf der Plattform.",
+     "public": True, "is_special": False, "is_negative": False, "sort_order": 417},
+    {"code": "platform_chat", "name": "Plattform-Chat", "category": "club", "icon": "messages-square",
+     "accent_color": "#29B6E8", "description": "Aktivität in Direktnachrichten, Teamchat, Turnierchat und Matchchat.",
+     "public": True, "is_special": False, "is_negative": False, "sort_order": 418},
+]
+ACHIEVEMENT_GROUPS.extend(ACHIEVEMENT_GROUPS_COMMUNITY_EXPANSION)
+
+ACHIEVEMENT_TIERS_COMMUNITY_EXPANSION = [
+    _t("social_network_b", "social_network", 1, "Erster Kontakt", "Schließe 1 Freundschaft auf der Plattform.",
+       condition_key="friends_count", progress_target=1, points=10, icon="user-plus"),
+    _t("social_network_s", "social_network", 2, "Kontaktliste", "Schließe 5 Freundschaften.",
+       condition_key="friends_count", progress_target=5, points=30, icon="users"),
+    _t("social_network_g", "social_network", 3, "Community-Kreis", "Schließe 15 Freundschaften.",
+       condition_key="friends_count", progress_target=15, points=80, icon="users-round"),
+    _t("social_network_p", "social_network", 4, "Gut vernetzt", "Schließe 30 Freundschaften.",
+       condition_key="friends_count", progress_target=30, points=180, icon="network"),
+    _t("platform_chat_dm_b", "platform_chat", 1, "Erste DM", "Sende deine erste Direktnachricht.",
+       condition_key="direct_messages_sent", progress_target=1, points=10, icon="message-square"),
+    _t("platform_chat_team_b", "platform_chat", 1, "Teamfunk", "Schreibe 10 Nachrichten im Teamchat.",
+       condition_key="team_chat_messages_sent", progress_target=10, points=20, icon="messages-square"),
+    _t("platform_chat_b", "platform_chat", 1, "Chat aktiv", "Schreibe 25 Plattform-Nachrichten.",
+       condition_key="community_messages_sent", progress_target=25, points=25, icon="message-circle"),
+    _t("platform_chat_s", "platform_chat", 2, "Gesprächsstoff", "Schreibe 100 Plattform-Nachrichten.",
+       condition_key="community_messages_sent", progress_target=100, points=60, icon="messages-square"),
+    _t("platform_chat_g", "platform_chat", 3, "Community-Stimme", "Schreibe 500 Plattform-Nachrichten.",
+       condition_key="community_messages_sent", progress_target=500, points=180, icon="message-circle"),
+    _t("platform_chat_p", "platform_chat", 4, "Chat-Zentrale", "Schreibe 1500 Plattform-Nachrichten.",
+       condition_key="community_messages_sent", progress_target=1500, points=420, icon="radio"),
+]
+ACHIEVEMENT_TIERS.extend(ACHIEVEMENT_TIERS_COMMUNITY_EXPANSION)
+
+CONDITION_KEY_STATUS.update({
+    "friends_count": "live",
+    "direct_messages_sent": "live",
+    "team_chat_messages_sent": "live",
+    "match_chat_messages_sent": "live",
+    "tournament_chat_messages_sent": "live",
+    "community_messages_sent": "live",
+})
+
 GROUP_BY_CODE = {g["code"]: g for g in ACHIEVEMENT_GROUPS}
 TIER_BY_CODE = {t["code"]: t for t in ACHIEVEMENT_TIERS}

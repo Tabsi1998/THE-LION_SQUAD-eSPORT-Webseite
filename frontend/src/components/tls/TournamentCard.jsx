@@ -24,11 +24,9 @@ export function TournamentCard({ tournament, index = 0 }) {
           className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-60 group-hover:scale-105 transition-all duration-500"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/70 to-transparent" />
-        <div className="absolute top-3 left-3 flex gap-2">
-          <PhaseBadge phase={t.public_phase} status={t.status} />
-        </div>
-        <div className="absolute top-3 right-3">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[#29B6E8] bg-[#29B6E8]/10 border border-[#29B6E8]/30 px-2 py-1 rounded-sm">
+        <div className="absolute top-3 inset-x-3 flex flex-col items-start gap-1.5 sm:flex-row sm:items-start sm:justify-between">
+          <PhaseBadge phase={t.public_phase} status={t.status} className="max-w-full sm:max-w-[68%]" />
+          <span className="max-w-full sm:max-w-[48%] text-[10px] font-bold uppercase tracking-wider text-[#29B6E8] bg-[#29B6E8]/10 border border-[#29B6E8]/30 px-2 py-1 rounded-sm leading-tight break-words">
             {formatTournamentFormat(t.format)}
           </span>
         </div>

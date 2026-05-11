@@ -215,15 +215,21 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     p["podium_finishes"] = podium
     p["rank_4_count"] = rank4
 
-    p["fastlap_valid_count"] = await db.f1_lap_times.count_documents({"user_id": user_id, "is_invalid": {"$ne": True}})
-    distinct_tracks = await db.f1_lap_times.distinct("track_id", {"user_id": user_id, "is_invalid": {"$ne": True}})
+    official_lap_query = {
+        "user_id": user_id,
+        "is_invalid": {"$ne": True},
+        "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}],
+    }
+    p["fastlap_valid_count"] = await db.f1_lap_times.count_documents(official_lap_query)
+    distinct_tracks = await db.f1_lap_times.distinct("track_id", official_lap_query)
     p["distinct_tracks"] = len([t for t in distinct_tracks if t])
     pole_count = 0
     for tid in distinct_tracks:
         if not tid:
             continue
         best = await db.f1_lap_times.find_one(
-            {"track_id": tid, "is_invalid": {"$ne": True}},
+            {"track_id": tid, "is_invalid": {"$ne": True},
+             "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}]},
             {"_id": 0, "user_id": 1, "time_ms": 1},
             sort=[("time_ms", 1)],
         )
@@ -321,6 +327,20 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     p["discord_messages"] = (user or {}).get("discord_messages_count", 0)
     p["twitch_live_sessions"] = (user or {}).get("twitch_live_sessions_count", 0)
     p["twitch_stream_minutes"] = (user or {}).get("twitch_stream_minutes", 0)
+    p["friends_count"] = await db.friendships.count_documents({
+        "status": "accepted",
+        "$or": [{"requester_id": user_id}, {"recipient_id": user_id}],
+    })
+    p["direct_messages_sent"] = await db.direct_messages.count_documents({"sender_id": user_id})
+    p["team_chat_messages_sent"] = await db.team_chat_messages.count_documents({"user_id": user_id})
+    p["match_chat_messages_sent"] = await db.match_chat_messages.count_documents({"user_id": user_id})
+    p["tournament_chat_messages_sent"] = await db.tournament_chat_messages.count_documents({"user_id": user_id})
+    p["community_messages_sent"] = (
+        p["direct_messages_sent"]
+        + p["team_chat_messages_sent"]
+        + p["match_chat_messages_sent"]
+        + p["tournament_chat_messages_sent"]
+    )
 
     for k in [
         "checkins_in_a_row", "fast_registrations", "clutch_count",
@@ -333,6 +353,8 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
         "team_no_show_count", "team_kills", "team_late_count", "team_member_churn",
         "zero_eight_losses", "long_warmup_count", "long_break_count", "loss_streak",
         "twitch_live_sessions", "twitch_stream_minutes",
+        "friends_count", "direct_messages_sent", "team_chat_messages_sent",
+        "match_chat_messages_sent", "tournament_chat_messages_sent", "community_messages_sent",
     ]:
         p.setdefault(k, 0)
 
