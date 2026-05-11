@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { openCookieSettings, useCookieConsent } from "@/components/tls/CookieConsent";
@@ -73,6 +74,7 @@ export function LiveStreamSlider() {
   const memberProfile = activeStream.member_profile || {};
   const memberName = memberProfile.gamertag || memberProfile.display_name || displayName;
   const memberHref = memberProfile.slug ? `/members/${memberProfile.slug}` : null;
+  const communityHref = activeStream.public_profile_url || null;
   const canEmbed = hasConsent("external_media");
 
   return (
@@ -143,9 +145,14 @@ export function LiveStreamSlider() {
               <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-widest">
                 {activeStream.game_name && <span className="text-[#9146FF]">{activeStream.game_name}</span>}
                 {memberHref && (
-                  <a href={memberHref} className="text-[#29B6E8] hover:text-white">
+                  <Link to={memberHref} className="text-[#29B6E8] hover:text-white">
                     Vereinsprofil ansehen
-                  </a>
+                  </Link>
+                )}
+                {communityHref && (
+                  <Link to={communityHref} className="text-white/55 hover:text-white">
+                    Normales Profil
+                  </Link>
                 )}
               </div>
             </div>

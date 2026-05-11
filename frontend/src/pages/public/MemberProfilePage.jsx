@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Crown, ExternalLink, Gamepad2, Monitor, User as UserIcon } from "lucide-react";
+import { ArrowLeft, Crown, ExternalLink, Gamepad2, Monitor, Radio, User as UserIcon } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
+import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { AccountLevelPill, AccountLevelProgress, accountAvatarFrameClass, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -52,6 +53,7 @@ export default function MemberProfilePage() {
                 ) : (
                   <div className="text-white/45 text-sm">Noch keine Biografie hinterlegt.</div>
                 )}
+                <MemberTwitchEmbed account={profile.linked_account} />
               </div>
               <aside className="space-y-4">
                 <InfoPanel title="Profil">
@@ -105,6 +107,43 @@ function MemberHero({ profile }) {
           {profile.role_title && <p className="mt-2 text-[#FFD700] font-bold uppercase tracking-wider">{profile.role_title}</p>}
         </div>
       </div>
+    </div>
+  );
+}
+
+function MemberTwitchEmbed({ account }) {
+  if (!account?.show_twitch_embed || !account?.twitch_handle) return null;
+  const twitchUrl = `https://www.twitch.tv/${account.twitch_handle}`;
+  return (
+    <div className="mt-8" data-testid="member-profile-twitch-embed">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#9146FF]">
+            <Radio className="w-3.5 h-3.5" /> Twitch
+          </div>
+          <h2 className="mt-1 font-heading text-2xl font-black uppercase">Stream im Vereinsprofil</h2>
+          <p className="mt-1 text-xs text-white/45">
+            Eingebettet vom verknuepften normalen Profil {account.username ? `@${account.username}` : ""}.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {account.profile_url && (
+            <Link to={account.profile_url} className="inline-flex items-center gap-2 border border-[#29B6E8]/45 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:bg-[#29B6E8]/10 rounded-sm">
+              Normales Profil <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
+          )}
+          <a href={twitchUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 border border-[#9146FF]/50 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#b88cff] hover:bg-[#9146FF]/10 rounded-sm">
+            Twitch <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      </div>
+      <StreamEmbed source={{
+        twitch_enabled: true,
+        twitch_channel: account.twitch_handle,
+        stream_platform: "twitch",
+        stream_title: "Twitch Stream",
+        stream_url: twitchUrl,
+      }} />
     </div>
   );
 }

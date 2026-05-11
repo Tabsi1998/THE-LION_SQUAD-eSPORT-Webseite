@@ -38,9 +38,6 @@ export default function HomePage() {
       {/* Live Banner — only when something is actually live */}
       {state?.has_live && <LiveBanner state={state} />}
 
-      {/* Phase E — Live Twitch Streams */}
-      <LiveStreamSlider />
-
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-white/10 bg-grid-dense">
         <div className="absolute inset-0 pointer-events-none">
@@ -85,6 +82,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <LiveStreamSlider />
 
       {state && (primaryNews || timeline.length > 0) && (
         <section className="border-b border-white/10 bg-[#080808]/35">

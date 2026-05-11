@@ -205,6 +205,8 @@ def _admin_profile(doc: dict) -> dict:
 def _public_account(user: dict | None, admin: bool = False) -> dict | None:
     if not user:
         return None
+    twitch_visible = (user.get("profile_visibility") or {}).get("twitch", "public") == "public"
+    twitch_handle = user.get("twitch_handle") if twitch_visible else None
     out = {
         "id": user.get("id"),
         "username": user.get("username"),
@@ -212,6 +214,8 @@ def _public_account(user: dict | None, admin: bool = False) -> dict | None:
         "avatar_url": user.get("avatar_url"),
         "profile_url": f"/u/{user.get('username')}" if user.get("username") else None,
         "achievement_level": user.get("achievement_level"),
+        "twitch_handle": twitch_handle,
+        "show_twitch_embed": bool(user.get("show_twitch_embed") and twitch_handle),
     }
     if admin:
         out["email"] = user.get("email")
@@ -238,6 +242,9 @@ async def _account_map_for_profiles(db, rows: list[dict], public_only: bool = Tr
         "avatar_url": 1,
         "email": 1,
         "is_club_member": 1,
+        "profile_visibility": 1,
+        "show_twitch_embed": 1,
+        "twitch_handle": 1,
     }
     users = await db.users.find(query, projection).to_list(2000)
     neg_codes = [g["code"] async for g in db.achievement_groups.find(

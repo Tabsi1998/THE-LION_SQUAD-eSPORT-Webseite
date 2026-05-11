@@ -38,6 +38,16 @@ async def list_live_streams():
     if not user_ids:
         return []
 
+    users = await db.users.find(
+        {"id": {"$in": user_ids}, "is_active": True, "is_banned": {"$ne": True}},
+        {"_id": 0, "id": 1, "username": 1, "privacy_public_profile": 1},
+    ).to_list(2000)
+    public_profile_by_user = {
+        user["id"]: f"/u/{user.get('username')}"
+        for user in users
+        if user.get("username") and user.get("privacy_public_profile") is True
+    }
+
     member_profiles = await db.club_member_profiles.find(
         {"user_id": {"$in": user_ids}, "is_active": {"$ne": False}},
         {
@@ -64,6 +74,7 @@ async def list_live_streams():
             "gamertag": profile.get("gamertag"),
             "photo_url": profile.get("photo_url"),
         }
+        stream["public_profile_url"] = public_profile_by_user.get(stream.get("user_id"))
         linked_streams.append(stream)
     return linked_streams
 
