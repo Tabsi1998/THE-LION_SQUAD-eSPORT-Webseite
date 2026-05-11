@@ -32,6 +32,11 @@ function placementText(item) {
   return `Platz ${item.placement}${item.participant_count ? ` von ${item.participant_count}` : ""}`;
 }
 
+function referenceLineup(item) {
+  const memberNames = (item.lineup_members || []).map((member) => member.display_name).filter(Boolean);
+  return [...memberNames, ...(item.lineup || [])];
+}
+
 export default function ReferencesPage() {
   useDocumentTitle("Referenzen", "Externe Turniere, Ligen und Ergebnisse von THE LION SQUAD eSports.");
   const [items, setItems] = useState([]);
@@ -101,6 +106,7 @@ function Stat({ label, value, icon: Icon, tone }) {
 
 function ReferenceCard({ item }) {
   const status = item.status || "completed";
+  const lineup = referenceLineup(item);
   return (
     <article className="grid lg:grid-cols-[12rem_minmax(0,1fr)_14rem] gap-4 border border-white/10 rounded-sm bg-[#111] p-4 md:p-5">
       <div className="flex lg:flex-col items-center lg:items-start gap-3">
@@ -128,7 +134,7 @@ function ReferenceCard({ item }) {
           {item.team_name || "THE LION SQUAD"} · {placementText(item)}
           {item.location ? ` · ${item.location}` : ""}
         </p>
-        {item.lineup?.length > 0 && <div className="mt-3 text-sm text-white/50">Lineup: {item.lineup.join(", ")}</div>}
+        {lineup.length > 0 && <div className="mt-3 text-sm text-white/50">Lineup: {lineup.join(", ")}</div>}
         {item.description && <p className="mt-3 text-sm text-white/60 leading-relaxed">{item.description}</p>}
         {item.highlights && <p className="mt-2 text-sm text-[#FFD700]/75 leading-relaxed">{item.highlights}</p>}
       </div>

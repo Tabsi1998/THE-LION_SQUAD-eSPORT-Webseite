@@ -14,6 +14,8 @@ const emptyReference = {
   game_name: "",
   team_name: "THE LION SQUAD",
   lineup: [],
+  member_profile_ids: [],
+  lineup_members: [],
   placement: "",
   placement_label: "",
   participant_count: "",
@@ -50,17 +52,20 @@ export default function AdminReferencesPage() {
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState({});
   const [games, setGames] = useState([]);
+  const [memberProfiles, setMemberProfiles] = useState([]);
   const [editing, setEditing] = useState(null);
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
-    const [{ data: refs }, { data: gameRows }] = await Promise.all([
+    const [{ data: refs }, { data: gameRows }, { data: profileRows }] = await Promise.all([
       api.get("/references/admin"),
       api.get("/games"),
+      api.get("/membership/profiles/admin/all"),
     ]);
     setItems(refs.items || []);
     setSummary(refs.summary || {});
     setGames(gameRows || []);
+    setMemberProfiles(profileRows || []);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -115,6 +120,9 @@ export default function AdminReferencesPage() {
                   {item.organizer || "Veranstalter offen"} · {item.team_name || "THE LION SQUAD"}
                   {item.placement && ` · Platz ${item.placement}${item.participant_count ? ` von ${item.participant_count}` : ""}`}
                 </div>
+                {referenceLineup(item).length > 0 && (
+                  <div className="mt-2 text-xs text-white/45">Lineup: {referenceLineup(item).join(", ")}</div>
+                )}
                 {(item.external_url || item.bracket_url || item.match_url || item.result_url) && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     <RefLink href={item.external_url} label="Turnier" />
@@ -134,7 +142,7 @@ export default function AdminReferencesPage() {
         {items.length === 0 && <div className="text-center py-16 border border-dashed border-white/15 rounded-sm text-white/40 font-display tracking-widest">NOCH KEINE REFERENZEN</div>}
       </div>
 
-      {editing && <ReferenceForm reference={editing} games={games} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+      {editing && <ReferenceForm reference={editing} games={games} memberProfiles={memberProfiles} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </AdminLayout>
   );
 }
@@ -154,12 +162,32 @@ function RefLink({ href, label }) {
   return <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-[#29B6E8] hover:underline">{label}<ExternalLink className="w-3 h-3" /></a>;
 }
 
-function ReferenceForm({ reference, games, onClose, onSaved }) {
+function referenceLineup(item) {
+  const memberNames = (item.lineup_members || []).map((member) => member.display_name).filter(Boolean);
+  return [...memberNames, ...(item.lineup || [])];
+}
+
+function ReferenceForm({ reference, games, memberProfiles, onClose, onSaved }) {
   const isNew = !reference.id;
-  const [form, setForm] = useState({ ...emptyReference, ...reference, lineup: reference.lineup || [] });
+  const [form, setForm] = useState({
+    ...emptyReference,
+    ...reference,
+    lineup: reference.lineup || [],
+    member_profile_ids: reference.member_profile_ids || [],
+    lineup_members: reference.lineup_members || [],
+  });
   const [saving, setSaving] = useState(false);
   const [lineupText, setLineupText] = useState((reference.lineup || []).join(", "));
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const toggleMember = (profileId) => setForm((current) => {
+    const ids = current.member_profile_ids || [];
+    return {
+      ...current,
+      member_profile_ids: ids.includes(profileId)
+        ? ids.filter((id) => id !== profileId)
+        : [...ids, profileId],
+    };
+  });
 
   const save = async (e) => {
     e.preventDefault();
@@ -167,6 +195,7 @@ function ReferenceForm({ reference, games, onClose, onSaved }) {
     const payload = {
       ...form,
       lineup: lineupText.split(",").map((name) => name.trim()).filter(Boolean),
+      member_profile_ids: form.member_profile_ids || [],
       placement: form.placement === "" ? null : Number(form.placement),
       participant_count: form.participant_count === "" ? null : Number(form.participant_count),
       team_count: form.team_count === "" ? null : Number(form.team_count),
@@ -205,7 +234,13 @@ function ReferenceForm({ reference, games, onClose, onSaved }) {
           <Field label="Spielname falls nicht vorhanden" value={form.game_name} onChange={(v) => set("game_name", v)} />
           <Field label="Team / Lineup-Name" value={form.team_name} onChange={(v) => set("team_name", v)} />
         </div>
-        <Field label="Lineup / Fahrer / Spieler (Komma getrennt)" value={lineupText} onChange={setLineupText} placeholder="Name 1, Name 2, Name 3" />
+        <MemberPicker
+          profiles={memberProfiles}
+          selectedIds={form.member_profile_ids || []}
+          frozenMembers={form.lineup_members || []}
+          onToggle={toggleMember}
+        />
+        <Field label="Weitere externe Spieler / alter Lineup-Text" value={lineupText} onChange={setLineupText} placeholder="Name 1, Name 2, Name 3" />
         <div className="grid md:grid-cols-4 gap-3">
           <Field label="Platz" type="number" value={form.placement} onChange={(v) => set("placement", v)} />
           <Field label="Label" value={form.placement_label} onChange={(v) => set("placement_label", v)} placeholder="z.B. Podium" />
@@ -239,6 +274,44 @@ function ReferenceForm({ reference, games, onClose, onSaved }) {
       </form>
     </div>
   );
+}
+
+function MemberPicker({ profiles, selectedIds, frozenMembers, onToggle }) {
+  const selected = new Set(selectedIds || []);
+  const sorted = [...(profiles || [])].sort((a, b) => memberName(a).localeCompare(memberName(b)));
+  const missing = (frozenMembers || []).filter((member) => member.profile_id && !sorted.some((profile) => profile.id === member.profile_id));
+  return (
+    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Vereinsspieler</div>
+          <div className="text-xs text-white/45 mt-1">Mehrfachauswahl. Namen werden beim Speichern eingefroren, damit alte Referenzen erhalten bleiben.</div>
+        </div>
+        <div className="text-xs text-[#29B6E8] font-bold">{selected.size} ausgewählt</div>
+      </div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1">
+        {sorted.map((profile) => (
+          <label key={profile.id} className={`flex items-center gap-2 border rounded-sm px-3 py-2 text-sm cursor-pointer ${selected.has(profile.id) ? "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#121212] text-white/65 hover:border-white/25"}`}>
+            <input type="checkbox" checked={selected.has(profile.id)} onChange={() => onToggle(profile.id)} className="accent-[#29B6E8]" />
+            <span className="min-w-0">
+              <span className="block truncate font-semibold">{memberName(profile)}</span>
+              {profile.is_active === false && <span className="block text-[10px] uppercase tracking-widest text-[#FFD700]">inaktiv</span>}
+            </span>
+          </label>
+        ))}
+        {sorted.length === 0 && <div className="text-sm text-white/40">Keine Vereinsprofile vorhanden.</div>}
+      </div>
+      {missing.length > 0 && (
+        <div className="mt-3 text-xs text-white/45">
+          Gespeicherte ehemalige Profile: {missing.map((member) => member.display_name || member.profile_id).join(", ")}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function memberName(profile) {
+  return profile?.gamertag || profile?.display_name || profile?.real_name || profile?.linked_account?.display_name || profile?.linked_account?.username || "Unbekannt";
 }
 
 function Field({ label, value, onChange, required, placeholder, type = "text" }) {

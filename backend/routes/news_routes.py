@@ -588,6 +588,59 @@ async def _enrich_references(items: list[dict]) -> list[dict]:
     return items
 
 
+def _clean_reference_profile_ids(value: list | None) -> list[str]:
+    seen = set()
+    ids: list[str] = []
+    for raw in value or []:
+        profile_id = str(raw or "").strip()
+        if profile_id and profile_id not in seen:
+            seen.add(profile_id)
+            ids.append(profile_id)
+    return ids
+
+
+def _reference_member_snapshot(profile: dict) -> dict:
+    display_name = (
+        profile.get("gamertag")
+        or profile.get("display_name")
+        or profile.get("real_name")
+        or "Unbekannt"
+    )
+    return {
+        "profile_id": profile.get("id"),
+        "user_id": profile.get("user_id"),
+        "display_name": display_name,
+        "profile_name": profile.get("display_name") or display_name,
+        "gamertag": profile.get("gamertag"),
+        "slug": profile.get("slug"),
+        "is_active": profile.get("is_active") is not False,
+    }
+
+
+async def _freeze_reference_members(db, doc: dict, existing: dict | None = None) -> None:
+    profile_ids = _clean_reference_profile_ids(doc.get("member_profile_ids"))
+    previous = {
+        item.get("profile_id"): item
+        for item in ((existing or {}).get("lineup_members") or doc.get("lineup_members") or [])
+        if isinstance(item, dict) and item.get("profile_id")
+    }
+    profiles = {}
+    if profile_ids:
+        profiles = {
+            row["id"]: row
+            for row in await db.club_member_profiles.find(
+                {"id": {"$in": profile_ids}}, {"_id": 0}
+            ).to_list(500)
+        }
+    doc["member_profile_ids"] = profile_ids
+    doc["lineup_members"] = [
+        _reference_member_snapshot(profiles[profile_id])
+        if profile_id in profiles
+        else previous.get(profile_id, {"profile_id": profile_id, "display_name": "Ehemaliges Mitglied"})
+        for profile_id in profile_ids
+    ]
+
+
 def _sort_references(items: list[dict]) -> list[dict]:
     status_rank = {"active": 0, "planned": 1, "completed": 2, "archived": 3}
 
@@ -686,6 +739,7 @@ async def create_reference(body: ReferenceCreate, me: dict = Depends(require_adm
     doc = body.model_dump()
     if doc.get("game_id") and not await db.games.find_one({"id": doc["game_id"]}, {"id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
+    await _freeze_reference_members(db, doc)
     doc["id"] = new_id()
     doc["created_at"] = now_utc().isoformat()
     doc["updated_at"] = now_utc().isoformat()
@@ -707,6 +761,12 @@ async def update_reference(rid: str, body: ReferenceUpdate, me: dict = Depends(r
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if updates.get("game_id") and not await db.games.find_one({"id": updates["game_id"]}, {"id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
+    existing = None
+    if "member_profile_ids" in updates or "lineup_members" in updates:
+        existing = await db.references.find_one({"id": rid}, {"_id": 0})
+        if not existing:
+            raise HTTPException(404, "Referenz nicht gefunden.")
+        await _freeze_reference_members(db, updates, existing)
     if not updates:
         return {"ok": True}
     updates["updated_at"] = now_utc().isoformat()

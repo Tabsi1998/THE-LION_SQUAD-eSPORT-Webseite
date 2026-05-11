@@ -907,6 +907,8 @@ class ReferenceCreate(BaseModel):
     game_name: Optional[str] = None
     team_name: Optional[str] = None
     lineup: List[str] = Field(default_factory=list)
+    member_profile_ids: List[str] = Field(default_factory=list)
+    lineup_members: List[dict] = Field(default_factory=list)
     placement: Optional[int] = Field(default=None, ge=1)
     placement_label: Optional[str] = None
     participant_count: Optional[int] = Field(default=None, ge=1)
@@ -934,6 +936,8 @@ class ReferenceUpdate(BaseModel):
     game_name: Optional[str] = None
     team_name: Optional[str] = None
     lineup: Optional[List[str]] = None
+    member_profile_ids: Optional[List[str]] = None
+    lineup_members: Optional[List[dict]] = None
     placement: Optional[int] = Field(default=None, ge=1)
     placement_label: Optional[str] = None
     participant_count: Optional[int] = Field(default=None, ge=1)
