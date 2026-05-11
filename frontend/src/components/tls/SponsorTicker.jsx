@@ -6,12 +6,12 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { SmartLogo } from "@/components/tls/SmartLogo";
 
-const tierSize = {
-  main: "h-14 md:h-16",
-  platinum: "h-12 md:h-14",
-  gold: "h-11 md:h-12",
-  silver: "h-10",
-  bronze: "h-9",
+const tierBox = {
+  main: "h-16 w-64 md:w-80",
+  platinum: "h-14 w-56 md:w-72",
+  gold: "h-12 w-52 md:w-64",
+  silver: "h-11 w-48 md:w-56",
+  bronze: "h-10 w-44 md:w-52",
 };
 
 function sponsorKey(sponsor) {
@@ -76,10 +76,10 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
               href={s.link || undefined}
               target={s.link ? "_blank" : undefined}
               rel="noreferrer"
-              className="inline-flex items-center justify-center shrink-0 min-w-32 opacity-75 hover:opacity-100 transition"
+              className={`inline-flex items-center justify-center shrink-0 opacity-75 hover:opacity-100 transition ${compact ? "h-10 w-44 md:w-52" : tierBox[s.tier] || tierBox.bronze}`}
               title={s.name}
             >
-              <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className={`${compact ? "h-7 max-w-32" : `${tierSize[s.tier] || "h-10"} max-w-64`} w-auto`} />
+              <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-h-full max-w-full w-auto h-auto" />
             </a>
           ))}
         </div>
@@ -107,8 +107,8 @@ export function SponsorGrid({ max = 4, placement = "tv" }) {
   return (
     <div className="flex items-center gap-5" data-testid="sponsor-grid">
       {logoSponsors.slice(0, max).map((s) => (
-        <a key={s.id} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" className="inline-flex items-center justify-center opacity-75 hover:opacity-100 transition" title={s.name}>
-          <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className={`${s.tier === "main" ? "h-9 max-w-44" : s.tier === "platinum" ? "h-8 max-w-40" : "h-7 max-w-36"} w-auto`} />
+        <a key={s.id} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" className={`inline-flex items-center justify-center opacity-75 hover:opacity-100 transition ${s.tier === "main" ? "h-10 w-52" : s.tier === "platinum" ? "h-9 w-48" : "h-8 w-44"}`} title={s.name}>
+          <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-h-full max-w-full w-auto h-auto" />
         </a>
       ))}
     </div>

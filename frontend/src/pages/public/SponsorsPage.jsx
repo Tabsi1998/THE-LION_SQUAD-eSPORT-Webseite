@@ -89,7 +89,7 @@ export default function SponsorsPage() {
                   >
                     <div className={`${tierLogo[t] || tierLogo.bronze} w-full flex items-center justify-center overflow-hidden`}>
                       {s.logo_url ? (
-                        <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="w-full h-full object-contain" />
+                        <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-w-full max-h-full w-auto h-auto" />
                       ) : (
                         <span className="sr-only">{s.name}</span>
                       )}
