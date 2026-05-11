@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Copy, Edit, MessageSquare, Plus, Search, Send, Shield, Trash2, Users, UserPlus } from "lucide-react";
 
 const emptyTeam = { name: "", tag: "", description: "", logo_url: "", discord_link: "" };
+const TEAM_ROLE_LABELS = { leader: "Leader", co_leader: "Co-Leader", member: "Mitglied" };
 
 export default function TeamsPage() {
   const { id } = useParams();
@@ -201,7 +202,10 @@ function TeamDetail({ id }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           <section>
-            <h2 className="font-heading text-2xl font-bold uppercase mb-4">Mitglieder</h2>
+            <div className="mb-4">
+              <h2 className="font-heading text-2xl font-bold uppercase">Mitglieder</h2>
+              {canEdit && <p className="mt-1 text-xs text-white/45">Leader können Rollen vergeben und die Leitung übertragen. Co-Leader dürfen Teamdaten pflegen, Mitglieder einladen, Team-Chat nutzen und Squads/Subteams verwalten.</p>}
+            </div>
             <div className="grid sm:grid-cols-2 gap-3">
               {team.members?.map((m) => {
               const isLead = team.leader_id === m.id;

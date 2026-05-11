@@ -18,7 +18,7 @@ def new_id():
 Role = Literal["player", "team_leader", "moderator", "tournament_admin", "club_admin", "superadmin"]
 UserType = Literal["guest", "community_user", "club_member"]
 VisibilityLevel = Literal["public", "community", "members", "admins", "private"]
-DirectMessagePrivacy = Literal["everyone", "team_members", "club_members", "admins_only", "none"]
+DirectMessagePrivacy = Literal["everyone", "friends", "team_members", "club_members", "admins_only", "none"]
 
 
 class UserRegister(BaseModel):

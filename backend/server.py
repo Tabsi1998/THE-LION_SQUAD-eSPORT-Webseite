@@ -19,6 +19,7 @@ from routes.auth_routes import router as auth_router
 from routes.user_routes import router as user_router
 from routes.team_routes import router as team_router
 from routes.message_routes import router as message_router
+from routes.friend_routes import router as friend_router
 from routes.game_routes import router as game_router
 from routes.event_routes import router as event_router
 from routes.tournament_routes import router as tournament_router
@@ -185,6 +186,7 @@ app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(team_router)
 app.include_router(message_router)
+app.include_router(friend_router)
 app.include_router(game_router)
 app.include_router(event_router)
 app.include_router(tournament_router)

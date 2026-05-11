@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
-from auth import get_current_user, require_admin, require_super, hash_password, hash_token
+from auth import get_current_user, get_optional_user, require_admin, require_super, hash_password, hash_token
 from email_service import send_template
 from services.membership_service import get_membership, derived_user_type, is_active_member
 from services.visibility import user_can_see
@@ -455,7 +455,7 @@ async def list_public_users():
 
 
 @router.get("/public/{username}")
-async def get_public_profile(username: str):
+async def get_public_profile(username: str, viewer: dict | None = Depends(get_optional_user)):
     db = get_db()
     u = await db.users.find_one({"username": username}, {"_id": 0, "password_hash": 0, "email": 0})
     if not u or u.get("is_active") is False or u.get("is_banned") is True:
@@ -508,6 +508,10 @@ async def get_public_profile(username: str):
         "user_type": "club_member" if is_member else "community_user",
         "membership": public_member,
     }
+    if viewer:
+        from services.friend_service import relationship_status
+        base["relationship"] = await relationship_status(db, viewer.get("id"), u["id"])
+        base["can_message"] = viewer.get("id") != u["id"]
     # Public socials (separately stored UserSocial entries with visibility=public)
     socials = await db.user_socials.find(
         {"user_id": u["id"], "visibility": "public"},
@@ -820,6 +824,7 @@ async def delete_user(user_id: str, me: dict = Depends(require_super())):
     await db.team_members.delete_many({"user_id": user_id})
     await db.teams.update_many({}, {"$pull": {"member_ids": user_id, "co_leader_ids": user_id}})
     await db.teams.update_many({"leader_id": user_id}, {"$set": {"leader_id": None, "updated_at": now_utc().isoformat()}})
+    await db.friendships.delete_many({"$or": [{"requester_id": user_id}, {"recipient_id": user_id}]})
     await db.audit_logs.insert_one({
         "id": new_id(),
         "action": "user.delete",

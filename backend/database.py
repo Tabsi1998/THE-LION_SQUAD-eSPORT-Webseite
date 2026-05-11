@@ -78,6 +78,10 @@ async def init_indexes():
     await db.direct_messages.create_index("id", unique=True)
     await db.direct_messages.create_index([("sender_id", 1), ("recipient_id", 1), ("created_at", -1)])
     await db.direct_messages.create_index([("recipient_id", 1), ("read_at", 1), ("created_at", -1)])
+    await db.friendships.create_index("id", unique=True)
+    await db.friendships.create_index("pair_key", unique=True)
+    await db.friendships.create_index([("requester_id", 1), ("status", 1), ("updated_at", -1)])
+    await db.friendships.create_index([("recipient_id", 1), ("status", 1), ("updated_at", -1)])
     # Audit
     await db.audit_logs.create_index("id", unique=True)
     await db.audit_logs.create_index("created_at")

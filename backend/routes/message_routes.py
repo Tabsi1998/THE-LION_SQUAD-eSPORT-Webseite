@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user
 from database import get_db
 from models import new_id, now_utc
+from services.friend_service import are_friends
 from services.notification_preferences import send_user_template
 from services.user_notifications import build_public_url, create_user_notification
 
@@ -14,6 +15,7 @@ router = APIRouter(prefix="/api/messages", tags=["messages"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 DM_PRIVACY_LABELS = {
     "everyone": "Alle eingeloggten Benutzer",
+    "friends": "Nur Freunde",
     "team_members": "Nur gemeinsame Teammitglieder",
     "club_members": "Nur Vereinsmitglieder",
     "admins_only": "Nur Admins",
@@ -91,6 +93,10 @@ async def _message_permission(db, sender: dict, recipient: dict) -> tuple[bool, 
     privacy = recipient.get("dm_privacy") or "everyone"
     if privacy == "everyone":
         return True, ""
+    if privacy == "friends":
+        if await are_friends(db, sender["id"], recipient["id"]):
+            return True, ""
+        return False, "Dieser Benutzer nimmt Direktnachrichten nur von Freunden an."
     if privacy == "team_members":
         if await _share_team(db, sender["id"], recipient["id"]):
             return True, ""

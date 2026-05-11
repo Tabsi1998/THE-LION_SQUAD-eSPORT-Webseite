@@ -22,6 +22,8 @@ Dokumenten, Achievements, Kontaktformular, Mailversand und Discord-Integrationen
 - Oeffentliche Webseite mit Home, Verein, Vorstand, Werte, News, Events, Galerie, Sponsoren, Kontakt, Impressum und Datenschutz.
 - Mitgliederbereich mit Dashboard, Mitgliedsdaten, Vorteilen, Dokumenten, News und geschuetzten Inhalten.
 - Profile mit Avatar, Banner, Bio, Social/Gaming-Daten, Sichtbarkeit und Achievements.
+- Freundschaftssystem mit Anfragen, Annahme/Ablehnung, Freundesliste und Direktnachrichten aus oeffentlichen Profilen.
+- Teamverwaltung mit Leader, Co-Leader, Mitgliedern, Einladungen, Team-Chat und Squads/Subteams.
 - Adminbereich fuer Benutzer, Mitglieder, Mitgliedsantraege, Turniere, Fast Lap, Events, News, Sponsoren, Galerie, Dokumente, Board, Navigation, CMS und Systemeinstellungen.
 - Turnier- und Matchverwaltung mit Registrierungen, Check-in, Brackets, Ergebnissen und TV-Anzeigen.
 - Flexible Turnierstrukturen fuer Duel und FFA, Custom-Brackets, automatische Slot-Weiterleitung und Heat-Ergebnisse.

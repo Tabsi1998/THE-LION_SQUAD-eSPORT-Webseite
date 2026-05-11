@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { api, formatMs, resolveMediaUrl } from "@/lib/api";
+import { useNavigate, useParams, Link } from "react-router-dom";
+import { api, formatMs, formatRequestError, resolveMediaUrl } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
@@ -11,7 +12,9 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import {
   Trophy, Flag, Users as UsersIcon, Medal, Shield, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio, Gamepad2, Globe,
+  MessageSquare, UserPlus, UserCheck, X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 function normalizeTwitchChannel(value) {
   const raw = String(value || "").trim();
@@ -130,6 +133,8 @@ function publicGamingIds(profile) {
 
 export default function PublicProfilePage() {
   const { username } = useParams();
+  const nav = useNavigate();
+  const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [achievementsData, setAchievementsData] = useState(null);
   const [liveStreams, setLiveStreams] = useState([]);
@@ -173,6 +178,44 @@ export default function PublicProfilePage() {
     : null;
   const socialLinks = publicSocialLinks(profile, twitchUrl);
   const gamingIds = publicGamingIds(profile);
+  const relationship = profile.relationship || { status: user?.id === profile.id ? "self" : "anonymous" };
+  const isOwnProfile = user?.id === profile.id;
+
+  const updateFriendship = async (action) => {
+    if (!user) {
+      nav(`/login?next=/u/${encodeURIComponent(profile.username)}`);
+      return;
+    }
+    try {
+      if (action === "request") {
+        const { data } = await api.post(`/friends/${profile.id}/request`);
+        setProfile((cur) => ({ ...cur, relationship: data }));
+        toast.success("Freundschaftsanfrage gesendet.");
+      } else if (action === "accept") {
+        await api.post(`/friends/${relationship.id}/accept`);
+        setProfile((cur) => ({ ...cur, relationship: { ...relationship, status: "accepted", incoming: false, outgoing: false } }));
+        toast.success("Freundschaftsanfrage angenommen.");
+      } else if (action === "decline") {
+        await api.post(`/friends/${relationship.id}/decline`);
+        setProfile((cur) => ({ ...cur, relationship: { status: "declined", can_request: true } }));
+        toast.success("Freundschaftsanfrage abgelehnt.");
+      } else if (action === "remove") {
+        await api.delete(`/friends/${profile.id}`);
+        setProfile((cur) => ({ ...cur, relationship: { status: "removed", can_request: true } }));
+        toast.success("Freundschaft entfernt.");
+      }
+    } catch (err) {
+      toast.error(formatRequestError(err, "Freundschaft konnte nicht verarbeitet werden."));
+    }
+  };
+
+  const openMessage = () => {
+    if (!user) {
+      nav(`/login?next=/u/${encodeURIComponent(profile.username)}`);
+      return;
+    }
+    nav(`/profile?tab=inbox&to=${encodeURIComponent(profile.id)}`);
+  };
 
   return (
     <PublicLayout>
@@ -236,6 +279,39 @@ export default function PublicProfilePage() {
               <div className="mt-4 max-w-md" data-testid="profile-level-progress">
                 <AccountLevelProgress level={level.level} points={level.points} nextLevelPoints={level.next_level_points} progress={level.progress} />
               </div>
+              {!isOwnProfile && (
+                <div className="mt-5 flex flex-wrap gap-2" data-testid="profile-actions">
+                  <button
+                    type="button"
+                    onClick={openMessage}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#1E95C2]"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" /> Nachricht
+                  </button>
+                  {relationship.status === "accepted" ? (
+                    <button type="button" onClick={() => updateFriendship("remove")} className="inline-flex items-center gap-2 px-4 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#FFD700]/10">
+                      <UserCheck className="w-3.5 h-3.5" /> Freunde
+                    </button>
+                  ) : relationship.incoming ? (
+                    <>
+                      <button type="button" onClick={() => updateFriendship("accept")} className="inline-flex items-center gap-2 px-4 py-2 border border-[#00FF88]/45 text-[#00FF88] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#00FF88]/10">
+                        <UserCheck className="w-3.5 h-3.5" /> Annehmen
+                      </button>
+                      <button type="button" onClick={() => updateFriendship("decline")} className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white">
+                        <X className="w-3.5 h-3.5" /> Ablehnen
+                      </button>
+                    </>
+                  ) : relationship.outgoing ? (
+                    <button type="button" onClick={() => updateFriendship("remove")} className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white">
+                      <UserPlus className="w-3.5 h-3.5" /> Anfrage offen
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => updateFriendship("request")} className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/70 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white hover:border-[#29B6E8]/45">
+                      <UserPlus className="w-3.5 h-3.5" /> Freund hinzufügen
+                    </button>
+                  )}
+                </div>
+              )}
               {/* Quick stats */}
               <div className="mt-6 grid grid-cols-3 md:grid-cols-6 gap-3">
                 <QuickStat icon={Zap} label="Level" value={level.level} color="#29B6E8" testId="profile-stat-level" />

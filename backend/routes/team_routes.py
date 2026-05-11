@@ -633,6 +633,19 @@ async def set_member_role(team_id: str, user_id: str, body: dict, me: dict = Dep
         await db.teams.update_one(
             {"id": team_id}, {"$pull": {"co_leader_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}},
         )
+    await db.team_members.update_one(
+        {"team_id": team_id, "user_id": user_id},
+        {"$set": {"role": role, "updated_at": now_utc().isoformat()}},
+        upsert=True,
+    )
+    await create_user_notification(
+        user_id,
+        title=f"Teamrolle aktualisiert: [{team.get('tag')}]",
+        body=f"Deine Rolle in {team.get('name')} ist jetzt {('Co-Leader' if role == 'co_leader' else 'Mitglied')}.",
+        url=f"/teams/{team_id}",
+        kind="team_role_changed",
+        meta={"team_id": team_id, "role": role},
+    )
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "team.role_change", "target_id": team_id,
         "actor_id": me["id"], "data": {"user_id": user_id, "role": role},
@@ -665,6 +678,24 @@ async def transfer_leader(team_id: str, body: dict, me: dict = Depends(get_curre
     })
     if old_leader:
         await db.teams.update_one({"id": team_id}, {"$addToSet": {"co_leader_ids": old_leader}})
+        await db.team_members.update_one(
+            {"team_id": team_id, "user_id": old_leader},
+            {"$set": {"role": "co_leader", "updated_at": now_utc().isoformat()}},
+            upsert=True,
+        )
+    await db.team_members.update_one(
+        {"team_id": team_id, "user_id": new_leader_id},
+        {"$set": {"role": "leader", "updated_at": now_utc().isoformat()}},
+        upsert=True,
+    )
+    await create_user_notification(
+        new_leader_id,
+        title=f"Du bist jetzt Team-Leader: [{team.get('tag')}]",
+        body=f"Die Leitung von {team.get('name')} wurde an dich übertragen.",
+        url=f"/teams/{team_id}",
+        kind="team_leader_transferred",
+        meta={"team_id": team_id, "old_leader": old_leader},
+    )
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "team.transfer_leader", "target_id": team_id,
         "actor_id": me["id"], "data": {"old_leader": old_leader, "new_leader": new_leader_id},
