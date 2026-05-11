@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_current_user, get_optional_user, require_admin
 from models import TeamCreate, TeamUpdate, now_utc, new_id
+from services.user_notifications import create_user_notification
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
 
@@ -28,6 +29,10 @@ class TeamSquadUpdate(BaseModel):
     game_id: Optional[str] = None
     member_ids: Optional[list[str]] = None
     status: Optional[Literal["active", "archived"]] = None
+
+
+class TeamInviteCreate(BaseModel):
+    user_id: str
 
 
 def _can_manage(team: dict, user: dict) -> bool:
@@ -55,6 +60,47 @@ def _public_user(user: dict | None) -> dict | None:
         "display_name": user.get("display_name"),
         "avatar_url": user.get("avatar_url"),
     }
+
+
+def _user_label(user: dict | None) -> str:
+    return (user or {}).get("display_name") or (user or {}).get("username") or "Benutzer"
+
+
+async def _add_team_member(db, team_id: str, user_id: str, role: str = "member") -> None:
+    await db.teams.update_one(
+        {"id": team_id},
+        {"$addToSet": {"member_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}},
+    )
+    await db.team_members.update_one(
+        {"team_id": team_id, "user_id": user_id},
+        {"$set": {
+            "team_id": team_id,
+            "user_id": user_id,
+            "role": role,
+            "joined_at": now_utc().isoformat(),
+        }},
+        upsert=True,
+    )
+    try:
+        from badges import on_team_joined
+        await on_team_joined(user_id, team_id)
+    except Exception:
+        pass
+
+
+async def _hydrate_invite(invite: dict) -> dict:
+    db = get_db()
+    team = await db.teams.find_one(
+        {"id": invite.get("team_id")},
+        {"_id": 0, "id": 1, "name": 1, "tag": 1, "logo_url": 1},
+    )
+    inviter = await db.users.find_one(
+        {"id": invite.get("invited_by")},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
+    )
+    invite["team"] = team
+    invite["inviter"] = _public_user(inviter)
+    return invite
 
 
 async def _hydrate_team(team: dict) -> dict:
@@ -150,6 +196,16 @@ async def my_teams(me: dict = Depends(get_current_user)):
     return teams
 
 
+@router.get("/invites/my")
+async def my_team_invites(me: dict = Depends(get_current_user)):
+    db = get_db()
+    invites = await db.team_invites.find(
+        {"user_id": me["id"], "status": "pending"},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(100)
+    return [await _hydrate_invite(invite) for invite in invites]
+
+
 @router.get("/{team_id}")
 async def get_team(team_id: str, user: dict | None = Depends(get_optional_user)):
     db = get_db()
@@ -160,6 +216,133 @@ async def get_team(team_id: str, user: dict | None = Depends(get_optional_user))
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     await _hydrate_team(team)
     return _team_response(team, user)
+
+
+@router.get("/{team_id}/invite-candidates")
+async def invite_candidates(team_id: str, q: str | None = None, me: dict = Depends(get_current_user)):
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_manage(team, me):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    query = {
+        "is_active": True,
+        "is_banned": {"$ne": True},
+        "id": {"$nin": team.get("member_ids") or []},
+    }
+    if q:
+        query["$or"] = [
+            {"username": {"$regex": q, "$options": "i"}},
+            {"display_name": {"$regex": q, "$options": "i"}},
+        ]
+    users = await db.users.find(
+        query,
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
+    ).sort("display_name", 1).to_list(25)
+    pending = await db.team_invites.find(
+        {"team_id": team_id, "status": "pending", "user_id": {"$in": [u["id"] for u in users]}},
+        {"_id": 0, "user_id": 1},
+    ).to_list(100)
+    pending_ids = {row["user_id"] for row in pending}
+    for user in users:
+        user["has_pending_invite"] = user["id"] in pending_ids
+    return users
+
+
+@router.post("/{team_id}/invites")
+async def invite_team_member(team_id: str, body: TeamInviteCreate, me: dict = Depends(get_current_user)):
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_manage(team, me):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    if body.user_id in (team.get("member_ids") or []):
+        raise HTTPException(status_code=409, detail="Nutzer ist bereits im Team")
+    user = await db.users.find_one(
+        {"id": body.user_id, "is_active": True, "is_banned": {"$ne": True}},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1},
+    )
+    if not user:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    existing = await db.team_invites.find_one(
+        {"team_id": team_id, "user_id": body.user_id, "status": "pending"},
+        {"_id": 0},
+    )
+    if existing:
+        return await _hydrate_invite(existing)
+    now = now_utc().isoformat()
+    invite = {
+        "id": new_id(),
+        "team_id": team_id,
+        "user_id": body.user_id,
+        "invited_by": me["id"],
+        "status": "pending",
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.team_invites.insert_one(invite)
+    await create_user_notification(
+        body.user_id,
+        title=f"Team-Einladung: {team.get('name')}",
+        body=f"{_user_label(me)} hat dich in das Team [{team.get('tag')}] eingeladen.",
+        url="/profile?tab=teams",
+        kind="team_invite",
+        meta={"invite_id": invite["id"], "team_id": team_id},
+    )
+    invite.pop("_id", None)
+    return await _hydrate_invite(invite)
+
+
+@router.post("/invites/{invite_id}/accept")
+async def accept_team_invite(invite_id: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    invite = await db.team_invites.find_one({"id": invite_id, "user_id": me["id"], "status": "pending"}, {"_id": 0})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Einladung nicht gefunden")
+    team = await db.teams.find_one({"id": invite["team_id"]}, {"_id": 0})
+    if not team:
+        await db.team_invites.update_one({"id": invite_id}, {"$set": {"status": "cancelled", "updated_at": now_utc().isoformat()}})
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if me["id"] not in (team.get("member_ids") or []):
+        await _add_team_member(db, team["id"], me["id"])
+    await db.team_invites.update_one(
+        {"id": invite_id},
+        {"$set": {"status": "accepted", "acted_at": now_utc().isoformat(), "updated_at": now_utc().isoformat()}},
+    )
+    await db.notifications.update_many(
+        {"user_id": me["id"], "meta.invite_id": invite_id},
+        {"$set": {"read": True}},
+    )
+    notify_ids = list({invite.get("invited_by"), team.get("leader_id")} - {None, me["id"]})
+    for uid in notify_ids:
+        await create_user_notification(
+            uid,
+            title=f"{_user_label(me)} ist [{team.get('tag')}] beigetreten",
+            body=f"Die Team-Einladung für {team.get('name')} wurde angenommen.",
+            url=f"/teams/{team['id']}",
+            kind="team_invite_accepted",
+            meta={"invite_id": invite_id, "team_id": team["id"]},
+        )
+    return {"ok": True}
+
+
+@router.post("/invites/{invite_id}/decline")
+async def decline_team_invite(invite_id: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    invite = await db.team_invites.find_one({"id": invite_id, "user_id": me["id"], "status": "pending"}, {"_id": 0})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Einladung nicht gefunden")
+    await db.team_invites.update_one(
+        {"id": invite_id},
+        {"$set": {"status": "declined", "acted_at": now_utc().isoformat(), "updated_at": now_utc().isoformat()}},
+    )
+    await db.notifications.update_many(
+        {"user_id": me["id"], "meta.invite_id": invite_id},
+        {"$set": {"read": True}},
+    )
+    return {"ok": True}
 
 
 @router.post("")

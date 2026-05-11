@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from datetime import datetime, timezone
 import math
+from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_current_user, require_admin, get_optional_user
 from services.visibility import user_can_see
@@ -32,6 +33,10 @@ from bracket_extensions import (
 router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 REGISTRATION_CHECKIN_STATUSES = {"approved", "checked_in", "no_show"}
+
+
+class TournamentChatCreate(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
 
 
 def _next_power_of_two(n: int) -> int:
@@ -83,6 +88,44 @@ def _is_staff(user: dict | None) -> bool:
 
 async def _is_tournament_staff(tid: str, user: dict | None, roles: set[str] | None = None) -> bool:
     return await has_tournament_staff_permission(user, tid, roles or READ_STAFF_ROLES)
+
+
+async def _can_use_tournament_chat(tournament: dict, user: dict | None) -> bool:
+    if not user:
+        return False
+    if _is_staff(user) or await _is_tournament_staff(tournament["id"], user):
+        return True
+    if tournament.get("show_chat") is not True:
+        return False
+    db = get_db()
+    own_registration = await db.tournament_registrations.find_one(
+        {
+            "tournament_id": tournament["id"],
+            "user_id": user["id"],
+            "status": {"$in": ["approved", "checked_in"]},
+        },
+        {"id": 1},
+    )
+    if own_registration:
+        return True
+    user_team_ids = [
+        row["team_id"] for row in await db.team_members.find(
+            {"user_id": user["id"]},
+            {"_id": 0, "team_id": 1},
+        ).to_list(100)
+        if row.get("team_id")
+    ]
+    if not user_team_ids:
+        return False
+    team_registration = await db.tournament_registrations.find_one(
+        {
+            "tournament_id": tournament["id"],
+            "team_id": {"$in": user_team_ids},
+            "status": {"$in": ["approved", "checked_in"]},
+        },
+        {"id": 1},
+    )
+    return bool(team_registration)
 
 
 async def _get_visible_tournament(tid: str, user: dict | None) -> dict:
@@ -400,6 +443,66 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, user=Depe
             for c in t["related_f1_challenges"]:
                 c["public_phase"] = derive_public_phase(c, "f1")
     return t
+
+
+@router.get("/{tid}/chat")
+async def list_tournament_chat(tid: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    tournament = await _get_visible_tournament(tid, me)
+    if not await _can_use_tournament_chat(tournament, me):
+        raise HTTPException(status_code=403, detail="Turnier-Chat ist nur für Teilnehmer und Turnierleitung sichtbar")
+    messages = await db.tournament_chat_messages.find(
+        {"tournament_id": tid, "deleted_at": {"$exists": False}},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(100)
+    messages.reverse()
+    user_ids = list({m.get("user_id") for m in messages if m.get("user_id")})
+    users = {u["id"]: u for u in await db.users.find(
+        {"id": {"$in": user_ids}},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1},
+    ).to_list(200)}
+    for message in messages:
+        author = users.get(message.get("user_id")) or {}
+        message["author"] = {
+            "id": author.get("id"),
+            "username": author.get("username"),
+            "display_name": author.get("display_name") or author.get("username") or "Benutzer",
+            "avatar_url": author.get("avatar_url"),
+            "role": author.get("role"),
+        }
+    return messages
+
+
+@router.post("/{tid}/chat")
+async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = Depends(get_current_user)):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    tournament = await _get_visible_tournament(tid, me)
+    if not await _can_use_tournament_chat(tournament, me):
+        raise HTTPException(status_code=403, detail="Turnier-Chat ist nur für Teilnehmer und Turnierleitung sichtbar")
+    text = body.message.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Nachricht darf nicht leer sein")
+    now = now_utc().isoformat()
+    doc = {
+        "id": new_id(),
+        "tournament_id": tid,
+        "user_id": me["id"],
+        "message": text,
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.tournament_chat_messages.insert_one(doc)
+    doc.pop("_id", None)
+    doc["author"] = {
+        "id": me.get("id"),
+        "username": me.get("username"),
+        "display_name": me.get("display_name") or me.get("username"),
+        "avatar_url": me.get("avatar_url"),
+        "role": me.get("role"),
+    }
+    return doc
 
 
 @router.post("")

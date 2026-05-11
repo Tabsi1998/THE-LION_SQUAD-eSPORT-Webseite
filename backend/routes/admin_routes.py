@@ -124,3 +124,10 @@ async def mark_read(nid: str, me: dict = Depends(get_current_user)):
     db = get_db()
     await db.notifications.update_one({"id": nid, "user_id": me["id"]}, {"$set": {"read": True}})
     return {"ok": True}
+
+
+@router.post("/notifications/read-all")
+async def mark_all_read(me: dict = Depends(get_current_user)):
+    db = get_db()
+    await db.notifications.update_many({"user_id": me["id"], "read": {"$ne": True}}, {"$set": {"read": True}})
+    return {"ok": True}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X, Flag } from "lucide-react";
+import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X, Flag, MessageSquare, Send } from "lucide-react";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { formatDateTime, getRegistrationState } from "@/lib/datetime";
@@ -194,6 +194,7 @@ export default function TournamentDetailPage() {
               </div>
             </section>
           )}
+          {t.show_chat && <TournamentChat tournament={t} user={user} />}
           <section>
             <h2 className="font-heading text-2xl font-bold uppercase mb-3">Teilnehmer ({regs.length})</h2>
             <div className="border border-white/10 rounded-sm divide-y divide-white/5 bg-[#121212]">
@@ -232,6 +233,104 @@ export default function TournamentDetailPage() {
         />
       )}
     </PublicLayout>
+  );
+}
+
+function TournamentChat({ tournament, user }) {
+  const [messages, setMessages] = useState([]);
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [blocked, setBlocked] = useState("");
+  const scrollRef = useRef(null);
+
+  const load = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data } = await api.get(`/tournaments/${tournament.id}/chat`);
+      setMessages(data || []);
+      setBlocked("");
+    } catch (err) {
+      setBlocked(err.response?.status === 403 ? "Chat nur für angemeldete Teilnehmer und Turnierleitung." : "Chat konnte nicht geladen werden.");
+    }
+  }, [tournament.id, user]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!user) return undefined;
+    const timer = setInterval(load, 6000);
+    return () => clearInterval(timer);
+  }, [load, user]);
+  useApiInvalidation(load, ["tournaments"]);
+
+  useEffect(() => {
+    const box = scrollRef.current;
+    if (box) box.scrollTop = box.scrollHeight;
+  }, [messages.length]);
+
+  const send = async (event) => {
+    event.preventDefault();
+    const message = text.trim();
+    if (!message) return;
+    setLoading(true);
+    try {
+      const { data } = await api.post(`/tournaments/${tournament.id}/chat`, { message });
+      setMessages((rows) => [...rows, data]);
+      setText("");
+      setBlocked("");
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Nachricht konnte nicht gesendet werden.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section data-testid="tournament-chat">
+      <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2">
+        <MessageSquare className="w-4 h-4 text-[#29B6E8]" /> Turnier-Chat
+      </h2>
+      <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
+        {!user ? (
+          <div className="p-5 text-sm text-white/55">
+            <Link to={`/login?next=/tournaments/${tournament.slug || tournament.id}`} className="text-[#29B6E8] font-bold hover:text-white">Einloggen</Link>, um den Chat als Teilnehmer zu nutzen.
+          </div>
+        ) : blocked ? (
+          <div className="p-5 text-sm text-white/45">{blocked}</div>
+        ) : (
+          <>
+            <div ref={scrollRef} className="max-h-80 overflow-y-auto p-4 space-y-3">
+              {messages.map((message) => {
+                const mine = message.user_id === user.id;
+                return (
+                  <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                    <div className={`max-w-[85%] border rounded-sm px-3 py-2 ${mine ? "border-[#29B6E8]/40 bg-[#29B6E8]/10" : "border-white/10 bg-[#0A0A0A]"}`}>
+                      <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/40">
+                        <span className={mine ? "text-[#29B6E8]" : "text-white/55"}>{message.author?.display_name || message.author?.username || "Benutzer"}</span>
+                        {message.created_at && <span>{new Date(message.created_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}</span>}
+                      </div>
+                      <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85">{message.message}</div>
+                    </div>
+                  </div>
+                );
+              })}
+              {messages.length === 0 && <div className="text-center py-8 text-sm text-white/35">Noch keine Nachrichten.</div>}
+            </div>
+            <form onSubmit={send} className="border-t border-white/10 p-3 flex gap-2">
+              <input
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                maxLength={1000}
+                placeholder="Spielcode, Lobbycode oder Absprache schreiben..."
+                className="flex-1 min-w-0 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-[#29B6E8]"
+              />
+              <button disabled={loading || !text.trim()} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
+                <Send className="w-3.5 h-3.5" /> Senden
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    </section>
   );
 }
 

@@ -30,6 +30,9 @@ async def init_indexes():
     await db.teams.create_index("id", unique=True)
     await db.teams.create_index("join_code", unique=True, sparse=True)
     await db.teams.create_index("tag")
+    await db.team_invites.create_index("id", unique=True)
+    await db.team_invites.create_index([("team_id", 1), ("user_id", 1), ("status", 1)])
+    await db.team_invites.create_index([("user_id", 1), ("status", 1), ("created_at", -1)])
     # Games
     await db.games.create_index("id", unique=True)
     await db.games.create_index("slug", unique=True)
@@ -69,6 +72,7 @@ async def init_indexes():
     # Notifications
     await db.notifications.create_index("id", unique=True)
     await db.notifications.create_index("user_id")
+    await db.notifications.create_index([("user_id", 1), ("read", 1), ("created_at", -1)])
     # Audit
     await db.audit_logs.create_index("id", unique=True)
     await db.audit_logs.create_index("created_at")
@@ -98,6 +102,8 @@ async def init_indexes():
     await db.matches_v2.create_index([("stage_id", 1), ("match_key", 1)])
     await db.match_reports_v2.create_index("id", unique=True)
     await db.match_reports_v2.create_index("match_id")
+    await db.tournament_chat_messages.create_index("id", unique=True)
+    await db.tournament_chat_messages.create_index([("tournament_id", 1), ("created_at", -1)])
     # Membership / club system
     await db.memberships.create_index("user_id", unique=True)
     await db.memberships.create_index("member_number", unique=True, sparse=True)

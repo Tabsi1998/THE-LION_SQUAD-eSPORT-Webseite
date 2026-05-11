@@ -7,7 +7,7 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Copy, Edit, Plus, Shield, Trash2, Users, UserPlus } from "lucide-react";
+import { Copy, Edit, Plus, Search, Shield, Trash2, Users, UserPlus } from "lucide-react";
 
 const emptyTeam = { name: "", tag: "", description: "", logo_url: "", discord_link: "" };
 
@@ -261,6 +261,7 @@ function TeamDetail({ id }) {
               </div>
             </div>
           )}
+          {canEdit && <InviteMemberPanel team={team} />}
           {user && !isMember && (
             <form onSubmit={join} className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
               <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Team beitreten</div>
@@ -276,6 +277,80 @@ function TeamDetail({ id }) {
       </div>
       {editing && <TeamModal team={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </PublicLayout>
+  );
+}
+
+function InviteMemberPanel({ team }) {
+  const [query, setQuery] = useState("");
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const needle = query.trim();
+    if (needle.length < 2) {
+      setCandidates([]);
+      return undefined;
+    }
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const { data } = await api.get(`/teams/${team.id}/invite-candidates?q=${encodeURIComponent(needle)}`);
+        setCandidates(data || []);
+      } catch {
+        setCandidates([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [query, team.id]);
+
+  const invite = async (user) => {
+    try {
+      await api.post(`/teams/${team.id}/invites`, { user_id: user.id });
+      toast.success(`${user.display_name || user.username} eingeladen.`);
+      setCandidates((rows) => rows.map((row) => row.id === user.id ? { ...row, has_pending_invite: true } : row));
+    } catch (err) {
+      toast.error(formatRequestError(err, "Einladung konnte nicht gesendet werden."));
+    }
+  };
+
+  return (
+    <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
+      <div>
+        <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Mitglieder einladen</div>
+        <p className="mt-1 text-xs text-white/45">Benutzer suchen und eine Team-Einladung in deren Inbox senden.</p>
+      </div>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Username suchen"
+          className="w-full bg-[#0A0A0A] border border-white/10 pl-9 pr-3 py-2 rounded-sm text-sm"
+        />
+      </div>
+      <div className="space-y-2">
+        {loading && <div className="text-xs text-white/40">Suche läuft...</div>}
+        {candidates.map((candidate) => (
+          <div key={candidate.id} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm p-2">
+            <div className="min-w-0 flex-1">
+              <div className="font-bold text-sm truncate">{candidate.display_name || candidate.username}</div>
+              <div className="text-xs text-white/40 truncate">@{candidate.username}</div>
+            </div>
+            <button
+              type="button"
+              disabled={candidate.has_pending_invite}
+              onClick={() => invite(candidate)}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-45 disabled:pointer-events-none"
+            >
+              <UserPlus className="w-3.5 h-3.5" /> {candidate.has_pending_invite ? "Offen" : "Einladen"}
+            </button>
+          </div>
+        ))}
+        {query.trim().length >= 2 && !loading && candidates.length === 0 && <div className="text-xs text-white/35">Keine passenden Benutzer gefunden.</div>}
+      </div>
+    </div>
   );
 }
 

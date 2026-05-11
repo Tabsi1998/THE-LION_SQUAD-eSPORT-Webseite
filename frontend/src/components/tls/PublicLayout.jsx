@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
 import { MainNav, MobileNav } from "@/components/tls/MainNav";
+import { NotificationBell } from "@/components/tls/NotificationBell";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { openCookieSettings } from "@/components/tls/CookieConsent";
 import { api } from "@/lib/api";
@@ -61,6 +62,7 @@ export function PublicLayout({ children }) {
                     <Shield className="w-3.5 h-3.5" /> Admin
                   </Link>
                 )}
+                <NotificationBell />
                 <Link
                   to="/dashboard"
                   data-testid="nav-dashboard"

@@ -36,7 +36,7 @@ export default function AdminTournamentNewPage() {
       { place: 2, label: "2. Platz", value: "" },
       { place: 3, label: "3. Platz", value: "" },
     ],
-    twitch_channel: "", twitch_enabled: false,
+    twitch_channel: "", twitch_enabled: false, show_chat: false,
     location: "", stream_link: "", discord_link: "",
   });
   const [saving, setSaving] = useState(false);
@@ -185,6 +185,10 @@ export default function AdminTournamentNewPage() {
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={form.twitch_enabled} onChange={(e) => set("twitch_enabled", e.target.checked)} data-testid="new-tr-twitch-enabled" className="accent-[#9146FF]" />
             <span>Twitch-Player auf Turnierseite einbetten</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.show_chat} onChange={(e) => set("show_chat", e.target.checked)} data-testid="new-tr-chat-enabled" className="accent-[#9146FF]" />
+            <span>Turnier-Chat für Teilnehmer anzeigen</span>
           </label>
           <Row>
             <Field label="Externer Stream-Verweis" value={form.stream_link} onChange={(v) => set("stream_link", v)} testId="new-tr-stream" placeholder="https://…" />

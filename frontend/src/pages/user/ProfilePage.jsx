@@ -8,7 +8,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
-import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil, Target, RefreshCw, Sparkles, Bell, Mail } from "lucide-react";
+import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil, Target, RefreshCw, Sparkles, Bell, Mail, Check, X, UserPlus } from "lucide-react";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 
 const TABS = [
@@ -726,6 +726,7 @@ const emptySquad = {
 
 function TeamsPanel() {
   const [teams, setTeams] = useState([]);
+  const [invites, setInvites] = useState([]);
   const [activeId, setActiveId] = useState("");
   const [squads, setSquads] = useState([]);
   const [tournaments, setTournaments] = useState([]);
@@ -742,6 +743,11 @@ function TeamsPanel() {
     setActiveId((cur) => cur || data?.[0]?.id || "");
   }, []);
 
+  const loadInvites = useCallback(async () => {
+    const { data } = await api.get("/teams/invites/my");
+    setInvites(data || []);
+  }, []);
+
   const loadMeta = useCallback(() => {
     api.get("/tournaments").then(({ data }) => setTournaments(data || [])).catch(() => {});
     api.get("/seasons").then(({ data }) => setSeasons(data || [])).catch(() => {});
@@ -749,12 +755,14 @@ function TeamsPanel() {
 
   useEffect(() => {
     loadTeams().catch(() => toast.error("Teams konnten nicht geladen werden."));
+    loadInvites().catch(() => {});
     loadMeta();
-  }, [loadMeta, loadTeams]);
+  }, [loadInvites, loadMeta, loadTeams]);
   useApiInvalidation(() => {
     loadTeams();
+    loadInvites();
     loadMeta();
-  }, ["teams", "tournaments", "seasons"]);
+  }, ["teams", "tournaments", "seasons", "admin/notifications"]);
 
   const loadSquads = useCallback(() => {
     if (!activeId) {
@@ -819,6 +827,17 @@ function TeamsPanel() {
     }));
   };
 
+  const actOnInvite = async (invite, action) => {
+    try {
+      await api.post(`/teams/invites/${invite.id}/${action}`);
+      toast.success(action === "accept" ? "Team-Einladung angenommen." : "Team-Einladung abgelehnt.");
+      setInvites((rows) => rows.filter((row) => row.id !== invite.id));
+      loadTeams();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Einladung konnte nicht verarbeitet werden."));
+    }
+  };
+
   return (
     <div className="space-y-6" data-testid="profile-teams-tab">
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 flex items-center justify-between gap-4 flex-wrap">
@@ -831,6 +850,31 @@ function TeamsPanel() {
           <Plus className="w-3.5 h-3.5" /> Team erstellen
         </Link>
       </div>
+
+      {invites.length > 0 && (
+        <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-5">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">
+            <UserPlus className="w-4 h-4" /> Offene Team-Einladungen
+          </div>
+          <div className="mt-4 grid md:grid-cols-2 gap-3">
+            {invites.map((invite) => (
+              <div key={invite.id} className="border border-white/10 bg-[#121212] rounded-sm p-4">
+                <div className="text-[10px] uppercase tracking-widest text-white/45">Einladung von {invite.inviter?.display_name || invite.inviter?.username || "Teamleitung"}</div>
+                <div className="mt-1 font-heading font-black uppercase">{invite.team?.name || "Team"}</div>
+                {invite.team?.tag && <div className="text-xs text-[#29B6E8] font-bold">[{invite.team.tag}]</div>}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => actOnInvite(invite, "accept")} className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold">
+                    <Check className="w-3.5 h-3.5" /> Annehmen
+                  </button>
+                  <button type="button" onClick={() => actOnInvite(invite, "decline")} className="inline-flex items-center gap-1.5 px-3 py-2 border border-white/15 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white">
+                    <X className="w-3.5 h-3.5" /> Ablehnen
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {teams.length === 0 ? (
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/45">
