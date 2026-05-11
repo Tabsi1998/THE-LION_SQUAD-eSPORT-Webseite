@@ -73,6 +73,9 @@ async def init_indexes():
     await db.news_posts.create_index("id", unique=True)
     await db.sponsors.create_index("id", unique=True)
     await db.partners.create_index("id", unique=True)
+    await db.references.create_index("id", unique=True)
+    await db.references.create_index("game_id")
+    await db.references.create_index([("is_active", 1), ("visibility", 1), ("start_date", -1)])
     # Notifications
     await db.notifications.create_index("id", unique=True)
     await db.notifications.create_index("user_id")

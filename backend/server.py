@@ -85,6 +85,7 @@ async def lifespan(app: FastAPI):
             "users", "teams", "team_members", "games", "events", "tournaments",
             "tournament_registrations", "matches", "f1_challenges", "f1_tracks",
             "f1_lap_times", "stations", "news_posts", "sponsors", "partners", "seasons",
+            "references",
             "tournament_groups", "memberships", "member_benefits", "user_socials",
             "gallery_albums", "gallery_photos", "documents", "season_points",
             "audit_logs", "email_logs", "notifications", "password_reset_tokens",

@@ -276,7 +276,7 @@ async def sitemap():
     static_paths = [
         "/", "/about", "/news", "/events", "/tournaments", "/fastlap", "/f1",
         "/teams", "/players", "/members", "/membership/join",
-        "/sponsors", "/partners", "/contact", "/galerie",
+        "/sponsors", "/partners", "/contact", "/galerie", "/references",
         "/privacy", "/imprint",
     ]
     urls: list[dict] = [

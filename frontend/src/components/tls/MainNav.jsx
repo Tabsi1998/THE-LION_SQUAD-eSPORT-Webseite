@@ -36,6 +36,7 @@ export const NAV_STRUCTURE = [
       { to: "/tournaments", label: "Turniere" },
       { to: "/fastlap", label: "Fast Lap" },
       { to: "/seasons/current", label: "Season Pass" },
+      { to: "/references", label: "Referenzen" },
     ],
   },
   {

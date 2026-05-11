@@ -82,6 +82,7 @@ import AboutPage from "@/pages/public/AboutPage";
 import ContactPage from "@/pages/public/ContactPage";
 import SponsorsPage from "@/pages/public/SponsorsPage";
 import PartnersPage from "@/pages/public/PartnersPage";
+import ReferencesPage from "@/pages/public/ReferencesPage";
 import PlayersPage from "@/pages/public/PlayersPage";
 import CommunityPage from "@/pages/public/CommunityPage";
 import MembersDirectoryPage from "@/pages/public/MembersDirectoryPage";
@@ -104,6 +105,7 @@ const AdminPrizesPage = lazy(() => import("@/pages/admin/AdminPrizesPage"));
 const AdminPenaltiesPage = lazy(() => import("@/pages/admin/AdminPenaltiesPage"));
 const AdminContactPage = lazy(() => import("@/pages/admin/AdminContactPage"));
 const AdminBoardPage = lazy(() => import("@/pages/admin/AdminBoardPage"));
+const AdminReferencesPage = lazy(() => import("@/pages/admin/AdminReferencesPage"));
 const SetupWizardPage = lazy(() => import("@/pages/SetupWizardPage"));
 import { NotFoundPage, ForbiddenPage } from "@/pages/ErrorPages";
 import { BoardPage, ValuesPage } from "@/pages/public/ClubPages";
@@ -129,6 +131,7 @@ function App() {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/sponsors" element={<SponsorsPage />} />
           <Route path="/partners" element={<PartnersPage />} />
+          <Route path="/references" element={<ReferencesPage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/players" element={<PlayersPage />} />
           <Route path="/members" element={<MembersDirectoryPage />} />
@@ -207,6 +210,7 @@ function App() {
           {/* Admin */}
           <Route path="/admin/sponsors" element={<ProtectedRoute requireAdmin><AdminSponsorsPage /></ProtectedRoute>} />
           <Route path="/admin/partners" element={<ProtectedRoute requireAdmin><AdminPartnersPage /></ProtectedRoute>} />
+          <Route path="/admin/references" element={<ProtectedRoute requireAdmin><AdminReferencesPage /></ProtectedRoute>} />
           <Route path="/admin/achievements" element={<ProtectedRoute requireAdmin><AdminAchievementsPage /></ProtectedRoute>} />
           <Route path="/admin/membership-applications" element={<ProtectedRoute requireAdmin><AdminMembershipApplicationsPage /></ProtectedRoute>} />
           <Route path="/admin/cms" element={<ProtectedRoute requireAdmin><AdminCmsPage /></ProtectedRoute>} />

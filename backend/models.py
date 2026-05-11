@@ -865,6 +865,63 @@ class PartnerUpdate(BaseModel):
     order_index: Optional[int] = None
 
 
+# ---------- External tournament references ----------
+ReferenceVisibility = Literal["public", "community", "members", "internal"]
+ReferenceMode = Literal["online", "offline", "hybrid"]
+
+
+class ReferenceCreate(BaseModel):
+    title: str
+    organizer: Optional[str] = None
+    game_id: Optional[str] = None
+    game_name: Optional[str] = None
+    team_name: Optional[str] = None
+    lineup: List[str] = Field(default_factory=list)
+    placement: Optional[int] = Field(default=None, ge=1)
+    placement_label: Optional[str] = None
+    participant_count: Optional[int] = Field(default=None, ge=1)
+    team_count: Optional[int] = Field(default=None, ge=1)
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    location: Optional[str] = None
+    mode: ReferenceMode = "online"
+    external_url: Optional[str] = None
+    bracket_url: Optional[str] = None
+    match_url: Optional[str] = None
+    result_url: Optional[str] = None
+    description: Optional[str] = None
+    highlights: Optional[str] = None
+    visibility: ReferenceVisibility = "public"
+    is_active: bool = True
+    order_index: int = 0
+
+
+class ReferenceUpdate(BaseModel):
+    title: Optional[str] = None
+    organizer: Optional[str] = None
+    game_id: Optional[str] = None
+    game_name: Optional[str] = None
+    team_name: Optional[str] = None
+    lineup: Optional[List[str]] = None
+    placement: Optional[int] = Field(default=None, ge=1)
+    placement_label: Optional[str] = None
+    participant_count: Optional[int] = Field(default=None, ge=1)
+    team_count: Optional[int] = Field(default=None, ge=1)
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    location: Optional[str] = None
+    mode: Optional[ReferenceMode] = None
+    external_url: Optional[str] = None
+    bracket_url: Optional[str] = None
+    match_url: Optional[str] = None
+    result_url: Optional[str] = None
+    description: Optional[str] = None
+    highlights: Optional[str] = None
+    visibility: Optional[ReferenceVisibility] = None
+    is_active: Optional[bool] = None
+    order_index: Optional[int] = None
+
+
 # ---------- Gallery ----------
 GalleryVisibility = Literal["public", "community", "members"]
 

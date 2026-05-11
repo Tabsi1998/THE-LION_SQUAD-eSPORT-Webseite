@@ -12,7 +12,7 @@ from services.notification_preferences import enqueue_newsletter_for_item
 from services.user_notifications import create_user_notification
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
-    PartnerCreate, PartnerUpdate,
+    PartnerCreate, PartnerUpdate, ReferenceCreate, ReferenceUpdate,
     GalleryAlbumCreate, GalleryAlbumUpdate,
     GalleryPhotoCreate, GalleryPhotoUpdate,
     now_utc, new_id,
@@ -529,6 +529,59 @@ def _partner_defaults(doc: dict) -> dict:
     return doc
 
 
+def _medal_for_placement(placement: int | None) -> str | None:
+    if placement == 1:
+        return "gold"
+    if placement == 2:
+        return "silver"
+    if placement == 3:
+        return "bronze"
+    return None
+
+
+def _reference_summary(items: list[dict]) -> dict:
+    placements = [int(item["placement"]) for item in items if item.get("placement")]
+    return {
+        "total": len(items),
+        "podiums": sum(1 for place in placements if place <= 3),
+        "gold": sum(1 for place in placements if place == 1),
+        "silver": sum(1 for place in placements if place == 2),
+        "bronze": sum(1 for place in placements if place == 3),
+        "top10": sum(1 for place in placements if place <= 10),
+        "games": len({item.get("game_id") or item.get("game_name") for item in items if item.get("game_id") or item.get("game_name")}),
+    }
+
+
+async def _enrich_references(items: list[dict]) -> list[dict]:
+    db = get_db()
+    game_ids = list({item.get("game_id") for item in items if item.get("game_id")})
+    games = {}
+    if game_ids:
+        games = {g["id"]: g for g in await db.games.find({"id": {"$in": game_ids}}, {"_id": 0}).to_list(200)}
+    for item in items:
+        game = games.get(item.get("game_id"))
+        if game:
+            item["game"] = {
+                "id": game.get("id"),
+                "name": game.get("name"),
+                "slug": game.get("slug"),
+                "short_name": game.get("short_name"),
+                "logo_url": game.get("logo_url"),
+                "cover_url": game.get("cover_url"),
+            }
+            item["game_name"] = item.get("game_name") or game.get("name")
+        item["medal"] = _medal_for_placement(item.get("placement"))
+    return items
+
+
+def _sort_references(items: list[dict]) -> list[dict]:
+    return sorted(items, key=lambda item: (
+        item.get("order_index") or 0,
+        item.get("start_date") or item.get("end_date") or "",
+        item.get("title") or "",
+    ), reverse=True)
+
+
 @router.get("/partners")
 async def list_partners():
     db = get_db()
@@ -577,6 +630,71 @@ async def update_partner(pid: str, body: PartnerUpdate, me: dict = Depends(requi
 async def delete_partner(pid: str, me: dict = Depends(require_admin())):
     db = get_db()
     await db.partners.delete_one({"id": pid})
+    return {"ok": True}
+
+
+# ---------- References ----------
+@router.get("/references")
+async def list_references(game_id: Optional[str] = None, user: dict | None = Depends(get_optional_user)):
+    db = get_db()
+    query = {"is_active": {"$ne": False}}
+    if game_id:
+        query["game_id"] = game_id
+    refs = await db.references.find(query, {"_id": 0}).to_list(1000)
+    refs = await _filter_visible(refs, user)
+    refs = _sort_references(await _enrich_references(refs))
+    return {"items": refs, "summary": _reference_summary(refs)}
+
+
+@router.get("/references/admin")
+async def admin_list_references(me: dict = Depends(require_admin())):
+    db = get_db()
+    refs = await db.references.find({}, {"_id": 0}).to_list(1000)
+    refs = _sort_references(await _enrich_references(refs))
+    return {"items": refs, "summary": _reference_summary(refs)}
+
+
+@router.post("/references")
+async def create_reference(body: ReferenceCreate, me: dict = Depends(require_admin())):
+    db = get_db()
+    doc = body.model_dump()
+    if doc.get("game_id") and not await db.games.find_one({"id": doc["game_id"]}, {"id": 1}):
+        raise HTTPException(404, "Spiel nicht gefunden.")
+    doc["id"] = new_id()
+    doc["created_at"] = now_utc().isoformat()
+    doc["updated_at"] = now_utc().isoformat()
+    await db.references.insert_one(doc)
+    doc.pop("_id", None)
+    return (await _enrich_references([doc]))[0]
+
+
+@router.put("/references/{rid}")
+@router.patch("/references/{rid}")
+async def update_reference(rid: str, body: ReferenceUpdate, me: dict = Depends(require_admin())):
+    db = get_db()
+    nullable_fields = {
+        "organizer", "game_id", "game_name", "team_name", "placement", "placement_label",
+        "participant_count", "team_count", "start_date", "end_date", "location",
+        "external_url", "bracket_url", "match_url", "result_url", "description", "highlights",
+    }
+    raw = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    if updates.get("game_id") and not await db.games.find_one({"id": updates["game_id"]}, {"id": 1}):
+        raise HTTPException(404, "Spiel nicht gefunden.")
+    if not updates:
+        return {"ok": True}
+    updates["updated_at"] = now_utc().isoformat()
+    res = await db.references.update_one({"id": rid}, {"$set": updates})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Referenz nicht gefunden.")
+    saved = await db.references.find_one({"id": rid}, {"_id": 0})
+    return (await _enrich_references([saved]))[0]
+
+
+@router.delete("/references/{rid}")
+async def delete_reference(rid: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    await db.references.delete_one({"id": rid})
     return {"ok": True}
 
 
