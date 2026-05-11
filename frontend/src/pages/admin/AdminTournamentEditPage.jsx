@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
-import { fromDateTimeLocal, normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
+import { formatDateTime, fromDateTimeLocal, normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { toast } from "sonner";
 import { Zap, RefreshCw, Eye } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -1029,17 +1029,28 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
     onSaveResult(match, results, { note });
   };
   return (
-    <div className="mt-4 border-t border-white/10 pt-3 space-y-2">
+    <div className="mt-4 border-t border-white/10 pt-3 space-y-3">
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">Ergebnis eintragen</div>
+        <p className="mt-1 text-[11px] text-white/45">Platz 1 ist Sieger/qualifiziert. Punkte sind Spielpunkte, Rennpunkte oder Kills; leer lassen, wenn nur die Platzierung zählt.</p>
+      </div>
+      <div className="hidden sm:grid grid-cols-12 gap-2 text-[10px] font-bold uppercase tracking-widest text-white/35">
+        <div className="col-span-3">Teilnehmer</div>
+        <div className="col-span-2">Platz</div>
+        <div className="col-span-3">Punkte</div>
+        <div className="col-span-2">Status</div>
+        <div className="col-span-2">Wertung</div>
+      </div>
       {rows.map((row) => (
         <div key={row.registration_id} className="grid grid-cols-12 gap-2 items-center">
           <div className="col-span-3 text-xs truncate">{labelFor(row.registration_id)}</div>
-          <input type="number" min="1" value={row.rank} onChange={(e)=>update(row.registration_id, { rank: e.target.value })} className="col-span-2 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Platz" />
-          <input type="number" min="0" value={row.score} onChange={(e)=>update(row.registration_id, { score: e.target.value })} className="col-span-3 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Punkte" />
+          <input type="number" min="1" value={row.rank} onChange={(e)=>update(row.registration_id, { rank: e.target.value })} className="col-span-2 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Platzierung" placeholder="Platz" />
+          <input type="number" min="0" value={row.score} onChange={(e)=>update(row.registration_id, { score: e.target.value })} className="col-span-3 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Punkte oder Score" placeholder="Punkte/Score" />
           <label className="col-span-2 text-[10px] text-white/60 truncate"><input type="checkbox" checked={row.dnf} onChange={(e)=>update(row.registration_id, { dnf: e.target.checked })} className="accent-[#29B6E8]" /> Nicht beendet</label>
-          <label className="col-span-2 text-[10px] text-white/60 truncate"><input type="checkbox" checked={row.forfeit} onChange={(e)=>update(row.registration_id, { forfeit: e.target.checked })} className="accent-[#FF3B30]" /> Wertung</label>
+          <label className="col-span-2 text-[10px] text-white/60 truncate"><input type="checkbox" checked={row.forfeit} onChange={(e)=>update(row.registration_id, { forfeit: e.target.checked })} className="accent-[#FF3B30]" /> Forfeit</label>
         </div>
       ))}
-      <input value={note} onChange={(e)=>setNote(e.target.value)} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" placeholder="Notiz" />
+      <input value={note} onChange={(e)=>setNote(e.target.value)} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" placeholder="Notiz für Turnierleitung oder Schiedsrichter" />
       <button type="button" onClick={save} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase">Ergebnis speichern</button>
     </div>
   );
@@ -1053,10 +1064,24 @@ function MatchScheduleControls({ match, onSave }) {
     setDuration(match.duration_minutes ?? match.settings?.duration_minutes ?? "");
   }, [match.id, match.scheduled_at, match.duration_minutes, match.updated_at, match.settings?.duration_minutes]);
   return (
-    <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
-      <input type="datetime-local" value={scheduledAt} onChange={(e)=>setScheduledAt(e.target.value)} className="bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs col-span-2" aria-label="Spielzeit" />
-      <input type="number" min="1" value={duration} onChange={(e)=>setDuration(e.target.value)} className="bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" placeholder="Min." aria-label="Dauer Minuten" />
-      <button type="button" onClick={() => onSave(match, { scheduled_at: scheduledAt, duration_minutes: duration })} className="px-2 py-1 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Zeit speichern</button>
+    <div className="mt-3 w-full max-w-md border border-white/10 bg-[#0A0A0A] rounded-sm p-3 space-y-2">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-white/50">Zeitplanung</div>
+      <div className="grid sm:grid-cols-[1fr_7rem] gap-2">
+        <label className="block">
+          <span className="block text-[10px] text-white/45 mb-1">Startdatum & Uhrzeit</span>
+          <input type="datetime-local" value={scheduledAt} onChange={(e)=>setScheduledAt(e.target.value)} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Startdatum und Uhrzeit" />
+        </label>
+        <label className="block">
+          <span className="block text-[10px] text-white/45 mb-1">Dauer Min.</span>
+          <input type="number" min="1" value={duration} onChange={(e)=>setDuration(e.target.value)} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" placeholder="z.B. 30" aria-label="Dauer in Minuten" />
+        </label>
+      </div>
+      {(match.scheduled_at || match.duration_minutes || match.settings?.duration_minutes) && (
+        <div className="text-[11px] text-white/45">
+          Gespeichert: {match.scheduled_at ? formatDateTime(match.scheduled_at) : "keine Startzeit"} · Dauer {match.duration_minutes ?? match.settings?.duration_minutes ?? "offen"} Min.
+        </div>
+      )}
+      <button type="button" onClick={() => onSave(match, { scheduled_at: scheduledAt, duration_minutes: duration })} className="px-3 py-2 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Zeit speichern</button>
     </div>
   );
 }
@@ -1383,11 +1408,16 @@ function MatchResultControls({ match, a, b, onSave }) {
       ? b.id
       : "";
   return (
-    <div className="flex flex-wrap items-center justify-end gap-1">
-      <input type="number" min="0" value={scoreA} onChange={(e)=>setScoreA(e.target.value)} className="w-14 bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Punkte A" />
-      <span className="text-white/40">:</span>
-      <input type="number" min="0" value={scoreB} onChange={(e)=>setScoreB(e.target.value)} className="w-14 bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Punkte B" />
-      <select value={winnerId} onChange={(e)=>onSave(match, scoreA, scoreB, e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs max-w-[150px]" aria-label="Gewinner">
+    <div className="flex flex-wrap items-end justify-end gap-2">
+      <label className="block">
+        <span className="block text-[10px] text-white/45 mb-1 truncate max-w-20">{a.display_name || "Spieler A"}</span>
+        <input type="number" min="0" value={scoreA} onChange={(e)=>setScoreA(e.target.value)} className="w-16 bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Punkte A" placeholder="Punkte" />
+      </label>
+      <label className="block">
+        <span className="block text-[10px] text-white/45 mb-1 truncate max-w-20">{b.display_name || "Spieler B"}</span>
+        <input type="number" min="0" value={scoreB} onChange={(e)=>setScoreB(e.target.value)} className="w-16 bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Punkte B" placeholder="Punkte" />
+      </label>
+      <select value={winnerId} onChange={(e)=>onSave(match, scoreA, scoreB, e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs max-w-[170px]" aria-label="Gewinner">
         <option value="">Gewinner wählen</option>
         <option value={a.id}>{a.display_name || "A"}</option>
         <option value={b.id}>{b.display_name || "B"}</option>

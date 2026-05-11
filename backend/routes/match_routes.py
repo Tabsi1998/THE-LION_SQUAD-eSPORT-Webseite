@@ -126,6 +126,8 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if "scheduled_at" in updates:
         updates["scheduled_at"] = updates["scheduled_at"].isoformat() if updates["scheduled_at"] else None
+    if updates.get("scheduled_at") and m.get("status") in {"pending", "ready", "preview"} and "status" not in updates:
+        updates["status"] = "scheduled"
     if "winner_id" in updates:
         validate_winner_id(m, updates.get("winner_id"))
         updates["loser_id"] = loser_for_winner(m, updates.get("winner_id"))
@@ -243,6 +245,12 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
                 all_matches = await db.matches.find({"tournament_id": m["tournament_id"]}).to_list(2000)
                 for um in advance_match_winner(m, all_matches):
                     await db.matches.update_one({"id": um["id"]}, {"$set": um})
+        else:
+            await db.matches.update_one({"id": match_id}, {"$set": {
+                "status": "disputed",
+                "admin_note": m.get("admin_note") or "Abweichende Ergebnisberichte; bitte durch Turnierleitung pruefen.",
+                "updated_at": now_utc().isoformat(),
+            }})
     m = await db.matches.find_one({"id": match_id}, {"_id": 0})
     return m
 

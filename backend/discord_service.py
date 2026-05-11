@@ -26,16 +26,31 @@ def _normalize_base_url(value: str | None) -> str:
         return ""
     if not base.startswith(("http://", "https://")):
         base = f"https://{base}"
+    parsed = urlparse(base)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    if parsed.path.rstrip("/") == "/api":
+        base = f"{parsed.scheme}://{parsed.netloc}"
     return base
 
 
 async def _public_base_url() -> str:
-    env_base = _normalize_base_url(os.getenv("PUBLIC_BASE_URL") or os.getenv("FRONTEND_URL"))
+    env_base = _normalize_base_url(
+        os.getenv("PUBLIC_BACKEND_URL")
+        or os.getenv("PUBLIC_BASE_URL")
+        or os.getenv("FRONTEND_URL")
+        or os.getenv("PUBLIC_URL")
+    )
     if env_base:
         return env_base
     db = get_db()
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "domain": 1}) or {}
-    return _normalize_base_url(branding.get("domain"))
+    return _normalize_base_url(branding.get("domain")) or "https://lionsquad.at"
+
+
+def _is_public_http_url(value: str | None) -> bool:
+    parsed = urlparse((value or "").strip())
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
 async def _public_avatar_url(value: str | None) -> str | None:
@@ -43,7 +58,7 @@ async def _public_avatar_url(value: str | None) -> str | None:
     if not avatar_url:
         return None
     parsed = urlparse(avatar_url)
-    if parsed.scheme in {"http", "https"} and parsed.netloc:
+    if _is_public_http_url(avatar_url):
         return avatar_url
     if parsed.scheme:
         return None
@@ -57,7 +72,20 @@ async def _public_avatar_url(value: str | None) -> str | None:
         path = f"/api/static/{raw_path}"
     else:
         path = f"/api/static/uploads/{raw_path}"
-    return f"{base}{path}"
+    candidate = f"{base}{path}"
+    return candidate if _is_public_http_url(candidate) else None
+
+
+async def _public_link_url(value: str | None) -> str | None:
+    link = (value or "").strip()
+    if not link:
+        return None
+    if _is_public_http_url(link):
+        return link
+    if urlparse(link).scheme:
+        return None
+    base = await _public_base_url()
+    return f"{base}/{link.lstrip('/')}" if base else None
 
 
 async def _get_discord_config() -> dict:
@@ -94,14 +122,19 @@ async def send_discord(title: str, description: str = "", *,
         return {"ok": False, "reason": "invalid_webhook_url", "error": log["error"]}
 
     embed = {"title": title[:256], "description": description[:4000], "color": color}
-    if url: embed["url"] = url
+    embed_url = await _public_link_url(url)
+    if embed_url: embed["url"] = embed_url
     if fields: embed["fields"] = [{"name": f["name"][:256], "value": str(f["value"])[:1024], "inline": f.get("inline", True)} for f in fields[:10]]
     payload = {"embeds": [embed]}
     if cfg["username"]: payload["username"] = cfg["username"]
-    if cfg["avatar_url"]: payload["avatar_url"] = cfg["avatar_url"]
+    if _is_public_http_url(cfg.get("avatar_url")):
+        payload["avatar_url"] = cfg["avatar_url"]
     try:
         async with httpx.AsyncClient(timeout=8) as client:
             r = await client.post(cfg["webhook_url"], json=payload)
+            if r.status_code == 400 and "avatar_url" in payload and "avatar_url" in r.text:
+                payload.pop("avatar_url", None)
+                r = await client.post(cfg["webhook_url"], json=payload)
         if r.status_code >= 400:
             log["status"] = "failed"
             log["error"] = f"{r.status_code} {r.text[:200]}"

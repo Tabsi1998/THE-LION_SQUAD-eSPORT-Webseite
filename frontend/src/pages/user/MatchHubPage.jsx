@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { formatDateTime } from "@/lib/datetime";
 import { toast } from "sonner";
 
 export default function MatchHubPage() {
@@ -13,6 +14,8 @@ export default function MatchHubPage() {
   const [m, setM] = useState(null);
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
+  const [reportNote, setReportNote] = useState("");
+  const [proofUrl, setProofUrl] = useState("");
   const [disputeReason, setDisputeReason] = useState("");
 
   const load = useCallback(async () => {
@@ -30,8 +33,15 @@ export default function MatchHubPage() {
 
   const reportScore = async () => {
     try {
-      await api.post(`/matches/${m.id}/report`, { score_a: Number(scoreA), score_b: Number(scoreB) });
+      await api.post(`/matches/${m.id}/report`, {
+        score_a: Number(scoreA),
+        score_b: Number(scoreB),
+        note: reportNote || null,
+        screenshot_url: proofUrl || null,
+      });
       toast.success("Ergebnis gemeldet.");
+      setReportNote("");
+      setProofUrl("");
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
@@ -55,6 +65,8 @@ export default function MatchHubPage() {
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <StatusBadge status={m.status} size="lg" />
           <span className="text-sm text-white/60">{m.round_name} · Best of {m.best_of}</span>
+          {m.scheduled_at && <span className="text-sm text-[#29B6E8]">{formatDateTime(m.scheduled_at)}</span>}
+          {m.duration_minutes && <span className="text-sm text-white/50">{m.duration_minutes} Min.</span>}
         </div>
         <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Spiel-Hub</h1>
 
@@ -66,13 +78,23 @@ export default function MatchHubPage() {
         {isParticipant && m.status !== "completed" && m.status !== "forfeit" && (
           <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5">
             <h2 className="font-heading text-lg font-bold uppercase mb-4">Ergebnis melden</h2>
-            <div className="flex items-center gap-4">
-              <input type="number" value={scoreA} onChange={(e) => setScoreA(e.target.value)} data-testid="match-score-a" className="w-24 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display text-2xl font-bold text-center" />
-              <span className="font-display text-2xl text-white/40">:</span>
-              <input type="number" value={scoreB} onChange={(e) => setScoreB(e.target.value)} data-testid="match-score-b" className="w-24 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display text-2xl font-bold text-center" />
-              <button onClick={reportScore} data-testid="match-report-btn" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2]">Melden</button>
+            <div className="grid sm:grid-cols-[1fr_auto_1fr] gap-4 items-end">
+              <label className="block">
+                <span className="block text-[11px] font-bold uppercase tracking-widest text-white/50 mb-1">{a?.display_name || "Seite A"} Punkte</span>
+                <input type="number" value={scoreA} onChange={(e) => setScoreA(e.target.value)} data-testid="match-score-a" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display text-2xl font-bold text-center" placeholder="Punkte" />
+              </label>
+              <span className="hidden sm:block font-display text-2xl text-white/40 pb-2">:</span>
+              <label className="block">
+                <span className="block text-[11px] font-bold uppercase tracking-widest text-white/50 mb-1">{b?.display_name || "Seite B"} Punkte</span>
+                <input type="number" value={scoreB} onChange={(e) => setScoreB(e.target.value)} data-testid="match-score-b" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display text-2xl font-bold text-center" placeholder="Punkte" />
+              </label>
             </div>
-            <p className="mt-3 text-xs text-white/50">Wenn beide Seiten das gleiche Ergebnis melden, wird das Spiel automatisch bestätigt. Bei Widerspruch kann ein Admin entscheiden.</p>
+            <div className="mt-4 grid sm:grid-cols-2 gap-3">
+              <input type="url" value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="Screenshot-/Beweis-Link optional" />
+              <input type="text" value={reportNote} onChange={(e) => setReportNote(e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="Notiz optional" />
+            </div>
+            <button onClick={reportScore} data-testid="match-report-btn" className="mt-4 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2]">Ergebnis melden</button>
+            <p className="mt-3 text-xs text-white/50">Wenn beide Seiten das gleiche Ergebnis melden, wird das Spiel automatisch bestätigt. Unterschiedliche Meldungen werden als Klärfall markiert und von der Turnierleitung entschieden.</p>
 
             <div className="mt-6 border-t border-white/5 pt-5">
               <input type="text" placeholder="Grund für Klärung" value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} data-testid="match-dispute-input" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
