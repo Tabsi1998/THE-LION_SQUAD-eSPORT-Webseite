@@ -28,14 +28,17 @@ const emptyReference = {
   description: "",
   highlights: "",
   visibility: "public",
+  status: "completed",
   is_active: true,
   order_index: 0,
 };
 
 const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
 const MODE_OPTIONS = [["online", "Online"], ["offline", "Vor Ort"], ["hybrid", "Hybrid"]];
+const STATUS_OPTIONS = [["active", "Laufend"], ["planned", "Geplant"], ["completed", "Abgeschlossen"], ["archived", "Archiviert"]];
 const medalLabel = { gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const visibilityLabel = Object.fromEntries(VISIBILITY_OPTIONS);
+const statusLabel = Object.fromEntries(STATUS_OPTIONS);
 
 function formatDate(value) {
   if (!value) return "—";
@@ -73,17 +76,19 @@ export default function AdminReferencesPage() {
     <AdminLayout>
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Referenzen</h1>
-          <p className="mt-2 text-white/60 text-sm max-w-xl">Externe Turniere, Ligen und Matches, bei denen THE LION SQUAD teilgenommen hat.</p>
+          <p className="mt-2 text-white/60 text-sm max-w-xl">Externe Turniere, Ligen und Matches, bei denen THE LION SQUAD teilnimmt oder teilgenommen hat.</p>
         </div>
         <button onClick={() => setEditing(emptyReference)} className="px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
           <Plus className="w-4 h-4" /> Neue Referenz
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-6">
         <Stat label="Turniere" value={summary.total || 0} />
+        <Stat label="Laufend" value={summary.active || 0} />
+        <Stat label="Geplant" value={summary.planned || 0} />
         <Stat label="Podest" value={summary.podiums || 0} />
         <Stat label="Gold" value={summary.gold || 0} tone="gold" />
         <Stat label="Silber" value={summary.silver || 0} />
@@ -98,6 +103,7 @@ export default function AdminReferencesPage() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/45 font-bold flex-wrap">
                   <span>{item.game_name || item.game?.name || "Spiel offen"}</span>
+                  <span className={(item.status || "completed") === "active" ? "text-[#00D26A]" : (item.status || "completed") === "planned" ? "text-[#29B6E8]" : "text-white/45"}>{statusLabel[item.status || "completed"]}</span>
                   {item.medal && <span className="text-[#FFD700]">{medalLabel[item.medal]}</span>}
                   <span>{formatDate(item.start_date)}</span>
                   {item.visibility !== "public" && <span className="text-[#29B6E8]">{visibilityLabel[item.visibility] || item.visibility}</span>}
@@ -217,7 +223,8 @@ function ReferenceForm({ reference, games, onClose, onSaved }) {
           <Field label="Match-Webseite" value={form.match_url} onChange={(v) => set("match_url", v)} placeholder="https://..." />
           <Field label="Ergebnis-Link" value={form.result_url} onChange={(v) => set("result_url", v)} placeholder="https://..." />
         </div>
-        <div className="grid md:grid-cols-3 gap-3">
+        <div className="grid md:grid-cols-4 gap-3">
+          <Select label="Status" value={form.status || "completed"} onChange={(v) => set("status", v)} options={STATUS_OPTIONS} />
           <Select label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} />
           <Field label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", v)} />
           <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={form.is_active !== false} onChange={(e) => set("is_active", e.target.checked)} className="accent-[#29B6E8]" /> Aktiv</label>

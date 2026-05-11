@@ -543,6 +543,8 @@ def _reference_summary(items: list[dict]) -> dict:
     placements = [int(item["placement"]) for item in items if item.get("placement")]
     return {
         "total": len(items),
+        "active": sum(1 for item in items if (item.get("status") or "completed") == "active"),
+        "planned": sum(1 for item in items if (item.get("status") or "completed") == "planned"),
         "podiums": sum(1 for place in placements if place <= 3),
         "gold": sum(1 for place in placements if place == 1),
         "silver": sum(1 for place in placements if place == 2),
@@ -575,11 +577,23 @@ async def _enrich_references(items: list[dict]) -> list[dict]:
 
 
 def _sort_references(items: list[dict]) -> list[dict]:
+    status_rank = {"active": 0, "planned": 1, "completed": 2, "archived": 3}
+
+    def date_ts(item: dict) -> float:
+        value = item.get("start_date") or item.get("end_date")
+        if not value:
+            return 0
+        try:
+            return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            return 0
+
     return sorted(items, key=lambda item: (
-        item.get("order_index") or 0,
-        item.get("start_date") or item.get("end_date") or "",
+        status_rank.get(item.get("status") or "completed", 2),
+        -(item.get("order_index") or 0),
+        -date_ts(item),
         item.get("title") or "",
-    ), reverse=True)
+    ))
 
 
 @router.get("/partners")

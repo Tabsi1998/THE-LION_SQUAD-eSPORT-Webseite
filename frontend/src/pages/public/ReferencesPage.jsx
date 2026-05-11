@@ -12,6 +12,13 @@ const medalClasses = {
 };
 const medalLabels = { gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const modeLabels = { online: "Online", offline: "Vor Ort", hybrid: "Hybrid" };
+const statusLabels = { active: "Laufend", planned: "Geplant", completed: "Abgeschlossen", archived: "Archiviert" };
+const statusClasses = {
+  active: "border-[#00D26A]/40 bg-[#00D26A]/10 text-[#00D26A]",
+  planned: "border-[#29B6E8]/40 bg-[#29B6E8]/10 text-[#29B6E8]",
+  completed: "border-white/15 bg-white/5 text-white/50",
+  archived: "border-white/10 bg-white/5 text-white/35",
+};
 
 function formatDate(value) {
   if (!value) return "";
@@ -45,14 +52,16 @@ export default function ReferencesPage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
+        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
         <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase">Referenzen</h1>
         <p className="mt-4 text-white/70 max-w-2xl">
-          Externe Turniere, Ligen und Events, bei denen THE LION SQUAD vertreten war. Ergebnisse, Brackets und Matchseiten sauber gesammelt.
+          Externe Turniere, Ligen und Events, bei denen THE LION SQUAD vertreten ist oder war. Ergebnisse, Brackets und Matchseiten sauber gesammelt.
         </p>
 
-        <div className="mt-10 grid grid-cols-2 md:grid-cols-6 gap-3">
+        <div className="mt-10 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
           <Stat label="Teilnahmen" value={summary.total || 0} icon={Trophy} />
+          <Stat label="Laufend" value={summary.active || 0} />
+          <Stat label="Geplant" value={summary.planned || 0} />
           <Stat label="Podest" value={summary.podiums || 0} icon={Medal} />
           <Stat label="Gold" value={summary.gold || 0} tone="gold" />
           <Stat label="Silber" value={summary.silver || 0} />
@@ -90,6 +99,7 @@ function Stat({ label, value, icon: Icon, tone }) {
 }
 
 function ReferenceCard({ item }) {
+  const status = item.status || "completed";
   return (
     <article className="grid lg:grid-cols-[12rem_minmax(0,1fr)_14rem] gap-4 border border-white/10 rounded-sm bg-[#111] p-4 md:p-5">
       <div className="flex lg:flex-col items-center lg:items-start gap-3">
@@ -108,6 +118,7 @@ function ReferenceCard({ item }) {
       </div>
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-sm border text-[10px] uppercase tracking-widest font-bold ${statusClasses[status] || statusClasses.completed}`}>{statusLabels[status] || status}</span>
           {item.medal && <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-sm border text-[10px] uppercase tracking-widest font-bold ${medalClasses[item.medal] || medalClasses.gold}`}><Medal className="w-3 h-3" /> {medalLabels[item.medal] || item.medal}</span>}
           {item.organizer && <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{item.organizer}</span>}
         </div>

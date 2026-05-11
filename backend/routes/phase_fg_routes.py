@@ -312,12 +312,12 @@ DEFAULT_NAV = {
             {"key": "members", "to": "/members", "label": "Vereinsmitglieder", "visible": True},
             {"key": "join", "to": "/membership/join", "label": "Mitglied werden", "visible": True},
             {"key": "gallery", "to": "/galerie", "label": "Galerie", "visible": True},
+            {"key": "references", "to": "/references", "label": "Referenzen", "visible": True},
         ]},
         {"key": "esports", "label": "eSports", "visible": True, "order": 4, "children": [
             {"key": "tournaments", "to": "/tournaments", "label": "Turniere", "visible": True},
             {"key": "fastlap", "to": "/fastlap", "label": "Fast Lap", "visible": True},
             {"key": "season", "to": "/seasons/current", "label": "Season Pass", "visible": True},
-            {"key": "references", "to": "/references", "label": "Referenzen", "visible": True},
         ]},
         {"key": "community", "label": "Community", "visible": True, "order": 5, "children": [
             {"key": "community_overview", "to": "/community", "label": "Übersicht", "visible": True},
@@ -329,7 +329,7 @@ DEFAULT_NAV = {
 }
 
 RETIRED_NAV_CHILD_KEYS = {
-    "esports": {"teams"},
+    "esports": {"teams", "references"},
     "community": {"members", "join"},
 }
 

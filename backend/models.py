@@ -868,6 +868,7 @@ class PartnerUpdate(BaseModel):
 # ---------- External tournament references ----------
 ReferenceVisibility = Literal["public", "community", "members", "internal"]
 ReferenceMode = Literal["online", "offline", "hybrid"]
+ReferenceStatus = Literal["planned", "active", "completed", "archived"]
 
 
 class ReferenceCreate(BaseModel):
@@ -892,6 +893,7 @@ class ReferenceCreate(BaseModel):
     description: Optional[str] = None
     highlights: Optional[str] = None
     visibility: ReferenceVisibility = "public"
+    status: ReferenceStatus = "completed"
     is_active: bool = True
     order_index: int = 0
 
@@ -918,6 +920,7 @@ class ReferenceUpdate(BaseModel):
     description: Optional[str] = None
     highlights: Optional[str] = None
     visibility: Optional[ReferenceVisibility] = None
+    status: Optional[ReferenceStatus] = None
     is_active: Optional[bool] = None
     order_index: Optional[int] = None
 

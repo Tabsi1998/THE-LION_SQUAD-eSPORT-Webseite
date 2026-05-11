@@ -194,6 +194,7 @@ export function PublicLayout({ children }) {
                 <li><Link to="/members" className="hover:text-[#29B6E8] transition">Vereinsmitglieder</Link></li>
                 <li><Link to="/membership/join" className="hover:text-[#29B6E8] transition">Mitglied werden</Link></li>
                 <li><Link to="/galerie" className="hover:text-[#29B6E8] transition">Galerie</Link></li>
+                <li><Link to="/references" className="hover:text-[#29B6E8] transition">Referenzen</Link></li>
               </ul>
             </div>
             <div className="lg:col-span-2">
@@ -203,7 +204,6 @@ export function PublicLayout({ children }) {
                 <li><Link to="/fastlap" className="hover:text-[#29B6E8] transition">Fast Lap</Link></li>
                 <li><Link to="/events" className="hover:text-[#29B6E8] transition">Events</Link></li>
                 <li><Link to="/seasons/current" className="hover:text-[#29B6E8] transition">Season Pass</Link></li>
-                <li><Link to="/references" className="hover:text-[#29B6E8] transition">Referenzen</Link></li>
               </ul>
             </div>
             <div className="lg:col-span-2">

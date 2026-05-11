@@ -28,6 +28,7 @@ export const NAV_STRUCTURE = [
       { to: "/members", label: "Vereinsmitglieder" },
       { to: "/membership/join", label: "Mitglied werden" },
       { to: "/galerie", label: "Galerie" },
+      { to: "/references", label: "Referenzen" },
     ],
   },
   {
@@ -36,7 +37,6 @@ export const NAV_STRUCTURE = [
       { to: "/tournaments", label: "Turniere" },
       { to: "/fastlap", label: "Fast Lap" },
       { to: "/seasons/current", label: "Season Pass" },
-      { to: "/references", label: "Referenzen" },
     ],
   },
   {
