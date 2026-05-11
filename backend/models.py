@@ -413,6 +413,7 @@ class TournamentCreate(BaseModel):
     max_participants: int = 32
     min_participants: int = 2
     registration_enabled: bool = True
+    block_club_member_registration: bool = False
     registration_open_from: Optional[datetime] = None
     registration_open_until: Optional[datetime] = None
     check_in_from: Optional[datetime] = None
@@ -464,6 +465,7 @@ class TournamentUpdate(BaseModel):
     max_participants: Optional[int] = None
     min_participants: Optional[int] = None
     registration_enabled: Optional[bool] = None
+    block_club_member_registration: Optional[bool] = None
     is_invite_only: Optional[bool] = None
     registration_open_from: Optional[datetime] = None
     registration_open_until: Optional[datetime] = None

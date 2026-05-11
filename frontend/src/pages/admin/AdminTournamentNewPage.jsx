@@ -24,7 +24,7 @@ export default function AdminTournamentNewPage() {
     platform: "", event_id: "", format: "single_elim",
     team_mode: "solo", team_size: 1,
     max_participants: 16, min_participants: 2,
-    registration_enabled: true, is_invite_only: false,
+    registration_enabled: true, is_invite_only: false, block_club_member_registration: false,
     registration_open_from: "", registration_open_until: "",
     check_in_from: "", check_in_until: "",
     start_date: "", end_date: "",
@@ -130,6 +130,10 @@ export default function AdminTournamentNewPage() {
             <label className="mt-3 flex items-start gap-2 text-sm text-white/75">
               <input type="checkbox" checked={form.is_invite_only} onChange={(e) => set("is_invite_only", e.target.checked)} data-testid="new-tr-invite-only" className="accent-[#29B6E8] mt-1" />
               <span>Nur Einladung/manuelle Teilnehmer, keine öffentliche Anmeldung</span>
+            </label>
+            <label className="mt-3 flex items-start gap-2 text-sm text-white/75">
+              <input type="checkbox" checked={form.block_club_member_registration} onChange={(e) => set("block_club_member_registration", e.target.checked)} data-testid="new-tr-block-members" className="accent-[#FFD700] mt-1" />
+              <span>Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten</span>
             </label>
           </Details>
         </div>

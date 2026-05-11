@@ -283,6 +283,16 @@ def _registration_error(t: dict) -> str | None:
     return None
 
 
+async def _is_active_club_member(db, user: dict) -> bool:
+    if user.get("is_club_member"):
+        return True
+    membership = await db.memberships.find_one(
+        {"user_id": user.get("id"), "member_status": {"$in": ["active", "honorary"]}},
+        {"_id": 0, "id": 1},
+    )
+    return bool(membership)
+
+
 def _required_game_fields(game: dict | None) -> list[dict]:
     fields = []
     for field in (game or {}).get("effective_player_id_fields") or (game or {}).get("player_id_fields") or []:
@@ -802,6 +812,8 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
     registration_error = _registration_error(t)
     if registration_error:
         raise HTTPException(status_code=400, detail=registration_error)
+    if t.get("block_club_member_registration") and await _is_active_club_member(db, me):
+        raise HTTPException(status_code=403, detail="Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.")
     existing = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": me["id"]})
     if existing:
         raise HTTPException(status_code=409, detail="Bereits angemeldet")

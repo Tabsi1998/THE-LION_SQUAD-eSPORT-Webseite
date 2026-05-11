@@ -94,6 +94,8 @@ export default function TournamentDetailPage() {
   const isTeamTournament = (t.team_mode || "solo") !== "solo";
   const myRegTeam = myReg?.team_id ? myTeams.find((team) => team.id === myReg.team_id) : null;
   const canCheckIn = !!myReg && (!myReg.team_id || myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role));
+  const clubMemberBlocked = !!user?.is_club_member && !!t.block_club_member_registration;
+  const canSelfRegister = registration.canRegister && !clubMemberBlocked;
 
   return (
     <PublicLayout>
@@ -134,11 +136,12 @@ export default function TournamentDetailPage() {
               {t.registration_open_from && t.registration_open_until && <span className="mx-2 text-white/20">·</span>}
               {t.registration_open_until && <span>Endet: {formatDateTime(t.registration_open_until)}</span>}
               {!t.registration_open_from && !t.registration_open_until && <span>Status wird vom Admin gesteuert.</span>}
+              {clubMemberBlocked && <div className="mt-1 text-[#FFD700]/75">Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.</div>}
             </div>
           </div>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            {registration.canRegister && !myReg && (
+            {canSelfRegister && !myReg && (
               <button
                 data-testid="tournament-register-btn"
                 onClick={handleRegister}
@@ -148,7 +151,16 @@ export default function TournamentDetailPage() {
                 {loading ? "Wird gesendet…" : (isTeamTournament ? "Team anmelden" : "Jetzt anmelden")}
               </button>
             )}
-            {!registration.canRegister && !myReg && (
+            {clubMemberBlocked && !myReg && (
+              <button
+                type="button"
+                disabled
+                className="px-6 py-3 border border-[#FFD700]/30 text-[#FFD700]/70 font-bold uppercase tracking-wider rounded-sm cursor-not-allowed"
+              >
+                Externe Anmeldung
+              </button>
+            )}
+            {!canSelfRegister && !clubMemberBlocked && !myReg && (
               <button
                 type="button"
                 disabled

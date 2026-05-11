@@ -1162,6 +1162,7 @@ function TournamentEditForm({ tournament, onSaved }) {
     location: tournament.location || "",
     registration_enabled: tournament.registration_enabled !== false,
     is_invite_only: !!tournament.is_invite_only,
+    block_club_member_registration: !!tournament.block_club_member_registration,
     registration_open_from: dt(tournament.registration_open_from),
     registration_open_until: dt(tournament.registration_open_until),
     check_in_from: dt(tournament.check_in_from),
@@ -1247,6 +1248,7 @@ function TournamentEditForm({ tournament, onSaved }) {
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.registration_enabled} onChange={(e)=>set("registration_enabled",e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Öffentliche Anmeldung erlauben</span></label>
           <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.is_invite_only} onChange={(e)=>set("is_invite_only",e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Nur Einladung/manuelle Teilnehmer</span></label>
+          <label className="flex items-start gap-2 text-sm text-white/75 sm:col-span-2"><input type="checkbox" checked={f.block_club_member_registration} onChange={(e)=>set("block_club_member_registration",e.target.checked)} className="accent-[#FFD700] mt-1"/><span>Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten</span></label>
         </div>
       </div>
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
