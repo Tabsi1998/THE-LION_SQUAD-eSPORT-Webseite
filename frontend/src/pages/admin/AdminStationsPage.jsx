@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
@@ -24,50 +24,93 @@ export default function AdminStationsPage() {
   const [activeTid, setActiveTid] = useState("");
   const [matches, setMatches] = useState([]);
   const [regs, setRegs] = useState([]);
+  const [loadingStations, setLoadingStations] = useState(false);
+  const [loadingMatches, setLoadingMatches] = useState(false);
+  const [pageError, setPageError] = useState("");
   const [form, setForm] = useState({ name: "", device_type: "switch", notes: "" });
   const [bulk, setBulk] = useState({ prefix: "Station", count: 4, device_type: "switch", notes: "" });
   const [assignFor, setAssignFor] = useState(null); // station object for assignment dialog
+  const stationsRequestRef = useRef(0);
+  const matchesRequestRef = useRef(0);
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
-    const { data: t } = await api.get("/tournaments?include_drafts=true");
-    const rows = t || [];
-    setTournaments(rows);
-    setActiveTid((current) => rows.some((row) => row.id === current) ? current : rows?.[0]?.id || "");
+    try {
+      const { data: t } = await api.get("/tournaments?include_drafts=true");
+      const rows = Array.isArray(t) ? t.filter(Boolean) : [];
+      setTournaments(rows);
+      setActiveTid((current) => rows.some((row) => row.id === current) ? current : rows?.[0]?.id || "");
+      setPageError("");
+    } catch (e) {
+      setTournaments([]);
+      setActiveTid("");
+      setPageError(formatRequestError(e, "Turniere konnten nicht geladen werden."));
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["tournaments"]);
 
   const loadStations = useCallback(async () => {
+    const requestId = stationsRequestRef.current + 1;
+    stationsRequestRef.current = requestId;
     if (!activeTid) {
       setList([]);
+      setLoadingStations(false);
       return;
     }
-    const { data } = await api.get(`/stations?tournament_id=${encodeURIComponent(activeTid)}`);
-    setList(data);
+    setLoadingStations(true);
+    try {
+      const { data } = await api.get(`/stations?tournament_id=${encodeURIComponent(activeTid)}`);
+      if (stationsRequestRef.current !== requestId) return;
+      setList(Array.isArray(data) ? data.filter(Boolean) : []);
+      setPageError("");
+    } catch (e) {
+      if (stationsRequestRef.current !== requestId) return;
+      setList([]);
+      setPageError(formatRequestError(e, "Stationen konnten nicht geladen werden."));
+    } finally {
+      if (stationsRequestRef.current === requestId) setLoadingStations(false);
+    }
   }, [activeTid]);
   useEffect(() => { loadStations(); }, [loadStations]);
   useApiInvalidation(loadStations, ["stations", "tournaments"]);
 
   const loadMatches = useCallback(async () => {
+    const requestId = matchesRequestRef.current + 1;
+    matchesRequestRef.current = requestId;
     if (!activeTid) {
       setMatches([]);
       setRegs([]);
+      setLoadingMatches(false);
       return;
     }
-    const { data } = await api.get(`/tournaments/${activeTid}/bracket`);
-    const tournament = data.tournament || {};
-    const duelMatches = (data.matches || []).map((m) => ({ ...m, is_multi_slot: false, tournament }));
-    const multiSlotMatches = (data.matches_v2 || []).map((m) => ({ ...m, is_multi_slot: true, tournament }));
-    setMatches([...duelMatches, ...multiSlotMatches]);
-    setRegs(data.registrations || []);
+    setLoadingMatches(true);
+    try {
+      const { data } = await api.get(`/tournaments/${activeTid}/bracket`);
+      if (matchesRequestRef.current !== requestId) return;
+      const tournament = data?.tournament || {};
+      const duelMatches = safeArray(data?.matches).map((m) => ({ ...m, is_multi_slot: false, tournament }));
+      const multiSlotMatches = safeArray(data?.matches_v2).map((m) => ({ ...m, is_multi_slot: true, tournament }));
+      setMatches([...duelMatches, ...multiSlotMatches]);
+      setRegs(safeArray(data?.registrations));
+      setPageError("");
+    } catch (e) {
+      if (matchesRequestRef.current !== requestId) return;
+      setMatches([]);
+      setRegs([]);
+      setPageError(formatRequestError(e, "Spiele konnten nicht geladen werden."));
+    } finally {
+      if (matchesRequestRef.current === requestId) setLoadingMatches(false);
+    }
   }, [activeTid]);
   useEffect(() => { loadMatches(); }, [loadMatches]);
   useApiInvalidation(loadMatches, ["stations", "matches", "tournaments"]);
   useEffect(() => {
     setAssignFor(null);
+    setList([]);
     setMatches([]);
     setRegs([]);
+    setPageError("");
   }, [activeTid]);
 
   const create = async (e) => {
@@ -146,17 +189,17 @@ export default function AdminStationsPage() {
     }
   };
 
-  const regById = Object.fromEntries(regs.map((r) => [r.id, r]));
-  const matchById = Object.fromEntries(matches.map((m) => [m.id, m]));
-  const unassignedMatches = matches.filter(
+  const regById = Object.fromEntries(safeArray(regs).filter((r) => r?.id).map((r) => [r.id, r]));
+  const matchById = Object.fromEntries(safeArray(matches).filter((m) => m?.id).map((m) => [m.id, m]));
+  const unassignedMatches = safeArray(matches).filter(
     (m) => !m.station_id && ["ready", "scheduled"].includes(m.status)
   );
 
   const nameOfMatch = (m) => {
     if (!m) return "—";
     if (m.is_multi_slot || m.slots) {
-      const names = (m.slots || [])
-        .map((slot) => regById[slot.registration_id]?.display_name || slot.source?.raw || "Offen")
+      const names = safeArray(m.slots)
+        .map((slot) => regById[slot?.registration_id]?.display_name || slot?.source?.raw || "Offen")
         .slice(0, 4);
       return `${m.match_key || "Durchgang"} · ${names.join(" / ")}`;
     }
@@ -174,10 +217,16 @@ export default function AdminStationsPage() {
     <AdminLayout>
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Event-Einrichtung</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Stationen &amp; Spiel-Zuweisung</h1>
+      {pageError && (
+        <div className="mb-4 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FFB3B3] px-4 py-3 rounded-sm text-sm">
+          {pageError}
+        </div>
+      )}
       <div className="mb-6 border border-white/10 rounded-sm bg-[#121212] p-4 flex flex-col lg:flex-row gap-3 lg:items-end lg:justify-between">
         <label className="block flex-1">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Aktives Turnier</div>
           <select value={activeTid} onChange={(e) => setActiveTid(e.target.value)} data-testid="station-tournament-select" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+            {!tournaments.length && <option value="">Keine Turniere verfügbar</option>}
             {tournaments.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
           </select>
         </label>
@@ -226,7 +275,8 @@ export default function AdminStationsPage() {
                   <div className="mt-1 text-white/40">{m.scheduled_at ? formatDateTime(m.scheduled_at) : "Keine feste Zeit"}{m.duration_minutes ? ` · ${m.duration_minutes} Min.` : ""}</div>
                 </div>
               ))}
-              {unassignedMatches.length === 0 && <div className="text-white/40 text-xs text-center py-6">Keine offenen Spiele</div>}
+              {loadingMatches && <div className="text-white/40 text-xs text-center py-6">Spiele werden geladen …</div>}
+              {!loadingMatches && unassignedMatches.length === 0 && <div className="text-white/40 text-xs text-center py-6">Keine offenen Spiele</div>}
             </div>
           </div>
         </div>
@@ -234,7 +284,7 @@ export default function AdminStationsPage() {
         {/* RIGHT: Stations grid */}
         <div className="lg:col-span-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {list.map((s) => {
+            {safeArray(list).map((s) => {
               const currentMatch = s.current_match_id ? matchById[s.current_match_id] : null;
               return (
               <div key={s.id} className={`border rounded-sm bg-[#121212] p-4 ${s.status === "busy" ? "border-[#FF3B30]/30" : "border-white/10"}`}>
@@ -277,7 +327,8 @@ export default function AdminStationsPage() {
               </div>
               );
             })}
-            {list.length === 0 && <div className="col-span-2 text-center py-16 text-white/40 font-display tracking-widest">KEINE STATIONEN</div>}
+            {loadingStations && <div className="col-span-2 text-center py-16 text-white/40 font-display tracking-widest">STATIONEN WERDEN GELADEN …</div>}
+            {!loadingStations && safeArray(list).length === 0 && <div className="col-span-2 text-center py-16 text-white/40 font-display tracking-widest">KEINE STATIONEN</div>}
           </div>
         </div>
       </div>
@@ -311,6 +362,10 @@ export default function AdminStationsPage() {
       )}
     </AdminLayout>
   );
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value.filter(Boolean) : [];
 }
 
 function StationDuelResult({ match, regById, onSaved }) {
@@ -352,10 +407,10 @@ function StationDuelResult({ match, regById, onSaved }) {
 }
 
 function StationHeatResult({ match, regById, onSaved }) {
-  const filledSlots = (match.slots || []).filter((slot) => slot.status === "filled" && slot.registration_id);
+  const filledSlots = safeArray(match.slots).filter((slot) => slot?.status === "filled" && slot?.registration_id);
   const initialRows = () => {
-    const existing = (match.results || []).length
-      ? [...match.results].sort((a, b) => (a.rank || 0) - (b.rank || 0))
+    const existing = safeArray(match.results).length
+      ? safeArray(match.results).sort((a, b) => (a.rank || 0) - (b.rank || 0))
       : filledSlots.map((slot, index) => ({ registration_id: slot.registration_id, rank: index + 1, score: "", dnf: false, forfeit: false }));
     const byReg = Object.fromEntries(existing.map((row) => [row.registration_id, row]));
     return filledSlots.map((slot, index) => ({
