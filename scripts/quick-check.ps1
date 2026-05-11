@@ -49,6 +49,7 @@ function Invoke-FrontendBuild {
 
 $pythonFiles = @(
     "backend/services/match_v2_results.py",
+    "backend/services/match_notifications.py",
     "backend/routes/friend_routes.py",
     "backend/routes/message_routes.py",
     "backend/routes/team_routes.py",

@@ -166,8 +166,8 @@ Naechster Schritt: operative Turnierleitung mit Next-up/Station-Queue, Live-Call
 - Korrekte Double-Elimination-Flows fuer 1v1 und FFA inklusive Loser-Bracket-Transfers.
 - Operatives Turnierleitungs-Dashboard: kombinierte Check-in/Warteliste/No-Show/Stationen/Next-up/offene-Ergebnisse-Ansicht.
 - Station-/Live-TV und Embed-Ausbau; Bracket-TV hat jetzt eine erste scrollfreie Rundensicht.
-- Benachrichtigungen fuer Match bereit, Station zugewiesen und Ergebnis bestaetigt.
-- Vollstaendige Downstream-Cascade/Undo fuer Ergebnis-Korrekturen, wenn Folge-Matches bereits gespielt wurden.
+- Benachrichtigungen fuer Match bereit bleiben offen; Station zugewiesen und Ergebnis bestaetigt sind als In-App-Benachrichtigung umgesetzt.
+- Downstream-Cascade fuer erzwungene v2-Ergebnis-Korrekturen ist umgesetzt; eine visuelle Undo-/Bestaetigungsoberflaeche bleibt als UI-Ausbau offen.
 - QR-/Vor-Ort-Check-in fuer Events und Turniere.
 - Feineres Rollenmodell fuer Event-Orga analog zu Turnier-Staff.
 - Weitere Presets fuer Smash, F1, Valorant, LoL und Rocket League.
@@ -191,6 +191,7 @@ Fuer Mario Kart mit 4 Spielern pro Heat braucht es deshalb nicht nur einen neuen
 - `frontend/src/pages/admin/AdminTournamentEditPage.jsx`: Admins koennen v2-Stages konfigurieren/generieren; Staff kann Teilnehmer manuell pflegen, Vorschauen/Generierung ausloesen, Zeiten setzen und FFA-Platzierungen erfassen.
 - `frontend/src/pages/admin/AdminStationsPage.jsx`: Stationen und Match-Zuweisung sind vorhanden, aber noch keine Turnierleitungs-Queue mit Check-in-Status, Next-up und Heat-Management.
 - `backend/services/match_reminder.py`: nutzt aktuelle Match-Felder, v2-Slots und Legacy-Fallbacks.
+- `backend/services/match_notifications.py`: informiert Teilnehmer und Teammitglieder per In-App-Benachrichtigung, wenn ein klassisches Match oder v2-Heat-Ergebnis bestaetigt bzw. korrigiert wurde.
 - `backend/routes/event_routes.py`: Events haben jetzt interne Anmeldung, Kapazitaetszaehlung, Begleitpersonen und Admin-Statuspflege.
 
 ## Externer Abgleich

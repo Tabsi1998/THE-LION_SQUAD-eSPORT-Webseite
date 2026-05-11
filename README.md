@@ -27,6 +27,7 @@ Dokumenten, Achievements, Kontaktformular, Mailversand und Discord-Integrationen
 - Adminbereich fuer Benutzer, Mitglieder, Mitgliedsantraege, Turniere, Fast Lap, Events, News, Sponsoren, Galerie, Dokumente, Board, Navigation, CMS und Systemeinstellungen.
 - Turnier- und Matchverwaltung mit Registrierungen, Check-in, Brackets, Ergebnissen und TV-Anzeigen.
 - Flexible Turnierstrukturen fuer Duel und FFA, Custom-Brackets, automatische Slot-Weiterleitung und Heat-Ergebnisse.
+- In-App-Benachrichtigungen fuer Station-Zuweisungen und bestaetigte bzw. korrigierte Match-Ergebnisse.
 - F1/Fast-Lap-Challenges mit Strecken, Zeiten, Strafen, Ranglisten, Display-Modus
   und getrennten Vereins-Referenzzeiten ausser Wertung.
 - Zeitplanung fuer Turniere und Fast-Lap-Challenges: Registrierung/Einreichung oeffnet,

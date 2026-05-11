@@ -14,6 +14,7 @@ from models import (
     now_utc,
 )
 from services.match_v2_results import MatchV2ResultError, build_v2_result_application
+from services.match_notifications import notify_match_result_confirmed
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     READ_STAFF_ROLES,
@@ -468,6 +469,10 @@ async def submit_match_v2_result(match_id: str, body: MatchV2ResultSubmit,
         "created_at": now_iso,
     })
     updated = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+    try:
+        await notify_match_result_confirmed(db, updated, "matches_v2", force=force)
+    except Exception:
+        pass
     return {
         "ok": True,
         "match": updated,

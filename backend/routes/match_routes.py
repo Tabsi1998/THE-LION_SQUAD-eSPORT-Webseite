@@ -24,6 +24,7 @@ from models import (
 )
 from bracket_engine import advance_match_winner
 from match_rules import loser_for_winner, match_allows_draw, validate_winner_id
+from services.match_notifications import notify_match_result_confirmed
 from services.match_v2_results import MatchV2ResultError, build_v2_result_application
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
@@ -547,6 +548,10 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
         "created_at": now_iso,
     })
     updated = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+    try:
+        await notify_match_result_confirmed(db, updated, "matches_v2", force=force)
+    except Exception:
+        pass
     return {
         "ok": True,
         "match": updated,
@@ -581,6 +586,12 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
     m = await db.matches.find_one({"id": match_id})
     if not m:
         raise HTTPException(status_code=404)
+    previous_result_signature = (
+        m.get("status"),
+        m.get("winner_id"),
+        m.get("score_a"),
+        m.get("score_b"),
+    )
     allowed = (
         await has_tournament_staff_permission(me, m["tournament_id"], RESULT_STAFF_ROLES, "tournament")
         or await has_tournament_staff_permission(me, m["tournament_id"], RESULT_STAFF_ROLES, "match", match_id)
@@ -612,6 +623,12 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
     updates["updated_at"] = now_utc().isoformat()
     await db.matches.update_one({"id": match_id}, {"$set": updates})
     m = await db.matches.find_one({"id": match_id})
+    current_result_signature = (
+        m.get("status"),
+        m.get("winner_id"),
+        m.get("score_a"),
+        m.get("score_b"),
+    )
     # If completed, advance bracket
     if m.get("status") == "completed" and m.get("winner_id"):
         all_matches = await db.matches.find({"tournament_id": m["tournament_id"]}).to_list(2000)
@@ -651,6 +668,11 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
             )
         except Exception:
             pass
+        if current_result_signature != previous_result_signature:
+            try:
+                await notify_match_result_confirmed(db, m, "matches")
+            except Exception:
+                pass
     m.pop("_id", None)
     return m
 
@@ -712,6 +734,10 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
                 all_matches = await db.matches.find({"tournament_id": m["tournament_id"]}).to_list(2000)
                 for um in advance_match_winner(m, all_matches):
                     await db.matches.update_one({"id": um["id"]}, {"$set": um})
+                try:
+                    await notify_match_result_confirmed(db, m, "matches")
+                except Exception:
+                    pass
         else:
             await db.matches.update_one({"id": match_id}, {"$set": {
                 "status": "disputed",
@@ -778,6 +804,10 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(get_current_user
     all_matches = await db.matches.find({"tournament_id": m["tournament_id"]}).to_list(2000)
     for um in advance_match_winner(m, all_matches):
         await db.matches.update_one({"id": um["id"]}, {"$set": um})
+    try:
+        await notify_match_result_confirmed(db, m, "matches")
+    except Exception:
+        pass
     m.pop("_id", None)
     # Phase B v4.1: forfeit ⇒ no_show for the loser
     try:
