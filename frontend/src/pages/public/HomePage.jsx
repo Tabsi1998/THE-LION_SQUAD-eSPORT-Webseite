@@ -88,9 +88,9 @@ export default function HomePage() {
 
       {state && (primaryNews || timeline.length > 0) && (
         <section className="border-b border-white/10 bg-[#080808]/35">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12 min-w-0">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12 min-w-0">
             {primaryNews && <FeaturedNews news={primaryNews} />}
-            <div className={`${primaryNews ? "mt-4 border-t border-white/10 pt-4" : ""}`}>
+            <div className={`${primaryNews ? "mt-8 md:mt-10 border-t border-white/10 pt-8 md:pt-10" : ""}`}>
               <NextUp items={timeline} />
             </div>
           </div>
