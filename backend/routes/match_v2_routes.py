@@ -1,9 +1,18 @@
 """v2 multi-slot match routes."""
 from fastapi import APIRouter, Depends, HTTPException
+from datetime import timedelta
 
 from auth import get_current_user, get_optional_user
 from database import get_db
-from models import MatchV2ResultSubmit, MatchV2Update, new_id, now_utc
+from models import (
+    MatchChatCreate,
+    MatchScheduleProposalCreate,
+    MatchScheduleProposalDecision,
+    MatchV2ResultSubmit,
+    MatchV2Update,
+    new_id,
+    now_utc,
+)
 from services.match_v2_results import MatchV2ResultError, build_v2_result_application
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
@@ -40,12 +49,55 @@ async def _user_registration_for_match(match: dict, user: dict | None) -> dict |
     )
 
 
+async def _registrations_for_match(match: dict) -> list[dict]:
+    reg_ids = [
+        slot.get("registration_id")
+        for slot in match.get("slots") or []
+        if slot.get("registration_id")
+    ]
+    if not reg_ids:
+        return []
+    db = get_db()
+    return await db.tournament_registrations.find({"id": {"$in": reg_ids}}, {"_id": 0}).to_list(32)
+
+
+async def _acting_registration_for_match(match: dict, user: dict | None) -> dict | None:
+    if not user:
+        return None
+    direct = await _user_registration_for_match(match, user)
+    if direct:
+        return direct
+    regs = await _registrations_for_match(match)
+    team_ids = list({r.get("team_id") for r in regs if r.get("team_id")})
+    if not team_ids:
+        return None
+    db = get_db()
+    teams = await db.teams.find(
+        {"id": {"$in": team_ids}, "$or": [
+            {"leader_id": user["id"]},
+            {"co_leader_ids": user["id"]},
+        ]},
+        {"_id": 0, "id": 1},
+    ).to_list(32)
+    captain_team_ids = {team["id"] for team in teams}
+    return next((reg for reg in regs if reg.get("team_id") in captain_team_ids), None)
+
+
+async def _can_act_for_match(match: dict, user: dict | None) -> bool:
+    return bool(
+        _is_staff(user)
+        or await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "match", match.get("id"))
+        or await _acting_registration_for_match(match, user)
+    )
+
+
 async def _can_read_match(user: dict | None, match: dict) -> bool:
     return (
         _is_staff(user)
         or await has_tournament_staff_permission(user, match.get("tournament_id"), READ_STAFF_ROLES, "match", match.get("id"))
         or await has_tournament_staff_permission(user, match.get("tournament_id"), READ_STAFF_ROLES, "stage", match.get("stage_id"))
         or bool(await _user_registration_for_match(match, user))
+        or bool(await _acting_registration_for_match(match, user))
     )
 
 
@@ -72,6 +124,89 @@ async def _require_v2_result_permission(user: dict, match: dict) -> None:
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Aktion")
 
 
+def _schedule_deadline(match: dict, tournament: dict | None = None):
+    value = match.get("schedule_deadline_at") or (match.get("settings") or {}).get("schedule_deadline_at")
+    if value:
+        return value
+    hours = int((tournament or {}).get("match_schedule_response_hours") or (match.get("settings") or {}).get("schedule_response_hours") or 72)
+    return (now_utc() + timedelta(hours=hours)).isoformat()
+
+
+async def _refresh_schedule_escalation(match: dict) -> dict:
+    status = match.get("schedule_status")
+    deadline = match.get("schedule_deadline_at")
+    if status in {"proposed", "declined"} and deadline:
+        try:
+            from datetime import datetime
+            dt = datetime.fromisoformat(str(deadline).replace("Z", "+00:00"))
+            if now_utc() > dt:
+                await get_db().matches_v2.update_one({"id": match["id"]}, {"$set": {
+                    "schedule_status": "escalated",
+                    "updated_at": now_utc().isoformat(),
+                }})
+                match["schedule_status"] = "escalated"
+        except Exception:
+            pass
+    return match
+
+
+async def _public_user_map(user_ids: list[str]) -> dict[str, dict]:
+    if not user_ids:
+        return {}
+    users = await get_db().users.find(
+        {"id": {"$in": user_ids}},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1},
+    ).to_list(500)
+    return {u["id"]: u for u in users}
+
+
+async def _match_page_payload(match: dict, user: dict | None = None) -> dict:
+    db = get_db()
+    match = await _refresh_schedule_escalation(match)
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0})
+    stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0})
+    regs = await _registrations_for_match(match)
+    reg_by_id = {r["id"]: r for r in regs}
+    user_ids = list({r.get("user_id") for r in regs if r.get("user_id")})
+    team_ids = list({r.get("team_id") for r in regs if r.get("team_id")})
+    users = await _public_user_map(user_ids)
+    teams = {t["id"]: t for t in await db.teams.find(
+        {"id": {"$in": team_ids}},
+        {"_id": 0, "id": 1, "name": 1, "tag": 1, "logo_url": 1, "leader_id": 1, "co_leader_ids": 1},
+    ).to_list(50)}
+    participants = []
+    for slot in match.get("slots") or []:
+        reg = reg_by_id.get(slot.get("registration_id")) or {}
+        user_doc = users.get(reg.get("user_id") or "")
+        team = teams.get(reg.get("team_id") or "")
+        participants.append({
+            "slot": slot.get("slot"),
+            "status": slot.get("status"),
+            "registration_id": reg.get("id") or slot.get("registration_id"),
+            "display_name": reg.get("display_name") or reg.get("ingame_name") or (team or {}).get("name") or (user_doc or {}).get("display_name") or (user_doc or {}).get("username"),
+            "team": team,
+            "user": user_doc,
+        })
+    proposals = await db.match_schedule_proposals.find({"match_id": match["id"]}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    actor_ids = list({p.get("actor_user_id") for p in proposals if p.get("actor_user_id")})
+    actors = await _public_user_map(actor_ids)
+    for proposal in proposals:
+        proposal["actor"] = actors.get(proposal.get("actor_user_id"))
+    can_act = bool(user and await _can_act_for_match(match, user))
+    acting_reg = await _acting_registration_for_match(match, user)
+    return {
+        "match": match,
+        "tournament": tournament,
+        "stage": stage,
+        "participants": participants,
+        "schedule_proposals": proposals,
+        "can_act": can_act,
+        "acting_registration_id": acting_reg.get("id") if acting_reg else None,
+        "matchday": match.get("matchday_number") or match.get("round"),
+        "matchday_label": match.get("matchday_label") or (f"Spieltag {match.get('round')}" if match.get("round") else "Match"),
+    }
+
+
 @router.get("/{match_id}")
 async def get_match_v2(match_id: str, user: dict | None = Depends(get_optional_user)):
     db = get_db()
@@ -80,6 +215,169 @@ async def get_match_v2(match_id: str, user: dict | None = Depends(get_optional_u
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
     await _assert_match_visible(match, user)
     return match
+
+
+@router.get("/{match_id}/page")
+async def get_match_v2_page(match_id: str, user: dict | None = Depends(get_optional_user)):
+    db = get_db()
+    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+    if not match:
+        raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    await _assert_match_visible(match, user)
+    return await _match_page_payload(match, user)
+
+
+@router.get("/{match_id}/schedule-proposals")
+async def list_schedule_proposals(match_id: str, user: dict | None = Depends(get_optional_user)):
+    db = get_db()
+    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+    if not match:
+        raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    await _assert_match_visible(match, user)
+    payload = await _match_page_payload(match, user)
+    return payload["schedule_proposals"]
+
+
+@router.post("/{match_id}/schedule-proposals")
+async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCreate,
+                                   me: dict = Depends(get_current_user)):
+    db = get_db()
+    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+    if not match:
+        raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    if not await _can_act_for_match(match, me):
+        raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen Termine vorschlagen")
+    acting_reg = await _acting_registration_for_match(match, me)
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0})
+    now_iso = now_utc().isoformat()
+    doc = {
+        "id": new_id(),
+        "match_id": match_id,
+        "tournament_id": match.get("tournament_id"),
+        "stage_id": match.get("stage_id"),
+        "actor_user_id": me["id"],
+        "actor_registration_id": acting_reg.get("id") if acting_reg else None,
+        "scheduled_at": body.scheduled_at.isoformat(),
+        "note": (body.note or "").strip() or None,
+        "status": "pending",
+        "kind": "proposal",
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+    await db.match_schedule_proposals.insert_one(doc)
+    await db.matches_v2.update_one({"id": match_id}, {"$set": {
+        "schedule_status": "proposed",
+        "schedule_deadline_at": _schedule_deadline(match, tournament),
+        "updated_at": now_iso,
+    }})
+    doc.pop("_id", None)
+    return doc
+
+
+@router.post("/{match_id}/schedule-proposals/{proposal_id}/decision")
+async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchScheduleProposalDecision,
+                                   me: dict = Depends(get_current_user)):
+    db = get_db()
+    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+    proposal = await db.match_schedule_proposals.find_one({"id": proposal_id, "match_id": match_id}, {"_id": 0})
+    if not match or not proposal:
+        raise HTTPException(status_code=404, detail="Terminvorschlag nicht gefunden")
+    if not await _can_act_for_match(match, me):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung fuer diesen Termin")
+    acting_reg = await _acting_registration_for_match(match, me)
+    if acting_reg and proposal.get("actor_registration_id") == acting_reg.get("id") and body.action in {"accept", "decline"}:
+        raise HTTPException(status_code=400, detail="Der eigene Vorschlag muss von der Gegenseite bestaetigt werden")
+    now_iso = now_utc().isoformat()
+    if body.action == "accept":
+        scheduled_at = proposal.get("scheduled_at")
+        await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": {
+            "status": "accepted",
+            "decision_user_id": me["id"],
+            "decision_note": (body.note or "").strip() or None,
+            "updated_at": now_iso,
+        }})
+        await db.matches_v2.update_one({"id": match_id}, {"$set": {
+            "scheduled_at": scheduled_at,
+            "schedule_status": "accepted",
+            "status": "scheduled" if match.get("status") in {"pending", "ready", "preview"} else match.get("status"),
+            "updated_at": now_iso,
+        }})
+        return {"ok": True, "status": "accepted", "scheduled_at": scheduled_at}
+    if body.action == "decline":
+        await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": {
+            "status": "declined",
+            "decision_user_id": me["id"],
+            "decision_note": (body.note or "").strip() or None,
+            "updated_at": now_iso,
+        }})
+        await db.matches_v2.update_one({"id": match_id}, {"$set": {"schedule_status": "declined", "updated_at": now_iso}})
+        return {"ok": True, "status": "declined"}
+    if not body.scheduled_at:
+        raise HTTPException(status_code=400, detail="Gegenvorschlag braucht Datum und Uhrzeit")
+    await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": {
+        "status": "countered",
+        "decision_user_id": me["id"],
+        "decision_note": (body.note or "").strip() or None,
+        "updated_at": now_iso,
+    }})
+    counter = {
+        "id": new_id(),
+        "match_id": match_id,
+        "tournament_id": match.get("tournament_id"),
+        "stage_id": match.get("stage_id"),
+        "actor_user_id": me["id"],
+        "actor_registration_id": acting_reg.get("id") if acting_reg else None,
+        "scheduled_at": body.scheduled_at.isoformat(),
+        "note": (body.note or "").strip() or None,
+        "status": "pending",
+        "kind": "counter",
+        "parent_proposal_id": proposal_id,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+    await db.match_schedule_proposals.insert_one(counter)
+    await db.matches_v2.update_one({"id": match_id}, {"$set": {"schedule_status": "proposed", "updated_at": now_iso}})
+    counter.pop("_id", None)
+    return counter
+
+
+@router.get("/{match_id}/chat")
+async def list_match_chat(match_id: str, user: dict | None = Depends(get_optional_user)):
+    db = get_db()
+    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+    if not match:
+        raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    await _assert_match_visible(match, user)
+    messages = await db.match_chat_messages.find({"match_id": match_id}, {"_id": 0}).sort("created_at", 1).to_list(500)
+    users = await _public_user_map(list({m.get("user_id") for m in messages if m.get("user_id")}))
+    for message in messages:
+        message["author"] = users.get(message.get("user_id"))
+    return messages
+
+
+@router.post("/{match_id}/chat")
+async def post_match_chat(match_id: str, body: MatchChatCreate, me: dict = Depends(get_current_user)):
+    db = get_db()
+    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+    if not match:
+        raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    if not await _can_act_for_match(match, me):
+        raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen im Matchchat schreiben")
+    now_iso = now_utc().isoformat()
+    doc = {
+        "id": new_id(),
+        "match_id": match_id,
+        "tournament_id": match.get("tournament_id"),
+        "stage_id": match.get("stage_id"),
+        "user_id": me["id"],
+        "message": body.message.strip(),
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+    await db.match_chat_messages.insert_one(doc)
+    doc.pop("_id", None)
+    doc["author"] = {"id": me.get("id"), "username": me.get("username"), "display_name": me.get("display_name"), "avatar_url": me.get("avatar_url"), "role": me.get("role")}
+    return doc
 
 
 @router.patch("/{match_id}")

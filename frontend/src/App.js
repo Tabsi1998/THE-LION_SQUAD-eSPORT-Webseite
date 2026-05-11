@@ -30,6 +30,8 @@ import TournamentsPage from "@/pages/public/TournamentsPage";
 import TournamentDetailPage from "@/pages/public/TournamentDetailPage";
 import TournamentBracketPage from "@/pages/public/TournamentBracketPage";
 import TournamentStandingsPage from "@/pages/public/TournamentStandingsPage";
+import TournamentSchedulePage from "@/pages/public/TournamentSchedulePage";
+import MatchPage from "@/pages/public/MatchPage";
 import F1ListPage from "@/pages/public/F1ListPage";
 import F1DetailPage from "@/pages/public/F1DetailPage";
 import EventsPage from "@/pages/public/EventsPage";
@@ -143,7 +145,9 @@ function App() {
           <Route path="/tournaments" element={<TournamentsPage />} />
           <Route path="/tournaments/:slug" element={<TournamentDetailPage />} />
           <Route path="/tournaments/:slug/bracket" element={<TournamentBracketPage />} />
+          <Route path="/tournaments/:slug/matches" element={<TournamentSchedulePage />} />
           <Route path="/tournaments/:slug/standings" element={<TournamentStandingsPage />} />
+          <Route path="/matches/:id" element={<MatchPage />} />
           <Route path="/f1" element={<FastLapLegacyRedirect />} />
           <Route path="/f1/:slug" element={<FastLapLegacyRedirect />} />
           <Route path="/events" element={<EventsPage />} />

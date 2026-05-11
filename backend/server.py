@@ -92,7 +92,7 @@ async def lifespan(app: FastAPI):
             "login_attempts", "user_achievements", "achievements", "achievement_groups",
             "mail_jobs", "media_uploads", "prize_pickups", "club_member_profiles",
             "tournament_staff_assignments", "event_registrations", "tournament_stages",
-            "matches_v2", "match_reports_v2",
+            "matches_v2", "match_reports_v2", "match_schedule_proposals", "match_chat_messages",
             "direct_messages", "team_chat_messages", "team_invites",
         ]:
             try:

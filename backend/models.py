@@ -607,6 +607,24 @@ class MatchV2ResultSubmit(BaseModel):
     note: Optional[str] = None
 
 
+ScheduleProposalAction = Literal["accept", "decline", "counter"]
+
+
+class MatchScheduleProposalCreate(BaseModel):
+    scheduled_at: datetime
+    note: Optional[str] = None
+
+
+class MatchScheduleProposalDecision(BaseModel):
+    action: ScheduleProposalAction
+    scheduled_at: Optional[datetime] = None
+    note: Optional[str] = None
+
+
+class MatchChatCreate(BaseModel):
+    message: str = Field(min_length=1, max_length=1500)
+
+
 class MatchUpdate(BaseModel):
     status: Optional[MatchStatus] = None
     score_a: Optional[int] = None

@@ -153,6 +153,9 @@ export default function TournamentDetailPage() {
             <Link to={`/tournaments/${t.slug || t.id}/bracket`} data-testid="tournament-bracket-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
               Turnierbaum ansehen
             </Link>
+            <Link to={`/tournaments/${t.slug || t.id}/matches`} data-testid="tournament-schedule-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
+              Spielplan
+            </Link>
             <Link to={`/tournaments/${t.slug || t.id}/standings`} data-testid="tournament-standings-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
               Rangliste
             </Link>

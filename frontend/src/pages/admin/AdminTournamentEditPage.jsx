@@ -966,6 +966,7 @@ function MatchV2Card({ match, regById, canEdit, onSaveResult, onSaveMatchMeta })
         <div>
           <div className="text-[10px] uppercase tracking-widest text-white/40">{formatBracketSection(match.section)} · {match.round_name}</div>
           <div className="font-heading font-bold uppercase">{match.match_key}</div>
+          <a href={`/matches/${match.id}`} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-[10px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">Öffentliche Matchseite</a>
         </div>
         <StatusBadge status={match.status || "pending"} />
       </div>
