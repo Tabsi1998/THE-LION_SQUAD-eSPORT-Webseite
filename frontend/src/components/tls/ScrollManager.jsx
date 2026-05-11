@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 
 function scrollPageTop() {
@@ -17,18 +17,20 @@ function scrollToHash(hash) {
   return true;
 }
 
-function isTabTrigger(target) {
-  const button = target?.closest?.("button, [role='tab']");
-  if (!button) return false;
-  if (button.getAttribute("role") === "tab") return true;
-  const testId = button.getAttribute("data-testid") || "";
-  return /(^|[-_])tab([-_]|$)/i.test(testId);
-}
-
 export function ScrollManager() {
   const location = useLocation();
+  const previousRef = useRef(null);
 
   useLayoutEffect(() => {
+    const previous = previousRef.current;
+    previousRef.current = {
+      pathname: location.pathname,
+      hash: location.hash,
+    };
+    const pathChanged = !previous || previous.pathname !== location.pathname;
+    const hashChanged = !previous || previous.hash !== location.hash;
+    if (!pathChanged && !hashChanged) return;
+
     if (location.hash) {
       requestAnimationFrame(() => {
         if (!scrollToHash(location.hash)) scrollPageTop();
@@ -37,15 +39,6 @@ export function ScrollManager() {
     }
     scrollPageTop();
   }, [location.pathname, location.search, location.hash]);
-
-  useEffect(() => {
-    const onClick = (event) => {
-      if (!isTabTrigger(event.target)) return;
-      window.setTimeout(scrollPageTop, 0);
-    };
-    document.addEventListener("click", onClick, true);
-    return () => document.removeEventListener("click", onClick, true);
-  }, []);
 
   return null;
 }

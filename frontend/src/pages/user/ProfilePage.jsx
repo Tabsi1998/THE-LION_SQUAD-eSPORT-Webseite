@@ -147,14 +147,13 @@ function achievementInsights(data) {
 export default function ProfilePage() {
   const { user, refresh, isClubMember } = useAuth();
   const [params, setParams] = useSearchParams();
-  const [tab, setTab] = useState(params.get("tab") || "basic");
-  useEffect(() => {
-    const next = params.get("tab") || "basic";
-    if (TABS.some((item) => item.k === next) && next !== tab) setTab(next);
-  }, [params, tab]);
-  useEffect(() => {
-    if ((params.get("tab") || "basic") !== tab) setParams({ tab }, { replace: true });
-  }, [params, setParams, tab]);
+  const requestedTab = params.get("tab") || "basic";
+  const tab = TABS.some((item) => item.k === requestedTab) ? requestedTab : "basic";
+  const setTab = useCallback((nextTab) => {
+    const next = new URLSearchParams(params);
+    next.set("tab", nextTab);
+    setParams(next, { replace: true });
+  }, [params, setParams]);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [evaluatingAchievements, setEvaluatingAchievements] = useState(false);
