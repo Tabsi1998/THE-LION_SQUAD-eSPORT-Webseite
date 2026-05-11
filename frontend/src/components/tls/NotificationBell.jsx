@@ -39,7 +39,7 @@ export function NotificationBell() {
     const timer = setInterval(load, 30000);
     return () => clearInterval(timer);
   }, [load, user]);
-  useApiInvalidation(load, ["admin/notifications", "notifications", "teams", "tournaments", "matches", "prizes"]);
+  useApiInvalidation(load, ["admin/notifications", "notifications", "messages", "teams", "tournaments", "matches", "prizes"]);
 
   useEffect(() => {
     if (!open) return undefined;

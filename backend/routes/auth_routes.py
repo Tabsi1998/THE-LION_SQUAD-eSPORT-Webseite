@@ -125,6 +125,7 @@ async def register(body: UserRegister, request: Request, response: Response):
         "main_platform": None, "preferred_role": None, "input_device": None,
         "privacy_public_profile": True,
         "profile_visibility": {},
+        "dm_privacy": "everyone",
         "bio": None,
         "is_active": True, "is_banned": False, "email_verified": False,
         "accepted_privacy": body.accept_privacy,

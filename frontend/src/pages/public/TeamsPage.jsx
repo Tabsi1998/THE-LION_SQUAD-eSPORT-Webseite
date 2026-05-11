@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -7,7 +7,7 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Copy, Edit, Plus, Search, Shield, Trash2, Users, UserPlus } from "lucide-react";
+import { Copy, Edit, MessageSquare, Plus, Search, Send, Shield, Trash2, Users, UserPlus } from "lucide-react";
 
 const emptyTeam = { name: "", tag: "", description: "", logo_url: "", discord_link: "" };
 
@@ -197,10 +197,11 @@ function TeamDetail({ id }) {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <h2 className="font-heading text-2xl font-bold uppercase mb-4">Mitglieder</h2>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {team.members?.map((m) => {
+        <div className="lg:col-span-2 space-y-8">
+          <section>
+            <h2 className="font-heading text-2xl font-bold uppercase mb-4">Mitglieder</h2>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {team.members?.map((m) => {
               const isLead = team.leader_id === m.id;
               const isCo = (team.co_leader_ids || []).includes(m.id);
               const isMe = user && user.id === m.id;
@@ -248,8 +249,10 @@ function TeamDetail({ id }) {
                   )}
                 </div>
               );
-            })}
-          </div>
+              })}
+            </div>
+          </section>
+          {(isMember || canEdit) && <TeamChat team={team} user={user} />}
         </div>
         <aside className="space-y-4">
           {canEdit && (
@@ -277,6 +280,94 @@ function TeamDetail({ id }) {
       </div>
       {editing && <TeamModal team={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </PublicLayout>
+  );
+}
+
+function TeamChat({ team, user }) {
+  const [messages, setMessages] = useState([]);
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef(null);
+
+  const load = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/teams/${team.id}/chat`);
+      setMessages(data || []);
+    } catch {
+      setMessages([]);
+    }
+  }, [team.id]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timer = setInterval(load, 8000);
+    return () => clearInterval(timer);
+  }, [load]);
+  useApiInvalidation(load, ["teams"]);
+
+  useEffect(() => {
+    const box = scrollRef.current;
+    if (box) box.scrollTop = box.scrollHeight;
+  }, [messages.length]);
+
+  const send = async () => {
+    const message = text.trim();
+    if (!message || loading) return;
+    setLoading(true);
+    try {
+      const { data } = await api.post(`/teams/${team.id}/chat`, { message });
+      setMessages((rows) => [...rows, data]);
+      setText("");
+    } catch (err) {
+      toast.error(formatRequestError(err, "Nachricht konnte nicht gesendet werden."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section data-testid="team-chat">
+      <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2">
+        <MessageSquare className="w-4 h-4 text-[#29B6E8]" /> Team-Chat
+      </h2>
+      <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
+        <div ref={scrollRef} className="max-h-96 overflow-y-auto p-4 space-y-3">
+          {messages.map((message) => {
+            const mine = message.user_id === user?.id;
+            return (
+              <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[85%] border rounded-sm px-3 py-2 ${mine ? "border-[#29B6E8]/40 bg-[#29B6E8]/10" : "border-white/10 bg-[#0A0A0A]"}`}>
+                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/40">
+                    <span className={mine ? "text-[#29B6E8]" : "text-white/55"}>{message.author?.display_name || message.author?.username || "Benutzer"}</span>
+                    {message.created_at && <span>{new Date(message.created_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}</span>}
+                  </div>
+                  <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85">{message.message}</div>
+                </div>
+              </div>
+            );
+          })}
+          {messages.length === 0 && <div className="text-center py-10 text-sm text-white/35">Noch keine Nachrichten im Team-Chat.</div>}
+        </div>
+        <div className="border-t border-white/10 p-3 flex gap-2">
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            maxLength={1500}
+            placeholder="Nachricht schreiben, mit @username erwähnen..."
+            className="flex-1 min-w-0 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"
+          />
+          <button type="button" onClick={send} disabled={loading || !text.trim()} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
+            <Send className="w-3.5 h-3.5" /> Senden
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 

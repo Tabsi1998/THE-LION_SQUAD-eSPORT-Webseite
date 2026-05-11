@@ -33,6 +33,8 @@ async def init_indexes():
     await db.team_invites.create_index("id", unique=True)
     await db.team_invites.create_index([("team_id", 1), ("user_id", 1), ("status", 1)])
     await db.team_invites.create_index([("user_id", 1), ("status", 1), ("created_at", -1)])
+    await db.team_chat_messages.create_index("id", unique=True)
+    await db.team_chat_messages.create_index([("team_id", 1), ("created_at", -1)])
     # Games
     await db.games.create_index("id", unique=True)
     await db.games.create_index("slug", unique=True)
@@ -73,6 +75,9 @@ async def init_indexes():
     await db.notifications.create_index("id", unique=True)
     await db.notifications.create_index("user_id")
     await db.notifications.create_index([("user_id", 1), ("read", 1), ("created_at", -1)])
+    await db.direct_messages.create_index("id", unique=True)
+    await db.direct_messages.create_index([("sender_id", 1), ("recipient_id", 1), ("created_at", -1)])
+    await db.direct_messages.create_index([("recipient_id", 1), ("read_at", 1), ("created_at", -1)])
     # Audit
     await db.audit_logs.create_index("id", unique=True)
     await db.audit_logs.create_index("created_at")

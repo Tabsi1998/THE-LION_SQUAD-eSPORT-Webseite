@@ -1,4 +1,5 @@
 """Team routes."""
+import re
 import secrets
 from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends
@@ -35,6 +36,13 @@ class TeamInviteCreate(BaseModel):
     user_id: str
 
 
+class TeamChatCreate(BaseModel):
+    message: str = Field(min_length=1, max_length=1500)
+
+
+MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
+
+
 def _can_manage(team: dict, user: dict) -> bool:
     return (
         team.get("leader_id") == user["id"]
@@ -64,6 +72,10 @@ def _public_user(user: dict | None) -> dict | None:
 
 def _user_label(user: dict | None) -> str:
     return (user or {}).get("display_name") or (user or {}).get("username") or "Benutzer"
+
+
+def _chat_allowed(team: dict, user: dict | None) -> bool:
+    return bool(user and (_can_manage(team, user) or _is_member(team, user)))
 
 
 async def _add_team_member(db, team_id: str, user_id: str, role: str = "member") -> None:
@@ -118,6 +130,48 @@ async def _hydrate_team(team: dict) -> dict:
     )
     team["squad_count"] = await db.team_squads.count_documents({"team_id": team["id"]})
     return team
+
+
+async def _enrich_team_chat(messages: list[dict]) -> list[dict]:
+    db = get_db()
+    user_ids = list({m.get("user_id") for m in messages if m.get("user_id")})
+    users = {u["id"]: u for u in await db.users.find(
+        {"id": {"$in": user_ids}},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1},
+    ).to_list(300)}
+    for message in messages:
+        author = users.get(message.get("user_id")) or {}
+        message["author"] = {
+            "id": author.get("id"),
+            "username": author.get("username"),
+            "display_name": author.get("display_name") or author.get("username") or "Benutzer",
+            "avatar_url": author.get("avatar_url"),
+            "role": author.get("role"),
+        }
+    return messages
+
+
+async def _notify_team_mentions(db, team: dict, sender: dict, message: dict) -> None:
+    handles = {m.lower() for m in MENTION_RE.findall(message.get("message") or "")}
+    if not handles:
+        return
+    members = await db.users.find(
+        {"id": {"$in": team.get("member_ids") or []}},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1},
+    ).to_list(500)
+    for member in members:
+        if member.get("id") == sender.get("id"):
+            continue
+        if (member.get("username") or "").lower() not in handles:
+            continue
+        await create_user_notification(
+            member["id"],
+            title=f"Erwähnung im Team-Chat [{team.get('tag')}]",
+            body=f"{_user_label(sender)} hat dich erwähnt: {(message.get('message') or '')[:140]}",
+            url=f"/teams/{team['id']}",
+            kind="team_chat_mention",
+            meta={"team_id": team["id"], "message_id": message["id"]},
+        )
 
 
 def _team_summary(team: dict) -> dict:
@@ -216,6 +270,49 @@ async def get_team(team_id: str, user: dict | None = Depends(get_optional_user))
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     await _hydrate_team(team)
     return _team_response(team, user)
+
+
+@router.get("/{team_id}/chat")
+async def list_team_chat(team_id: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _chat_allowed(team, me):
+        raise HTTPException(status_code=403, detail="Team-Chat ist nur für Teammitglieder sichtbar")
+    messages = await db.team_chat_messages.find(
+        {"team_id": team_id, "deleted_at": {"$exists": False}},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(150)
+    messages.reverse()
+    return await _enrich_team_chat(messages)
+
+
+@router.post("/{team_id}/chat")
+async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(get_current_user)):
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _chat_allowed(team, me):
+        raise HTTPException(status_code=403, detail="Team-Chat ist nur für Teammitglieder sichtbar")
+    text = body.message.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Nachricht darf nicht leer sein")
+    now = now_utc().isoformat()
+    message = {
+        "id": new_id(),
+        "team_id": team_id,
+        "user_id": me["id"],
+        "message": text,
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.team_chat_messages.insert_one(message)
+    await _notify_team_mentions(db, team, me, message)
+    message.pop("_id", None)
+    enriched = await _enrich_team_chat([message])
+    return enriched[0]
 
 
 @router.get("/{team_id}/invite-candidates")

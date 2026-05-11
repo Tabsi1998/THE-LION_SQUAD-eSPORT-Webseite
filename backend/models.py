@@ -18,6 +18,7 @@ def new_id():
 Role = Literal["player", "team_leader", "moderator", "tournament_admin", "club_admin", "superadmin"]
 UserType = Literal["guest", "community_user", "club_member"]
 VisibilityLevel = Literal["public", "community", "members", "admins", "private"]
+DirectMessagePrivacy = Literal["everyone", "team_members", "club_members", "admins_only", "none"]
 
 
 class UserRegister(BaseModel):
@@ -98,6 +99,7 @@ class UserUpdate(BaseModel):
     # Privacy
     privacy_public_profile: Optional[bool] = None
     profile_visibility: Optional[Dict[str, VisibilityLevel]] = None  # field_name -> level
+    dm_privacy: Optional[DirectMessagePrivacy] = None
     newsletter_consent: Optional[bool] = None
     notification_preferences: Optional[Dict[str, bool]] = None
 

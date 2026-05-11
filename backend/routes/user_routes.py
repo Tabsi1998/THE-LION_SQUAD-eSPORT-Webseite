@@ -70,7 +70,7 @@ USER_NULLABLE_FIELDS = {
     "discord_id", "switch_code", "steam_id", "epic_id", "psn_id", "xbox_id",
     "riot_id", "twitch_handle", "youtube_handle", "tiktok_handle",
     "instagram_handle", "x_handle", "nintendo_fc", "ea_id", "battlenet_id",
-    "profile_visibility",
+    "profile_visibility", "dm_privacy",
 }
 
 
@@ -271,6 +271,7 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
         "accepted_privacy": True,
         "accepted_terms": True,
         "newsletter_consent": False,
+        "dm_privacy": "everyone",
         "favorite_games": [],
         "created_at": now_utc().isoformat(),
         "updated_at": now_utc().isoformat(),

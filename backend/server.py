@@ -18,6 +18,7 @@ from badges import seed_badges
 from routes.auth_routes import router as auth_router
 from routes.user_routes import router as user_router
 from routes.team_routes import router as team_router
+from routes.message_routes import router as message_router
 from routes.game_routes import router as game_router
 from routes.event_routes import router as event_router
 from routes.tournament_routes import router as tournament_router
@@ -90,6 +91,7 @@ async def lifespan(app: FastAPI):
             "mail_jobs", "media_uploads", "prize_pickups", "club_member_profiles",
             "tournament_staff_assignments", "event_registrations", "tournament_stages",
             "matches_v2", "match_reports_v2",
+            "direct_messages", "team_chat_messages", "team_invites",
         ]:
             try:
                 await db[coll].delete_many({})
@@ -182,6 +184,7 @@ else:
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(team_router)
+app.include_router(message_router)
 app.include_router(game_router)
 app.include_router(event_router)
 app.include_router(tournament_router)
