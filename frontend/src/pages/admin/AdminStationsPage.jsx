@@ -31,8 +31,9 @@ export default function AdminStationsPage() {
 
   const load = useCallback(async () => {
     const { data: t } = await api.get("/tournaments?include_drafts=true");
-    setTournaments(t);
-    setActiveTid((current) => current || t?.[0]?.id || "");
+    const rows = t || [];
+    setTournaments(rows);
+    setActiveTid((current) => rows.some((row) => row.id === current) ? current : rows?.[0]?.id || "");
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["tournaments"]);
@@ -49,7 +50,11 @@ export default function AdminStationsPage() {
   useApiInvalidation(loadStations, ["stations", "tournaments"]);
 
   const loadMatches = useCallback(async () => {
-    if (!activeTid) return;
+    if (!activeTid) {
+      setMatches([]);
+      setRegs([]);
+      return;
+    }
     const { data } = await api.get(`/tournaments/${activeTid}/bracket`);
     const tournament = data.tournament || {};
     const duelMatches = (data.matches || []).map((m) => ({ ...m, is_multi_slot: false, tournament }));
@@ -59,6 +64,11 @@ export default function AdminStationsPage() {
   }, [activeTid]);
   useEffect(() => { loadMatches(); }, [loadMatches]);
   useApiInvalidation(loadMatches, ["stations", "matches", "tournaments"]);
+  useEffect(() => {
+    setAssignFor(null);
+    setMatches([]);
+    setRegs([]);
+  }, [activeTid]);
 
   const create = async (e) => {
     e.preventDefault();
@@ -224,7 +234,9 @@ export default function AdminStationsPage() {
         {/* RIGHT: Stations grid */}
         <div className="lg:col-span-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {list.map((s) => (
+            {list.map((s) => {
+              const currentMatch = s.current_match_id ? matchById[s.current_match_id] : null;
+              return (
               <div key={s.id} className={`border rounded-sm bg-[#121212] p-4 ${s.status === "busy" ? "border-[#FF3B30]/30" : "border-white/10"}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -243,17 +255,17 @@ export default function AdminStationsPage() {
                 {s.current_match_id ? (
                   <div className="mt-3 p-2 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm">
                     <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{s.status === "reserved" ? "Reserviert" : "Aktuell"}</div>
-                    <div className="text-sm text-white truncate">{nameOfMatch(matchById[s.current_match_id])}</div>
-                    {matchById[s.current_match_id]?.scheduled_at && <div className="mt-1 text-[11px] text-white/45">{formatDateTime(matchById[s.current_match_id].scheduled_at)}</div>}
+                    <div className="text-sm text-white truncate">{currentMatch ? nameOfMatch(currentMatch) : "Spiel wird geladen oder ist nicht mehr vorhanden"}</div>
+                    {currentMatch?.scheduled_at && <div className="mt-1 text-[11px] text-white/45">{formatDateTime(currentMatch.scheduled_at)}</div>}
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {s.status === "reserved" && <button onClick={() => assign(s.id, s.current_match_id, true)} className="text-[10px] text-[#00FF88] font-bold uppercase tracking-widest hover:underline inline-flex items-center gap-1"><Play className="w-3 h-3" /> Starten</button>}
+                      {s.status === "reserved" && currentMatch && <button onClick={() => assign(s.id, s.current_match_id, true)} className="text-[10px] text-[#00FF88] font-bold uppercase tracking-widest hover:underline inline-flex items-center gap-1"><Play className="w-3 h-3" /> Starten</button>}
                       <button onClick={() => clearStation(s.id)} data-testid={`station-clear-${s.id}`} className="text-[10px] text-[#FF3B30] font-bold uppercase tracking-widest hover:underline inline-flex items-center gap-1"><XIcon className="w-3 h-3" /> Freigeben</button>
                     </div>
-                    {!matchById[s.current_match_id]?.is_multi_slot && (
-                      <StationDuelResult match={matchById[s.current_match_id]} regById={regById} onSaved={() => { loadStations(); loadMatches(); }} />
+                    {currentMatch && !currentMatch.is_multi_slot && (
+                      <StationDuelResult match={currentMatch} regById={regById} onSaved={() => { loadStations(); loadMatches(); }} />
                     )}
-                    {matchById[s.current_match_id]?.is_multi_slot && (
-                      <StationHeatResult match={matchById[s.current_match_id]} regById={regById} onSaved={() => { loadStations(); loadMatches(); }} />
+                    {currentMatch?.is_multi_slot && (
+                      <StationHeatResult match={currentMatch} regById={regById} onSaved={() => { loadStations(); loadMatches(); }} />
                     )}
                   </div>
                 ) : (
@@ -263,7 +275,8 @@ export default function AdminStationsPage() {
                 )}
                 {s.notes && <div className="mt-2 text-white/50 text-xs">{s.notes}</div>}
               </div>
-            ))}
+              );
+            })}
             {list.length === 0 && <div className="col-span-2 text-center py-16 text-white/40 font-display tracking-widest">KEINE STATIONEN</div>}
           </div>
         </div>
