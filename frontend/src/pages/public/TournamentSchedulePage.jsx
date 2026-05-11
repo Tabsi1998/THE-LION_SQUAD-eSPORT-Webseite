@@ -16,7 +16,7 @@ function participantLabel(slot, registrations) {
   return reg.display_name || reg.ingame_name || reg.user?.display_name || slot.source?.raw || "Offen";
 }
 
-function legacyLabels(match, registrations) {
+function duelLabels(match, registrations) {
   const a = registrations[match.participant_a_id] || {};
   const b = registrations[match.participant_b_id] || {};
   return [
@@ -40,21 +40,19 @@ export default function TournamentSchedulePage() {
 
   const groups = useMemo(() => {
     const registrations = Object.fromEntries((data?.registrations || []).map((r) => [r.id, r]));
-    const v2Rows = (data?.matches_v2 || []).map((match) => ({
+    const multiSlotRows = (data?.matches_v2 || []).map((match) => ({
       ...match,
-      engine: "v2",
       matchday: match.matchday_number || match.round || 0,
       matchdayLabel: match.matchday_label || (match.round ? `Spieltag ${match.round}` : "Ohne Spieltag"),
       labels: (match.slots || []).map((slot) => participantLabel(slot, registrations)),
     }));
-    const legacyRows = (data?.matches || []).map((match) => ({
+    const duelRows = (data?.matches || []).map((match) => ({
       ...match,
-      engine: "legacy",
       matchday: match.round || 0,
       matchdayLabel: match.round_name || (match.round ? `Runde ${match.round}` : "Ohne Runde"),
-      labels: legacyLabels(match, registrations),
+      labels: duelLabels(match, registrations),
     }));
-    const rows = [...v2Rows, ...legacyRows];
+    const rows = [...multiSlotRows, ...duelRows];
     const byDay = new Map();
     rows.forEach((match) => {
       const key = `${match.matchday}:${match.matchdayLabel}`;
