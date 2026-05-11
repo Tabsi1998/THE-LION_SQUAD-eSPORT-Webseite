@@ -592,7 +592,7 @@ class MatchScoreReport(BaseModel):
 
 class MatchV2ResultEntry(BaseModel):
     registration_id: str
-    rank: int = Field(ge=1)
+    rank: Optional[int] = Field(default=None, ge=1)
     score: Optional[float] = None
     points: Optional[float] = None
     time_ms: Optional[int] = Field(default=None, ge=0)

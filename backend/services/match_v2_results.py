@@ -42,12 +42,39 @@ def _as_number(value: Any) -> int | float | None:
     return int(number) if number.is_integer() else number
 
 
+def _result_score_for_ranking(entry: dict) -> int | float:
+    score = _as_number(entry.get("points"))
+    if score is None:
+        score = _as_number(entry.get("score"))
+    if score is None:
+        score = 0
+    return score
+
+
+def _auto_rank_results(raw_results: list[dict]) -> list[dict]:
+    ranked = sorted(
+        enumerate(raw_results),
+        key=lambda item: (
+            bool(item[1].get("forfeit")),
+            bool(item[1].get("dnf")),
+            -_result_score_for_ranking(item[1]),
+            item[0],
+        ),
+    )
+    next_rows = [dict(entry) for entry in raw_results]
+    for rank, (idx, _) in enumerate(ranked, start=1):
+        next_rows[idx]["rank"] = rank
+    return next_rows
+
+
 def normalize_v2_results(match: dict, raw_results: list[dict]) -> list[dict]:
     participants = _slot_participant_map(match)
     if not participants:
         raise MatchV2ResultError("Match hat keine belegten Slots")
     if len(raw_results) != len(participants):
         raise MatchV2ResultError("Ergebnisliste muss alle belegten Teilnehmer enthalten")
+    if any(entry.get("rank") in (None, "") for entry in raw_results):
+        raw_results = _auto_rank_results(raw_results)
 
     seen_regs: set[str] = set()
     seen_ranks: set[int] = set()

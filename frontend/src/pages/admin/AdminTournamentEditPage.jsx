@@ -995,6 +995,20 @@ function MatchV2Card({ match, regById, canEdit, onSaveResult, onSaveMatchMeta })
 }
 
 function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
+  const autoRankRows = (nextRows) => {
+    const ranked = [...nextRows]
+      .map((row, index) => ({ row, index }))
+      .sort((a, b) => {
+        if (!!a.row.forfeit !== !!b.row.forfeit) return a.row.forfeit ? 1 : -1;
+        if (!!a.row.dnf !== !!b.row.dnf) return a.row.dnf ? 1 : -1;
+        const scoreA = a.row.score === "" ? 0 : Number(a.row.score) || 0;
+        const scoreB = b.row.score === "" ? 0 : Number(b.row.score) || 0;
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        return a.index - b.index;
+      });
+    const rankByRegistration = Object.fromEntries(ranked.map(({ row }, index) => [row.registration_id, index + 1]));
+    return nextRows.map((row) => ({ ...row, rank: rankByRegistration[row.registration_id] || row.rank }));
+  };
   const initialRows = () => {
     const existing = (match.results || []).length
       ? [...match.results].sort((a, b) => (a.rank || 0) - (b.rank || 0))
@@ -1010,15 +1024,22 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
     }));
   };
   const [rows, setRows] = useState(initialRows);
+  const [autoRank, setAutoRank] = useState(true);
   const [note, setNote] = useState(match.result_meta?.note || "");
   useEffect(() => {
     setRows(initialRows());
+    setAutoRank(true);
     setNote(match.result_meta?.note || "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [match.id, match.updated_at, filledSlots.length]);
-  const update = (registrationId, patch) => setRows((current) => current.map((row) => row.registration_id === registrationId ? { ...row, ...patch } : row));
+  const update = (registrationId, patch) => setRows((current) => {
+    const next = current.map((row) => row.registration_id === registrationId ? { ...row, ...patch } : row);
+    return autoRank ? autoRankRows(next) : next;
+  });
+  const recalcRanks = () => setRows((current) => autoRankRows(current));
   const save = () => {
-    const results = rows.map((row) => ({
+    const finalRows = autoRank ? autoRankRows(rows) : rows;
+    const results = finalRows.map((row) => ({
       registration_id: row.registration_id,
       rank: Number(row.rank) || 1,
       score: row.score === "" ? null : Number(row.score),
@@ -1032,7 +1053,14 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
     <div className="mt-4 border-t border-white/10 pt-3 space-y-3">
       <div>
         <div className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">Ergebnis eintragen</div>
-        <p className="mt-1 text-[11px] text-white/45">Platz 1 ist Sieger/qualifiziert. Punkte sind Spielpunkte, Rennpunkte oder Kills; leer lassen, wenn nur die Platzierung zählt.</p>
+        <p className="mt-1 text-[11px] text-white/45">Bei aktiver Automatik wird Platz 1 aus den höchsten Punkten berechnet. DNF und Forfeit landen automatisch hinten.</p>
+        <div className="mt-2 flex items-center gap-3 flex-wrap">
+          <label className="inline-flex items-center gap-2 text-[11px] text-white/60">
+            <input type="checkbox" checked={autoRank} onChange={(e)=>setAutoRank(e.target.checked)} className="accent-[#29B6E8]" />
+            Platzierung aus Punkten berechnen
+          </label>
+          <button type="button" onClick={recalcRanks} className="text-[10px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">Jetzt berechnen</button>
+        </div>
       </div>
       <div className="hidden sm:grid grid-cols-12 gap-2 text-[10px] font-bold uppercase tracking-widest text-white/35">
         <div className="col-span-3">Teilnehmer</div>
@@ -1044,7 +1072,7 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
       {rows.map((row) => (
         <div key={row.registration_id} className="grid grid-cols-12 gap-2 items-center">
           <div className="col-span-3 text-xs truncate">{labelFor(row.registration_id)}</div>
-          <input type="number" min="1" value={row.rank} onChange={(e)=>update(row.registration_id, { rank: e.target.value })} className="col-span-2 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Platzierung" placeholder="Platz" />
+          <input type="number" min="1" value={row.rank} onChange={(e)=>update(row.registration_id, { rank: e.target.value })} disabled={autoRank} className="col-span-2 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs disabled:opacity-60" aria-label="Platzierung" placeholder="Platz" />
           <input type="number" min="0" value={row.score} onChange={(e)=>update(row.registration_id, { score: e.target.value })} className="col-span-3 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Punkte oder Score" placeholder="Punkte/Score" />
           <label className="col-span-2 text-[10px] text-white/60 truncate"><input type="checkbox" checked={row.dnf} onChange={(e)=>update(row.registration_id, { dnf: e.target.checked })} className="accent-[#29B6E8]" /> Nicht beendet</label>
           <label className="col-span-2 text-[10px] text-white/60 truncate"><input type="checkbox" checked={row.forfeit} onChange={(e)=>update(row.registration_id, { forfeit: e.target.checked })} className="accent-[#FF3B30]" /> Forfeit</label>
