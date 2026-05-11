@@ -684,6 +684,7 @@ class F1ChallengeCreate(BaseModel):
     unlimited_attempts: bool = True
     registration_enabled: bool = True
     block_club_member_results: bool = False
+    allow_club_reference_times: bool = True
     show_club_reference_times: bool = True
     online_registration_enabled: bool = False
     registration_open_from: Optional[datetime] = None
@@ -724,6 +725,7 @@ class F1ChallengeUpdate(BaseModel):
     unlimited_attempts: Optional[bool] = None
     registration_enabled: Optional[bool] = None
     block_club_member_results: Optional[bool] = None
+    allow_club_reference_times: Optional[bool] = None
     show_club_reference_times: Optional[bool] = None
     online_registration_enabled: Optional[bool] = None
     registration_open_from: Optional[datetime] = None

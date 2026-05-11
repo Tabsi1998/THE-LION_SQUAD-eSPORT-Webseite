@@ -54,12 +54,19 @@ function FastLapCard({ challenge: c }) {
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <PhaseBadge phase={c.public_phase} status={c.status} />
             {c.is_championship && <span className="text-[10px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 px-2 py-[3px] rounded-sm">Championship</span>}
+            {c.block_club_member_results && <span className="text-[10px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 bg-[#FFD700]/10 px-2 py-[3px] rounded-sm">Externe Wertung</span>}
+            {c.allow_club_reference_times !== false && c.show_club_reference_times !== false && (c.club_reference_count || 0) > 0 && (
+              <span className="text-[10px] font-bold uppercase tracking-wider text-white/65 border border-white/15 px-2 py-[3px] rounded-sm">Referenzzeiten</span>
+            )}
           </div>
           <h2 className="font-heading text-2xl font-bold group-hover:text-[#29B6E8] transition">{c.title}</h2>
           {c.description && <p className="mt-1 text-sm text-white/60 line-clamp-2">{c.description}</p>}
           <div className="mt-3 flex flex-wrap gap-5 text-xs text-white/60">
             <span className="inline-flex items-center gap-1.5"><Flag className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.track_count} Strecken</span>
             <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.participant_count} Fahrer</span>
+            {(c.club_reference_count || 0) > 0 && c.allow_club_reference_times !== false && c.show_club_reference_times !== false && (
+              <span className="inline-flex items-center gap-1.5"><Flag className="w-3.5 h-3.5 text-[#FFD700]" /> {c.club_reference_count} Referenzen</span>
+            )}
             {c.platform && <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.platform}</span>}
             {c.start_date && <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#29B6E8]" /> Start {formatDate(c.start_date)}</span>}
           </div>

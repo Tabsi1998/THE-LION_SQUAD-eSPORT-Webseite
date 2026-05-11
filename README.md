@@ -27,7 +27,8 @@ Dokumenten, Achievements, Kontaktformular, Mailversand und Discord-Integrationen
 - Adminbereich fuer Benutzer, Mitglieder, Mitgliedsantraege, Turniere, Fast Lap, Events, News, Sponsoren, Galerie, Dokumente, Board, Navigation, CMS und Systemeinstellungen.
 - Turnier- und Matchverwaltung mit Registrierungen, Check-in, Brackets, Ergebnissen und TV-Anzeigen.
 - Flexible Turnierstrukturen fuer Duel und FFA, Custom-Brackets, automatische Slot-Weiterleitung und Heat-Ergebnisse.
-- F1/Fast-Lap-Challenges mit Strecken, Zeiten, Strafen, Ranglisten und Display-Modus.
+- F1/Fast-Lap-Challenges mit Strecken, Zeiten, Strafen, Ranglisten, Display-Modus
+  und getrennten Vereins-Referenzzeiten ausser Wertung.
 - Zeitplanung fuer Turniere und Fast-Lap-Challenges: Registrierung/Einreichung oeffnet,
   Registrierung/Einreichung endet, Start/Ende, Status `scheduled`, `registration_open`,
   `registration_closed` und `live`.
@@ -361,6 +362,17 @@ Moderatoren haben keinen vollen Adminbereich. Sie duerfen aber operative Ergebni
 
 System-, Branding-, Benutzer-, Rollen-, Mail- und Rechtseinstellungen bleiben Adminrollen
 vorbehalten.
+
+## Fast-Lap Vereins-Referenzzeiten
+
+Fast-Lap-Challenges haben drei getrennte Einstellungen:
+
+- `Vereinsmitglieder aus offizieller Wertung ausschliessen`: fuer externe Challenges, bei
+  denen Vereinsmitglieder nicht offiziell teilnehmen sollen.
+- `Vereins-Referenzzeiten erlauben`: Zeiten ausser Wertung. Diese Zeiten zaehlen nicht fuer
+  Rangliste, Season-Punkte oder Achievements.
+- `Referenzzeiten oeffentlich anzeigen`: zeigt die Top-3-Referenzzeiten auf der Challenge-
+  und TV-Ansicht. Wenn deaktiviert, bleiben sie nur im Admin sichtbar.
 
 Unterstuetzt fuer Bilder:
 

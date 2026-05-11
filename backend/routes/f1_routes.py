@@ -80,6 +80,44 @@ def _official_time_query(extra: dict | None = None) -> dict:
     }
 
 
+def _reference_time_query(extra: dict | None = None) -> dict:
+    return {
+        **(extra or {}),
+        "is_invalid": {"$ne": True},
+        "score_scope": "club_reference",
+    }
+
+
+def _normalize_reference_settings(doc: dict) -> dict:
+    """Keep Fast-Lap reference settings explicit and internally consistent."""
+    if doc.get("block_club_member_results") is True:
+        doc["allow_club_reference_times"] = True
+    elif "allow_club_reference_times" not in doc:
+        doc["allow_club_reference_times"] = True
+    if "show_club_reference_times" not in doc:
+        doc["show_club_reference_times"] = True
+    return doc
+
+
+async def _annotate_reference_policy(challenge: dict, include_counts: bool = False) -> dict:
+    db = get_db()
+    _normalize_reference_settings(challenge)
+    allow_reference = challenge.get("allow_club_reference_times", True)
+    challenge["club_reference_policy"] = {
+        "block_club_member_results": bool(challenge.get("block_club_member_results")),
+        "allow_club_reference_times": bool(allow_reference),
+        "show_club_reference_times": bool(allow_reference and challenge.get("show_club_reference_times", True)),
+    }
+    if include_counts:
+        challenge["club_reference_count"] = 0
+        if allow_reference:
+            challenge["club_reference_count"] = len(await db.f1_lap_times.distinct(
+                "user_id",
+                _reference_time_query({"challenge_id": challenge["id"]}),
+            ))
+    return challenge
+
+
 def _best_lap_entries(times: list[dict], users: dict[str, dict]) -> list[dict]:
     best_per_user = {}
     attempts_per_user = {}
@@ -169,6 +207,7 @@ async def list_challenges(status: str | None = None, limit: int = 100, include_d
     for c in challenges:
         if not await user_can_see(user, c.get("visibility") or "public"):
             continue
+        await _annotate_reference_policy(c, include_counts=True)
         c["public_phase"] = derive_public_phase(c, "f1")
         c["track_count"] = await db.f1_tracks.count_documents({"challenge_id": c["id"]})
         c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", _official_time_query({"challenge_id": c["id"]})))
@@ -180,6 +219,7 @@ async def list_challenges(status: str | None = None, limit: int = 100, include_d
 async def get_challenge(slug_or_id: str, include_draft: bool = False, user=Depends(get_optional_user)):
     db = get_db()
     c = await _get_visible_challenge(slug_or_id, user, include_draft=include_draft)
+    await _annotate_reference_policy(c, include_counts=True)
     tracks = await db.f1_tracks.find({"challenge_id": c["id"]}, {"_id": 0}).sort("order_index", 1).to_list(100)
     c["tracks"] = tracks
     c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", _official_time_query({"challenge_id": c["id"]})))
@@ -196,6 +236,7 @@ async def create_challenge(body: F1ChallengeCreate, me: dict = Depends(require_a
     if await db.f1_challenges.find_one({"slug": body.slug}):
         raise HTTPException(status_code=409, detail="Slug bereits vergeben")
     doc = body.model_dump()
+    _normalize_reference_settings(doc)
     doc["id"] = new_id()
     doc["status"] = doc.get("status") or "draft"
     doc["online_registration_enabled"] = doc.get("registration_enabled") is True
@@ -228,6 +269,16 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
         "registration_open_from", "registration_open_until", "start_date", "end_date",
     }
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    if updates.get("block_club_member_results") is True:
+        updates["allow_club_reference_times"] = True
+    elif updates.get("allow_club_reference_times") is False and (
+        updates.get("block_club_member_results") is True
+        or (existing.get("block_club_member_results") is True and updates.get("block_club_member_results") is not False)
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Wenn Vereinsmitglieder von der offiziellen Wertung ausgeschlossen sind, muessen Vereins-Referenzzeiten erlaubt bleiben.",
+        )
     if "registration_enabled" in updates:
         updates["online_registration_enabled"] = updates.get("registration_enabled") is True
     if updates.get("online_registration_enabled") is False:
@@ -253,6 +304,7 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
                 {"$set": {"score_scope": "club_reference", "updated_at": now_utc().isoformat()}},
             )
     c = await db.f1_challenges.find_one({"id": cid}, {"_id": 0})
+    await _annotate_reference_policy(c, include_counts=True)
     if existing.get("status") != c.get("status") and c.get("status") == "results_published":
         try:
             await _award_f1_season_points(c)
@@ -364,16 +416,22 @@ async def leaderboard(cid: str, track_id: str | None = None, user=Depends(get_op
         {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0}).to_list(500)}
     entries = _best_lap_entries(times, users)
     club_reference_entries = []
-    if c.get("show_club_reference_times", True):
+    if c.get("allow_club_reference_times", True) and c.get("show_club_reference_times", True):
         reference_times = await db.f1_lap_times.find(
-            {"challenge_id": cid, "track_id": track_id, "is_invalid": {"$ne": True}, "score_scope": "club_reference"},
+            _reference_time_query({"challenge_id": cid, "track_id": track_id}),
             {"_id": 0},
         ).to_list(5000)
         reference_user_ids = list({t["user_id"] for t in reference_times})
         reference_users = {u["id"]: u for u in await db.users.find(
             {"id": {"$in": reference_user_ids}}, {"_id": 0, "password_hash": 0}).to_list(500)}
         club_reference_entries = _best_lap_entries(reference_times, reference_users)[:3]
-    return {"challenge": c, "track": track, "entries": entries, "club_reference_entries": club_reference_entries}
+    return {
+        "challenge": c,
+        "track": track,
+        "entries": entries,
+        "club_reference_entries": club_reference_entries,
+        "club_reference_public": bool(c.get("allow_club_reference_times", True) and c.get("show_club_reference_times", True)),
+    }
 
 
 @router.get("/challenges/{cid}/championship")
@@ -438,6 +496,11 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_r
     if not await db.users.find_one({"id": body.user_id}):
         raise HTTPException(status_code=400, detail="Spieler nicht gefunden")
     score_scope = body.score_scope or "official"
+    if score_scope == "club_reference" and not c.get("allow_club_reference_times", True):
+        raise HTTPException(
+            status_code=400,
+            detail="Vereins-Referenzzeiten sind bei dieser Challenge deaktiviert.",
+        )
     is_club_member = await _is_active_club_member(body.user_id)
     if c.get("block_club_member_results") and is_club_member and score_scope != "club_reference":
         raise HTTPException(
@@ -552,8 +615,13 @@ async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(re
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     final_scope = updates.get("score_scope", existing.get("score_scope") or "official")
+    challenge = await db.f1_challenges.find_one({"id": existing.get("challenge_id")}, {"_id": 0}) or {}
+    if final_scope == "club_reference" and not challenge.get("allow_club_reference_times", True):
+        raise HTTPException(
+            status_code=400,
+            detail="Vereins-Referenzzeiten sind bei dieser Challenge deaktiviert.",
+        )
     if final_scope == "official":
-        challenge = await db.f1_challenges.find_one({"id": existing.get("challenge_id")}, {"_id": 0}) or {}
         if challenge.get("block_club_member_results") and await _is_active_club_member(existing.get("user_id")):
             raise HTTPException(
                 status_code=400,

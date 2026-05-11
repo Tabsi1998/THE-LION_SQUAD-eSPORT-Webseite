@@ -94,6 +94,7 @@ export default function F1TVPage() {
   const entries = board?.entries || [];
   const top3 = entries.slice(0, 3);
   const rest = entries.slice(3, 13);
+  const references = board?.club_reference_entries || [];
   const publicUrl = `${window.location.origin}/fastlap/${challenge.slug || challenge.id}`;
   const prevTrack = () => challenge.tracks?.length && setActiveTrackIdx((i) => (i - 1 + challenge.tracks.length) % challenge.tracks.length);
   const nextTrack = () => challenge.tracks?.length && setActiveTrackIdx((i) => (i + 1) % challenge.tracks.length);
@@ -178,6 +179,27 @@ export default function F1TVPage() {
             ))}
           </AnimatePresence>
         </div>
+        {references.length > 0 && (
+          <div className="mt-6 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.3em] text-[#FFD700] font-bold">Vereins-Referenz · außer Wertung</div>
+                <div className="text-xs text-white/45 mt-1">Zielzeiten zum Schlagen, nicht Teil der offiziellen Rangliste.</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {references.map((e) => (
+                <div key={e.user_id} className="border border-white/10 bg-[#0A0A0A]/60 rounded-sm px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-display font-bold text-[#FFD700]">#{e.rank}</span>
+                    <span className="font-display font-bold tabular-nums text-white text-2xl">{e.time_str}</span>
+                  </div>
+                  <div className="mt-1 font-heading font-bold uppercase truncate">{e.display_name}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <footer className="absolute bottom-0 left-0 right-0 px-8 py-4 pr-40 border-t border-white/5 flex items-center justify-between gap-4 bg-[#0A0A0A]/80 backdrop-blur-sm">

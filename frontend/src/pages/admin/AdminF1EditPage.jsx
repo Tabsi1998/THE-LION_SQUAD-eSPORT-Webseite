@@ -426,6 +426,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
     start_date: dt(challenge.start_date),
     end_date: dt(challenge.end_date),
     block_club_member_results: !!challenge.block_club_member_results,
+    allow_club_reference_times: challenge.allow_club_reference_times !== false,
     show_club_reference_times: challenge.show_club_reference_times !== false,
     unlimited_attempts: challenge.unlimited_attempts !== false,
     max_attempts: challenge.max_attempts || 0,
@@ -440,6 +441,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
   const save = async () => {
     try {
       const payload = { ...form };
+      if (payload.block_club_member_results) payload.allow_club_reference_times = true;
       if (!payload.event_id) payload.event_id = null;
       if (payload.unlimited_attempts) payload.max_attempts = null;
       if (!payload.registration_enabled) {
@@ -495,8 +497,44 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.registration_enabled} onChange={(e)=>set("registration_enabled", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Online-Einreichung öffentlich anzeigen</span></label>
         <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.unlimited_attempts} onChange={(e)=>set("unlimited_attempts", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Unbegrenzte Versuche</span></label>
-        <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.block_club_member_results} onChange={(e)=>set("block_club_member_results", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Vereinsmitglieder nur als Referenzzeiten erlauben</span></label>
-        <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.show_club_reference_times} onChange={(e)=>set("show_club_reference_times", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Vereins-Referenzzeiten öffentlich anzeigen</span></label>
+      </div>
+      <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 space-y-3">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Teilnahme & Vereins-Referenzzeiten</div>
+          <div className="text-xs text-white/50 mt-1">Für externe Fast-Lap-Challenges kann die Vereinswertung sauber von Referenzzeiten getrennt werden.</div>
+        </div>
+        <label className="flex items-start gap-2 text-sm text-white/75">
+          <input
+            type="checkbox"
+            checked={form.block_club_member_results}
+            onChange={(e)=>{
+              const checked = e.target.checked;
+              setForm((f) => ({ ...f, block_club_member_results: checked, allow_club_reference_times: checked ? true : f.allow_club_reference_times }));
+            }}
+            className="accent-[#29B6E8] mt-1"
+          />
+          <span><strong className="text-white">Vereinsmitglieder aus offizieller Wertung ausschließen</strong><br /><span className="text-xs text-white/50">Sie erscheinen nicht in Rangliste, Season-Punkten oder Achievements dieser Challenge.</span></span>
+        </label>
+        <label className="flex items-start gap-2 text-sm text-white/75">
+          <input
+            type="checkbox"
+            checked={form.allow_club_reference_times}
+            disabled={form.block_club_member_results}
+            onChange={(e)=>set("allow_club_reference_times", e.target.checked)}
+            className="accent-[#29B6E8] mt-1 disabled:opacity-50"
+          />
+          <span><strong className="text-white">Vereins-Referenzzeiten erlauben</strong><br /><span className="text-xs text-white/50">Separater Bereich außer Wertung als Motivation/Zielzeit.</span></span>
+        </label>
+        <label className="flex items-start gap-2 text-sm text-white/75">
+          <input
+            type="checkbox"
+            checked={form.show_club_reference_times}
+            disabled={!form.allow_club_reference_times}
+            onChange={(e)=>set("show_club_reference_times", e.target.checked)}
+            className="accent-[#29B6E8] mt-1 disabled:opacity-50"
+          />
+          <span><strong className="text-white">Referenzzeiten öffentlich anzeigen</strong><br /><span className="text-xs text-white/50">Wenn aus, bleiben Referenzzeiten nur im Admin sichtbar.</span></span>
+        </label>
       </div>
       {!form.unlimited_attempts && <SmallField label="Max Versuche" type="number" value={form.max_attempts} onChange={(v)=>set("max_attempts", Number(v))} />}
       <button type="button" onClick={save} className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>

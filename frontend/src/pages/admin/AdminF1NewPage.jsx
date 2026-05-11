@@ -22,7 +22,7 @@ export default function AdminF1NewPage() {
     controller_type: "", platform: "", banner_url: "",
     unlimited_attempts: true, max_attempts: 0,
     registration_enabled: false, registration_open_from: "", registration_open_until: "",
-    block_club_member_results: false, show_club_reference_times: true,
+    block_club_member_results: false, allow_club_reference_times: true, show_club_reference_times: true,
     start_date: "", end_date: "", status: "draft",
     is_championship: false,
     twitch_channel: "", twitch_enabled: false,
@@ -41,6 +41,7 @@ export default function AdminF1NewPage() {
     setSaving(true);
     try {
       const payload = { ...form };
+      if (payload.block_club_member_results) payload.allow_club_reference_times = true;
       if (!payload.event_id) payload.event_id = null;
       if (payload.unlimited_attempts) payload.max_attempts = null;
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
@@ -104,14 +105,45 @@ export default function AdminF1NewPage() {
             <input type="checkbox" checked={form.registration_enabled} onChange={(e) => set("registration_enabled", e.target.checked)} data-testid="f1-new-reg-enabled" className="accent-[#29B6E8] mt-1" />
             <span>Online-Einreichung auf der öffentlichen Seite anzeigen</span>
           </label>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 space-y-3">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Teilnahme & Vereins-Referenzzeiten</div>
+              <div className="text-xs text-white/50 mt-1">Für Challenges, die wir für externe Teilnehmer veranstalten: Vereinsmitglieder können dann nicht in die offizielle Wertung, aber optional Referenzzeiten außer Wertung setzen.</div>
+            </div>
             <label className="flex items-start gap-2 text-sm text-white/75">
-              <input type="checkbox" checked={form.block_club_member_results} onChange={(e) => set("block_club_member_results", e.target.checked)} data-testid="f1-new-club-reference-only" className="accent-[#29B6E8] mt-1" />
-              <span>Vereinsmitglieder nur als Referenzzeiten erlauben</span>
+              <input
+                type="checkbox"
+                checked={form.block_club_member_results}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setForm((f) => ({ ...f, block_club_member_results: checked, allow_club_reference_times: checked ? true : f.allow_club_reference_times }));
+                }}
+                data-testid="f1-new-club-reference-only"
+                className="accent-[#29B6E8] mt-1"
+              />
+              <span><strong className="text-white">Vereinsmitglieder aus offizieller Wertung ausschließen</strong><br /><span className="text-xs text-white/50">Wie bei externen Turnieren: Sie können nicht offiziell mitmachen.</span></span>
             </label>
             <label className="flex items-start gap-2 text-sm text-white/75">
-              <input type="checkbox" checked={form.show_club_reference_times} onChange={(e) => set("show_club_reference_times", e.target.checked)} data-testid="f1-new-show-club-reference" className="accent-[#29B6E8] mt-1" />
-              <span>Vereins-Referenzzeiten öffentlich anzeigen</span>
+              <input
+                type="checkbox"
+                checked={form.allow_club_reference_times}
+                disabled={form.block_club_member_results}
+                onChange={(e) => set("allow_club_reference_times", e.target.checked)}
+                data-testid="f1-new-allow-club-reference"
+                className="accent-[#29B6E8] mt-1 disabled:opacity-50"
+              />
+              <span><strong className="text-white">Vereins-Referenzzeiten erlauben</strong><br /><span className="text-xs text-white/50">Separater Bereich ohne Punkte, ohne Season-Wertung und ohne Achievements.</span></span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-white/75">
+              <input
+                type="checkbox"
+                checked={form.show_club_reference_times}
+                disabled={!form.allow_club_reference_times}
+                onChange={(e) => set("show_club_reference_times", e.target.checked)}
+                data-testid="f1-new-show-club-reference"
+                className="accent-[#29B6E8] mt-1 disabled:opacity-50"
+              />
+              <span><strong className="text-white">Referenzzeiten öffentlich anzeigen</strong><br /><span className="text-xs text-white/50">Zeigt die Top 3 Referenzzeiten öffentlich als Zielzeit zum Schlagen.</span></span>
             </label>
           </div>
         </div>

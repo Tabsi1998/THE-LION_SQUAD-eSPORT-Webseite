@@ -100,6 +100,17 @@ export default function F1DetailPage() {
               </div>
             </div>
           )}
+          {(challenge.block_club_member_results || challenge.allow_club_reference_times !== false) && (
+            <div className="mt-4 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm px-4 py-3 text-sm max-w-3xl">
+              <div className="font-bold uppercase tracking-wider text-xs text-[#FFD700]">Vereins-Referenzzeiten</div>
+              <div className="mt-1 text-white/60">
+                {challenge.block_club_member_results
+                  ? "Diese Challenge ist fuer externe Teilnehmer gewertet. Vereinsmitglieder erscheinen nur als Referenzzeiten ausser Wertung."
+                  : "Vereins-Referenzzeiten sind separat moeglich und zaehlen nicht zur offiziellen Rangliste."}
+                {challenge.show_club_reference_times === false && <span> Die Referenzen sind aktuell nur intern sichtbar.</span>}
+              </div>
+            </div>
+          )}
           <div className="mt-6 flex flex-wrap gap-3">
             <Link to={`/display/f1/${challenge.id}${activeTrack ? `?track=${activeTrack}` : ""}`} target="_blank" data-testid="f1-tv-link" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
               <Tv className="w-4 h-4" /> TV / Beamer Modus
