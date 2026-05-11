@@ -122,6 +122,18 @@ curl https://lionsquad.at/api/health
 docker compose ps
 ```
 
+Lokaler Schnellcheck vor Commit oder groesseren Deployments:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\quick-check.ps1
+```
+
+Fuer reine Backend-Aenderungen kann der Frontend-Build uebersprungen werden:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\quick-check.ps1 -SkipFrontendBuild
+```
+
 Weitere Details:
 
 - [UPDATE.md](UPDATE.md) fuer den normalen Update-Ablauf.

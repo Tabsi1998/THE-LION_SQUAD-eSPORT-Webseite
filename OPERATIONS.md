@@ -32,6 +32,16 @@ curl -fsS http://localhost:8001/api/health
 curl -I https://lionsquad.at
 ```
 
+Vor groesseren Updates lokal ausfuehren:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\quick-check.ps1
+```
+
+Der Schnellcheck kompiliert kritische Backend-Dateien, fuehrt die Match-V2-Unit-Tests aus
+und baut das Frontend. Bei reinen Backend-Aenderungen kann `-SkipFrontendBuild` genutzt
+werden.
+
 Im Admin:
 
 - `Einstellungen -> Status`
