@@ -4,6 +4,8 @@ import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { MentionTextarea } from "@/components/tls/MentionTextarea";
+import { MentionText } from "@/components/tls/MentionText";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
@@ -341,7 +343,7 @@ function TeamChat({ team, user }) {
                     <span className={mine ? "text-[#29B6E8]" : "text-white/55"}>{message.author?.display_name || message.author?.username || "Benutzer"}</span>
                     {message.created_at && <span>{new Date(message.created_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}</span>}
                   </div>
-                  <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85">{message.message}</div>
+                  <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85"><MentionText text={message.message} /></div>
                 </div>
               </div>
             );
@@ -349,18 +351,22 @@ function TeamChat({ team, user }) {
           {messages.length === 0 && <div className="text-center py-10 text-sm text-white/35">Noch keine Nachrichten im Team-Chat.</div>}
         </div>
         <div className="border-t border-white/10 p-3 flex gap-2">
-          <input
+          <MentionTextarea
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onValueChange={setText}
+            scope="team"
+            scopeId={team.id}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 send();
               }
             }}
+            rows={1}
             maxLength={1500}
             placeholder="Nachricht schreiben, mit @username erwähnen..."
-            className="flex-1 min-w-0 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"
+            className="flex-1 min-w-0"
+            textareaClassName="h-10 max-h-28 w-full resize-none bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-[#29B6E8]"
           />
           <button type="button" onClick={send} disabled={loading || !text.trim()} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
             <Send className="w-3.5 h-3.5" /> Senden

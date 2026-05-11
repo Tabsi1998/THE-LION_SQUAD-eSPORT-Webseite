@@ -1,4 +1,5 @@
 """News, Sponsors & Gallery routes — Vereins-CMS Phase 3."""
+import re
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from datetime import datetime, timezone
@@ -18,6 +19,8 @@ from models import (
 
 router = APIRouter(prefix="/api", tags=["news"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
+PROFILE_LINK_RE = re.compile(r"/u/([A-Za-z0-9_.-]{2,32})")
 
 
 # ---------- Visibility helper (delegates to shared module) ----------
@@ -75,6 +78,41 @@ def _parse_dt(value):
 def _published_now(post: dict) -> bool:
     published_at = _parse_dt(post.get("published_at"))
     return not published_at or published_at <= now_utc()
+
+
+async def _mentioned_user_ids_from_content(content: str | None, explicit_ids: list[str] | None = None) -> list[str]:
+    handles: list[str] = []
+    seen_handles: set[str] = set()
+    for regex in (MENTION_RE, PROFILE_LINK_RE):
+        for match in regex.findall(content or ""):
+            handle = str(match or "").strip()
+            lower = handle.lower()
+            if handle and lower not in seen_handles:
+                seen_handles.add(lower)
+                handles.append(handle)
+
+    db = get_db()
+    ordered_ids: list[str] = []
+    for user_id in explicit_ids or []:
+        if user_id and user_id not in ordered_ids:
+            ordered_ids.append(user_id)
+    if not handles:
+        return ordered_ids
+
+    users = await db.users.find(
+        {
+            "is_active": True,
+            "is_banned": {"$ne": True},
+            "$or": [{"username": {"$regex": f"^{re.escape(handle)}$", "$options": "i"}} for handle in handles],
+        },
+        {"_id": 0, "id": 1, "username": 1},
+    ).to_list(100)
+    by_username = {(user.get("username") or "").lower(): user["id"] for user in users}
+    for handle in handles:
+        user_id = by_username.get(handle.lower())
+        if user_id and user_id not in ordered_ids:
+            ordered_ids.append(user_id)
+    return ordered_ids
 
 
 # ---------- News ----------
@@ -175,6 +213,7 @@ async def create_news(body: NewsCreate, me: dict = Depends(require_admin())):
     doc = body.model_dump()
     if doc.get("published_at"):
         doc["published_at"] = doc["published_at"].isoformat()
+    doc["mentioned_user_ids"] = await _mentioned_user_ids_from_content(doc.get("content"), doc.get("mentioned_user_ids") or [])
     doc["id"] = new_id()
     created_at = now_utc().isoformat()
     doc["created_at"] = created_at
@@ -212,6 +251,12 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_adm
         raise HTTPException(400, "Keine Änderungen.")
     if update.get("published_at"):
         update["published_at"] = update["published_at"].isoformat()
+    if "content" in update or "mentioned_user_ids" in update:
+        next_content = update.get("content", existing.get("content"))
+        update["mentioned_user_ids"] = await _mentioned_user_ids_from_content(
+            next_content,
+            update.get("mentioned_user_ids", existing.get("mentioned_user_ids") or []),
+        )
     if update.get("published") is True and "published_at" not in update:
         existing = await db.news_posts.find_one({"id": nid}, {"_id": 0, "published_at": 1})
         if existing and not existing.get("published_at"):

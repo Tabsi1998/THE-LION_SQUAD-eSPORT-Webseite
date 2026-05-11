@@ -24,13 +24,20 @@ function sanitizeHref(rawHref) {
   }
 }
 
-function formatInlineText(rawText) {
-  return escapeHtml(rawText)
+function linkMentions(html) {
+  return html.replace(/(^|[^A-Za-z0-9_.-])@([A-Za-z0-9_.-]{2,32})/g, (match, prefix, username) => (
+    `${prefix}<a href="/u/${encodeURIComponent(username)}" class="mention-link">@${username}</a>`
+  ));
+}
+
+function formatInlineText(rawText, options = {}) {
+  const html = escapeHtml(rawText)
     .replace(/`(.+?)`/g, "<code>$1</code>")
     .replace(/~~(.+?)~~/g, "<del>$1</del>")
     .replace(/\+\+(.+?)\+\+/g, "<u>$1</u>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>");
+  return options.linkMentions === false ? html : linkMentions(html);
 }
 
 function renderInline(rawText) {
@@ -42,7 +49,7 @@ function renderInline(rawText) {
   while ((match = linkPattern.exec(rawText)) !== null) {
     html += formatInlineText(rawText.slice(lastIndex, match.index));
     const isImage = match[1] === "!";
-    const label = formatInlineText(match[2]);
+    const label = formatInlineText(match[2], { linkMentions: false });
     const href = sanitizeHref(match[3]);
     if (href && isImage) {
       html += `<img src="${escapeHtml(href)}" alt="${escapeHtml(match[2])}" loading="lazy"/>`;

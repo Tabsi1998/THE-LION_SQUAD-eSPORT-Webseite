@@ -1,4 +1,5 @@
 """Tournament + bracket routes."""
+import re
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from datetime import datetime, timezone
@@ -29,10 +30,12 @@ from bracket_engine import generate_bracket, compute_round_robin_standings
 from bracket_extensions import (
     generate_swiss_round, compute_swiss_standings, generate_groups, compute_group_standings,
 )
+from services.user_notifications import create_user_notification
 
 router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 REGISTRATION_CHECKIN_STATUSES = {"approved", "checked_in", "no_show"}
+MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 
 
 class TournamentChatCreate(BaseModel):
@@ -126,6 +129,57 @@ async def _can_use_tournament_chat(tournament: dict, user: dict | None) -> bool:
         {"id": 1},
     )
     return bool(team_registration)
+
+
+def _user_label(user: dict | None) -> str:
+    return (user or {}).get("display_name") or (user or {}).get("username") or "Benutzer"
+
+
+async def _tournament_chat_user_ids(db, tid: str) -> set[str]:
+    regs = await db.tournament_registrations.find(
+        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+        {"_id": 0, "user_id": 1, "team_id": 1},
+    ).to_list(1000)
+    user_ids = {row.get("user_id") for row in regs if row.get("user_id")}
+    team_ids = {row.get("team_id") for row in regs if row.get("team_id")}
+    if team_ids:
+        teams = await db.teams.find({"id": {"$in": list(team_ids)}}, {"_id": 0, "member_ids": 1}).to_list(500)
+        for team in teams:
+            user_ids.update(team.get("member_ids") or [])
+    staff_rows = await db.tournament_staff_assignments.find(
+        {"tournament_id": tid, "is_active": {"$ne": False}},
+        {"_id": 0, "user_id": 1},
+    ).to_list(500)
+    user_ids.update(row.get("user_id") for row in staff_rows if row.get("user_id"))
+    return {user_id for user_id in user_ids if user_id}
+
+
+async def _notify_tournament_mentions(db, tournament: dict, sender: dict, message: dict) -> None:
+    handles = {m.lower() for m in MENTION_RE.findall(message.get("message") or "")}
+    if not handles:
+        return
+    candidates = await db.users.find(
+        {
+            "is_active": True,
+            "is_banned": {"$ne": True},
+            "$or": [{"username": {"$regex": f"^{re.escape(handle)}$", "$options": "i"}} for handle in handles],
+        },
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "role": 1},
+    ).to_list(100)
+    allowed_ids = await _tournament_chat_user_ids(db, tournament["id"])
+    for member in candidates:
+        if member.get("id") == sender.get("id"):
+            continue
+        if member.get("id") not in allowed_ids and member.get("role") not in STAFF_ROLES:
+            continue
+        await create_user_notification(
+            member["id"],
+            title=f"Erwähnung im Turnier-Chat: {tournament.get('title')}",
+            body=f"{_user_label(sender)} hat dich erwähnt: {(message.get('message') or '')[:140]}",
+            url=f"/tournaments/{tournament.get('slug') or tournament['id']}",
+            kind="tournament_chat_mention",
+            meta={"tournament_id": tournament["id"], "message_id": message["id"]},
+        )
 
 
 async def _get_visible_tournament(tid: str, user: dict | None) -> dict:
@@ -494,6 +548,7 @@ async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = 
         "updated_at": now,
     }
     await db.tournament_chat_messages.insert_one(doc)
+    await _notify_tournament_mentions(db, tournament, me, doc)
     doc.pop("_id", None)
     doc["author"] = {
         "id": me.get("id"),

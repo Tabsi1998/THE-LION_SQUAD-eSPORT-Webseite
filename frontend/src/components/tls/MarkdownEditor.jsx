@@ -40,6 +40,7 @@ import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
 import { prepareImageForUpload } from "@/components/tls/ImageUpload";
+import { MentionSuggestionList, MentionTextarea, mentionTriggerAt, useMentionSearch } from "@/components/tls/MentionTextarea";
 
 function normalizeMarkdown(value) {
   return String(value || "")
@@ -219,6 +220,9 @@ export function MarkdownEditor({
   libraryEndpoint,
   uploadEndpoint = "/uploads/image",
   mediaScope,
+  mentionsEnabled = true,
+  mentionScope,
+  mentionScopeId,
 }) {
   const [mode, setMode] = useState("visual");
   const [htmlInput, setHtmlInput] = useState("");
@@ -226,10 +230,62 @@ export function MarkdownEditor({
   const [mediaLoading, setMediaLoading] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const [media, setMedia] = useState([]);
+  const [visualMention, setVisualMention] = useState(null);
+  const [visualMentionIndex, setVisualMentionIndex] = useState(0);
   const imageInputRef = useRef(null);
   const prompt = usePrompt();
   const syncingRef = useRef(false);
   const preview = useMemo(() => renderMarkdownLite(value), [value]);
+  const mentionSearch = useMentionSearch(mentionsEnabled ? visualMention?.query || "" : "", {
+    scope: mentionScope,
+    scopeId: mentionScopeId,
+  });
+
+  function refreshVisualMention(nextEditor = editor) {
+    if (!mentionsEnabled || !nextEditor || mode !== "visual") {
+      setVisualMention(null);
+      return;
+    }
+    const { selection } = nextEditor.state;
+    if (!selection.empty) {
+      setVisualMention(null);
+      return;
+    }
+    const from = selection.$from;
+    const before = from.parent.textBetween(0, from.parentOffset, "\n", "\n");
+    const trigger = mentionTriggerAt(before, before.length);
+    if (!trigger) {
+      setVisualMention(null);
+      return;
+    }
+    setVisualMention({ query: trigger.query, from: from.pos - trigger.query.length - 1, to: from.pos });
+    setVisualMentionIndex(0);
+  }
+
+  function insertVisualMention(user) {
+    if (!editor || !visualMention) return;
+    editor.chain().focus().insertContentAt({ from: visualMention.from, to: visualMention.to }, `@${user.username} `).run();
+    setVisualMention(null);
+  }
+
+  function handleVisualKeyDown(event) {
+    const open = !!visualMention && (mentionSearch.loading || mentionSearch.items.length > 0);
+    if (!open || !["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === "Escape") {
+      setVisualMention(null);
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      setVisualMentionIndex((index) => Math.min(index + 1, Math.max(mentionSearch.items.length - 1, 0)));
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      setVisualMentionIndex((index) => Math.max(index - 1, 0));
+      return;
+    }
+    if (mentionSearch.items[visualMentionIndex]) insertVisualMention(mentionSearch.items[visualMentionIndex]);
+  }
 
   const editor = useEditor({
     extensions: [
@@ -420,17 +476,32 @@ export function MarkdownEditor({
         </div>
       </div>
 
-      {mode === "visual" && <EditorContent editor={editor} />}
+      {mode === "visual" && (
+        <div className="relative" onKeyDown={handleVisualKeyDown} onKeyUp={() => refreshVisualMention()} onMouseUp={() => refreshVisualMention()}>
+          <EditorContent editor={editor} />
+          {!!visualMention && (mentionSearch.loading || mentionSearch.items.length > 0) && (
+            <MentionSuggestionList
+              items={mentionSearch.items}
+              loading={mentionSearch.loading}
+              activeIndex={visualMentionIndex}
+              onPick={insertVisualMention}
+              className="absolute left-3 top-3"
+            />
+          )}
+        </div>
+      )}
 
       {mode === "markdown" && (
-        <textarea
+        <MentionTextarea
           value={value || ""}
-          onChange={(e) => onChange(e.target.value)}
+          onValueChange={onChange}
+          scope={mentionScope}
+          scopeId={mentionScopeId}
           rows={rows}
           required={required}
           placeholder={placeholder}
           data-testid={testId ? `${testId}-markdown` : "markdown-editor-source"}
-          className="w-full bg-[#0A0A0A] px-3 py-3 text-sm font-mono text-white focus:outline-none resize-y min-h-40"
+          textareaClassName="w-full bg-[#0A0A0A] px-3 py-3 text-sm font-mono text-white focus:outline-none resize-y min-h-40"
         />
       )}
 

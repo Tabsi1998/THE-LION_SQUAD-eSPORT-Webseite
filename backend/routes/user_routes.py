@@ -241,6 +241,72 @@ async def list_users(q: str | None = None, role: str | None = None,
     return users
 
 
+@router.get("/mention-search")
+async def mention_search(
+    q: str | None = None,
+    scope: str | None = None,
+    scope_id: str | None = None,
+    me: dict = Depends(get_current_user),
+):
+    db = get_db()
+    needle = (q or "").strip().lstrip("@")
+    if len(needle) < 1:
+        return []
+
+    query: dict = {"is_active": True, "is_banned": {"$ne": True}}
+    scope_key = (scope or "").strip().lower()
+    staff = me.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
+
+    if scope_key == "team":
+        team = await db.teams.find_one({"id": scope_id}, {"_id": 0, "member_ids": 1, "leader_id": 1, "co_leader_ids": 1})
+        if not team:
+            raise HTTPException(status_code=404, detail="Team nicht gefunden")
+        member_ids = team.get("member_ids") or []
+        can_see = staff or me["id"] in member_ids or team.get("leader_id") == me["id"] or me["id"] in (team.get("co_leader_ids") or [])
+        if not can_see:
+            raise HTTPException(status_code=403, detail="Keine Berechtigung")
+        query["id"] = {"$in": member_ids}
+    elif scope_key == "tournament":
+        tournament = await db.tournaments.find_one({"id": scope_id}, {"_id": 0, "id": 1})
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+        regs = await db.tournament_registrations.find(
+            {"tournament_id": scope_id, "status": {"$in": ["approved", "checked_in"]}},
+            {"_id": 0, "user_id": 1, "team_id": 1},
+        ).to_list(1000)
+        reg_user_ids = {row.get("user_id") for row in regs if row.get("user_id")}
+        reg_team_ids = {row.get("team_id") for row in regs if row.get("team_id")}
+        team_member_ids: set[str] = set()
+        if reg_team_ids:
+            team_rows = await db.teams.find(
+                {"id": {"$in": list(reg_team_ids)}},
+                {"_id": 0, "member_ids": 1},
+            ).to_list(500)
+            for team_row in team_rows:
+                team_member_ids.update(team_row.get("member_ids") or [])
+        staff_rows = await db.tournament_staff_assignments.find(
+            {"tournament_id": scope_id, "is_active": {"$ne": False}},
+            {"_id": 0, "user_id": 1},
+        ).to_list(500)
+        tournament_user_ids = reg_user_ids | team_member_ids | {row.get("user_id") for row in staff_rows if row.get("user_id")}
+        if not staff and me["id"] not in tournament_user_ids:
+            raise HTTPException(status_code=403, detail="Keine Berechtigung")
+        query["id"] = {"$in": list(tournament_user_ids)}
+    elif not staff:
+        query["privacy_public_profile"] = True
+
+    escaped = re.escape(needle)
+    query["$or"] = [
+        {"username": {"$regex": escaped, "$options": "i"}},
+        {"display_name": {"$regex": escaped, "$options": "i"}},
+    ]
+    users = await db.users.find(
+        query,
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
+    ).sort("username", 1).to_list(12)
+    return users
+
+
 @router.post("")
 async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_super())):
     db = get_db()
