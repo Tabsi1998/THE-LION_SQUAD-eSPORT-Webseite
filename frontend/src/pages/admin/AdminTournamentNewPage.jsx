@@ -49,12 +49,15 @@ export default function AdminTournamentNewPage() {
   useApiInvalidation(loadSources, ["games", "events"]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setTeamMode = (value) => setForm((f) => ({ ...f, team_mode: value, team_size: value === "solo" ? 1 : Math.max(2, Number(f.team_size) || 2) }));
 
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
       const payload = { ...form };
+      payload.team_mode = payload.team_mode === "solo" ? "solo" : "team";
+      payload.team_size = payload.team_mode === "solo" ? 1 : Number(payload.team_size || 2);
       if (!payload.event_id) delete payload.event_id;
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
       // Filter empty prize places
@@ -126,12 +129,12 @@ export default function AdminTournamentNewPage() {
           <Select label="Event" value={form.event_id || ""} onChange={(v) => set("event_id", v)} options={[["", "— keins —"], ...events.map((e) => [e.id, e.name])]} testId="new-tr-event" />
         </Row>
         <Row>
-          <Select label="Modus" value={form.team_mode} onChange={(v) => set("team_mode", v)} options={[["solo", "Solo"], ["duo", "Duo"], ["team", "Team"], ["squad", "Squad"]]} testId="new-tr-mode" />
-          <Field label="Teamgröße" type="number" value={form.team_size} onChange={(v) => set("team_size", Number(v))} testId="new-tr-team-size" />
+          <Select label="Teilnahme" value={form.team_mode} onChange={setTeamMode} options={[["solo", "Einzelspieler"], ["team", "Team"]]} testId="new-tr-mode" />
+          {form.team_mode === "team" && <Field label="Spieler pro Team" type="number" min="2" max="6" value={form.team_size} onChange={(v) => set("team_size", Number(v))} testId="new-tr-team-size" />}
         </Row>
         <Row>
-          <Field label="Max Teilnehmer" type="number" value={form.max_participants} onChange={(v) => set("max_participants", Number(v))} testId="new-tr-max" />
-          <Field label="Min Teilnehmer" type="number" value={form.min_participants} onChange={(v) => set("min_participants", Number(v))} testId="new-tr-min" />
+          <Field label={form.team_mode === "team" ? "Max Teams" : "Max Spieler"} type="number" value={form.max_participants} onChange={(v) => set("max_participants", Number(v))} testId="new-tr-max" />
+          <Field label={form.team_mode === "team" ? "Min Teams" : "Min Spieler"} type="number" value={form.min_participants} onChange={(v) => set("min_participants", Number(v))} testId="new-tr-min" />
         </Row>
         <Row>
           <Field label="Best of" type="number" value={form.best_of} onChange={(v) => set("best_of", Number(v))} testId="new-tr-bestof" />
@@ -204,11 +207,11 @@ export default function AdminTournamentNewPage() {
 }
 
 function Row({ children }) { return <div className="grid md:grid-cols-2 gap-4">{children}</div>; }
-function Field({ label, value, onChange, type = "text", required, placeholder, testId }) {
+function Field({ label, value, onChange, type = "text", required, placeholder, testId, min, max }) {
   return (
     <label className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <input type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} required={required} placeholder={placeholder} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white focus:outline-none" />
+      <input type={type} min={min} max={max} value={value ?? ""} onChange={(e) => onChange(e.target.value)} required={required} placeholder={placeholder} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white focus:outline-none" />
     </label>
   );
 }

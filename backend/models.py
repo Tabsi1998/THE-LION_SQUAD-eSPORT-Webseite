@@ -389,7 +389,7 @@ TournamentStatus = Literal[
     "check_in", "live", "paused", "completed", "results_published",
     "archived", "cancelled",
 ]
-TeamMode = Literal["solo", "duo", "team", "squad"]
+TeamMode = Literal["solo", "team"]
 StreamPlatform = Literal["twitch", "youtube", "kick", "custom"]
 
 

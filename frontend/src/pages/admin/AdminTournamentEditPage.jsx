@@ -52,7 +52,7 @@ const TOURNAMENT_FORMAT_OPTIONS = [
   ["grand_prix", "Rennserie"],
 ];
 
-const TEAM_MODE_OPTIONS = [["solo", "Einzelspieler"], ["duo", "Duo-Team"], ["team", "Team"], ["squad", "Squad / Gruppe"]];
+const TEAM_MODE_OPTIONS = [["solo", "Einzelspieler"], ["team", "Team"]];
 const SEEDING_OPTIONS = [["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]];
 const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
 const STREAM_PLATFORM_OPTIONS = [["", "—"], ["twitch", "Twitch"], ["youtube", "YouTube"], ["kick", "Kick"], ["custom", "Eigene Plattform"]];
@@ -1149,8 +1149,8 @@ function TournamentEditForm({ tournament, onSaved }) {
     event_id: tournament.event_id || "",
     format: tournament.format || "single_elim",
     status: tournament.status || "draft",
-    team_mode: tournament.team_mode || "solo",
-    team_size: tournament.team_size || 1,
+    team_mode: tournament.team_mode === "solo" ? "solo" : "team",
+    team_size: tournament.team_mode === "solo" ? 1 : (tournament.team_size || 2),
     substitutes_allowed: !!tournament.substitutes_allowed,
     rules: tournament.rules || "",
     prize_pool: tournament.prize_pool || "",
@@ -1189,6 +1189,11 @@ function TournamentEditForm({ tournament, onSaved }) {
     api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(() => setEvents([]));
   }, []);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
+  const setTeamMode = (value) => setF((current) => ({
+    ...current,
+    team_mode: value,
+    team_size: value === "solo" ? 1 : Math.max(2, Number(current.team_size) || 2),
+  }));
   const save = async () => {
     try {
       const payload = { ...f };
@@ -1242,13 +1247,13 @@ function TournamentEditForm({ tournament, onSaved }) {
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
         <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Struktur</div>
         <p className="text-xs text-white/50">
-          Teilnahme legt fest, wer sich anmelden darf: Einzelspieler melden sich selbst an, bei Duo/Team/Squad meldet ein Team-Leader oder Co-Leader das Team an.
+          Teilnahme legt fest, wer sich anmelden darf: Einzelspieler melden sich selbst an, bei Team meldet ein Team-Leader oder Co-Leader das Team an.
         </p>
         <div className="grid md:grid-cols-3 gap-3">
           <SelectField label="Format" value={f.format} onChange={(v)=>set("format",v)} options={TOURNAMENT_FORMAT_OPTIONS} />
-          <SelectField label="Teilnahme" value={f.team_mode} onChange={(v)=>set("team_mode",v)} options={TEAM_MODE_OPTIONS} />
+          <SelectField label="Teilnahme" value={f.team_mode} onChange={setTeamMode} options={TEAM_MODE_OPTIONS} />
           <SelectField label="Seeding" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} />
-          {f.team_mode !== "solo" && <Fld label="Spieler pro Team" type="number" value={f.team_size} onChange={(v)=>set("team_size",v)} testId="tr-edit-team-size"/>}
+          {f.team_mode !== "solo" && <Fld label="Spieler pro Team" type="number" min="2" max="6" value={f.team_size} onChange={(v)=>set("team_size",v)} testId="tr-edit-team-size"/>}
           <Fld label={f.team_mode === "solo" ? "Min Spieler" : "Min Teams"} type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>
           <Fld label={f.team_mode === "solo" ? "Max Spieler" : "Max Teams"} type="number" value={f.max_participants} onChange={(v)=>set("max_participants",v)} testId="tr-edit-max"/>
           <Fld label="Best of" type="number" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"/>
@@ -1480,8 +1485,8 @@ function MatchResultControls({ match, a, b, onSave }) {
   );
 }
 
-function Fld({ label, value, onChange, type="text", testId }) {
-  return (<label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><input type={type} value={value ?? ""} onChange={(e)=>onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"/></label>);
+function Fld({ label, value, onChange, type="text", testId, min, max }) {
+  return (<label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><input type={type} min={min} max={max} value={value ?? ""} onChange={(e)=>onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"/></label>);
 }
 function Txt({ label, value, onChange, testId }) {
   return (<div className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><MarkdownEditor value={value ?? ""} onChange={onChange} rows={5} testId={testId} /></div>);

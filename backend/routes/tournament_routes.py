@@ -221,6 +221,22 @@ def _is_team_tournament(tournament: dict) -> bool:
     return (tournament.get("team_mode") or "solo") != "solo"
 
 
+def _normalize_team_settings(doc: dict) -> dict:
+    mode = doc.get("team_mode") or "solo"
+    if mode not in {"solo", "team"}:
+        raise HTTPException(status_code=422, detail="Teilnahme muss 'solo' oder 'team' sein")
+    if mode == "solo":
+        doc["team_mode"] = "solo"
+        doc["team_size"] = 1
+        return doc
+    team_size = int(doc.get("team_size") or 2)
+    if team_size < 2 or team_size > 6:
+        raise HTTPException(status_code=422, detail="Spieler pro Team muss zwischen 2 und 6 liegen")
+    doc["team_mode"] = "team"
+    doc["team_size"] = team_size
+    return doc
+
+
 def _can_register_team(team: dict, user: dict) -> bool:
     return (
         team.get("leader_id") == user["id"]
@@ -653,6 +669,9 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
             raise HTTPException(status_code=409, detail="Slug bereits vergeben")
     if body.game_id and not await db.games.find_one({"id": body.game_id}, {"id": 1}):
         raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
+    existing = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     raw_updates = body.model_dump(exclude_unset=True)
     nullable_fields = {
         "description", "platform", "event_id", "registration_open_from",
@@ -662,6 +681,13 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         "banner_url", "stream_platform", "stream_url", "stream_title",
     }
     updates = {k: v for k, v in raw_updates.items() if v is not None or k in nullable_fields}
+    if "team_mode" in updates or "team_size" in updates:
+        normalized_team_settings = _normalize_team_settings({
+            "team_mode": updates.get("team_mode", existing.get("team_mode") or "solo"),
+            "team_size": updates.get("team_size", existing.get("team_size") or 1),
+        })
+        updates["team_mode"] = normalized_team_settings["team_mode"]
+        updates["team_size"] = normalized_team_settings["team_size"]
     for k in ["registration_open_from", "registration_open_until", "check_in_from",
               "check_in_until", "start_date", "end_date"]:
         if k in updates:
@@ -1042,7 +1068,7 @@ async def create_tournament_staff(tid: str, body: TournamentStaffAssignmentCreat
     })
     if existing:
         raise HTTPException(status_code=409, detail="Diese Zuweisung existiert bereits")
-    doc = body.model_dump()
+    doc = _normalize_team_settings(body.model_dump())
     doc["id"] = new_id()
     doc["tournament_id"] = tid
     doc["scope"] = scope
