@@ -134,3 +134,17 @@ async def mark_all_read(me: dict = Depends(get_current_user)):
     db = get_db()
     await db.notifications.update_many({"user_id": me["id"], "read": {"$ne": True}}, {"$set": {"read": True}})
     return {"ok": True}
+
+
+@router.delete("/notifications/read")
+async def delete_read_notifications(me: dict = Depends(get_current_user)):
+    db = get_db()
+    result = await db.notifications.delete_many({"user_id": me["id"], "read": True})
+    return {"ok": True, "deleted": result.deleted_count}
+
+
+@router.delete("/notifications/{nid}")
+async def delete_notification(nid: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    result = await db.notifications.delete_one({"id": nid, "user_id": me["id"]})
+    return {"ok": True, "deleted": result.deleted_count}
