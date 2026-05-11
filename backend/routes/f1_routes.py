@@ -30,6 +30,16 @@ def _validate_penalty_note(penalty_seconds: float, is_invalid: bool, admin_note:
             )
 
 
+def _max_attempts(challenge: dict) -> int | None:
+    if challenge.get("unlimited_attempts") is not False:
+        return None
+    try:
+        value = int(challenge.get("max_attempts") or 0)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
 router = APIRouter(prefix="/api/f1", tags=["f1"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 
@@ -515,6 +525,13 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_r
     else:
         attempt_query["$or"] = [{"score_scope": {"$exists": False}}, {"score_scope": "official"}]
     attempt_count = await db.f1_lap_times.count_documents(attempt_query)
+    max_attempts = _max_attempts(c)
+    if max_attempts is not None and attempt_count >= max_attempts:
+        scope_label = "Referenzzeiten" if score_scope == "club_reference" else "offizielle Zeiten"
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximale Anzahl Versuche erreicht ({max_attempts}) fuer {scope_label}.",
+        )
     doc = {
         "id": new_id(),
         "challenge_id": cid,

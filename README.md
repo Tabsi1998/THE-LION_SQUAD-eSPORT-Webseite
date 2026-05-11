@@ -374,6 +374,9 @@ Fast-Lap-Challenges haben drei getrennte Einstellungen:
 - `Referenzzeiten oeffentlich anzeigen`: zeigt die Top-3-Referenzzeiten auf der Challenge-
   und TV-Ansicht. Wenn deaktiviert, bleiben sie nur im Admin sichtbar.
 
+Wenn `Unbegrenzte Versuche` deaktiviert ist, erzwingt die API das eingestellte
+Versuchslimit getrennt fuer offizielle Zeiten und Referenzzeiten.
+
 Unterstuetzt fuer Bilder:
 
 - PNG
