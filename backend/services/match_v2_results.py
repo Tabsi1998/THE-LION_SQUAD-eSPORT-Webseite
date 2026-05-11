@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any
+from collections import defaultdict
 
 
 class MatchV2ResultError(ValueError):
@@ -133,6 +134,29 @@ def _find_slot(match: dict, slot_number: int) -> dict | None:
     return None
 
 
+def _downstream_links(stage_matches: list[dict]) -> dict[str, list[tuple[str, int]]]:
+    links: dict[str, list[tuple[str, int]]] = defaultdict(list)
+    for match in stage_matches:
+        match_id = match.get("id")
+        if not match_id:
+            continue
+        for slot in match.get("slots") or []:
+            source = slot.get("source_result") or {}
+            source_match_id = source.get("from_match_id")
+            if source_match_id:
+                links[source_match_id].append((match_id, int(slot.get("slot") or 0)))
+    return links
+
+
+def _clear_slot(slot: dict) -> bool:
+    had_value = bool(slot.get("registration_id") or slot.get("user_id") or slot.get("source_result"))
+    slot["registration_id"] = None
+    slot["user_id"] = None
+    slot["source_result"] = None
+    slot["status"] = "pending"
+    return had_value
+
+
 def _status_after_slot_fill(match: dict, preserve_terminal: bool = True) -> str:
     current = match.get("status") or "pending"
     if preserve_terminal and current in {"completed", "forfeit", "cancelled"}:
@@ -144,6 +168,55 @@ def _status_after_slot_fill(match: dict, preserve_terminal: bool = True) -> str:
     if not pending and len(filled) >= min_players:
         return "ready"
     return "pending"
+
+
+def _reset_match_result_state(match: dict, target_sets: dict[str, dict], now_iso: str) -> None:
+    target_sets.setdefault(match["id"], {})
+    target_sets[match["id"]].update({
+        "results": [],
+        "result_meta": None,
+        "completed_at": None,
+        "completed_by": None,
+        "status": _status_after_slot_fill(match, preserve_terminal=False),
+        "updated_at": now_iso,
+    })
+
+
+def _cascade_clear_downstream(
+    source_match_id: str,
+    by_id: dict[str, dict],
+    downstream: dict[str, list[tuple[str, int]]],
+    target_sets: dict[str, dict],
+    now_iso: str,
+    visited: set[str] | None = None,
+) -> None:
+    visited = visited or set()
+    if source_match_id in visited:
+        return
+    visited.add(source_match_id)
+
+    for child_id, slot_number in downstream.get(source_match_id, []):
+        child = by_id.get(child_id)
+        if not child:
+            continue
+        slots = target_sets.get(child_id, {}).get("slots") or child.get("slots") or []
+        slot = _find_slot({"slots": slots}, slot_number)
+        if not slot:
+            continue
+        source = slot.get("source_result") or {}
+        if source.get("from_match_id") != source_match_id:
+            continue
+        if not _clear_slot(slot):
+            continue
+        child["slots"] = slots
+        target_sets.setdefault(child_id, {})
+        target_sets[child_id].update({
+            "slots": slots,
+            "status": _status_after_slot_fill(child, preserve_terminal=False),
+            "updated_at": now_iso,
+        })
+        _reset_match_result_state(child, target_sets, now_iso)
+        _cascade_clear_downstream(child_id, by_id, downstream, target_sets, now_iso, visited)
 
 
 def build_v2_result_application(
@@ -164,8 +237,9 @@ def build_v2_result_application(
     results = normalize_v2_results(match, raw_results)
     result_by_rank = {entry["rank"]: entry for entry in results}
     by_id, by_key = _target_lookup(stage_matches)
+    downstream = _downstream_links(stage_matches)
     target_sets: dict[str, dict] = {}
-    touched_targets: set[str] = set()
+    overwritten_targets: set[str] = set()
 
     for advancement in match.get("advancement") or []:
         target = by_id.get(advancement.get("to_match_id")) or by_key.get(advancement.get("to_match_key"))
@@ -185,8 +259,9 @@ def build_v2_result_application(
                     f"Zielslot {target.get('match_key')}:{target_slot.get('slot')} ist bereits belegt. Fuer Korrektur force=true nutzen.",
                     409,
                 )
+            overwritten_targets.add(target["id"])
             if target.get("status") in LOCKED_DOWNSTREAM_STATUSES:
-                touched_targets.add(target["id"])
+                overwritten_targets.add(target["id"])
 
         target_slot["registration_id"] = result["registration_id"]
         target_slot["user_id"] = result.get("user_id")
@@ -205,16 +280,11 @@ def build_v2_result_application(
         }
 
     if force:
-        for target_id in touched_targets:
-            target_sets.setdefault(target_id, {})
-            target_sets[target_id].update({
-                "results": [],
-                "result_meta": None,
-                "completed_at": None,
-                "completed_by": None,
-                "status": _status_after_slot_fill(by_id[target_id], preserve_terminal=False),
-                "updated_at": now_iso,
-            })
+        for target_id in overwritten_targets:
+            target = by_id[target_id]
+            if target.get("status") in LOCKED_DOWNSTREAM_STATUSES or target.get("results"):
+                _reset_match_result_state(target, target_sets, now_iso)
+            _cascade_clear_downstream(target_id, by_id, downstream, target_sets, now_iso)
 
     match_set = {
         "results": results,

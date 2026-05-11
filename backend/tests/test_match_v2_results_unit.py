@@ -120,3 +120,38 @@ def test_v2_result_application_allows_forced_downstream_correction():
     assert application["target_sets"]["m-b"]["results"] == []
     assert application["target_sets"]["m-b"]["status"] == "ready"
     assert application["match_set"]["result_meta"]["force"] is True
+
+
+def test_v2_result_application_force_clears_dependent_downstream_slots():
+    source = _source_match()
+    winner_target = _target("m-b", "B")
+    winner_target["status"] = "completed"
+    winner_target["results"] = [{"registration_id": "old-reg", "rank": 1}]
+    winner_target["slots"][0]["registration_id"] = "old-reg"
+    winner_target["slots"][0]["status"] = "filled"
+
+    downstream_target = _target("m-c", "C")
+    downstream_target["status"] = "completed"
+    downstream_target["results"] = [{"registration_id": "old-reg", "rank": 1}]
+    downstream_target["slots"][0].update({
+        "registration_id": "old-reg",
+        "user_id": "old-user",
+        "status": "filled",
+        "source_result": {"from_match_id": "m-b", "rank": 1},
+    })
+
+    application = build_v2_result_application(
+        source,
+        [source, winner_target, _target("m-l", "L"), downstream_target],
+        RESULTS,
+        actor_id="admin",
+        now_iso="2026-05-08T12:00:00+00:00",
+        force=True,
+    )
+
+    assert application["target_sets"]["m-b"]["slots"][0]["registration_id"] == "r2"
+    assert application["target_sets"]["m-b"]["results"] == []
+    assert application["target_sets"]["m-c"]["slots"][0]["registration_id"] is None
+    assert application["target_sets"]["m-c"]["slots"][0]["source_result"] is None
+    assert application["target_sets"]["m-c"]["results"] == []
+    assert application["target_sets"]["m-c"]["status"] == "pending"
