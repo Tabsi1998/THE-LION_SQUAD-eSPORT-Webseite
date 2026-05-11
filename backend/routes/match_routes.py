@@ -15,6 +15,7 @@ from models import (
     MatchChatCreate,
     MatchScheduleProposalCreate,
     MatchScheduleProposalDecision,
+    MatchV2ResultSubmit,
     MatchUpdate,
     MatchScoreReport,
     MatchDispute,
@@ -23,6 +24,7 @@ from models import (
 )
 from bracket_engine import advance_match_winner
 from match_rules import loser_for_winner, match_allows_draw, validate_winner_id
+from services.match_v2_results import MatchV2ResultError, build_v2_result_application
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
@@ -140,6 +142,17 @@ async def _can_read_match(match: dict, user: dict | None) -> bool:
         or bool(await _user_registration_for_match(match, user))
         or bool(await _acting_registration_for_match(match, user))
     )
+
+
+async def _require_result_permission(user: dict, match: dict) -> None:
+    allowed = (
+        await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES)
+        or await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "match", match["id"])
+        or await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "stage", match.get("stage_id"))
+        or (match.get("station_id") and await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "station", match.get("station_id")))
+    )
+    if not allowed:
+        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Aktion")
 
 
 async def _assert_match_visible(match: dict, user: dict | None) -> None:
@@ -261,6 +274,12 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         proposal["actor"] = actors.get(proposal.get("actor_user_id"))
         proposal.pop("match_collection", None)
     acting_reg = await _acting_registration_for_match(match, user)
+    round_number = match.get("matchday_number") or match.get("round")
+    league_like = (tournament or {}).get("format") in {"league", "round_robin"} or (stage or {}).get("stage_type") in {"league", "round_robin_groups", "ffa_league"}
+    matchday_label = match.get("matchday_label") or match.get("round_name")
+    if not matchday_label:
+        prefix = "Spieltag" if league_like else "Runde"
+        matchday_label = f"{prefix} {round_number}" if round_number else "Match"
     return {
         "match": match,
         "tournament": tournament,
@@ -269,8 +288,8 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "schedule_proposals": proposals,
         "can_act": bool(user and await _can_act_for_match(match, user)),
         "acting_registration_id": acting_reg.get("id") if acting_reg else None,
-        "matchday": match.get("matchday_number") or match.get("round"),
-        "matchday_label": match.get("matchday_label") or match.get("round_name") or (f"Spieltag {match.get('round')}" if match.get("round") else "Match"),
+        "matchday": round_number,
+        "matchday_label": matchday_label,
     }
 
 
@@ -460,6 +479,75 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, me: dict = Depen
         "role": me.get("role"),
     }
     return doc
+
+
+@router.post("/{match_id}/result")
+async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
+                              force: bool = False,
+                              me: dict = Depends(get_current_user)):
+    db = get_db()
+    match, collection = await _find_match_any(match_id)
+    if collection != "matches_v2":
+        raise HTTPException(status_code=400, detail="Dieses Ergebnisformular ist fuer Mehrspieler-Heats vorgesehen")
+    await _require_result_permission(me, match)
+    stage_matches = await db.matches_v2.find(
+        {"stage_id": match["stage_id"]},
+        {"_id": 0},
+    ).to_list(3000)
+    now_iso = now_utc().isoformat()
+    try:
+        application = build_v2_result_application(
+            match,
+            stage_matches,
+            [entry.model_dump() for entry in body.results],
+            actor_id=me["id"],
+            now_iso=now_iso,
+            proof_url=body.proof_url,
+            note=body.note,
+            force=force,
+        )
+    except MatchV2ResultError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+    await db.matches_v2.update_one({"id": match_id}, {"$set": application["match_set"]})
+    for target_id, update in application["target_sets"].items():
+        await db.matches_v2.update_one({"id": target_id}, {"$set": update})
+
+    report = {
+        "id": new_id(),
+        "match_id": match_id,
+        "tournament_id": match["tournament_id"],
+        "stage_id": match["stage_id"],
+        "reporter_user_id": me["id"],
+        "source": "staff",
+        "results": application["results"],
+        "proof_url": body.proof_url,
+        "note": body.note,
+        "force": force,
+        "created_at": now_iso,
+    }
+    await db.match_reports_v2.insert_one(report)
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "match.result.submit",
+        "target_id": match["tournament_id"],
+        "actor_id": me["id"],
+        "data": {
+            "match_id": match_id,
+            "stage_id": match["stage_id"],
+            "match_key": match.get("match_key"),
+            "advanced_matches": list(application["target_sets"].keys()),
+            "force": force,
+        },
+        "created_at": now_iso,
+    })
+    updated = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+    return {
+        "ok": True,
+        "match": updated,
+        "advanced_match_ids": list(application["target_sets"].keys()),
+        "report_id": report["id"],
+    }
 
 
 @router.get("/{match_id}")

@@ -5,6 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
 
 function formatDateTime(value) {
   if (!value) return "Termin offen";
@@ -39,11 +40,12 @@ export default function TournamentSchedulePage() {
   useApiInvalidation(load, ["tournaments", "matches", "matches_v2"]);
 
   const groups = useMemo(() => {
+    const tournament = data?.tournament || {};
     const registrations = Object.fromEntries((data?.registrations || []).map((r) => [r.id, r]));
     const multiSlotRows = (data?.matches_v2 || []).map((match) => ({
       ...match,
       matchday: match.matchday_number || match.round || 0,
-      matchdayLabel: match.matchday_label || (match.round ? `Spieltag ${match.round}` : "Ohne Spieltag"),
+      matchdayLabel: formatScheduleGroupLabel(match, tournament),
       labels: (match.slots || []).map((slot) => participantLabel(slot, registrations)),
     }));
     const duelRows = (data?.matches || []).map((match) => ({
@@ -63,7 +65,7 @@ export default function TournamentSchedulePage() {
   }, [data]);
 
   const tournament = data?.tournament || {};
-  useDocumentTitle(`${tournament.title || "Turnier"} Spielplan`, "Spielplan und Matchtage.");
+  useDocumentTitle(`${tournament.title || "Turnier"} Spielplan`, "Runden, Heats, Zeiten und Matchseiten.");
 
   if (!data) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE SPIELPLAN …</div></PublicLayout>;
 
@@ -72,7 +74,7 @@ export default function TournamentSchedulePage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Link to={`/tournaments/${tournament.slug || tournament.id}`} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
         <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase">Spielplan</h1>
-        <p className="mt-3 text-white/60 max-w-2xl">Alle Matchtage, Termine und öffentlichen Matchseiten für Terminabstimmung, Chat und Ergebnisstatus.</p>
+        <p className="mt-3 text-white/60 max-w-2xl">Alle Runden, Heats, Zeiten und öffentlichen Matchseiten für Terminabstimmung, Chat und Ergebnisstatus.</p>
 
         <div className="mt-10 space-y-8">
           {groups.map((group) => (
@@ -83,10 +85,10 @@ export default function TournamentSchedulePage() {
                   <Link key={match.id} to={`/matches/${match.id}`} className="border border-white/10 hover:border-[#29B6E8]/50 bg-[#121212] rounded-sm p-4 transition">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-[10px] uppercase tracking-widest text-white/40">{match.match_key}</div>
+                        <div className="text-[10px] uppercase tracking-widest text-white/40">{formatMatchKind(match)} {match.match_key || ""}</div>
                         <div className="mt-1 font-heading font-bold uppercase line-clamp-2">{match.labels.join(" vs. ")}</div>
                       </div>
-                      <span className="text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">{match.schedule_status || match.status}</span>
+                      <span className="text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">{formatMatchStatus(match.schedule_status || match.status)}</span>
                     </div>
                     <div className="mt-3 text-sm text-white/55">{formatDateTime(match.scheduled_at)}</div>
                   </Link>

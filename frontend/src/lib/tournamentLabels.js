@@ -209,3 +209,39 @@ export function formatRoundName(value, number) {
     .replace(/^Grand Final$/i, "Großes Finale")
     .replace(/^Bronze Match$/i, "Spiel um Platz 3");
 }
+
+export function isLeagueSchedule(tournamentOrFormat, matchOrStage = {}) {
+  const format = typeof tournamentOrFormat === "string"
+    ? tournamentOrFormat
+    : tournamentOrFormat?.format;
+  const stageType = matchOrStage?.stage_type;
+  return ["league", "round_robin"].includes(format)
+    || ["league", "round_robin_groups", "ffa_league"].includes(stageType);
+}
+
+export function isHeatSchedule(tournamentOrFormat, matchOrStage = {}) {
+  const format = typeof tournamentOrFormat === "string"
+    ? tournamentOrFormat
+    : tournamentOrFormat?.format;
+  const stageType = matchOrStage?.stage_type;
+  return matchOrStage?.match_type === "ffa"
+    || ["ffa", "battle_royale", "grand_prix", "time_trial"].includes(format)
+    || ["ffa_single_elimination", "ffa_custom_bracket"].includes(stageType);
+}
+
+export function formatScheduleGroupLabel(match = {}, tournament = {}) {
+  if (match.matchday_label) return match.matchday_label;
+  if (match.round_name) return formatRoundName(match.round_name, match.round);
+  const number = match.matchday_number || match.round;
+  if (isLeagueSchedule(tournament, match)) {
+    return number ? `Spieltag ${number}` : "Spieltag";
+  }
+  if (isHeatSchedule(tournament, match)) {
+    return number ? `Runde ${number}` : "Runde";
+  }
+  return number ? `Runde ${number}` : "Runde";
+}
+
+export function formatMatchKind(match = {}) {
+  return isHeatSchedule(null, match) ? "Heat" : "Spiel";
+}

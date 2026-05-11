@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useAuth } from "@/context/AuthContext";
-import { formatBracketSection, formatDeviceType, formatMatchStatus } from "@/lib/tournamentLabels";
+import { formatBracketSection, formatDeviceType, formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
 import { formatDateTime } from "@/lib/datetime";
 import { Plus, Trash2, Link as LinkIcon, X as XIcon, Wand2, Play } from "lucide-react";
 import { toast } from "sonner";
@@ -51,9 +51,10 @@ export default function AdminStationsPage() {
   const loadMatches = useCallback(async () => {
     if (!activeTid) return;
     const { data } = await api.get(`/tournaments/${activeTid}/bracket`);
-    const legacy = (data.matches || []).map((m) => ({ ...m, engine: "legacy" }));
-    const flexible = (data.matches_v2 || []).map((m) => ({ ...m, engine: "v2" }));
-    setMatches([...legacy, ...flexible]);
+    const tournament = data.tournament || {};
+    const duelMatches = (data.matches || []).map((m) => ({ ...m, is_multi_slot: false, tournament }));
+    const multiSlotMatches = (data.matches_v2 || []).map((m) => ({ ...m, is_multi_slot: true, tournament }));
+    setMatches([...duelMatches, ...multiSlotMatches]);
     setRegs(data.registrations || []);
   }, [activeTid]);
   useEffect(() => { loadMatches(); }, [loadMatches]);
@@ -143,7 +144,7 @@ export default function AdminStationsPage() {
 
   const nameOfMatch = (m) => {
     if (!m) return "—";
-    if (m.engine === "v2" || m.slots) {
+    if (m.is_multi_slot || m.slots) {
       const names = (m.slots || [])
         .map((slot) => regById[slot.registration_id]?.display_name || slot.source?.raw || "Offen")
         .slice(0, 4);
@@ -152,6 +153,11 @@ export default function AdminStationsPage() {
     const a = regById[m.participant_a_id]?.display_name || "Offen";
     const b = regById[m.participant_b_id]?.display_name || "Offen";
     return `${a} gegen ${b}`;
+  };
+  const detailOfMatch = (m) => {
+    if (!m) return "Spiel";
+    const section = m.section ? `${formatBracketSection(m.section)} · ` : "";
+    return `${section}${formatScheduleGroupLabel(m, m.tournament)} · ${formatMatchKind(m)}`;
   };
 
   return (
@@ -205,7 +211,7 @@ export default function AdminStationsPage() {
             <div className="space-y-1.5 max-h-[360px] overflow-y-auto">
               {unassignedMatches.map((m) => (
                 <div key={m.id} data-testid={`match-unassigned-${m.id}`} className="p-2 border border-white/10 rounded-sm text-xs bg-[#0A0A0A] hover:border-[#29B6E8]/40">
-                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{m.engine === "v2" ? `${formatBracketSection(m.section || "MAIN")} · ${m.round_name || `Runde ${m.round}`}` : (m.round_name || `Runde ${m.round}`)}</div>
+                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{detailOfMatch(m)}</div>
                   <div className="text-white font-semibold mt-0.5 truncate">{nameOfMatch(m)}</div>
                   <div className="mt-1 text-white/40">{m.scheduled_at ? formatDateTime(m.scheduled_at) : "Keine feste Zeit"}{m.duration_minutes ? ` · ${m.duration_minutes} Min.` : ""}</div>
                 </div>
@@ -243,11 +249,11 @@ export default function AdminStationsPage() {
                       {s.status === "reserved" && <button onClick={() => assign(s.id, s.current_match_id, true)} className="text-[10px] text-[#00FF88] font-bold uppercase tracking-widest hover:underline inline-flex items-center gap-1"><Play className="w-3 h-3" /> Starten</button>}
                       <button onClick={() => clearStation(s.id)} data-testid={`station-clear-${s.id}`} className="text-[10px] text-[#FF3B30] font-bold uppercase tracking-widest hover:underline inline-flex items-center gap-1"><XIcon className="w-3 h-3" /> Freigeben</button>
                     </div>
-                    {matchById[s.current_match_id]?.engine === "legacy" && (
-                      <StationLegacyResult match={matchById[s.current_match_id]} regById={regById} onSaved={() => { loadStations(); loadMatches(); }} />
+                    {!matchById[s.current_match_id]?.is_multi_slot && (
+                      <StationDuelResult match={matchById[s.current_match_id]} regById={regById} onSaved={() => { loadStations(); loadMatches(); }} />
                     )}
-                    {matchById[s.current_match_id]?.engine === "v2" && (
-                      <StationV2Result match={matchById[s.current_match_id]} regById={regById} onSaved={() => { loadStations(); loadMatches(); }} />
+                    {matchById[s.current_match_id]?.is_multi_slot && (
+                      <StationHeatResult match={matchById[s.current_match_id]} regById={regById} onSaved={() => { loadStations(); loadMatches(); }} />
                     )}
                   </div>
                 ) : (
@@ -277,7 +283,7 @@ export default function AdminStationsPage() {
             <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
               {unassignedMatches.map((m) => (
                 <div key={m.id} className="p-2 border border-white/10 rounded-sm hover:border-[#29B6E8] hover:bg-[#29B6E8]/5 text-xs">
-                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{m.engine === "v2" ? `${formatBracketSection(m.section || "MAIN")} · ${m.round_name || `Runde ${m.round}`}` : (m.round_name || `Runde ${m.round}`)}</div>
+                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{detailOfMatch(m)}</div>
                   <div className="text-white font-semibold mt-0.5">{nameOfMatch(m)}</div>
                   <div className="mt-2 flex gap-2">
                     <button type="button" onClick={() => assign(assignFor.id, m.id)} data-testid={`assign-match-${m.id}`} className="px-2 py-1 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase">Zuweisen</button>
@@ -294,7 +300,7 @@ export default function AdminStationsPage() {
   );
 }
 
-function StationLegacyResult({ match, regById, onSaved }) {
+function StationDuelResult({ match, regById, onSaved }) {
   const a = regById[match.participant_a_id] || {};
   const b = regById[match.participant_b_id] || {};
   const [scoreA, setScoreA] = useState(match.score_a ?? 0);
@@ -332,7 +338,7 @@ function StationLegacyResult({ match, regById, onSaved }) {
   );
 }
 
-function StationV2Result({ match, regById, onSaved }) {
+function StationHeatResult({ match, regById, onSaved }) {
   const filledSlots = (match.slots || []).filter((slot) => slot.status === "filled" && slot.registration_id);
   const initialRows = () => {
     const existing = (match.results || []).length
@@ -358,7 +364,7 @@ function StationV2Result({ match, regById, onSaved }) {
   const update = (registrationId, patch) => setRows((current) => current.map((row) => row.registration_id === registrationId ? { ...row, ...patch } : row));
   const save = async () => {
     try {
-      await api.post(`/matches-v2/${match.id}/result`, {
+      await api.post(`/matches/${match.id}/result`, {
         results: rows.map((row) => ({
           registration_id: row.registration_id,
           rank: Number(row.rank) || 1,
