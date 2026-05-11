@@ -6,7 +6,8 @@ from pydantic import BaseModel, Field
 from auth import get_current_user
 from database import get_db
 from models import new_id, now_utc
-from services.user_notifications import create_user_notification
+from services.notification_preferences import send_user_template
+from services.user_notifications import build_public_url, create_user_notification
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
 
@@ -108,7 +109,7 @@ async def _message_permission(db, sender: dict, recipient: dict) -> tuple[bool, 
 async def _get_active_user(db, user_id: str) -> dict:
     user = await db.users.find_one(
         {"id": user_id, "is_active": True, "is_banned": {"$ne": True}},
-        {"_id": 0, "password_hash": 0, "email": 0},
+        {"_id": 0, "password_hash": 0},
     )
     if not user:
         raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
@@ -247,6 +248,22 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, me: dict 
         url="/profile?tab=inbox",
         kind="direct_message",
         meta={"message_id": doc["id"], "thread_user_id": me["id"]},
+    )
+    await send_user_template(
+        recipient,
+        "direct_message",
+        display_name=_label(recipient),
+        sender_name=_label(me),
+        preview=text[:300],
+        url=await build_public_url("/profile?tab=inbox"),
+        preferences_url=await build_public_url("/profile?tab=privacy"),
+        dedupe_key=f"direct_message:{doc['id']}:{recipient['id']}",
+        mail_meta={
+            "kind": "direct_message",
+            "message_id": doc["id"],
+            "sender_id": me["id"],
+            "recipient_id": recipient["id"],
+        },
     )
     doc.pop("_id", None)
     return _public_message(doc, {me["id"]: me, recipient["id"]: recipient})

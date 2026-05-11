@@ -416,6 +416,49 @@ def tpl_birthday_greeting(display_name: str, preferences_url: str = "") -> tuple
     return "Alles Gute zum Geburtstag", _wrap("Alles Gute zum Geburtstag", body)
 
 
+def tpl_direct_message(display_name: str, sender_name: str, preview: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
+    sender_subject = str(sender_name or "Benutzer").replace("\r", " ").replace("\n", " ")[:80]
+    sender = html_lib.escape(sender_name or "Benutzer")
+    preview_html = html_lib.escape(preview or "")
+    body = (
+        f"<p>Hallo {html_lib.escape(display_name or 'Löwe')},</p>"
+        f"<p><strong>{sender}</strong> hat dir eine Direktnachricht auf der Webseite geschickt.</p>"
+    )
+    if preview_html:
+        body += f'<p style="border-left:3px solid {BRAND_CYAN};padding-left:12px;color:#374151">{preview_html}</p>'
+    if preferences_url:
+        body += (
+            '<p style="font-size:12px;color:#6b7280">'
+            f'Diese E-Mails kannst du in deinen <a href="{html_lib.escape(preferences_url, quote=True)}">'
+            "Benachrichtigungs-Einstellungen</a> deaktivieren.</p>"
+        )
+    return f"Neue Nachricht von {sender_subject}", _wrap(
+        "Neue Direktnachricht", body, "Nachricht öffnen", url,
+    )
+
+
+def tpl_team_chat_mention(display_name: str, team_name: str, sender_name: str, preview: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
+    team_subject = str(team_name or "Team").replace("\r", " ").replace("\n", " ")[:80]
+    team = html_lib.escape(team_name or "Team")
+    sender = html_lib.escape(sender_name or "Benutzer")
+    preview_html = html_lib.escape(preview or "")
+    body = (
+        f"<p>Hallo {html_lib.escape(display_name or 'Löwe')},</p>"
+        f"<p><strong>{sender}</strong> hat dich im Team-Chat von <strong>{team}</strong> erwähnt.</p>"
+    )
+    if preview_html:
+        body += f'<p style="border-left:3px solid {BRAND_CYAN};padding-left:12px;color:#374151">{preview_html}</p>'
+    if preferences_url:
+        body += (
+            '<p style="font-size:12px;color:#6b7280">'
+            f'Erwähnungs-Mails kannst du in deinen <a href="{html_lib.escape(preferences_url, quote=True)}">'
+            "Benachrichtigungs-Einstellungen</a> deaktivieren.</p>"
+        )
+    return f"Erwähnung im Team-Chat: {team_subject}", _wrap(
+        "Du wurdest erwähnt", body, "Team-Chat öffnen", url,
+    )
+
+
 def _wrap(title: str, body_html: str, cta_label: Optional[str] = None, cta_url: Optional[str] = None) -> str:
     """Neutral transactional email layout tuned for inbox placement."""
     cta = ""
@@ -497,6 +540,8 @@ async def send_template(
         "membership_deactivated": tpl_membership_deactivated,
         "membership_blocked": tpl_membership_blocked,
         "birthday_greeting": tpl_birthday_greeting,
+        "direct_message": tpl_direct_message,
+        "team_chat_mention": tpl_team_chat_mention,
         "newsletter_news": tpl_newsletter_news,
         "newsletter_event": tpl_newsletter_event,
     }

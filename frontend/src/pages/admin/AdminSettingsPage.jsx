@@ -24,6 +24,8 @@ const MAIL_TEMPLATE_LABELS = {
   membership_activated: "Mitgliedschaft aktiviert",
   membership_deactivated: "Mitgliedschaft deaktiviert",
   membership_blocked: "Mitgliedschaft gesperrt",
+  direct_message: "Direktnachricht",
+  team_chat_mention: "Team-Chat-Erwähnung",
   newsletter_news: "Newsletter: News",
   newsletter_event: "Newsletter: Event",
   contact_autoreply: "Kontakt-Antwort",

@@ -7,7 +7,8 @@ from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_current_user, get_optional_user, require_admin
 from models import TeamCreate, TeamUpdate, now_utc, new_id
-from services.user_notifications import create_user_notification
+from services.notification_preferences import send_user_template
+from services.user_notifications import build_public_url, create_user_notification
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
 
@@ -157,8 +158,10 @@ async def _notify_team_mentions(db, team: dict, sender: dict, message: dict) -> 
         return
     members = await db.users.find(
         {"id": {"$in": team.get("member_ids") or []}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1, "notification_preferences": 1, "newsletter_consent": 1},
     ).to_list(500)
+    url = await build_public_url(f"/teams/{team['id']}")
+    preferences_url = await build_public_url("/profile?tab=privacy")
     for member in members:
         if member.get("id") == sender.get("id"):
             continue
@@ -171,6 +174,24 @@ async def _notify_team_mentions(db, team: dict, sender: dict, message: dict) -> 
             url=f"/teams/{team['id']}",
             kind="team_chat_mention",
             meta={"team_id": team["id"], "message_id": message["id"]},
+        )
+        await send_user_template(
+            member,
+            "team_chat_mention",
+            display_name=_user_label(member),
+            team_name=team.get("name") or team.get("tag") or "Team",
+            sender_name=_user_label(sender),
+            preview=(message.get("message") or "")[:300],
+            url=url,
+            preferences_url=preferences_url,
+            dedupe_key=f"team_chat_mention:{message['id']}:{member['id']}",
+            mail_meta={
+                "kind": "team_chat_mention",
+                "team_id": team["id"],
+                "message_id": message["id"],
+                "sender_id": sender.get("id"),
+                "user_id": member["id"],
+            },
         )
 
 

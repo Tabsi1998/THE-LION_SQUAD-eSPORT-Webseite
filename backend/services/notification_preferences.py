@@ -36,6 +36,11 @@ OPTIONAL_EMAIL_PREFERENCES = {
         "description": "Einmal im Jahr eine Geburtstagsmail vom Verein.",
         "default": True,
     },
+    "community_messages": {
+        "label": "Nachrichten & Erwähnungen",
+        "description": "Direktnachrichten, Team-Chat-Erwähnungen und ähnliche Community-Hinweise.",
+        "default": True,
+    },
     "news_events": {
         "label": "News & Events",
         "description": "Neue Vereinsnews, neue Events und wichtige Ankündigungen.",
@@ -71,6 +76,8 @@ TEMPLATE_CATEGORY = {
     "membership_approve": "membership_updates",
     "membership_reject": "membership_updates",
     "birthday_greeting": "birthday_greetings",
+    "direct_message": "community_messages",
+    "team_chat_mention": "community_messages",
     "newsletter_news": "news_events",
     "newsletter_event": "news_events",
 }
