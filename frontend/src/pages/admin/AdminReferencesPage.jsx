@@ -3,6 +3,7 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { gameOptionLabel } from "@/lib/gameLabels";
 import { toast } from "sonner";
 import { ExternalLink, Pencil, Plus, Trash2, X } from "lucide-react";
 
@@ -102,7 +103,7 @@ export default function AdminReferencesPage() {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/45 font-bold flex-wrap">
-                  <span>{item.game_name || item.game?.name || "Spiel offen"}</span>
+                  <span>{item.game_name || item.game?.display_name || item.game?.name || "Spiel offen"}</span>
                   <span className={(item.status || "completed") === "active" ? "text-[#00D26A]" : (item.status || "completed") === "planned" ? "text-[#29B6E8]" : "text-white/45"}>{statusLabel[item.status || "completed"]}</span>
                   {item.medal && <span className="text-[#FFD700]">{medalLabel[item.medal]}</span>}
                   <span>{formatDate(item.start_date)}</span>
@@ -198,7 +199,7 @@ function ReferenceForm({ reference, games, onClose, onSaved }) {
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spiel</div>
             <select value={form.game_id || ""} onChange={(e) => set("game_id", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
               <option value="">— Spiel wählen —</option>
-              {games.map((game) => <option key={game.id} value={game.id}>{game.name}</option>)}
+              {games.map((game) => <option key={game.id} value={game.id}>{gameOptionLabel(game)}</option>)}
             </select>
           </label>
           <Field label="Spielname falls nicht vorhanden" value={form.game_name} onChange={(v) => set("game_name", v)} />

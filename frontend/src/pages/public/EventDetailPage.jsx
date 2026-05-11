@@ -10,6 +10,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { formatTournamentFormat } from "@/lib/tournamentLabels";
+import { gameLabel } from "@/lib/gameLabels";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag, UserPlus, CheckCircle, XCircle } from "lucide-react";
@@ -379,7 +380,7 @@ function EventTournamentEmbed({ tournament }) {
         </div>
         <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#FFD700] transition break-words">{tournament.title}</h3>
         <div className="mt-2 flex flex-wrap gap-3 text-xs text-white/55">
-          {tournament.game?.name && <span>{tournament.game.name}</span>}
+          {tournament.game && <span>{gameLabel(tournament.game)}</span>}
           {tournament.format && <span>{formatTournamentFormat(tournament.format)}</span>}
           {Number.isFinite(tournament.participant_count) && <span>{tournament.participant_count}/{tournament.max_participants} Teilnehmer</span>}
         </div>

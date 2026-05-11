@@ -561,8 +561,21 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
              "status": 1, "start_date": 1, "id": 1, "visibility": 1, "is_public": 1}).to_list(200)
         t_map = {t["id"]: t for t in tournaments_raw if await _is_public_tournament(t)}
         game_ids = list({t.get("game_id") for t in t_map.values() if t.get("game_id")})
-        g_map = {g["id"]: g for g in await db.games.find(
-            {"id": {"$in": game_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1}).to_list(200)}
+        games = await db.games.find(
+            {"id": {"$in": game_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "kind": 1, "parent_game_id": 1, "short_name": 1}).to_list(200)
+        parent_ids = list({g.get("parent_game_id") for g in games if g.get("parent_game_id")})
+        parents = {}
+        if parent_ids:
+            parents = {g["id"]: g for g in await db.games.find({"id": {"$in": parent_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "short_name": 1}).to_list(200)}
+        for g in games:
+            parent = parents.get(g.get("parent_game_id"))
+            name = (g.get("name") or "").strip()
+            parent_name = ((parent or {}).get("name") or "").strip()
+            if g.get("kind") == "edition" and parent_name and name and not name.lower().startswith(f"{parent_name.lower()}:") and name.lower() != parent_name.lower():
+                g["display_name"] = f"{parent_name}: {name}"
+            else:
+                g["display_name"] = name
+        g_map = {g["id"]: g for g in games}
         visible_reg_ids = []
         for r in regs:
             t = t_map.get(r["tournament_id"])

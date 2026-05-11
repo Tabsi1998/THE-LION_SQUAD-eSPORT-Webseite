@@ -6,6 +6,7 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MultiSelect } from "@/components/tls/MultiSelect";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { gameLabel } from "@/lib/gameLabels";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
 import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil, Target, RefreshCw, Sparkles, Bell, Mail, Check, X, UserPlus, MessageSquare, Send, Search } from "lucide-react";
@@ -267,7 +268,7 @@ export default function ProfilePage() {
       const fields = game.effective_player_id_fields || game.player_id_fields || [];
       if (!fields.length) return;
       const sourceSlug = game.identity_game_slug || game.slug;
-      const sourceName = game.identity_game_name || game.name;
+      const sourceName = game.identity_game_name || gameLabel(game);
       const key = `${sourceSlug}:${fields.map((field) => field.key).join("|")}`;
       const existing = groups.get(key) || {
         slug: sourceSlug,
@@ -275,7 +276,7 @@ export default function ProfilePage() {
         games: [],
         fields,
       };
-      existing.games.push(game.name);
+      existing.games.push(gameLabel(game));
       groups.set(key, existing);
     });
     return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title));

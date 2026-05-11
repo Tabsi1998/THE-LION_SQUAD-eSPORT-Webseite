@@ -560,18 +560,30 @@ async def _enrich_references(items: list[dict]) -> list[dict]:
     games = {}
     if game_ids:
         games = {g["id"]: g for g in await db.games.find({"id": {"$in": game_ids}}, {"_id": 0}).to_list(200)}
+    parent_ids = list({g.get("parent_game_id") for g in games.values() if g.get("parent_game_id")})
+    parents = {}
+    if parent_ids:
+        parents = {g["id"]: g for g in await db.games.find({"id": {"$in": parent_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "short_name": 1}).to_list(200)}
     for item in items:
         game = games.get(item.get("game_id"))
         if game:
+            parent = parents.get(game.get("parent_game_id"))
+            game_name = (game.get("name") or "").strip()
+            parent_name = ((parent or {}).get("name") or "").strip()
+            if game.get("kind") == "edition" and parent_name and game_name and not game_name.lower().startswith(f"{parent_name.lower()}:") and game_name.lower() != parent_name.lower():
+                display_name = f"{parent_name}: {game_name}"
+            else:
+                display_name = game_name
             item["game"] = {
                 "id": game.get("id"),
                 "name": game.get("name"),
+                "display_name": display_name,
                 "slug": game.get("slug"),
                 "short_name": game.get("short_name"),
                 "logo_url": game.get("logo_url"),
                 "cover_url": game.get("cover_url"),
             }
-            item["game_name"] = item.get("game_name") or game.get("name")
+            item["game_name"] = item.get("game_name") or display_name
         item["medal"] = _medal_for_placement(item.get("placement"))
     return items
 

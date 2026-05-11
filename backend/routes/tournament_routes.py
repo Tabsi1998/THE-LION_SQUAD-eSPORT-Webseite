@@ -294,6 +294,23 @@ def _required_game_fields(game: dict | None) -> list[dict]:
 async def _enrich_game_identity(db, game: dict | None) -> dict | None:
     if not game:
         return None
+    parent = None
+    if game.get("parent_game_id"):
+        parent = await db.games.find_one({"id": game.get("parent_game_id")}, {"_id": 0})
+    name = (game.get("name") or "").strip()
+    parent_name = ((parent or {}).get("name") or "").strip()
+    if game.get("kind") == "edition" and parent_name and name and not name.lower().startswith(f"{parent_name.lower()}:") and name.lower() != parent_name.lower():
+        game["display_name"] = f"{parent_name}: {name}"
+    else:
+        game["display_name"] = name
+    if parent:
+        game["parent_game"] = {
+            "id": parent.get("id"),
+            "name": parent.get("name"),
+            "display_name": parent.get("display_name") or parent.get("name"),
+            "slug": parent.get("slug"),
+            "short_name": parent.get("short_name"),
+        }
     source = game
     source_id = game.get("identity_source_game_id")
     if not source_id and game.get("inherit_player_ids") is not False:

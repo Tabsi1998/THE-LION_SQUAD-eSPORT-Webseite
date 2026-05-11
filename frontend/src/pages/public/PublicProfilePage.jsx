@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { AccountLevelPill, AccountLevelProgress, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { gameLabel } from "@/lib/gameLabels";
 import {
   Trophy, Flag, Users as UsersIcon, Medal, Shield, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio, Gamepad2, Globe,
@@ -588,7 +589,7 @@ function TournamentRow({ t, expanded = false }) {
         </div>
         <div className="mt-1 font-heading text-base font-bold truncate">{t.title}</div>
         <div className="text-xs text-white/50 mt-0.5 flex items-center gap-2">
-          {t.game?.name && <span>{t.game.name}</span>}
+          {t.game && <span>{gameLabel(t.game)}</span>}
           {date && <span>· {date.toLocaleDateString("de-DE")}</span>}
           {expanded && t.final_position && <span>· Endplatz: <span className="text-white">{t.final_position}</span></span>}
         </div>

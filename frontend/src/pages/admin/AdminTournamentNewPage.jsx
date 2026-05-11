@@ -7,6 +7,7 @@ import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields } from "@/lib/datetime";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
+import { gameOptionLabel } from "@/lib/gameLabels";
 import { toast } from "sonner";
 
 const CREATE_STATUS_OPTIONS = [
@@ -92,7 +93,7 @@ export default function AdminTournamentNewPage() {
       <form onSubmit={submit} className="max-w-3xl space-y-5">
         <Row>
           <Field label="Titel" value={form.title} onChange={(v) => { set("title", v); if (!form.slug) set("slug", autoSlug(v)); }} required testId="new-tr-title" />
-          <Select label="Spiel *" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, g.name])]} required testId="new-tr-game" />
+          <Select label="Spiel *" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} required testId="new-tr-game" />
         </Row>
         <Row>
           <Select label="Format" value={form.format} onChange={(v) => set("format", v)} options={TOURNAMENT_FORMAT_OPTIONS} testId="new-tr-format" />

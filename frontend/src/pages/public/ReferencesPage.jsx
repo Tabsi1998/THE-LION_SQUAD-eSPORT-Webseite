@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { api, resolveMediaUrl } from "@/lib/api";
+import { gameLabel } from "@/lib/gameLabels";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Award, ExternalLink, Medal, Trophy } from "lucide-react";
@@ -111,7 +112,7 @@ function ReferenceCard({ item }) {
           )}
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{item.game_name || item.game?.name || "Extern"}</div>
+          <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{item.game_name || gameLabel(item.game) || "Extern"}</div>
           <div className="mt-1 text-xs text-white/45">{formatDate(item.start_date)}</div>
           {item.mode && <div className="mt-1 text-xs text-white/35 uppercase">{modeLabels[item.mode] || item.mode}</div>}
         </div>

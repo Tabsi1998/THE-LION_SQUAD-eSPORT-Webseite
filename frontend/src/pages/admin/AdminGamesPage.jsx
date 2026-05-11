@@ -5,6 +5,7 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
+import { gameLabel } from "@/lib/gameLabels";
 import { toast } from "sonner";
 import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
@@ -39,6 +40,8 @@ export default function AdminGamesPage() {
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["games"]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const parentOptions = list.filter((g) => g.kind !== "edition").map((g) => [g.id, gameLabel(g)]);
+  const identityOptions = list.map((g) => [g.id, `ID von ${gameLabel(g)}`]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -76,13 +79,14 @@ export default function AdminGamesPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         <form onSubmit={submit} className="lg:col-span-1 border border-white/10 rounded-sm bg-[#121212] p-5 space-y-3">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Neues Spiel</div>
-          <Input placeholder="Name" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v, slug: f.slug || slugFrom(v) }))} required testId="game-name" />
+          <Input placeholder={form.kind === "edition" ? "Versionsname, z.B. Black Ops 7" : "Name, z.B. Call of Duty"} value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v, slug: f.slug || slugFrom(v) }))} required testId="game-name" />
           <Input placeholder="Slug" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} required testId="game-slug" />
           <Select value={form.kind} onChange={(v) => set("kind", v)} options={GAME_KIND_OPTIONS} testId="game-kind" />
           {form.kind === "edition" && (
             <>
-              <Select value={form.parent_game_id} onChange={(v) => set("parent_game_id", v)} options={[["", "Hauptspiel wählen"], ...list.map((g) => [g.id, g.name])]} testId="game-parent" />
-              <Select value={form.identity_source_game_id} onChange={(v) => set("identity_source_game_id", v)} options={[["", "ID-Quelle: automatisch Hauptspiel"], ...list.map((g) => [g.id, `ID von ${g.name}`])]} testId="game-identity-source" />
+              <Select value={form.parent_game_id} onChange={(v) => set("parent_game_id", v)} options={[["", "Hauptspiel wählen"], ...parentOptions]} testId="game-parent" />
+              <Select value={form.identity_source_game_id} onChange={(v) => set("identity_source_game_id", v)} options={[["", "ID-Quelle: automatisch Hauptspiel"], ...identityOptions]} testId="game-identity-source" />
+              <EditionPreview form={form} games={list} />
               <label className="flex items-start gap-2 text-xs text-white/65 border border-white/10 rounded-sm p-3 bg-[#0A0A0A]">
                 <input type="checkbox" checked={form.inherit_player_ids !== false} onChange={(e) => set("inherit_player_ids", e.target.checked)} className="accent-[#29B6E8] mt-0.5" />
                 Spieler-IDs vom Hauptspiel verwenden, solange keine eigene ID-Quelle gesetzt ist.
@@ -107,9 +111,12 @@ export default function AdminGamesPage() {
             <tbody className="divide-y divide-white/5">
               {list.map((g) => (
                 <tr key={g.id}>
-                  <td className="px-4 py-3">{g.name}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-semibold text-white">{gameLabel(g)}</div>
+                    {gameLabel(g) !== g.name && <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/35">Version: {g.name}</div>}
+                  </td>
                   <td className="px-4 py-3 text-white/60">{GAME_KIND_OPTIONS.find(([v]) => v === (g.kind || "standalone"))?.[1] || "Einzelspiel"}</td>
-                  <td className="px-4 py-3 text-white/60">{g.identity_source_game?.name || (g.inherit_player_ids !== false && g.parent_game?.name) || "Eigene IDs"}</td>
+                  <td className="px-4 py-3 text-white/60">{g.identity_source_game?.display_name || g.identity_source_game?.name || (g.inherit_player_ids !== false && (g.parent_game?.display_name || g.parent_game?.name)) || "Eigene IDs"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-2">
                       <button onClick={() => setEditing(toForm(g))} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Spiel bearbeiten" data-testid={`game-edit-${g.slug}`}>
@@ -197,6 +204,8 @@ function EditGameModal({ game, games, onClose, onSaved }) {
   const [form, setForm] = useState(game);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const parentOptions = games.filter((g) => g.id !== form.id && g.kind !== "edition").map((g) => [g.id, gameLabel(g)]);
+  const identityOptions = games.filter((g) => g.id !== form.id).map((g) => [g.id, `ID von ${gameLabel(g)}`]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -220,7 +229,7 @@ function EditGameModal({ game, games, onClose, onSaved }) {
         </div>
         <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
           <div className="grid md:grid-cols-2 gap-3">
-            <Input placeholder="Name" value={form.name} onChange={(v) => { set("name", v); if (!form.slug) set("slug", slugFrom(v)); }} required testId="game-edit-name" />
+            <Input placeholder={form.kind === "edition" ? "Versionsname, z.B. Black Ops 7" : "Name, z.B. Call of Duty"} value={form.name} onChange={(v) => { set("name", v); if (!form.slug) set("slug", slugFrom(v)); }} required testId="game-edit-name" />
             <Input placeholder="Slug" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} required testId="game-edit-slug" />
             <Select value={form.kind} onChange={(v) => set("kind", v)} options={GAME_KIND_OPTIONS} testId="game-edit-kind" />
             <Input placeholder="Kurzname" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-edit-short" />
@@ -228,8 +237,9 @@ function EditGameModal({ game, games, onClose, onSaved }) {
           </div>
           {form.kind === "edition" && (
             <div className="grid md:grid-cols-2 gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-              <Select value={form.parent_game_id} onChange={(v) => set("parent_game_id", v)} options={[["", "Hauptspiel wählen"], ...games.filter((g) => g.id !== form.id).map((g) => [g.id, g.name])]} testId="game-edit-parent" />
-              <Select value={form.identity_source_game_id} onChange={(v) => set("identity_source_game_id", v)} options={[["", "ID-Quelle: automatisch Hauptspiel"], ...games.filter((g) => g.id !== form.id).map((g) => [g.id, `ID von ${g.name}`])]} testId="game-edit-identity-source" />
+              <Select value={form.parent_game_id} onChange={(v) => set("parent_game_id", v)} options={[["", "Hauptspiel wählen"], ...parentOptions]} testId="game-edit-parent" />
+              <Select value={form.identity_source_game_id} onChange={(v) => set("identity_source_game_id", v)} options={[["", "ID-Quelle: automatisch Hauptspiel"], ...identityOptions]} testId="game-edit-identity-source" />
+              <div className="md:col-span-2"><EditionPreview form={form} games={games} /></div>
               <label className="md:col-span-2 flex items-start gap-2 text-xs text-white/65">
                 <input type="checkbox" checked={form.inherit_player_ids !== false} onChange={(e) => set("inherit_player_ids", e.target.checked)} className="accent-[#29B6E8] mt-0.5" />
                 Spieler-IDs vom Hauptspiel verwenden, solange keine eigene ID-Quelle gesetzt ist.
@@ -259,6 +269,16 @@ function EditGameModal({ game, games, onClose, onSaved }) {
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function EditionPreview({ form, games }) {
+  const parent = games.find((game) => game.id === form.parent_game_id);
+  if (!parent || form.kind !== "edition" || !form.name) return null;
+  return (
+    <div className="rounded-sm border border-[#29B6E8]/20 bg-[#29B6E8]/5 p-3 text-xs text-white/60">
+      Anzeige in Turnieren und Profilen: <span className="font-bold text-white">{gameLabel({ ...form, parent_game: parent })}</span>
     </div>
   );
 }

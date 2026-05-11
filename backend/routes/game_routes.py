@@ -26,15 +26,30 @@ def _merge_player_id_fields(source: dict, game: dict) -> list[dict]:
     return merged
 
 
+def _game_display_name(game: dict, parent: dict | None = None) -> str:
+    name = (game.get("name") or "").strip()
+    parent_name = (parent or {}).get("name") or ""
+    parent_name = parent_name.strip()
+    if game.get("kind") != "edition" or not parent_name or not name:
+        return name
+    lower_name = name.lower()
+    lower_parent = parent_name.lower()
+    if lower_name == lower_parent or lower_name.startswith(f"{lower_parent}:"):
+        return name
+    return f"{parent_name}: {name}"
+
+
 def _enrich_games(games: list[dict]) -> list[dict]:
     by_id = {game.get("id"): game for game in games if game.get("id")}
     for game in games:
         parent = by_id.get(game.get("parent_game_id"))
         source = _effective_identity_source(game, by_id)
+        game["display_name"] = _game_display_name(game, parent)
         if parent:
             game["parent_game"] = {
                 "id": parent.get("id"),
                 "name": parent.get("name"),
+                "display_name": parent.get("display_name") or _game_display_name(parent),
                 "slug": parent.get("slug"),
                 "short_name": parent.get("short_name"),
             }
@@ -42,6 +57,7 @@ def _enrich_games(games: list[dict]) -> list[dict]:
             game["identity_source_game"] = {
                 "id": source.get("id"),
                 "name": source.get("name"),
+                "display_name": source.get("display_name") or _game_display_name(source, by_id.get(source.get("parent_game_id"))),
                 "slug": source.get("slug"),
                 "short_name": source.get("short_name"),
             }
@@ -55,7 +71,7 @@ def _enrich_games(games: list[dict]) -> list[dict]:
 async def list_games():
     db = get_db()
     games = await db.games.find({}, {"_id": 0}).sort("name", 1).to_list(200)
-    return _enrich_games(games)
+    return sorted(_enrich_games(games), key=lambda game: (game.get("display_name") or game.get("name") or "").lower())
 
 
 @router.get("/{slug_or_id}")

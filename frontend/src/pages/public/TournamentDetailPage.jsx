@@ -16,6 +16,7 @@ import { MentionText } from "@/components/tls/MentionText";
 import { formatDateTime, getRegistrationState } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { formatTeamMode, formatTournamentFormat } from "@/lib/tournamentLabels";
+import { gameLabel } from "@/lib/gameLabels";
 
 export default function TournamentDetailPage() {
   const { slug } = useParams();
@@ -108,7 +109,7 @@ export default function TournamentDetailPage() {
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <PhaseBadge phase={t.public_phase} status={t.status} size="lg" />
             <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1">{formatTournamentFormat(t.format)}</span>
-            {t.game && <span className="text-white/60 text-sm">· {t.game.name}</span>}
+            {t.game && <span className="text-white/60 text-sm">· {gameLabel(t.game)}</span>}
           </div>
           <h1 data-testid="tournament-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{t.title}</h1>
           {t.description && <div className="mt-4 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(t.description) }} />}
@@ -388,7 +389,7 @@ function RegistrationModal({ tournament, user, myTeams = [], loading, onClose, o
             <p className="text-xs text-white/50 mt-1">
               {needsTeam
                 ? "Wähle das Team aus, das du als Leader oder Co-Leader anmelden möchtest."
-                : `${game.name} benötigt Spieler-IDs${sourceSlug !== game.slug ? ` aus ${game.identity_game_name || "dem Hauptspiel"}` : ""}.`}
+                : `${gameLabel(game)} benötigt Spieler-IDs${sourceSlug !== game.slug ? ` aus ${game.identity_game_name || "dem Hauptspiel"}` : ""}.`}
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-white/45 hover:text-white"><X className="w-5 h-5" /></button>
