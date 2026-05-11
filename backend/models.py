@@ -683,6 +683,8 @@ class F1ChallengeCreate(BaseModel):
     max_attempts: Optional[int] = None
     unlimited_attempts: bool = True
     registration_enabled: bool = True
+    block_club_member_results: bool = False
+    show_club_reference_times: bool = True
     online_registration_enabled: bool = False
     registration_open_from: Optional[datetime] = None
     registration_open_until: Optional[datetime] = None
@@ -721,6 +723,8 @@ class F1ChallengeUpdate(BaseModel):
     max_attempts: Optional[int] = None
     unlimited_attempts: Optional[bool] = None
     registration_enabled: Optional[bool] = None
+    block_club_member_results: Optional[bool] = None
+    show_club_reference_times: Optional[bool] = None
     online_registration_enabled: Optional[bool] = None
     registration_open_from: Optional[datetime] = None
     registration_open_until: Optional[datetime] = None
@@ -749,6 +753,7 @@ class F1LapTimeCreate(BaseModel):
     time_ms: int = Field(ge=0, description="Lap time in milliseconds")
     penalty_seconds: float = 0.0
     is_invalid: bool = False
+    score_scope: Literal["official", "club_reference"] = "official"
     proof_url: Optional[str] = None
     admin_note: Optional[str] = None
 
@@ -757,6 +762,7 @@ class F1LapTimeUpdate(BaseModel):
     time_ms: Optional[int] = None
     penalty_seconds: Optional[float] = None
     is_invalid: Optional[bool] = None
+    score_scope: Optional[Literal["official", "club_reference"]] = None
     proof_url: Optional[str] = None
     admin_note: Optional[str] = None
 

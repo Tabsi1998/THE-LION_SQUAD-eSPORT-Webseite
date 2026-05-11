@@ -22,6 +22,7 @@ export default function AdminF1NewPage() {
     controller_type: "", platform: "", banner_url: "",
     unlimited_attempts: true, max_attempts: 0,
     registration_enabled: false, registration_open_from: "", registration_open_until: "",
+    block_club_member_results: false, show_club_reference_times: true,
     start_date: "", end_date: "", status: "draft",
     is_championship: false,
     twitch_channel: "", twitch_enabled: false,
@@ -103,6 +104,16 @@ export default function AdminF1NewPage() {
             <input type="checkbox" checked={form.registration_enabled} onChange={(e) => set("registration_enabled", e.target.checked)} data-testid="f1-new-reg-enabled" className="accent-[#29B6E8] mt-1" />
             <span>Online-Einreichung auf der öffentlichen Seite anzeigen</span>
           </label>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="flex items-start gap-2 text-sm text-white/75">
+              <input type="checkbox" checked={form.block_club_member_results} onChange={(e) => set("block_club_member_results", e.target.checked)} data-testid="f1-new-club-reference-only" className="accent-[#29B6E8] mt-1" />
+              <span>Vereinsmitglieder nur als Referenzzeiten erlauben</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-white/75">
+              <input type="checkbox" checked={form.show_club_reference_times} onChange={(e) => set("show_club_reference_times", e.target.checked)} data-testid="f1-new-show-club-reference" className="accent-[#29B6E8] mt-1" />
+              <span>Vereins-Referenzzeiten öffentlich anzeigen</span>
+            </label>
+          </div>
         </div>
         <div className="grid md:grid-cols-2 gap-4">
           <Field label="Fahrzeug" value={form.vehicle} onChange={(v) => set("vehicle", v)} testId="f1-new-vehicle" />

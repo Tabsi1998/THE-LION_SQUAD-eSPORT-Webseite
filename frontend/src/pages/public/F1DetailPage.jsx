@@ -242,6 +242,7 @@ export default function F1DetailPage() {
                   </tbody>
                 </table>
               </div>
+              <ClubReferenceTimes entries={board?.club_reference_entries || []} />
             </div>
           </div>
         )}
@@ -278,5 +279,32 @@ export default function F1DetailPage() {
         )}
       </div>
     </PublicLayout>
+  );
+}
+
+function ClubReferenceTimes({ entries }) {
+  if (!entries?.length) return null;
+  return (
+    <div className="mt-4 border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-4">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Vereins-Referenz</div>
+          <div className="text-xs text-white/50 mt-0.5">Top 3 außer Wertung als Zielzeit zum Schlagen.</div>
+        </div>
+        <Flag className="w-4 h-4 text-[#FFD700]" />
+      </div>
+      <div className="grid sm:grid-cols-3 gap-2">
+        {entries.map((entry) => (
+          <div key={entry.user_id} className="border border-white/10 bg-[#0A0A0A]/60 rounded-sm px-3 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-display font-bold text-[#FFD700]">#{entry.rank}</span>
+              <span className="font-display font-bold tabular-nums text-white">{entry.time_str}</span>
+            </div>
+            <div className="mt-1 text-sm font-bold truncate">{entry.display_name}</div>
+            <div className="text-[10px] uppercase tracking-widest text-white/40">{entry.attempts} Versuche</div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

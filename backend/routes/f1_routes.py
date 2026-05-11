@@ -61,6 +61,59 @@ def _is_staff(user: dict | None) -> bool:
     return bool(user and user.get("role") in STAFF_ROLES)
 
 
+async def _is_active_club_member(user_id: str | None) -> bool:
+    if not user_id:
+        return False
+    db = get_db()
+    membership = await db.memberships.find_one(
+        {"user_id": user_id, "member_status": {"$in": ["active", "honorary"]}},
+        {"_id": 0, "id": 1},
+    )
+    return bool(membership)
+
+
+def _official_time_query(extra: dict | None = None) -> dict:
+    return {
+        **(extra or {}),
+        "is_invalid": {"$ne": True},
+        "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}],
+    }
+
+
+def _best_lap_entries(times: list[dict], users: dict[str, dict]) -> list[dict]:
+    best_per_user = {}
+    attempts_per_user = {}
+    for t in times:
+        uid = t["user_id"]
+        attempts_per_user[uid] = attempts_per_user.get(uid, 0) + 1
+        effective = t["time_ms"] + int(t.get("penalty_seconds", 0) * 1000)
+        if uid not in best_per_user or effective < best_per_user[uid]["effective_ms"]:
+            best_per_user[uid] = {**t, "effective_ms": effective}
+    entries = []
+    for uid, t in best_per_user.items():
+        u = users.get(uid, {})
+        entries.append({
+            "user_id": uid,
+            "username": u.get("username"),
+            "display_name": u.get("display_name") or u.get("username"),
+            "avatar_url": u.get("avatar_url"),
+            "time_ms": t["effective_ms"],
+            "time_str": _ms_to_time_str(t["effective_ms"]),
+            "raw_time_ms": t["time_ms"],
+            "penalty_seconds": t.get("penalty_seconds", 0),
+            "penalty_note": t.get("admin_note") if (t.get("penalty_seconds", 0) > 0) else None,
+            "attempts": attempts_per_user.get(uid, 0),
+            "last_updated": t.get("created_at"),
+            "score_scope": t.get("score_scope") or "official",
+        })
+    entries.sort(key=lambda e: (e["time_ms"], -(datetime.fromisoformat(e["last_updated"].replace("Z","+00:00")).timestamp() if e.get("last_updated") else 0)))
+    for i, e in enumerate(entries):
+        e["rank"] = i + 1
+        e["gap_ms"] = e["time_ms"] - entries[0]["time_ms"] if i > 0 else 0
+        e["gap_str"] = f"+{e['gap_ms']/1000:.3f}s" if i > 0 else ""
+    return entries
+
+
 async def _visible_event_summary(event_id: str, user: dict | None, include_draft: bool = False) -> dict | None:
     db = get_db()
     user = _auth_user(user)
@@ -118,7 +171,7 @@ async def list_challenges(status: str | None = None, limit: int = 100, include_d
             continue
         c["public_phase"] = derive_public_phase(c, "f1")
         c["track_count"] = await db.f1_tracks.count_documents({"challenge_id": c["id"]})
-        c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", {"challenge_id": c["id"]}))
+        c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", _official_time_query({"challenge_id": c["id"]})))
         visible.append(c)
     return visible
 
@@ -129,7 +182,7 @@ async def get_challenge(slug_or_id: str, include_draft: bool = False, user=Depen
     c = await _get_visible_challenge(slug_or_id, user, include_draft=include_draft)
     tracks = await db.f1_tracks.find({"challenge_id": c["id"]}, {"_id": 0}).sort("order_index", 1).to_list(100)
     c["tracks"] = tracks
-    c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", {"challenge_id": c["id"]}))
+    c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", _official_time_query({"challenge_id": c["id"]})))
     if c.get("event_id"):
         event = await _visible_event_summary(c["event_id"], user)
         if event:
@@ -188,6 +241,17 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
             updates[k] = _iso(updates.get(k))
     updates["updated_at"] = now_utc().isoformat()
     await db.f1_challenges.update_one({"id": cid}, {"$set": updates})
+    if updates.get("block_club_member_results") is True:
+        member_ids = await db.memberships.distinct("user_id", {"member_status": {"$in": ["active", "honorary"]}})
+        if member_ids:
+            await db.f1_lap_times.update_many(
+                {
+                    "challenge_id": cid,
+                    "user_id": {"$in": member_ids},
+                    "$or": [{"score_scope": {"$exists": False}}, {"score_scope": "official"}],
+                },
+                {"$set": {"score_scope": "club_reference", "updated_at": now_utc().isoformat()}},
+            )
     c = await db.f1_challenges.find_one({"id": cid}, {"_id": 0})
     if existing.get("status") != c.get("status") and c.get("status") == "results_published":
         try:
@@ -207,7 +271,7 @@ async def _award_f1_season_points(challenge: dict):
     source_type = "mini" if weight < 1.5 else ("major" if weight >= 2.5 else "tournament")
     for track in tracks:
         times = await db.f1_lap_times.find(
-            {"challenge_id": cid, "track_id": track["id"], "is_invalid": {"$ne": True}},
+            _official_time_query({"challenge_id": cid, "track_id": track["id"]}),
             {"_id": 0},
         ).to_list(5000)
         best_per_user: dict[str, int] = {}
@@ -291,46 +355,25 @@ async def leaderboard(cid: str, track_id: str | None = None, user=Depends(get_op
             return {"challenge": c, "track": None, "entries": []}
         track_id = first_track["id"]
     track = await db.f1_tracks.find_one({"id": track_id}, {"_id": 0})
-    # Get best time per user
     times = await db.f1_lap_times.find(
-        {"challenge_id": cid, "track_id": track_id, "is_invalid": {"$ne": True}},
+        _official_time_query({"challenge_id": cid, "track_id": track_id}),
         {"_id": 0},
     ).to_list(5000)
-    best_per_user = {}
-    attempts_per_user = {}
-    for t in times:
-        uid = t["user_id"]
-        attempts_per_user[uid] = attempts_per_user.get(uid, 0) + 1
-        effective = t["time_ms"] + int(t.get("penalty_seconds", 0) * 1000)
-        if uid not in best_per_user or effective < best_per_user[uid]["effective_ms"]:
-            best_per_user[uid] = {**t, "effective_ms": effective}
-    # Gather users
-    user_ids = list(best_per_user.keys())
+    user_ids = list({t["user_id"] for t in times})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0}).to_list(500)}
-    entries = []
-    for uid, t in best_per_user.items():
-        u = users.get(uid, {})
-        entries.append({
-            "user_id": uid,
-            "username": u.get("username"),
-            "display_name": u.get("display_name") or u.get("username"),
-            "avatar_url": u.get("avatar_url"),
-            "time_ms": t["effective_ms"],
-            "time_str": _ms_to_time_str(t["effective_ms"]),
-            "raw_time_ms": t["time_ms"],
-            "penalty_seconds": t.get("penalty_seconds", 0),
-            "penalty_note": t.get("admin_note") if (t.get("penalty_seconds", 0) > 0) else None,
-            "attempts": attempts_per_user.get(uid, 0),
-            "last_updated": t.get("created_at"),
-        })
-    # Sort by effective time; tie-break by newer submission (last_updated desc)
-    entries.sort(key=lambda e: (e["time_ms"], -(datetime.fromisoformat(e["last_updated"].replace("Z","+00:00")).timestamp() if e.get("last_updated") else 0)))
-    for i, e in enumerate(entries):
-        e["rank"] = i + 1
-        e["gap_ms"] = e["time_ms"] - entries[0]["time_ms"] if i > 0 else 0
-        e["gap_str"] = f"+{e['gap_ms']/1000:.3f}s" if i > 0 else ""
-    return {"challenge": c, "track": track, "entries": entries}
+    entries = _best_lap_entries(times, users)
+    club_reference_entries = []
+    if c.get("show_club_reference_times", True):
+        reference_times = await db.f1_lap_times.find(
+            {"challenge_id": cid, "track_id": track_id, "is_invalid": {"$ne": True}, "score_scope": "club_reference"},
+            {"_id": 0},
+        ).to_list(5000)
+        reference_user_ids = list({t["user_id"] for t in reference_times})
+        reference_users = {u["id"]: u for u in await db.users.find(
+            {"id": {"$in": reference_user_ids}}, {"_id": 0, "password_hash": 0}).to_list(500)}
+        club_reference_entries = _best_lap_entries(reference_times, reference_users)[:3]
+    return {"challenge": c, "track": track, "entries": entries, "club_reference_entries": club_reference_entries}
 
 
 @router.get("/challenges/{cid}/championship")
@@ -345,7 +388,7 @@ async def championship_standings(cid: str, user=Depends(get_optional_user)):
     per_track_results = {}
     for track in tracks:
         times = await db.f1_lap_times.find(
-            {"challenge_id": cid, "track_id": track["id"], "is_invalid": {"$ne": True}},
+            _official_time_query({"challenge_id": cid, "track_id": track["id"]}),
             {"_id": 0},
         ).to_list(5000)
         best_per_user = {}
@@ -394,10 +437,21 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_r
         raise HTTPException(status_code=400, detail="Strecke gehört nicht zur Challenge")
     if not await db.users.find_one({"id": body.user_id}):
         raise HTTPException(status_code=400, detail="Spieler nicht gefunden")
+    score_scope = body.score_scope or "official"
+    is_club_member = await _is_active_club_member(body.user_id)
+    if c.get("block_club_member_results") and is_club_member and score_scope != "club_reference":
+        raise HTTPException(
+            status_code=400,
+            detail="Vereinsmitglieder dürfen bei dieser Challenge nur als Vereins-Referenz eingetragen werden.",
+        )
     _validate_penalty_note(body.penalty_seconds, body.is_invalid, body.admin_note)
     # Attempt count
-    attempt_count = await db.f1_lap_times.count_documents({
-        "challenge_id": cid, "track_id": body.track_id, "user_id": body.user_id})
+    attempt_query = {"challenge_id": cid, "track_id": body.track_id, "user_id": body.user_id}
+    if score_scope == "club_reference":
+        attempt_query["score_scope"] = "club_reference"
+    else:
+        attempt_query["$or"] = [{"score_scope": {"$exists": False}}, {"score_scope": "official"}]
+    attempt_count = await db.f1_lap_times.count_documents(attempt_query)
     doc = {
         "id": new_id(),
         "challenge_id": cid,
@@ -408,6 +462,7 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_r
         "is_invalid": body.is_invalid,
         "proof_url": body.proof_url,
         "admin_note": body.admin_note,
+        "score_scope": score_scope,
         "attempt_number": attempt_count + 1,
         "created_by": me["id"],
         "created_at": now_utc().isoformat(),
@@ -418,14 +473,13 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_r
     doc["time_str"] = _ms_to_time_str(body.time_ms)
     # Discord trigger: if this submission is the new P1 on this track
     was_new_leader = False
-    if not body.is_invalid:
+    if not body.is_invalid and score_scope != "club_reference":
         try:
             from discord_service import send_discord
             effective = body.time_ms + int((body.penalty_seconds or 0) * 1000)
             # Find current P1
             others = await db.f1_lap_times.find(
-                {"challenge_id": cid, "track_id": body.track_id,
-                 "is_invalid": {"$ne": True}, "id": {"$ne": doc["id"]}},
+                {**_official_time_query({"challenge_id": cid, "track_id": body.track_id}), "id": {"$ne": doc["id"]}},
                 {"_id": 0}).to_list(5000)
             # Compute per-user best (effective)
             best = {}
@@ -453,11 +507,12 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_r
         except Exception:
             pass
     # Badge trigger
-    try:
-        from badges import on_lap_submitted
-        await on_lap_submitted(body.user_id, cid, body.track_id, was_new_leader, body.is_invalid)
-    except Exception:
-        pass
+    if score_scope != "club_reference":
+        try:
+            from badges import on_lap_submitted
+            await on_lap_submitted(body.user_id, cid, body.track_id, was_new_leader, body.is_invalid)
+        except Exception:
+            pass
     return doc
 
 
@@ -473,10 +528,15 @@ async def list_times(cid: str, track_id: str | None = None, user_id: str | None 
     user_ids = list({t["user_id"] for t in times})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0}).to_list(500)}
+    memberships = set(await db.memberships.distinct("user_id", {
+        "user_id": {"$in": user_ids},
+        "member_status": {"$in": ["active", "honorary"]},
+    }))
     for t in times:
         u = users.get(t["user_id"], {})
+        t["score_scope"] = t.get("score_scope") or "official"
         t["user"] = {"username": u.get("username"), "display_name": u.get("display_name"),
-                      "avatar_url": u.get("avatar_url")}
+                      "avatar_url": u.get("avatar_url"), "is_club_member": t["user_id"] in memberships}
         t["time_str"] = _ms_to_time_str(t["time_ms"])
     return times
 
@@ -491,6 +551,14 @@ async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(re
     nullable_fields = {"proof_url", "admin_note"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    final_scope = updates.get("score_scope", existing.get("score_scope") or "official")
+    if final_scope == "official":
+        challenge = await db.f1_challenges.find_one({"id": existing.get("challenge_id")}, {"_id": 0}) or {}
+        if challenge.get("block_club_member_results") and await _is_active_club_member(existing.get("user_id")):
+            raise HTTPException(
+                status_code=400,
+                detail="Vereinsmitglieder dürfen bei dieser Challenge nur als Vereins-Referenz eingetragen werden.",
+            )
     # P0 validation: compute resulting state and require note
     final_pen = updates.get("penalty_seconds", existing.get("penalty_seconds", 0))
     final_inv = updates.get("is_invalid", existing.get("is_invalid", False))

@@ -35,7 +35,7 @@ export default function AdminF1EditPage() {
   const [activeTrack, setActiveTrack] = useState(null);
   const [newTrack, setNewTrack] = useState({ name: "", image_url: "", country: "" });
   const [editTrack, setEditTrack] = useState(null);
-  const [newTime, setNewTime] = useState({ user_id: "", time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "" });
+  const [newTime, setNewTime] = useState({ user_id: "", time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "", score_scope: "official" });
   const [editTime, setEditTime] = useState(null);
   const confirm = useConfirm();
   const setNewTrackField = (k, v) => setNewTrack((track) => ({ ...track, [k]: v }));
@@ -60,6 +60,15 @@ export default function AdminF1EditPage() {
   useEffect(() => { loadTimes(); }, [loadTimes]);
   useApiInvalidation(load, ["f1", "users"]);
   useApiInvalidation(loadTimes, ["f1"]);
+
+  const selectedNewTimeUser = users.find((u) => u.id === newTime.user_id);
+  const forceReferenceScope = !!challenge?.block_club_member_results && !!selectedNewTimeUser?.is_club_member;
+
+  useEffect(() => {
+    if (forceReferenceScope && newTime.score_scope !== "club_reference") {
+      setNewTime((current) => ({ ...current, score_scope: "club_reference" }));
+    }
+  }, [forceReferenceScope, newTime.score_scope]);
 
   const addTrack = async (e) => {
     e.preventDefault();
@@ -117,6 +126,7 @@ export default function AdminF1EditPage() {
         time_ms: ms, penalty_seconds: pen,
         proof_url: newTime.proof_url || null,
         admin_note: newTime.admin_note?.trim() || null,
+        score_scope: newTime.score_scope || "official",
       });
       setNewTime({ ...newTime, time_str: "", proof_url: "", admin_note: "", penalty_seconds: 0 });
       toast.success("Zeit eingetragen.");
@@ -152,6 +162,7 @@ export default function AdminF1EditPage() {
         is_invalid: inv,
         proof_url: editTime.proof_url || null,
         admin_note: note || null,
+        score_scope: editTime.score_scope || "official",
       });
       toast.success("Zeit aktualisiert.");
       setEditTime(null);
@@ -258,6 +269,14 @@ export default function AdminF1EditPage() {
                   <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Zeit (m:ss.SSS)</div>
                   <input value={newTime.time_str} onChange={(e) => setNewTime({ ...newTime, time_str: e.target.value })} placeholder="1:24.587" required data-testid="f1-add-time-value" className="w-36 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display text-lg tabular-nums" />
                 </div>
+                <div className="min-w-[170px]">
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Wertung</div>
+                  <select value={newTime.score_scope || "official"} onChange={(e) => setNewTime({ ...newTime, score_scope: e.target.value })} data-testid="f1-add-time-scope" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+                    <option value="official" disabled={forceReferenceScope}>Offizielle Wertung</option>
+                    <option value="club_reference">Vereins-Referenz</option>
+                  </select>
+                  {forceReferenceScope && <div className="mt-1 text-[10px] text-[#FFD700]">Vereinsmitglied: nur Referenzzeit.</div>}
+                </div>
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Strafe (s)</div>
                   <input type="number" step="0.1" value={newTime.penalty_seconds} onChange={(e) => setNewTime({ ...newTime, penalty_seconds: e.target.value })} data-testid="f1-add-time-penalty" className="w-24 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
@@ -291,10 +310,21 @@ export default function AdminF1EditPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`font-display font-bold text-lg tabular-nums ${t.is_invalid ? "line-through text-white/40" : "text-white"}`}>{t.time_str}</span>
+                      {(t.score_scope || "official") === "club_reference" && <span className="text-[#FFD700] border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm">Referenz</span>}
                       {t.penalty_seconds > 0 && <span className="text-[#FF3B30] text-xs">+{t.penalty_seconds}s</span>}
                       {t.is_invalid && <span className="text-[#FF3B30] text-[10px] font-bold uppercase tracking-widest">INVALID</span>}
                       {t.proof_url && <a href={t.proof_url} target="_blank" rel="noreferrer" className="text-[10px] text-[#29B6E8] uppercase tracking-widest hover:underline">Proof</a>}
-                      <button onClick={() => setEditTime({ ...t, time_str: t.time_str })} data-testid={`f1-edit-time-${t.id}`} className="p-1 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-3.5 h-3.5" /></button>
+                      <button
+                        onClick={() => setEditTime({
+                          ...t,
+                          time_str: t.time_str,
+                          score_scope: challenge.block_club_member_results && t.user?.is_club_member ? "club_reference" : (t.score_scope || "official"),
+                        })}
+                        data-testid={`f1-edit-time-${t.id}`}
+                        className="p-1 text-white/40 hover:text-[#29B6E8]"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
                       <button onClick={() => delTime(t.id)} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
@@ -322,6 +352,21 @@ export default function AdminF1EditPage() {
             <label className="block">
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Strafsekunden</div>
               <input type="number" step="0.1" value={editTime.penalty_seconds ?? 0} onChange={(e) => setEditTime({ ...editTime, penalty_seconds: e.target.value })} data-testid="f1-edit-time-penalty" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
+            </label>
+            <label className="block">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Wertung</div>
+              <select
+                value={editTime.score_scope || "official"}
+                onChange={(e) => setEditTime({ ...editTime, score_scope: e.target.value })}
+                data-testid="f1-edit-time-scope"
+                className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"
+              >
+                <option value="official" disabled={!!challenge?.block_club_member_results && !!editTime.user?.is_club_member}>Offizielle Wertung</option>
+                <option value="club_reference">Vereins-Referenz</option>
+              </select>
+              {!!challenge?.block_club_member_results && !!editTime.user?.is_club_member && (
+                <div className="mt-1 text-[10px] text-[#FFD700]">Vereinsmitglieder sind bei dieser Challenge nur als Referenz erlaubt.</div>
+              )}
             </label>
             <label className="block">
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Proof URL</div>
@@ -380,6 +425,8 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
     registration_open_until: dt(challenge.registration_open_until),
     start_date: dt(challenge.start_date),
     end_date: dt(challenge.end_date),
+    block_club_member_results: !!challenge.block_club_member_results,
+    show_club_reference_times: challenge.show_club_reference_times !== false,
     unlimited_attempts: challenge.unlimited_attempts !== false,
     max_attempts: challenge.max_attempts || 0,
   });
@@ -448,6 +495,8 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.registration_enabled} onChange={(e)=>set("registration_enabled", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Online-Einreichung öffentlich anzeigen</span></label>
         <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.unlimited_attempts} onChange={(e)=>set("unlimited_attempts", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Unbegrenzte Versuche</span></label>
+        <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.block_club_member_results} onChange={(e)=>set("block_club_member_results", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Vereinsmitglieder nur als Referenzzeiten erlauben</span></label>
+        <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.show_club_reference_times} onChange={(e)=>set("show_club_reference_times", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Vereins-Referenzzeiten öffentlich anzeigen</span></label>
       </div>
       {!form.unlimited_attempts && <SmallField label="Max Versuche" type="number" value={form.max_attempts} onChange={(v)=>set("max_attempts", Number(v))} />}
       <button type="button" onClick={save} className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
