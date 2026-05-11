@@ -23,9 +23,12 @@ def _ordinal(rank: int) -> str:
 async def auto_create_for_tournament(tid: str) -> int:
     """Build PrizePickups when tournament results are published.
 
-    Reads `prize_places` (list of {place, label, value}) and the placements that
+    Reads `prize_places` (list of {group, place, label, value}) and the placements that
     were derived from matches.final_position. Idempotent: skips already-existing
     (tournament_id, user_id, place) combinations.
+
+    Bracket-specific prize groups are displayed publicly, but are not auto-assigned
+    here until bracket-specific final placements exist in match data.
     """
     db = get_db()
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
@@ -57,6 +60,9 @@ async def auto_create_for_tournament(tid: str) -> int:
     created = 0
     deadline = (now_utc() + timedelta(days=DEFAULT_PICKUP_WINDOW_DAYS)).isoformat()
     for prize in prize_places:
+        prize_group = prize.get("group") or "overall"
+        if prize_group != "overall":
+            continue
         try:
             raw_place = prize.get("place")
             place = last_rank if str(raw_place).lower() in {"last", "letzter", "-1"} else int(raw_place)
@@ -86,6 +92,7 @@ async def auto_create_for_tournament(tid: str) -> int:
             "user_id": uid,
             "team_id": team_id,
             "place": place,
+            "prize_group": prize_group,
             "place_label": prize.get("label") or _ordinal(place),
             "prize_label": prize.get("label") or "",
             "prize_value": prize.get("value") or "",

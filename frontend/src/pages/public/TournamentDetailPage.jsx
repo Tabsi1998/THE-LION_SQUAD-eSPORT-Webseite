@@ -198,7 +198,7 @@ export default function TournamentDetailPage() {
           {t.rules && (
             <section>
               <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-[#29B6E8]" /> Regeln</h2>
-              <div className="text-white/80 whitespace-pre-line border border-white/10 rounded-sm p-5 bg-[#121212]">{t.rules}</div>
+              <div className="prose-cms border border-white/10 rounded-sm p-5 bg-[#121212]" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(t.rules) }} />
             </section>
           )}
           {(t.prize_places?.length || t.prize_pool) && (

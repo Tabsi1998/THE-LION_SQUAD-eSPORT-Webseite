@@ -424,7 +424,7 @@ class TournamentCreate(BaseModel):
     is_invite_only: bool = False
     rules: Optional[str] = None
     prize_pool: Optional[str] = None
-    prize_places: Optional[List[dict]] = None  # [{"place":1,"label":"1. Platz","value":"…"}]
+    prize_places: Optional[List[dict]] = None  # [{"group":"overall|winner|loser","place":1,"label":"1. Platz","value":"…"}]
     best_of: int = 1
     bronze_match: bool = False
     match_duration_minutes: int = 30

@@ -1,17 +1,26 @@
 import { Trophy, Medal, Award, Star } from "lucide-react";
 
 /**
- * PrizeList — renders structured prize_places (array of {place, label, value})
+ * PrizeList — renders structured prize_places (array of {group, place, label, value})
  * Falls back to whitespace-pre-line prize_pool text block when structured data is missing.
  */
 export function PrizeList({ prizePlaces, prizePool, compact = false }) {
   if (!prizePlaces?.length && !prizePool) return null;
 
   if (prizePlaces?.length) {
-    const sorted = [...prizePlaces].sort((a, b) => (a.place ?? 99) - (b.place ?? 99));
+    const groups = groupedPrizes(prizePlaces);
     return (
-      <div data-testid="prize-list" className={compact ? "space-y-1.5" : "grid grid-cols-1 sm:grid-cols-2 gap-3"}>
-        {sorted.map((p, i) => <PrizeRow key={`${p.place}-${i}`} prize={p} compact={compact} />)}
+      <div data-testid="prize-list" className="space-y-4">
+        {groups.map((group) => (
+          <section key={group.key} className="space-y-2">
+            {groups.length > 1 && (
+              <h3 className="text-[11px] uppercase tracking-[0.25em] font-bold text-[#FFD700]">{group.label}</h3>
+            )}
+            <div className={compact ? "space-y-1.5" : "grid grid-cols-1 sm:grid-cols-2 gap-3"}>
+              {group.prizes.map((p, i) => <PrizeRow key={`${group.key}-${p.place}-${i}`} prize={p} compact={compact} />)}
+            </div>
+          </section>
+        ))}
       </div>
     );
   }
@@ -21,6 +30,39 @@ export function PrizeList({ prizePlaces, prizePool, compact = false }) {
       {prizePool}
     </div>
   );
+}
+
+const PRIZE_GROUPS = {
+  overall: "Gesamtwertung",
+  winner: "Gewinner-Bracket",
+  loser: "Loser-Bracket",
+  special: "Sonderpreise",
+};
+
+function groupedPrizes(prizes) {
+  const order = ["overall", "winner", "loser", "special"];
+  const buckets = new Map();
+  prizes.forEach((prize) => {
+    const key = prize.group || prize.bracket || "overall";
+    const bucket = buckets.get(key) || {
+      key,
+      label: prize.group_label || PRIZE_GROUPS[key] || key,
+      prizes: [],
+    };
+    bucket.prizes.push(prize);
+    buckets.set(key, bucket);
+  });
+  return [...buckets.values()]
+    .sort((a, b) => (order.indexOf(a.key) === -1 ? 99 : order.indexOf(a.key)) - (order.indexOf(b.key) === -1 ? 99 : order.indexOf(b.key)))
+    .map((group) => ({
+      ...group,
+      prizes: group.prizes.sort((a, b) => placeOrder(a.place) - placeOrder(b.place)),
+    }));
+}
+
+function placeOrder(place) {
+  if (String(place).toLowerCase() === "last") return 999;
+  return Number(place) || 99;
 }
 
 function PrizeRow({ prize, compact }) {

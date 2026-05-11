@@ -15,6 +15,13 @@ const CREATE_STATUS_OPTIONS = [
   ["scheduled", "Angekündigt"],
 ];
 
+const PRIZE_GROUP_OPTIONS = [
+  ["overall", "Gesamtwertung"],
+  ["winner", "Gewinner-Bracket"],
+  ["loser", "Loser-Bracket"],
+  ["special", "Sonderpreis"],
+];
+
 export default function AdminTournamentNewPage() {
   const nav = useNavigate();
   const [games, setGames] = useState([]);
@@ -33,9 +40,9 @@ export default function AdminTournamentNewPage() {
     is_public: true, rules: "", prize_pool: "",
     banner_url: "",
     prize_places: [
-      { place: 1, label: "1. Platz", value: "" },
-      { place: 2, label: "2. Platz", value: "" },
-      { place: 3, label: "3. Platz", value: "" },
+      { group: "overall", place: 1, label: "1. Platz", value: "" },
+      { group: "overall", place: 2, label: "2. Platz", value: "" },
+      { group: "overall", place: 3, label: "3. Platz", value: "" },
     ],
     twitch_channel: "", twitch_enabled: false, show_chat: false,
     location: "", stream_link: "", discord_link: "",
@@ -52,6 +59,10 @@ export default function AdminTournamentNewPage() {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setTeamMode = (value) => setForm((f) => ({ ...f, team_mode: value, team_size: value === "solo" ? 1 : Math.max(2, Number(f.team_size) || 2) }));
+  const addPrizeTop3 = (group) => set("prize_places", [
+    ...(form.prize_places || []),
+    ...[1, 2, 3].map((place) => ({ group, place, label: `${place}. Platz`, value: "" })),
+  ]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -65,7 +76,12 @@ export default function AdminTournamentNewPage() {
       // Filter empty prize places
       payload.prize_places = (payload.prize_places || [])
         .filter((p) => p.value && p.value.trim())
-        .map((p) => ({ place: p.place === "last" ? "last" : Number(p.place) || 0, label: p.label || (p.place === "last" ? "Letzter Platz" : `Platz ${p.place}`), value: p.value }));
+        .map((p) => ({
+          group: p.group || "overall",
+          place: p.place === "last" ? "last" : Number(p.place) || 0,
+          label: p.label || (p.place === "last" ? "Letzter Platz" : `Platz ${p.place}`),
+          value: p.value,
+        }));
       if (payload.prize_places.length === 0) payload.prize_places = null;
       const { data } = await api.post("/tournaments", payload);
       toast.success("Turnier erstellt.");
@@ -165,13 +181,20 @@ export default function AdminTournamentNewPage() {
               <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Preise (strukturiert)</div>
               <div className="text-xs text-white/50 mt-0.5">Jede Zeile erscheint als eigene Preis-Karte auf der Turnierseite.</div>
             </div>
-            <div className="flex gap-3">
-              <button type="button" onClick={() => set("prize_places", [...form.prize_places, { place: form.prize_places.length + 1, label: `Platz ${form.prize_places.length + 1}`, value: "" }])} data-testid="new-tr-prize-add" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
-              <button type="button" onClick={() => set("prize_places", [...form.prize_places, { place: "last", label: "Letzter Platz", value: "" }])} data-testid="new-tr-prize-last" className="text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">+ Letzter Platz</button>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button type="button" onClick={() => addPrizeTop3("winner")} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Gewinner Top 3</button>
+              <button type="button" onClick={() => addPrizeTop3("loser")} className="text-xs font-bold uppercase tracking-wider text-[#CD7F32] hover:text-white">+ Loser Top 3</button>
+              <button type="button" onClick={() => set("prize_places", [...form.prize_places, { group: "overall", place: form.prize_places.length + 1, label: `Platz ${form.prize_places.length + 1}`, value: "" }])} data-testid="new-tr-prize-add" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
+              <button type="button" onClick={() => set("prize_places", [...form.prize_places, { group: "overall", place: "last", label: "Letzter Platz", value: "" }])} data-testid="new-tr-prize-last" className="text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">+ Letzter Platz</button>
             </div>
           </div>
           {form.prize_places.map((p, i) => (
             <div key={i} className="grid grid-cols-12 gap-2 items-start">
+              <select value={p.group || "overall"} onChange={(e) => {
+                const np = [...form.prize_places]; np[i] = { ...p, group: e.target.value }; set("prize_places", np);
+              }} className="col-span-12 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm">
+                {PRIZE_GROUP_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
               <select value={p.place} onChange={(e) => {
                 const np = [...form.prize_places]; np[i] = { ...p, place: e.target.value === "last" ? "last" : Number(e.target.value) || 1 }; set("prize_places", np);
               }} data-testid={`new-tr-prize-place-${i}`} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm">
@@ -180,10 +203,10 @@ export default function AdminTournamentNewPage() {
               </select>
               <input value={p.label || ""} onChange={(e) => {
                 const np = [...form.prize_places]; np[i] = { ...p, label: e.target.value }; set("prize_places", np);
-              }} data-testid={`new-tr-prize-label-${i}`} className="col-span-4 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Label (z.B. Champion)" />
+              }} data-testid={`new-tr-prize-label-${i}`} className="col-span-4 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Label (z.B. Champion)" />
               <input value={p.value || ""} onChange={(e) => {
                 const np = [...form.prize_places]; np[i] = { ...p, value: e.target.value }; set("prize_places", np);
-              }} data-testid={`new-tr-prize-value-${i}`} className="col-span-5 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Preis (z.B. 100 €)" />
+              }} data-testid={`new-tr-prize-value-${i}`} className="col-span-5 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Preis (z.B. 100 €)" />
               <button type="button" onClick={() => set("prize_places", form.prize_places.filter((_, j) => j !== i))} data-testid={`new-tr-prize-remove-${i}`} className="col-span-1 text-white/40 hover:text-[#FF3B30] text-center py-2">✕</button>
             </div>
           ))}
