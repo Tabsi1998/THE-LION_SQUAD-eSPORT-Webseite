@@ -9,6 +9,7 @@ import { ApiInvalidationBridge } from "@/components/tls/ApiInvalidationBridge";
 import { ScrollManager } from "@/components/tls/ScrollManager";
 import { CookieConsentProvider } from "@/components/tls/CookieConsent";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
+import { AppErrorBoundary } from "@/components/tls/AppErrorBoundary";
 
 function RouteFallback() {
   return <div className="min-h-screen flex items-center justify-center text-white/40 font-display tracking-widest">LADE …</div>;
@@ -123,6 +124,7 @@ function App() {
             <ApiInvalidationBridge />
             <ScrollManager />
             <Toaster theme="dark" position="top-right" richColors />
+            <AppErrorBoundary>
             <Suspense fallback={<RouteFallback />}>
             <Routes>
           {/* Public — Verein */}
@@ -241,6 +243,7 @@ function App() {
           <Route path="*" element={<NotFoundPage />} />
             </Routes>
             </Suspense>
+            </AppErrorBoundary>
           </ConfirmDialogProvider>
         </CookieConsentProvider>
       </BrowserRouter>
