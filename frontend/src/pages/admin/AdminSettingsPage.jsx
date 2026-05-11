@@ -91,22 +91,24 @@ export default function AdminSettingsPage() {
   const brandDirtyRef = useRef(false);
   const discordDirtyRef = useRef(false);
   const loadSeqRef = useRef(0);
+  const loadErrorKeyRef = useRef("");
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
     const seq = ++loadSeqRef.current;
-    const requests = await Promise.allSettled([
-      api.get("/settings/email"),
-      api.get("/settings/branding"),
-      api.get("/settings/discord"),
-      api.get("/settings/email/logs"),
-      api.get("/settings/smtp"),
-      api.get("/settings/mail-queue?limit=100"),
-      api.get("/settings/mail-queue/stats"),
-      api.get("/admin/system-status"),
-      api.get("/admin/streams/status"),
-      api.get("/admin/discord/counters?limit=50"),
-    ]);
+    const requestDefs = [
+      { key: "email", label: "E-Mail", critical: true, request: () => api.get("/settings/email") },
+      { key: "branding", label: "Branding", critical: true, request: () => api.get("/settings/branding") },
+      { key: "discord", label: "Discord", critical: true, request: () => api.get("/settings/discord") },
+      { key: "email_logs", label: "E-Mail-Logs", critical: false, request: () => api.get("/settings/email/logs") },
+      { key: "smtp", label: "SMTP", critical: true, request: () => api.get("/settings/smtp") },
+      { key: "queue", label: "Mail-Queue", critical: false, request: () => api.get("/settings/mail-queue?limit=100") },
+      { key: "queue_stats", label: "Mail-Queue-Statistik", critical: false, request: () => api.get("/settings/mail-queue/stats") },
+      { key: "system", label: "Systemstatus", critical: false, request: () => api.get("/admin/system-status") },
+      { key: "twitch", label: "Twitch-Status", critical: false, request: () => api.get("/admin/streams/status") },
+      { key: "discord_counters", label: "Discord-Zähler", critical: false, request: () => api.get("/admin/discord/counters?limit=50") },
+    ];
+    const requests = await Promise.allSettled(requestDefs.map((entry) => entry.request()));
     if (seq !== loadSeqRef.current) return;
     const value = (i) => requests[i].status === "fulfilled" ? requests[i].value.data : null;
     const e = value(0), b = value(1), d = value(2), l = value(3), sm = value(4), q = value(5), qs = value(6), st = value(7), tw = value(8), dc = value(9);
@@ -120,8 +122,24 @@ export default function AdminSettingsPage() {
     if (st) setSystemStatus(st);
     if (tw) setTwitchStatus(tw);
     if (dc) setDiscordCounters(dc);
-    if (requests.some((r) => r.status === "rejected")) {
-      toast.error("Ein Teil der Einstellungen konnte nicht geladen werden. Die verfuegbaren Tabs bleiben nutzbar.");
+    const failed = requests
+      .map((result, index) => ({ result, def: requestDefs[index] }))
+      .filter(({ result }) => result.status === "rejected");
+    if (failed.length) {
+      console.warn("Admin-Einstellungen teilweise nicht geladen:", failed.map(({ def, result }) => ({
+        key: def.key,
+        label: def.label,
+        status: result.reason?.response?.status,
+        detail: result.reason?.response?.data?.detail || result.reason?.message,
+      })));
+    }
+    const criticalFailed = failed.filter(({ def }) => def.critical);
+    const errorKey = criticalFailed.map(({ def }) => def.key).sort().join(",");
+    if (criticalFailed.length && loadErrorKeyRef.current !== errorKey) {
+      loadErrorKeyRef.current = errorKey;
+      toast.error(`Einstellungen konnten nicht vollständig geladen werden: ${criticalFailed.map(({ def }) => def.label).join(", ")}.`);
+    } else if (!criticalFailed.length) {
+      loadErrorKeyRef.current = "";
     }
   }, []);
 
