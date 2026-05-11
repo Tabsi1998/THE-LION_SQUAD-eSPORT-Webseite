@@ -58,7 +58,11 @@ export default function EventDetailPage() {
   const [e, setE] = useState(null);
   const [error, setError] = useState(null);
   const { hasConsent, openSettings } = useCookieConsent();
-  useDocumentTitle(e?.name || "Event", e?.description || "Event von THE LION SQUAD eSports.");
+  useDocumentTitle(e?.name || "Event", e?.description || "Event von THE LION SQUAD eSports.", {
+    image: e?.banner_url,
+    type: "event",
+    canonical: e?.slug ? `${window.location.origin}/events/${e.slug}` : undefined,
+  });
 
   const load = useCallback(() => {
     return api.get(`/events/${slug}`).then(({ data }) => {

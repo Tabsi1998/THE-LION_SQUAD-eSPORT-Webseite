@@ -10,6 +10,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Tv, Trophy, Flag, Download, FileDown, Calendar } from "lucide-react";
 import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function F1DetailPage() {
   const { slug } = useParams();
@@ -18,6 +19,10 @@ export default function F1DetailPage() {
   const [board, setBoard] = useState(null);
   const [championship, setChampionship] = useState(null);
   const [tab, setTab] = useState("track"); // track | championship
+  useDocumentTitle(challenge?.title || "Fast Lap", challenge?.description || "Fast-Lap-Challenge von THE LION SQUAD eSports.", {
+    image: challenge?.banner_url,
+    canonical: challenge?.slug ? `${window.location.origin}/fastlap/${challenge.slug}` : undefined,
+  });
 
   const loadChallenge = useCallback(async () => {
     const { data } = await api.get(`/f1/challenges/${slug}`);

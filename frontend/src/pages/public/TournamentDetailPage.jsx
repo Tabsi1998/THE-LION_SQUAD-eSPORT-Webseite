@@ -17,6 +17,7 @@ import { formatDateTime, getRegistrationState } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { formatTeamMode, formatTournamentFormat } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function TournamentDetailPage() {
   const { slug } = useParams();
@@ -28,6 +29,10 @@ export default function TournamentDetailPage() {
   const [myTeams, setMyTeams] = useState([]);
   const [loading, setLoading] = useState(false);
   const [registerModal, setRegisterModal] = useState(false);
+  useDocumentTitle(t?.title || "Turnier", t?.description || "Turnier von THE LION SQUAD eSports.", {
+    image: t?.banner_url,
+    canonical: t?.slug ? `${window.location.origin}/tournaments/${t.slug}` : undefined,
+  });
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/tournaments/${slug}`);

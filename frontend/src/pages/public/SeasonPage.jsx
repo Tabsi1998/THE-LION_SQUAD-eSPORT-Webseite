@@ -4,6 +4,7 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Award, BarChart3, CalendarDays, Flag, Medal, Trophy, Users } from "lucide-react";
 
 function rankColor(rank) {
@@ -16,6 +17,11 @@ function rankColor(rank) {
 export default function SeasonPage() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
+  const season = data?.season;
+  useDocumentTitle(season?.name || "Saison", season?.description || "Season Pass von THE LION SQUAD eSports.", {
+    image: season?.banner_url,
+    canonical: season?.slug ? `${window.location.origin}/seasons/${season.slug}` : undefined,
+  });
   const load = useCallback(async () => {
     const { data: st } = await api.get(`/seasons/${slug}/standings`);
     setData(st);

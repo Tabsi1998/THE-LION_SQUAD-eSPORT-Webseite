@@ -10,6 +10,7 @@ import { AccountLevelPill, AccountLevelProgress, accountLevelFrameClass } from "
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameLabel } from "@/lib/gameLabels";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   Trophy, Flag, Users as UsersIcon, Medal, Shield, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio, Gamepad2, Globe,
@@ -141,6 +142,11 @@ export default function PublicProfilePage() {
   const [liveStreams, setLiveStreams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("overview");
+  useDocumentTitle(profile?.display_name || profile?.username || "Community-Profil", profile?.bio || "Community-Profil bei THE LION SQUAD eSports.", {
+    image: profile?.avatar_url || profile?.banner_url,
+    type: "profile",
+    canonical: profile?.username ? `${window.location.origin}/u/${profile.username}` : undefined,
+  });
   const { hasConsent, openSettings } = useCookieConsent();
 
   const load = useCallback(async () => {

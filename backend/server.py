@@ -41,6 +41,7 @@ from routes.phase_fg_routes import (
     media_router, admin_media_router, nav_router, admin_nav_router, seo_router, seo_meta_router,
     seed_default_nav,
 )
+from routes.seo_render_routes import router as seo_render_router
 from routes.penalty_routes import router as penalty_router, admin_router as penalty_admin_router
 from routes.membership_routes import router as membership_router
 from routes.document_routes import router as document_router
@@ -219,6 +220,7 @@ app.include_router(nav_router)
 app.include_router(admin_nav_router)
 app.include_router(seo_router)
 app.include_router(seo_meta_router)
+app.include_router(seo_render_router)
 app.include_router(membership_router)
 app.include_router(document_router)
 app.include_router(home_router)

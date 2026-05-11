@@ -12,7 +12,11 @@ export default function NewsDetailPage() {
   const { slug } = useParams();
   const [post, setPost] = useState(null);
   const [error, setError] = useState(null);
-  useDocumentTitle(post?.title || "News", post?.excerpt || "News von THE LION SQUAD eSports.");
+  useDocumentTitle(post?.title || "News", post?.excerpt || "News von THE LION SQUAD eSports.", {
+    image: post?.banner_url,
+    type: "article",
+    canonical: post?.slug ? `${window.location.origin}/news/${post.slug}` : undefined,
+  });
 
   const load = useCallback(() => {
     api.get(`/news/${slug}`).then(({ data }) => {

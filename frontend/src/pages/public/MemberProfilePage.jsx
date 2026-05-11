@@ -6,11 +6,17 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
 import { AccountLevelPill, AccountLevelProgress, accountAvatarFrameClass, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 import { api, resolveMediaUrl } from "@/lib/api";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function MemberProfilePage() {
   const { slug } = useParams();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  useDocumentTitle(profile?.display_name || "Vereinsmitglied", profile?.bio || "Vereinsmitglied bei THE LION SQUAD eSports.", {
+    image: profile?.avatar_url || profile?.banner_url,
+    type: "profile",
+    canonical: profile?.slug ? `${window.location.origin}/members/${profile.slug}` : undefined,
+  });
 
   useEffect(() => {
     setLoading(true);

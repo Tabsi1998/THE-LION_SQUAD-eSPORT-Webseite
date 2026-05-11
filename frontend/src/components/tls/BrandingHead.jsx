@@ -36,6 +36,8 @@ function applyBranding(data) {
   const description = data.site_description || "THE LION SQUAD - eSPORTS";
   const themeColor = data.primary_color || "#29B6E8";
   const icon = data.favicon_url || data.mascot_url || data.logo_url || TLS_MASCOT;
+  const image = resolveMediaUrl(data.og_image_url || data.mascot_url || data.logo_url || TLS_MASCOT);
+  const origin = data.domain || (typeof window !== "undefined" ? window.location.origin : "");
 
   if (!document.title || document.title === DEFAULT_TITLE || /React App|Vereinsplattform/i.test(document.title)) {
     document.title = siteTitle;
@@ -51,6 +53,14 @@ function applyBranding(data) {
   upsertMeta('meta[property="og:site_name"]', { property: "og:site_name", content: name });
   upsertMeta('meta[property="og:title"]', { property: "og:title", content: siteTitle });
   upsertMeta('meta[property="og:description"]', { property: "og:description", content: description });
+  upsertMeta('meta[property="og:url"]', { property: "og:url", content: origin });
+  upsertMeta('meta[property="og:image"]', { property: "og:image", content: image });
+  upsertMeta('meta[property="og:image:secure_url"]', { property: "og:image:secure_url", content: image });
+  upsertMeta('meta[property="og:image:alt"]', { property: "og:image:alt", content: siteTitle });
+  upsertMeta('meta[name="twitter:card"]', { name: "twitter:card", content: "summary_large_image" });
+  upsertMeta('meta[name="twitter:title"]', { name: "twitter:title", content: siteTitle });
+  upsertMeta('meta[name="twitter:description"]', { name: "twitter:description", content: description });
+  upsertMeta('meta[name="twitter:image"]', { name: "twitter:image", content: image });
 }
 
 export function BrandingHead() {

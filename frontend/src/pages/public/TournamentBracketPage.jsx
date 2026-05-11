@@ -5,12 +5,18 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatTournamentFormat } from "@/lib/tournamentLabels";
 import { Tv } from "lucide-react";
 
 export default function TournamentBracketPage() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
+  const tournament = data?.tournament;
+  useDocumentTitle(`${tournament?.title || "Turnier"} Turnierbaum`, tournament?.description || "Live-Turnierbaum von THE LION SQUAD eSports.", {
+    image: tournament?.banner_url,
+    canonical: tournament?.slug ? `${window.location.origin}/tournaments/${tournament.slug}/bracket` : undefined,
+  });
 
   const load = useCallback(async () => {
     const { data: t } = await api.get(`/tournaments/${slug}`);

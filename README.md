@@ -190,6 +190,29 @@ Im Adminbereich unter `Einstellungen -> Branding` pflegen:
 Diese Werte werden oeffentlich genutzt, unter anderem fuer Header/Footer, Kontaktseite,
 Browser-Favicon, Apple Icon, Manifest, Theme-Color und SEO-Meta.
 
+## SEO, Google und Link-Vorschauen
+
+Oeffentliche Detailseiten fuer News, Events, Turniere, Fast-Lap-Challenges,
+Saisons, Galerie-Alben sowie Profile liefern dynamische Meta-Daten aus:
+
+- `title`, `description` und Canonical-URL
+- Open-Graph-Tags fuer WhatsApp, Discord, Facebook, LinkedIn und aehnliche Dienste
+- Twitter/X Summary Card
+- JSON-LD fuer Google und andere Suchmaschinen
+
+Normale Besucher bekommen weiterhin die React-App. Bekannte Crawler/Bots werden
+ueber Nginx auf `/api/seo/preview?path=/...` geleitet und erhalten eine kleine
+HTML-Seite mit passenden Meta-Tags. Dadurch koennen geteilte Links auch dann
+korrekt erkannt werden, wenn der Dienst kein JavaScript ausfuehrt.
+
+Wichtig fuer saubere Share-Bilder:
+
+- Branding-Domain muss auf die oeffentliche HTTPS-Adresse zeigen.
+- News/Event/Turnier/Galerie-Bilder sollten oeffentlich erreichbar sein.
+- Wenn WhatsApp oder Discord ein altes Bild zeigt, ist meist deren Cache aktiv.
+  Dann den Link spaeter erneut testen oder bei hartnaeckigen Faellen das Bild
+  neu hochladen, damit sich die Bild-URL aendert.
+
 ## Impressum und Datenschutz
 
 Im Adminbereich unter `Einstellungen -> Rechtliches` pflegen:

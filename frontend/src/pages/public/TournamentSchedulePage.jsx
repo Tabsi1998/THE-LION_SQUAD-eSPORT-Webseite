@@ -65,7 +65,10 @@ export default function TournamentSchedulePage() {
   }, [data]);
 
   const tournament = data?.tournament || {};
-  useDocumentTitle(`${tournament.title || "Turnier"} Spielplan`, "Runden, Heats, Zeiten und Matchseiten.");
+  useDocumentTitle(`${tournament.title || "Turnier"} Spielplan`, "Runden, Heats, Zeiten und Matchseiten.", {
+    image: tournament.banner_url,
+    canonical: tournament.slug ? `${window.location.origin}/tournaments/${tournament.slug}/matches` : undefined,
+  });
 
   if (!data) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE SPIELPLAN …</div></PublicLayout>;
 

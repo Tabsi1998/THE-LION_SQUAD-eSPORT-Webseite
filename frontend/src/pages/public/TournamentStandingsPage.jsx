@@ -3,11 +3,16 @@ import { useParams, Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function TournamentStandingsPage() {
   const { slug } = useParams();
   const [t, setT] = useState(null);
   const [rows, setRows] = useState([]);
+  useDocumentTitle(`${t?.title || "Turnier"} Rangliste`, "Rangliste und Ergebnisse des Turniers.", {
+    image: t?.banner_url,
+    canonical: t?.slug ? `${window.location.origin}/tournaments/${t.slug}/standings` : undefined,
+  });
 
   const load = useCallback(async () => {
     const { data: tr } = await api.get(`/tournaments/${slug}`);
