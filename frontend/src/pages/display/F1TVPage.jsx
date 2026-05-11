@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { MascotBadge } from "@/components/tls/Logo";
 import { SponsorGrid } from "@/components/tls/SponsorTicker";
+import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -16,14 +17,22 @@ export default function F1TVPage() {
   const [challenge, setChallenge] = useState(null);
   const [activeTrackIdx, setActiveTrackIdx] = useState(0);
   const [board, setBoard] = useState(null);
+  const [challengeError, setChallengeError] = useState(null);
+  const [boardError, setBoardError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const trackParam = searchParams.get("track");
 
   const loadChallenge = useCallback(async () => {
-    const { data } = await api.get(`/f1/challenges/${id}`);
-    setChallenge(data);
-    if (trackParam && data.tracks) {
-      const idx = data.tracks.findIndex((t) => t.id === trackParam || t.slug === trackParam);
-      if (idx >= 0) setActiveTrackIdx(idx);
+    try {
+      const { data } = await api.get(`/f1/challenges/${id}`);
+      setChallenge(data);
+      setChallengeError(null);
+      if (trackParam && data.tracks) {
+        const idx = data.tracks.findIndex((t) => t.id === trackParam || t.slug === trackParam);
+        if (idx >= 0) setActiveTrackIdx(idx);
+      }
+    } catch (error) {
+      setChallengeError(error);
     }
   }, [id, trackParam]);
 
@@ -37,8 +46,14 @@ export default function F1TVPage() {
     if (!challenge?.tracks?.length) return;
     const tr = challenge.tracks[activeTrackIdx % challenge.tracks.length];
     const fetchLB = async () => {
-      const { data } = await api.get(`/f1/challenges/${id}/leaderboard?track_id=${tr.id}`);
-      setBoard(data);
+      try {
+        const { data } = await api.get(`/f1/challenges/${id}/leaderboard?track_id=${tr.id}`);
+        setBoard(data);
+        setBoardError(null);
+        setLastUpdated(Date.now());
+      } catch (error) {
+        setBoardError(error);
+      }
     };
     fetchLB();
     const iv = setInterval(fetchLB, 7000);
@@ -64,7 +79,16 @@ export default function F1TVPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [challenge]);
 
-  if (!challenge) return <div className="min-h-screen bg-black flex items-center justify-center font-display tracking-widest text-white/40">LADE …</div>;
+  if (!challenge) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col">
+        <DisplayStatusBanner error={challengeError} label="Fast-Lap Challenge" onRetry={loadChallenge} />
+        <div className="flex-1 flex items-center justify-center font-display tracking-widest text-white/40">
+          {challengeError ? "FAST-LAP ANSICHT KONNTE NICHT GELADEN WERDEN" : "LADE …"}
+        </div>
+      </div>
+    );
+  }
 
   const track = board?.track;
   const entries = board?.entries || [];
@@ -109,6 +133,7 @@ export default function F1TVPage() {
           )}
         </div>
       </header>
+      <DisplayStatusBanner error={boardError} lastUpdated={lastUpdated} label="Rangliste" onRetry={loadChallenge} compact />
 
       <div className="px-8 py-6">
         <div className="grid grid-cols-3 gap-6 mb-10">

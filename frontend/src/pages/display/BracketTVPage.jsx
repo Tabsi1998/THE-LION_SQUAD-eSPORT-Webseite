@@ -5,6 +5,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { MascotBadge } from "@/components/tls/Logo";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { SponsorGrid } from "@/components/tls/SponsorTicker";
+import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
 import { QRCodeSVG } from "qrcode.react";
 import { formatDateTime } from "@/lib/datetime";
 import {
@@ -24,11 +25,19 @@ const DONE_STATUSES = new Set(["completed", "archived", "forfeit", "bye", "cance
 export default function BracketTVPage() {
   const { id } = useParams();
   const [data, setData] = useState(null);
+  const [loadError, setLoadError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [viewIndex, setViewIndex] = useState(0);
 
   const load = useCallback(async () => {
-    const { data: br } = await api.get(`/tournaments/${id}/bracket`);
-    setData(br);
+    try {
+      const { data: br } = await api.get(`/tournaments/${id}/bracket`);
+      setData(br);
+      setLoadError(null);
+      setLastUpdated(Date.now());
+    } catch (error) {
+      setLoadError(error);
+    }
   }, [id]);
 
   useEffect(() => {
@@ -48,7 +57,16 @@ export default function BracketTVPage() {
     return () => clearInterval(iv);
   }, [views.length]);
 
-  if (!data) return <div className="h-screen bg-black flex items-center justify-center font-display tracking-widest text-white/40">LADE TURNIERBAUM …</div>;
+  if (!data) {
+    return (
+      <div className="h-screen bg-black text-white flex flex-col">
+        <DisplayStatusBanner error={loadError} label="Turnierbaum" onRetry={load} />
+        <div className="flex-1 flex items-center justify-center font-display tracking-widest text-white/40">
+          {loadError ? "TURNIERBAUM KONNTE NICHT GELADEN WERDEN" : "LADE TURNIERBAUM …"}
+        </div>
+      </div>
+    );
+  }
   const t = data.tournament;
   const publicUrl = `${window.location.origin}/tournaments/${t.slug || t.id}/bracket`;
   const activeView = views[viewIndex % Math.max(views.length, 1)] || { title: "Turnierbaum", columns: [], registrations: [] };
@@ -67,6 +85,7 @@ export default function BracketTVPage() {
         </div>
         <StatusBadge status={t.status} size="lg" />
       </header>
+      <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label="Turnierbaum" onRetry={load} compact />
 
       <main className="flex-1 min-h-0 p-4 overflow-hidden">
         {!hasMatches ? (
