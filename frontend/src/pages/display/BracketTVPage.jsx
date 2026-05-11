@@ -2,12 +2,24 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { BracketTree } from "@/components/tls/BracketTree";
 import { MascotBadge } from "@/components/tls/Logo";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { SponsorGrid } from "@/components/tls/SponsorTicker";
 import { QRCodeSVG } from "qrcode.react";
-import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
+import { formatDateTime } from "@/lib/datetime";
+import {
+  formatBracketSection,
+  formatMatchKind,
+  formatMatchStatus,
+  formatRoundName,
+  formatScheduleGroupLabel,
+} from "@/lib/tournamentLabels";
+
+const MAX_COLUMNS_PER_VIEW = 4;
+const MAX_DUEL_MATCHES_PER_COLUMN = 8;
+const MAX_HEAT_MATCHES_PER_COLUMN = 5;
+const MAX_LARGE_HEAT_MATCHES_PER_COLUMN = 3;
+const DONE_STATUSES = new Set(["completed", "archived", "forfeit", "bye", "cancelled"]);
 
 export default function BracketTVPage() {
   const { id } = useParams();
@@ -32,21 +44,21 @@ export default function BracketTVPage() {
   }, [data?.tournament?.id, views.length]);
   useEffect(() => {
     if (views.length <= 1) return undefined;
-    const iv = setInterval(() => setViewIndex((current) => (current + 1) % views.length), 9000);
+    const iv = setInterval(() => setViewIndex((current) => (current + 1) % views.length), 11000);
     return () => clearInterval(iv);
   }, [views.length]);
 
   if (!data) return <div className="h-screen bg-black flex items-center justify-center font-display tracking-widest text-white/40">LADE TURNIERBAUM …</div>;
   const t = data.tournament;
   const publicUrl = `${window.location.origin}/tournaments/${t.slug || t.id}/bracket`;
-  const activeView = views[viewIndex % Math.max(views.length, 1)] || { title: "Turnierbaum", data };
+  const activeView = views[viewIndex % Math.max(views.length, 1)] || { title: "Turnierbaum", columns: [], registrations: [] };
   const hasMatches = (data.matches?.length || 0) + (data.matches_v2?.length || 0) > 0;
 
   return (
     <div className="h-screen tv-bg text-white flex flex-col overflow-hidden">
       <header className="shrink-0 flex items-center justify-between gap-6 px-8 py-4 border-b border-white/10">
-        <div className="flex items-center gap-4">
-          <MascotBadge className="w-12 h-12" />
+        <div className="flex items-center gap-4 min-w-0">
+          <MascotBadge className="w-12 h-12 shrink-0" />
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">THE LION SQUAD · LIVE</div>
             <h1 className="font-heading text-2xl md:text-4xl font-black uppercase truncate">{t.title}</h1>
@@ -55,15 +67,17 @@ export default function BracketTVPage() {
         </div>
         <StatusBadge status={t.status} size="lg" />
       </header>
-      <div className="flex-1 min-h-0 p-4 overflow-hidden">
+
+      <main className="flex-1 min-h-0 p-4 overflow-hidden">
         {!hasMatches ? (
           <div className="h-full border border-white/10 bg-[#0A0A0A]/75 rounded-sm flex items-center justify-center text-white/45 font-display uppercase tracking-[0.25em]">
             Turnierbaum wurde noch nicht generiert
           </div>
         ) : (
-          <BracketTree data={activeView.data} compact viewMode="tv" />
+          <TvMatchBoard view={activeView} />
         )}
-      </div>
+      </main>
+
       <footer className="shrink-0 px-8 py-3 border-t border-white/10 flex items-center justify-between gap-4 bg-[#0A0A0A]/90 backdrop-blur-sm z-10">
         <div className="flex items-center gap-4 min-w-0">
           <div className="bg-white p-1.5 rounded-sm shrink-0">
@@ -93,78 +107,284 @@ export default function BracketTVPage() {
   );
 }
 
-function buildTvViews(data) {
-  if (!data) return [];
-  const base = {
-    tournament: data.tournament,
-    registrations: data.registrations || [],
-  };
-  const views = [];
+function TvMatchBoard({ view }) {
+  const regMap = useMemo(() => new Map((view.registrations || []).map((reg) => [reg.id, reg])), [view.registrations]);
 
-  if ((data.matches_v2 || []).length > 0) {
-    const stages = data.stages || [];
-    const stageById = new Map(stages.map((stage) => [stage.id, stage]));
-    const groups = new Map();
-    for (const match of data.matches_v2 || []) {
-      const key = `${match.stage_id || "__default"}::${match.section || "MAIN"}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(match);
-    }
-    for (const [key, matches] of groups) {
-      const [stageId, section] = key.split("::");
-      const stage = stageById.get(stageId);
-      const viewStage = stage || { id: stageId, name: "Phase", number: 1 };
-      for (const roundView of splitRoundViews(matches)) {
-        views.push({
-          key: `${key}-${roundView.key}`,
-          title: [viewStage.name || "Phase", formatBracketSection(section), roundView.title].filter(Boolean).join(" · "),
-          data: { ...base, stages: [viewStage], matches: [], matches_v2: roundView.matches },
-        });
-      }
-    }
-    return views;
-  }
-
-  const legacyGroups = new Map();
-  for (const match of data.matches || []) {
-    const bracket = match.bracket || "winner";
-    if (!legacyGroups.has(bracket)) legacyGroups.set(bracket, []);
-    legacyGroups.get(bracket).push(match);
-  }
-  for (const [bracket, matches] of legacyGroups) {
-    for (const roundView of splitRoundViews(matches)) {
-      views.push({
-        key: `${bracket}-${roundView.key}`,
-        title: [formatBracketSection(bracket), roundView.title].filter(Boolean).join(" · "),
-        data: { ...base, stages: [], matches: roundView.matches, matches_v2: [] },
-      });
-    }
-  }
-  return views;
+  return (
+    <div className="h-full grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+      {(view.columns || []).map((column) => (
+        <RoundColumn key={column.key} column={column} regMap={regMap} />
+      ))}
+    </div>
+  );
 }
 
-function splitRoundViews(matches) {
-  const byRound = new Map();
-  for (const match of matches || []) {
-    const round = Number(match.round || 1);
-    if (!byRound.has(round)) byRound.set(round, []);
-    byRound.get(round).push(match);
+function RoundColumn({ column, regMap }) {
+  const shown = column.matches.slice(0, column.displayLimit || matchLimitForColumn(column));
+  const hiddenCount = Math.max(0, column.matches.length - shown.length);
+  const progress = `${column.doneCount}/${column.totalCount}`;
+
+  return (
+    <section className="min-h-0 border border-white/10 bg-[#0A0A0A]/82 rounded-sm overflow-hidden flex flex-col">
+      <div className="shrink-0 px-3 py-2 border-b border-white/10 bg-white/[0.03] flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-[0.22em] text-[#29B6E8] font-bold truncate">{column.sectionLabel}</div>
+          <h2 className="font-heading text-xl font-black uppercase leading-none truncate">{column.roundLabel}</h2>
+        </div>
+        <div className={`shrink-0 border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${column.isFallback ? "border-[#FFD600]/50 text-[#FFD600]" : "border-white/15 text-white/55"}`}>
+          {column.isFallback ? "Fertig" : progress}
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 p-2.5 grid content-start gap-2 overflow-hidden">
+        {shown.map((match) => (
+          <TvMatchCard key={match.id} match={match} regMap={regMap} />
+        ))}
+        {hiddenCount > 0 && (
+          <div className="border border-dashed border-white/15 px-3 py-2 text-center text-[11px] uppercase tracking-[0.18em] text-white/45">
+            + {hiddenCount} weitere Spiele
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function TvMatchCard({ match, regMap }) {
+  const isV2 = Array.isArray(match.slots);
+  const statusTone = getStatusTone(match.status);
+  const station = match.station_name || match.station_label || match.station_id;
+
+  return (
+    <article className={`border ${statusTone.border} ${statusTone.bg} rounded-sm overflow-hidden`}>
+      <div className="px-2.5 py-1.5 border-b border-white/5 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-[#29B6E8] font-bold truncate">{match.match_key || matchLabel(match)}</div>
+          <div className="text-[10px] uppercase tracking-wider text-white/38 truncate">{formatMatchKind(match)} · {formatMatchStatus(match.status)}</div>
+        </div>
+        {match.scheduled_at && <div className="shrink-0 text-right text-[10px] text-white/55">{formatDateTime(match.scheduled_at).replace(", ", " ")}</div>}
+      </div>
+
+      <div>
+        {isV2 ? (
+          (match.slots || []).map((slot) => {
+            const result = (match.results || []).find((row) => row.registration_id === slot.registration_id);
+            return <ParticipantRow key={slot.slot} label={participantLabel(slot, regMap)} result={result} position={slot.slot} />;
+          })
+        ) : (
+          <>
+            <ParticipantRow
+              label={legacyParticipantLabel(match.participant_a_id, regMap)}
+              score={match.score_a}
+              isWinner={match.winner_id && match.winner_id === match.participant_a_id}
+              side="A"
+            />
+            <ParticipantRow
+              label={legacyParticipantLabel(match.participant_b_id, regMap)}
+              score={match.score_b}
+              isWinner={match.winner_id && match.winner_id === match.participant_b_id}
+              side="B"
+            />
+          </>
+        )}
+      </div>
+
+      {(station || match.duration_minutes) && (
+        <div className="px-2.5 py-1.5 border-t border-white/5 flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider text-white/42">
+          <span className="truncate">{station ? `Station ${station}` : "Keine Station"}</span>
+          {match.duration_minutes && <span className="shrink-0">{match.duration_minutes} Min.</span>}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function ParticipantRow({ label, result, score, isWinner, position, side }) {
+  const rowScore = result?.score ?? result?.points ?? score;
+  const rank = result?.rank ? `#${result.rank}` : null;
+  return (
+    <div className={`flex items-center justify-between gap-2 px-2.5 py-1.5 border-b border-white/5 last:border-b-0 ${isWinner || result?.qualified ? "bg-[#29B6E8]/10" : ""}`}>
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="w-5 h-5 shrink-0 border border-white/10 bg-white/5 flex items-center justify-center text-[10px] font-bold text-white/55">
+          {side || position}
+        </span>
+        <span className={`truncate text-sm ${isWinner || result?.qualified ? "text-[#29B6E8] font-semibold" : "text-white/82"}`}>{label}</span>
+      </div>
+      <div className="shrink-0 text-right font-display font-bold text-white/75">
+        {rank || (rowScore != null ? rowScore : "—")}
+        {rank && rowScore != null && <div className="text-[10px] font-sans font-normal text-white/45">{rowScore} Pkt.</div>}
+      </div>
+    </div>
+  );
+}
+
+function buildTvViews(data) {
+  if (!data) return [];
+  const registrations = data.registrations || [];
+  const columns = (data.matches_v2 || []).length > 0
+    ? buildV2Columns(data)
+    : buildLegacyColumns(data);
+
+  const activeColumns = columns.filter((column) => !column.isComplete);
+  const displayColumns = expandColumnsForDisplay(
+    activeColumns.length > 0 ? activeColumns : columns.slice(-MAX_COLUMNS_PER_VIEW).map((column) => ({ ...column, isFallback: true }))
+  );
+  const titlePrefix = activeColumns.length > 0 ? "Aktive Runden" : "Abgeschlossene Runden";
+  const pages = chunk(displayColumns, MAX_COLUMNS_PER_VIEW);
+
+  return pages.map((page, index) => ({
+    key: `tv-board-${index}`,
+    title: pages.length > 1 ? `${titlePrefix} · Seite ${index + 1}/${pages.length}` : titlePrefix,
+    columns: page,
+    registrations,
+  }));
+}
+
+function buildV2Columns(data) {
+  const stages = data.stages || [];
+  const stageById = new Map(stages.map((stage) => [stage.id, stage]));
+  const groups = new Map();
+
+  for (const match of data.matches_v2 || []) {
+    const round = Number(match.round || match.matchday_number || 1);
+    const key = `${match.stage_id || "__default"}::${match.section || "MAIN"}::${round}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(match);
   }
-  const views = [];
-  for (const round of [...byRound.keys()].sort((a, b) => a - b)) {
-    const list = byRound.get(round).sort((a, b) => (a.order ?? a.match_index ?? 0) - (b.order ?? b.match_index ?? 0));
-    const hasMultiplayer = list.some((match) => match.match_type === "ffa" || (match.slots || []).length > 2);
-    const size = hasMultiplayer ? 4 : 6;
-    const pageCount = Math.max(1, Math.ceil(list.length / size));
-    for (let index = 0; index < pageCount; index += 1) {
-      const chunk = list.slice(index * size, (index + 1) * size);
-      const suffix = pageCount > 1 ? ` · Teil ${index + 1}/${pageCount}` : "";
-      views.push({
-        key: `r${round}-${index}`,
-        title: `${formatRoundName(chunk[0]?.round_name, round)}${suffix}`,
-        matches: chunk,
+
+  return [...groups.entries()]
+    .map(([key, matches]) => {
+      const [stageId, section, roundValue] = key.split("::");
+      const round = Number(roundValue || 1);
+      const stage = stageById.get(stageId) || { id: stageId, name: "Phase", number: 1 };
+      const sortedMatches = sortMatches(matches);
+      return makeColumn({
+        key,
+        stageNumber: Number(stage.number || 1),
+        section,
+        round,
+        sectionLabel: [stage.name || "Phase", formatBracketSection(section)].filter(Boolean).join(" · "),
+        roundLabel: formatScheduleGroupLabel(sortedMatches[0], data.tournament),
+        matches: sortedMatches,
       });
-    }
+    })
+    .sort(sortColumns);
+}
+
+function buildLegacyColumns(data) {
+  const groups = new Map();
+  for (const match of data.matches || []) {
+    const round = Number(match.round || 1);
+    const section = match.bracket || "winner";
+    const key = `${section}::${round}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(match);
   }
-  return views;
+
+  return [...groups.entries()]
+    .map(([key, matches]) => {
+      const [section, roundValue] = key.split("::");
+      const round = Number(roundValue || 1);
+      const sortedMatches = sortMatches(matches);
+      return makeColumn({
+        key,
+        stageNumber: 1,
+        section,
+        round,
+        sectionLabel: formatBracketSection(section),
+        roundLabel: formatRoundName(sortedMatches[0]?.round_name, round),
+        matches: sortedMatches,
+      });
+    })
+    .sort(sortColumns);
+}
+
+function makeColumn(column) {
+  const doneCount = column.matches.filter(isMatchDone).length;
+  const totalCount = column.matches.length;
+  return {
+    ...column,
+    doneCount,
+    totalCount,
+    isComplete: totalCount > 0 && doneCount >= totalCount,
+  };
+}
+
+function expandColumnsForDisplay(columns) {
+  return columns.flatMap((column) => {
+    const limit = matchLimitForColumn(column);
+    if (column.matches.length <= limit) return [{ ...column, displayLimit: limit }];
+    const parts = chunk(column.matches, limit);
+    return parts.map((matches, index) => ({
+      ...column,
+      key: `${column.key}-tv-${index}`,
+      roundLabel: `${column.roundLabel} · ${index + 1}/${parts.length}`,
+      matches,
+      displayLimit: limit,
+    }));
+  });
+}
+
+function matchLimitForColumn(column) {
+  const maxSlots = Math.max(2, ...column.matches.map((match) => (match.slots || []).length || 2));
+  if (maxSlots >= 6) return MAX_LARGE_HEAT_MATCHES_PER_COLUMN;
+  if (maxSlots > 2) return MAX_HEAT_MATCHES_PER_COLUMN;
+  return MAX_DUEL_MATCHES_PER_COLUMN;
+}
+
+function sortColumns(a, b) {
+  return (a.stageNumber - b.stageNumber)
+    || (sectionOrder(a.section) - sectionOrder(b.section))
+    || (a.round - b.round);
+}
+
+function sortMatches(matches) {
+  return [...matches].sort((a, b) => (a.order ?? a.match_index ?? 0) - (b.order ?? b.match_index ?? 0));
+}
+
+function sectionOrder(section) {
+  const normalized = String(section || "").toUpperCase();
+  if (["WB", "WINNER", "MAIN"].includes(normalized)) return 1;
+  if (["LB", "LOSER"].includes(normalized)) return 2;
+  if (["BRONZE"].includes(normalized)) return 3;
+  if (["GF", "FINAL", "GRAND_FINAL"].includes(normalized)) return 4;
+  return 9;
+}
+
+function isMatchDone(match) {
+  if (DONE_STATUSES.has(match.status)) return true;
+  if (match.winner_id) return true;
+  if ((match.results || []).length > 0 && ["completed", "archived"].includes(match.status)) return true;
+  return false;
+}
+
+function participantLabel(slot, regMap) {
+  const reg = regMap.get(slot.registration_id);
+  return reg?.display_name || reg?.user?.display_name || reg?.ingame_name || slot.source?.raw || "Offen";
+}
+
+function legacyParticipantLabel(registrationId, regMap) {
+  const reg = regMap.get(registrationId);
+  return reg?.display_name || reg?.user?.display_name || reg?.ingame_name || (registrationId ? "—" : "Offen");
+}
+
+function matchLabel(match) {
+  if (Number.isInteger(match.match_index)) return `Spiel ${match.match_index + 1}`;
+  if (match.order != null) return `Spiel ${Number(match.order) + 1}`;
+  return "Spiel";
+}
+
+function getStatusTone(status) {
+  if (["running", "in_progress"].includes(status)) return { border: "border-[#00FF88]/35", bg: "bg-[#00FF88]/5" };
+  if (["ready", "scheduled"].includes(status)) return { border: "border-[#29B6E8]/35", bg: "bg-[#29B6E8]/5" };
+  if (["disputed", "waiting_result"].includes(status)) return { border: "border-[#FFD600]/35", bg: "bg-[#FFD600]/5" };
+  if (DONE_STATUSES.has(status)) return { border: "border-white/10", bg: "bg-white/[0.025]" };
+  return { border: "border-white/10", bg: "bg-[#111111]" };
+}
+
+function chunk(items, size) {
+  const chunks = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
 }
