@@ -9,6 +9,7 @@ from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
 from services.sponsor_utils import dedupe_public_sponsors
 from services.notification_preferences import enqueue_newsletter_for_item
+from services.user_notifications import create_user_notification
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
     PartnerCreate, PartnerUpdate,
@@ -113,6 +114,53 @@ async def _mentioned_user_ids_from_content(content: str | None, explicit_ids: li
         if user_id and user_id not in ordered_ids:
             ordered_ids.append(user_id)
     return ordered_ids
+
+
+def _user_label(user: dict | None) -> str:
+    return (user or {}).get("display_name") or (user or {}).get("username") or "Benutzer"
+
+
+async def _notify_news_mentions(db, post: dict, actor: dict) -> None:
+    if not post or not post.get("published") or not _published_now(post):
+        return
+    mentioned_ids = [user_id for user_id in post.get("mentioned_user_ids") or [] if user_id]
+    if not mentioned_ids:
+        return
+    already_notified = set(post.get("news_mention_notified_user_ids") or [])
+    target_ids = [user_id for user_id in mentioned_ids if user_id not in already_notified and user_id != actor.get("id")]
+    if not target_ids:
+        return
+
+    users = await db.users.find(
+        {
+            "id": {"$in": target_ids},
+            "is_active": True,
+            "is_banned": {"$ne": True},
+        },
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "role": 1, "privacy_public_profile": 1},
+    ).to_list(200)
+    notified_ids: list[str] = []
+    slug_or_id = post.get("slug") or post.get("id")
+    url = f"/news/{slug_or_id}"
+    for user in users:
+        if post.get("visibility") == "internal" and user.get("role") not in STAFF_ROLES:
+            continue
+        if not await _user_can_see(user, post.get("visibility") or "public"):
+            continue
+        await create_user_notification(
+            user["id"],
+            title="Du wurdest in News erwähnt",
+            body=f"{_user_label(actor)} hat dich in \"{post.get('title') or 'News'}\" erwähnt.",
+            url=url,
+            kind="news_mention",
+            meta={"news_id": post.get("id"), "slug": post.get("slug")},
+        )
+        notified_ids.append(user["id"])
+    if notified_ids:
+        await db.news_posts.update_one(
+            {"id": post["id"]},
+            {"$addToSet": {"news_mention_notified_user_ids": {"$each": notified_ids}}},
+        )
 
 
 # ---------- News ----------
@@ -235,6 +283,7 @@ async def create_news(body: NewsCreate, me: dict = Depends(require_admin())):
                     "newsletter_sent_count": doc["newsletter_sent_count"],
                 }},
             )
+        await _notify_news_mentions(db, doc, me)
     doc.pop("_id", None)
     return doc
 
@@ -277,6 +326,9 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_adm
                 }},
             )
             saved = await db.news_posts.find_one({"id": nid}, {"_id": 0})
+    if saved:
+        await _notify_news_mentions(db, saved, me)
+        saved = await db.news_posts.find_one({"id": nid}, {"_id": 0}) or saved
     return saved
 
 

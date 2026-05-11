@@ -48,11 +48,12 @@ function userLabel(user) {
   return user?.display_name || user?.username || "Benutzer";
 }
 
-export function MentionSuggestionList({ items, activeIndex = 0, onPick, loading = false, className = "" }) {
+export function MentionSuggestionList({ items, activeIndex = 0, onPick, loading = false, className = "", style }) {
   if (!loading && (!items || items.length === 0)) return null;
   return (
     <div
       className={`z-40 w-full max-w-sm overflow-hidden rounded-sm border border-[#29B6E8]/40 bg-[#121212] shadow-2xl shadow-black/50 ${className}`}
+      style={style}
       onMouseDown={(event) => event.preventDefault()}
       role="listbox"
     >
@@ -85,6 +86,40 @@ export function MentionSuggestionList({ items, activeIndex = 0, onPick, loading 
   );
 }
 
+function getTextareaCaretPosition(textarea, caret) {
+  if (!textarea || typeof document === "undefined") return { left: 0, top: 0 };
+  const style = window.getComputedStyle(textarea);
+  const mirror = document.createElement("div");
+  const properties = [
+    "boxSizing", "width", "height", "overflowX", "overflowY", "borderTopWidth", "borderRightWidth",
+    "borderBottomWidth", "borderLeftWidth", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
+    "fontStyle", "fontVariant", "fontWeight", "fontStretch", "fontSize", "fontSizeAdjust", "lineHeight",
+    "fontFamily", "textAlign", "textTransform", "textIndent", "textDecoration", "letterSpacing", "wordSpacing",
+    "tabSize", "MozTabSize",
+  ];
+  mirror.style.position = "absolute";
+  mirror.style.visibility = "hidden";
+  mirror.style.whiteSpace = "pre-wrap";
+  mirror.style.wordWrap = "break-word";
+  mirror.style.top = "0";
+  mirror.style.left = "-9999px";
+  properties.forEach((prop) => {
+    mirror.style[prop] = style[prop];
+  });
+  const before = textarea.value.slice(0, caret);
+  const after = textarea.value.slice(caret) || ".";
+  mirror.textContent = before;
+  const marker = document.createElement("span");
+  marker.textContent = after[0];
+  mirror.appendChild(marker);
+  document.body.appendChild(mirror);
+  const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.35 || 18;
+  const left = marker.offsetLeft - textarea.scrollLeft;
+  const top = marker.offsetTop - textarea.scrollTop + lineHeight;
+  document.body.removeChild(mirror);
+  return { left, top };
+}
+
 export function MentionTextarea({
   value = "",
   onValueChange,
@@ -100,14 +135,17 @@ export function MentionTextarea({
 }) {
   const inputRef = useRef(null);
   const [trigger, setTrigger] = useState(null);
+  const [menuPosition, setMenuPosition] = useState({ left: 0, top: 0 });
   const [activeIndex, setActiveIndex] = useState(0);
   const { items, loading } = useMentionSearch(trigger?.query || "", { scope, scopeId });
 
   const refreshTrigger = () => {
     const input = inputRef.current;
     if (!input) return;
-    const next = mentionTriggerAt(input.value, input.selectionStart || 0);
+    const caret = input.selectionStart || 0;
+    const next = mentionTriggerAt(input.value, caret);
     setTrigger(next);
+    if (next) setMenuPosition(getTextareaCaretPosition(input, caret));
     setActiveIndex(0);
   };
 
@@ -173,7 +211,8 @@ export function MentionTextarea({
           loading={loading}
           activeIndex={activeIndex}
           onPick={insertMention}
-          className="absolute bottom-full left-0 mb-2"
+          className="absolute"
+          style={{ left: menuPosition.left, top: menuPosition.top + 4 }}
         />
       )}
     </div>

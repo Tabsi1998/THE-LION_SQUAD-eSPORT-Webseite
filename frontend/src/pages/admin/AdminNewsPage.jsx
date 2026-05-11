@@ -31,6 +31,15 @@ export default function AdminNewsPage() {
     try { await api.delete(`/news/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Beitrag konnte nicht geloescht werden.")); }
   };
 
+  const publicationState = (post) => {
+    if (!post.published) return { label: "Entwurf", detail: "", className: "text-white/40" };
+    const date = post.published_at ? new Date(post.published_at) : null;
+    if (date && !Number.isNaN(date.getTime()) && date.getTime() > Date.now()) {
+      return { label: "Geplant", detail: `Wird ${formatTimeUntil(date)} veröffentlicht`, className: "text-[#29B6E8]" };
+    }
+    return { label: "Veröffentlicht", detail: "", className: "text-[#10B981]" };
+  };
+
   return (
     <AdminLayout>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -63,7 +72,9 @@ export default function AdminNewsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {list.map((n) => (
+                {list.map((n) => {
+                  const state = publicationState(n);
+                  return (
                   <tr key={n.id}>
                     <td className="px-4 py-3">
                       <div className="font-bold text-white flex items-center gap-1.5">
@@ -75,7 +86,8 @@ export default function AdminNewsPage() {
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{n.category}</td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-white/60 font-bold">{n.visibility}</td>
                     <td className="px-4 py-3 text-xs">
-                      {n.published ? <span className="text-[#10B981] font-bold uppercase">Veröffentlicht</span> : <span className="text-white/40 uppercase">Entwurf</span>}
+                      <span className={`${state.className} font-bold uppercase`}>{state.label}</span>
+                      {state.detail && <div className="mt-0.5 text-[11px] normal-case text-white/45">{state.detail}</div>}
                     </td>
                     <td className="px-4 py-3 text-xs text-white/55">{new Date(n.published_at || n.created_at).toLocaleDateString("de-DE")}</td>
                     <td className="px-4 py-3 text-center space-x-2 whitespace-nowrap">
@@ -85,7 +97,8 @@ export default function AdminNewsPage() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -196,6 +209,10 @@ function NewsModal({ post, meta, onClose, onSaved }) {
       .filter((user) => `${user.username || ""} ${user.display_name || ""} ${user.email || ""}`.toLowerCase().includes(userNeedle))
       .slice(0, 8)
     : [];
+  const plannedDate = form.published && form.published_at ? new Date(form.published_at) : null;
+  const plannedDetail = plannedDate && !Number.isNaN(plannedDate.getTime()) && plannedDate.getTime() > Date.now()
+    ? `Dieser Beitrag ist geplant und wird ${formatTimeUntil(plannedDate)} öffentlich angezeigt.`
+    : "";
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 overflow-y-auto p-2 sm:p-4">
@@ -272,6 +289,7 @@ function NewsModal({ post, meta, onClose, onSaved }) {
               data-testid="news-published-at"
               className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"
             />
+            {plannedDetail && <div className="mt-1 text-xs text-[#29B6E8]">{plannedDetail}</div>}
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -332,6 +350,16 @@ function Field({ label, children }) {
       {children}
     </div>
   );
+}
+
+function formatTimeUntil(date) {
+  const ms = Math.max(0, date.getTime() - Date.now());
+  const minutes = Math.ceil(ms / 60000);
+  if (minutes < 60) return `in ${minutes} Minute${minutes === 1 ? "" : "n"}`;
+  const hours = Math.ceil(minutes / 60);
+  if (hours < 48) return `in ${hours} Stunde${hours === 1 ? "" : "n"}`;
+  const days = Math.ceil(hours / 24);
+  return `in ${days} Tag${days === 1 ? "" : "en"}`;
 }
 function Input({ value, onChange, placeholder, testId, required }) {
   return <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} required={required} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />;

@@ -232,6 +232,8 @@ export function MarkdownEditor({
   const [media, setMedia] = useState([]);
   const [visualMention, setVisualMention] = useState(null);
   const [visualMentionIndex, setVisualMentionIndex] = useState(0);
+  const [visualMentionPosition, setVisualMentionPosition] = useState({ left: 12, top: 44 });
+  const visualEditorWrapRef = useRef(null);
   const imageInputRef = useRef(null);
   const prompt = usePrompt();
   const syncingRef = useRef(false);
@@ -258,13 +260,33 @@ export function MarkdownEditor({
       setVisualMention(null);
       return;
     }
+    try {
+      const coords = nextEditor.view.coordsAtPos(from.pos);
+      const wrap = visualEditorWrapRef.current?.getBoundingClientRect();
+      if (wrap) {
+        setVisualMentionPosition({
+          left: Math.max(8, coords.left - wrap.left),
+          top: Math.max(8, coords.bottom - wrap.top + 4),
+        });
+      }
+    } catch {}
     setVisualMention({ query: trigger.query, from: from.pos - trigger.query.length - 1, to: from.pos });
     setVisualMentionIndex(0);
   }
 
   function insertVisualMention(user) {
     if (!editor || !visualMention) return;
-    editor.chain().focus().insertContentAt({ from: visualMention.from, to: visualMention.to }, `@${user.username} `).run();
+    editor.chain().focus().insertContentAt(
+      { from: visualMention.from, to: visualMention.to },
+      [
+        {
+          type: "text",
+          text: `@${user.username}`,
+          marks: [{ type: "link", attrs: { href: `/u/${encodeURIComponent(user.username)}` } }],
+        },
+        { type: "text", text: " " },
+      ],
+    ).run();
     setVisualMention(null);
   }
 
@@ -477,7 +499,7 @@ export function MarkdownEditor({
       </div>
 
       {mode === "visual" && (
-        <div className="relative" onKeyDown={handleVisualKeyDown} onKeyUp={() => refreshVisualMention()} onMouseUp={() => refreshVisualMention()}>
+        <div ref={visualEditorWrapRef} className="relative" onKeyDown={handleVisualKeyDown} onKeyUp={() => refreshVisualMention()} onMouseUp={() => refreshVisualMention()}>
           <EditorContent editor={editor} />
           {!!visualMention && (mentionSearch.loading || mentionSearch.items.length > 0) && (
             <MentionSuggestionList
@@ -485,7 +507,8 @@ export function MarkdownEditor({
               loading={mentionSearch.loading}
               activeIndex={visualMentionIndex}
               onPick={insertVisualMention}
-              className="absolute left-3 top-3"
+              className="absolute"
+              style={visualMentionPosition}
             />
           )}
         </div>

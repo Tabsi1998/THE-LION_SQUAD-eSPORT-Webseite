@@ -17,7 +17,7 @@ export function MentionText({ text = "" }) {
       <Link
         key={`${mentionStart}-${username}`}
         to={`/u/${encodeURIComponent(username)}`}
-        className="font-bold text-[#29B6E8] hover:text-white"
+        className="inline-flex items-center rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/10 px-1 font-bold leading-snug text-[#6FD6FF] no-underline hover:border-[#29B6E8]/65 hover:bg-[#29B6E8]/20 hover:text-white"
       >
         @{username}
       </Link>,

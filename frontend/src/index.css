@@ -281,6 +281,28 @@ textarea.input {
 }
 .prose-cms p { margin-bottom: 1em; }
 .prose-cms a { color: #29B6E8; text-decoration: underline; }
+.prose-cms a.mention-link,
+.prose-cms a[href^="/u/"],
+.tiptap-editor a[href^="/u/"] {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  border: 1px solid rgba(41,182,232,0.32);
+  border-radius: 3px;
+  background: rgba(41,182,232,0.12);
+  color: #6FD6FF;
+  padding: 0.02rem 0.28rem;
+  font-weight: 800;
+  line-height: 1.45;
+  text-decoration: none;
+}
+.prose-cms a.mention-link:hover,
+.prose-cms a[href^="/u/"]:hover,
+.tiptap-editor a[href^="/u/"]:hover {
+  border-color: rgba(41,182,232,0.65);
+  background: rgba(41,182,232,0.2);
+  color: #fff;
+}
 .prose-cms ul { padding-left: 1.25rem; margin-bottom: 1em; list-style-type: disc; }
 .prose-cms ol { padding-left: 1.25rem; margin-bottom: 1em; list-style-type: decimal; }
 .prose-cms li { margin: 0.25rem 0; }
