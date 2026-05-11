@@ -67,6 +67,8 @@ async def init_indexes():
     await db.f1_lap_times.create_index([("challenge_id", 1), ("track_id", 1), ("time_ms", 1)])
     # Stations
     await db.stations.create_index("id", unique=True)
+    await db.stations.create_index("tournament_id")
+    await db.stations.create_index([("tournament_id", 1), ("status", 1)])
     # News + sponsors
     await db.news_posts.create_index("id", unique=True)
     await db.sponsors.create_index("id", unique=True)

@@ -734,6 +734,7 @@ class F1LapTimeUpdate(BaseModel):
 class StationCreate(BaseModel):
     name: str
     device_type: str  # switch | switch2 | pc | racing_rig | beamer | stream_setup | admin_desk
+    tournament_id: Optional[str] = None
     event_id: Optional[str] = None
     game_id: Optional[str] = None
     notes: Optional[str] = None
@@ -742,6 +743,9 @@ class StationCreate(BaseModel):
 class StationUpdate(BaseModel):
     name: Optional[str] = None
     device_type: Optional[str] = None
+    tournament_id: Optional[str] = None
+    event_id: Optional[str] = None
+    game_id: Optional[str] = None
     status: Optional[Literal["free", "busy", "broken", "reserved"]] = None
     current_match_id: Optional[str] = None
     current_match_type: Optional[Literal["matches", "matches_v2"]] = None

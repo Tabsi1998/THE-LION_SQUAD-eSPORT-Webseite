@@ -66,6 +66,7 @@ async def _require_v2_result_permission(user: dict, match: dict) -> None:
     allowed = (
         await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "match", match["id"])
         or await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "stage", match.get("stage_id"))
+        or await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "station", match.get("station_id"))
     )
     if not allowed:
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Aktion")

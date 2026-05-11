@@ -120,7 +120,13 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
     m = await db.matches.find_one({"id": match_id})
     if not m:
         raise HTTPException(status_code=404)
-    await require_tournament_staff_permission(me, m["tournament_id"], RESULT_STAFF_ROLES)
+    allowed = (
+        await has_tournament_staff_permission(me, m["tournament_id"], RESULT_STAFF_ROLES, "tournament")
+        or await has_tournament_staff_permission(me, m["tournament_id"], RESULT_STAFF_ROLES, "match", match_id)
+        or (m.get("station_id") and await has_tournament_staff_permission(me, m["tournament_id"], RESULT_STAFF_ROLES, "station", m.get("station_id")))
+    )
+    if not allowed:
+        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Aktion")
     nullable_fields = {"winner_id", "scheduled_at", "station_id", "admin_note", "map", "best_of", "duration_minutes"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
