@@ -40,6 +40,7 @@ export default function AdminTournamentNewPage() {
     location: "", stream_link: "", discord_link: "",
   });
   const [saving, setSaving] = useState(false);
+  const isTeam = form.team_mode === "team";
 
   const loadSources = useCallback(() => {
     api.get("/games").then(({ data }) => setGames(data));
@@ -91,20 +92,23 @@ export default function AdminTournamentNewPage() {
       <form onSubmit={submit} className="max-w-3xl space-y-5">
         <Row>
           <Field label="Titel" value={form.title} onChange={(v) => { set("title", v); if (!form.slug) set("slug", autoSlug(v)); }} required testId="new-tr-title" />
-          <Field label="Slug (URL)" value={form.slug} onChange={(v) => set("slug", autoSlug(v))} required testId="new-tr-slug" />
+          <Select label="Spiel *" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, g.name])]} required testId="new-tr-game" />
         </Row>
-        <Textarea label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="new-tr-description" />
-        <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Turnier-Banner" testId="new-tr-banner-upload" variant="wide" allowLibrary />
+        <Row>
+          <Select label="Format" value={form.format} onChange={(v) => set("format", v)} options={TOURNAMENT_FORMAT_OPTIONS} testId="new-tr-format" />
+          <Select label="Teilnahme" value={form.team_mode} onChange={setTeamMode} options={[["solo", "Einzelspieler"], ["team", "Team"]]} testId="new-tr-mode" />
+        </Row>
+        <Row>
+          {isTeam && <Field label="Spieler pro Team" type="number" min="2" max="6" value={form.team_size} onChange={(v) => set("team_size", Number(v))} testId="new-tr-team-size" />}
+          <Field label={isTeam ? "Max Teams" : "Max Spieler"} type="number" value={form.max_participants} onChange={(v) => set("max_participants", Number(v))} testId="new-tr-max" />
+          <Field label={isTeam ? "Min Teams" : "Min Spieler"} type="number" value={form.min_participants} onChange={(v) => set("min_participants", Number(v))} testId="new-tr-min" />
+        </Row>
         <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeitplan & Anmeldung</div>
           <Row>
             <Select label="Veröffentlichung" value={form.status} onChange={(v) => set("status", v)} options={CREATE_STATUS_OPTIONS} testId="new-tr-status" />
             <Field label="Start Event/Turnier" type="datetime-local" value={form.start_date} onChange={(v) => set("start_date", v)} testId="new-tr-start" />
-            <Field label="Ende Event/Turnier" type="datetime-local" value={form.end_date} onChange={(v) => set("end_date", v)} testId="new-tr-end" />
-            <Field label="Anmeldung öffnet" type="datetime-local" value={form.registration_open_from} onChange={(v) => set("registration_open_from", v)} testId="new-tr-reg-from" />
             <Field label="Anmeldung endet" type="datetime-local" value={form.registration_open_until} onChange={(v) => set("registration_open_until", v)} testId="new-tr-reg-until" />
-            <Field label="Check-in öffnet" type="datetime-local" value={form.check_in_from} onChange={(v) => set("check_in_from", v)} testId="new-tr-checkin-from" />
-            <Field label="Check-in endet" type="datetime-local" value={form.check_in_until} onChange={(v) => set("check_in_until", v)} testId="new-tr-checkin-until" />
           </Row>
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
             Anmeldung, Check-in, Live und Beendet werden anhand dieser Zeiten automatisch geschaltet. Manuelle Sonderstatus setzt du später in der Bearbeitung.
@@ -114,40 +118,43 @@ export default function AdminTournamentNewPage() {
               <input type="checkbox" checked={form.registration_enabled} onChange={(e) => set("registration_enabled", e.target.checked)} data-testid="new-tr-reg-enabled" className="accent-[#29B6E8] mt-1" />
               <span>Öffentliche Anmeldung grundsätzlich erlauben</span>
             </label>
-            <label className="flex items-start gap-2 text-sm text-white/75">
+          </div>
+          <Details title="Weitere Zeiten und Sonderfälle">
+            <Row>
+              <Field label="Ende Event/Turnier" type="datetime-local" value={form.end_date} onChange={(v) => set("end_date", v)} testId="new-tr-end" />
+              <Field label="Anmeldung öffnet" type="datetime-local" value={form.registration_open_from} onChange={(v) => set("registration_open_from", v)} testId="new-tr-reg-from" />
+              <Field label="Check-in öffnet" type="datetime-local" value={form.check_in_from} onChange={(v) => set("check_in_from", v)} testId="new-tr-checkin-from" />
+              <Field label="Check-in endet" type="datetime-local" value={form.check_in_until} onChange={(v) => set("check_in_until", v)} testId="new-tr-checkin-until" />
+            </Row>
+            <label className="mt-3 flex items-start gap-2 text-sm text-white/75">
               <input type="checkbox" checked={form.is_invite_only} onChange={(e) => set("is_invite_only", e.target.checked)} data-testid="new-tr-invite-only" className="accent-[#29B6E8] mt-1" />
               <span>Nur Einladung/manuelle Teilnehmer, keine öffentliche Anmeldung</span>
             </label>
-          </div>
+          </Details>
         </div>
-        <Row>
-          <Select label="Spiel *" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, g.name])]} required testId="new-tr-game" />
-          <Select label="Format" value={form.format} onChange={(v) => set("format", v)} options={TOURNAMENT_FORMAT_OPTIONS} testId="new-tr-format" />
-        </Row>
-        <Row>
-          <Field label="Plattform" value={form.platform} onChange={(v) => set("platform", v)} placeholder="z.B. Nintendo Switch" testId="new-tr-platform" />
-          <Select label="Event" value={form.event_id || ""} onChange={(v) => set("event_id", v)} options={[["", "— keins —"], ...events.map((e) => [e.id, e.name])]} testId="new-tr-event" />
-        </Row>
-        <Row>
-          <Select label="Teilnahme" value={form.team_mode} onChange={setTeamMode} options={[["solo", "Einzelspieler"], ["team", "Team"]]} testId="new-tr-mode" />
-          {form.team_mode === "team" && <Field label="Spieler pro Team" type="number" min="2" max="6" value={form.team_size} onChange={(v) => set("team_size", Number(v))} testId="new-tr-team-size" />}
-        </Row>
-        <Row>
-          <Field label={form.team_mode === "team" ? "Max Teams" : "Max Spieler"} type="number" value={form.max_participants} onChange={(v) => set("max_participants", Number(v))} testId="new-tr-max" />
-          <Field label={form.team_mode === "team" ? "Min Teams" : "Min Spieler"} type="number" value={form.min_participants} onChange={(v) => set("min_participants", Number(v))} testId="new-tr-min" />
-        </Row>
-        <Row>
-          <Field label="Best of" type="number" value={form.best_of} onChange={(v) => set("best_of", Number(v))} testId="new-tr-bestof" />
-          <Select label="Seeding" value={form.seeding_mode} onChange={(v) => set("seeding_mode", v)} options={[["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]]} testId="new-tr-seeding" />
-        </Row>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={form.bronze_match} onChange={(e) => set("bronze_match", e.target.checked)} data-testid="new-tr-bronze" className="accent-[#29B6E8]" />
-          <span>Spiel um Platz 3 ermitteln</span>
-        </label>
-        <Textarea label="Regeln" value={form.rules} onChange={(v) => set("rules", v)} testId="new-tr-rules" />
+        <Details title="Darstellung und Regeln">
+          <Row>
+            <Field label="Slug (URL)" value={form.slug} onChange={(v) => set("slug", autoSlug(v))} required testId="new-tr-slug" />
+            <Field label="Plattform" value={form.platform} onChange={(v) => set("platform", v)} placeholder="z.B. Nintendo Switch" testId="new-tr-platform" />
+            <Select label="Event" value={form.event_id || ""} onChange={(v) => set("event_id", v)} options={[["", "— keins —"], ...events.map((e) => [e.id, e.name])]} testId="new-tr-event" />
+          </Row>
+          <Textarea label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="new-tr-description" />
+          <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Turnier-Banner" testId="new-tr-banner-upload" variant="wide" allowLibrary />
+          <Textarea label="Regeln" value={form.rules} onChange={(v) => set("rules", v)} testId="new-tr-rules" />
+        </Details>
+        <Details title="Spieloptionen">
+          <Row>
+            <Field label="Best of" type="number" value={form.best_of} onChange={(v) => set("best_of", Number(v))} testId="new-tr-bestof" />
+            <Select label="Seeding" value={form.seeding_mode} onChange={(v) => set("seeding_mode", v)} options={[["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]]} testId="new-tr-seeding" />
+          </Row>
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.bronze_match} onChange={(e) => set("bronze_match", e.target.checked)} data-testid="new-tr-bronze" className="accent-[#29B6E8]" />
+            <span>Spiel um Platz 3 ermitteln</span>
+          </label>
+        </Details>
 
         {/* Structured Prize Places */}
-        <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-4 space-y-3">
+        <Details title="Preise">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Preise (strukturiert)</div>
@@ -176,10 +183,10 @@ export default function AdminTournamentNewPage() {
             </div>
           ))}
           <Textarea label="Fallback Text (freier Preis-Text, falls nicht strukturiert)" value={form.prize_pool} onChange={(v) => set("prize_pool", v)} testId="new-tr-prizes" />
-        </div>
+        </Details>
 
         {/* Streaming + Links */}
-        <div className="border border-[#9146FF]/20 bg-[#9146FF]/5 rounded-sm p-4 space-y-3">
+        <Details title="Streaming und externe Links">
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#9146FF]">Streaming &amp; Verweise</div>
           <Row>
             <Field label="Twitch-Kanal" value={form.twitch_channel} onChange={(v) => set("twitch_channel", v)} testId="new-tr-twitch" placeholder="the_lion_squad_esports" />
@@ -197,7 +204,7 @@ export default function AdminTournamentNewPage() {
             <Field label="Externer Stream-Verweis" value={form.stream_link} onChange={(v) => set("stream_link", v)} testId="new-tr-stream" placeholder="https://…" />
             <Field label="Discord-Einladung" value={form.discord_link} onChange={(v) => set("discord_link", v)} testId="new-tr-discord" placeholder="https://discord.com/invite/…" />
           </Row>
-        </div>
+        </Details>
         <button disabled={saving} data-testid="new-tr-submit" className="px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50">
           {saving ? "Erstelle …" : "Turnier erstellen"}
         </button>
@@ -207,6 +214,14 @@ export default function AdminTournamentNewPage() {
 }
 
 function Row({ children }) { return <div className="grid md:grid-cols-2 gap-4">{children}</div>; }
+function Details({ title, children }) {
+  return (
+    <details className="border border-white/10 bg-[#121212] rounded-sm p-4 group">
+      <summary className="cursor-pointer select-none text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">{title}</summary>
+      <div className="mt-4 space-y-4">{children}</div>
+    </details>
+  );
+}
 function Field({ label, value, onChange, type = "text", required, placeholder, testId, min, max }) {
   return (
     <label className="block">
