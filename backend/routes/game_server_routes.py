@@ -328,8 +328,13 @@ async def _sync_one(db, server: dict) -> dict:
         error = str(exc)
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
-    updates = {"last_sync_at": now_utc().isoformat(), "last_sync_error": error, "last_sync_note": None, "updated_at": now_utc().isoformat()}
-    if not _maintenance_active(server) and server.get("status") != "planned":
+    updates = {
+        "last_sync_at": now_utc().isoformat(),
+        "last_sync_error": None,
+        "last_sync_note": f"Sync konnte den Server vom Webserver aus nicht erreichen. Letzter Status bleibt erhalten. Details: {error}",
+        "updated_at": now_utc().isoformat(),
+    }
+    if not server.get("last_sync_at") and not _maintenance_active(server) and server.get("status") != "planned":
         updates["status"] = "offline"
         updates["player_count"] = 0
         updates["player_names"] = []
@@ -375,7 +380,7 @@ async def touch_game_server(server_id: str, me: dict = Depends(require_admin()))
     db = get_db()
     res = await db.game_servers.update_one(
         {"id": server_id},
-        {"$set": {"last_sync_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(), "last_sync_error": None}},
+        {"$set": {"last_sync_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(), "last_sync_error": None, "last_sync_note": None}},
     )
     if res.matched_count == 0:
         raise HTTPException(404, "Server nicht gefunden.")

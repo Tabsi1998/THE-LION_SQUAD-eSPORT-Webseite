@@ -250,6 +250,14 @@ Endzeitpunkt, Geplant bleibt sichtbar als angekuendigter Server.
 Wenn ein Minecraft-Statusping einmal nicht antwortet, aber der Port erreichbar ist,
 bleibt der Server online und bekommt nur einen Sync-Hinweis statt faelschlich offline
 zu werden.
+Wenn Backend und Gameserver im selben internen Netz laufen, kann die oeffentliche
+Domain aus dem Docker-Container heraus auf eine andere Route zeigen als von einem
+normalen Client. Dann bleibt `Adresse` die oeffentliche Spieleradresse, waehrend
+`Interne Sync-Adresse` optional auf die aus dem Backend erreichbare Adresse gesetzt
+wird, z.B. `host.docker.internal`, `192.168.x.x` oder ein interner DNS-Name.
+`docker-compose.yml` enthaelt bereits `host.docker.internal:host-gateway` fuer diesen
+Fall. Wenn der Sync eine interne Verbindung nicht erreicht, bleibt der letzte Status
+erhalten und der Admin sieht nur einen Sync-Hinweis.
 
 Empfohlene Sync-Auswahl:
 

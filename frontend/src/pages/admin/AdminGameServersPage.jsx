@@ -196,7 +196,7 @@ export default function AdminGameServersPage() {
     try {
       const { data } = await api.post(`/game-servers/${server.id}/sync`);
       if (data.ok) toast.success("Serverdaten synchronisiert.");
-      else toast.error(data.error || "Sync fehlgeschlagen.");
+      else toast("Sync geprüft. Hinweis wurde am Server gespeichert.");
       load();
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail) || "Sync fehlgeschlagen.");
@@ -209,7 +209,7 @@ export default function AdminGameServersPage() {
     setSyncing("all");
     try {
       const { data } = await api.post("/game-servers/sync");
-      if (data.failed) toast.error(`${data.failed} von ${data.processed} Servern konnten nicht synchronisiert werden.`);
+      if (data.failed) toast(`${data.failed} von ${data.processed} Servern haben einen Sync-Hinweis bekommen.`);
       else toast.success(`${data.processed} Server synchronisiert.`);
       load();
     } catch (e) {
@@ -348,8 +348,8 @@ export default function AdminGameServersPage() {
             </label>
             {form.sync_provider !== "manual" && (
               <>
-                <Field label="Query-Host" value={form.query_host} onChange={(v) => set("query_host", v)} placeholder="leer = aus Adresse" />
-                <Field label="Query-Port" type="number" value={form.query_port} onChange={(v) => set("query_port", v)} placeholder="z.B. 25565" />
+                <Field label="Interne Sync-Adresse" value={form.query_host} onChange={(v) => set("query_host", v)} placeholder="leer = öffentliche Adresse, z.B. host.docker.internal" />
+                <Field label="Sync-Port" type="number" value={form.query_port} onChange={(v) => set("query_port", v)} placeholder="z.B. 25565" />
               </>
             )}
             {form.sync_provider === "rcon" && (
