@@ -8,19 +8,28 @@ import { openCookieSettings } from "@/components/tls/CookieConsent";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Menu, X, User, LogOut, Shield, Crown } from "lucide-react";
+import { Menu, X, User, LogOut, Shield, Crown, Megaphone } from "lucide-react";
 import { useCallback, useState, useEffect } from "react";
 
 export function PublicLayout({ children }) {
   const { user, logout, isAdmin, isClubMember } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [branding, setBranding] = useState(getCachedBranding());
+  const [siteBanner, setSiteBanner] = useState(null);
   const loadBranding = useCallback(async () => {
     try {
       const { data } = await api.get("/settings/public");
       setCachedBranding(data || {});
       setBranding(data || {});
     } catch {}
+  }, []);
+  const loadSiteBanner = useCallback(async () => {
+    try {
+      const { data } = await api.get("/settings/site-banner");
+      setSiteBanner(data?.enabled ? data : null);
+    } catch {
+      setSiteBanner(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -29,6 +38,8 @@ export function PublicLayout({ children }) {
     return unsubscribe;
   }, [loadBranding]);
   useApiInvalidation(loadBranding, ["settings", "branding"]);
+  useEffect(() => { loadSiteBanner(); }, [loadSiteBanner, user?.id, isClubMember, isAdmin]);
+  useApiInvalidation(loadSiteBanner, ["settings", "branding"]);
   const nav = useNavigate();
   const closeMobile = () => setMobileOpen(false);
   const clubName = branding?.club_name || "THE LION SQUAD";
@@ -148,6 +159,7 @@ export function PublicLayout({ children }) {
           </div>
         )}
       </header>
+      <SiteBanner banner={siteBanner} />
       <main className="flex-1 min-w-0 max-w-full overflow-x-clip">{children}</main>
       <footer className="border-t border-white/10 bg-[#0A0A0A] mt-24 min-w-0 max-w-full overflow-x-clip">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -240,6 +252,33 @@ export function PublicLayout({ children }) {
           </div>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function SiteBanner({ banner }) {
+  if (!banner?.enabled || !banner?.text) return null;
+  const tone = banner.tone || "info";
+  const isTicker = (banner.mode || "ticker") === "ticker";
+  const text = String(banner.text || "").trim();
+  const repeated = `${text}  •  `;
+  const content = isTicker ? repeated.repeat(8) : text;
+  const linkUrl = String(banner.link_url || "");
+  const linkLabel = banner.link_label || "Mehr";
+  const link = linkUrl
+    ? /^https?:\/\//i.test(linkUrl)
+      ? <a href={linkUrl} target="_blank" rel="noreferrer" className="tls-site-banner__link">{linkLabel}</a>
+      : <Link to={linkUrl} className="tls-site-banner__link">{linkLabel}</Link>
+    : null;
+  return (
+    <div className={`tls-site-banner tls-site-banner--${tone}`}>
+      <div className="tls-site-banner__inner">
+        <Megaphone className="w-4 h-4 shrink-0" />
+        <div className={`tls-site-banner__text ${isTicker ? "tls-site-banner__text--ticker" : ""}`}>
+          <span>{content}</span>
+        </div>
+        {link}
+      </div>
     </div>
   );
 }

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import io
 
 from database import get_db
-from auth import require_admin, require_super, get_current_user
+from auth import require_admin, require_super, get_current_user, get_optional_user
 from services.visibility import user_can_see
 from models import now_utc, new_id
 from email_service import send_template, _get_email_config
@@ -76,6 +76,15 @@ class BrandingSettings(BaseModel):
     twitch_client_id: Optional[str] = None
     twitch_client_secret: Optional[str] = None
     twitch_live_detection: Optional[bool] = None
+    site_banner_enabled: Optional[bool] = None
+    site_banner_text: Optional[str] = None
+    site_banner_tone: Optional[Literal["info", "live", "warning", "success"]] = None
+    site_banner_mode: Optional[Literal["ticker", "static"]] = None
+    site_banner_audience: Optional[Literal["all", "logged_in", "members", "admins"]] = None
+    site_banner_link_url: Optional[str] = None
+    site_banner_link_label: Optional[str] = None
+    site_banner_starts_at: Optional[str] = None
+    site_banner_ends_at: Optional[str] = None
 
 
 class TestEmailBody(BaseModel):
@@ -163,6 +172,44 @@ async def _audit_settings_change(db, action: str, setting_id: str, actor_id: str
     })
 
 
+def _parse_public_dt(value: str | None):
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except ValueError:
+        return None
+
+
+def _banner_user_can_see(branding: dict, user: dict | None) -> bool:
+    if not branding.get("site_banner_enabled"):
+        return False
+    text = str(branding.get("site_banner_text") or "").strip()
+    if not text:
+        return False
+    now = now_utc()
+    starts_at = _parse_public_dt(branding.get("site_banner_starts_at"))
+    ends_at = _parse_public_dt(branding.get("site_banner_ends_at"))
+    if starts_at and starts_at > now:
+        return False
+    if ends_at and ends_at < now:
+        return False
+    audience = branding.get("site_banner_audience") or "all"
+    admin_roles = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+    if audience == "all":
+        return True
+    if audience == "logged_in":
+        return bool(user)
+    if audience == "members":
+        return bool(user and (user.get("is_club_member") or user.get("role") in admin_roles))
+    if audience == "admins":
+        return bool(user and user.get("role") in admin_roles)
+    return False
+
+
 @settings_router.get("/public")
 async def public_settings(response: Response):
     """Public-safe settings for branding on public pages."""
@@ -223,6 +270,27 @@ async def public_settings(response: Response):
         "instagram_url": b.get("instagram_url") or "https://instagram.com/thelionsquadesports",
         "tiktok_url": b.get("tiktok_url") or "https://www.tiktok.com/@thelionsquadesports",
         "youtube_url": b.get("youtube_url") or "https://www.youtube.com/@TheLionSquadeSports",
+    }
+
+
+@settings_router.get("/site-banner")
+async def get_site_banner(response: Response, me: dict | None = Depends(get_optional_user)):
+    response.headers["Cache-Control"] = "no-store"
+    db = get_db()
+    b = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
+    if not _banner_user_can_see(b, me):
+        return {"enabled": False}
+    link_url = str(b.get("site_banner_link_url") or "").strip()
+    if link_url and not link_url.startswith(("http://", "https://", "/")):
+        link_url = "https://" + link_url
+    return {
+        "enabled": True,
+        "text": str(b.get("site_banner_text") or "").strip(),
+        "tone": b.get("site_banner_tone") or "info",
+        "mode": b.get("site_banner_mode") or "ticker",
+        "link_url": link_url,
+        "link_label": str(b.get("site_banner_link_label") or "").strip(),
+        "audience": b.get("site_banner_audience") or "all",
     }
 
 

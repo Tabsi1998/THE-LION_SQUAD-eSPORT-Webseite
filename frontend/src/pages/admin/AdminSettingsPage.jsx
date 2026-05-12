@@ -71,6 +71,9 @@ export default function AdminSettingsPage() {
     imprint: "", privacy_policy: "", legal_extra: "", privacy_extra: "",
     discord_invite_url: "", twitch_channel: "", twitch_client_id: "", twitch_client_secret: "",
     twitch_client_secret_masked: "", twitch_live_detection: true,
+    site_banner_enabled: false, site_banner_text: "", site_banner_tone: "info", site_banner_mode: "ticker",
+    site_banner_audience: "all", site_banner_link_url: "", site_banner_link_label: "",
+    site_banner_starts_at: "", site_banner_ends_at: "",
   });
   const [discord, setDiscord] = useState({ webhook_url: "", username: "", avatar_url: "", enabled: true, configured: false, webhook_url_masked: "", last_status: "", last_error: "", last_event_key: "", last_checked_at: "" });
   const [discordCounters, setDiscordCounters] = useState([]);
@@ -1191,6 +1194,43 @@ export default function AdminSettingsPage() {
               <ImageUpload value={brand.mascot_url} onChange={(v) => setBrandField("mascot_url", v)} label="Maskottchen" testId="brand-mascot" variant="square" allowLibrary />
               <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Favicon / Browser Icon" testId="brand-favicon" variant="square" allowLibrary />
             </div>
+            <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
+              <div>
+                <div className="font-heading font-bold uppercase">Globale Hinweisleiste</div>
+                <p className="text-xs text-white/50 mt-1">Für Live-Hinweise, Wartung, wichtige Termine oder Community-News. Wird unter der Navigation angezeigt und nur an die gewählte Zielgruppe ausgeliefert.</p>
+              </div>
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" checked={!!brand.site_banner_enabled} onChange={(e) => setBrandField("site_banner_enabled", e.target.checked)} data-testid="brand-site-banner-enabled" className="accent-[#29B6E8] mt-1" />
+                <span>Hinweisleiste anzeigen</span>
+              </label>
+              <LegalTextArea label="Text" value={brand.site_banner_text} onChange={(v) => setBrandField("site_banner_text", v)} testId="brand-site-banner-text" rows={2} />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <BrandSelect label="Stil" value={brand.site_banner_tone || "info"} onChange={(v) => setBrandField("site_banner_tone", v)} testId="brand-site-banner-tone" options={[
+                  ["info", "Info"],
+                  ["live", "Live"],
+                  ["warning", "Warnung"],
+                  ["success", "Erfolg"],
+                ]} />
+                <BrandSelect label="Animation" value={brand.site_banner_mode || "ticker"} onChange={(v) => setBrandField("site_banner_mode", v)} testId="brand-site-banner-mode" options={[
+                  ["ticker", "Lauftext"],
+                  ["static", "Statisch"],
+                ]} />
+                <BrandSelect label="Zielgruppe" value={brand.site_banner_audience || "all"} onChange={(v) => setBrandField("site_banner_audience", v)} testId="brand-site-banner-audience" options={[
+                  ["all", "Alle Besucher"],
+                  ["logged_in", "Eingeloggt"],
+                  ["members", "Vereinsmitglieder"],
+                  ["admins", "Admins"],
+                ]} />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <BrandField label="Link URL" value={brand.site_banner_link_url} onChange={(v) => setBrandField("site_banner_link_url", v)} testId="brand-site-banner-link-url" placeholder="/events oder https://..." />
+                <BrandField label="Link-Text" value={brand.site_banner_link_label} onChange={(v) => setBrandField("site_banner_link_label", v)} testId="brand-site-banner-link-label" placeholder="Mehr anzeigen" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <BrandField label="Anzeigen ab" value={brand.site_banner_starts_at} onChange={(v) => setBrandField("site_banner_starts_at", v)} testId="brand-site-banner-starts" placeholder="2026-06-20T10:00:00+02:00" />
+                <BrandField label="Anzeigen bis" value={brand.site_banner_ends_at} onChange={(v) => setBrandField("site_banner_ends_at", v)} testId="brand-site-banner-ends" placeholder="2026-06-21T23:59:00+02:00" />
+              </div>
+            </div>
             <p className="text-xs text-white/45">Impressum, Datenschutz und Vereinsdaten liegen im Tab Rechtliches.</p>
             <button onClick={saveBrand} disabled={imageUploadBusy || savingBrand} data-testid="brand-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingBrand ? "Speichere..." : "Speichern"}</button>
           </div>
@@ -1312,6 +1352,17 @@ function BrandField({ label, value, onChange, testId, placeholder = "" }) {
     <label className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
       <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+    </label>
+  );
+}
+
+function BrandSelect({ label, value, onChange, testId, options }) {
+  return (
+    <label className="block">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <select value={value || ""} onChange={(e) => onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+        {options.map(([key, labelText]) => <option key={key} value={key}>{labelText}</option>)}
+      </select>
     </label>
   );
 }
