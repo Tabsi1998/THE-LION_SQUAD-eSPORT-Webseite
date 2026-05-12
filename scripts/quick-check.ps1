@@ -55,6 +55,7 @@ $pythonFiles = @(
     "backend/routes/team_routes.py",
     "backend/routes/match_routes.py",
     "backend/routes/match_v2_routes.py",
+    "backend/routes/phase_ef_routes.py",
     "backend/routes/tournament_routes.py",
     "backend/routes/f1_routes.py",
     "backend/models.py"

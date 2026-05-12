@@ -204,6 +204,13 @@ Im Adminbereich unter `Einstellungen -> Branding` pflegen:
 Diese Werte werden oeffentlich genutzt, unter anderem fuer Header/Footer, Kontaktseite,
 Browser-Favicon, Apple Icon, Manifest, Theme-Color und SEO-Meta.
 
+## Twitch und Live-Streams
+
+- Twitch wird pro Account erkannt, wenn ein Twitch-Name im Profil hinterlegt ist.
+- Der Twitch-Embed auf einer oeffentlichen Profilseite bleibt eine Profil-Einstellung.
+- Der Live-Bereich auf der Startseite zeigt nur aktive bzw. Ehren-Vereinsmitglieder mit aktivem Vereinsprofil.
+- Normale Community-Profile koennen ihren Twitch-Embed im Profil anzeigen, erscheinen aber nicht im Startseiten-Live-Slider.
+
 ## SEO, Google und Link-Vorschauen
 
 Oeffentliche Detailseiten fuer News, Events, Turniere, Fast-Lap-Challenges,

@@ -28,6 +28,7 @@ from services.content_embed_service import resolve_content_embeds
 
 # ============= Streams (public + admin) =============
 streams_router = APIRouter(prefix="/api/streams", tags=["streams"])
+ACTIVE_STREAM_MEMBER_STATUSES = ("active", "honorary")
 
 
 @streams_router.get("/live")
@@ -42,14 +43,23 @@ async def list_live_streams():
         {"id": {"$in": user_ids}, "is_active": True, "is_banned": {"$ne": True}},
         {"_id": 0, "id": 1, "username": 1, "privacy_public_profile": 1},
     ).to_list(2000)
+    active_user_ids = {user["id"] for user in users}
+    memberships = await db.memberships.find(
+        {"user_id": {"$in": list(active_user_ids)}, "member_status": {"$in": list(ACTIVE_STREAM_MEMBER_STATUSES)}},
+        {"_id": 0, "user_id": 1},
+    ).to_list(2000)
+    member_user_ids = {membership.get("user_id") for membership in memberships if membership.get("user_id")}
+    if not member_user_ids:
+        return []
     public_profile_by_user = {
         user["id"]: f"/u/{user.get('username')}"
         for user in users
-        if user.get("username") and user.get("privacy_public_profile") is True
+        if user.get("id") in member_user_ids and user.get("username") and user.get("privacy_public_profile") is True
     }
 
+    # Homepage-Live-Slider: nur aktive Vereinsmitglieder. Profil-Twitch-Embeds bleiben separat pro Profil steuerbar.
     member_profiles = await db.club_member_profiles.find(
-        {"user_id": {"$in": user_ids}, "is_active": {"$ne": False}},
+        {"user_id": {"$in": list(member_user_ids)}, "is_active": {"$ne": False}},
         {
             "_id": 0,
             "id": 1,
@@ -64,6 +74,8 @@ async def list_live_streams():
 
     linked_streams = []
     for stream in streams:
+        if stream.get("user_id") not in member_user_ids:
+            continue
         profile = profile_by_user.get(stream.get("user_id"))
         if not profile:
             continue
