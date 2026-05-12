@@ -217,6 +217,21 @@ export default function AdminGameServersPage() {
     }
   };
 
+  const removeSeededDefaults = async () => {
+    if (!await confirm({
+      title: "Demo-Startliste entfernen?",
+      description: "Entfernt nur automatisch angelegte Startserver ohne Ersteller. Selbst angelegte Server bleiben erhalten.",
+      confirmLabel: "Startliste entfernen",
+    })) return;
+    try {
+      const { data } = await api.delete("/game-servers/seeded-defaults");
+      toast.success(`${data.deleted || 0} Demo-Server entfernt.`);
+      load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Startliste konnte nicht entfernt werden.");
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
@@ -228,10 +243,13 @@ export default function AdminGameServersPage() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={syncAll} disabled={syncing === "all"} className="px-4 py-2.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50">
+          <button onClick={removeSeededDefaults} className="w-full sm:w-auto px-4 py-2.5 border border-[#FFD700]/45 text-[#FFD700] rounded-sm font-bold uppercase tracking-wider">
+            Demo-Startliste entfernen
+          </button>
+          <button onClick={syncAll} disabled={syncing === "all"} className="w-full sm:w-auto px-4 py-2.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 disabled:opacity-50">
             <RefreshCw className={`w-4 h-4 ${syncing === "all" ? "animate-spin" : ""}`} /> Alle syncen
           </button>
-          <button onClick={startCreate} className="px-5 py-2.5 bg-[#29B6E8] text-black rounded-sm font-bold uppercase tracking-wider inline-flex items-center gap-2">
+          <button onClick={startCreate} className="w-full sm:w-auto px-5 py-2.5 bg-[#29B6E8] text-black rounded-sm font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2">
             <Plus className="w-4 h-4" /> Server anlegen
           </button>
         </div>

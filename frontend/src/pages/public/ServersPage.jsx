@@ -152,9 +152,15 @@ function ServerCard({ server }) {
     toast.success("Server-Adresse kopiert.");
   };
   const copySecret = async () => {
-    if (!server.access_secret || !navigator.clipboard) return;
-    await navigator.clipboard.writeText(server.access_secret).catch(() => null);
-    toast.success(`${secretLabels[server.access_secret_kind] || "Zugang"} kopiert.`);
+    if (!server.has_access_secret || !navigator.clipboard) return;
+    try {
+      const { data } = await api.get(`/game-servers/${server.id}/access`);
+      if (!data?.access_secret) throw new Error("missing-secret");
+      await navigator.clipboard.writeText(data.access_secret);
+      toast.success(`${secretLabels[server.access_secret_kind] || "Zugang"} kopiert.`);
+    } catch {
+      toast.error("Zugang konnte nicht geladen werden.");
+    }
   };
   return (
     <article className={`relative overflow-hidden border rounded-sm bg-[#111] p-5 min-h-[18rem] flex flex-col ${status === "maintenance" ? "border-[#FFD700]/35" : "border-white/10"}`}>
@@ -216,7 +222,7 @@ function ServerCard({ server }) {
                 <div className="text-[10px] uppercase tracking-widest text-[#FFD700] font-black">{server.access_label || secretLabels[server.access_secret_kind] || "Zugang"}</div>
                 <div className="font-mono text-xs text-white/70 mt-1">{server.has_access_secret ? (server.access_secret_masked || "••••••") : "siehe Hinweis"}</div>
               </div>
-              {server.access_secret && (
+              {server.has_access_secret && (
                 <button type="button" onClick={copySecret} className="shrink-0 inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FFD700]/10">
                   <KeyRound className="w-3.5 h-3.5" /> Kopieren
                 </button>

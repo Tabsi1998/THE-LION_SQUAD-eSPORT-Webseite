@@ -21,7 +21,7 @@ from routes.team_routes import router as team_router
 from routes.message_routes import router as message_router
 from routes.friend_routes import router as friend_router
 from routes.game_routes import router as game_router
-from routes.game_server_routes import router as game_server_router, seed_default_game_servers
+from routes.game_server_routes import router as game_server_router, seed_demo_game_servers
 from routes.event_routes import router as event_router
 from routes.tournament_routes import router as tournament_router
 from routes.match_routes import router as match_router
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI):
     await seed_default_pages()
     await seed_email_templates()
     await seed_default_nav()
-    await seed_default_game_servers()
+    await seed_demo_game_servers()
     if os.environ.get("SEED_DEMO", "false").lower() == "true":
         logger.info("[THE LION SQUAD] Seeding demo data...")
         await seed_demo_data()

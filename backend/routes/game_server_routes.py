@@ -1,4 +1,5 @@
 """Community game server directory and admin maintenance."""
+import os
 import re
 from datetime import datetime, timezone
 from typing import Literal, Optional
@@ -19,7 +20,7 @@ ServerSecretKind = Literal["none", "password", "invite_code", "whitelist", "disc
 router = APIRouter(prefix="/api/game-servers", tags=["game-servers"])
 
 
-DEFAULT_GAME_SERVERS = [
+DEMO_GAME_SERVERS = [
     {"name": "THE LION SQUAD (Minecraft Survival)", "game_name": "Minecraft", "slug": "minecraft-survival", "status": "online", "visibility": "public", "address": "gameserver.lionsquad.at:25565", "max_players": 100, "sort_order": 10},
     {"name": "THE LION SQUAD eSPORTS (Assetto Corsa Competizione)", "game_name": "Assetto Corsa Competizione", "slug": "assetto-corsa-competizione", "status": "offline", "visibility": "public", "address": "gameserver.lionsquad.at:9231", "sort_order": 20},
     {"name": "THE LION SQUAD (Rust)", "game_name": "Rust", "slug": "rust", "status": "online", "visibility": "community", "address": "gameserver.lionsquad.at:28015", "max_players": 100, "sort_order": 30},
@@ -30,6 +31,8 @@ DEFAULT_GAME_SERVERS = [
     {"name": "THE LION SQUAD (ARK)", "game_name": "ARK", "slug": "ark", "status": "offline", "visibility": "members", "address": "gameserver.lionsquad.at:7777", "sort_order": 80},
     {"name": "THE LION SQUAD (Satisfactory)", "game_name": "Satisfactory", "slug": "satisfactory", "status": "offline", "visibility": "members", "address": "gameserver.lionsquad.at:7778", "sort_order": 90},
 ]
+
+DEMO_GAME_SERVER_SLUGS = {item["slug"] for item in DEMO_GAME_SERVERS}
 
 
 def _slugify(value: str) -> str:
@@ -188,9 +191,15 @@ class GameServerPatch(BaseModel):
     sort_order: Optional[int] = None
 
 
-async def seed_default_game_servers():
+async def seed_demo_game_servers():
+    seed_values = {"1", "true", "yes", "on"}
+    if (
+        os.environ.get("SEED_GAME_SERVERS", "").lower() not in seed_values
+        and os.environ.get("SEED_DEMO", "").lower() not in seed_values
+    ):
+        return
     db = get_db()
-    for index, item in enumerate(DEFAULT_GAME_SERVERS):
+    for index, item in enumerate(DEMO_GAME_SERVERS):
         await db.game_servers.update_one(
             {"slug": item["slug"]},
             {"$setOnInsert": {
@@ -203,6 +212,7 @@ async def seed_default_game_servers():
                 "updated_at": now_utc().isoformat(),
                 "last_sync_at": None,
                 "sync_provider": "auto_public",
+                "seeded_default": True,
                 "sort_order": index * 10,
                 **item,
             }},
@@ -238,6 +248,23 @@ async def admin_list_game_servers(me: dict = Depends(require_admin())):
     rows = await db.game_servers.find({}, {"_id": 0}).sort([("sort_order", 1), ("name", 1)]).to_list(500)
     game_by_id = await _game_lookup(db, [row.get("game_id") for row in rows if row.get("game_id")])
     return [_public_doc(row, game_by_id.get(row.get("game_id")), include_admin_fields=True) for row in rows]
+
+
+@router.get("/{server_id}/access")
+async def get_game_server_access(server_id: str, me: dict | None = Depends(get_optional_user)):
+    db = get_db()
+    server = await db.game_servers.find_one({"id": server_id}, {"_id": 0})
+    if not server:
+        raise HTTPException(404, "Server nicht gefunden.")
+    if not _can_view(server, me):
+        raise HTTPException(403, "Kein Zugriff auf diesen Server.")
+    if not server.get("access_secret") or (server.get("access_secret_kind") or "none") == "none":
+        raise HTTPException(404, "Kein Zugang hinterlegt.")
+    return {
+        "kind": server.get("access_secret_kind") or "password",
+        "label": server.get("access_label"),
+        "access_secret": server.get("access_secret"),
+    }
 
 
 @router.post("")
@@ -362,6 +389,16 @@ async def touch_game_server(server_id: str, me: dict = Depends(require_admin()))
     if res.matched_count == 0:
         raise HTTPException(404, "Server nicht gefunden.")
     return await db.game_servers.find_one({"id": server_id}, {"_id": 0})
+
+
+@router.delete("/seeded-defaults")
+async def delete_seeded_default_game_servers(me: dict = Depends(require_admin())):
+    db = get_db()
+    res = await db.game_servers.delete_many({
+        "slug": {"$in": sorted(DEMO_GAME_SERVER_SLUGS)},
+        "created_by": {"$exists": False},
+    })
+    return {"ok": True, "deleted": res.deleted_count}
 
 
 @router.delete("/{server_id}")

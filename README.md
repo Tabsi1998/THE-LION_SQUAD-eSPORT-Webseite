@@ -217,6 +217,13 @@ Browser-Favicon, Apple Icon, Manifest, Theme-Color und SEO-Meta.
 Der Tab `Community -> Server` zeigt Gameserver aus `/api/game-servers`. Admins pflegen
 sie unter `Admin -> Game-Server`.
 
+Produktive Installationen starten ohne automatisch angelegte Server. Die fruehere
+Demo-Startliste wird nur noch importiert, wenn `SEED_GAME_SERVERS=true` oder
+`SEED_DEMO=true` gesetzt ist. Falls aus einer alten Version bereits Startserver in
+der Datenbank liegen, kann sie ein Admin unter `Admin -> Game-Server` mit
+`Demo-Startliste entfernen` bereinigen. Selbst angelegte Server werden dabei nicht
+geloescht.
+
 Sichtbarkeiten:
 
 - `Oeffentlich`: fuer jeden Besucher sichtbar.
@@ -260,7 +267,9 @@ Zugangsdaten werden getrennt von der Serveradresse gepflegt:
 - `Im Discord`: zeigt nur den Hinweis, dass der Zugang im Discord steht.
 
 Passwort und Invite-Code werden in der Serverkarte maskiert angezeigt und koennen nur
-von Personen kopiert werden, die den Server wegen seiner Sichtbarkeit sehen duerfen.
+von Personen abgerufen und kopiert werden, die den Server wegen seiner Sichtbarkeit
+sehen duerfen. Die Serverliste liefert Secrets nicht gesammelt aus; der echte Wert
+wird erst beim Klick auf `Kopieren` geladen.
 Im Adminbereich bleiben gespeicherte Secrets beim Bearbeiten erhalten, wenn das Feld
 leer gelassen wird.
 
