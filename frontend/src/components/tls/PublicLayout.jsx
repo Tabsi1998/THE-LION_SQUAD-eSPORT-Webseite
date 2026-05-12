@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
 import { MainNav, MobileNav } from "@/components/tls/MainNav";
@@ -13,6 +13,7 @@ import { useCallback, useState, useEffect } from "react";
 
 export function PublicLayout({ children }) {
   const { user, logout, isAdmin, isClubMember } = useAuth();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [branding, setBranding] = useState(getCachedBranding());
   const [siteBanner, setSiteBanner] = useState(null);
@@ -159,8 +160,10 @@ export function PublicLayout({ children }) {
           </div>
         )}
       </header>
-      <SiteBanner banner={siteBanner} />
+      <SiteBanner banner={siteBanner} pathname={location.pathname} slot="below_nav" />
       <main className="flex-1 min-w-0 max-w-full overflow-x-clip">{children}</main>
+      <SiteBanner banner={siteBanner} pathname={location.pathname} slot="above_footer" />
+      <SiteBanner banner={siteBanner} pathname={location.pathname} slot="bottom_fixed" />
       <footer className="border-t border-white/10 bg-[#0A0A0A] mt-24 min-w-0 max-w-full overflow-x-clip">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           {/* Reihe 1 — Brand + 4 Link-Spalten */}
@@ -256,9 +259,32 @@ export function PublicLayout({ children }) {
   );
 }
 
-function SiteBanner({ banner }) {
+function bannerMatchesPath(banner, pathname) {
+  const path = pathname || "/";
+  const scope = banner?.scope || "all";
+  if (scope === "all") return true;
+  if (scope === "tournaments") return path.startsWith("/tournaments") || path.startsWith("/tournament");
+  if (scope === "events") return path.startsWith("/events") || path.startsWith("/event");
+  if (scope === "news") return path.startsWith("/news");
+  if (scope === "community") return ["/community", "/players", "/teams", "/servers"].some((prefix) => path.startsWith(prefix));
+  if (scope === "servers") return path.startsWith("/servers");
+  if (scope === "members") return ["/members", "/membership", "/about", "/board", "/values", "/references"].some((prefix) => path.startsWith(prefix));
+  if (scope === "custom") {
+    const custom = String(banner?.path || "").trim();
+    if (!custom) return false;
+    const normalized = custom.startsWith("/") ? custom : `/${custom}`;
+    return path === normalized || path.startsWith(`${normalized.replace(/\/+$/, "")}/`);
+  }
+  return false;
+}
+
+function SiteBanner({ banner, pathname, slot }) {
   if (!banner?.enabled || !banner?.text) return null;
+  const position = banner.position || "below_nav";
+  if (position !== slot) return null;
+  if (!bannerMatchesPath(banner, pathname)) return null;
   const tone = banner.tone || "info";
+  const style = banner.style || "neon";
   const isTicker = (banner.mode || "ticker") === "ticker";
   const text = String(banner.text || "").trim();
   const repeated = `${text}  •  `;
@@ -271,7 +297,7 @@ function SiteBanner({ banner }) {
       : <Link to={linkUrl} className="tls-site-banner__link">{linkLabel}</Link>
     : null;
   return (
-    <div className={`tls-site-banner tls-site-banner--${tone}`}>
+    <div className={`tls-site-banner tls-site-banner--${tone} tls-site-banner--${style} tls-site-banner--pos-${position}`}>
       <div className="tls-site-banner__inner">
         <Megaphone className="w-4 h-4 shrink-0" />
         <div className={`tls-site-banner__text ${isTicker ? "tls-site-banner__text--ticker" : ""}`}>

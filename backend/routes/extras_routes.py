@@ -80,6 +80,10 @@ class BrandingSettings(BaseModel):
     site_banner_text: Optional[str] = None
     site_banner_tone: Optional[Literal["info", "live", "warning", "success"]] = None
     site_banner_mode: Optional[Literal["ticker", "static"]] = None
+    site_banner_style: Optional[Literal["neon", "solid", "minimal"]] = None
+    site_banner_position: Optional[Literal["below_nav", "bottom_fixed", "above_footer"]] = None
+    site_banner_scope: Optional[Literal["all", "tournaments", "events", "news", "community", "servers", "members", "custom"]] = None
+    site_banner_path: Optional[str] = None
     site_banner_audience: Optional[Literal["all", "logged_in", "members", "admins"]] = None
     site_banner_link_url: Optional[str] = None
     site_banner_link_label: Optional[str] = None
@@ -288,6 +292,10 @@ async def get_site_banner(response: Response, me: dict | None = Depends(get_opti
         "text": str(b.get("site_banner_text") or "").strip(),
         "tone": b.get("site_banner_tone") or "info",
         "mode": b.get("site_banner_mode") or "ticker",
+        "style": b.get("site_banner_style") or "neon",
+        "position": b.get("site_banner_position") or "below_nav",
+        "scope": b.get("site_banner_scope") or "all",
+        "path": str(b.get("site_banner_path") or "").strip(),
         "link_url": link_url,
         "link_label": str(b.get("site_banner_link_label") or "").strip(),
         "audience": b.get("site_banner_audience") or "all",

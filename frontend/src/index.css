@@ -304,6 +304,47 @@ img, video, canvas, svg {
 .tls-site-banner--live { color: #FF3B30; }
 .tls-site-banner--warning { color: #FFD700; }
 .tls-site-banner--success { color: #00FF88; }
+.tls-site-banner--pos-bottom_fixed {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  border-top: 1px solid rgba(255,255,255,0.10);
+  border-bottom: 0;
+  box-shadow: 0 -16px 35px rgba(0,0,0,0.45);
+}
+
+.tls-site-banner--pos-above_footer {
+  margin-top: 4rem;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.tls-site-banner--solid {
+  background: color-mix(in srgb, currentColor 18%, #0A0A0A);
+  border-color: color-mix(in srgb, currentColor 38%, transparent);
+}
+
+.tls-site-banner--solid::before {
+  opacity: 0.10;
+}
+
+.tls-site-banner--minimal {
+  background: rgba(10,10,10,0.98);
+}
+
+.tls-site-banner--minimal::before {
+  display: none;
+}
+
+.tls-site-banner--minimal .tls-site-banner__inner {
+  min-height: 2.25rem;
+}
+
+.tls-site-banner--minimal .tls-site-banner__text {
+  color: rgba(255,255,255,0.64);
+  font-weight: 700;
+}
 
 .tls-site-banner__inner {
   position: relative;

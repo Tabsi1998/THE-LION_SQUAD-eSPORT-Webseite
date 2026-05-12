@@ -72,6 +72,7 @@ export default function AdminSettingsPage() {
     discord_invite_url: "", twitch_channel: "", twitch_client_id: "", twitch_client_secret: "",
     twitch_client_secret_masked: "", twitch_live_detection: true,
     site_banner_enabled: false, site_banner_text: "", site_banner_tone: "info", site_banner_mode: "ticker",
+    site_banner_style: "neon", site_banner_position: "below_nav", site_banner_scope: "all", site_banner_path: "",
     site_banner_audience: "all", site_banner_link_url: "", site_banner_link_label: "",
     site_banner_starts_at: "", site_banner_ends_at: "",
   });
@@ -1215,6 +1216,28 @@ export default function AdminSettingsPage() {
                   ["ticker", "Lauftext"],
                   ["static", "Statisch"],
                 ]} />
+                <BrandSelect label="Design" value={brand.site_banner_style || "neon"} onChange={(v) => setBrandField("site_banner_style", v)} testId="brand-site-banner-style" options={[
+                  ["neon", "Neon"],
+                  ["solid", "Signal"],
+                  ["minimal", "Minimal"],
+                ]} />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <BrandSelect label="Position" value={brand.site_banner_position || "below_nav"} onChange={(v) => setBrandField("site_banner_position", v)} testId="brand-site-banner-position" options={[
+                  ["below_nav", "Unter Navigation"],
+                  ["bottom_fixed", "Unten fixiert"],
+                  ["above_footer", "Über Footer"],
+                ]} />
+                <BrandSelect label="Bereich" value={brand.site_banner_scope || "all"} onChange={(v) => setBrandField("site_banner_scope", v)} testId="brand-site-banner-scope" options={[
+                  ["all", "Ganze Website"],
+                  ["tournaments", "Turniere"],
+                  ["events", "Events"],
+                  ["news", "News"],
+                  ["community", "Community"],
+                  ["servers", "Server"],
+                  ["members", "Verein"],
+                  ["custom", "Eigener Pfad"],
+                ]} />
                 <BrandSelect label="Zielgruppe" value={brand.site_banner_audience || "all"} onChange={(v) => setBrandField("site_banner_audience", v)} testId="brand-site-banner-audience" options={[
                   ["all", "Alle Besucher"],
                   ["logged_in", "Eingeloggt"],
@@ -1222,6 +1245,9 @@ export default function AdminSettingsPage() {
                   ["admins", "Admins"],
                 ]} />
               </div>
+              {(brand.site_banner_scope || "all") === "custom" && (
+                <BrandField label="Eigener URL-Pfad" value={brand.site_banner_path} onChange={(v) => setBrandField("site_banner_path", v)} testId="brand-site-banner-path" placeholder="/tournaments/gamers-heaven" />
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <BrandField label="Link URL" value={brand.site_banner_link_url} onChange={(v) => setBrandField("site_banner_link_url", v)} testId="brand-site-banner-link-url" placeholder="/events oder https://..." />
                 <BrandField label="Link-Text" value={brand.site_banner_link_label} onChange={(v) => setBrandField("site_banner_link_label", v)} testId="brand-site-banner-link-label" placeholder="Mehr anzeigen" />
