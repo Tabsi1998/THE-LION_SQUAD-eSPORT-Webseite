@@ -73,7 +73,7 @@ export default function ServersPage() {
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Community</span>
-        <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase">Server</h1>
+        <h1 className="mt-3 pb-2 font-heading text-4xl md:text-6xl font-black uppercase leading-[0.95]">Server</h1>
         <p className="mt-4 max-w-3xl text-white/65">
           Unsere Community- und Vereinsserver. Öffentliche Server sind direkt sichtbar, Community-Server nach Login und Vereinsserver nur für aktive Vereinsmitglieder.
         </p>
@@ -133,8 +133,8 @@ function Stat({ label, value, icon: Icon, tone }) {
 function ServerSection({ title, items }) {
   return (
     <section>
-      <div className="flex items-center gap-3">
-        <h2 className="font-heading text-2xl font-black uppercase">{title}</h2>
+      <div className="flex items-end gap-3">
+        <h2 className="pb-1 font-heading text-2xl font-black uppercase leading-[1.08]">{title}</h2>
         <div className="h-px flex-1 bg-white/10" />
       </div>
       <div className="mt-4 grid lg:grid-cols-2 2xl:grid-cols-3 gap-4">
@@ -198,7 +198,7 @@ function ServerCard({ server }) {
                 <Gamepad2 className="w-3 h-3 shrink-0" />
                 <span className="truncate">{gameName(server)}</span>
               </div>
-              <h3 className="mt-1 font-heading text-xl sm:text-2xl font-black uppercase leading-none line-clamp-2 break-words">{server.name}</h3>
+              <h3 className="mt-1 pb-1 font-heading text-xl sm:text-2xl font-black uppercase leading-[1.08] break-words hyphens-auto">{server.name}</h3>
             </div>
           </div>
           {status !== "maintenance" && (
