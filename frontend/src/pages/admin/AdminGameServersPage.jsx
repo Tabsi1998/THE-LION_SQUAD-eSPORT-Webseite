@@ -35,19 +35,15 @@ const emptyForm = {
   query_host: "",
   query_port: "",
   rcon_port: "",
-  amp_instance_name: "",
-  amp_module: "",
-  amp_url: "",
-  amp_username: "",
-  amp_password: "",
   is_active: true,
   sort_order: 100,
 };
 
 const statusLabels = { online: "Online", offline: "Offline", maintenance: "Wartung", planned: "Geplant" };
 const visibilityLabels = { public: "Öffentlich", community: "Nur eingeloggte Community", members: "Nur Vereinsmitglieder", internal: "Intern / versteckt" };
-const syncLabels = { auto_public: "Automatisch öffentlich", manual: "Manuell", minecraft: "Minecraft Query", steam_a2s: "Steam/A2S Query", rcon: "RCON erreichbar", amp: "AMP API" };
+const syncLabels = { auto_public: "Automatisch erkennen", minecraft: "Minecraft Query", steam_a2s: "Steam/A2S Query", rcon: "TCP / RCON erreichbar", manual: "Manuelle Pflege" };
 const secretLabels = { none: "Kein Kennwort", password: "Passwort", invite_code: "Invite-Code", whitelist: "Whitelist / Freischaltung", discord: "Im Discord" };
+const modeLabels = { auto: "Automatisch", maintenance: "Wartung", planned: "Geplant" };
 
 function datetimeInputValue(value) {
   if (!value) return "";
@@ -66,8 +62,7 @@ function toForm(server) {
     query_host: server.query_host || "",
     query_port: server.query_port ?? "",
     rcon_port: server.rcon_port ?? "",
-    amp_username: server.amp_username || "",
-    amp_password: "",
+    sync_provider: syncLabels[server.sync_provider] ? server.sync_provider : "auto_public",
     access_secret: "",
     maintenance_until: datetimeInputValue(server.maintenance_until),
     player_names_text: (server.player_names || []).join(", "),
@@ -104,14 +99,15 @@ function toPayload(form) {
     query_host: form.query_host || null,
     query_port: form.query_port === "" ? null : Number(form.query_port || 0),
     rcon_port: form.rcon_port === "" ? null : Number(form.rcon_port || 0),
-    amp_instance_name: form.amp_instance_name || null,
-    amp_module: form.amp_module || null,
-    amp_url: form.amp_url || null,
-    amp_username: form.amp_username || null,
-    amp_password: form.amp_password || undefined,
     is_active: !!form.is_active,
     sort_order: Number(form.sort_order || 0),
   };
+}
+
+function operatingMode(status) {
+  if (status === "maintenance") return "maintenance";
+  if (status === "planned") return "planned";
+  return "auto";
 }
 
 export default function AdminGameServersPage() {
@@ -164,7 +160,6 @@ export default function AdminGameServersPage() {
     setSaving(true);
     try {
       const payload = toPayload(form);
-      if (!payload.amp_password) delete payload.amp_password;
       if (!payload.access_secret) delete payload.access_secret;
       if (editing) {
         await api.patch(`/game-servers/${editing.id}`, payload);
@@ -217,6 +212,23 @@ export default function AdminGameServersPage() {
     }
   };
 
+  const setServerMode = async (server, mode) => {
+    const status = mode === "maintenance" ? "maintenance" : mode === "planned" ? "planned" : "offline";
+    setSyncing(`${server.id}:mode`);
+    try {
+      await api.patch(`/game-servers/${server.id}`, { status });
+      if (mode === "auto" && server.sync_provider !== "manual") {
+        await api.post(`/game-servers/${server.id}/sync`);
+      }
+      toast.success(`Betrieb auf ${modeLabels[mode]} gestellt.`);
+      load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Betrieb konnte nicht geändert werden.");
+    } finally {
+      setSyncing(null);
+    }
+  };
+
   const removeSeededDefaults = async () => {
     if (!await confirm({
       title: "Demo-Startliste entfernen?",
@@ -239,7 +251,7 @@ export default function AdminGameServersPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Community</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Game-Server</h1>
           <p className="mt-2 text-white/60 text-sm max-w-2xl">
-            Server sichtbar pflegen, Zugriff steuern und Live-Werte hinterlegen. Standard ist die automatische öffentliche Abfrage; AMP bleibt optional, wenn ein Spiel über öffentliche Queries nicht genug Daten liefert.
+            Server sichtbar pflegen, Zugriff steuern und Live-Werte automatisch über öffentliche Game-Server-Abfragen synchronisieren.
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -284,10 +296,19 @@ export default function AdminGameServersPage() {
             </label>
             <Field label="Spielname fallback" value={form.game_name} onChange={(v) => set("game_name", v)} placeholder="z.B. Rust" />
             <label className="block">
-              <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Status</span>
-              <select value={form.status} onChange={(e) => set("status", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm">
-                {Object.entries(statusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-              </select>
+              <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Betrieb</span>
+              <div className="mt-1 grid grid-cols-3 gap-1 rounded-sm border border-white/10 bg-[#0A0A0A] p-1">
+                {Object.entries(modeLabels).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => set("status", key === "maintenance" ? "maintenance" : key === "planned" ? "planned" : "offline")}
+                    className={`px-2 py-2 text-[11px] font-black uppercase tracking-wider rounded-sm ${operatingMode(form.status) === key ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </label>
             <label className="block">
               <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Sichtbarkeit</span>
@@ -312,15 +333,13 @@ export default function AdminGameServersPage() {
             <Field label="Server-Icon / Logo" value={form.server_icon_url} onChange={(v) => set("server_icon_url", v)} placeholder="/api/static/uploads/... oder https://..." />
             <Field label="Karten-Link" value={form.map_url} onChange={(v) => set("map_url", v)} placeholder="Dynmap, BattleMetrics, Karte..." />
             <Field label="Externe Statusseite" value={form.external_status_url} onChange={(v) => set("external_status_url", v)} placeholder="z.B. BattleMetrics/Serverliste" />
-            <Field label="Spieler online" type="number" value={form.player_count} onChange={(v) => set("player_count", v)} />
-            <Field label="Max. Spieler" type="number" value={form.max_players} onChange={(v) => set("max_players", v)} />
             <label className="block">
               <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Sync-Quelle</span>
               <select value={form.sync_provider} onChange={(e) => set("sync_provider", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm">
                 {Object.entries(syncLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
               </select>
             </label>
-            {form.sync_provider !== "manual" && form.sync_provider !== "amp" && (
+            {form.sync_provider !== "manual" && (
               <>
                 <Field label="Query-Host" value={form.query_host} onChange={(v) => set("query_host", v)} placeholder="leer = aus Adresse" />
                 <Field label="Query-Port" type="number" value={form.query_port} onChange={(v) => set("query_port", v)} placeholder="z.B. 25565" />
@@ -329,29 +348,41 @@ export default function AdminGameServersPage() {
             {form.sync_provider === "rcon" && (
               <Field label="RCON-Port" type="number" value={form.rcon_port} onChange={(v) => set("rcon_port", v)} />
             )}
-            <Field label="Map" value={form.map_name} onChange={(v) => set("map_name", v)} />
-            <Field label="Version" value={form.version} onChange={(v) => set("version", v)} />
+            {form.sync_provider === "manual" && (
+              <>
+                <div className="block">
+                  <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Manueller Live-Status</span>
+                  <div className="mt-1 grid grid-cols-2 gap-1 rounded-sm border border-white/10 bg-[#0A0A0A] p-1">
+                    {["online", "offline"].map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => set("status", value)}
+                        className={`px-2 py-2 text-[11px] font-black uppercase tracking-wider rounded-sm ${form.status === value ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
+                      >
+                        {statusLabels[value]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Field label="Spieler online" type="number" value={form.player_count} onChange={(v) => set("player_count", v)} />
+                <Field label="Max. Spieler" type="number" value={form.max_players} onChange={(v) => set("max_players", v)} />
+                <Field label="Map" value={form.map_name} onChange={(v) => set("map_name", v)} />
+                <Field label="Version" value={form.version} onChange={(v) => set("version", v)} />
+                <label className="md:col-span-2 block">
+                  <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Spieler-Namen</span>
+                  <input value={form.player_names_text} onChange={(e) => set("player_names_text", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm" placeholder="Name1, Name2, Name3" />
+                </label>
+              </>
+            )}
             <Field label="Wartungsnotiz" value={form.maintenance_note} onChange={(v) => set("maintenance_note", v)} placeholder="z.B. Mod-Update, neue Map..." />
             <Field label="Wartung bis" type="datetime-local" value={form.maintenance_until} onChange={(v) => set("maintenance_until", v)} />
             <Field label="Sortierung" type="number" value={form.sort_order} onChange={(v) => set("sort_order", v)} />
             <Field label="Regel-Link" value={form.rules_url} onChange={(v) => set("rules_url", v)} />
             <Field label="Allgemeiner Hinweis" value={form.password_hint} onChange={(v) => set("password_hint", v)} placeholder="z.B. Modpack vorher installieren" />
-            {form.sync_provider === "amp" && (
-              <>
-                <Field label="AMP Instanzname" value={form.amp_instance_name} onChange={(v) => set("amp_instance_name", v)} />
-                <Field label="AMP Modul" value={form.amp_module} onChange={(v) => set("amp_module", v)} placeholder="Minecraft, Generic, Rust..." />
-                <Field label="AMP URL intern" value={form.amp_url} onChange={(v) => set("amp_url", v)} placeholder="nur Admin" />
-                <Field label="AMP Benutzer" value={form.amp_username} onChange={(v) => set("amp_username", v)} />
-                <Field label="AMP Passwort / neues Passwort" type="password" value={form.amp_password} onChange={(v) => set("amp_password", v)} placeholder={editing?.has_amp_password ? "gespeichert, leer lassen" : ""} />
-              </>
-            )}
             <label className="md:col-span-2 xl:col-span-4 block">
               <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Beschreibung</span>
               <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm" />
-            </label>
-            <label className="md:col-span-2 block">
-              <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Spieler-Namen</span>
-              <input value={form.player_names_text} onChange={(e) => set("player_names_text", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm" placeholder="Name1, Name2, Name3" />
             </label>
             <label className="flex items-center gap-2 mt-6 text-sm text-white/75">
               <input type="checkbox" checked={form.is_active} onChange={(e) => set("is_active", e.target.checked)} className="accent-[#29B6E8]" />
@@ -395,6 +426,19 @@ export default function AdminGameServersPage() {
               <Info label="Spieler" value={`${server.player_count || 0}${server.max_players != null ? `/${server.max_players}` : ""}`} />
               <Info label="Sync-Quelle" value={syncLabels[server.sync_provider || "manual"] || server.sync_provider || "Manuell"} />
               <Info label="Sync" value={server.last_sync_at ? new Date(server.last_sync_at).toLocaleString("de-DE") : "noch nie"} />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {Object.entries(modeLabels).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  disabled={syncing === `${server.id}:mode`}
+                  onClick={() => setServerMode(server, mode)}
+                  className={`px-3 py-1.5 border rounded-sm text-[10px] font-black uppercase tracking-widest disabled:opacity-50 ${operatingMode(server.status) === mode ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/50 hover:text-white"}`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
             {server.last_sync_error && <div className="mt-3 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FF8A80] rounded-sm px-3 py-2 text-xs">{server.last_sync_error}</div>}
             {server.description && <p className="mt-3 text-sm text-white/55 line-clamp-2">{server.description}</p>}

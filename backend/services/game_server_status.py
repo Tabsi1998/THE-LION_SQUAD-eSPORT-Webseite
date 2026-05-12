@@ -1,16 +1,14 @@
 """Live status probes for community game servers.
 
-The service intentionally keeps protocols separated. AMP is a control-panel API,
-Steam/A2S and Minecraft are public query protocols, and RCON is treated only as
-a reachability check until per-game commands are configured.
+The service uses public game-server communication only: Minecraft status ping,
+Steam/A2S and a generic TCP reachability check for ports that do not expose a
+stable public query protocol.
 """
 import asyncio
 import json
 import socket
 import struct
 from urllib.parse import urlparse
-
-import httpx
 
 
 class GameServerProbeError(RuntimeError):
@@ -196,47 +194,11 @@ async def probe_auto_public(server: dict) -> dict:
     raise GameServerProbeError("Keine öffentliche Abfrage erfolgreich. " + " | ".join(errors))
 
 
-async def probe_amp(server: dict, timeout: float = 5.0) -> dict:
-    amp_url = (server.get("amp_url") or "").rstrip("/")
-    username = server.get("amp_username")
-    password = server.get("amp_password")
-    if not amp_url or not username or not password:
-        raise GameServerProbeError("AMP-Sync braucht AMP-URL, Benutzer und Passwort.")
-    async with httpx.AsyncClient(timeout=timeout, verify=True) as client:
-        login = await client.post(
-            f"{amp_url}/API/Core/Login",
-            json={"username": username, "password": password, "token": "", "rememberMe": False},
-        )
-        if login.status_code >= 400:
-            raise GameServerProbeError(f"AMP Login fehlgeschlagen: HTTP {login.status_code}")
-        body = login.json()
-        session_id = body.get("sessionID") or body.get("SESSIONID") or body.get("sessionId") or body.get("result")
-        if isinstance(session_id, dict):
-            session_id = session_id.get("sessionID") or session_id.get("SESSIONID")
-        if not session_id:
-            raise GameServerProbeError("AMP Login hat keine Session-ID geliefert.")
-        status = await client.post(f"{amp_url}/API/Core/GetStatus", json={"SESSIONID": session_id})
-        if status.status_code >= 400:
-            raise GameServerProbeError(f"AMP Status fehlgeschlagen: HTTP {status.status_code}")
-        data = status.json()
-        result = data.get("result") if isinstance(data, dict) else data
-        if not isinstance(result, dict):
-            result = data if isinstance(data, dict) else {}
-        state = str(result.get("State") or result.get("state") or "").lower()
-        players = result.get("Players") or result.get("players") or result.get("UserCount") or result.get("userCount")
-        max_players = result.get("MaxPlayers") or result.get("maxPlayers") or result.get("MaxUsers") or result.get("maxUsers")
-        return {
-            "status": "online" if state in {"running", "ready", "started", "online"} else "offline",
-            "player_count": int(players or 0),
-            "max_players": int(max_players) if max_players is not None else None,
-        }
-
-
 async def probe_game_server(server: dict) -> dict:
     provider = server.get("sync_provider") or "manual"
     if provider == "manual":
         raise GameServerProbeError("Dieser Server steht auf manueller Pflege.")
-    if provider == "auto_public":
+    if provider in {"auto_public", "amp"}:
         return await probe_auto_public(server)
     if provider == "minecraft":
         return await probe_minecraft(server)
@@ -244,6 +206,4 @@ async def probe_game_server(server: dict) -> dict:
         return await probe_steam_a2s(server)
     if provider == "rcon":
         return await probe_rcon_reachable(server)
-    if provider == "amp":
-        return await probe_amp(server)
     raise GameServerProbeError(f"Unbekannte Sync-Quelle: {provider}")

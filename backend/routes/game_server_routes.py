@@ -14,7 +14,7 @@ from models import new_id, now_utc
 
 ServerVisibility = Literal["public", "community", "members", "internal"]
 ServerStatus = Literal["online", "offline", "maintenance", "planned"]
-ServerSyncProvider = Literal["manual", "auto_public", "amp", "minecraft", "steam_a2s", "rcon"]
+ServerSyncProvider = Literal["manual", "auto_public", "minecraft", "steam_a2s", "rcon"]
 ServerSecretKind = Literal["none", "password", "invite_code", "whitelist", "discord"]
 
 router = APIRouter(prefix="/api/game-servers", tags=["game-servers"])
@@ -84,12 +84,13 @@ async def _game_lookup(db, game_ids: list[str]) -> dict[str, dict]:
 
 
 def _public_doc(server: dict, game: dict | None = None, include_admin_fields: bool = False) -> dict:
-    hidden = {"_id", "amp_password", "amp_session_id", "access_secret"}
+    hidden = {
+        "_id", "access_secret",
+        "amp_password", "amp_session_id", "amp_url", "amp_username", "amp_instance_name", "amp_module",
+    }
     if not include_admin_fields:
-        hidden.update({"amp_url", "amp_username", "query_host", "query_port", "rcon_port", "last_sync_error"})
+        hidden.update({"query_host", "query_port", "rcon_port", "last_sync_error"})
     doc = {k: v for k, v in server.items() if k not in hidden}
-    if server.get("amp_password"):
-        doc["has_amp_password"] = True
     if server.get("access_secret"):
         doc["has_access_secret"] = True
         doc["access_secret_masked"] = "••••••"
@@ -142,11 +143,6 @@ class GameServerPayload(BaseModel):
     query_host: Optional[str] = Field(default=None, max_length=180)
     query_port: Optional[int] = Field(default=None, ge=1, le=65535)
     rcon_port: Optional[int] = Field(default=None, ge=1, le=65535)
-    amp_instance_name: Optional[str] = Field(default=None, max_length=180)
-    amp_module: Optional[str] = Field(default=None, max_length=80)
-    amp_url: Optional[str] = Field(default=None, max_length=300)
-    amp_username: Optional[str] = Field(default=None, max_length=120)
-    amp_password: Optional[str] = Field(default=None, max_length=300)
     last_sync_error: Optional[str] = None
     is_active: bool = True
     sort_order: int = 100
@@ -181,11 +177,6 @@ class GameServerPatch(BaseModel):
     query_host: Optional[str] = Field(default=None, max_length=180)
     query_port: Optional[int] = Field(default=None, ge=1, le=65535)
     rcon_port: Optional[int] = Field(default=None, ge=1, le=65535)
-    amp_instance_name: Optional[str] = Field(default=None, max_length=180)
-    amp_module: Optional[str] = Field(default=None, max_length=80)
-    amp_url: Optional[str] = Field(default=None, max_length=300)
-    amp_username: Optional[str] = Field(default=None, max_length=120)
-    amp_password: Optional[str] = Field(default=None, max_length=300)
     last_sync_error: Optional[str] = None
     is_active: Optional[bool] = None
     sort_order: Optional[int] = None
@@ -297,8 +288,7 @@ async def update_game_server(server_id: str, body: GameServerPatch, me: dict = D
         "game_id", "game_name", "description", "address", "connect_url", "password_hint",
         "access_secret", "access_label", "server_icon_url", "map_url", "external_status_url",
         "rules_url", "map_name", "version", "maintenance_note", "maintenance_until",
-        "max_players", "query_host", "query_port", "rcon_port", "amp_instance_name",
-        "amp_module", "amp_url", "amp_username", "amp_password", "last_sync_error",
+        "max_players", "query_host", "query_port", "rcon_port", "last_sync_error",
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
@@ -322,12 +312,12 @@ async def _sync_one(db, server: dict) -> dict:
             "last_sync_error": None,
             "updated_at": now_utc().isoformat(),
         }
-        maintenance_active = _maintenance_active(server)
-        if maintenance_active:
-            updates["status"] = "maintenance"
+        locked_status = "maintenance" if _maintenance_active(server) else "planned" if server.get("status") == "planned" else None
+        if locked_status:
+            updates["status"] = locked_status
         for key in ("status", "player_count", "max_players", "player_names", "map_name", "version", "game_name"):
             if key in result and result[key] is not None:
-                if key == "status" and maintenance_active:
+                if key == "status" and locked_status:
                     continue
                 updates[key] = result[key]
         await db.game_servers.update_one({"id": server["id"]}, {"$set": updates})
@@ -338,7 +328,7 @@ async def _sync_one(db, server: dict) -> dict:
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
     updates = {"last_sync_at": now_utc().isoformat(), "last_sync_error": error, "updated_at": now_utc().isoformat()}
-    if not _maintenance_active(server):
+    if not _maintenance_active(server) and server.get("status") != "planned":
         updates["status"] = "offline"
         updates["player_count"] = 0
         updates["player_names"] = []

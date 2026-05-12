@@ -231,27 +231,31 @@ Sichtbarkeiten:
 - `Vereinsmitglieder`: nur fuer aktive Vereinsmitglieder und Admins sichtbar.
 - `Intern`: nicht oeffentlich sichtbar.
 
-Spielerzahlen, Max-Slots, Map, Version, Adresse und Connect-Link koennen manuell
-gepflegt oder ueber eine Sync-Quelle aktualisiert werden:
+Spielerzahlen, Max-Slots, Map und Version werden bevorzugt automatisch ueber
+oeffentliche Game-Server-Abfragen aktualisiert. Der Scheduler synchronisiert
+konfigurierte Server alle 60 Sekunden. Manuelle Werte sind nur fuer Server gedacht,
+die keine stabile oeffentliche Abfrage beantworten.
 
-- `Manuell`: Werte werden im Adminbereich gepflegt.
+- `Automatisch erkennen`: probiert Minecraft, Steam/A2S und TCP-Erreichbarkeit.
 - `Minecraft Query`: nutzt den Minecraft Server List Ping.
 - `Steam/A2S Query`: nutzt die Valve/Steam Server Query fuer Spiele mit A2S-Unterstuetzung.
-- `RCON erreichbar`: prueft zunaechst nur TCP-Erreichbarkeit am RCON-Port.
-- `AMP API`: nutzt die AMP-API der jeweiligen Installation.
+- `TCP / RCON erreichbar`: prueft TCP-Erreichbarkeit, wenn keine bessere Query
+  verfuegbar ist.
+- `Manuelle Pflege`: Werte werden im Adminbereich gepflegt.
 
-AMP stellt seine API pro Installation unter `/API` bereit; vor API-Aufrufen muss
-eine Session ueber `API/Core/Login` geholt werden. Zugangsdaten werden nicht an
-die oeffentliche API ausgeliefert.
+Der sichtbare Status `Online`/`Offline` kommt bei synchronisierten Servern aus
+dieser Abfrage. `Wartung` und `Geplant` sind bewusst manuelle Betriebsmodi:
+Wartung sperrt den automatisch ermittelten Online/Offline-Status bis zum optionalen
+Endzeitpunkt, Geplant bleibt sichtbar als angekuendigter Server.
 
 Empfohlene Sync-Auswahl:
 
-- `Minecraft`: `Automatisch oeffentlich` oder `Minecraft Query`, Port normalerweise `25565`.
+- `Minecraft`: `Automatisch erkennen` oder `Minecraft Query`, Port normalerweise `25565`.
 - `Rust`, `ARK`, `Assetto Corsa Competizione`, `Satisfactory`, viele SteamCMD-Server:
-  `Automatisch oeffentlich` oder `Steam/A2S Query`, falls der Query-Port erreichbar ist.
+  `Automatisch erkennen` oder `Steam/A2S Query`, falls der Query-Port erreichbar ist.
 - `Palworld`, `Core Keeper`, `7 Days To Die`: je nach Server-Konfiguration `Steam/A2S Query`
-  oder als Mindeststatus `RCON erreichbar`/TCP-Port.
-- Wenn ein Spiel keine oeffentliche Query sauber beantwortet: `Manuell` oder `AMP API`.
+  oder als Mindeststatus `TCP / RCON erreichbar`.
+- Wenn ein Spiel keine oeffentliche Query sauber beantwortet: `Manuelle Pflege`.
 
 Fuer die Darstellung koennen pro Server ein Icon/Logo, Karten-Link, externe Statusseite,
 Regel-Link, Connect-Link und Wartungsnotiz gepflegt werden. Logos werden nicht automatisch

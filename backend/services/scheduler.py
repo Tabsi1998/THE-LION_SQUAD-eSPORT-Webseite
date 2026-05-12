@@ -195,13 +195,13 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_twitch_poll, IntervalTrigger(seconds=90), id="twitch_poll",
                   max_instances=1, coalesce=True)
-    sched.add_job(_safe_game_server_sync, IntervalTrigger(minutes=5), id="game_server_sync",
+    sched.add_job(_safe_game_server_sync, IntervalTrigger(seconds=60), id="game_server_sync",
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_status_transitions, IntervalTrigger(seconds=60), id="status_transitions",
                   max_instances=1, coalesce=True)
     sched.start()
     _scheduler = sched
-    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · birthday 6h · twitch 90s · game_server_sync 5m)")
+    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · birthday 6h · twitch 90s · game_server_sync 60s)")
     return sched
 
 
