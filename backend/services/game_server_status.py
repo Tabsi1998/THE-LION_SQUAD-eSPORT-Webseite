@@ -31,6 +31,21 @@ def parse_host_port(address: str | None, default_port: int | None = None) -> tup
     return raw, default_port
 
 
+def _host_port_candidates(server: dict, default_port: int | None = None) -> list[tuple[str, int]]:
+    query_default = server.get("query_port") or default_port
+    candidates: list[tuple[str, int]] = []
+    for raw, port_default in (
+        (server.get("query_host"), query_default),
+        (server.get("address"), default_port or server.get("query_port")),
+    ):
+        host, port = parse_host_port(raw, port_default)
+        if host and port:
+            candidate = (host, int(port))
+            if candidate not in candidates:
+                candidates.append(candidate)
+    return candidates
+
+
 def _varint(value: int) -> bytes:
     out = bytearray()
     while True:
@@ -153,25 +168,52 @@ def _tcp_reachable_sync(host: str, port: int, timeout: float) -> dict:
         return {"status": "online"}
 
 
-async def probe_minecraft(server: dict, timeout: float = 3.0) -> dict:
-    host, port = parse_host_port(server.get("query_host") or server.get("address"), server.get("query_port") or 25565)
-    if not host or not port:
+async def probe_minecraft(server: dict, timeout: float = 5.0) -> dict:
+    candidates = _host_port_candidates(server, 25565)
+    if not candidates:
         raise GameServerProbeError("Minecraft-Query braucht Host und Port.")
-    return await asyncio.to_thread(_minecraft_status_sync, host, int(port), timeout)
+    errors = []
+    for host, port in candidates:
+        try:
+            return await asyncio.to_thread(_minecraft_status_sync, host, port, timeout)
+        except (TimeoutError, socket.timeout):
+            try:
+                await asyncio.to_thread(_tcp_reachable_sync, host, port, min(timeout, 3.0))
+                return {
+                    "status": "online",
+                    "sync_note": "Minecraft-Statusping hat nicht geantwortet, der Server-Port ist aber erreichbar.",
+                }
+            except Exception as exc:
+                errors.append(f"{host}:{port}: {exc}")
+        except Exception as exc:
+            errors.append(f"{host}:{port}: {exc}")
+    raise GameServerProbeError("Minecraft-Query fehlgeschlagen. " + " | ".join(errors))
 
 
 async def probe_steam_a2s(server: dict, timeout: float = 3.0) -> dict:
-    host, port = parse_host_port(server.get("query_host") or server.get("address"), server.get("query_port"))
-    if not host or not port:
+    candidates = _host_port_candidates(server, server.get("query_port"))
+    if not candidates:
         raise GameServerProbeError("Steam/A2S braucht Host und Query-Port.")
-    return await asyncio.to_thread(_a2s_query_sync, host, int(port), timeout)
+    errors = []
+    for host, port in candidates:
+        try:
+            return await asyncio.to_thread(_a2s_query_sync, host, port, timeout)
+        except Exception as exc:
+            errors.append(f"{host}:{port}: {exc}")
+    raise GameServerProbeError("Steam/A2S fehlgeschlagen. " + " | ".join(errors))
 
 
 async def probe_rcon_reachable(server: dict, timeout: float = 3.0) -> dict:
-    host, port = parse_host_port(server.get("query_host") or server.get("address"), server.get("rcon_port") or server.get("query_port"))
-    if not host or not port:
+    candidates = _host_port_candidates(server, server.get("rcon_port") or server.get("query_port"))
+    if not candidates:
         raise GameServerProbeError("RCON-Erreichbarkeit braucht Host und Port.")
-    return await asyncio.to_thread(_tcp_reachable_sync, host, int(port), timeout)
+    errors = []
+    for host, port in candidates:
+        try:
+            return await asyncio.to_thread(_tcp_reachable_sync, host, port, timeout)
+        except Exception as exc:
+            errors.append(f"{host}:{port}: {exc}")
+    raise GameServerProbeError("TCP/RCON-Erreichbarkeit fehlgeschlagen. " + " | ".join(errors))
 
 
 async def probe_auto_public(server: dict) -> dict:

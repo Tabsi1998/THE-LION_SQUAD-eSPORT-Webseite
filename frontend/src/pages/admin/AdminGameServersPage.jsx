@@ -45,6 +45,13 @@ const syncLabels = { auto_public: "Automatisch erkennen", minecraft: "Minecraft 
 const secretLabels = { none: "Kein Kennwort", password: "Passwort", invite_code: "Invite-Code", whitelist: "Whitelist / Freischaltung", discord: "Im Discord" };
 const modeLabels = { auto: "Automatisch", maintenance: "Wartung", planned: "Geplant" };
 
+function syncText(server) {
+  const configured = syncLabels[server.sync_provider || "auto_public"] || "Automatisch erkennen";
+  return server.detected_sync_provider && (server.sync_provider || "auto_public") === "auto_public"
+    ? `${configured}: ${server.detected_sync_provider}`
+    : configured;
+}
+
 function datetimeInputValue(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -424,8 +431,8 @@ export default function AdminGameServersPage() {
             <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
               <Info label="Adresse" value={server.address || "-"} />
               <Info label="Spieler" value={`${server.player_count || 0}${server.max_players != null ? `/${server.max_players}` : ""}`} />
-              <Info label="Sync-Quelle" value={syncLabels[server.sync_provider || "manual"] || server.sync_provider || "Manuell"} />
-              <Info label="Sync" value={server.last_sync_at ? new Date(server.last_sync_at).toLocaleString("de-DE") : "noch nie"} />
+              <Info label="Sync" value={syncText(server)} />
+              <Info label="Letzter Sync" value={server.last_sync_at ? new Date(server.last_sync_at).toLocaleString("de-DE") : "noch nie"} />
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {Object.entries(modeLabels).map(([mode, label]) => (
@@ -440,6 +447,7 @@ export default function AdminGameServersPage() {
                 </button>
               ))}
             </div>
+            {server.last_sync_note && <div className="mt-3 border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] rounded-sm px-3 py-2 text-xs">{server.last_sync_note}</div>}
             {server.last_sync_error && <div className="mt-3 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FF8A80] rounded-sm px-3 py-2 text-xs">{server.last_sync_error}</div>}
             {server.description && <p className="mt-3 text-sm text-white/55 line-clamp-2">{server.description}</p>}
           </article>

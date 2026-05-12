@@ -236,7 +236,7 @@ oeffentliche Game-Server-Abfragen aktualisiert. Der Scheduler synchronisiert
 konfigurierte Server alle 60 Sekunden. Manuelle Werte sind nur fuer Server gedacht,
 die keine stabile oeffentliche Abfrage beantworten.
 
-- `Automatisch erkennen`: probiert Minecraft, Steam/A2S und TCP-Erreichbarkeit.
+- `Automatisch erkennen`: Standard fuer neue Server; probiert Minecraft, Steam/A2S und TCP-Erreichbarkeit.
 - `Minecraft Query`: nutzt den Minecraft Server List Ping.
 - `Steam/A2S Query`: nutzt die Valve/Steam Server Query fuer Spiele mit A2S-Unterstuetzung.
 - `TCP / RCON erreichbar`: prueft TCP-Erreichbarkeit, wenn keine bessere Query
@@ -247,6 +247,9 @@ Der sichtbare Status `Online`/`Offline` kommt bei synchronisierten Servern aus
 dieser Abfrage. `Wartung` und `Geplant` sind bewusst manuelle Betriebsmodi:
 Wartung sperrt den automatisch ermittelten Online/Offline-Status bis zum optionalen
 Endzeitpunkt, Geplant bleibt sichtbar als angekuendigter Server.
+Wenn ein Minecraft-Statusping einmal nicht antwortet, aber der Port erreichbar ist,
+bleibt der Server online und bekommt nur einen Sync-Hinweis statt faelschlich offline
+zu werden.
 
 Empfohlene Sync-Auswahl:
 

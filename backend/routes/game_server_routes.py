@@ -310,12 +310,13 @@ async def _sync_one(db, server: dict) -> dict:
         updates = {
             "last_sync_at": now_utc().isoformat(),
             "last_sync_error": None,
+            "last_sync_note": result.get("sync_note"),
             "updated_at": now_utc().isoformat(),
         }
         locked_status = "maintenance" if _maintenance_active(server) else "planned" if server.get("status") == "planned" else None
         if locked_status:
             updates["status"] = locked_status
-        for key in ("status", "player_count", "max_players", "player_names", "map_name", "version", "game_name"):
+        for key in ("status", "player_count", "max_players", "player_names", "map_name", "version", "game_name", "detected_sync_provider"):
             if key in result and result[key] is not None:
                 if key == "status" and locked_status:
                     continue
@@ -327,7 +328,7 @@ async def _sync_one(db, server: dict) -> dict:
         error = str(exc)
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
-    updates = {"last_sync_at": now_utc().isoformat(), "last_sync_error": error, "updated_at": now_utc().isoformat()}
+    updates = {"last_sync_at": now_utc().isoformat(), "last_sync_error": error, "last_sync_note": None, "updated_at": now_utc().isoformat()}
     if not _maintenance_active(server) and server.get("status") != "planned":
         updates["status"] = "offline"
         updates["player_count"] = 0
