@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Clipboard, Clock3, ExternalLink, Gamepad2, KeyRound, Lock, Map, Server, Shield, Signal, Users } from "lucide-react";
+import { Clipboard, ExternalLink, Gamepad2, KeyRound, Lock, Map, Server, Shield, Signal, Users } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useAuth } from "@/context/AuthContext";
 import { api, resolveMediaUrl } from "@/lib/api";
@@ -154,6 +154,7 @@ function ServerCard({ server }) {
     server.maintenance_note,
     server.maintenance_until ? `bis ${formatDateTime(server.maintenance_until)}` : "",
   ].filter(Boolean).join(" · ");
+  const maintenanceBandText = ["Wartung", maintenanceText].filter(Boolean).join(" · ");
   const copyAddress = async () => {
     if (!server.address || !navigator.clipboard) return;
     await navigator.clipboard.writeText(server.address).catch(() => null);
@@ -180,11 +181,7 @@ function ServerCard({ server }) {
 
   return (
     <article className={`group relative overflow-hidden border rounded-sm bg-[#101010] min-h-[19rem] flex flex-col transition ${status === "maintenance" ? "border-[#FFD700]/45" : "border-white/10 hover:border-white/20"}`}>
-      {status === "maintenance" && (
-        <div className="pointer-events-none absolute -right-16 top-8 z-10 w-64 rotate-12 border-y border-black/20 bg-[#FFD700] py-1 text-center text-[10px] font-black uppercase tracking-[0.22em] text-black shadow-lg">
-          Wartung
-        </div>
-      )}
+      {status === "maintenance" && <MaintenanceTape text={maintenanceBandText} />}
       <div className={`h-1 ${status === "online" ? "bg-[#00FF88]" : status === "maintenance" ? "bg-[#FFD700]" : status === "planned" ? "bg-[#29B6E8]" : "bg-white/10"}`} />
 
       <div className="p-5 flex flex-col grow">
@@ -229,13 +226,6 @@ function ServerCard({ server }) {
         {server.player_names?.length > 0 && (
           <div className="mt-4 text-xs text-white/45">
             Online: <span className="text-white/70">{server.player_names.slice(0, 6).join(", ")}</span>{server.player_names.length > 6 ? " …" : ""}
-          </div>
-        )}
-
-        {status === "maintenance" && maintenanceText && (
-          <div className="mt-5 border border-[#FFD700]/30 bg-[#FFD700]/10 rounded-sm p-3 text-sm text-[#FFD700]/85 flex gap-2">
-            <Clock3 className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{maintenanceText}</span>
           </div>
         )}
 
@@ -287,6 +277,18 @@ function ServerCard({ server }) {
         </div>
       </div>
     </article>
+  );
+}
+
+function MaintenanceTape({ text }) {
+  const repeated = `${text || "Wartung"}  •  `;
+  return (
+    <div className="tls-maintenance-tape pointer-events-none absolute -left-10 right-auto top-8 z-10 w-[130%] rotate-[-8deg] border-y border-white/80 shadow-[0_10px_28px_rgba(0,0,0,0.45)]">
+      <div className="tls-maintenance-tape__stripe" />
+      <div className="tls-maintenance-tape__marquee">
+        <span>{repeated.repeat(8)}</span>
+      </div>
+    </div>
   );
 }
 
