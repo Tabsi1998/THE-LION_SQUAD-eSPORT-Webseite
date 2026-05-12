@@ -14,6 +14,7 @@ from models import new_id, now_utc
 ServerVisibility = Literal["public", "community", "members", "internal"]
 ServerStatus = Literal["online", "offline", "maintenance", "planned"]
 ServerSyncProvider = Literal["manual", "auto_public", "amp", "minecraft", "steam_a2s", "rcon"]
+ServerSecretKind = Literal["none", "password", "invite_code", "whitelist", "discord"]
 
 router = APIRouter(prefix="/api/game-servers", tags=["game-servers"])
 
@@ -80,12 +81,15 @@ async def _game_lookup(db, game_ids: list[str]) -> dict[str, dict]:
 
 
 def _public_doc(server: dict, game: dict | None = None, include_admin_fields: bool = False) -> dict:
-    hidden = {"_id", "amp_password", "amp_session_id"}
+    hidden = {"_id", "amp_password", "amp_session_id", "access_secret"}
     if not include_admin_fields:
         hidden.update({"amp_url", "amp_username", "query_host", "query_port", "rcon_port", "last_sync_error"})
     doc = {k: v for k, v in server.items() if k not in hidden}
     if server.get("amp_password"):
         doc["has_amp_password"] = True
+    if server.get("access_secret"):
+        doc["has_access_secret"] = True
+        doc["access_secret_masked"] = "••••••"
     if game:
         doc["game"] = game
     return doc
@@ -116,6 +120,9 @@ class GameServerPayload(BaseModel):
     visibility: ServerVisibility = "community"
     address: Optional[str] = Field(default=None, max_length=180)
     connect_url: Optional[str] = Field(default=None, max_length=300)
+    access_secret_kind: ServerSecretKind = "none"
+    access_secret: Optional[str] = Field(default=None, max_length=300)
+    access_label: Optional[str] = Field(default=None, max_length=80)
     server_icon_url: Optional[str] = Field(default=None, max_length=300)
     map_url: Optional[str] = Field(default=None, max_length=300)
     external_status_url: Optional[str] = Field(default=None, max_length=300)
@@ -152,6 +159,9 @@ class GameServerPatch(BaseModel):
     visibility: Optional[ServerVisibility] = None
     address: Optional[str] = Field(default=None, max_length=180)
     connect_url: Optional[str] = Field(default=None, max_length=300)
+    access_secret_kind: Optional[ServerSecretKind] = None
+    access_secret: Optional[str] = Field(default=None, max_length=300)
+    access_label: Optional[str] = Field(default=None, max_length=80)
     server_icon_url: Optional[str] = Field(default=None, max_length=300)
     map_url: Optional[str] = Field(default=None, max_length=300)
     external_status_url: Optional[str] = Field(default=None, max_length=300)
@@ -258,10 +268,10 @@ async def update_game_server(server_id: str, body: GameServerPatch, me: dict = D
         raise HTTPException(404, "Server nicht gefunden.")
     nullable_fields = {
         "game_id", "game_name", "description", "address", "connect_url", "password_hint",
-        "server_icon_url", "map_url", "external_status_url", "rules_url", "map_name",
-        "version", "maintenance_note", "maintenance_until", "max_players", "query_host",
-        "query_port", "rcon_port", "amp_instance_name", "amp_module", "amp_url",
-        "amp_username", "amp_password", "last_sync_error",
+        "access_secret", "access_label", "server_icon_url", "map_url", "external_status_url",
+        "rules_url", "map_name", "version", "maintenance_note", "maintenance_until",
+        "max_players", "query_host", "query_port", "rcon_port", "amp_instance_name",
+        "amp_module", "amp_url", "amp_username", "amp_password", "last_sync_error",
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}

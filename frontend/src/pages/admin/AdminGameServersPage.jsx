@@ -16,6 +16,9 @@ const emptyForm = {
   visibility: "community",
   address: "",
   connect_url: "",
+  access_secret_kind: "none",
+  access_secret: "",
+  access_label: "",
   server_icon_url: "",
   map_url: "",
   external_status_url: "",
@@ -44,6 +47,7 @@ const emptyForm = {
 const statusLabels = { online: "Online", offline: "Offline", maintenance: "Wartung", planned: "Geplant" };
 const visibilityLabels = { public: "Öffentlich", community: "Nur eingeloggte Community", members: "Nur Vereinsmitglieder", internal: "Intern / versteckt" };
 const syncLabels = { auto_public: "Automatisch öffentlich", manual: "Manuell", minecraft: "Minecraft Query", steam_a2s: "Steam/A2S Query", rcon: "RCON erreichbar", amp: "AMP API" };
+const secretLabels = { none: "Kein Kennwort", password: "Passwort", invite_code: "Invite-Code", whitelist: "Whitelist / Freischaltung", discord: "Im Discord" };
 
 function datetimeInputValue(value) {
   if (!value) return "";
@@ -64,6 +68,7 @@ function toForm(server) {
     rcon_port: server.rcon_port ?? "",
     amp_username: server.amp_username || "",
     amp_password: "",
+    access_secret: "",
     maintenance_until: datetimeInputValue(server.maintenance_until),
     player_names_text: (server.player_names || []).join(", "),
   };
@@ -80,6 +85,9 @@ function toPayload(form) {
     visibility: form.visibility,
     address: form.address || null,
     connect_url: form.connect_url || null,
+    access_secret_kind: form.access_secret_kind || "none",
+    access_secret: form.access_secret || undefined,
+    access_label: form.access_label || null,
     server_icon_url: form.server_icon_url || null,
     map_url: form.map_url || null,
     external_status_url: form.external_status_url || null,
@@ -157,6 +165,7 @@ export default function AdminGameServersPage() {
     try {
       const payload = toPayload(form);
       if (!payload.amp_password) delete payload.amp_password;
+      if (!payload.access_secret) delete payload.access_secret;
       if (editing) {
         await api.patch(`/game-servers/${editing.id}`, payload);
         toast.success("Server gespeichert.");
@@ -270,6 +279,18 @@ export default function AdminGameServersPage() {
             </label>
             <Field label="Adresse" value={form.address} onChange={(v) => set("address", v)} placeholder="gameserver.lionsquad.at:25565" />
             <Field label="Connect-Link" value={form.connect_url} onChange={(v) => set("connect_url", v)} placeholder="steam://connect/..." />
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Zugang</span>
+              <select value={form.access_secret_kind} onChange={(e) => set("access_secret_kind", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm">
+                {Object.entries(secretLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+              </select>
+            </label>
+            {form.access_secret_kind !== "none" && form.access_secret_kind !== "whitelist" && form.access_secret_kind !== "discord" && (
+              <Field label={form.access_secret_kind === "invite_code" ? "Invite-Code / neuer Code" : "Passwort / neues Passwort"} type="password" value={form.access_secret} onChange={(v) => set("access_secret", v)} placeholder={editing?.has_access_secret ? "gespeichert, leer lassen" : ""} />
+            )}
+            {form.access_secret_kind !== "none" && (
+              <Field label="Zugangs-Hinweis" value={form.access_label} onChange={(v) => set("access_label", v)} placeholder="z.B. Code im Discord, Passwort kopieren" />
+            )}
             <Field label="Server-Icon / Logo" value={form.server_icon_url} onChange={(v) => set("server_icon_url", v)} placeholder="/api/static/uploads/... oder https://..." />
             <Field label="Karten-Link" value={form.map_url} onChange={(v) => set("map_url", v)} placeholder="Dynmap, BattleMetrics, Karte..." />
             <Field label="Externe Statusseite" value={form.external_status_url} onChange={(v) => set("external_status_url", v)} placeholder="z.B. BattleMetrics/Serverliste" />
@@ -281,21 +302,31 @@ export default function AdminGameServersPage() {
                 {Object.entries(syncLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
               </select>
             </label>
-            <Field label="Query-Host" value={form.query_host} onChange={(v) => set("query_host", v)} placeholder="leer = aus Adresse" />
-            <Field label="Query-Port" type="number" value={form.query_port} onChange={(v) => set("query_port", v)} placeholder="z.B. 25565" />
-            <Field label="RCON-Port" type="number" value={form.rcon_port} onChange={(v) => set("rcon_port", v)} />
+            {form.sync_provider !== "manual" && form.sync_provider !== "amp" && (
+              <>
+                <Field label="Query-Host" value={form.query_host} onChange={(v) => set("query_host", v)} placeholder="leer = aus Adresse" />
+                <Field label="Query-Port" type="number" value={form.query_port} onChange={(v) => set("query_port", v)} placeholder="z.B. 25565" />
+              </>
+            )}
+            {form.sync_provider === "rcon" && (
+              <Field label="RCON-Port" type="number" value={form.rcon_port} onChange={(v) => set("rcon_port", v)} />
+            )}
             <Field label="Map" value={form.map_name} onChange={(v) => set("map_name", v)} />
             <Field label="Version" value={form.version} onChange={(v) => set("version", v)} />
             <Field label="Wartungsnotiz" value={form.maintenance_note} onChange={(v) => set("maintenance_note", v)} placeholder="z.B. Mod-Update, neue Map..." />
             <Field label="Wartung bis" type="datetime-local" value={form.maintenance_until} onChange={(v) => set("maintenance_until", v)} />
             <Field label="Sortierung" type="number" value={form.sort_order} onChange={(v) => set("sort_order", v)} />
             <Field label="Regel-Link" value={form.rules_url} onChange={(v) => set("rules_url", v)} />
-            <Field label="Passwort-Hinweis" value={form.password_hint} onChange={(v) => set("password_hint", v)} placeholder="z.B. im Discord #server-info" />
-            <Field label="AMP Instanzname" value={form.amp_instance_name} onChange={(v) => set("amp_instance_name", v)} />
-            <Field label="AMP Modul" value={form.amp_module} onChange={(v) => set("amp_module", v)} placeholder="Minecraft, Generic, Rust..." />
-            <Field label="AMP URL intern" value={form.amp_url} onChange={(v) => set("amp_url", v)} placeholder="nur Admin" />
-            <Field label="AMP Benutzer" value={form.amp_username} onChange={(v) => set("amp_username", v)} />
-            <Field label="AMP Passwort / neues Passwort" type="password" value={form.amp_password} onChange={(v) => set("amp_password", v)} placeholder={editing?.has_amp_password ? "gespeichert, leer lassen" : ""} />
+            <Field label="Allgemeiner Hinweis" value={form.password_hint} onChange={(v) => set("password_hint", v)} placeholder="z.B. Modpack vorher installieren" />
+            {form.sync_provider === "amp" && (
+              <>
+                <Field label="AMP Instanzname" value={form.amp_instance_name} onChange={(v) => set("amp_instance_name", v)} />
+                <Field label="AMP Modul" value={form.amp_module} onChange={(v) => set("amp_module", v)} placeholder="Minecraft, Generic, Rust..." />
+                <Field label="AMP URL intern" value={form.amp_url} onChange={(v) => set("amp_url", v)} placeholder="nur Admin" />
+                <Field label="AMP Benutzer" value={form.amp_username} onChange={(v) => set("amp_username", v)} />
+                <Field label="AMP Passwort / neues Passwort" type="password" value={form.amp_password} onChange={(v) => set("amp_password", v)} placeholder={editing?.has_amp_password ? "gespeichert, leer lassen" : ""} />
+              </>
+            )}
             <label className="md:col-span-2 xl:col-span-4 block">
               <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Beschreibung</span>
               <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm" />
@@ -331,6 +362,7 @@ export default function AdminGameServersPage() {
                 <div className="mt-2 flex gap-1 flex-wrap">
                   <Badge label={statusLabels[server.status] || server.status} tone={server.status === "online" ? "green" : server.status === "maintenance" ? "gold" : "muted"} />
                   <Badge label={visibilityLabels[server.visibility] || server.visibility} tone={server.visibility === "members" ? "gold" : server.visibility === "public" ? "cyan" : "muted"} />
+                  {server.access_secret_kind && server.access_secret_kind !== "none" && <Badge label={secretLabels[server.access_secret_kind] || "Zugang"} tone="gold" />}
                   {server.is_active === false && <Badge label="Inaktiv" tone="red" />}
                 </div>
               </div>

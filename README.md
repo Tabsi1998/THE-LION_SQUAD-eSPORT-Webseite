@@ -252,6 +252,18 @@ aus fremden Quellen gezogen, damit keine fremden Marken- oder Hotlink-Abhaengigk
 entstehen; bevorzugt wird ein gepflegtes Spiel-Logo aus `Admin -> Spiele` oder ein
 servereigenes Icon.
 
+Zugangsdaten werden getrennt von der Serveradresse gepflegt:
+
+- `Passwort`: fuer Spiele mit klassischem Serverpasswort.
+- `Invite-Code`: fuer Spiele wie Windrose oder Systeme mit Einladungs-Code.
+- `Whitelist / Freischaltung`: zeigt nur den Hinweis, dass eine Freischaltung noetig ist.
+- `Im Discord`: zeigt nur den Hinweis, dass der Zugang im Discord steht.
+
+Passwort und Invite-Code werden in der Serverkarte maskiert angezeigt und koennen nur
+von Personen kopiert werden, die den Server wegen seiner Sichtbarkeit sehen duerfen.
+Im Adminbereich bleiben gespeicherte Secrets beim Bearbeiten erhalten, wenn das Feld
+leer gelassen wird.
+
 ## SEO, Google und Link-Vorschauen
 
 Oeffentliche Detailseiten fuer News, Events, Turniere, Fast-Lap-Challenges,

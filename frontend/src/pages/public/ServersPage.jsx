@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Clipboard, ExternalLink, Lock, Map, Server, Shield, Signal, Users } from "lucide-react";
+import { Clipboard, ExternalLink, KeyRound, Lock, Map, Server, Shield, Signal, Users } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useAuth } from "@/context/AuthContext";
 import { api, resolveMediaUrl } from "@/lib/api";
@@ -10,6 +10,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const statusLabels = { online: "Online", offline: "Offline", maintenance: "Wartung", planned: "Geplant" };
 const visibilityLabels = { public: "Öffentlich", community: "Community", members: "Vereinsmitglieder", internal: "Intern" };
+const secretLabels = { password: "Passwort", invite_code: "Invite-Code", whitelist: "Whitelist", discord: "Discord" };
 const statusClasses = {
   online: "border-[#00FF88]/40 bg-[#00FF88]/10 text-[#00FF88]",
   offline: "border-white/15 bg-white/5 text-white/45",
@@ -150,6 +151,11 @@ function ServerCard({ server }) {
     await navigator.clipboard.writeText(server.address).catch(() => null);
     toast.success("Server-Adresse kopiert.");
   };
+  const copySecret = async () => {
+    if (!server.access_secret || !navigator.clipboard) return;
+    await navigator.clipboard.writeText(server.access_secret).catch(() => null);
+    toast.success(`${secretLabels[server.access_secret_kind] || "Zugang"} kopiert.`);
+  };
   return (
     <article className={`relative overflow-hidden border rounded-sm bg-[#111] p-5 min-h-[18rem] flex flex-col ${status === "maintenance" ? "border-[#FFD700]/35" : "border-white/10"}`}>
       {status === "maintenance" && (
@@ -203,6 +209,21 @@ function ServerCard({ server }) {
           </button>
         )}
         {server.password_hint && <div className="text-xs text-[#FFD700]/80">{server.password_hint}</div>}
+        {server.access_secret_kind && server.access_secret_kind !== "none" && (
+          <div className="border border-[#FFD700]/25 bg-[#FFD700]/10 rounded-sm p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-widest text-[#FFD700] font-black">{server.access_label || secretLabels[server.access_secret_kind] || "Zugang"}</div>
+                <div className="font-mono text-xs text-white/70 mt-1">{server.has_access_secret ? (server.access_secret_masked || "••••••") : "siehe Hinweis"}</div>
+              </div>
+              {server.access_secret && (
+                <button type="button" onClick={copySecret} className="shrink-0 inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FFD700]/10">
+                  <KeyRound className="w-3.5 h-3.5" /> Kopieren
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         <div className="flex gap-2 flex-wrap">
           {server.connect_url && (
             <a href={server.connect_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10">
