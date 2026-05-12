@@ -237,6 +237,21 @@ AMP stellt seine API pro Installation unter `/API` bereit; vor API-Aufrufen muss
 eine Session ueber `API/Core/Login` geholt werden. Zugangsdaten werden nicht an
 die oeffentliche API ausgeliefert.
 
+Empfohlene Sync-Auswahl:
+
+- `Minecraft`: `Automatisch oeffentlich` oder `Minecraft Query`, Port normalerweise `25565`.
+- `Rust`, `ARK`, `Assetto Corsa Competizione`, `Satisfactory`, viele SteamCMD-Server:
+  `Automatisch oeffentlich` oder `Steam/A2S Query`, falls der Query-Port erreichbar ist.
+- `Palworld`, `Core Keeper`, `7 Days To Die`: je nach Server-Konfiguration `Steam/A2S Query`
+  oder als Mindeststatus `RCON erreichbar`/TCP-Port.
+- Wenn ein Spiel keine oeffentliche Query sauber beantwortet: `Manuell` oder `AMP API`.
+
+Fuer die Darstellung koennen pro Server ein Icon/Logo, Karten-Link, externe Statusseite,
+Regel-Link, Connect-Link und Wartungsnotiz gepflegt werden. Logos werden nicht automatisch
+aus fremden Quellen gezogen, damit keine fremden Marken- oder Hotlink-Abhaengigkeiten
+entstehen; bevorzugt wird ein gepflegtes Spiel-Logo aus `Admin -> Spiele` oder ein
+servereigenes Icon.
+
 ## SEO, Google und Link-Vorschauen
 
 Oeffentliche Detailseiten fuer News, Events, Turniere, Fast-Lap-Challenges,

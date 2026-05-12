@@ -1,5 +1,6 @@
 """Community game server directory and admin maintenance."""
 import re
+from datetime import datetime, timezone
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,7 +13,7 @@ from models import new_id, now_utc
 
 ServerVisibility = Literal["public", "community", "members", "internal"]
 ServerStatus = Literal["online", "offline", "maintenance", "planned"]
-ServerSyncProvider = Literal["manual", "amp", "minecraft", "steam_a2s", "rcon"]
+ServerSyncProvider = Literal["manual", "auto_public", "amp", "minecraft", "steam_a2s", "rcon"]
 
 router = APIRouter(prefix="/api/game-servers", tags=["game-servers"])
 
@@ -90,6 +91,21 @@ def _public_doc(server: dict, game: dict | None = None, include_admin_fields: bo
     return doc
 
 
+def _maintenance_active(server: dict) -> bool:
+    if server.get("status") != "maintenance":
+        return False
+    until = server.get("maintenance_until")
+    if not until:
+        return True
+    try:
+        dt = datetime.fromisoformat(str(until).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt > datetime.now(timezone.utc)
+    except ValueError:
+        return True
+
+
 class GameServerPayload(BaseModel):
     name: str = Field(min_length=2, max_length=160)
     slug: Optional[str] = Field(default=None, max_length=90)
@@ -100,10 +116,15 @@ class GameServerPayload(BaseModel):
     visibility: ServerVisibility = "community"
     address: Optional[str] = Field(default=None, max_length=180)
     connect_url: Optional[str] = Field(default=None, max_length=300)
+    server_icon_url: Optional[str] = Field(default=None, max_length=300)
+    map_url: Optional[str] = Field(default=None, max_length=300)
+    external_status_url: Optional[str] = Field(default=None, max_length=300)
     password_hint: Optional[str] = Field(default=None, max_length=180)
     rules_url: Optional[str] = Field(default=None, max_length=300)
     map_name: Optional[str] = Field(default=None, max_length=120)
     version: Optional[str] = Field(default=None, max_length=80)
+    maintenance_note: Optional[str] = Field(default=None, max_length=300)
+    maintenance_until: Optional[str] = None
     player_count: int = Field(default=0, ge=0)
     max_players: Optional[int] = Field(default=None, ge=0)
     player_names: list[str] = Field(default_factory=list)
@@ -131,10 +152,15 @@ class GameServerPatch(BaseModel):
     visibility: Optional[ServerVisibility] = None
     address: Optional[str] = Field(default=None, max_length=180)
     connect_url: Optional[str] = Field(default=None, max_length=300)
+    server_icon_url: Optional[str] = Field(default=None, max_length=300)
+    map_url: Optional[str] = Field(default=None, max_length=300)
+    external_status_url: Optional[str] = Field(default=None, max_length=300)
     password_hint: Optional[str] = Field(default=None, max_length=180)
     rules_url: Optional[str] = Field(default=None, max_length=300)
     map_name: Optional[str] = Field(default=None, max_length=120)
     version: Optional[str] = Field(default=None, max_length=80)
+    maintenance_note: Optional[str] = Field(default=None, max_length=300)
+    maintenance_until: Optional[str] = None
     player_count: Optional[int] = Field(default=None, ge=0)
     max_players: Optional[int] = Field(default=None, ge=0)
     player_names: Optional[list[str]] = None
@@ -166,11 +192,15 @@ async def seed_default_game_servers():
                 "created_at": now_utc().isoformat(),
                 "updated_at": now_utc().isoformat(),
                 "last_sync_at": None,
-                "sync_provider": "manual",
+                "sync_provider": "auto_public",
                 "sort_order": index * 10,
                 **item,
             }},
             upsert=True,
+        )
+        await db.game_servers.update_many(
+            {"slug": item["slug"], "created_by": {"$exists": False}, "sync_provider": {"$in": [None, "", "manual"]}},
+            {"$set": {"sync_provider": "auto_public"}},
         )
 
 
@@ -228,9 +258,10 @@ async def update_game_server(server_id: str, body: GameServerPatch, me: dict = D
         raise HTTPException(404, "Server nicht gefunden.")
     nullable_fields = {
         "game_id", "game_name", "description", "address", "connect_url", "password_hint",
-        "rules_url", "map_name", "version", "max_players", "query_host", "query_port",
-        "rcon_port", "amp_instance_name", "amp_module", "amp_url", "amp_username",
-        "amp_password", "last_sync_error",
+        "server_icon_url", "map_url", "external_status_url", "rules_url", "map_name",
+        "version", "maintenance_note", "maintenance_until", "max_players", "query_host",
+        "query_port", "rcon_port", "amp_instance_name", "amp_module", "amp_url",
+        "amp_username", "amp_password", "last_sync_error",
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
@@ -254,8 +285,13 @@ async def _sync_one(db, server: dict) -> dict:
             "last_sync_error": None,
             "updated_at": now_utc().isoformat(),
         }
+        maintenance_active = _maintenance_active(server)
+        if maintenance_active:
+            updates["status"] = "maintenance"
         for key in ("status", "player_count", "max_players", "player_names", "map_name", "version", "game_name"):
             if key in result and result[key] is not None:
+                if key == "status" and maintenance_active:
+                    continue
                 updates[key] = result[key]
         await db.game_servers.update_one({"id": server["id"]}, {"$set": updates})
         synced = await db.game_servers.find_one({"id": server["id"]}, {"_id": 0})
@@ -264,9 +300,14 @@ async def _sync_one(db, server: dict) -> dict:
         error = str(exc)
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
+    updates = {"last_sync_at": now_utc().isoformat(), "last_sync_error": error, "updated_at": now_utc().isoformat()}
+    if not _maintenance_active(server):
+        updates["status"] = "offline"
+        updates["player_count"] = 0
+        updates["player_names"] = []
     await db.game_servers.update_one(
         {"id": server["id"]},
-        {"$set": {"last_sync_at": now_utc().isoformat(), "last_sync_error": error, "updated_at": now_utc().isoformat()}},
+        {"$set": updates},
     )
     synced = await db.game_servers.find_one({"id": server["id"]}, {"_id": 0})
     return {"ok": False, "error": error, "server": _public_doc(synced, include_admin_fields=True)}

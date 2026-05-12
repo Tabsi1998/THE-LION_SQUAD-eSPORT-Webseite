@@ -176,6 +176,26 @@ async def probe_rcon_reachable(server: dict, timeout: float = 3.0) -> dict:
     return await asyncio.to_thread(_tcp_reachable_sync, host, int(port), timeout)
 
 
+async def probe_auto_public(server: dict) -> dict:
+    attempts = []
+    _, detected_port = parse_host_port(server.get("query_host") or server.get("address"), server.get("query_port"))
+    game_name = f"{server.get('game_name') or ''} {server.get('name') or ''}".lower()
+    if detected_port == 25565 or "minecraft" in game_name:
+        attempts.append(("Minecraft Query", probe_minecraft))
+    attempts.append(("Steam/A2S Query", probe_steam_a2s))
+    attempts.append(("TCP erreichbar", probe_rcon_reachable))
+
+    errors = []
+    for label, probe in attempts:
+        try:
+            result = await probe(server)
+            result["detected_sync_provider"] = label
+            return result
+        except Exception as exc:
+            errors.append(f"{label}: {exc}")
+    raise GameServerProbeError("Keine öffentliche Abfrage erfolgreich. " + " | ".join(errors))
+
+
 async def probe_amp(server: dict, timeout: float = 5.0) -> dict:
     amp_url = (server.get("amp_url") or "").rstrip("/")
     username = server.get("amp_username")
@@ -216,6 +236,8 @@ async def probe_game_server(server: dict) -> dict:
     provider = server.get("sync_provider") or "manual"
     if provider == "manual":
         raise GameServerProbeError("Dieser Server steht auf manueller Pflege.")
+    if provider == "auto_public":
+        return await probe_auto_public(server)
     if provider == "minecraft":
         return await probe_minecraft(server)
     if provider == "steam_a2s":

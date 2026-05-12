@@ -16,14 +16,19 @@ const emptyForm = {
   visibility: "community",
   address: "",
   connect_url: "",
+  server_icon_url: "",
+  map_url: "",
+  external_status_url: "",
   password_hint: "",
   rules_url: "",
   map_name: "",
   version: "",
+  maintenance_note: "",
+  maintenance_until: "",
   player_count: 0,
   max_players: "",
   player_names_text: "",
-  sync_provider: "manual",
+  sync_provider: "auto_public",
   query_host: "",
   query_port: "",
   rcon_port: "",
@@ -38,7 +43,15 @@ const emptyForm = {
 
 const statusLabels = { online: "Online", offline: "Offline", maintenance: "Wartung", planned: "Geplant" };
 const visibilityLabels = { public: "Öffentlich", community: "Nur eingeloggte Community", members: "Nur Vereinsmitglieder", internal: "Intern / versteckt" };
-const syncLabels = { manual: "Manuell", minecraft: "Minecraft Query", steam_a2s: "Steam/A2S Query", rcon: "RCON erreichbar", amp: "AMP API" };
+const syncLabels = { auto_public: "Automatisch öffentlich", manual: "Manuell", minecraft: "Minecraft Query", steam_a2s: "Steam/A2S Query", rcon: "RCON erreichbar", amp: "AMP API" };
+
+function datetimeInputValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 16);
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
 
 function toForm(server) {
   return {
@@ -51,6 +64,7 @@ function toForm(server) {
     rcon_port: server.rcon_port ?? "",
     amp_username: server.amp_username || "",
     amp_password: "",
+    maintenance_until: datetimeInputValue(server.maintenance_until),
     player_names_text: (server.player_names || []).join(", "),
   };
 }
@@ -66,14 +80,19 @@ function toPayload(form) {
     visibility: form.visibility,
     address: form.address || null,
     connect_url: form.connect_url || null,
+    server_icon_url: form.server_icon_url || null,
+    map_url: form.map_url || null,
+    external_status_url: form.external_status_url || null,
     password_hint: form.password_hint || null,
     rules_url: form.rules_url || null,
     map_name: form.map_name || null,
     version: form.version || null,
+    maintenance_note: form.maintenance_note || null,
+    maintenance_until: form.maintenance_until || null,
     player_count: Number(form.player_count || 0),
     max_players: form.max_players === "" ? null : Number(form.max_players || 0),
     player_names: String(form.player_names_text || "").split(",").map((x) => x.trim()).filter(Boolean),
-    sync_provider: form.sync_provider || "manual",
+    sync_provider: form.sync_provider || "auto_public",
     query_host: form.query_host || null,
     query_port: form.query_port === "" ? null : Number(form.query_port || 0),
     rcon_port: form.rcon_port === "" ? null : Number(form.rcon_port || 0),
@@ -196,7 +215,7 @@ export default function AdminGameServersPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Community</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Game-Server</h1>
           <p className="mt-2 text-white/60 text-sm max-w-2xl">
-            Server sichtbar pflegen, Zugriff steuern und Live-Werte hinterlegen. AMP-Felder sind vorbereitet, damit ein späterer Sync die Spielerzahlen automatisch aktualisieren kann.
+            Server sichtbar pflegen, Zugriff steuern und Live-Werte hinterlegen. Standard ist die automatische öffentliche Abfrage; AMP bleibt optional, wenn ein Spiel über öffentliche Queries nicht genug Daten liefert.
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -251,6 +270,9 @@ export default function AdminGameServersPage() {
             </label>
             <Field label="Adresse" value={form.address} onChange={(v) => set("address", v)} placeholder="gameserver.lionsquad.at:25565" />
             <Field label="Connect-Link" value={form.connect_url} onChange={(v) => set("connect_url", v)} placeholder="steam://connect/..." />
+            <Field label="Server-Icon / Logo" value={form.server_icon_url} onChange={(v) => set("server_icon_url", v)} placeholder="/api/static/uploads/... oder https://..." />
+            <Field label="Karten-Link" value={form.map_url} onChange={(v) => set("map_url", v)} placeholder="Dynmap, BattleMetrics, Karte..." />
+            <Field label="Externe Statusseite" value={form.external_status_url} onChange={(v) => set("external_status_url", v)} placeholder="z.B. BattleMetrics/Serverliste" />
             <Field label="Spieler online" type="number" value={form.player_count} onChange={(v) => set("player_count", v)} />
             <Field label="Max. Spieler" type="number" value={form.max_players} onChange={(v) => set("max_players", v)} />
             <label className="block">
@@ -264,6 +286,8 @@ export default function AdminGameServersPage() {
             <Field label="RCON-Port" type="number" value={form.rcon_port} onChange={(v) => set("rcon_port", v)} />
             <Field label="Map" value={form.map_name} onChange={(v) => set("map_name", v)} />
             <Field label="Version" value={form.version} onChange={(v) => set("version", v)} />
+            <Field label="Wartungsnotiz" value={form.maintenance_note} onChange={(v) => set("maintenance_note", v)} placeholder="z.B. Mod-Update, neue Map..." />
+            <Field label="Wartung bis" type="datetime-local" value={form.maintenance_until} onChange={(v) => set("maintenance_until", v)} />
             <Field label="Sortierung" type="number" value={form.sort_order} onChange={(v) => set("sort_order", v)} />
             <Field label="Regel-Link" value={form.rules_url} onChange={(v) => set("rules_url", v)} />
             <Field label="Passwort-Hinweis" value={form.password_hint} onChange={(v) => set("password_hint", v)} placeholder="z.B. im Discord #server-info" />

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ExternalLink, Lock, Server, Shield, Signal, Users } from "lucide-react";
+import { toast } from "sonner";
+import { Clipboard, ExternalLink, Lock, Map, Server, Shield, Signal, Users } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useAuth } from "@/context/AuthContext";
 import { api, resolveMediaUrl } from "@/lib/api";
@@ -24,6 +25,13 @@ function playerText(server) {
   const current = Number(server.player_count || 0);
   if (server.max_players == null || server.max_players === "") return `${current} online`;
   return `${current}/${server.max_players} online`;
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
 }
 
 export default function ServersPage() {
@@ -132,12 +140,27 @@ function ServerCard({ server }) {
   const max = Number(server.max_players || 0);
   const current = Number(server.player_count || 0);
   const pct = max > 0 ? Math.min(100, Math.round((current / max) * 100)) : 0;
+  const iconUrl = server.server_icon_url || server.game?.logo_url;
+  const maintenanceText = [
+    server.maintenance_note,
+    server.maintenance_until ? `bis ${formatDateTime(server.maintenance_until)}` : "",
+  ].filter(Boolean).join(" · ");
+  const copyAddress = async () => {
+    if (!server.address || !navigator.clipboard) return;
+    await navigator.clipboard.writeText(server.address).catch(() => null);
+    toast.success("Server-Adresse kopiert.");
+  };
   return (
-    <article className="border border-white/10 bg-[#111] rounded-sm p-5 min-h-[18rem] flex flex-col">
+    <article className={`relative overflow-hidden border rounded-sm bg-[#111] p-5 min-h-[18rem] flex flex-col ${status === "maintenance" ? "border-[#FFD700]/35" : "border-white/10"}`}>
+      {status === "maintenance" && (
+        <div className="absolute inset-x-0 top-0 bg-[#FFD700] text-black text-[10px] font-black uppercase tracking-[0.25em] px-4 py-1">
+          Baustelle / Wartung{maintenanceText ? ` · ${maintenanceText}` : ""}
+        </div>
+      )}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-14 h-14 rounded-sm border border-white/10 bg-black/30 flex items-center justify-center overflow-hidden shrink-0">
-            {server.game?.logo_url ? <img src={resolveMediaUrl(server.game.logo_url)} alt="" className="w-full h-full object-contain p-2" /> : <Server className="w-6 h-6 text-[#29B6E8]" />}
+            {iconUrl ? <img src={resolveMediaUrl(iconUrl)} alt="" className="w-full h-full object-contain p-2" /> : <Server className="w-6 h-6 text-[#29B6E8]" />}
           </div>
           <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold truncate">{gameName(server)}</div>
@@ -174,13 +197,26 @@ function ServerCard({ server }) {
 
       <div className="mt-auto pt-5 space-y-2">
         {server.address && (
-          <div className="font-mono text-xs border border-white/10 bg-black/30 rounded-sm px-3 py-2 text-white/75 break-all">{server.address}</div>
+          <button type="button" onClick={copyAddress} className="w-full text-left font-mono text-xs border border-white/10 bg-black/30 rounded-sm px-3 py-2 text-white/75 break-all hover:border-[#29B6E8]/50 hover:text-white transition inline-flex items-center justify-between gap-3">
+            <span>{server.address}</span>
+            <Clipboard className="w-3.5 h-3.5 shrink-0 text-[#29B6E8]" />
+          </button>
         )}
         {server.password_hint && <div className="text-xs text-[#FFD700]/80">{server.password_hint}</div>}
         <div className="flex gap-2 flex-wrap">
           {server.connect_url && (
             <a href={server.connect_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10">
               Verbinden <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
+          {server.map_url && (
+            <a href={server.map_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FFD700]/10">
+              Karte <Map className="w-3.5 h-3.5" />
+            </a>
+          )}
+          {server.external_status_url && (
+            <a href={server.external_status_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/65 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white">
+              Status <ExternalLink className="w-3.5 h-3.5" />
             </a>
           )}
           {server.rules_url && (
