@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Clipboard, ExternalLink, KeyRound, Lock, Map, Server, Shield, Signal, Users } from "lucide-react";
+import { Clipboard, Clock3, ExternalLink, Gamepad2, KeyRound, Lock, Map, Server, Shield, Signal, Users } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useAuth } from "@/context/AuthContext";
 import { api, resolveMediaUrl } from "@/lib/api";
@@ -26,6 +26,14 @@ function playerText(server) {
   const current = Number(server.player_count || 0);
   if (server.max_players == null || server.max_players === "") return `${current} online`;
   return `${current}/${server.max_players} online`;
+}
+
+function accessText(server) {
+  const visibility = visibilityLabels[server.visibility] || server.visibility || "Öffentlich";
+  const secret = server.access_secret_kind && server.access_secret_kind !== "none"
+    ? (server.access_label || secretLabels[server.access_secret_kind] || "Zugang")
+    : "";
+  return [visibility, secret].filter(Boolean).join(" · ");
 }
 
 function formatDateTime(value) {
@@ -129,7 +137,7 @@ function ServerSection({ title, items }) {
         <h2 className="font-heading text-2xl font-black uppercase">{title}</h2>
         <div className="h-px flex-1 bg-white/10" />
       </div>
-      <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="mt-4 grid lg:grid-cols-2 2xl:grid-cols-3 gap-4">
         {items.map((server) => <ServerCard key={server.id} server={server} />)}
       </div>
     </section>
@@ -162,95 +170,120 @@ function ServerCard({ server }) {
       toast.error("Zugang konnte nicht geladen werden.");
     }
   };
+  const quickFacts = [
+    { label: "Zugriff", value: accessText(server) },
+    { label: "Spieler", value: playerText(server) },
+    server.map_name ? { label: "Karte", value: server.map_name } : null,
+    server.version ? { label: "Version", value: server.version } : null,
+    server.last_sync_at ? { label: "Stand", value: formatDateTime(server.last_sync_at) } : null,
+  ].filter(Boolean);
+
   return (
-    <article className={`relative overflow-hidden border rounded-sm bg-[#111] p-5 min-h-[18rem] flex flex-col ${status === "maintenance" ? "border-[#FFD700]/35" : "border-white/10"}`}>
+    <article className={`group relative overflow-hidden border rounded-sm bg-[#101010] min-h-[19rem] flex flex-col transition ${status === "maintenance" ? "border-[#FFD700]/45" : "border-white/10 hover:border-white/20"}`}>
       {status === "maintenance" && (
-        <div className="absolute inset-x-0 top-0 bg-[#FFD700] text-black text-[10px] font-black uppercase tracking-[0.25em] px-4 py-1">
-          Baustelle / Wartung{maintenanceText ? ` · ${maintenanceText}` : ""}
+        <div className="pointer-events-none absolute -right-16 top-8 z-10 w-64 rotate-12 border-y border-black/20 bg-[#FFD700] py-1 text-center text-[10px] font-black uppercase tracking-[0.22em] text-black shadow-lg">
+          Wartung
         </div>
       )}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-14 h-14 rounded-sm border border-white/10 bg-black/30 flex items-center justify-center overflow-hidden shrink-0">
-            {iconUrl ? <img src={resolveMediaUrl(iconUrl)} alt="" className="w-full h-full object-contain p-2" /> : <Server className="w-6 h-6 text-[#29B6E8]" />}
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold truncate">{gameName(server)}</div>
-            <h3 className="font-heading text-xl font-black uppercase leading-tight truncate">{server.name}</h3>
-          </div>
-        </div>
-        <span className={`shrink-0 border px-2 py-1 rounded-sm text-[10px] font-black uppercase tracking-widest ${statusClasses[status] || statusClasses.offline}`}>
-          {statusLabels[status] || status}
-        </span>
-      </div>
+      <div className={`h-1 ${status === "online" ? "bg-[#00FF88]" : status === "maintenance" ? "bg-[#FFD700]" : status === "planned" ? "bg-[#29B6E8]" : "bg-white/10"}`} />
 
-      {server.description && <p className="mt-4 text-sm text-white/60 line-clamp-3">{server.description}</p>}
-
-      <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
-        <Info label="Zugriff" value={visibilityLabels[server.visibility] || server.visibility} />
-        <Info label="Spieler" value={playerText(server)} />
-        {server.map_name && <Info label="Map" value={server.map_name} />}
-        {server.version && <Info label="Version" value={server.version} />}
-      </div>
-
-      {max > 0 && (
-        <div className="mt-4">
-          <div className="h-2 bg-white/10 rounded-sm overflow-hidden">
-            <div className="h-full bg-[#29B6E8]" style={{ width: `${pct}%` }} />
-          </div>
-        </div>
-      )}
-
-      {server.player_names?.length > 0 && (
-        <div className="mt-4 text-xs text-white/45">
-          Online: <span className="text-white/70">{server.player_names.slice(0, 6).join(", ")}</span>{server.player_names.length > 6 ? " …" : ""}
-        </div>
-      )}
-
-      <div className="mt-auto pt-5 space-y-2">
-        {server.address && (
-          <button type="button" onClick={copyAddress} className="w-full text-left font-mono text-xs border border-white/10 bg-black/30 rounded-sm px-3 py-2 text-white/75 break-all hover:border-[#29B6E8]/50 hover:text-white transition inline-flex items-center justify-between gap-3">
-            <span>{server.address}</span>
-            <Clipboard className="w-3.5 h-3.5 shrink-0 text-[#29B6E8]" />
-          </button>
-        )}
-        {server.password_hint && <div className="text-xs text-[#FFD700]/80">{server.password_hint}</div>}
-        {server.access_secret_kind && server.access_secret_kind !== "none" && (
-          <div className="border border-[#FFD700]/25 bg-[#FFD700]/10 rounded-sm p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[10px] uppercase tracking-widest text-[#FFD700] font-black">{server.access_label || secretLabels[server.access_secret_kind] || "Zugang"}</div>
-                <div className="font-mono text-xs text-white/70 mt-1">{server.has_access_secret ? (server.access_secret_masked || "••••••") : "siehe Hinweis"}</div>
+      <div className="p-5 flex flex-col grow">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-14 h-14 rounded-sm border border-white/10 bg-black/30 flex items-center justify-center overflow-hidden shrink-0">
+              {iconUrl ? <img src={resolveMediaUrl(iconUrl)} alt="" className="w-full h-full object-contain p-2" /> : <Server className="w-6 h-6 text-[#29B6E8]" />}
+            </div>
+            <div className="min-w-0 pt-0.5">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">
+                <Gamepad2 className="w-3 h-3 shrink-0" />
+                <span className="truncate">{gameName(server)}</span>
               </div>
-              {server.has_access_secret && (
-                <button type="button" onClick={copySecret} className="shrink-0 inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FFD700]/10">
-                  <KeyRound className="w-3.5 h-3.5" /> Kopieren
-                </button>
-              )}
+              <h3 className="mt-1 font-heading text-xl sm:text-2xl font-black uppercase leading-none line-clamp-2 break-words">{server.name}</h3>
+            </div>
+          </div>
+          {status !== "maintenance" && (
+            <span className={`shrink-0 border px-2 py-1 rounded-sm text-[10px] font-black uppercase tracking-widest ${statusClasses[status] || statusClasses.offline}`}>
+              {statusLabels[status] || status}
+            </span>
+          )}
+        </div>
+
+        {server.description && <p className="mt-4 text-sm leading-relaxed text-white/60 line-clamp-3">{server.description}</p>}
+
+        <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-3 text-xs">
+          {quickFacts.map((fact) => <Info key={fact.label} label={fact.label} value={fact.value} />)}
+        </div>
+
+        {max > 0 && (
+          <div className="mt-5">
+            <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/35 font-bold">
+              <span>Auslastung</span>
+              <span>{pct}%</span>
+            </div>
+            <div className="mt-2 h-1.5 bg-white/10 rounded-sm overflow-hidden">
+              <div className={`h-full ${status === "online" ? "bg-[#00FF88]" : "bg-[#29B6E8]"}`} style={{ width: `${pct}%` }} />
             </div>
           </div>
         )}
-        <div className="flex gap-2 flex-wrap">
-          {server.connect_url && (
-            <a href={server.connect_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10">
-              Verbinden <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+
+        {server.player_names?.length > 0 && (
+          <div className="mt-4 text-xs text-white/45">
+            Online: <span className="text-white/70">{server.player_names.slice(0, 6).join(", ")}</span>{server.player_names.length > 6 ? " …" : ""}
+          </div>
+        )}
+
+        {status === "maintenance" && maintenanceText && (
+          <div className="mt-5 border border-[#FFD700]/30 bg-[#FFD700]/10 rounded-sm p-3 text-sm text-[#FFD700]/85 flex gap-2">
+            <Clock3 className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{maintenanceText}</span>
+          </div>
+        )}
+
+        <div className="mt-auto pt-5 space-y-2">
+          {server.address && (
+            <button type="button" onClick={copyAddress} className="w-full text-left font-mono text-xs border border-white/10 bg-black/30 rounded-sm px-3 py-2 text-white/75 break-all hover:border-[#29B6E8]/50 hover:text-white transition inline-flex items-center justify-between gap-3">
+              <span>{server.address}</span>
+              <Clipboard className="w-3.5 h-3.5 shrink-0 text-[#29B6E8]" />
+            </button>
           )}
-          {server.map_url && (
-            <a href={server.map_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FFD700]/10">
-              Karte <Map className="w-3.5 h-3.5" />
-            </a>
+          {server.password_hint && <div className="text-xs text-[#FFD700]/80">{server.password_hint}</div>}
+          {server.access_secret_kind && server.access_secret_kind !== "none" && (
+            <div className="border border-[#FFD700]/25 bg-[#FFD700]/10 rounded-sm p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-widest text-[#FFD700] font-black">{server.access_label || secretLabels[server.access_secret_kind] || "Zugang"}</div>
+                  <div className="font-mono text-xs text-white/70 mt-1">{server.has_access_secret ? (server.access_secret_masked || "••••••") : "siehe Hinweis"}</div>
+                </div>
+                {server.has_access_secret && (
+                  <button type="button" onClick={copySecret} className="shrink-0 inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FFD700]/10">
+                    <KeyRound className="w-3.5 h-3.5" /> Kopieren
+                  </button>
+                )}
+              </div>
+            </div>
           )}
-          {server.external_status_url && (
-            <a href={server.external_status_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/65 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white">
-              Status <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
-          {server.rules_url && (
-            <a href={server.rules_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/65 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white">
-              Regeln
-            </a>
-          )}
+          <div className="flex gap-2 flex-wrap">
+            {server.connect_url && (
+              <a href={server.connect_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10">
+                Verbinden <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+            {server.map_url && (
+              <a href={server.map_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FFD700]/10">
+                Karte <Map className="w-3.5 h-3.5" />
+              </a>
+            )}
+            {server.external_status_url && (
+              <a href={server.external_status_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/65 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white">
+                Status <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+            {server.rules_url && (
+              <a href={server.rules_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/65 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white">
+                Regeln
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </article>
@@ -259,9 +292,9 @@ function ServerCard({ server }) {
 
 function Info({ label, value }) {
   return (
-    <div className="border border-white/10 rounded-sm px-3 py-2 bg-black/20 min-w-0">
+    <div className="min-w-0 border-t border-white/10 pt-2">
       <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">{label}</div>
-      <div className="mt-1 text-white/75 truncate">{value || "-"}</div>
+      <div className="mt-1 text-white/75 truncate text-sm">{value || "-"}</div>
     </div>
   );
 }
