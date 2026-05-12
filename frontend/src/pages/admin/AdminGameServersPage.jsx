@@ -23,15 +23,22 @@ const emptyForm = {
   player_count: 0,
   max_players: "",
   player_names_text: "",
+  sync_provider: "manual",
+  query_host: "",
+  query_port: "",
+  rcon_port: "",
   amp_instance_name: "",
   amp_module: "",
   amp_url: "",
+  amp_username: "",
+  amp_password: "",
   is_active: true,
   sort_order: 100,
 };
 
 const statusLabels = { online: "Online", offline: "Offline", maintenance: "Wartung", planned: "Geplant" };
 const visibilityLabels = { public: "Öffentlich", community: "Nur eingeloggte Community", members: "Nur Vereinsmitglieder", internal: "Intern / versteckt" };
+const syncLabels = { manual: "Manuell", minecraft: "Minecraft Query", steam_a2s: "Steam/A2S Query", rcon: "RCON erreichbar", amp: "AMP API" };
 
 function toForm(server) {
   return {
@@ -39,6 +46,11 @@ function toForm(server) {
     ...server,
     game_id: server.game_id || "",
     max_players: server.max_players ?? "",
+    query_host: server.query_host || "",
+    query_port: server.query_port ?? "",
+    rcon_port: server.rcon_port ?? "",
+    amp_username: server.amp_username || "",
+    amp_password: "",
     player_names_text: (server.player_names || []).join(", "),
   };
 }
@@ -61,9 +73,15 @@ function toPayload(form) {
     player_count: Number(form.player_count || 0),
     max_players: form.max_players === "" ? null : Number(form.max_players || 0),
     player_names: String(form.player_names_text || "").split(",").map((x) => x.trim()).filter(Boolean),
+    sync_provider: form.sync_provider || "manual",
+    query_host: form.query_host || null,
+    query_port: form.query_port === "" ? null : Number(form.query_port || 0),
+    rcon_port: form.rcon_port === "" ? null : Number(form.rcon_port || 0),
     amp_instance_name: form.amp_instance_name || null,
     amp_module: form.amp_module || null,
     amp_url: form.amp_url || null,
+    amp_username: form.amp_username || null,
+    amp_password: form.amp_password || undefined,
     is_active: !!form.is_active,
     sort_order: Number(form.sort_order || 0),
   };
@@ -76,6 +94,7 @@ export default function AdminGameServersPage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(null);
   const confirm = useConfirm();
 
   const load = useCallback(() => {
@@ -118,6 +137,7 @@ export default function AdminGameServersPage() {
     setSaving(true);
     try {
       const payload = toPayload(form);
+      if (!payload.amp_password) delete payload.amp_password;
       if (editing) {
         await api.patch(`/game-servers/${editing.id}`, payload);
         toast.success("Server gespeichert.");
@@ -141,10 +161,32 @@ export default function AdminGameServersPage() {
     load();
   };
 
-  const touch = async (server) => {
-    await api.post(`/game-servers/${server.id}/touch`);
-    toast.success("Sync-Zeit aktualisiert.");
-    load();
+  const syncOne = async (server) => {
+    setSyncing(server.id);
+    try {
+      const { data } = await api.post(`/game-servers/${server.id}/sync`);
+      if (data.ok) toast.success("Serverdaten synchronisiert.");
+      else toast.error(data.error || "Sync fehlgeschlagen.");
+      load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Sync fehlgeschlagen.");
+    } finally {
+      setSyncing(null);
+    }
+  };
+
+  const syncAll = async () => {
+    setSyncing("all");
+    try {
+      const { data } = await api.post("/game-servers/sync");
+      if (data.failed) toast.error(`${data.failed} von ${data.processed} Servern konnten nicht synchronisiert werden.`);
+      else toast.success(`${data.processed} Server synchronisiert.`);
+      load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Sync fehlgeschlagen.");
+    } finally {
+      setSyncing(null);
+    }
   };
 
   return (
@@ -157,9 +199,14 @@ export default function AdminGameServersPage() {
             Server sichtbar pflegen, Zugriff steuern und Live-Werte hinterlegen. AMP-Felder sind vorbereitet, damit ein späterer Sync die Spielerzahlen automatisch aktualisieren kann.
           </p>
         </div>
-        <button onClick={startCreate} className="px-5 py-2.5 bg-[#29B6E8] text-black rounded-sm font-bold uppercase tracking-wider inline-flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Server anlegen
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={syncAll} disabled={syncing === "all"} className="px-4 py-2.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50">
+            <RefreshCw className={`w-4 h-4 ${syncing === "all" ? "animate-spin" : ""}`} /> Alle syncen
+          </button>
+          <button onClick={startCreate} className="px-5 py-2.5 bg-[#29B6E8] text-black rounded-sm font-bold uppercase tracking-wider inline-flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Server anlegen
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -206,6 +253,15 @@ export default function AdminGameServersPage() {
             <Field label="Connect-Link" value={form.connect_url} onChange={(v) => set("connect_url", v)} placeholder="steam://connect/..." />
             <Field label="Spieler online" type="number" value={form.player_count} onChange={(v) => set("player_count", v)} />
             <Field label="Max. Spieler" type="number" value={form.max_players} onChange={(v) => set("max_players", v)} />
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Sync-Quelle</span>
+              <select value={form.sync_provider} onChange={(e) => set("sync_provider", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm">
+                {Object.entries(syncLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+              </select>
+            </label>
+            <Field label="Query-Host" value={form.query_host} onChange={(v) => set("query_host", v)} placeholder="leer = aus Adresse" />
+            <Field label="Query-Port" type="number" value={form.query_port} onChange={(v) => set("query_port", v)} placeholder="z.B. 25565" />
+            <Field label="RCON-Port" type="number" value={form.rcon_port} onChange={(v) => set("rcon_port", v)} />
             <Field label="Map" value={form.map_name} onChange={(v) => set("map_name", v)} />
             <Field label="Version" value={form.version} onChange={(v) => set("version", v)} />
             <Field label="Sortierung" type="number" value={form.sort_order} onChange={(v) => set("sort_order", v)} />
@@ -214,6 +270,8 @@ export default function AdminGameServersPage() {
             <Field label="AMP Instanzname" value={form.amp_instance_name} onChange={(v) => set("amp_instance_name", v)} />
             <Field label="AMP Modul" value={form.amp_module} onChange={(v) => set("amp_module", v)} placeholder="Minecraft, Generic, Rust..." />
             <Field label="AMP URL intern" value={form.amp_url} onChange={(v) => set("amp_url", v)} placeholder="nur Admin" />
+            <Field label="AMP Benutzer" value={form.amp_username} onChange={(v) => set("amp_username", v)} />
+            <Field label="AMP Passwort / neues Passwort" type="password" value={form.amp_password} onChange={(v) => set("amp_password", v)} placeholder={editing?.has_amp_password ? "gespeichert, leer lassen" : ""} />
             <label className="md:col-span-2 xl:col-span-4 block">
               <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Beschreibung</span>
               <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm" />
@@ -253,7 +311,7 @@ export default function AdminGameServersPage() {
                 </div>
               </div>
               <div className="flex gap-1 shrink-0">
-                <button onClick={() => touch(server)} title="Sync-Zeit aktualisieren" className="p-2 text-white/45 hover:text-[#29B6E8]"><RefreshCw className="w-4 h-4" /></button>
+                <button onClick={() => syncOne(server)} disabled={syncing === server.id || server.sync_provider === "manual"} title="Live-Daten synchronisieren" className="p-2 text-white/45 hover:text-[#29B6E8] disabled:opacity-30"><RefreshCw className={`w-4 h-4 ${syncing === server.id ? "animate-spin" : ""}`} /></button>
                 <button onClick={() => startEdit(server)} title="Bearbeiten" className="p-2 text-white/45 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
                 <button onClick={() => remove(server)} title="Löschen" className="p-2 text-white/45 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
               </div>
@@ -261,9 +319,10 @@ export default function AdminGameServersPage() {
             <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
               <Info label="Adresse" value={server.address || "-"} />
               <Info label="Spieler" value={`${server.player_count || 0}${server.max_players != null ? `/${server.max_players}` : ""}`} />
-              <Info label="AMP" value={server.amp_instance_name || "-"} />
-              <Info label="Sync" value={server.last_sync_at ? new Date(server.last_sync_at).toLocaleString("de-DE") : "manuell"} />
+              <Info label="Sync-Quelle" value={syncLabels[server.sync_provider || "manual"] || server.sync_provider || "Manuell"} />
+              <Info label="Sync" value={server.last_sync_at ? new Date(server.last_sync_at).toLocaleString("de-DE") : "noch nie"} />
             </div>
+            {server.last_sync_error && <div className="mt-3 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FF8A80] rounded-sm px-3 py-2 text-xs">{server.last_sync_error}</div>}
             {server.description && <p className="mt-3 text-sm text-white/55 line-clamp-2">{server.description}</p>}
           </article>
         ))}

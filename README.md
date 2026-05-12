@@ -225,10 +225,17 @@ Sichtbarkeiten:
 - `Intern`: nicht oeffentlich sichtbar.
 
 Spielerzahlen, Max-Slots, Map, Version, Adresse und Connect-Link koennen manuell
-gepflegt werden. AMP/CubeCoders-Felder sind vorbereitet; fuer echte Live-Syncs
-braucht der Server spaeter die AMP-Zugangsdaten bzw. die jeweilige AMP-API-URL der
-Installation. AMP stellt seine API pro Installation unter `/API` bereit; vor API-
-Aufrufen muss eine Session ueber `API/Core/Login` geholt werden.
+gepflegt oder ueber eine Sync-Quelle aktualisiert werden:
+
+- `Manuell`: Werte werden im Adminbereich gepflegt.
+- `Minecraft Query`: nutzt den Minecraft Server List Ping.
+- `Steam/A2S Query`: nutzt die Valve/Steam Server Query fuer Spiele mit A2S-Unterstuetzung.
+- `RCON erreichbar`: prueft zunaechst nur TCP-Erreichbarkeit am RCON-Port.
+- `AMP API`: nutzt die AMP-API der jeweiligen Installation.
+
+AMP stellt seine API pro Installation unter `/API` bereit; vor API-Aufrufen muss
+eine Session ueber `API/Core/Login` geholt werden. Zugangsdaten werden nicht an
+die oeffentliche API ausgeliefert.
 
 ## SEO, Google und Link-Vorschauen
 

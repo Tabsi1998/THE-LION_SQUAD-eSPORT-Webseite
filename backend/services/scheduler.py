@@ -7,6 +7,7 @@ Runs recurring jobs in the FastAPI process:
   - scheduled_news every 60 seconds
   - prize_expiry every 60 minutes
   - birthday_greetings every 6 hours
+  - game_server_sync every 5 minutes
 
 Designed to be safe-by-default: every job catches its own exceptions so the
 scheduler never crashes the app.
@@ -89,6 +90,16 @@ async def _safe_twitch_poll():
         await twitch_poll_loop()
     except Exception as exc:
         logger.exception(f"[scheduler] twitch_poll crash: {exc}")
+
+
+async def _safe_game_server_sync():
+    try:
+        from routes.game_server_routes import sync_configured_game_servers
+        res = await sync_configured_game_servers()
+        if res.get("processed"):
+            logger.info(f"[scheduler] game_server_sync processed={res.get('processed')} failed={res.get('failed')}")
+    except Exception as exc:
+        logger.exception(f"[scheduler] game_server_sync crash: {exc}")
 
 
 def _parse_dt(value):
@@ -184,11 +195,13 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_twitch_poll, IntervalTrigger(seconds=90), id="twitch_poll",
                   max_instances=1, coalesce=True)
+    sched.add_job(_safe_game_server_sync, IntervalTrigger(minutes=5), id="game_server_sync",
+                  max_instances=1, coalesce=True)
     sched.add_job(_safe_status_transitions, IntervalTrigger(seconds=60), id="status_transitions",
                   max_instances=1, coalesce=True)
     sched.start()
     _scheduler = sched
-    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · birthday 6h · twitch 90s)")
+    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · birthday 6h · twitch 90s · game_server_sync 5m)")
     return sched
 
 
