@@ -314,7 +314,7 @@ async def update_game_server(server_id: str, body: GameServerPatch, me: dict = D
 
 
 async def _sync_one(db, server: dict) -> dict:
-    from services.game_server_status import GameServerProbeError, probe_game_server
+    from services.game_server_status import GameServerProbeError, probe_game_server, summarize_probe_failure
     try:
         result = await probe_game_server(server)
         updates = {
@@ -341,7 +341,7 @@ async def _sync_one(db, server: dict) -> dict:
     updates = {
         "last_sync_at": now_utc().isoformat(),
         "last_sync_error": None,
-        "last_sync_note": f"Sync konnte den Server vom Webserver aus nicht erreichen. Letzter Status bleibt erhalten. Details: {error}",
+        "last_sync_note": f"Sync konnte den Server vom Webserver aus nicht erreichen. Letzter Status bleibt erhalten. {summarize_probe_failure(error)}",
         "updated_at": now_utc().isoformat(),
     }
     if not server.get("last_sync_at") and not _maintenance_active(server) and server.get("status") != "planned":

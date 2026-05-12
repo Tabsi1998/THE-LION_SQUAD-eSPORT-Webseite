@@ -60,6 +60,28 @@ def _resolve_host_sync(host: str) -> list[str]:
     return addresses
 
 
+def explain_connection_error(error: str | None) -> str | None:
+    text = str(error or "").lower()
+    if not text:
+        return None
+    if "connection refused" in text or "errno 111" in text or "winerror 10061" in text:
+        return "Host erreichbar, aber Port geschlossen: falscher Port, Dienst lauscht nicht auf dieser IP oder Firewall lehnt aktiv ab."
+    if "timed out" in text or "timeout" in text:
+        return "Keine Antwort: Routing, Firewall, Hairpin-NAT oder UDP/TCP-Portweiterleitung pruefen."
+    if "name or service not known" in text or "nodename nor servname" in text or "getaddrinfo" in text:
+        return "DNS-Name kann vom Backend aus nicht aufgeloest werden."
+    if "network is unreachable" in text or "no route to host" in text:
+        return "Keine Route vom Backend-Netz zur Zieladresse."
+    return None
+
+
+def summarize_probe_failure(error: str) -> str:
+    explanation = explain_connection_error(error)
+    if not explanation:
+        return error
+    return f"{explanation} Details: {error}"
+
+
 def _varint(value: int) -> bytes:
     out = bytearray()
     while True:
@@ -280,10 +302,13 @@ async def diagnose_game_server(server: dict) -> dict:
             item["tcp_ok"] = True
         except Exception as exc:
             item["error"] = str(exc)
+            item["hint"] = explain_connection_error(item["error"])
         checks.append(item)
 
     if any(item["tcp_ok"] for item in checks):
         recommendation = "Mindestens eine Adresse ist vom Backend aus erreichbar. Diese Adresse sollte fuer den Sync verwendet werden."
+    elif any("Port geschlossen" in str(item.get("hint") or "") for item in checks):
+        recommendation = "Mindestens ein Host antwortet, aber der Game-Port ist geschlossen. Pruefe in AMP/Minecraft den tatsaechlichen Port, die Bind-Adresse und Firewall-Regeln."
     elif server.get("query_host"):
         recommendation = "Keine Sync-Adresse ist erreichbar. Pruefe internen DNS, LAN-IP, Firewall und ob der Spielserver auf diesem Port wirklich lauscht."
     else:

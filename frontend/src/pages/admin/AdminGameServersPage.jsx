@@ -489,6 +489,7 @@ function DiagnosticsPanel({ data }) {
             </div>
             <div className="mt-1 text-white/40">{item.source}</div>
             {item.resolved_ips?.length > 0 && <div className="mt-1 text-white/55 break-all">DNS: {item.resolved_ips.join(", ")}</div>}
+            {item.hint && <div className="mt-1 text-[#FFD700] break-words">{item.hint}</div>}
             {item.error && <div className="mt-1 text-[#FF8A80] break-words">{item.error}</div>}
           </div>
         ))}
