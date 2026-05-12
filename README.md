@@ -258,6 +258,10 @@ wird, z.B. `host.docker.internal`, `192.168.x.x` oder ein interner DNS-Name.
 `docker-compose.yml` enthaelt bereits `host.docker.internal:host-gateway` fuer diesen
 Fall. Wenn der Sync eine interne Verbindung nicht erreicht, bleibt der letzte Status
 erhalten und der Admin sieht nur einen Sync-Hinweis.
+Im Adminbereich gibt es pro Server eine Netzwerkdiagnose. Sie zeigt aus Sicht des
+Backend-Containers DNS-Aufloesung, getestete Host/Port-Kandidaten und ob TCP
+erreichbar ist. Damit laesst sich schnell unterscheiden, ob ein Website-Problem
+vorliegt oder ob Hairpin-NAT, Split-DNS, Firewall oder Portweiterleitung fehlt.
 
 Empfohlene Sync-Auswahl:
 

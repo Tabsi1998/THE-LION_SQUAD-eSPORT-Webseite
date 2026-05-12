@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { Network, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { api, formatApiError } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -125,6 +125,7 @@ export default function AdminGameServersPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(null);
+  const [diagnostics, setDiagnostics] = useState({});
   const confirm = useConfirm();
 
   const load = useCallback(() => {
@@ -214,6 +215,21 @@ export default function AdminGameServersPage() {
       load();
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail) || "Sync fehlgeschlagen.");
+    } finally {
+      setSyncing(null);
+    }
+  };
+
+  const diagnose = async (server) => {
+    setSyncing(`${server.id}:diagnose`);
+    try {
+      const { data } = await api.get(`/game-servers/${server.id}/diagnostics`);
+      setDiagnostics((prev) => ({ ...prev, [server.id]: data }));
+      const reachable = (data.candidates || []).some((item) => item.tcp_ok);
+      if (reachable) toast.success("Diagnose fertig: mindestens eine Adresse erreichbar.");
+      else toast("Diagnose fertig: keine Adresse vom Backend erreichbar.");
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Diagnose fehlgeschlagen.");
     } finally {
       setSyncing(null);
     }
@@ -424,6 +440,7 @@ export default function AdminGameServersPage() {
               </div>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => syncOne(server)} disabled={syncing === server.id || server.sync_provider === "manual"} title="Live-Daten synchronisieren" className="p-2 text-white/45 hover:text-[#29B6E8] disabled:opacity-30"><RefreshCw className={`w-4 h-4 ${syncing === server.id ? "animate-spin" : ""}`} /></button>
+                <button onClick={() => diagnose(server)} disabled={syncing === `${server.id}:diagnose`} title="Netzwerkdiagnose" className="p-2 text-white/45 hover:text-[#FFD700] disabled:opacity-30"><Network className={`w-4 h-4 ${syncing === `${server.id}:diagnose` ? "animate-pulse" : ""}`} /></button>
                 <button onClick={() => startEdit(server)} title="Bearbeiten" className="p-2 text-white/45 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
                 <button onClick={() => remove(server)} title="Löschen" className="p-2 text-white/45 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
               </div>
@@ -449,11 +466,34 @@ export default function AdminGameServersPage() {
             </div>
             {server.last_sync_note && <div className="mt-3 border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] rounded-sm px-3 py-2 text-xs">{server.last_sync_note}</div>}
             {server.last_sync_error && <div className="mt-3 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FF8A80] rounded-sm px-3 py-2 text-xs">{server.last_sync_error}</div>}
+            {diagnostics[server.id] && <DiagnosticsPanel data={diagnostics[server.id]} />}
             {server.description && <p className="mt-3 text-sm text-white/55 line-clamp-2">{server.description}</p>}
           </article>
         ))}
       </div>
     </AdminLayout>
+  );
+}
+
+function DiagnosticsPanel({ data }) {
+  return (
+    <div className="mt-3 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-3 text-xs">
+      <div className="font-bold uppercase tracking-widest text-[#FFD700]">Netzwerkdiagnose</div>
+      <div className="mt-2 text-white/60">{data.recommendation}</div>
+      <div className="mt-3 space-y-2">
+        {(data.candidates || []).map((item, index) => (
+          <div key={`${item.host}:${item.port}:${index}`} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-white/75 break-all">{item.host}:{item.port}</span>
+              <Badge label={item.tcp_ok ? "Erreichbar" : "Nicht erreichbar"} tone={item.tcp_ok ? "green" : "red"} />
+            </div>
+            <div className="mt-1 text-white/40">{item.source}</div>
+            {item.resolved_ips?.length > 0 && <div className="mt-1 text-white/55 break-all">DNS: {item.resolved_ips.join(", ")}</div>}
+            {item.error && <div className="mt-1 text-[#FF8A80] break-words">{item.error}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

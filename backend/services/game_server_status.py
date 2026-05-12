@@ -31,19 +31,33 @@ def parse_host_port(address: str | None, default_port: int | None = None) -> tup
     return raw, default_port
 
 
-def _host_port_candidates(server: dict, default_port: int | None = None) -> list[tuple[str, int]]:
+def _host_port_candidate_details(server: dict, default_port: int | None = None) -> list[dict]:
     query_default = server.get("query_port") or default_port
-    candidates: list[tuple[str, int]] = []
-    for raw, port_default in (
-        (server.get("query_host"), query_default),
-        (server.get("address"), default_port or server.get("query_port")),
+    candidates: list[dict] = []
+    for source, raw, port_default in (
+        ("interne Sync-Adresse", server.get("query_host"), query_default),
+        ("öffentliche Adresse", server.get("address"), default_port or server.get("query_port")),
     ):
         host, port = parse_host_port(raw, port_default)
         if host and port:
-            candidate = (host, int(port))
-            if candidate not in candidates:
-                candidates.append(candidate)
+            key = (host, int(port))
+            if not any((item["host"], item["port"]) == key for item in candidates):
+                candidates.append({"source": source, "host": host, "port": int(port)})
     return candidates
+
+
+def _host_port_candidates(server: dict, default_port: int | None = None) -> list[tuple[str, int]]:
+    return [(item["host"], item["port"]) for item in _host_port_candidate_details(server, default_port)]
+
+
+def _resolve_host_sync(host: str) -> list[str]:
+    infos = socket.getaddrinfo(host, None, proto=socket.IPPROTO_TCP)
+    addresses = []
+    for info in infos:
+        address = info[4][0]
+        if address not in addresses:
+            addresses.append(address)
+    return addresses
 
 
 def _varint(value: int) -> bytes:
@@ -249,3 +263,37 @@ async def probe_game_server(server: dict) -> dict:
     if provider == "rcon":
         return await probe_rcon_reachable(server)
     raise GameServerProbeError(f"Unbekannte Sync-Quelle: {provider}")
+
+
+async def diagnose_game_server(server: dict) -> dict:
+    game_name = f"{server.get('game_name') or ''} {server.get('name') or ''}".lower()
+    default_port = server.get("query_port") or server.get("rcon_port") or (25565 if "minecraft" in game_name else None)
+    candidates = _host_port_candidate_details(server, default_port)
+    checks = []
+    for candidate in candidates:
+        host = candidate["host"]
+        port = candidate["port"]
+        item = {**candidate, "resolved_ips": [], "tcp_ok": False, "error": None}
+        try:
+            item["resolved_ips"] = await asyncio.to_thread(_resolve_host_sync, host)
+            await asyncio.to_thread(_tcp_reachable_sync, host, port, 3.0)
+            item["tcp_ok"] = True
+        except Exception as exc:
+            item["error"] = str(exc)
+        checks.append(item)
+
+    if any(item["tcp_ok"] for item in checks):
+        recommendation = "Mindestens eine Adresse ist vom Backend aus erreichbar. Diese Adresse sollte fuer den Sync verwendet werden."
+    elif server.get("query_host"):
+        recommendation = "Keine Sync-Adresse ist erreichbar. Pruefe internen DNS, LAN-IP, Firewall und ob der Spielserver auf diesem Port wirklich lauscht."
+    else:
+        recommendation = "Die oeffentliche Adresse ist vom Backend aus nicht erreichbar. Hinter NAT/Reverse Proxy ist meist eine interne Sync-Adresse noetig, z.B. host.docker.internal oder die LAN-IP."
+
+    return {
+        "address": server.get("address"),
+        "query_host": server.get("query_host"),
+        "query_port": server.get("query_port"),
+        "sync_provider": server.get("sync_provider") or "auto_public",
+        "candidates": checks,
+        "recommendation": recommendation,
+    }

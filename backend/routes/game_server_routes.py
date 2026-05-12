@@ -258,6 +258,16 @@ async def get_game_server_access(server_id: str, me: dict | None = Depends(get_o
     }
 
 
+@router.get("/{server_id}/diagnostics")
+async def diagnose_game_server_route(server_id: str, me: dict = Depends(require_admin())):
+    from services.game_server_status import diagnose_game_server
+    db = get_db()
+    server = await db.game_servers.find_one({"id": server_id}, {"_id": 0})
+    if not server:
+        raise HTTPException(404, "Server nicht gefunden.")
+    return await diagnose_game_server(server)
+
+
 @router.post("")
 async def create_game_server(body: GameServerPayload, me: dict = Depends(require_admin())):
     db = get_db()
