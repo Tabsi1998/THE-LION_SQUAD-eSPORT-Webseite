@@ -269,17 +269,17 @@ export default function AdminGameServersPage() {
 
   return (
     <AdminLayout>
-      <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
-        <div>
+      <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 mb-6">
+        <div className="min-w-0">
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Community</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Game-Server</h1>
+          <h1 className="font-heading text-2xl sm:text-3xl md:text-4xl font-black uppercase mt-1 break-words">Game-Server</h1>
           <p className="mt-2 text-white/60 text-sm max-w-2xl">
             Server sichtbar pflegen, Zugriff steuern und Live-Werte automatisch über öffentliche Game-Server-Abfragen synchronisieren.
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="grid grid-cols-1 sm:grid-cols-3 xl:flex gap-2 w-full xl:w-auto">
           <button onClick={removeSeededDefaults} className="w-full sm:w-auto px-4 py-2.5 border border-[#FFD700]/45 text-[#FFD700] rounded-sm font-bold uppercase tracking-wider">
-            Demo-Startliste entfernen
+            Demo-Startliste
           </button>
           <button onClick={syncAll} disabled={syncing === "all"} className="w-full sm:w-auto px-4 py-2.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 disabled:opacity-50">
             <RefreshCw className={`w-4 h-4 ${syncing === "all" ? "animate-spin" : ""}`} /> Alle syncen
@@ -290,7 +290,7 @@ export default function AdminGameServersPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-6">
         <Stat label="Server" value={stats.total} />
         <Stat label="Aktiv" value={stats.active} tone="green" />
         <Stat label="Online" value={stats.online} tone="cyan" />
@@ -298,16 +298,16 @@ export default function AdminGameServersPage() {
       </div>
 
       {(creating || editing) && (
-        <form onSubmit={save} className="mb-8 border border-[#29B6E8]/25 bg-[#101416] rounded-sm p-5">
-          <div className="flex items-center justify-between gap-4 mb-5">
-            <div>
+        <form onSubmit={save} className="mb-8 border border-[#29B6E8]/25 bg-[#101416] rounded-sm p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3 mb-5">
+            <div className="min-w-0">
               <div className="font-heading text-xl font-black uppercase">{editing ? "Server bearbeiten" : "Neuer Server"}</div>
               <div className="text-xs text-white/45 mt-1">Alle Texte im öffentlichen Bereich bleiben bewusst kurz und klar.</div>
             </div>
-            <button type="button" onClick={closeForm} className="p-2 text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
+            <button type="button" onClick={closeForm} className="p-2 text-white/50 hover:text-white shrink-0"><X className="w-5 h-5" /></button>
           </div>
 
-          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <Field label="Name" value={form.name} onChange={(v) => set("name", v)} required />
             <Field label="Slug" value={form.slug} onChange={(v) => set("slug", v)} placeholder="automatisch wenn leer" />
             <label className="block">
@@ -413,24 +413,24 @@ export default function AdminGameServersPage() {
             </label>
           </div>
 
-          <div className="mt-5 flex gap-2">
-            <button disabled={saving} className="px-5 py-2.5 bg-[#29B6E8] text-black rounded-sm font-bold uppercase tracking-wider disabled:opacity-50">
+          <div className="mt-5 flex flex-col sm:flex-row gap-2">
+            <button disabled={saving} className="w-full sm:w-auto px-5 py-2.5 bg-[#29B6E8] text-black rounded-sm font-bold uppercase tracking-wider disabled:opacity-50">
               {saving ? "Speichere…" : "Speichern"}
             </button>
-            <button type="button" onClick={closeForm} className="px-5 py-2.5 border border-white/15 text-white/70 rounded-sm font-bold uppercase tracking-wider">
+            <button type="button" onClick={closeForm} className="w-full sm:w-auto px-5 py-2.5 border border-white/15 text-white/70 rounded-sm font-bold uppercase tracking-wider">
               Abbrechen
             </button>
           </div>
         </form>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {servers.map((server) => (
-          <article key={server.id} className="border border-white/10 bg-[#121212] rounded-sm p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
+          <article key={server.id} className="border border-white/10 bg-[#121212] rounded-sm p-4 sm:p-5 min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div className="min-w-0 w-full">
                 <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{server.game?.short_name || server.game?.name || server.game_name || "Server"}</div>
-                <h2 className="font-heading text-xl font-black uppercase truncate">{server.name}</h2>
+                <h2 className="font-heading text-lg sm:text-xl font-black uppercase break-words leading-tight">{server.name}</h2>
                 <div className="mt-2 flex gap-1 flex-wrap">
                   <Badge label={statusLabels[server.status] || server.status} tone={server.status === "online" ? "green" : server.status === "maintenance" ? "gold" : "muted"} />
                   <Badge label={visibilityLabels[server.visibility] || server.visibility} tone={server.visibility === "members" ? "gold" : server.visibility === "public" ? "cyan" : "muted"} />
@@ -438,27 +438,27 @@ export default function AdminGameServersPage() {
                   {server.is_active === false && <Badge label="Inaktiv" tone="red" />}
                 </div>
               </div>
-              <div className="flex gap-1 shrink-0">
-                <button onClick={() => syncOne(server)} disabled={syncing === server.id || server.sync_provider === "manual"} title="Live-Daten synchronisieren" className="p-2 text-white/45 hover:text-[#29B6E8] disabled:opacity-30"><RefreshCw className={`w-4 h-4 ${syncing === server.id ? "animate-spin" : ""}`} /></button>
-                <button onClick={() => diagnose(server)} disabled={syncing === `${server.id}:diagnose`} title="Netzwerkdiagnose" className="p-2 text-white/45 hover:text-[#FFD700] disabled:opacity-30"><Network className={`w-4 h-4 ${syncing === `${server.id}:diagnose` ? "animate-pulse" : ""}`} /></button>
-                <button onClick={() => startEdit(server)} title="Bearbeiten" className="p-2 text-white/45 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
-                <button onClick={() => remove(server)} title="Löschen" className="p-2 text-white/45 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+              <div className="grid grid-cols-4 sm:flex gap-1 shrink-0 w-full sm:w-auto">
+                <button onClick={() => syncOne(server)} disabled={syncing === server.id || server.sync_provider === "manual"} title="Live-Daten synchronisieren" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#29B6E8] disabled:opacity-30"><RefreshCw className={`w-4 h-4 ${syncing === server.id ? "animate-spin" : ""}`} /></button>
+                <button onClick={() => diagnose(server)} disabled={syncing === `${server.id}:diagnose`} title="Netzwerkdiagnose" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#FFD700] disabled:opacity-30"><Network className={`w-4 h-4 ${syncing === `${server.id}:diagnose` ? "animate-pulse" : ""}`} /></button>
+                <button onClick={() => startEdit(server)} title="Bearbeiten" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
+                <button onClick={() => remove(server)} title="Löschen" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 text-xs">
               <Info label="Adresse" value={server.address || "-"} />
               <Info label="Spieler" value={`${server.player_count || 0}${server.max_players != null ? `/${server.max_players}` : ""}`} />
               <Info label="Sync" value={syncText(server)} />
               <Info label="Letzter Sync" value={server.last_sync_at ? new Date(server.last_sync_at).toLocaleString("de-DE") : "noch nie"} />
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 grid grid-cols-3 sm:flex sm:flex-wrap gap-2">
               {Object.entries(modeLabels).map(([mode, label]) => (
                 <button
                   key={mode}
                   type="button"
                   disabled={syncing === `${server.id}:mode`}
                   onClick={() => setServerMode(server, mode)}
-                  className={`px-3 py-1.5 border rounded-sm text-[10px] font-black uppercase tracking-widest disabled:opacity-50 ${operatingMode(server.status) === mode ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/50 hover:text-white"}`}
+                  className={`px-2 sm:px-3 py-2 sm:py-1.5 border rounded-sm text-[10px] font-black uppercase tracking-widest disabled:opacity-50 ${operatingMode(server.status) === mode ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/50 hover:text-white"}`}
                 >
                   {label}
                 </button>
@@ -477,15 +477,15 @@ export default function AdminGameServersPage() {
 
 function DiagnosticsPanel({ data }) {
   return (
-    <div className="mt-3 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-3 text-xs">
+    <div className="mt-3 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-3 text-xs min-w-0">
       <div className="font-bold uppercase tracking-widest text-[#FFD700]">Netzwerkdiagnose</div>
-      <div className="mt-2 text-white/60">{data.recommendation}</div>
+      <div className="mt-2 text-white/60 break-words">{data.recommendation}</div>
       <div className="mt-3 space-y-2">
         {(data.candidates || []).map((item, index) => (
-          <div key={`${item.host}:${item.port}:${index}`} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-white/75 break-all">{item.host}:{item.port}</span>
-              <Badge label={item.tcp_ok ? "Erreichbar" : "Nicht erreichbar"} tone={item.tcp_ok ? "green" : "red"} />
+          <div key={`${item.host}:${item.port}:${index}`} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2 min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <span className="font-mono text-white/75 break-all min-w-0">{item.host}:{item.port}</span>
+              <span className="shrink-0"><Badge label={item.tcp_ok ? "Erreichbar" : "Nicht erreichbar"} tone={item.tcp_ok ? "green" : "red"} /></span>
             </div>
             <div className="mt-1 text-white/40">{item.source}</div>
             {item.resolved_ips?.length > 0 && <div className="mt-1 text-white/55 break-all">DNS: {item.resolved_ips.join(", ")}</div>}
@@ -500,9 +500,9 @@ function DiagnosticsPanel({ data }) {
 function Stat({ label, value, tone }) {
   const color = tone === "green" ? "text-[#00FF88]" : tone === "gold" ? "text-[#FFD700]" : "text-[#29B6E8]";
   return (
-    <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
-      <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</div>
-      <div className={`mt-1 font-display text-3xl font-black ${color}`}>{value}</div>
+    <div className="border border-white/10 bg-[#121212] rounded-sm p-3 sm:p-4 min-w-0">
+      <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-white/45 font-bold break-words">{label}</div>
+      <div className={`mt-1 font-display text-2xl sm:text-3xl font-black ${color}`}>{value}</div>
     </div>
   );
 }
@@ -531,7 +531,7 @@ function Info({ label, value }) {
   return (
     <div className="border border-white/10 bg-black/20 rounded-sm px-3 py-2 min-w-0">
       <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">{label}</div>
-      <div className="mt-1 text-white/75 truncate">{value}</div>
+      <div className="mt-1 text-white/75 break-words">{value}</div>
     </div>
   );
 }
