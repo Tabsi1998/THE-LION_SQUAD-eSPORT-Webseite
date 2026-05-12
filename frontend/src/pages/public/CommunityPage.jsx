@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Crown, Gamepad2, Shield, Users } from "lucide-react";
+import { Crown, Gamepad2, Server, Shield, Users } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { api, resolveMediaUrl } from "@/lib/api";
 
@@ -17,6 +17,8 @@ export default function CommunityPage() {
   const [players, setPlayers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [clubMembers, setClubMembers] = useState([]);
+  const [servers, setServers] = useState([]);
+  const [serverSummary, setServerSummary] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,10 +27,15 @@ export default function CommunityPage() {
       api.get("/users/public-list"),
       api.get("/teams"),
       api.get("/membership/profiles"),
-    ]).then(([u, t, m]) => {
+      api.get("/game-servers"),
+    ]).then(([u, t, m, s]) => {
       if (u.status === "fulfilled") setPlayers(u.value.data || []);
       if (t.status === "fulfilled") setTeams(t.value.data || []);
       if (m.status === "fulfilled") setClubMembers(m.value.data || []);
+      if (s.status === "fulfilled") {
+        setServers(s.value.data?.items || []);
+        setServerSummary(s.value.data?.summary || {});
+      }
     }).finally(() => setLoading(false));
   }, []);
 
@@ -36,7 +43,8 @@ export default function CommunityPage() {
     { label: "Öffentliche Accounts", value: players.length, icon: Users },
     { label: "Teams", value: teams.length, icon: Shield },
     { label: "Vereinsmitglieder", value: clubMembers.length, icon: Crown },
-  ], [players.length, teams.length, clubMembers.length]);
+    { label: "Server online", value: serverSummary.online || 0, icon: Server },
+  ], [players.length, teams.length, clubMembers.length, serverSummary.online]);
 
   return (
     <PublicLayout>
@@ -47,7 +55,7 @@ export default function CommunityPage() {
           Öffentliche Profile aller Community-Accounts, Teamseiten und die separat gepflegten offiziellen Vereinsmitglieder an einem Ort.
         </p>
 
-        <div className="mt-8 grid sm:grid-cols-3 gap-3">
+        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {stats.map((s) => (
             <div key={s.label} className="border border-white/10 bg-[#121212] rounded-sm p-4">
               <s.icon className="w-5 h-5 text-[#29B6E8]" />
@@ -57,7 +65,7 @@ export default function CommunityPage() {
           ))}
         </div>
 
-        <div className="mt-10 grid lg:grid-cols-3 gap-6">
+        <div className="mt-10 grid md:grid-cols-2 xl:grid-cols-4 gap-6">
           <CommunityBlock
             title="Community-Profile"
             text="Alle öffentlichen Benutzerkonten mit Profil, Achievements und Stats."
@@ -98,14 +106,29 @@ export default function CommunityPage() {
               image: m.photo_url,
             }))}
           />
+          <CommunityBlock
+            title="Server"
+            text="Öffentliche, Community- und Vereinsserver mit Status, Zugriff und Spielerzahlen."
+            to="/servers"
+            cta="Server öffnen"
+            accent="green"
+            icon={Server}
+            items={servers.slice(0, 6).map((s) => ({
+              key: s.id,
+              to: "/servers",
+              title: s.name,
+              subtitle: `${s.status === "online" ? "Online" : "Offline"} · ${s.player_count || 0}${s.max_players ? `/${s.max_players}` : ""} Spieler`,
+              image: s.game?.logo_url,
+            }))}
+          />
         </div>
       </section>
     </PublicLayout>
   );
 }
 
-function CommunityBlock({ title, text, to, cta, items, accent = "cyan" }) {
-  const color = accent === "gold" ? "#FFD700" : "#29B6E8";
+function CommunityBlock({ title, text, to, cta, items, accent = "cyan", icon: Icon = Gamepad2 }) {
+  const color = accent === "gold" ? "#FFD700" : accent === "green" ? "#00FF88" : "#29B6E8";
   return (
     <section className="border border-white/10 bg-[#121212] rounded-sm p-5">
       <div className="flex items-start justify-between gap-4">
@@ -113,7 +136,7 @@ function CommunityBlock({ title, text, to, cta, items, accent = "cyan" }) {
           <h2 className="font-heading text-xl font-black uppercase">{title}</h2>
           <p className="mt-2 text-sm text-white/55">{text}</p>
         </div>
-        <Gamepad2 className="w-5 h-5 shrink-0" style={{ color }} />
+        <Icon className="w-5 h-5 shrink-0" style={{ color }} />
       </div>
       <div className="mt-5 space-y-2 min-h-64">
         {items.length ? items.map((item) => (

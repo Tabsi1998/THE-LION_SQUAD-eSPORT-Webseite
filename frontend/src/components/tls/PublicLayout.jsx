@@ -210,6 +210,7 @@ export function PublicLayout({ children }) {
               <h4 className="font-heading font-bold text-white uppercase tracking-wider text-xs">Community</h4>
               <ul className="mt-3 space-y-2 text-sm text-white/60">
                 <li><Link to="/community" className="hover:text-[#29B6E8] transition">Community-Übersicht</Link></li>
+                <li><Link to="/servers" className="hover:text-[#29B6E8] transition">Server</Link></li>
                 <li><Link to="/players" className="hover:text-[#29B6E8] transition">Community-Spieler</Link></li>
                 <li><Link to="/teams" className="hover:text-[#29B6E8] transition">Teams</Link></li>
               </ul>

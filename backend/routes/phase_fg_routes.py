@@ -321,6 +321,7 @@ DEFAULT_NAV = {
         ]},
         {"key": "community", "label": "Community", "visible": True, "order": 5, "children": [
             {"key": "community_overview", "to": "/community", "label": "Übersicht", "visible": True},
+            {"key": "servers", "to": "/servers", "label": "Server", "visible": True},
             {"key": "players", "to": "/players", "label": "Community-Spieler", "visible": True},
             {"key": "community_teams", "to": "/teams", "label": "Teams", "visible": True},
         ]},

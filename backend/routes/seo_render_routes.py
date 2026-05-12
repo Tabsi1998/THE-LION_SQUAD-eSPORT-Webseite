@@ -288,6 +288,7 @@ def static_page_meta(slug: str, base: dict) -> dict | None:
         "references": ("Referenzen", "Externe Turniere, Ligen, Platzierungen und Erfolge des Vereins."),
         "members": ("Vereinsmitglieder", "Öffentliche Profile der Vereinsmitglieder von THE LION SQUAD."),
         "community": ("Community", "Community, Mitglieder und Teams rund um THE LION SQUAD."),
+        "servers": ("Server", "Öffentliche und geschützte Community-Gameserver von THE LION SQUAD."),
         "sponsors": ("Sponsoren", "Partner und Sponsoren von THE LION SQUAD."),
         "partners": ("Partner", "Partnernetzwerk von THE LION SQUAD."),
         "gallery": ("Galerie", "Fotos und Eindrücke von Events und Community-Abenden."),

@@ -24,6 +24,7 @@ Dokumenten, Achievements, Kontaktformular, Mailversand und Discord-Integrationen
 - Profile mit Avatar, Banner, Bio, Social/Gaming-Daten, Sichtbarkeit und Achievements.
 - Freundschaftssystem mit Anfragen, Annahme/Ablehnung, Freundesliste und Direktnachrichten aus oeffentlichen Profilen.
 - Teamverwaltung mit Leader, Co-Leader, Mitgliedern, Einladungen, Team-Chat und Squads/Subteams.
+- Community-Serverbereich mit Zugriffsstufen fuer oeffentliche Server, eingeloggte Community und Vereinsmitglieder.
 - Adminbereich fuer Benutzer, Mitglieder, Mitgliedsantraege, Turniere, Fast Lap, Events, News, Sponsoren, Galerie, Dokumente, Board, Navigation, CMS und Systemeinstellungen.
 - Turnier- und Matchverwaltung mit Registrierungen, Check-in, Brackets, Ergebnissen und TV-Anzeigen.
 - Flexible Turnierstrukturen fuer Duel und FFA, Custom-Brackets, automatische Slot-Weiterleitung und Heat-Ergebnisse.
@@ -210,6 +211,24 @@ Browser-Favicon, Apple Icon, Manifest, Theme-Color und SEO-Meta.
 - Der Twitch-Embed auf einer oeffentlichen Profilseite bleibt eine Profil-Einstellung.
 - Der Live-Bereich auf der Startseite zeigt nur aktive bzw. Ehren-Vereinsmitglieder mit aktivem Vereinsprofil.
 - Normale Community-Profile koennen ihren Twitch-Embed im Profil anzeigen, erscheinen aber nicht im Startseiten-Live-Slider.
+
+## Community-Server
+
+Der Tab `Community -> Server` zeigt Gameserver aus `/api/game-servers`. Admins pflegen
+sie unter `Admin -> Game-Server`.
+
+Sichtbarkeiten:
+
+- `Oeffentlich`: fuer jeden Besucher sichtbar.
+- `Community`: nur nach Login sichtbar.
+- `Vereinsmitglieder`: nur fuer aktive Vereinsmitglieder und Admins sichtbar.
+- `Intern`: nicht oeffentlich sichtbar.
+
+Spielerzahlen, Max-Slots, Map, Version, Adresse und Connect-Link koennen manuell
+gepflegt werden. AMP/CubeCoders-Felder sind vorbereitet; fuer echte Live-Syncs
+braucht der Server spaeter die AMP-Zugangsdaten bzw. die jeweilige AMP-API-URL der
+Installation. AMP stellt seine API pro Installation unter `/API` bereit; vor API-
+Aufrufen muss eine Session ueber `API/Core/Login` geholt werden.
 
 ## SEO, Google und Link-Vorschauen
 

@@ -26,6 +26,7 @@ export function AdminLayout({ children }) {
     { to: "/admin/events", label: "Events", icon: CalendarDays },
     { to: "/admin/seasons", label: "Saisons / Circuit", icon: Trophy },
     { to: "/admin/games", label: "Spiele", icon: Gamepad2 },
+    { to: "/admin/game-servers", label: "Game-Server", icon: Building2 },
     { to: "/admin/stations", label: "Stationen", icon: Building2 },
     { to: "/admin/news", label: "News", icon: Newspaper },
     { to: "/admin/gallery", label: "Galerie", icon: ImageIcon },
