@@ -564,6 +564,21 @@ async def _enrich_references(items: list[dict]) -> list[dict]:
     parents = {}
     if parent_ids:
         parents = {g["id"]: g for g in await db.games.find({"id": {"$in": parent_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "short_name": 1}).to_list(200)}
+    lineup_user_ids = list({
+        member.get("user_id")
+        for item in items
+        for member in (item.get("lineup_members") or [])
+        if isinstance(member, dict) and member.get("user_id")
+    })
+    users_by_id = {}
+    if lineup_user_ids:
+        users_by_id = {
+            user["id"]: user
+            for user in await db.users.find(
+                {"id": {"$in": lineup_user_ids}, "privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}},
+                {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
+            ).to_list(500)
+        }
     for item in items:
         game = games.get(item.get("game_id"))
         if game:
@@ -585,6 +600,16 @@ async def _enrich_references(items: list[dict]) -> list[dict]:
             }
             item["game_name"] = item.get("game_name") or display_name
         item["medal"] = _medal_for_placement(item.get("placement"))
+        item["lineup_members"] = [
+            {
+                **member,
+                "username": users_by_id.get(member.get("user_id"), {}).get("username"),
+                "avatar_url": users_by_id.get(member.get("user_id"), {}).get("avatar_url"),
+                "profile_url": f"/u/{users_by_id[member.get('user_id')]['username']}" if users_by_id.get(member.get("user_id")) else None,
+            }
+            for member in (item.get("lineup_members") or [])
+            if isinstance(member, dict)
+        ]
     return items
 
 
@@ -731,6 +756,18 @@ async def admin_list_references(me: dict = Depends(require_admin())):
     refs = await db.references.find({}, {"_id": 0}).to_list(1000)
     refs = _sort_references(await _enrich_references(refs))
     return {"items": refs, "summary": _reference_summary(refs)}
+
+
+@router.get("/references/{rid}")
+async def get_reference(rid: str, user: dict | None = Depends(get_optional_user)):
+    db = get_db()
+    ref = await db.references.find_one({"id": rid, "is_active": {"$ne": False}}, {"_id": 0})
+    if not ref:
+        raise HTTPException(404, "Referenz nicht gefunden.")
+    visible = await _filter_visible([ref], user)
+    if not visible:
+        raise HTTPException(404, "Referenz nicht gefunden.")
+    return (await _enrich_references(visible))[0]
 
 
 @router.post("/references")

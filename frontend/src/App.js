@@ -85,7 +85,7 @@ import AboutPage from "@/pages/public/AboutPage";
 import ContactPage from "@/pages/public/ContactPage";
 import SponsorsPage from "@/pages/public/SponsorsPage";
 import PartnersPage from "@/pages/public/PartnersPage";
-import ReferencesPage from "@/pages/public/ReferencesPage";
+import ReferencesPage, { ReferenceDetailPage } from "@/pages/public/ReferencesPage";
 import PlayersPage from "@/pages/public/PlayersPage";
 import CommunityPage from "@/pages/public/CommunityPage";
 import ServersPage from "@/pages/public/ServersPage";
@@ -138,6 +138,7 @@ function App() {
           <Route path="/sponsors" element={<SponsorsPage />} />
           <Route path="/partners" element={<PartnersPage />} />
           <Route path="/references" element={<ReferencesPage />} />
+          <Route path="/references/:id" element={<ReferenceDetailPage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/servers" element={<ServersPage />} />
           <Route path="/players" element={<PlayersPage />} />

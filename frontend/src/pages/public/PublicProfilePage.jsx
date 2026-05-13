@@ -188,6 +188,7 @@ export default function PublicProfilePage() {
   const gamingIds = publicGamingIds(profile);
   const relationship = profile.relationship || { status: user?.id === profile.id ? "self" : "anonymous" };
   const isOwnProfile = user?.id === profile.id;
+  const references = profile.references || [];
 
   const updateFriendship = async (action) => {
     if (!user) {
@@ -323,11 +324,14 @@ export default function PublicProfilePage() {
                 </div>
               )}
               {/* Quick stats */}
-              <div className="mt-6 grid grid-cols-3 md:grid-cols-6 gap-3">
+              <div className="mt-6 grid grid-cols-3 md:grid-cols-6 xl:grid-cols-7 gap-3">
                 <QuickStat icon={Zap} label="Level" value={level.level} color="#29B6E8" testId="profile-stat-level" />
                 <QuickStat icon={Medal} label="Achievements" value={achievementsData?.awards?.length || 0} testId="profile-stat-badges" />
                 {(twitchChannel || s.twitch_live_sessions > 0) && (
                   <QuickStat icon={Radio} label="Streams" value={s.twitch_live_sessions || 0} color="#9146FF" testId="profile-stat-streams" />
+                )}
+                {(s.references || references.length) > 0 && (
+                  <QuickStat icon={Trophy} label="Referenzen" value={s.references || references.length} color="#FFD700" testId="profile-stat-references" />
                 )}
                 <QuickStat icon={Zap} label="Punkte" value={s.points || 0} color="#29B6E8" testId="profile-stat-points" />
                 <QuickStat icon={Trophy} label="Siege" value={s.wins || 0} color="#FFD700" testId="profile-stat-wins" />
@@ -345,6 +349,7 @@ export default function PublicProfilePage() {
           {[
             ["overview", "Übersicht"],
             ["badges", `Achievements (${achievementsData?.awards?.length || 0})`],
+            ["references", `Referenzen (${references.length})`],
             ["tournaments", `Turniere (${profile.tournaments?.length || 0})`],
             ["fastlap", `Fast Lap (${profile.f1_bests?.length || 0})`],
             ["teams", `Teams (${profile.teams?.length || 0})`],
@@ -358,7 +363,7 @@ export default function PublicProfilePage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {isPrivate && (tab === "tournaments" || tab === "fastlap" || tab === "teams") && (
+        {isPrivate && (tab === "references" || tab === "tournaments" || tab === "fastlap" || tab === "teams") && (
           <div className="py-20 text-center text-white/40">
             <Lock className="w-8 h-8 mx-auto mb-3 opacity-50" />
             <p>Diese Daten hat {profile.display_name} privat gestellt.</p>
@@ -440,6 +445,21 @@ export default function PublicProfilePage() {
               {gamingIds.length > 0 && <GamingIdsCard ids={gamingIds} />}
 
               <div>
+                <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Referenzen</h2>
+                {references.length ? (
+                  <div className="space-y-2">
+                    <ReferenceStats stats={s} compact />
+                    {references.slice(0, 4).map((item) => <ReferenceRow key={item.id} item={item} />)}
+                    {references.length > 4 && (
+                      <button onClick={() => setTab("references")} className="text-sm font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">Alle Referenzen ansehen →</button>
+                    )}
+                  </div>
+                ) : (
+                  <EmptyState text="Noch keine Vereinsreferenzen." />
+                )}
+              </div>
+
+              <div>
                 <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Recent Turniere</h2>
                 {profile.tournaments?.length ? (
                   <div className="space-y-2">
@@ -456,6 +476,19 @@ export default function PublicProfilePage() {
         {tab === "badges" && (
           <div>
             <AchievementGroupsView groups={achievementsData?.groups || []} earnedOnly emptyText="Noch keine Achievements freigeschaltet." />
+          </div>
+        )}
+
+        {tab === "references" && !isPrivate && (
+          <div className="space-y-4">
+            {references.length ? (
+              <>
+                <ReferenceStats stats={s} />
+                <div className="space-y-3">
+                  {references.map((item) => <ReferenceRow key={item.id} item={item} expanded />)}
+                </div>
+              </>
+            ) : <EmptyState text="Keine Vereinsreferenzen verknüpft." />}
           </div>
         )}
 
@@ -581,6 +614,106 @@ function GamingIdsCard({ ids }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function ReferenceStats({ stats, compact = false }) {
+  const items = [
+    ["Gold", stats.reference_gold || 0, "#FFD700"],
+    ["Silber", stats.reference_silver || 0, "#D8DDE5"],
+    ["Bronze", stats.reference_bronze || 0, "#CD7F32"],
+    ["Podest", stats.reference_podiums || 0, "#29B6E8"],
+    ["Solo", stats.reference_solo || 0, "#FFFFFF"],
+    ["Team", stats.reference_team || 0, "#FFFFFF"],
+  ];
+  return (
+    <div className={`grid ${compact ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"} gap-2`}>
+      {items.map(([label, value, color]) => (
+        <div key={label} className="border border-white/10 bg-[#121212] rounded-sm px-3 py-2">
+          <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{label}</div>
+          <div className="font-display text-xl font-bold tabular-nums" style={{ color }}>{value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function referencePlacementText(item) {
+  if (item.placement_label) return item.placement_label;
+  if (!item.placement) return "Teilnahme";
+  return `Platz ${item.placement}${item.participant_count ? ` von ${item.participant_count}` : ""}`;
+}
+
+function referenceTone(item) {
+  if (item.medal === "gold") return "border-[#FFD700]/45 bg-[#FFD700]/10 text-[#FFD700]";
+  if (item.medal === "silver") return "border-white/30 bg-white/10 text-white";
+  if (item.medal === "bronze") return "border-[#CD7F32]/45 bg-[#CD7F32]/10 text-[#CD7F32]";
+  return "border-[#29B6E8]/30 bg-[#29B6E8]/10 text-[#29B6E8]";
+}
+
+function ReferenceRow({ item, expanded = false }) {
+  const date = item.event_date || item.start_date;
+  const parsedDate = date ? new Date(date) : null;
+  const displayDate = parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate.toLocaleDateString("de-DE") : "";
+  const members = item.lineup_members || [];
+  const otherLineup = (item.lineup || []).filter(Boolean);
+  const placement = referencePlacementText(item);
+  const logo = item.game_logo_url ? resolveMediaUrl(item.game_logo_url) : "";
+
+  return (
+    <Link to={`/references/${item.id}`} className={`block border rounded-sm bg-[#121212] transition hover:border-[#29B6E8]/60 ${item.medal ? "border-[#FFD700]/20" : "border-white/10"}`}>
+      <div className="p-4 sm:p-5 flex gap-4">
+        <div className={`w-16 sm:w-20 shrink-0 border rounded-sm flex flex-col items-center justify-center ${referenceTone(item)}`}>
+          {item.placement ? (
+            <>
+              <Medal className="w-5 h-5 mb-1" />
+              <span className="font-display text-2xl font-black tabular-nums">{item.placement}.</span>
+            </>
+          ) : (
+            <>
+              <Trophy className="w-5 h-5 mb-1" />
+              <span className="text-[10px] uppercase tracking-widest font-black">Dabei</span>
+            </>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`inline-flex items-center gap-1 px-2 py-1 border rounded-sm text-[10px] font-bold uppercase tracking-widest ${referenceTone(item)}`}>
+              {placement}
+            </span>
+            <span className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold truncate">{gameLabel(item.game) || item.game_name || "Extern"}</span>
+            {displayDate && <span className="text-[10px] uppercase tracking-widest text-white/35">{displayDate}</span>}
+          </div>
+          <div className="mt-2 flex items-start gap-3">
+            {logo && <img src={logo} alt="" className="w-10 h-10 object-contain border border-white/10 bg-black rounded-sm p-1 shrink-0" />}
+            <div className="min-w-0">
+              <div className="font-heading text-lg sm:text-xl font-black uppercase leading-tight break-words">{item.title}</div>
+              <div className="mt-1 text-xs text-white/55 truncate">{item.team_name || item.organizer || item.competition || "THE LION SQUAD"}</div>
+            </div>
+          </div>
+          {(members.length > 0 || otherLineup.length > 0) && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {members.slice(0, expanded ? 20 : 6).map((member) => (
+                <span key={member.profile_id || member.user_id || member.display_name} className="inline-flex items-center gap-1.5 border border-[#29B6E8]/25 bg-[#29B6E8]/10 rounded-sm px-2 py-1 text-xs text-white/75">
+                  {member.avatar_url && <img src={resolveMediaUrl(member.avatar_url)} alt="" className="w-4 h-4 rounded-sm object-cover" />}
+                  {member.display_name}
+                </span>
+              ))}
+              {otherLineup.slice(0, expanded ? 20 : 4).map((name) => (
+                <span key={name} className="border border-white/10 bg-black/30 rounded-sm px-2 py-1 text-xs text-white/50">{name}</span>
+              ))}
+              {!expanded && (members.length + otherLineup.length > 6) && (
+                <span className="border border-white/10 rounded-sm px-2 py-1 text-xs text-white/40">+{members.length + otherLineup.length - 6}</span>
+              )}
+            </div>
+          )}
+          {expanded && item.description && (
+            <p className="mt-3 text-sm text-white/65 leading-relaxed whitespace-pre-line">{item.description}</p>
+          )}
+        </div>
+        <ExternalLink className="w-4 h-4 text-white/25 shrink-0 mt-1" />
+      </div>
+    </Link>
   );
 }
 
