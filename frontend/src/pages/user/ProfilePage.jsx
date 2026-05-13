@@ -7,6 +7,7 @@ import { MultiSelect } from "@/components/tls/MultiSelect";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameLabel } from "@/lib/gameLabels";
+import { buildDirtyPayload, hasPayloadChanges, sameValue } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
 import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil, Target, RefreshCw, Sparkles, Bell, Mail, Check, X, UserPlus, MessageSquare, Send, Search } from "lucide-react";
@@ -109,6 +110,67 @@ const ACHIEVEMENT_ACTIONS = {
 };
 const TEAM_ROLE_LABELS = { leader: "Leader", co_leader: "Co-Leader", member: "Mitglied" };
 
+function profileToForm(user) {
+  return {
+    // basic
+    display_name: user.display_name || "",
+    first_name: user.first_name || "",
+    last_name: user.last_name || "",
+    nickname: user.nickname || "",
+    bio: user.bio || "",
+    birth_date: user.birth_date?.slice(0, 10) || "",
+    gender: user.gender || "",
+    country: user.country || "",
+    city: user.city || "",
+    avatar_url: user.avatar_url || "",
+    banner_url: user.banner_url || "",
+    // gaming
+    favorite_games: (user.favorite_games || []).join(", "),
+    main_platform: user.main_platform || "",
+    main_platforms: user.main_platforms || (user.main_platform ? [user.main_platform] : []),
+    preferred_role: user.preferred_role || "",
+    input_device: user.input_device || "",
+    input_devices: user.input_devices || (user.input_device ? [user.input_device] : []),
+    gaming_subscriptions: user.gaming_subscriptions || [],
+    game_ids: user.game_ids || {},
+    // socials
+    discord_name: user.discord_name || "",
+    twitch_handle: user.twitch_handle || "",
+    show_twitch_embed: user.show_twitch_embed ?? false,
+    youtube_handle: user.youtube_handle || "",
+    tiktok_handle: user.tiktok_handle || "",
+    instagram_handle: user.instagram_handle || "",
+    x_handle: user.x_handle || "",
+    steam_id: user.steam_id || "",
+    epic_id: user.epic_id || "",
+    psn_id: user.psn_id || "",
+    xbox_id: user.xbox_id || "",
+    nintendo_fc: user.nintendo_fc || user.switch_code || "",
+    ea_id: user.ea_id || "",
+    riot_id: user.riot_id || "",
+    battlenet_id: user.battlenet_id || "",
+    website: user.website || "",
+    // privacy
+    privacy_public_profile: user.privacy_public_profile ?? true,
+    newsletter_consent: !!user.newsletter_consent,
+    notification_preferences: user.notification_preferences || {},
+    profile_visibility: user.profile_visibility || {},
+    dm_privacy: user.dm_privacy || "everyone",
+  };
+}
+
+function profileFormPayload(form) {
+  const payload = { ...(form || {}) };
+  if (!payload.gender) payload.gender = null;
+  if (typeof payload.favorite_games === "string") {
+    payload.favorite_games = payload.favorite_games
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return payload;
+}
+
 function flattenAchievementTiers(data) {
   return (data?.groups || []).flatMap((group) =>
     (group.tiers || []).map((tier) => ({
@@ -165,6 +227,8 @@ export default function ProfilePage() {
   const [achData, setAchData] = useState(null);
   const [completeness, setCompleteness] = useState(null);
   const [games, setGames] = useState([]);
+  const initialProfileFormRef = useRef(null);
+  const initialProfileUserIdRef = useRef("");
 
   const loadAchievements = useCallback(async () => {
     const [achievements, profileCompleteness] = await Promise.allSettled([
@@ -197,51 +261,15 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (user) {
-      setForm({
-        // basic
-        display_name: user.display_name || "",
-        first_name: user.first_name || "",
-        last_name: user.last_name || "",
-        nickname: user.nickname || "",
-        bio: user.bio || "",
-        birth_date: user.birth_date?.slice(0, 10) || "",
-        gender: user.gender || "",
-        country: user.country || "",
-        city: user.city || "",
-        avatar_url: user.avatar_url || "",
-        banner_url: user.banner_url || "",
-        // gaming
-        favorite_games: (user.favorite_games || []).join(", "),
-        main_platform: user.main_platform || "",
-        main_platforms: user.main_platforms || (user.main_platform ? [user.main_platform] : []),
-        preferred_role: user.preferred_role || "",
-        input_device: user.input_device || "",
-        input_devices: user.input_devices || (user.input_device ? [user.input_device] : []),
-        gaming_subscriptions: user.gaming_subscriptions || [],
-        game_ids: user.game_ids || {},
-        // socials
-        discord_name: user.discord_name || "",
-        twitch_handle: user.twitch_handle || "",
-        show_twitch_embed: user.show_twitch_embed ?? false,
-        youtube_handle: user.youtube_handle || "",
-        tiktok_handle: user.tiktok_handle || "",
-        instagram_handle: user.instagram_handle || "",
-        x_handle: user.x_handle || "",
-        steam_id: user.steam_id || "",
-        epic_id: user.epic_id || "",
-        psn_id: user.psn_id || "",
-        xbox_id: user.xbox_id || "",
-        nintendo_fc: user.nintendo_fc || user.switch_code || "",
-        ea_id: user.ea_id || "",
-        riot_id: user.riot_id || "",
-        battlenet_id: user.battlenet_id || "",
-        website: user.website || "",
-        // privacy
-        privacy_public_profile: user.privacy_public_profile ?? true,
-        newsletter_consent: !!user.newsletter_consent,
-        notification_preferences: user.notification_preferences || {},
-        profile_visibility: user.profile_visibility || {},
-        dm_privacy: user.dm_privacy || "everyone",
+      const nextForm = profileToForm(user);
+      setForm((current) => {
+        const sameUser = initialProfileUserIdRef.current === user.id;
+        const hasUnsavedLocalChanges = initialProfileFormRef.current
+          && !sameValue(profileFormPayload(current), profileFormPayload(initialProfileFormRef.current));
+        if (sameUser && hasUnsavedLocalChanges) return current;
+        initialProfileUserIdRef.current = user.id;
+        initialProfileFormRef.current = nextForm;
+        return nextForm;
       });
     }
   }, [user]);
@@ -293,14 +321,19 @@ export default function ProfilePage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form };
-      if (!payload.gender) payload.gender = null;
-      // normalize favorite_games csv -> array
-      if (typeof payload.favorite_games === "string") {
-        payload.favorite_games = payload.favorite_games
-          .split(",").map((s) => s.trim()).filter(Boolean);
+      const payload = buildDirtyPayload(
+        profileFormPayload(form),
+        profileFormPayload(initialProfileFormRef.current || {}),
+      );
+      if (!hasPayloadChanges(payload)) {
+        toast.info("Keine Änderungen zum Speichern.");
+        return;
       }
-      await api.patch("/users/me", payload);
+      const { data } = await api.patch("/users/me", payload);
+      const savedForm = profileToForm(data);
+      initialProfileUserIdRef.current = data.id;
+      initialProfileFormRef.current = savedForm;
+      setForm(savedForm);
       await refresh();
       toast.success("Profil gespeichert.");
     } catch (err) {

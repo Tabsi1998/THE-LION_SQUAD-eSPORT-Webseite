@@ -146,6 +146,39 @@ def _validated_companion_count(event: dict, value: int | None) -> int:
     return companion_count
 
 
+async def _apply_event_checkin_rewards(event: dict, registration: dict) -> None:
+    """Award Season/achievement progress once an admin confirms attendance."""
+    user_id = registration.get("user_id")
+    if not user_id:
+        return
+    db = get_db()
+    try:
+        from services.season_service import award_points
+
+        summary = await _event_registration_summary(event)
+        await award_points(
+            user_id=user_id,
+            source_type="event",
+            source_id=f"{event['id']}:{registration['id']}",
+            source_name=event.get("name") or "Event-Teilnahme",
+            rank=None,
+            num_participants=max(int(summary.get("checked_in_count") or summary.get("registered_count") or 1), 1),
+            weight=0.5,
+            bonus=5,
+            bonus_reason="Teilnahme von Admin/Moderator bestaetigt",
+        )
+    except Exception:
+        import logging
+        logging.getLogger("tls.events").warning("event check-in season points failed", exc_info=True)
+    try:
+        from badges import evaluate_user_progress
+
+        await evaluate_user_progress(user_id)
+    except Exception:
+        import logging
+        logging.getLogger("tls.events").warning("event check-in achievement evaluation failed", exc_info=True)
+
+
 async def _attach_event_registration_view(event: dict, user: dict | None) -> None:
     db = get_db()
     is_staff = bool(user and user.get("role") in STAFF_ROLES)
@@ -489,6 +522,8 @@ async def update_event_registration(event_id: str, registration_id: str, body: E
         "created_at": now_utc().isoformat(),
     })
     updated = await db.event_registrations.find_one({"id": registration_id}, {"_id": 0})
+    if current.get("status") != "checked_in" and updated.get("status") == "checked_in":
+        await _apply_event_checkin_rewards(event, updated)
     return _public_event_registration(updated, is_staff=True)
 
 

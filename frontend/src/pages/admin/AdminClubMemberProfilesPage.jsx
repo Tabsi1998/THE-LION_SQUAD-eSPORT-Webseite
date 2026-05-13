@@ -7,6 +7,7 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { api, formatRequestError, resolveMediaUrl, suggestSlug } from "@/lib/api";
+import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 const emptyForm = {
@@ -201,30 +202,39 @@ function ProfileModal({ entry, users = [], onClose, onSaved }) {
   const isEdit = !!entry.profile;
   const set = (key, value) => setForm((cur) => ({ ...cur, [key]: value }));
 
-  const payload = () => ({
-    display_name: form.display_name,
-    gamertag: form.gamertag || null,
-    real_name: form.real_name || form.display_name || null,
-    slug: form.slug || suggestSlug(form.gamertag || form.display_name).replace(/-\d{4}$/, ""),
-    role_title: form.role_title || null,
-    photo_url: form.photo_url || null,
-    cover_url: form.cover_url || null,
-    bio: form.bio || "",
-    birth_date: form.birth_date || null,
-    gender: form.gender || null,
-    user_id: form.user_id || null,
-    games: textToList(form.games),
-    platforms: textToList(form.platforms),
-    order_index: Number(form.order_index) || 0,
-    is_active: !!form.is_active,
+  const payload = (source = form) => ({
+    display_name: source.display_name,
+    gamertag: source.gamertag || null,
+    real_name: source.real_name || source.display_name || null,
+    slug: source.slug || suggestSlug(source.gamertag || source.display_name).replace(/-\d{4}$/, ""),
+    role_title: source.role_title || null,
+    photo_url: source.photo_url || null,
+    cover_url: source.cover_url || null,
+    bio: source.bio || "",
+    birth_date: source.birth_date || null,
+    gender: source.gender || null,
+    user_id: source.user_id || null,
+    games: textToList(source.games),
+    platforms: textToList(source.platforms),
+    order_index: Number(source.order_index) || 0,
+    is_active: !!source.is_active,
   });
 
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      if (isEdit) await api.patch(`/membership/profiles/admin/${entry.profile.id}`, payload());
-      else await api.post("/membership/profiles/admin", payload());
+      const currentPayload = payload();
+      if (isEdit) {
+        const patch = buildDirtyPayload(currentPayload, payload(entry.form));
+        if (!hasPayloadChanges(patch)) {
+          toast.info("Keine Änderungen zum Speichern.");
+          return;
+        }
+        await api.patch(`/membership/profiles/admin/${entry.profile.id}`, patch);
+      } else {
+        await api.post("/membership/profiles/admin", currentPayload);
+      }
       toast.success(isEdit ? "Mitgliederprofil gespeichert." : "Mitgliederprofil erstellt.");
       onSaved();
     } catch (e) {

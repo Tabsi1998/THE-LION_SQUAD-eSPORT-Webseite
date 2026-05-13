@@ -14,7 +14,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   Trophy, Flag, Users as UsersIcon, Medal, Shield, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio, Gamepad2, Globe,
-  MessageSquare, UserPlus, UserCheck, X,
+  MessageSquare, UserPlus, UserCheck, X, Copy, Info,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -51,6 +51,25 @@ function externalUrl(value) {
 
 function cleanHandle(value) {
   return String(value || "").trim().replace(/^@/, "");
+}
+
+function copyText(value, successMessage = "Kopiert.") {
+  const text = String(value || "").trim();
+  if (!text || typeof navigator === "undefined" || !navigator.clipboard) return;
+  navigator.clipboard.writeText(text)
+    .then(() => toast.success(successMessage))
+    .catch(() => toast.error("Konnte nicht kopiert werden."));
+}
+
+function formatPublicDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
+}
+
+function listText(value) {
+  return Array.isArray(value) ? value.filter(Boolean).join(", ") : String(value || "").trim();
 }
 
 function socialUrl(platform, value) {
@@ -344,6 +363,7 @@ export default function PublicProfilePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 overflow-x-auto">
           {[
             ["overview", "Übersicht"],
+            ["info", "Info"],
             ["badges", `Achievements (${achievementsData?.awards?.length || 0})`],
             ["tournaments", `Turniere (${profile.tournaments?.length || 0})`],
             ["fastlap", `Fast Lap (${profile.f1_bests?.length || 0})`],
@@ -453,6 +473,17 @@ export default function PublicProfilePage() {
           </div>
         )}
 
+        {tab === "info" && (
+          <ProfileInfoTab
+            profile={profile}
+            joinedDate={joinedDate}
+            socialLinks={socialLinks}
+            gamingIds={gamingIds}
+            isOwnProfile={isOwnProfile}
+            onMessage={openMessage}
+          />
+        )}
+
         {tab === "badges" && (
           <div>
             <AchievementGroupsView groups={achievementsData?.groups || []} earnedOnly emptyText="Noch keine Achievements freigeschaltet." />
@@ -504,6 +535,101 @@ export default function PublicProfilePage() {
   );
 }
 
+function ProfileInfoTab({ profile, joinedDate, socialLinks, gamingIds, isOwnProfile, onMessage }) {
+  const birthday = formatPublicDate(profile.birth_date);
+  const location = [profile.city, profile.country].filter(Boolean).join(", ");
+  const membership = profile.membership?.membership_type || (profile.is_club_member ? "Vereinsmitglied" : "");
+  const setupRows = [
+    { label: "Plattformen", value: listText(profile.main_platforms || profile.main_platform) },
+    { label: "Eingabe", value: listText(profile.input_devices) },
+    { label: "Abos", value: listText(profile.gaming_subscriptions) },
+    { label: "Lieblingsspiele", value: listText(profile.favorite_games) },
+  ].filter((row) => row.value);
+  const infoRows = [
+    { label: "Name", value: profile.display_name || profile.username },
+    { label: "Username", value: `@${profile.username}` },
+    { label: "Mitglied seit", value: joinedDate ? joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" }) : "" },
+    { label: "Geburtstag", value: birthday },
+    { label: "Ort", value: location },
+    { label: "Rolle", value: profile.role && profile.role !== "player" ? profile.role.replace("_", " ") : "" },
+    { label: "Mitgliedschaft", value: membership },
+  ].filter((row) => row.value);
+
+  return (
+    <div className="grid lg:grid-cols-3 gap-6">
+      <section className="lg:col-span-2 border border-white/10 bg-[#121212] rounded-sm p-5">
+        <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2">
+          <Info className="w-5 h-5 text-[#29B6E8]" /> Öffentliche Infos
+        </h2>
+        {infoRows.length ? (
+          <div className="grid sm:grid-cols-2 gap-3" data-testid="public-profile-info">
+            {infoRows.map((row) => <InfoValue key={row.label} label={row.label} value={row.value} />)}
+          </div>
+        ) : (
+          <EmptyState text="Keine öffentlichen Profildaten freigegeben." />
+        )}
+      </section>
+
+      <div className="space-y-6 min-w-0">
+        {profile.discord_name && (
+          <DiscordContactCard discordName={profile.discord_name} isOwnProfile={isOwnProfile} onMessage={onMessage} />
+        )}
+        {socialLinks.length > 0 && <ProfileLinksCard links={socialLinks} />}
+        {gamingIds.length > 0 && <GamingIdsCard ids={gamingIds} />}
+      </div>
+
+      <section className="lg:col-span-3 border border-white/10 bg-[#121212] rounded-sm p-5">
+        <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2">
+          <Gamepad2 className="w-5 h-5 text-[#FFD700]" /> Setup & Games
+        </h2>
+        {setupRows.length ? (
+          <div className="grid md:grid-cols-4 gap-3">
+            {setupRows.map((row) => <InfoValue key={row.label} label={row.label} value={row.value} />)}
+          </div>
+        ) : (
+          <EmptyState text="Keine Setup-Daten freigegeben." />
+        )}
+      </section>
+    </div>
+  );
+}
+
+function InfoValue({ label, value }) {
+  return (
+    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm px-3 py-2 min-w-0">
+      <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{label}</div>
+      <div className="mt-1 text-sm text-white/85 break-words">{value}</div>
+    </div>
+  );
+}
+
+function DiscordContactCard({ discordName, isOwnProfile, onMessage }) {
+  return (
+    <div className="border border-[#5865F2]/35 rounded-sm bg-[#121212] p-4" data-testid="public-profile-discord-contact">
+      <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2 text-white">
+        <SocialIcon kind="discord" className="w-4 h-4 text-[#5865F2]" /> Discord
+      </h2>
+      <button
+        type="button"
+        onClick={() => copyText(discordName, "Discord-Name kopiert.")}
+        className="w-full text-left border border-white/10 bg-[#0A0A0A] rounded-sm px-3 py-2 text-white/85 hover:border-[#5865F2]/60 transition inline-flex items-center justify-between gap-3"
+      >
+        <span className="truncate">{discordName}</span>
+        <Copy className="w-4 h-4 text-[#5865F2] shrink-0" />
+      </button>
+      {!isOwnProfile && (
+        <button
+          type="button"
+          onClick={onMessage}
+          className="mt-3 w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-[#5865F2] text-white rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#4752C4]"
+        >
+          <MessageSquare className="w-3.5 h-3.5" /> TLS Nachricht
+        </button>
+      )}
+    </div>
+  );
+}
+
 function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", testId }) {
   return (
     <div data-testid={testId} className="border border-white/10 rounded-sm bg-[#121212] px-3 py-3">
@@ -543,16 +669,18 @@ function ProfileLinksCard({ links }) {
             );
           }
           return (
-            <span
+            <button
               key={key}
-              aria-label={`${meta.label} angegeben`}
-              title={`${meta.label} angegeben`}
+              type="button"
+              onClick={() => copyText(link.value, `${meta.label} kopiert.`)}
+              aria-label={`${meta.label} kopieren`}
+              title={`${meta.label} kopieren`}
               data-testid={`profile-social-${meta.key}`}
-              className={`${className} cursor-default border-[var(--social-color)]/40 text-[var(--social-color)]`}
+              className={`${className} border-[var(--social-color)]/40 text-[var(--social-color)] hover:border-[var(--social-color)]`}
               style={style}
             >
               <SocialIcon kind={meta.key} />
-            </span>
+            </button>
           );
         })}
       </div>

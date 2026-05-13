@@ -7,6 +7,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { appendEmbedToken } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toDateTimeLocalInput } from "@/lib/datetime";
+import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
 import { AtSign, Flag, Plus, Pin, Trash2, Save, Search, X, Newspaper } from "lucide-react";
 
@@ -112,17 +113,20 @@ export default function AdminNewsPage() {
 
 function NewsModal({ post, meta, onClose, onSaved }) {
   const isNew = !post?.id;
+  const formFromPost = (source = {}) => ({
+    title: source.title || "",
+    slug: source.slug || "",
+    excerpt: source.excerpt || "",
+    content: source.content || "",
+    banner_url: source.banner_url || "",
+    category: source.category || "club",
+    visibility: source.visibility || "public",
+    published: source.published ?? true,
+    pinned: source.pinned ?? false,
+    published_at: toDateTimeLocalInput(source.published_at),
+  });
   const [form, setForm] = useState({
-    title: post.title || "",
-    slug: post.slug || "",
-    excerpt: post.excerpt || "",
-    content: post.content || "",
-    banner_url: post.banner_url || "",
-    category: post.category || "club",
-    visibility: post.visibility || "public",
-    published: post.published ?? true,
-    pinned: post.pinned ?? false,
-    published_at: toDateTimeLocalInput(post.published_at),
+    ...formFromPost(post),
   });
   const [tournaments, setTournaments] = useState([]);
   const [events, setEvents] = useState([]);
@@ -177,20 +181,39 @@ function NewsModal({ post, meta, onClose, onSaved }) {
     .replace(/^-|-$/g, "")
     .slice(0, 80);
 
+  const normalizePayload = (payload) => {
+    const next = { ...payload };
+    if (next.published_at) {
+      const d = new Date(next.published_at);
+      if (!isNaN(d.getTime())) next.published_at = d.toISOString();
+    } else {
+      delete next.published_at;
+    }
+    return next;
+  };
+
   const submit = async (ev) => {
     ev.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form, linked_tournament_ids: linkedT, linked_event_ids: linkedE, linked_f1_challenge_ids: linkedF, mentioned_user_ids: mentionedUserIds };
-      // Convert datetime-local back to ISO with seconds + UTC marker
-      if (payload.published_at) {
-        const d = new Date(payload.published_at);
-        if (!isNaN(d.getTime())) payload.published_at = d.toISOString();
-      } else {
-        delete payload.published_at;
-      }
+      const payload = normalizePayload({ ...form, linked_tournament_ids: linkedT, linked_event_ids: linkedE, linked_f1_challenge_ids: linkedF, mentioned_user_ids: mentionedUserIds });
       if (isNew) await api.post("/news", payload);
-      else await api.patch(`/news/${post.id}`, payload);
+      else {
+        const originalPayload = normalizePayload({
+          ...formFromPost(post),
+          linked_tournament_ids: post.linked_tournament_ids || [],
+          linked_event_ids: post.linked_event_ids || [],
+          linked_f1_challenge_ids: post.linked_f1_challenge_ids || [],
+          mentioned_user_ids: post.mentioned_user_ids || [],
+        });
+        const patch = buildDirtyPayload(payload, originalPayload);
+        if (!hasPayloadChanges(patch)) {
+          toast.info("Keine Änderungen zum Speichern.");
+          setSaving(false);
+          return;
+        }
+        await api.patch(`/news/${post.id}`, patch);
+      }
       toast.success("Gespeichert.");
       onSaved();
       onClose();

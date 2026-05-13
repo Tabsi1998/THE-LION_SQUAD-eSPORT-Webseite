@@ -482,6 +482,7 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
         "avatar_url": u.get("avatar_url"), "banner_url": u.get("banner_url"),
         "bio": u.get("bio") if public else None,
         "role": u.get("role"), "created_at": u.get("created_at"),
+        "birth_date": _visible_field(u, "birth_date", public),
         "country": _visible_field(u, "country", public),
         "city": _visible_field(u, "city", public),
         "discord_name": _visible_field(u, "discord", public),

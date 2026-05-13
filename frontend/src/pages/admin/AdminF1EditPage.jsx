@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
+import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
 import { Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -408,30 +409,30 @@ export default function AdminF1EditPage() {
 
 function ChallengeSettingsForm({ challenge, onSaved }) {
   const dt = toDateTimeLocalInput;
-  const onlineRegistrationActive = challenge.online_registration_enabled === true && challenge.registration_enabled === true;
-  const [form, setForm] = useState({
-    title: challenge.title || "",
-    description: challenge.description || "",
-    banner_url: challenge.banner_url || "",
-    event_id: challenge.event_id || "",
-    visibility: challenge.visibility || "public",
-    vehicle: challenge.vehicle || "",
-    weather: challenge.weather || "",
-    assists_allowed: challenge.assists_allowed || "",
-    controller_type: challenge.controller_type || "",
-    platform: challenge.platform || "",
-    registration_enabled: onlineRegistrationActive,
-    registration_open_from: dt(challenge.registration_open_from),
-    registration_open_until: dt(challenge.registration_open_until),
-    start_date: dt(challenge.start_date),
-    end_date: dt(challenge.end_date),
-    block_club_member_results: !!challenge.block_club_member_results,
-    allow_club_reference_times: challenge.allow_club_reference_times !== false,
-    show_club_reference_times: challenge.show_club_reference_times !== false,
-    unlimited_attempts: challenge.unlimited_attempts !== false,
-    max_attempts: challenge.max_attempts || 0,
-    site_banner_enabled: !!challenge.site_banner_enabled,
+  const formFromChallenge = (source = challenge) => ({
+    title: source.title || "",
+    description: source.description || "",
+    banner_url: source.banner_url || "",
+    event_id: source.event_id || "",
+    visibility: source.visibility || "public",
+    vehicle: source.vehicle || "",
+    weather: source.weather || "",
+    assists_allowed: source.assists_allowed || "",
+    controller_type: source.controller_type || "",
+    platform: source.platform || "",
+    registration_enabled: source.online_registration_enabled === true && source.registration_enabled === true,
+    registration_open_from: dt(source.registration_open_from),
+    registration_open_until: dt(source.registration_open_until),
+    start_date: dt(source.start_date),
+    end_date: dt(source.end_date),
+    block_club_member_results: !!source.block_club_member_results,
+    allow_club_reference_times: source.allow_club_reference_times !== false,
+    show_club_reference_times: source.show_club_reference_times !== false,
+    unlimited_attempts: source.unlimited_attempts !== false,
+    max_attempts: source.max_attempts || 0,
+    site_banner_enabled: !!source.site_banner_enabled,
   });
+  const [form, setForm] = useState(formFromChallenge());
   const [events, setEvents] = useState([]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -441,16 +442,25 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
 
   const save = async () => {
     try {
-      const payload = { ...form };
-      if (payload.block_club_member_results) payload.allow_club_reference_times = true;
-      if (!payload.event_id) payload.event_id = null;
-      if (payload.unlimited_attempts) payload.max_attempts = null;
-      if (!payload.registration_enabled) {
-        payload.registration_open_from = null;
-        payload.registration_open_until = null;
+      const normalizePayload = (source) => {
+        const payload = { ...source };
+        if (payload.block_club_member_results) payload.allow_club_reference_times = true;
+        if (!payload.event_id) payload.event_id = null;
+        if (payload.unlimited_attempts) payload.max_attempts = null;
+        if (!payload.registration_enabled) {
+          payload.registration_open_from = null;
+          payload.registration_open_until = null;
+        }
+        normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
+        return payload;
+      };
+      const payload = normalizePayload(form);
+      const patch = buildDirtyPayload(payload, normalizePayload(formFromChallenge()));
+      if (!hasPayloadChanges(patch)) {
+        toast.info("Keine Änderungen zum Speichern.");
+        return;
       }
-      normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
-      await api.patch(`/f1/challenges/${challenge.id}`, payload);
+      await api.patch(`/f1/challenges/${challenge.id}`, patch);
       toast.success("Challenge gespeichert.");
       onSaved();
     } catch (e) { toast.error(formatRequestError(e, "Challenge konnte nicht gespeichert werden.", { title: form.title })); }

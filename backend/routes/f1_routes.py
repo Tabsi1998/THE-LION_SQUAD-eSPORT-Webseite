@@ -330,7 +330,6 @@ async def _award_f1_season_points(challenge: dict):
     cid = challenge["id"]
     tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).sort("order_index", 1).to_list(100)
     weight = float(challenge.get("season_weight") or 1.0)
-    source_type = "mini" if weight < 1.5 else ("major" if weight >= 2.5 else "tournament")
     for track in tracks:
         times = await db.f1_lap_times.find(
             _official_time_query({"challenge_id": cid, "track_id": track["id"]}),
@@ -347,7 +346,7 @@ async def _award_f1_season_points(challenge: dict):
         for pos, (uid, _) in enumerate(ranked):
             await award_points(
                 user_id=uid,
-                source_type=source_type,
+                source_type="fastlap",
                 source_id=f"{cid}:{track['id']}",
                 source_name=f"{challenge.get('title') or 'Fast Lap'} - {track.get('name') or 'Strecke'}",
                 rank=pos + 1,

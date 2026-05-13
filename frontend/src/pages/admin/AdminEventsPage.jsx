@@ -7,6 +7,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { appendEmbedToken } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
+import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
 import { Flag, Plus, Save, X, Trash2, Calendar, Trophy, UserCheck } from "lucide-react";
 
@@ -205,6 +206,56 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
     if (kind === "fastlap" && !relatedF1Ids.includes(item.id)) setRelatedF1Ids((ids) => [...ids, item.id]);
   };
 
+  const normalizeEventPayload = (source) => {
+    const payload = { ...source };
+    Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
+    normalizeDateTimeFields(payload, ["start_date", "end_date", "door_time", "registration_opens_at", "registration_closes_at"]);
+    if (payload.max_participants) payload.max_participants = parseInt(payload.max_participants);
+    if (payload.allow_companions) payload.max_companions_per_registration = parseInt(payload.max_companions_per_registration || 1);
+    else payload.max_companions_per_registration = 0;
+    payload.sponsor_ids = payload.owned_by_club && payload.show_sponsors ? (payload.sponsor_ids || []) : [];
+    return payload;
+  };
+
+  const originalEventPayload = () => normalizeEventPayload({
+    name: event.name || "",
+    slug: event.slug || "",
+    description: event.description || "",
+    event_type: event.event_type || "general",
+    visibility: event.visibility || "public",
+    start_date: toDateTimeLocalInput(event.start_date),
+    end_date: toDateTimeLocalInput(event.end_date),
+    door_time: toDateTimeLocalInput(event.door_time),
+    registration_opens_at: toDateTimeLocalInput(event.registration_opens_at),
+    registration_closes_at: toDateTimeLocalInput(event.registration_closes_at),
+    has_registration: event.has_registration ?? false,
+    registration_url: event.registration_url || "",
+    allow_companions: event.allow_companions ?? false,
+    max_companions_per_registration: event.max_companions_per_registration ?? 0,
+    location: event.location || "",
+    address: event.address || "",
+    postal_code: event.postal_code || "",
+    city: event.city || "",
+    country: event.country || "Ã–sterreich",
+    show_map: event.show_map ?? true,
+    organizer_name: event.organizer_name || "",
+    organizer_url: event.organizer_url || "",
+    owned_by_club: event.owned_by_club ?? true,
+    show_sponsors: event.show_sponsors ?? true,
+    sponsor_ids: event.sponsor_ids || [],
+    is_online: event.is_online ?? false,
+    is_hybrid: event.is_hybrid ?? false,
+    banner_url: event.banner_url || "",
+    contact: event.contact || "",
+    max_participants: event.max_participants || "",
+    show_participants: event.show_participants ?? true,
+    program: event.program || "",
+    has_live_stream: event.has_live_stream ?? false,
+    stream_platform: event.stream_platform || "",
+    stream_url: event.stream_url || "",
+    status: event.status || "draft",
+  });
+
   const syncRelatedItems = async (eventId) => {
     const jobs = [];
     tournaments.forEach((t) => {
@@ -224,20 +275,26 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
     ev.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form };
-      Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
-      normalizeDateTimeFields(payload, ["start_date", "end_date", "door_time", "registration_opens_at", "registration_closes_at"]);
-      if (payload.max_participants) payload.max_participants = parseInt(payload.max_participants);
-      if (payload.allow_companions) payload.max_companions_per_registration = parseInt(payload.max_companions_per_registration || 1);
-      else payload.max_companions_per_registration = 0;
-      payload.sponsor_ids = payload.owned_by_club && payload.show_sponsors ? (payload.sponsor_ids || []) : [];
+      const payload = normalizeEventPayload(form);
       let savedEvent;
       if (isNew) {
         const { data } = await api.post("/events", payload);
         savedEvent = data;
       } else {
-        const { data } = await api.patch(`/events/${event.id}`, payload);
-        savedEvent = data;
+        const patch = buildDirtyPayload(payload, originalEventPayload());
+        const relatedChanged = tournaments.some((t) => relatedTournamentIds.includes(t.id) !== (t.event_id === event.id))
+          || f1Challenges.some((c) => relatedF1Ids.includes(c.id) !== (c.event_id === event.id));
+        if (!hasPayloadChanges(patch) && !relatedChanged) {
+          toast.info("Keine Änderungen zum Speichern.");
+          setSaving(false);
+          return;
+        }
+        if (hasPayloadChanges(patch)) {
+          const { data } = await api.patch(`/events/${event.id}`, patch);
+          savedEvent = data;
+        } else {
+          savedEvent = event;
+        }
       }
       await syncRelatedItems(savedEvent.id);
       toast.success("Gespeichert.");

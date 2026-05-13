@@ -5,6 +5,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload, useImageUploadBusy } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
 import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye, Search, Plus } from "lucide-react";
 
@@ -104,6 +105,39 @@ function fromDateTimeInput(value) {
   return Number.isNaN(date.getTime()) ? value : date.toISOString();
 }
 
+function emailPayload(source) {
+  const payload = { ...(source || {}) };
+  if (!payload.resend_api_key) delete payload.resend_api_key;
+  delete payload.resend_api_key_masked;
+  return payload;
+}
+
+function smtpPayload(source) {
+  const payload = { ...(source || {}) };
+  if (!payload.smtp_pass) delete payload.smtp_pass;
+  delete payload.smtp_pass_masked;
+  return payload;
+}
+
+function brandPayload(source = {}) {
+  const payload = { ...source };
+  if (!payload.twitch_client_secret) delete payload.twitch_client_secret;
+  delete payload.twitch_client_secret_masked;
+  return payload;
+}
+
+function discordPayload(source) {
+  const payload = { ...(source || {}) };
+  if (!payload.webhook_url) delete payload.webhook_url;
+  delete payload.configured;
+  delete payload.webhook_url_masked;
+  delete payload.last_status;
+  delete payload.last_error;
+  delete payload.last_event_key;
+  delete payload.last_checked_at;
+  return payload;
+}
+
 function mailTemplateLabel(job) {
   return MAIL_TEMPLATE_LABELS[job?.template_key] || job?.template_key || "Mail";
 }
@@ -161,6 +195,10 @@ export default function AdminSettingsPage() {
   const imageUploadBusy = useImageUploadBusy();
   const brandDirtyRef = useRef(false);
   const discordDirtyRef = useRef(false);
+  const originalEmailRef = useRef({});
+  const originalSmtpRef = useRef({});
+  const originalBrandRef = useRef({});
+  const originalDiscordRef = useRef({});
   const loadSeqRef = useRef(0);
   const loadErrorKeyRef = useRef("");
   const confirm = useConfirm();
@@ -184,11 +222,27 @@ export default function AdminSettingsPage() {
     if (seq !== loadSeqRef.current) return;
     const value = (i) => requests[i].status === "fulfilled" ? requests[i].value.data : null;
     const e = value(0), b = value(1), d = value(2), l = value(3), sm = value(4), q = value(5), qs = value(6), st = value(7), tw = value(8), dc = value(9), sb = value(10);
-    if (e) setEmail((prev) => ({ ...prev, ...e, resend_api_key: "" }));
-    if (b && !brandDirtyRef.current) setBrand((prev) => ({ ...prev, ...b }));
-    if (d && !discordDirtyRef.current) setDiscord((prev) => ({ ...prev, ...d, webhook_url: "" }));
+    if (e) setEmail((prev) => {
+      const next = { ...prev, ...e, resend_api_key: "" };
+      originalEmailRef.current = emailPayload(next);
+      return next;
+    });
+    if (b && !brandDirtyRef.current) setBrand((prev) => {
+      const next = { ...prev, ...b };
+      originalBrandRef.current = brandPayload(next);
+      return next;
+    });
+    if (d && !discordDirtyRef.current) setDiscord((prev) => {
+      const next = { ...prev, ...d, webhook_url: "" };
+      originalDiscordRef.current = discordPayload(next);
+      return next;
+    });
     if (l) setLogs(l);
-    if (sm) setSmtp((prev) => ({ ...prev, ...sm, smtp_pass: "" }));
+    if (sm) setSmtp((prev) => {
+      const next = { ...prev, ...sm, smtp_pass: "" };
+      originalSmtpRef.current = smtpPayload(next);
+      return next;
+    });
     if (q) setQueue(q);
     if (qs) setQueueStats(qs);
     if (st) setSystemStatus(st);
@@ -277,18 +331,12 @@ export default function AdminSettingsPage() {
 
   const saveEmail = async () => {
     if (savingEmail) return;
-    const payload = { ...email };
-    if (!payload.resend_api_key) delete payload.resend_api_key;
+    const payload = buildDirtyPayload(emailPayload(email), originalEmailRef.current);
+    if (!hasPayloadChanges(payload)) return toast.info("Keine Änderungen zum Speichern.");
     setSavingEmail(true);
     try { await api.put("/settings/email", payload); toast.success("E-Mail-Einstellungen gespeichert."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
     finally { setSavingEmail(false); }
-  };
-  const buildBrandPayload = (source = brand) => {
-    const payload = { ...source };
-    if (!payload.twitch_client_secret) delete payload.twitch_client_secret;
-    delete payload.twitch_client_secret_masked;
-    return payload;
   };
   const saveBrand = async () => {
     if (savingBrand) return;
@@ -296,7 +344,12 @@ export default function AdminSettingsPage() {
     setSavingBrand(true);
     try {
       loadSeqRef.current += 1;
-      const { data } = await api.put("/settings/branding", buildBrandPayload());
+      const payload = buildDirtyPayload(brandPayload(brand), originalBrandRef.current);
+      if (!hasPayloadChanges(payload)) {
+        toast.info("Keine Änderungen zum Speichern.");
+        return;
+      }
+      const { data } = await api.put("/settings/branding", payload);
       brandDirtyRef.current = false;
       if (data && !data.ok) setBrand((prev) => ({ ...prev, ...data }));
       await refreshPublicBranding();
@@ -364,14 +417,19 @@ export default function AdminSettingsPage() {
     if (savingTwitch) return;
     setSavingTwitch(true);
     try {
-      const payload = buildBrandPayload({
+      const payload = brandPayload({
         twitch_channel: brand.twitch_channel,
         twitch_client_id: brand.twitch_client_id,
         twitch_client_secret: brand.twitch_client_secret,
         twitch_live_detection: !!brand.twitch_live_detection,
       });
+      const patch = buildDirtyPayload(payload, originalBrandRef.current);
+      if (!hasPayloadChanges(patch)) {
+        toast.info("Keine Änderungen zum Speichern.");
+        return;
+      }
       loadSeqRef.current += 1;
-      const { data } = await api.put("/settings/branding", payload);
+      const { data } = await api.put("/settings/branding", patch);
       brandDirtyRef.current = false;
       setBrand((prev) => ({ ...prev, ...data, twitch_client_secret: "" }));
       toast.success("Twitch-Einstellungen gespeichert.");
@@ -393,14 +451,8 @@ export default function AdminSettingsPage() {
   const saveDiscord = async () => {
     if (savingDiscord) return;
     if (imageUploadBusy) return toast.error("Bild-Upload läuft noch. Bitte kurz warten und dann speichern.");
-    const payload = { ...discord };
-    if (!payload.webhook_url) delete payload.webhook_url;
-    delete payload.configured;
-    delete payload.webhook_url_masked;
-    delete payload.last_status;
-    delete payload.last_error;
-    delete payload.last_event_key;
-    delete payload.last_checked_at;
+    const payload = buildDirtyPayload(discordPayload(discord), originalDiscordRef.current);
+    if (!hasPayloadChanges(payload)) return toast.info("Keine Änderungen zum Speichern.");
     setSavingDiscord(true);
     try { loadSeqRef.current += 1; await api.put("/settings/discord", payload); discordDirtyRef.current = false; toast.success("Discord gespeichert."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
@@ -492,14 +544,15 @@ export default function AdminSettingsPage() {
 
   const saveSmtp = async () => {
     if (savingSmtp) return;
-    const payload = { ...smtp };
+    const payload = smtpPayload(smtp);
     if (payload.provider === "smtp" && payload.smtp_auth === "login") {
       if (!payload.smtp_user) return toast.error("SMTP User fehlt. Für einfachen Versand bitte office@... eintragen.");
-      if (!payload.smtp_pass && !payload.smtp_pass_masked) return toast.error("SMTP Passwort fehlt.");
+      if (!smtp.smtp_pass && !smtp.smtp_pass_masked) return toast.error("SMTP Passwort fehlt.");
     }
-    if (!payload.smtp_pass) delete payload.smtp_pass;
+    const patch = buildDirtyPayload(payload, originalSmtpRef.current);
+    if (!hasPayloadChanges(patch)) return toast.info("Keine Änderungen zum Speichern.");
     setSavingSmtp(true);
-    try { await api.put("/settings/smtp", payload); toast.success("SMTP-Einstellungen gespeichert."); load(); }
+    try { await api.put("/settings/smtp", patch); toast.success("SMTP-Einstellungen gespeichert."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
     finally { setSavingSmtp(false); }
   };

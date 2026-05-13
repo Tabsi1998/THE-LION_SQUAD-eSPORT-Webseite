@@ -5,7 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { Award, BarChart3, CalendarDays, Flag, Medal, Trophy, Users } from "lucide-react";
+import { Award, BarChart3, CalendarDays, CheckCircle2, Flag, Medal, MessageCircle, Star, Timer, Trophy, Users } from "lucide-react";
 
 function rankColor(rank) {
   if (rank === 1) return "text-[#FFD700]";
@@ -13,6 +13,34 @@ function rankColor(rank) {
   if (rank === 3) return "text-[#CD7F32]";
   return "text-[#29B6E8]";
 }
+
+const POINT_SOURCES = [
+  {
+    icon: Trophy,
+    title: "Turniere",
+    text: "Teilnahme zählt, Platzierungen zählen mehr. Siege, Podium und größere Teilnehmerfelder bringen sichtbar mehr Punkte.",
+  },
+  {
+    icon: Timer,
+    title: "Fast Lap",
+    text: "Gültige Zeiten werden pro Strecke gewertet. Pole Positions, starke Ränge und veröffentlichte Challenges laufen in die Wertung.",
+  },
+  {
+    icon: CheckCircle2,
+    title: "Events",
+    text: "Wenn Admins oder Moderatoren deine Teilnahme per Check-in bestätigen, wird daraus ein Season-Eintrag.",
+  },
+  {
+    icon: Star,
+    title: "Achievements",
+    text: "Achievements geben Profilpunkte und schalten weitere Ranglisten-Erfolge frei. Saisonpunkte erzeugen wiederum eigene Achievements.",
+  },
+  {
+    icon: MessageCircle,
+    title: "Community",
+    text: "Discord-, Stream-, Team- und Community-Aktivität kann über Achievements oder manuelle Admin-Wertungen Punkte bringen.",
+  },
+];
 
 export default function SeasonPage() {
   const { slug } = useParams();
@@ -116,8 +144,21 @@ export default function SeasonPage() {
             {standings.length === 0 && <div className="text-center py-10 text-white/40">Noch keine Ergebnisse</div>}
           </div>
         </div>
+        <section className="mt-8">
+          <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#29B6E8]">Punkte</div>
+              <h2 className="mt-1 font-heading text-2xl md:text-3xl font-black uppercase">Wie du Punkte sammelst</h2>
+            </div>
+            <div className="text-xs text-white/45">Alles zählt, sobald es bestätigt oder veröffentlicht ist.</div>
+          </div>
+          <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-3">
+            {POINT_SOURCES.map((item) => <PointSourceCard key={item.title} {...item} />)}
+          </div>
+        </section>
+
         <section className="mt-8 grid md:grid-cols-2 gap-4">
-          <InfoPanel icon={Award} title="Punktewertung" text={`Punkte werden aus verknüpften Turnieren, Challenges, Achievements und manuellen Wertungen berechnet. Formel: ${(s.points_per_position || []).join(", ") || "25, 18, 15, 12, 10, 8, 6, 4, 2, 1"}.`} />
+          <InfoPanel icon={Award} title="Punktewertung" text="Season-Punkte werden aus echten Wertungseinträgen berechnet: Turnier- und Fast-Lap-Ergebnisse, bestätigte Event-Teilnahme sowie manuelle Admin-Wertungen. Platz, Gewichtung, Teilnehmerfeld und Boni fließen in die Summe ein." />
           <InfoPanel icon={Medal} title="Streichresultate" text={s.drop_worst ? `${s.drop_worst} schlechteste Resultat(e) werden nicht in die Gesamtpunkte gerechnet.` : "Alle gewerteten Resultate zählen in die Gesamtwertung."} />
         </section>
       </div>
@@ -180,6 +221,16 @@ function MiniStat({ label, value }) {
     <div className="border border-white/10 bg-black/25 rounded-sm p-2">
       <div className="font-display text-xl font-black text-white">{value}</div>
       <div className="text-[9px] uppercase tracking-widest text-white/40">{label}</div>
+    </div>
+  );
+}
+
+function PointSourceCard({ icon: Icon, title, text }) {
+  return (
+    <div className="border border-white/10 bg-[#101010] rounded-sm p-4 min-h-[150px]">
+      <Icon className="w-5 h-5 text-[#FFD700]" />
+      <h3 className="mt-3 font-heading font-bold uppercase">{title}</h3>
+      <p className="mt-2 text-sm text-white/55 leading-relaxed">{text}</p>
     </div>
   );
 }

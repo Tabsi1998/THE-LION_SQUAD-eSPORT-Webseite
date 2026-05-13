@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, ArrowRight } from "lucide-react";
+import { Trophy, ArrowRight, CheckCircle2, Star, Timer } from "lucide-react";
 
 /**
  * SeasonPassWidget — Animierter Champion-Ticker.
@@ -36,6 +36,12 @@ export function SeasonPassWidget() {
   const top3 = standings.slice(0, 3);
   const spotlight = top3[spotlightIdx];
   const rest = standings.slice(3, 5);
+  const pointHints = [
+    { icon: Trophy, label: "Turniere" },
+    { icon: Timer, label: "Fast Lap" },
+    { icon: CheckCircle2, label: "Event-Check-in" },
+    { icon: Star, label: "Achievements" },
+  ];
 
   return (
     <section data-testid="season-pass-widget" className="relative overflow-hidden border-y border-white/10 bg-[#0A0A0A]">
@@ -59,6 +65,13 @@ export function SeasonPassWidget() {
             <p className="mt-4 text-white/70 text-base max-w-md">
               {s.description || "Die Vereinswertung bündelt Punkte aus Turnieren, Challenges, Achievements und Community-Aktivität."}
             </p>
+            <div className="mt-4 grid grid-cols-2 gap-2 max-w-md">
+              {pointHints.map(({ icon: Icon, label }) => (
+                <div key={label} className="inline-flex items-center gap-2 border border-white/10 bg-white/[0.03] px-3 py-2 rounded-sm text-[10px] uppercase tracking-widest text-white/65 font-bold">
+                  <Icon className="w-3.5 h-3.5 text-[#FFD700]" /> {label}
+                </div>
+              ))}
+            </div>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
                 to={`/seasons/${s.slug || s.id}`}

@@ -7,6 +7,7 @@ import { BracketTree } from "@/components/tls/BracketTree";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { formatDateTime, fromDateTimeLocal, normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
+import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
 import { Zap, RefreshCw, Eye } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -1141,6 +1142,52 @@ function TournamentEditForm({ tournament, onSaved }) {
   const dt = toDateTimeLocalInput;
   const [games, setGames] = useState([]);
   const [events, setEvents] = useState([]);
+  const formFromTournament = (source = tournament) => ({
+    title: source.title || "",
+    slug: source.slug || "",
+    description: source.description || "",
+    game_id: source.game_id || "",
+    platform: source.platform || "",
+    event_id: source.event_id || "",
+    format: source.format || "single_elim",
+    status: source.status || "draft",
+    team_mode: source.team_mode === "solo" ? "solo" : "team",
+    team_size: source.team_mode === "solo" ? 1 : (source.team_size || 2),
+    substitutes_allowed: !!source.substitutes_allowed,
+    rules: source.rules || "",
+    prize_pool: source.prize_pool || "",
+    prize_places: source.prize_places || [],
+    banner_url: source.banner_url || "",
+    stream_link: source.stream_link || "",
+    discord_link: source.discord_link || "",
+    location: source.location || "",
+    registration_enabled: source.registration_enabled !== false,
+    is_invite_only: !!source.is_invite_only,
+    block_club_member_registration: !!source.block_club_member_registration,
+    registration_open_from: dt(source.registration_open_from),
+    registration_open_until: dt(source.registration_open_until),
+    check_in_from: dt(source.check_in_from),
+    check_in_until: dt(source.check_in_until),
+    start_date: dt(source.start_date),
+    end_date: dt(source.end_date),
+    max_participants: source.max_participants || 16,
+    min_participants: source.min_participants || 2,
+    best_of: source.best_of || 1,
+    match_duration_minutes: source.match_duration_minutes || 30,
+    bronze_match: !!source.bronze_match,
+    seeding_mode: source.seeding_mode || "random",
+    is_public: source.is_public !== false,
+    visibility: source.visibility || "public",
+    site_banner_enabled: !!source.site_banner_enabled,
+    twitch_channel: source.twitch_channel || "",
+    twitch_enabled: !!source.twitch_enabled,
+    has_live_stream: !!source.has_live_stream,
+    stream_platform: source.stream_platform || "",
+    stream_url: source.stream_url || "",
+    stream_title: source.stream_title || "",
+    show_chat: !!source.show_chat,
+    season_weight: source.season_weight ?? 2,
+  });
   const [f, setF] = useState({
     title: tournament.title || "",
     slug: tournament.slug || "",
@@ -1199,24 +1246,33 @@ function TournamentEditForm({ tournament, onSaved }) {
   }));
   const save = async () => {
     try {
-      const payload = { ...f };
-      if (!payload.event_id) payload.event_id = null;
-      if (!payload.stream_platform) payload.stream_platform = null;
-      normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
-      ["team_size", "max_participants", "min_participants", "best_of", "match_duration_minutes"].forEach((key) => {
-        if (payload[key] !== "" && payload[key] != null) payload[key] = Number(payload[key]);
-      });
-      payload.season_weight = Number(payload.season_weight || 0);
-      payload.prize_places = (payload.prize_places || [])
-        .filter((p) => p.value && String(p.value).trim())
-        .map((p) => ({
-          group: p.group || "overall",
-          place: p.place === "last" ? "last" : Number(p.place) || 0,
-          label: p.label || (p.place === "last" ? "Letzter Platz" : `Platz ${p.place}`),
-          value: p.value,
-        }));
-      if (payload.prize_places.length === 0) payload.prize_places = null;
-      await api.patch(`/tournaments/${tournament.id}`, payload);
+      const normalizeTournamentPayload = (source) => {
+        const payload = { ...source };
+        if (!payload.event_id) payload.event_id = null;
+        if (!payload.stream_platform) payload.stream_platform = null;
+        normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
+        ["team_size", "max_participants", "min_participants", "best_of", "match_duration_minutes"].forEach((key) => {
+          if (payload[key] !== "" && payload[key] != null) payload[key] = Number(payload[key]);
+        });
+        payload.season_weight = Number(payload.season_weight || 0);
+        payload.prize_places = (payload.prize_places || [])
+          .filter((p) => p.value && String(p.value).trim())
+          .map((p) => ({
+            group: p.group || "overall",
+            place: p.place === "last" ? "last" : Number(p.place) || 0,
+            label: p.label || (p.place === "last" ? "Letzter Platz" : `Platz ${p.place}`),
+            value: p.value,
+          }));
+        if (payload.prize_places.length === 0) payload.prize_places = null;
+        return payload;
+      };
+      const payload = normalizeTournamentPayload(f);
+      const patch = buildDirtyPayload(payload, normalizeTournamentPayload(formFromTournament()));
+      if (!hasPayloadChanges(patch)) {
+        toast.info("Keine Änderungen zum Speichern.");
+        return;
+      }
+      await api.patch(`/tournaments/${tournament.id}`, patch);
       toast.success("Gespeichert.");
       onSaved();
     } catch (e) { toast.error(formatRequestError(e, "Turnier konnte nicht gespeichert werden.", { title: f.title })); }
