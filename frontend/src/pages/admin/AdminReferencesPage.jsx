@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -42,6 +42,63 @@ const STATUS_OPTIONS = [["active", "Laufend"], ["planned", "Geplant"], ["complet
 const medalLabel = { gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const visibilityLabel = Object.fromEntries(VISIBILITY_OPTIONS);
 const statusLabel = Object.fromEntries(STATUS_OPTIONS);
+const DEFAULT_PLATFORM_TAGS = ["ALL", "XBO+PS", "PC", "PS", "XBO"];
+const DEFAULT_TITLE_SEGMENTS = ["HC", "CORE", "S&D 4vs4", "S&D 2vs2", "S&Z 4vs4", "S&Z 2vs2", "LIGA A", "NEWCOMER LIGA"];
+
+function cleanSuggestion(value) {
+  return String(value || "").trim();
+}
+
+function uniqueSuggestions(values, limit = 80) {
+  const seen = new Map();
+  values.map(cleanSuggestion).filter(Boolean).forEach((value) => {
+    const key = value.toLocaleLowerCase("de-AT");
+    if (!seen.has(key)) seen.set(key, value);
+  });
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, "de-AT")).slice(0, limit);
+}
+
+function titleParts(title) {
+  const raw = cleanSuggestion(title);
+  const platforms = [...raw.matchAll(/\[([^\]]+)\]/g)].flatMap((match) => match[1].split(/[+/,&]/).map(cleanSuggestion));
+  const withoutTags = raw.replace(/\[[^\]]+\]\s*/g, " ");
+  const segments = withoutTags
+    .split(/\s+\|\s+|[-–—]/)
+    .map((part) => part.replace(/season\s*#?\d+/ig, "").trim())
+    .filter((part) => part.length >= 2 && part.length <= 24 && !/^\d+$/.test(part));
+  const modeTokens = [...withoutTags.matchAll(/\b(HC|CORE|S&D\s*\d+vs\d+|S&Z\s*\d+vs\d+|SEARCH\s*&\s*DESTROY)\b/ig)]
+    .map((match) => match[1].replace(/\s+/g, " ").toUpperCase());
+  return { platforms, segments: [...segments, ...modeTokens] };
+}
+
+function buildReferenceSuggestions(items) {
+  const parsedTitles = (items || []).map((item) => titleParts(item.title));
+  return {
+    titles: uniqueSuggestions((items || []).map((item) => item.title), 160),
+    organizers: uniqueSuggestions((items || []).map((item) => item.organizer)),
+    gameNames: uniqueSuggestions((items || []).map((item) => item.game_name)),
+    teamNames: uniqueSuggestions((items || []).map((item) => item.team_name)),
+    placementLabels: uniqueSuggestions((items || []).map((item) => item.placement_label)),
+    locations: uniqueSuggestions((items || []).map((item) => item.location)),
+    platformTags: uniqueSuggestions([...DEFAULT_PLATFORM_TAGS, ...parsedTitles.flatMap((part) => part.platforms)], 20),
+    titleSegments: uniqueSuggestions([...DEFAULT_TITLE_SEGMENTS, ...parsedTitles.flatMap((part) => part.segments)], 28),
+  };
+}
+
+function upsertLeadingTag(title, tag) {
+  const value = cleanSuggestion(title);
+  const nextTag = `[${tag}]`;
+  if (!value) return `${nextTag} `;
+  if (/^\[[^\]]+\]/.test(value)) return value.replace(/^\[[^\]]+\]/, nextTag);
+  return `${nextTag} ${value}`;
+}
+
+function appendTitleSegment(title, segment) {
+  const value = cleanSuggestion(title);
+  if (!value) return segment;
+  if (value.toLocaleLowerCase("de-AT").includes(segment.toLocaleLowerCase("de-AT"))) return value;
+  return `${value} | ${segment}`;
+}
 
 function formatDate(value) {
   if (!value) return "—";
@@ -55,6 +112,7 @@ export default function AdminReferencesPage() {
   const [memberProfiles, setMemberProfiles] = useState([]);
   const [editing, setEditing] = useState(null);
   const confirm = useConfirm();
+  const suggestions = useMemo(() => buildReferenceSuggestions(items), [items]);
 
   const load = useCallback(async () => {
     const [{ data: refs }, { data: gameRows }, { data: profileRows }] = await Promise.all([
@@ -142,7 +200,7 @@ export default function AdminReferencesPage() {
         {items.length === 0 && <div className="text-center py-16 border border-dashed border-white/15 rounded-sm text-white/40 font-display tracking-widest">NOCH KEINE REFERENZEN</div>}
       </div>
 
-      {editing && <ReferenceForm reference={editing} games={games} memberProfiles={memberProfiles} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+      {editing && <ReferenceForm reference={editing} games={games} memberProfiles={memberProfiles} suggestions={suggestions} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </AdminLayout>
   );
 }
@@ -167,7 +225,7 @@ function referenceLineup(item) {
   return [...memberNames, ...(item.lineup || [])];
 }
 
-function ReferenceForm({ reference, games, memberProfiles, onClose, onSaved }) {
+function ReferenceForm({ reference, games, memberProfiles, suggestions, onClose, onSaved }) {
   const isNew = !reference.id;
   const [form, setForm] = useState({
     ...emptyReference,
@@ -221,9 +279,15 @@ function ReferenceForm({ reference, games, memberProfiles, onClose, onSaved }) {
           <h3 className="font-heading text-xl font-bold uppercase">{isNew ? "Neue Referenz" : "Referenz bearbeiten"}</h3>
           <button type="button" onClick={onClose} className="text-white/40 hover:text-white"><X className="w-4 h-4" /></button>
         </div>
-        <Field label="Titel" value={form.title} onChange={(v) => set("title", v)} required />
+        <Field label="Titel" value={form.title} onChange={(v) => set("title", v)} suggestions={suggestions.titles} required />
+        <TitleHelper
+          platforms={suggestions.platformTags}
+          segments={suggestions.titleSegments}
+          onPlatform={(tag) => set("title", upsertLeadingTag(form.title, tag))}
+          onSegment={(segment) => set("title", appendTitleSegment(form.title, segment))}
+        />
         <div className="grid md:grid-cols-2 gap-3">
-          <Field label="Veranstalter / Liga" value={form.organizer} onChange={(v) => set("organizer", v)} />
+          <Field label="Veranstalter / Liga" value={form.organizer} onChange={(v) => set("organizer", v)} suggestions={suggestions.organizers} />
           <label className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spiel</div>
             <select value={form.game_id || ""} onChange={(e) => set("game_id", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
@@ -231,8 +295,8 @@ function ReferenceForm({ reference, games, memberProfiles, onClose, onSaved }) {
               {games.map((game) => <option key={game.id} value={game.id}>{gameOptionLabel(game)}</option>)}
             </select>
           </label>
-          <Field label="Spielname falls nicht vorhanden" value={form.game_name} onChange={(v) => set("game_name", v)} />
-          <Field label="Team / Lineup-Name" value={form.team_name} onChange={(v) => set("team_name", v)} />
+          <Field label="Spielname falls nicht vorhanden" value={form.game_name} onChange={(v) => set("game_name", v)} suggestions={suggestions.gameNames} />
+          <Field label="Team / Lineup-Name" value={form.team_name} onChange={(v) => set("team_name", v)} suggestions={suggestions.teamNames} />
         </div>
         <MemberPicker
           profiles={memberProfiles}
@@ -243,14 +307,14 @@ function ReferenceForm({ reference, games, memberProfiles, onClose, onSaved }) {
         <Field label="Weitere externe Spieler / alter Lineup-Text" value={lineupText} onChange={setLineupText} placeholder="Name 1, Name 2, Name 3" />
         <div className="grid md:grid-cols-4 gap-3">
           <Field label="Platz" type="number" value={form.placement} onChange={(v) => set("placement", v)} />
-          <Field label="Label" value={form.placement_label} onChange={(v) => set("placement_label", v)} placeholder="z.B. Podium" />
+          <Field label="Label" value={form.placement_label} onChange={(v) => set("placement_label", v)} placeholder="z.B. Podium" suggestions={suggestions.placementLabels} />
           <Field label="Teilnehmer" type="number" value={form.participant_count} onChange={(v) => set("participant_count", v)} />
           <Field label="Teams" type="number" value={form.team_count} onChange={(v) => set("team_count", v)} />
         </div>
         <div className="grid md:grid-cols-4 gap-3">
           <Field label="Start" type="date" value={form.start_date} onChange={(v) => set("start_date", v)} />
           <Field label="Ende" type="date" value={form.end_date} onChange={(v) => set("end_date", v)} />
-          <Field label="Ort" value={form.location} onChange={(v) => set("location", v)} />
+          <Field label="Ort" value={form.location} onChange={(v) => set("location", v)} suggestions={suggestions.locations} />
           <Select label="Modus" value={form.mode} onChange={(v) => set("mode", v)} options={MODE_OPTIONS} />
         </div>
         <div className="grid md:grid-cols-2 gap-3">
@@ -320,11 +384,48 @@ function positiveNumberOrNull(value) {
   return Number.isFinite(number) && number >= 1 ? number : null;
 }
 
-function Field({ label, value, onChange, required, placeholder, type = "text" }) {
+function TitleHelper({ platforms, segments, onPlatform, onSegment }) {
+  return (
+    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
+      <div className="flex flex-wrap items-start gap-4">
+        <ChipGroup label="Plattform-Tag" values={platforms} onPick={onPlatform} />
+        <ChipGroup label="Titel-Baustein" values={segments} onPick={onSegment} />
+      </div>
+      <div className="mt-2 text-[11px] text-white/40">
+        Vorschläge werden aus gespeicherten Referenzen gebildet. Neue Veranstalter, Labels oder Titel-Bausteine erscheinen nach dem Speichern automatisch wieder.
+      </div>
+    </div>
+  );
+}
+
+function ChipGroup({ label, values, onPick }) {
+  const visible = (values || []).slice(0, 10);
+  if (visible.length === 0) return null;
+  return (
+    <div className="min-w-0 flex-1">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-white/45 mb-2">{label}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {visible.map((value) => (
+          <button key={value} type="button" onClick={() => onPick(value)} className="px-2.5 py-1 border border-white/10 bg-[#121212] text-white/70 hover:border-[#29B6E8]/70 hover:text-[#29B6E8] rounded-sm text-[11px] font-bold uppercase tracking-wider">
+            {value}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, required, placeholder, type = "text", suggestions = [] }) {
+  const datalistId = suggestions.length > 0 ? `ref-field-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` : undefined;
   return (
     <label className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <input type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} required={required} placeholder={placeholder} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+      <input list={datalistId} type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} required={required} placeholder={placeholder} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+      {datalistId && (
+        <datalist id={datalistId}>
+          {suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}
+        </datalist>
+      )}
     </label>
   );
 }
