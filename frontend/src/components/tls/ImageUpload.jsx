@@ -103,7 +103,8 @@ function ImagePreviewBox({ value, previewClass, onClear, testId }) {
           {state === "error" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 text-center bg-[#0A0A0A]">
               <ImageIcon className="w-7 h-7 text-[#FF3B30]/70" />
-              <span className="text-[10px] uppercase tracking-widest font-bold text-[#FF3B30]">Bild nicht erreichbar</span>
+              <span className="text-[10px] uppercase tracking-widest font-bold text-[#FF3B30]">Vorschau nicht ladbar</span>
+              <span className="text-[10px] text-white/45">Die Bild-URL ist gespeichert.</span>
               <span className="text-[10px] text-white/35 break-all line-clamp-2">{imageFileName(value)}</span>
             </div>
           )}
@@ -554,6 +555,16 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
             >
               Medien wählen
             </button>
+          )}
+          {value && (
+            <a
+              href={resolveMediaUrl(value)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-[10px] text-white/45 hover:text-[#29B6E8] break-all"
+            >
+              {imageFileName(value)}
+            </a>
           )}
           <p className="text-[10px] text-white/40">PNG/JPG/WebP bis {maxSizeMb} MB.</p>
         </div>

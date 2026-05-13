@@ -141,12 +141,12 @@ PROFILE_FIELDS = [
     ("bio", 1.0),
     ("country", 0.8),
     ("city", 0.6),
-    ("birthdate", 0.6),
+    ("birth_date", 0.6),
     ("main_platforms", 1.0),     # list, non-empty
     ("input_devices", 0.8),      # list
     ("favorite_games", 0.8),     # list
     ("discord_name", 0.8),
-    ("twitch_channel", 0.6),
+    ("twitch_handle", 0.6),
     ("privacy_public_profile", 0.4),  # explicit choice
 ]
 

@@ -63,7 +63,10 @@ function copyText(value, successMessage = "Kopiert.") {
 
 function formatPublicDate(value) {
   if (!value) return "";
-  const date = new Date(value);
+  const raw = String(value).trim();
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+    ? new Date(`${raw}T12:00:00`)
+    : new Date(raw);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
 }
@@ -248,6 +251,14 @@ export default function PublicProfilePage() {
     <PublicLayout>
       {/* Hero */}
       <div className="relative border-b border-white/10 overflow-hidden">
+        {profile.banner_url && (
+          <img
+            src={resolveMediaUrl(profile.banner_url)}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover opacity-20"
+          />
+        )}
+        {profile.banner_url && <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/75 via-[#0A0A0A]/65 to-[#0A0A0A]" />}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-20 -left-10 w-[500px] h-[500px] rounded-full bg-[#29B6E8] blur-[160px] opacity-10" />
           <div className="absolute -bottom-20 -right-10 w-[400px] h-[400px] rounded-full bg-[#FFD700] blur-[160px] opacity-5" />
@@ -363,7 +374,6 @@ export default function PublicProfilePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 overflow-x-auto">
           {[
             ["overview", "Übersicht"],
-            ["info", "Info"],
             ["badges", `Achievements (${achievementsData?.awards?.length || 0})`],
             ["tournaments", `Turniere (${profile.tournaments?.length || 0})`],
             ["fastlap", `Fast Lap (${profile.f1_bests?.length || 0})`],
@@ -387,8 +397,11 @@ export default function PublicProfilePage() {
 
         {tab === "overview" && (
           <div className="grid lg:grid-cols-3 gap-8 min-w-0">
-            {/* Recent achievements */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 space-y-8">
+              <PublicInfoPanel profile={profile} joinedDate={joinedDate} />
+              <PublicSetupPanel profile={profile} />
+              {/* Recent achievements */}
+              <div>
               <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Medal className="w-5 h-5 text-[#FFD700]" /> Letzte Achievements</h2>
               {achievementsData?.awards?.length ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2" data-testid="profile-recent-awards">
@@ -411,6 +424,7 @@ export default function PublicProfilePage() {
               {achievementsData?.awards?.length > 4 && (
                 <button onClick={() => setTab("badges")} className="mt-4 text-sm font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">Alle Achievements ansehen →</button>
               )}
+              </div>
             </div>
             <div className="space-y-6 min-w-0">
               {profile.show_twitch_embed && twitchChannel && (
@@ -473,17 +487,6 @@ export default function PublicProfilePage() {
           </div>
         )}
 
-        {tab === "info" && (
-          <ProfileInfoTab
-            profile={profile}
-            joinedDate={joinedDate}
-            socialLinks={socialLinks}
-            gamingIds={gamingIds}
-            isOwnProfile={isOwnProfile}
-            onMessage={openMessage}
-          />
-        )}
-
         {tab === "badges" && (
           <div>
             <AchievementGroupsView groups={achievementsData?.groups || []} earnedOnly emptyText="Noch keine Achievements freigeschaltet." />
@@ -532,6 +535,60 @@ export default function PublicProfilePage() {
         )}
       </div>
     </PublicLayout>
+  );
+}
+
+function PublicInfoPanel({ profile, joinedDate }) {
+  const birthday = formatPublicDate(profile.birth_date);
+  const location = [profile.city, profile.country].filter(Boolean).join(", ");
+  const membership = profile.membership?.membership_type || (profile.is_club_member ? "Vereinsmitglied" : "");
+  const infoRows = [
+    { label: "Name", value: profile.display_name || profile.username },
+    { label: "Username", value: `@${profile.username}` },
+    { label: "Mitglied seit", value: joinedDate ? joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" }) : "" },
+    { label: "Geburtstag", value: birthday },
+    { label: "Ort", value: location },
+    { label: "Rolle", value: profile.role && profile.role !== "player" ? profile.role.replace("_", " ") : "" },
+    { label: "Mitgliedschaft", value: membership },
+  ].filter((row) => row.value);
+
+  return (
+    <section className="border border-white/10 bg-[#121212] rounded-sm p-5">
+      <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2">
+        <Info className="w-5 h-5 text-[#29B6E8]" /> Öffentliche Infos
+      </h2>
+      {infoRows.length ? (
+        <div className="grid sm:grid-cols-2 gap-3" data-testid="public-profile-info">
+          {infoRows.map((row) => <InfoValue key={row.label} label={row.label} value={row.value} />)}
+        </div>
+      ) : (
+        <EmptyState text="Keine öffentlichen Profildaten freigegeben." />
+      )}
+    </section>
+  );
+}
+
+function PublicSetupPanel({ profile }) {
+  const setupRows = [
+    { label: "Plattformen", value: listText(profile.main_platforms?.length ? profile.main_platforms : profile.main_platform) },
+    { label: "Eingabe", value: listText(profile.input_devices) },
+    { label: "Abos", value: listText(profile.gaming_subscriptions) },
+    { label: "Lieblingsspiele", value: listText(profile.favorite_games) },
+  ].filter((row) => row.value);
+
+  return (
+    <section className="border border-white/10 bg-[#121212] rounded-sm p-5">
+      <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2">
+        <Gamepad2 className="w-5 h-5 text-[#FFD700]" /> Setup & Games
+      </h2>
+      {setupRows.length ? (
+        <div className="grid md:grid-cols-2 gap-3">
+          {setupRows.map((row) => <InfoValue key={row.label} label={row.label} value={row.value} />)}
+        </div>
+      ) : (
+        <EmptyState text="Keine Setup-Daten freigegeben." />
+      )}
+    </section>
   );
 }
 

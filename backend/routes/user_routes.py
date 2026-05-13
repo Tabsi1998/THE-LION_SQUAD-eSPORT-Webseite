@@ -74,10 +74,33 @@ USER_NULLABLE_FIELDS = {
 }
 
 
+def _visibility_aliases(key: str) -> list[str]:
+    source_key = {
+        "discord": "discord_name",
+        "twitch": "twitch_handle",
+        "youtube": "youtube_handle",
+        "instagram": "instagram_handle",
+        "x": "x_handle",
+        "steam": "steam_id",
+        "epic": "epic_id",
+        "psn": "psn_id",
+        "xbox": "xbox_id",
+        "nintendo": "nintendo_fc",
+        "ea": "ea_id",
+        "riot": "riot_id",
+        "battlenet": "battlenet_id",
+    }.get(key, key)
+    aliases = [key, source_key]
+    if key == "birth_date":
+        aliases += ["birthdate", "birthday"]
+    return list(dict.fromkeys(aliases))
+
+
 def _field_visible(user: dict, key: str, profile_public: bool) -> bool:
     if not profile_public:
         return False
-    visibility = (user.get("profile_visibility") or {}).get(key, "public")
+    visibility_map = user.get("profile_visibility") or {}
+    visibility = next((visibility_map[a] for a in _visibility_aliases(key) if a in visibility_map), "public")
     return visibility == "public"
 
 

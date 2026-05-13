@@ -110,6 +110,14 @@ const ACHIEVEMENT_ACTIONS = {
 };
 const TEAM_ROLE_LABELS = { leader: "Leader", co_leader: "Co-Leader", member: "Mitglied" };
 
+function dateInputValue(value) {
+  if (!value) return "";
+  const raw = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
 function profileToForm(user) {
   return {
     // basic
@@ -118,7 +126,7 @@ function profileToForm(user) {
     last_name: user.last_name || "",
     nickname: user.nickname || "",
     bio: user.bio || "",
-    birth_date: user.birth_date?.slice(0, 10) || "",
+    birth_date: dateInputValue(user.birth_date),
     gender: user.gender || "",
     country: user.country || "",
     city: user.city || "",
