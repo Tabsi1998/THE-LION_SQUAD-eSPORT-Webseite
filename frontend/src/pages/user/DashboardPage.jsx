@@ -1,11 +1,43 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Trophy, Bell, Crown, Gift, Award, UserCheck, AlertTriangle, Medal, Users } from "lucide-react";
+
+function DashboardAvatar({ user, isClubMember }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const avatarUrl = user?.avatar_url ? resolveMediaUrl(user.avatar_url) : "";
+  const label = user?.display_name || user?.username || "Profil";
+  const initials = (label || "TLS").slice(0, 2).toUpperCase();
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [avatarUrl]);
+
+  return (
+    <div
+      className={`w-20 h-20 md:w-24 md:h-24 shrink-0 overflow-hidden border-2 ${
+        isClubMember ? "border-[#FFD700]/70 shadow-[0_0_28px_rgba(255,215,0,0.14)]" : "border-[#29B6E8]/60 shadow-[0_0_28px_rgba(41,182,232,0.12)]"
+      } rounded-sm bg-[#0A0A0A] flex items-center justify-center font-heading font-black text-2xl ${
+        isClubMember ? "text-[#FFD700]" : "text-[#29B6E8]"
+      }`}
+    >
+      {avatarUrl && !imageFailed ? (
+        <img
+          src={avatarUrl}
+          alt={`${label} Profilbild`}
+          className="w-full h-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <span>{initials}</span>
+      )}
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const { user, isClubMember } = useAuth();
@@ -36,9 +68,7 @@ export default function DashboardPage() {
     <PublicLayout>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex items-center gap-4 mb-10">
-          <div className={`w-16 h-16 border ${isClubMember ? "border-[#FFD700]/60" : "border-[#29B6E8]/50"} rounded-sm bg-[#0A0A0A] flex items-center justify-center font-heading font-black text-2xl ${isClubMember ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>
-            {user?.display_name?.[0] || user?.username?.[0] || "L"}
-          </div>
+          <DashboardAvatar user={user} isClubMember={isClubMember} />
           <div>
             <span className={`text-[11px] font-bold uppercase tracking-[0.3em] ${isClubMember ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{isClubMember ? "VEREINSMITGLIED" : "COMMUNITY"}</span>
             <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">{user?.display_name || user?.username}</h1>
