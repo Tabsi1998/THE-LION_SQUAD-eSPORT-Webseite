@@ -53,6 +53,7 @@ export default function ReferencesPage() {
   useDocumentTitle("Referenzen", "Externe Turniere, Ligen und Ergebnisse von THE LION SQUAD eSports.");
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState({});
+  const [filter, setFilter] = useState("all");
 
   const load = useCallback(() => {
     api.get("/references").then(({ data }) => {
@@ -66,18 +67,36 @@ export default function ReferencesPage() {
 
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["references"]);
+  const filteredItems = items.filter((item) => {
+    if (filter === "podium") return item.placement && Number(item.placement) <= 3;
+    if (filter === "active") return item.status === "active" || item.status === "planned";
+    if (filter === "completed") return item.status === "completed" || item.status === "archived";
+    return true;
+  });
 
   return (
     <PublicLayout>
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
-        <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase">Referenzen</h1>
-        <p className="mt-4 text-white/70 max-w-3xl">
-          Externe Turniere, Ligen und Events, bei denen THE LION SQUAD oder Vereinsspieler im Namen des Vereins angetreten sind.
-          Platzierungen, Lineups und Ergebnisquellen sind hier zentral verlinkt.
-        </p>
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_22rem] gap-8 items-end">
+          <div>
+            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
+            <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase">Referenzen</h1>
+            <p className="mt-4 text-white/70 max-w-3xl">
+              Externe Turniere, Ligen und Events, bei denen THE LION SQUAD oder Vereinsspieler im Namen des Vereins angetreten sind.
+              Platzierungen, Lineups und Ergebnisquellen sind hier zentral verlinkt.
+            </p>
+          </div>
+          <div className="border border-[#29B6E8]/25 bg-[#071117] rounded-sm p-4">
+            <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">Aktueller Stand</div>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <MiniStat label="Podest" value={summary.podiums || 0} />
+              <MiniStat label="Laufend" value={summary.active || 0} />
+              <MiniStat label="Spiele" value={summary.games || 0} />
+            </div>
+          </div>
+        </div>
 
-        <div className="mt-10 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
           <Stat label="Teilnahmen" value={summary.total || 0} icon={Trophy} />
           <Stat label="Laufend" value={summary.active || 0} />
           <Stat label="Geplant" value={summary.planned || 0} />
@@ -88,15 +107,26 @@ export default function ReferencesPage() {
           <Stat label="Spiele" value={summary.games || 0} icon={Award} />
         </div>
 
+        <div className="mt-8 flex flex-wrap gap-2">
+          <FilterButton active={filter === "all"} onClick={() => setFilter("all")}>Alle</FilterButton>
+          <FilterButton active={filter === "podium"} onClick={() => setFilter("podium")}>Podest</FilterButton>
+          <FilterButton active={filter === "active"} onClick={() => setFilter("active")}>Laufend/Geplant</FilterButton>
+          <FilterButton active={filter === "completed"} onClick={() => setFilter("completed")}>Abgeschlossen</FilterButton>
+        </div>
+
         {items.length === 0 ? (
           <div className="mt-12 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
             <Medal className="w-10 h-10 mx-auto opacity-40 mb-4" />
             <div className="font-heading font-bold text-lg">Referenzen werden bald ergänzt.</div>
             <div className="text-sm mt-2">Sobald externe Turniere gepflegt sind, erscheinen sie hier.</div>
           </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="mt-8 border border-dashed border-white/15 rounded-sm p-10 text-center text-white/45">
+            Keine Referenzen in diesem Filter.
+          </div>
         ) : (
-          <div className="mt-12 space-y-4">
-            {items.map((item) => <ReferenceCard key={item.id} item={item} />)}
+          <div className="mt-8 grid xl:grid-cols-2 gap-4">
+            {filteredItems.map((item) => <ReferenceCard key={item.id} item={item} />)}
           </div>
         )}
       </section>
@@ -120,32 +150,38 @@ export function ReferenceDetailPage() {
 
   return (
     <PublicLayout>
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Link to="/references" className="text-xs uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">Zurück zu Referenzen</Link>
-        <div className="mt-6 grid lg:grid-cols-[13rem_minmax(0,1fr)] gap-8">
-          <PlacementPanel item={item} large />
+        <div className="mt-6 grid xl:grid-cols-[minmax(0,1fr)_20rem] gap-8 items-start">
           <div className="min-w-0">
             <div className="flex flex-wrap gap-2">
               <Badge className={statusClasses[item.status || "completed"] || statusClasses.completed}>{statusLabels[item.status || "completed"] || item.status}</Badge>
               {item.medal && <Badge className={medalClasses[item.medal] || medalClasses.gold}><Medal className="w-3 h-3" /> {medalLabels[item.medal] || item.medal}</Badge>}
               <Badge>{referenceGameName(item)}</Badge>
             </div>
-            <h1 className="mt-4 font-heading text-4xl md:text-6xl font-black uppercase leading-[0.95] break-words">{item.title}</h1>
+            <h1 className="mt-4 font-heading text-4xl md:text-5xl xl:text-6xl font-black uppercase leading-[0.95] break-words max-w-5xl">{item.title}</h1>
             <p className="mt-4 text-lg text-white/75">
               {item.team_name || "THE LION SQUAD"} · {placementText(item)}
               {item.location ? ` · ${item.location}` : ""}
             </p>
             <MetaGrid item={item} />
-            {item.description && <TextBlock title="Bericht" text={item.description} />}
-            {item.highlights && <TextBlock title="Highlights" text={item.highlights} tone="gold" />}
-            <LineupBlock item={item} />
-            <div className="mt-8 flex flex-wrap gap-2">
+          </div>
+          <aside className="space-y-3 xl:sticky xl:top-24">
+            <PlacementPanel item={item} large />
+            <div className="grid gap-2">
               <RefButton href={item.external_url} label="Turnierseite" />
               <RefButton href={item.bracket_url} label="Bracket" />
               <RefButton href={item.match_url} label="Matchseite" />
               <RefButton href={item.result_url} label="Ergebnis" />
             </div>
+          </aside>
+        </div>
+        <div className="mt-8 grid lg:grid-cols-[minmax(0,1fr)_25rem] gap-6 items-start">
+          <div className="min-w-0">
+            {item.description && <TextBlock title="Bericht" text={item.description} />}
+            {item.highlights && <TextBlock title="Highlights" text={item.highlights} tone="gold" />}
           </div>
+          <LineupBlock item={item} compact />
         </div>
       </section>
     </PublicLayout>
@@ -165,31 +201,52 @@ function Stat({ label, value, icon: Icon, tone }) {
   );
 }
 
+function MiniStat({ label, value }) {
+  return (
+    <div className="border border-white/10 bg-black/25 rounded-sm px-3 py-2">
+      <div className="text-[9px] uppercase tracking-widest text-white/40 font-bold">{label}</div>
+      <div className="font-display text-2xl font-black text-white tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function FilterButton({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-2 border rounded-sm text-xs uppercase tracking-wider font-bold transition ${active ? "border-[#29B6E8] bg-[#29B6E8] text-black" : "border-white/10 text-white/55 hover:text-white hover:border-[#29B6E8]/45"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
 function ReferenceCard({ item }) {
   const status = item.status || "completed";
   const lineup = referenceLineup(item);
   return (
-    <article className="grid lg:grid-cols-[10rem_minmax(0,1fr)_12rem] gap-5 border border-white/10 rounded-sm bg-[#111] p-4 md:p-5 hover:border-[#29B6E8]/35 transition">
+    <article className="h-full grid sm:grid-cols-[6.5rem_minmax(0,1fr)] gap-4 border border-white/10 rounded-sm bg-[#111] p-4 hover:border-[#29B6E8]/35 transition">
       <PlacementPanel item={item} />
-      <div className="min-w-0">
+      <div className="min-w-0 flex flex-col">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge className={statusClasses[status] || statusClasses.completed}>{statusLabels[status] || status}</Badge>
           {item.medal && <Badge className={medalClasses[item.medal] || medalClasses.gold}><Medal className="w-3 h-3" /> {medalLabels[item.medal] || item.medal}</Badge>}
           {item.organizer && <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{item.organizer}</span>}
         </div>
-        <Link to={`/references/${item.id}`} className="block mt-2 font-heading text-2xl md:text-3xl font-black uppercase leading-tight break-words hover:text-[#29B6E8] transition">{item.title}</Link>
-        <p className="mt-2 text-white/70">
+        <Link to={`/references/${item.id}`} className="block mt-2 font-heading text-xl md:text-2xl font-black uppercase leading-tight break-words hover:text-[#29B6E8] transition">{item.title}</Link>
+        <p className="mt-2 text-sm text-white/70">
           {item.team_name || "THE LION SQUAD"} · {placementText(item)}
           {item.location ? ` · ${item.location}` : ""}
         </p>
         {item.description && <p className="mt-3 text-sm text-white/62 leading-relaxed line-clamp-2">{item.description}</p>}
-        {lineup.length > 0 && <LineupInline item={item} />}
-      </div>
-      <div className="flex lg:flex-col gap-2 flex-wrap lg:items-stretch">
-        <Link to={`/references/${item.id}`} className="inline-flex items-center justify-center gap-2 px-3 py-2 border border-[#29B6E8]/45 rounded-sm text-xs uppercase tracking-wider font-bold text-[#29B6E8] hover:bg-[#29B6E8]/10">Details</Link>
-        <RefButton href={item.external_url} label="Turnier" />
-        <RefButton href={item.bracket_url} label="Bracket" />
-        <RefButton href={item.result_url} label="Ergebnis" />
+        {lineup.length > 0 && <LineupInline item={item} compact />}
+        <div className="mt-auto pt-4 flex flex-wrap gap-2">
+          <Link to={`/references/${item.id}`} className="inline-flex items-center justify-center gap-2 px-3 py-2 border border-[#29B6E8]/45 rounded-sm text-xs uppercase tracking-wider font-bold text-[#29B6E8] hover:bg-[#29B6E8]/10">Details</Link>
+          <RefButton href={item.external_url} label="Turnier" />
+          <RefButton href={item.bracket_url} label="Bracket" />
+          <RefButton href={item.result_url} label="Ergebnis" />
+        </div>
       </div>
     </article>
   );
@@ -198,8 +255,8 @@ function ReferenceCard({ item }) {
 function PlacementPanel({ item, large = false }) {
   const medalClass = item.medal ? medalClasses[item.medal] : "border-white/15 bg-white/5 text-white/65";
   return (
-    <div className={`border rounded-sm ${medalClass} ${large ? "p-5" : "p-4"} flex lg:flex-col items-center lg:items-start gap-4`}>
-      <div className={`${large ? "w-24 h-24" : "w-16 h-16"} rounded-sm bg-black/35 border border-current/20 flex items-center justify-center overflow-hidden shrink-0`}>
+    <div className={`border rounded-sm ${medalClass} ${large ? "p-5" : "p-3"} flex ${large ? "xl:flex-col" : "sm:flex-col"} items-center ${large ? "xl:items-start" : "sm:items-start"} gap-3`}>
+      <div className={`${large ? "w-24 h-24" : "w-14 h-14"} rounded-sm bg-black/35 border border-current/20 flex items-center justify-center overflow-hidden shrink-0`}>
         {item.game?.logo_url ? (
           <img src={resolveMediaUrl(item.game.logo_url)} alt="" className="w-full h-full object-contain p-2" />
         ) : item.medal ? (
@@ -210,7 +267,7 @@ function PlacementPanel({ item, large = false }) {
       </div>
       <div>
         <div className="text-[10px] uppercase tracking-widest font-black opacity-80">Platzierung</div>
-        <div className={`${large ? "text-5xl" : "text-4xl"} mt-1 font-display font-black leading-none`}>{placementShort(item)}</div>
+        <div className={`${large ? "text-5xl" : "text-3xl"} mt-1 font-display font-black leading-none`}>{placementShort(item)}</div>
         <div className="mt-2 text-xs text-white/55">{item.participant_count ? `${item.participant_count} Teilnehmer` : item.team_count ? `${item.team_count} Teams` : "Teilnahme"}</div>
         <div className="mt-1 text-xs text-white/45">{formatDate(item.start_date)}</div>
       </div>
@@ -218,20 +275,28 @@ function PlacementPanel({ item, large = false }) {
   );
 }
 
-function LineupInline({ item }) {
+function LineupInline({ item, compact = false }) {
+  const members = item.lineup_members || [];
+  const names = item.lineup || [];
+  const max = compact ? 6 : 99;
+  const visibleMembers = members.slice(0, max);
+  const remainingSlots = Math.max(max - visibleMembers.length, 0);
+  const visibleNames = names.slice(0, remainingSlots);
+  const hidden = members.length + names.length - visibleMembers.length - visibleNames.length;
   return (
     <div className="mt-4 flex flex-wrap gap-2">
-      {(item.lineup_members || []).map((member) => <PlayerChip key={member.profile_id || member.display_name} member={member} />)}
-      {(item.lineup || []).map((name) => <span key={name} className="px-2 py-1 border border-white/10 bg-black/20 text-xs text-white/55 rounded-sm">{name}</span>)}
+      {visibleMembers.map((member) => <PlayerChip key={member.profile_id || member.display_name} member={member} />)}
+      {visibleNames.map((name) => <span key={name} className="px-2 py-1 border border-white/10 bg-black/20 text-xs text-white/55 rounded-sm">{name}</span>)}
+      {hidden > 0 && <span className="px-2 py-1 border border-white/10 bg-black/20 text-xs text-white/45 rounded-sm">+{hidden}</span>}
     </div>
   );
 }
 
-function LineupBlock({ item }) {
+function LineupBlock({ item, compact = false }) {
   const lineup = referenceLineup(item);
   if (!lineup.length) return null;
   return (
-    <div className="mt-8 border border-white/10 bg-[#121212] rounded-sm p-5">
+    <div className={`${compact ? "" : "mt-8"} border border-white/10 bg-[#121212] rounded-sm p-5`}>
       <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><Users className="w-5 h-5 text-[#29B6E8]" /> Lineup</h2>
       <div className="mt-4 flex flex-wrap gap-2">
         {(item.lineup_members || []).map((member) => <PlayerChip key={member.profile_id || member.display_name} member={member} large />)}

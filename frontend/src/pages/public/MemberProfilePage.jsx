@@ -30,7 +30,7 @@ export default function MemberProfilePage() {
 
   return (
     <PublicLayout>
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Vereinsmitglieder", to: "/members" }, { label: profile?.display_name || "Profil" }]} className="mb-6" />
 
         {loading ? (
@@ -47,7 +47,7 @@ export default function MemberProfilePage() {
           <>
             <MemberHero profile={profile} />
 
-            <div className="mt-8 grid lg:grid-cols-[1fr_20rem] gap-8">
+            <div className="mt-8 grid xl:grid-cols-[minmax(0,1fr)_21rem] gap-8 items-start">
               <div className="min-w-0">
                 {profile.bio ? (
                   <RichContent text={profile.bio} />
@@ -55,7 +55,6 @@ export default function MemberProfilePage() {
                   <div className="text-white/45 text-sm">Noch keine Biografie hinterlegt.</div>
                 )}
                 <MemberTwitchEmbed account={profile.linked_account} />
-                <MemberReferences profile={profile} />
               </div>
               <aside className="space-y-4">
                 <InfoPanel title="Profil">
@@ -69,6 +68,7 @@ export default function MemberProfilePage() {
                 </Link>
               </aside>
             </div>
+            <MemberReferences profile={profile} />
           </>
         )}
       </section>
@@ -121,7 +121,7 @@ function MemberReferences({ profile }) {
         <ReferenceStat label="Solo" value={stats.solo || 0} />
         <ReferenceStat label="Team" value={stats.team || 0} />
       </div>
-      <div className="space-y-3">
+      <div className="grid lg:grid-cols-2 gap-3">
         {references.map((item) => <MemberReferenceCard key={item.id} item={item} />)}
       </div>
     </section>
@@ -141,7 +141,7 @@ function MemberReferenceCard({ item }) {
   const members = item.lineup_members || [];
   const otherLineup = (item.lineup || []).filter(Boolean);
   return (
-    <Link to={`/references/${item.id}`} className="block border border-white/10 bg-[#121212] rounded-sm hover:border-[#29B6E8]/55 transition">
+    <Link to={`/references/${item.id}`} className="h-full block border border-white/10 bg-[#121212] rounded-sm hover:border-[#29B6E8]/55 transition">
       <div className="p-4 flex gap-4">
         <div className={`w-16 shrink-0 border rounded-sm flex flex-col items-center justify-center ${referenceTone(item)}`}>
           {item.placement ? (
