@@ -42,11 +42,78 @@ function referenceGameName(item) {
   return item.game_name || gameLabel(item.game) || "Externes Turnier";
 }
 
+function platformLabel(value) {
+  const map = { ALL: "Alle Plattformen", XBO: "Xbox", XBOX: "Xbox", PS: "PlayStation", PC: "PC" };
+  return String(value || "")
+    .split("+")
+    .map((part) => map[part.trim().toUpperCase()] || part.trim())
+    .filter(Boolean)
+    .join(" + ");
+}
+
+function titleParts(item) {
+  let rest = String(item.title || "").trim();
+  const platforms = [];
+  let match = rest.match(/^\[([^\]]+)\]\s*/);
+  while (match) {
+    platforms.push(match[1].trim());
+    rest = rest.slice(match[0].length).trim();
+    match = rest.match(/^\[([^\]]+)\]\s*/);
+  }
+  const segments = rest.split(/\s*\|\s*/).map((part) => part.trim()).filter(Boolean);
+  const chips = platforms.map(platformLabel);
+  if (segments[0]) {
+    const format = segments[0].match(/\b(HC|CORE)\b/i)?.[1]?.toUpperCase();
+    if (format) chips.push(format);
+  }
+  if (segments.length >= 3) {
+    chips.push(segments[1]);
+    return { title: segments.slice(2).join(" | "), platforms, chips };
+  }
+  return { title: rest || item.title, platforms, chips };
+}
+
+function gameKey(item) {
+  return item.game?.id || item.game_id || referenceGameName(item);
+}
+
+function gameTitle(item) {
+  return item.game?.display_name || item.game?.name || referenceGameName(item);
+}
+
+function groupReferences(items) {
+  const games = new Map();
+  items.forEach((item) => {
+    const gKey = gameKey(item);
+    if (!games.has(gKey)) {
+      games.set(gKey, {
+        key: gKey,
+        title: gameTitle(item),
+        logo: item.game?.logo_url,
+        platforms: new Map(),
+      });
+    }
+    const game = games.get(gKey);
+    const platform = titleParts(item).platforms[0] || "all";
+    if (!game.platforms.has(platform)) {
+      game.platforms.set(platform, { key: platform, label: platformLabel(platform), items: [] });
+    }
+    game.platforms.get(platform).items.push(item);
+  });
+  return Array.from(games.values()).map((game) => ({
+    ...game,
+    count: Array.from(game.platforms.values()).reduce((sum, group) => sum + group.items.length, 0),
+    platforms: Array.from(game.platforms.values()),
+  }));
+}
+
 export default function ReferencesPage() {
   useDocumentTitle("Referenzen", "Externe Turniere, Ligen und Ergebnisse von THE LION SQUAD eSports.");
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState({});
   const [filter, setFilter] = useState("all");
+  const [gameFilter, setGameFilter] = useState("all");
+  const [platformFilter, setPlatformFilter] = useState("all");
 
   const load = useCallback(() => {
     api.get("/references").then(({ data }) => {
@@ -65,7 +132,17 @@ export default function ReferencesPage() {
     if (filter === "active") return item.status === "active" || item.status === "planned";
     if (filter === "completed") return item.status === "completed" || item.status === "archived";
     return true;
+  }).filter((item) => {
+    if (gameFilter !== "all" && gameKey(item) !== gameFilter) return false;
+    if (platformFilter !== "all" && (titleParts(item).platforms[0] || "all") !== platformFilter) return false;
+    return true;
   });
+  const gameOptions = groupReferences(items).map((game) => ({ key: game.key, label: game.title, count: game.count }));
+  const platformOptions = Array.from(new Map(items.map((item) => {
+    const platform = titleParts(item).platforms[0] || "all";
+    return [platform, { key: platform, label: platformLabel(platform) }];
+  })).values());
+  const groupedItems = groupReferences(filteredItems);
 
   return (
     <PublicLayout>
@@ -90,11 +167,31 @@ export default function ReferencesPage() {
           <Stat label="Spiele" value={summary.games || 0} icon={Award} />
         </div>
 
-        <div className="mt-8 flex flex-wrap gap-2">
-          <FilterButton active={filter === "all"} onClick={() => setFilter("all")}>Alle</FilterButton>
-          <FilterButton active={filter === "podium"} onClick={() => setFilter("podium")}>Podest</FilterButton>
-          <FilterButton active={filter === "active"} onClick={() => setFilter("active")}>Laufend/Geplant</FilterButton>
-          <FilterButton active={filter === "completed"} onClick={() => setFilter("completed")}>Abgeschlossen</FilterButton>
+        <div className="mt-8 space-y-3">
+          <FilterRow label="Status">
+            <FilterButton active={filter === "all"} onClick={() => setFilter("all")}>Alle</FilterButton>
+            <FilterButton active={filter === "podium"} onClick={() => setFilter("podium")}>Podest</FilterButton>
+            <FilterButton active={filter === "active"} onClick={() => setFilter("active")}>Laufend/Geplant</FilterButton>
+            <FilterButton active={filter === "completed"} onClick={() => setFilter("completed")}>Abgeschlossen</FilterButton>
+          </FilterRow>
+          <FilterRow label="Spiel">
+            <FilterButton active={gameFilter === "all"} onClick={() => setGameFilter("all")}>Alle Spiele</FilterButton>
+            {gameOptions.map((game) => (
+              <FilterButton key={game.key} active={gameFilter === game.key} onClick={() => setGameFilter(game.key)}>
+                {game.label} ({game.count})
+              </FilterButton>
+            ))}
+          </FilterRow>
+          {platformOptions.length > 1 && (
+            <FilterRow label="Plattform">
+              <FilterButton active={platformFilter === "all"} onClick={() => setPlatformFilter("all")}>Alle Plattformen</FilterButton>
+              {platformOptions.map((platform) => (
+                <FilterButton key={platform.key} active={platformFilter === platform.key} onClick={() => setPlatformFilter(platform.key)}>
+                  {platform.label}
+                </FilterButton>
+              ))}
+            </FilterRow>
+          )}
         </div>
 
         {items.length === 0 ? (
@@ -108,8 +205,8 @@ export default function ReferencesPage() {
             Keine Referenzen in diesem Filter.
           </div>
         ) : (
-          <div className="mt-8 grid xl:grid-cols-2 gap-4">
-            {filteredItems.map((item) => <ReferenceCard key={item.id} item={item} />)}
+          <div className="mt-8 space-y-8">
+            {groupedItems.map((game) => <ReferenceGameGroup key={game.key} group={game} />)}
           </div>
         )}
       </section>
@@ -141,7 +238,8 @@ export function ReferenceDetailPage() {
               <Badge className={statusClasses[item.status || "completed"] || statusClasses.completed}>{statusLabels[item.status || "completed"] || item.status}</Badge>
               <Badge>{referenceGameName(item)}</Badge>
             </div>
-            <h1 className="mt-4 font-heading text-4xl md:text-5xl xl:text-6xl font-black uppercase leading-[0.95] break-words max-w-5xl">{item.title}</h1>
+            <TitleChips item={item} className="mt-4" />
+            <h1 className="mt-3 font-heading text-4xl md:text-5xl xl:text-6xl font-black uppercase leading-[0.95] break-words max-w-5xl">{titleParts(item).title}</h1>
             <p className="mt-4 text-lg text-white/75">
               {item.team_name || "THE LION SQUAD"}
               {item.location ? ` · ${item.location}` : ""}
@@ -183,6 +281,15 @@ function Stat({ label, value, icon: Icon, tone }) {
   );
 }
 
+function FilterRow({ label, children }) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+      <div className="w-24 shrink-0 text-[10px] uppercase tracking-widest text-white/35 font-bold">{label}</div>
+      <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
 function FilterButton({ active, onClick, children }) {
   return (
     <button
@@ -195,9 +302,50 @@ function FilterButton({ active, onClick, children }) {
   );
 }
 
+function ReferenceGameGroup({ group }) {
+  return (
+    <section>
+      <div className="mb-3 flex items-center gap-3">
+        <div className="w-11 h-11 border border-white/10 bg-black rounded-sm flex items-center justify-center overflow-hidden">
+          {group.logo ? <img src={resolveMediaUrl(group.logo)} alt="" className="w-full h-full object-contain p-1.5" /> : <Trophy className="w-5 h-5 text-[#29B6E8]" />}
+        </div>
+        <div className="min-w-0">
+          <h2 className="font-heading text-2xl font-black uppercase leading-tight truncate">{group.title}</h2>
+          <div className="text-xs text-white/40">{group.count} Referenzen</div>
+        </div>
+      </div>
+      <div className="space-y-5">
+        {group.platforms.map((platform) => (
+          <div key={platform.key}>
+            {group.platforms.length > 1 && (
+              <div className="mb-2 text-[10px] uppercase tracking-widest text-white/40 font-bold">{platform.label}</div>
+            )}
+            <div className="grid xl:grid-cols-2 gap-4">
+              {platform.items.map((item) => <ReferenceCard key={item.id} item={item} />)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TitleChips({ item, className = "" }) {
+  const chips = titleParts(item).chips.filter(Boolean);
+  if (!chips.length) return null;
+  return (
+    <div className={`${className} flex flex-wrap gap-1.5`}>
+      {chips.map((chip) => (
+        <span key={chip} className="px-2 py-1 border border-white/10 bg-white/[0.03] rounded-sm text-[10px] uppercase tracking-widest text-white/50 font-bold">{chip}</span>
+      ))}
+    </div>
+  );
+}
+
 function ReferenceCard({ item }) {
   const status = item.status || "completed";
   const lineup = referenceLineup(item);
+  const parts = titleParts(item);
   return (
     <article className="h-full grid sm:grid-cols-[6.5rem_minmax(0,1fr)] gap-4 border border-white/10 rounded-sm bg-[#111] p-4 hover:border-[#29B6E8]/35 transition">
       <PlacementPanel item={item} />
@@ -206,7 +354,8 @@ function ReferenceCard({ item }) {
           <Badge className={statusClasses[status] || statusClasses.completed}>{statusLabels[status] || status}</Badge>
           {item.organizer && <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{item.organizer}</span>}
         </div>
-        <Link to={`/references/${item.id}`} className="block mt-2 font-heading text-xl md:text-2xl font-black uppercase leading-tight break-words hover:text-[#29B6E8] transition">{item.title}</Link>
+        <TitleChips item={item} className="mt-2" />
+        <Link to={`/references/${item.id}`} className="block mt-2 font-heading text-xl md:text-2xl font-black uppercase leading-tight break-words hover:text-[#29B6E8] transition">{parts.title}</Link>
         <p className="mt-2 text-sm text-white/70">
           {item.team_name || "THE LION SQUAD"}
           {item.location ? ` · ${item.location}` : ""}
