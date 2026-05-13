@@ -83,12 +83,6 @@ function formatDate(value) {
   return date.toLocaleDateString("de-DE", { dateStyle: "medium" });
 }
 
-function referencePlacementText(item) {
-  if (item.placement_label) return item.placement_label;
-  if (!item.placement) return "Teilnahme";
-  return `Platz ${item.placement}${item.participant_count ? ` von ${item.participant_count}` : ""}`;
-}
-
 function referenceTone(item) {
   if (item.medal === "gold") return "border-[#FFD700]/45 bg-[#FFD700]/10 text-[#FFD700]";
   if (item.medal === "silver") return "border-white/30 bg-white/10 text-white";
@@ -171,7 +165,6 @@ function MemberReferenceCard({ item }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`inline-flex px-2 py-1 border rounded-sm text-[10px] uppercase tracking-widest font-bold ${referenceTone(item)}`}>{referencePlacementText(item)}</span>
             <span className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{gameLabel(item.game) || item.game_name || "Extern"}</span>
             {formatDate(item.start_date) && <span className="text-[10px] uppercase tracking-widest text-white/35">{formatDate(item.start_date)}</span>}
           </div>

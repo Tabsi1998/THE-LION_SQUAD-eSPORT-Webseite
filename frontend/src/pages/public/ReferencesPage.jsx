@@ -12,7 +12,6 @@ const medalClasses = {
   silver: "border-white/35 bg-white/10 text-white",
   bronze: "border-[#CD7F32]/50 bg-[#CD7F32]/12 text-[#CD7F32]",
 };
-const medalLabels = { gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const modeLabels = { online: "Online", offline: "Vor Ort", hybrid: "Hybrid" };
 const statusLabels = { active: "Laufend", planned: "Geplant", completed: "Abgeschlossen", archived: "Archiviert" };
 const statusClasses = {
@@ -27,12 +26,6 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleDateString("de-DE", { dateStyle: "medium" });
-}
-
-function placementText(item) {
-  if (item.placement_label) return item.placement_label;
-  if (!item.placement) return "Teilnahme";
-  return `Platz ${item.placement}${item.participant_count ? ` von ${item.participant_count}` : ""}`;
 }
 
 function placementShort(item) {
@@ -146,12 +139,11 @@ export function ReferenceDetailPage() {
           <div className="min-w-0">
             <div className="flex flex-wrap gap-2">
               <Badge className={statusClasses[item.status || "completed"] || statusClasses.completed}>{statusLabels[item.status || "completed"] || item.status}</Badge>
-              {item.medal && <Badge className={medalClasses[item.medal] || medalClasses.gold}><Medal className="w-3 h-3" /> {medalLabels[item.medal] || item.medal}</Badge>}
               <Badge>{referenceGameName(item)}</Badge>
             </div>
             <h1 className="mt-4 font-heading text-4xl md:text-5xl xl:text-6xl font-black uppercase leading-[0.95] break-words max-w-5xl">{item.title}</h1>
             <p className="mt-4 text-lg text-white/75">
-              {item.team_name || "THE LION SQUAD"} · {placementText(item)}
+              {item.team_name || "THE LION SQUAD"}
               {item.location ? ` · ${item.location}` : ""}
             </p>
             <MetaGrid item={item} />
@@ -212,12 +204,11 @@ function ReferenceCard({ item }) {
       <div className="min-w-0 flex flex-col">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge className={statusClasses[status] || statusClasses.completed}>{statusLabels[status] || status}</Badge>
-          {item.medal && <Badge className={medalClasses[item.medal] || medalClasses.gold}><Medal className="w-3 h-3" /> {medalLabels[item.medal] || item.medal}</Badge>}
           {item.organizer && <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{item.organizer}</span>}
         </div>
         <Link to={`/references/${item.id}`} className="block mt-2 font-heading text-xl md:text-2xl font-black uppercase leading-tight break-words hover:text-[#29B6E8] transition">{item.title}</Link>
         <p className="mt-2 text-sm text-white/70">
-          {item.team_name || "THE LION SQUAD"} · {placementText(item)}
+          {item.team_name || "THE LION SQUAD"}
           {item.location ? ` · ${item.location}` : ""}
         </p>
         {item.description && <p className="mt-3 text-sm text-white/62 leading-relaxed line-clamp-2">{item.description}</p>}
