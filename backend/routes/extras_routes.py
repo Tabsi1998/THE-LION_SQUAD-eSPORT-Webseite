@@ -102,6 +102,59 @@ class NewsletterTriggerBody(BaseModel):
     force: bool = False
 
 
+BannerTone = Literal["info", "live", "warning", "success"]
+BannerMode = Literal["ticker", "static"]
+BannerStyle = Literal["neon", "solid", "minimal"]
+BannerPosition = Literal["below_nav", "bottom_fixed", "above_footer"]
+BannerScope = Literal["all", "tournaments", "events", "news", "community", "servers", "members", "custom"]
+BannerAudience = Literal["all", "logged_in", "members", "admins"]
+BannerTemplate = Literal["custom", "live", "maintenance", "event", "registration", "discord"]
+
+
+class SiteBannerPayload(BaseModel):
+    title: Optional[str] = None
+    text: str
+    enabled: bool = True
+    priority: int = 50
+    tone: BannerTone = "info"
+    mode: BannerMode = "ticker"
+    speed_seconds: int = 22
+    style: BannerStyle = "neon"
+    position: BannerPosition = "below_nav"
+    scope: BannerScope = "all"
+    path: Optional[str] = None
+    audience: BannerAudience = "all"
+    link_url: Optional[str] = None
+    link_label: Optional[str] = None
+    starts_at: Optional[str] = None
+    ends_at: Optional[str] = None
+    template: BannerTemplate = "custom"
+
+
+class SiteBannerPatch(BaseModel):
+    title: Optional[str] = None
+    text: Optional[str] = None
+    enabled: Optional[bool] = None
+    priority: Optional[int] = None
+    tone: Optional[BannerTone] = None
+    mode: Optional[BannerMode] = None
+    speed_seconds: Optional[int] = None
+    style: Optional[BannerStyle] = None
+    position: Optional[BannerPosition] = None
+    scope: Optional[BannerScope] = None
+    path: Optional[str] = None
+    audience: Optional[BannerAudience] = None
+    link_url: Optional[str] = None
+    link_label: Optional[str] = None
+    starts_at: Optional[str] = None
+    ends_at: Optional[str] = None
+    template: Optional[BannerTemplate] = None
+
+
+class SiteBannerStatBody(BaseModel):
+    banner_id: str
+
+
 async def _newsletter_source(kind: str, source_id: str) -> dict:
     db = get_db()
     if kind == "news":
@@ -215,6 +268,188 @@ def _banner_user_can_see(branding: dict, user: dict | None) -> bool:
     return False
 
 
+def _normalize_banner_link(value: str | None) -> str:
+    link_url = str(value or "").strip()
+    if link_url and not link_url.startswith(("http://", "https://", "/")):
+        link_url = "https://" + link_url
+    return link_url
+
+
+def _banner_active(doc: dict, user: dict | None) -> bool:
+    if not doc.get("enabled", True):
+        return False
+    if not str(doc.get("text") or "").strip():
+        return False
+    now = now_utc()
+    starts_at = _parse_public_dt(doc.get("starts_at"))
+    ends_at = _parse_public_dt(doc.get("ends_at"))
+    if starts_at and starts_at > now:
+        return False
+    if ends_at and ends_at < now:
+        return False
+    audience = doc.get("audience") or "all"
+    admin_roles = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+    if audience == "all":
+        return True
+    if audience == "logged_in":
+        return bool(user)
+    if audience == "members":
+        return bool(user and (user.get("is_club_member") or user.get("role") in admin_roles))
+    if audience == "admins":
+        return bool(user and user.get("role") in admin_roles)
+    return False
+
+
+def _public_banner_doc(doc: dict, stats: dict | None = None) -> dict:
+    return {
+        "id": doc.get("id"),
+        "enabled": bool(doc.get("enabled", True)),
+        "title": doc.get("title") or "",
+        "text": str(doc.get("text") or "").strip(),
+        "tone": doc.get("tone") or "info",
+        "mode": doc.get("mode") or "ticker",
+        "speed_seconds": max(8, min(90, int(doc.get("speed_seconds") or 22))),
+        "style": doc.get("style") or "neon",
+        "position": doc.get("position") or "below_nav",
+        "scope": doc.get("scope") or "all",
+        "path": str(doc.get("path") or "").strip(),
+        "audience": doc.get("audience") or "all",
+        "link_url": _normalize_banner_link(doc.get("link_url")),
+        "link_label": str(doc.get("link_label") or "").strip(),
+        "priority": int(doc.get("priority") or 0),
+        "template": doc.get("template") or "custom",
+        "source": doc.get("source") or "manual",
+        "stats": {
+            "impressions": int((stats or {}).get("impressions") or doc.get("impressions") or 0),
+            "clicks": int((stats or {}).get("clicks") or doc.get("clicks") or 0),
+        },
+    }
+
+
+def _legacy_branding_banner(branding: dict) -> dict | None:
+    if not branding.get("site_banner_enabled") or not str(branding.get("site_banner_text") or "").strip():
+        return None
+    return {
+        "id": "legacy-branding-banner",
+        "enabled": True,
+        "title": "Branding Hinweisleiste",
+        "text": branding.get("site_banner_text"),
+        "tone": branding.get("site_banner_tone") or "info",
+        "mode": branding.get("site_banner_mode") or "ticker",
+        "speed_seconds": branding.get("site_banner_speed_seconds") or 22,
+        "style": branding.get("site_banner_style") or "neon",
+        "position": branding.get("site_banner_position") or "below_nav",
+        "scope": branding.get("site_banner_scope") or "all",
+        "path": branding.get("site_banner_path") or "",
+        "audience": branding.get("site_banner_audience") or "all",
+        "link_url": branding.get("site_banner_link_url") or "",
+        "link_label": branding.get("site_banner_link_label") or "",
+        "starts_at": branding.get("site_banner_starts_at"),
+        "ends_at": branding.get("site_banner_ends_at"),
+        "priority": 40,
+        "template": "custom",
+        "source": "legacy",
+    }
+
+
+def _parse_dt_any(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    return _parse_public_dt(str(value))
+
+
+async def _auto_site_banners(db) -> list[dict]:
+    now = now_utc()
+    items: list[dict] = []
+    live = await db.live_streams.find({}, {"_id": 0}).sort("viewer_count", -1).to_list(3)
+    for stream in live:
+        name = stream.get("display_name") or stream.get("username") or stream.get("twitch_login") or "Stream"
+        items.append({
+            "id": f"auto-stream-{stream.get('stream_id') or stream.get('twitch_login')}",
+            "source": "auto",
+            "template": "live",
+            "enabled": True,
+            "priority": 90,
+            "text": f"{name} ist live: {stream.get('title') or 'Live-Stream'}",
+            "tone": "live",
+            "mode": "ticker",
+            "speed_seconds": 22,
+            "style": "solid",
+            "position": "below_nav",
+            "scope": "all",
+            "audience": "all",
+            "link_url": stream.get("stream_url") or "",
+            "link_label": "Stream öffnen",
+        })
+
+    servers = await db.game_servers.find(
+        {"status": "maintenance", "is_active": {"$ne": False}},
+        {"_id": 0, "id": 1, "name": 1, "maintenance_note": 1, "maintenance_until": 1, "visibility": 1},
+    ).sort("sort_order", 1).to_list(3)
+    for server in servers:
+        until = server.get("maintenance_until")
+        text = f"{server.get('name') or 'Server'} ist in Wartung"
+        if server.get("maintenance_note"):
+            text += f": {server['maintenance_note']}"
+        if until:
+            text += f" · bis {until}"
+        items.append({
+            "id": f"auto-server-maintenance-{server.get('id')}",
+            "source": "auto",
+            "template": "maintenance",
+            "enabled": True,
+            "priority": 80,
+            "text": text,
+            "tone": "warning",
+            "mode": "ticker",
+            "speed_seconds": 24,
+            "style": "minimal",
+            "position": "below_nav",
+            "scope": "servers",
+            "audience": "members" if server.get("visibility") == "members" else "logged_in" if server.get("visibility") == "community" else "all",
+            "link_url": "/servers",
+            "link_label": "Server ansehen",
+        })
+
+    tournaments = await db.tournaments.find(
+        {"status": {"$in": ["registration_open", "check_in", "scheduled", "registration_closed"]}, "is_public": {"$ne": False}},
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1},
+    ).sort("start_date", 1).to_list(10)
+    for t in tournaments:
+        start_dt = _parse_dt_any(t.get("start_date"))
+        if t.get("status") == "check_in":
+            text = f"Check-in offen: {t.get('title') or 'Turnier'}"
+            template, tone, priority = "registration", "warning", 85
+        elif t.get("status") == "registration_open":
+            text = f"Anmeldung offen: {t.get('title') or 'Turnier'}"
+            template, tone, priority = "registration", "success", 75
+        elif start_dt and now <= start_dt and (start_dt - now).total_seconds() <= 24 * 3600:
+            text = f"Turnier startet bald: {t.get('title') or 'Turnier'}"
+            template, tone, priority = "event", "info", 70
+        else:
+            continue
+        items.append({
+            "id": f"auto-tournament-{template}-{t.get('id')}",
+            "source": "auto",
+            "template": template,
+            "enabled": True,
+            "priority": priority,
+            "text": text,
+            "tone": tone,
+            "mode": "ticker",
+            "speed_seconds": 24,
+            "style": "neon",
+            "position": "below_nav",
+            "scope": "tournaments",
+            "audience": "all",
+            "link_url": f"/tournaments/{t.get('slug') or t.get('id')}",
+            "link_label": "Zum Turnier",
+        })
+    return items
+
+
 @settings_router.get("/public")
 async def public_settings(response: Response):
     """Public-safe settings for branding on public pages."""
@@ -281,27 +516,103 @@ async def public_settings(response: Response):
 @settings_router.get("/site-banner")
 async def get_site_banner(response: Response, me: dict | None = Depends(get_optional_user)):
     response.headers["Cache-Control"] = "no-store"
-    db = get_db()
-    b = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
-    if not _banner_user_can_see(b, me):
+    data = await list_site_banners(response, me)
+    first = (data.get("items") or [None])[0]
+    if not first:
         return {"enabled": False}
-    link_url = str(b.get("site_banner_link_url") or "").strip()
-    if link_url and not link_url.startswith(("http://", "https://", "/")):
-        link_url = "https://" + link_url
-    return {
-        "enabled": True,
-        "text": str(b.get("site_banner_text") or "").strip(),
-        "tone": b.get("site_banner_tone") or "info",
-        "mode": b.get("site_banner_mode") or "ticker",
-        "speed_seconds": max(8, min(90, int(b.get("site_banner_speed_seconds") or 22))),
-        "style": b.get("site_banner_style") or "neon",
-        "position": b.get("site_banner_position") or "below_nav",
-        "scope": b.get("site_banner_scope") or "all",
-        "path": str(b.get("site_banner_path") or "").strip(),
-        "link_url": link_url,
-        "link_label": str(b.get("site_banner_link_label") or "").strip(),
-        "audience": b.get("site_banner_audience") or "all",
+    return first
+
+
+@settings_router.get("/site-banners")
+async def list_site_banners(response: Response, me: dict | None = Depends(get_optional_user)):
+    response.headers["Cache-Control"] = "no-store"
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
+    manual = await db.site_banners.find({}, {"_id": 0}).sort([("priority", -1), ("updated_at", -1)]).to_list(100)
+    legacy = _legacy_branding_banner(branding)
+    all_docs = manual + ([legacy] if legacy else []) + await _auto_site_banners(db)
+    active = [doc for doc in all_docs if _banner_active(doc, me)]
+    stats_rows = await db.site_banner_stats.find({"id": {"$in": [doc["id"] for doc in active if doc.get("id")]}}, {"_id": 0}).to_list(200)
+    stats = {row["id"]: row for row in stats_rows}
+    items = [_public_banner_doc(doc, stats.get(doc.get("id"))) for doc in active]
+    items.sort(key=lambda row: (int(row.get("priority") or 0), row.get("id") or ""), reverse=True)
+    return {"items": items[:8]}
+
+
+@settings_router.get("/site-banners/admin")
+async def admin_site_banners(me: dict = Depends(require_admin())):
+    db = get_db()
+    rows = await db.site_banners.find({}, {"_id": 0}).sort([("priority", -1), ("updated_at", -1)]).to_list(200)
+    stats_rows = await db.site_banner_stats.find({"id": {"$in": [row["id"] for row in rows if row.get("id")]}}, {"_id": 0}).to_list(200)
+    stats = {row["id"]: row for row in stats_rows}
+    return [_public_banner_doc(row, stats.get(row.get("id"))) | {
+        "starts_at": row.get("starts_at") or "",
+        "ends_at": row.get("ends_at") or "",
+    } for row in rows]
+
+
+@settings_router.post("/site-banners/admin")
+async def create_site_banner(body: SiteBannerPayload, me: dict = Depends(require_admin())):
+    db = get_db()
+    now = now_utc().isoformat()
+    doc = {
+        **body.model_dump(),
+        "id": new_id(),
+        "created_at": now,
+        "updated_at": now,
+        "created_by": me["id"],
+        "source": "manual",
     }
+    await db.site_banners.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@settings_router.patch("/site-banners/admin/{banner_id}")
+@settings_router.put("/site-banners/admin/{banner_id}")
+async def update_site_banner(banner_id: str, body: SiteBannerPatch, me: dict = Depends(require_admin())):
+    db = get_db()
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    if not updates:
+        raise HTTPException(400, "Keine Änderungen.")
+    updates["updated_at"] = now_utc().isoformat()
+    res = await db.site_banners.update_one({"id": banner_id}, {"$set": updates})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Banner nicht gefunden.")
+    return await db.site_banners.find_one({"id": banner_id}, {"_id": 0})
+
+
+@settings_router.delete("/site-banners/admin/{banner_id}")
+async def delete_site_banner(banner_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    res = await db.site_banners.delete_one({"id": banner_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Banner nicht gefunden.")
+    return {"ok": True}
+
+
+@settings_router.post("/site-banners/impression")
+async def track_site_banner_impression(body: SiteBannerStatBody):
+    db = get_db()
+    now = now_utc().isoformat()
+    await db.site_banner_stats.update_one(
+        {"id": body.banner_id},
+        {"$inc": {"impressions": 1}, "$set": {"last_impression_at": now}, "$setOnInsert": {"id": body.banner_id}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+@settings_router.post("/site-banners/click")
+async def track_site_banner_click(body: SiteBannerStatBody):
+    db = get_db()
+    now = now_utc().isoformat()
+    await db.site_banner_stats.update_one(
+        {"id": body.banner_id},
+        {"$inc": {"clicks": 1}, "$set": {"last_click_at": now}, "$setOnInsert": {"id": body.banner_id}},
+        upsert=True,
+    )
+    return {"ok": True}
 
 
 @settings_router.get("/email")

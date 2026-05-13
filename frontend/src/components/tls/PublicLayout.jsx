@@ -9,14 +9,14 @@ import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Menu, X, User, LogOut, Shield, Crown, Megaphone } from "lucide-react";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 
 export function PublicLayout({ children }) {
   const { user, logout, isAdmin, isClubMember } = useAuth();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [branding, setBranding] = useState(getCachedBranding());
-  const [siteBanner, setSiteBanner] = useState(null);
+  const [siteBanners, setSiteBanners] = useState([]);
   const loadBranding = useCallback(async () => {
     try {
       const { data } = await api.get("/settings/public");
@@ -26,10 +26,10 @@ export function PublicLayout({ children }) {
   }, []);
   const loadSiteBanner = useCallback(async () => {
     try {
-      const { data } = await api.get("/settings/site-banner");
-      setSiteBanner(data?.enabled ? data : null);
+      const { data } = await api.get("/settings/site-banners");
+      setSiteBanners(Array.isArray(data?.items) ? data.items : []);
     } catch {
-      setSiteBanner(null);
+      setSiteBanners([]);
     }
   }, []);
 
@@ -160,10 +160,10 @@ export function PublicLayout({ children }) {
           </div>
         )}
       </header>
-      <SiteBanner banner={siteBanner} pathname={location.pathname} slot="below_nav" />
+      <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="below_nav" />
       <main className="flex-1 min-w-0 max-w-full overflow-x-clip">{children}</main>
-      <SiteBanner banner={siteBanner} pathname={location.pathname} slot="above_footer" />
-      <SiteBanner banner={siteBanner} pathname={location.pathname} slot="bottom_fixed" />
+      <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="above_footer" />
+      <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="bottom_fixed" />
       <footer className="border-t border-white/10 bg-[#0A0A0A] mt-24 min-w-0 max-w-full overflow-x-clip">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           {/* Reihe 1 — Brand + 4 Link-Spalten */}
@@ -278,11 +278,30 @@ function bannerMatchesPath(banner, pathname) {
   return false;
 }
 
+function SiteBannerSlot({ banners, pathname, slot }) {
+  const visible = useMemo(
+    () => (banners || []).filter((banner) => (banner.position || "below_nav") === slot && bannerMatchesPath(banner, pathname)).slice(0, slot === "bottom_fixed" ? 1 : 3),
+    [banners, pathname, slot],
+  );
+  useEffect(() => {
+    visible.forEach((banner) => {
+      const key = `tls-banner-seen:${banner.id}`;
+      if (!banner.id || sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+      api.post("/settings/site-banners/impression", { banner_id: banner.id }).catch(() => {});
+    });
+  }, [visible]);
+  if (!visible.length) return null;
+  return (
+    <div className={slot === "bottom_fixed" ? "" : "space-y-0"}>
+      {visible.map((banner) => <SiteBanner key={banner.id || banner.text} banner={banner} />)}
+    </div>
+  );
+}
+
 function SiteBanner({ banner, pathname, slot }) {
   if (!banner?.enabled || !banner?.text) return null;
   const position = banner.position || "below_nav";
-  if (position !== slot) return null;
-  if (!bannerMatchesPath(banner, pathname)) return null;
   const tone = banner.tone || "info";
   const style = banner.style || "neon";
   const isTicker = (banner.mode || "ticker") === "ticker";
@@ -292,10 +311,13 @@ function SiteBanner({ banner, pathname, slot }) {
   const speed = Math.max(8, Math.min(90, Number(banner.speed_seconds || 22)));
   const linkUrl = String(banner.link_url || "");
   const linkLabel = banner.link_label || "Mehr";
+  const trackClick = () => {
+    if (banner.id) api.post("/settings/site-banners/click", { banner_id: banner.id }).catch(() => {});
+  };
   const link = linkUrl
     ? /^https?:\/\//i.test(linkUrl)
-      ? <a href={linkUrl} target="_blank" rel="noreferrer" className="tls-site-banner__link">{linkLabel}</a>
-      : <Link to={linkUrl} className="tls-site-banner__link">{linkLabel}</Link>
+      ? <a href={linkUrl} target="_blank" rel="noreferrer" onClick={trackClick} className="tls-site-banner__link">{linkLabel}</a>
+      : <Link to={linkUrl} onClick={trackClick} className="tls-site-banner__link">{linkLabel}</Link>
     : null;
   return (
     <div className={`tls-site-banner tls-site-banner--${tone} tls-site-banner--${style} tls-site-banner--pos-${position}`} style={{ "--tls-marquee-duration": `${speed}s` }}>

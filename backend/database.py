@@ -109,6 +109,9 @@ async def init_indexes():
     await db.refresh_tokens.create_index("expires_at", expireAfterSeconds=0)
     # Phase 2/3 collections
     await db.settings.create_index("id", unique=True)
+    await db.site_banners.create_index("id", unique=True)
+    await db.site_banners.create_index([("enabled", 1), ("priority", -1), ("updated_at", -1)])
+    await db.site_banner_stats.create_index("id", unique=True)
     await db.email_logs.create_index("created_at")
     await db.seasons.create_index("id", unique=True)
     await db.seasons.create_index("slug", unique=True)

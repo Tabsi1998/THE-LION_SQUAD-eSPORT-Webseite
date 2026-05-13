@@ -6,7 +6,7 @@ import { ImageUpload, useImageUploadBusy } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye, Search } from "lucide-react";
+import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye, Search, Plus } from "lucide-react";
 
 const MAIL_TEMPLATE_LABELS = {
   user_invite: "Einladungsmail",
@@ -40,6 +40,37 @@ const STATUS_LABELS = {
   failed: "fehlgeschlagen",
   skipped: "übersprungen",
 };
+
+const BANNER_TEMPLATE_PRESETS = {
+  custom: { title: "Eigener Hinweis", text: "", tone: "info", style: "neon", link_label: "Mehr", scope: "all" },
+  live: { title: "Live-Hinweis", text: "Wir sind live - schau jetzt im Stream vorbei.", tone: "live", style: "solid", link_label: "Stream öffnen", scope: "all" },
+  maintenance: { title: "Wartung", text: "Wartung aktiv - einzelne Funktionen können kurzzeitig nicht verfügbar sein.", tone: "warning", style: "minimal", link_label: "Status", scope: "all" },
+  event: { title: "Event", text: "Nächstes Event steht bevor - sichere dir deinen Platz.", tone: "info", style: "neon", link_label: "Event ansehen", scope: "events" },
+  registration: { title: "Anmeldung offen", text: "Anmeldung ist geöffnet - jetzt teilnehmen.", tone: "success", style: "solid", link_label: "Anmelden", scope: "tournaments" },
+  discord: { title: "Discord", text: "Komm auf unseren Discord und bleib in der Community am Ball.", tone: "info", style: "minimal", link_label: "Discord öffnen", scope: "community" },
+};
+
+function emptyBannerForm() {
+  return {
+    title: "",
+    text: "",
+    enabled: true,
+    priority: 50,
+    tone: "info",
+    mode: "ticker",
+    speed_seconds: 22,
+    style: "neon",
+    position: "below_nav",
+    scope: "all",
+    path: "",
+    audience: "all",
+    link_url: "",
+    link_label: "",
+    starts_at: "",
+    ends_at: "",
+    template: "custom",
+  };
+}
 
 function toDateTimeInput(value) {
   if (!value) return "";
@@ -99,6 +130,10 @@ export default function AdminSettingsPage() {
   const [logs, setLogs] = useState([]);
   const [systemStatus, setSystemStatus] = useState(null);
   const [twitchStatus, setTwitchStatus] = useState(null);
+  const [siteBanners, setSiteBanners] = useState([]);
+  const [bannerForm, setBannerForm] = useState(emptyBannerForm());
+  const [editingBannerId, setEditingBannerId] = useState("");
+  const [savingBanner, setSavingBanner] = useState(false);
   const [savingEmail, setSavingEmail] = useState(false);
   const [savingSmtp, setSavingSmtp] = useState(false);
   const [savingBrand, setSavingBrand] = useState(false);
@@ -125,11 +160,12 @@ export default function AdminSettingsPage() {
       { key: "system", label: "Systemstatus", critical: false, request: () => api.get("/admin/system-status") },
       { key: "twitch", label: "Twitch-Status", critical: false, request: () => api.get("/admin/streams/status") },
       { key: "discord_counters", label: "Discord-Zähler", critical: false, request: () => api.get("/admin/discord/counters?limit=50") },
+      { key: "site_banners", label: "Hinweisleisten", critical: false, request: () => api.get("/settings/site-banners/admin") },
     ];
     const requests = await Promise.allSettled(requestDefs.map((entry) => entry.request()));
     if (seq !== loadSeqRef.current) return;
     const value = (i) => requests[i].status === "fulfilled" ? requests[i].value.data : null;
-    const e = value(0), b = value(1), d = value(2), l = value(3), sm = value(4), q = value(5), qs = value(6), st = value(7), tw = value(8), dc = value(9);
+    const e = value(0), b = value(1), d = value(2), l = value(3), sm = value(4), q = value(5), qs = value(6), st = value(7), tw = value(8), dc = value(9), sb = value(10);
     if (e) setEmail((prev) => ({ ...prev, ...e, resend_api_key: "" }));
     if (b && !brandDirtyRef.current) setBrand((prev) => ({ ...prev, ...b }));
     if (d && !discordDirtyRef.current) setDiscord((prev) => ({ ...prev, ...d, webhook_url: "" }));
@@ -140,6 +176,7 @@ export default function AdminSettingsPage() {
     if (st) setSystemStatus(st);
     if (tw) setTwitchStatus(tw);
     if (dc) setDiscordCounters(dc);
+    if (sb) setSiteBanners(Array.isArray(sb) ? sb : []);
     const failed = requests
       .map((result, index) => ({ result, def: requestDefs[index] }))
       .filter(({ result }) => result.status === "rejected");
@@ -250,6 +287,60 @@ export default function AdminSettingsPage() {
     }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
     finally { setSavingBrand(false); }
+  };
+  const setBannerField = (key, value) => setBannerForm((prev) => ({ ...prev, [key]: value }));
+  const applyBannerTemplate = (template) => {
+    const preset = BANNER_TEMPLATE_PRESETS[template] || BANNER_TEMPLATE_PRESETS.custom;
+    setBannerForm((prev) => ({ ...prev, ...preset, template }));
+  };
+  const editBanner = (banner) => {
+    setEditingBannerId(banner.id);
+    setBannerForm({
+      ...emptyBannerForm(),
+      ...banner,
+      starts_at: banner.starts_at || "",
+      ends_at: banner.ends_at || "",
+    });
+  };
+  const resetBannerForm = () => {
+    setEditingBannerId("");
+    setBannerForm(emptyBannerForm());
+  };
+  const saveSiteBanner = async () => {
+    if (savingBanner) return;
+    if (!String(bannerForm.text || "").trim()) return toast.error("Banner-Text fehlt.");
+    const payload = { ...bannerForm };
+    setSavingBanner(true);
+    try {
+      if (editingBannerId) {
+        await api.patch(`/settings/site-banners/admin/${editingBannerId}`, payload);
+        toast.success("Hinweisleiste gespeichert.");
+      } else {
+        await api.post("/settings/site-banners/admin", payload);
+        toast.success("Hinweisleiste erstellt.");
+      }
+      resetBannerForm();
+      load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Hinweisleiste konnte nicht gespeichert werden.");
+    } finally {
+      setSavingBanner(false);
+    }
+  };
+  const deleteSiteBanner = async (banner) => {
+    if (!await confirm({
+      title: "Hinweisleiste löschen?",
+      description: banner.title || banner.text,
+      confirmLabel: "Löschen",
+    })) return;
+    try {
+      await api.delete(`/settings/site-banners/admin/${banner.id}`);
+      toast.success("Hinweisleiste gelöscht.");
+      if (editingBannerId === banner.id) resetBannerForm();
+      load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Hinweisleiste konnte nicht gelöscht werden.");
+    }
   };
   const saveTwitch = async () => {
     if (savingTwitch) return;
@@ -1211,8 +1302,8 @@ export default function AdminSettingsPage() {
             </div>
             <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
               <div>
-                <div className="font-heading font-bold uppercase">Globale Hinweisleiste</div>
-                <p className="text-xs text-white/50 mt-1">Für Live-Hinweise, Wartung, wichtige Termine oder Community-News. Wird unter der Navigation angezeigt und nur an die gewählte Zielgruppe ausgeliefert.</p>
+                <div className="font-heading font-bold uppercase">Schnelle globale Hinweisleiste</div>
+                <p className="text-xs text-white/50 mt-1">Ein einfacher Legacy-Hinweis. Für mehrere Banner, Priorität, Vorschau und Statistik bitte den Banner-Manager darunter verwenden.</p>
               </div>
               <label className="flex items-start gap-2 text-sm">
                 <input type="checkbox" checked={!!brand.site_banner_enabled} onChange={(e) => setBrandField("site_banner_enabled", e.target.checked)} data-testid="brand-site-banner-enabled" className="accent-[#29B6E8] mt-1" />
@@ -1272,6 +1363,93 @@ export default function AdminSettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <BrandDateTimeField label="Anzeigen ab" value={brand.site_banner_starts_at} onChange={(v) => setBrandField("site_banner_starts_at", v)} testId="brand-site-banner-starts" />
                 <BrandDateTimeField label="Anzeigen bis" value={brand.site_banner_ends_at} onChange={(v) => setBrandField("site_banner_ends_at", v)} testId="brand-site-banner-ends" />
+              </div>
+            </div>
+            <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-4">
+              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+                <div>
+                  <div className="font-heading font-bold uppercase">Banner-Manager</div>
+                  <p className="text-xs text-white/50 mt-1">Mehrere professionelle Hinweise mit Templates, Zielbereichen, Priorität, Vorschau und Klick-/Sichtungsstatistik.</p>
+                </div>
+                <button type="button" onClick={resetBannerForm} className="inline-flex items-center justify-center gap-2 px-3 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider">
+                  <Plus className="w-3.5 h-3.5" /> Neuer Banner
+                </button>
+              </div>
+
+              <div className="grid xl:grid-cols-[1.1fr_0.9fr] gap-4">
+                <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-bold uppercase tracking-widest text-xs text-white/65">{editingBannerId ? "Banner bearbeiten" : "Neuer Banner"}</div>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={!!bannerForm.enabled} onChange={(e) => setBannerField("enabled", e.target.checked)} className="accent-[#29B6E8]" />
+                      <span>Aktiv</span>
+                    </label>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <BrandSelect label="Template" value={bannerForm.template || "custom"} onChange={applyBannerTemplate} testId="site-banner-template" options={[
+                      ["custom", "Eigener Hinweis"],
+                      ["live", "Live"],
+                      ["maintenance", "Wartung"],
+                      ["event", "Event"],
+                      ["registration", "Anmeldung offen"],
+                      ["discord", "Discord"],
+                    ]} />
+                    <BrandNumberField label="Priorität" value={bannerForm.priority || 50} min={0} max={999} onChange={(v) => setBannerField("priority", v)} testId="site-banner-priority" />
+                  </div>
+                  <BrandField label="Interner Titel" value={bannerForm.title} onChange={(v) => setBannerField("title", v)} testId="site-banner-title" placeholder="z.B. GH Check-in" />
+                  <LegalTextArea label="Text" value={bannerForm.text} onChange={(v) => setBannerField("text", v)} testId="site-banner-text" rows={2} />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <BrandSelect label="Stil" value={bannerForm.tone} onChange={(v) => setBannerField("tone", v)} testId="site-banner-tone" options={[["info", "Info"], ["live", "Live"], ["warning", "Warnung"], ["success", "Erfolg"]]} />
+                    <BrandSelect label="Design" value={bannerForm.style} onChange={(v) => setBannerField("style", v)} testId="site-banner-style" options={[["neon", "Neon"], ["solid", "Signal"], ["minimal", "Minimal"]]} />
+                    <BrandSelect label="Animation" value={bannerForm.mode} onChange={(v) => setBannerField("mode", v)} testId="site-banner-mode" options={[["ticker", "Lauftext"], ["static", "Statisch"]]} />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <BrandSelect label="Position" value={bannerForm.position} onChange={(v) => setBannerField("position", v)} testId="site-banner-position" options={[["below_nav", "Unter Navigation"], ["bottom_fixed", "Unten fixiert"], ["above_footer", "Über Footer"]]} />
+                    <BrandSelect label="Bereich" value={bannerForm.scope} onChange={(v) => setBannerField("scope", v)} testId="site-banner-scope" options={[["all", "Ganze Website"], ["tournaments", "Turniere"], ["events", "Events"], ["news", "News"], ["community", "Community"], ["servers", "Server"], ["members", "Verein"], ["custom", "Eigener Pfad"]]} />
+                    <BrandSelect label="Zielgruppe" value={bannerForm.audience} onChange={(v) => setBannerField("audience", v)} testId="site-banner-audience" options={[["all", "Alle Besucher"], ["logged_in", "Eingeloggt"], ["members", "Vereinsmitglieder"], ["admins", "Admins"]]} />
+                  </div>
+                  {bannerForm.scope === "custom" && <BrandField label="Eigener URL-Pfad" value={bannerForm.path} onChange={(v) => setBannerField("path", v)} testId="site-banner-path" placeholder="/tournaments/gamers-heaven" />}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <BrandNumberField label="Laufzeit Sek." value={bannerForm.speed_seconds || 22} min={8} max={90} onChange={(v) => setBannerField("speed_seconds", v)} testId="site-banner-speed" />
+                    <BrandDateTimeField label="Anzeigen ab" value={bannerForm.starts_at} onChange={(v) => setBannerField("starts_at", v)} testId="site-banner-starts" />
+                    <BrandDateTimeField label="Anzeigen bis" value={bannerForm.ends_at} onChange={(v) => setBannerField("ends_at", v)} testId="site-banner-ends" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <BrandField label="Link URL" value={bannerForm.link_url} onChange={(v) => setBannerField("link_url", v)} testId="site-banner-link-url" placeholder="/events oder https://..." />
+                    <BrandField label="Link-Text" value={bannerForm.link_label} onChange={(v) => setBannerField("link_label", v)} testId="site-banner-link-label" placeholder="Mehr anzeigen" />
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button type="button" onClick={saveSiteBanner} disabled={savingBanner} className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
+                      {savingBanner ? "Speichere..." : editingBannerId ? "Banner speichern" : "Banner erstellen"}
+                    </button>
+                    {editingBannerId && <button type="button" onClick={resetBannerForm} className="px-5 py-2 border border-white/15 text-white/70 font-bold uppercase tracking-wider rounded-sm">Abbrechen</button>}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <BannerPreview banner={bannerForm} />
+                  <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
+                    <div className="font-bold uppercase tracking-widest text-xs text-white/65 mb-3">Aktive Banner</div>
+                    <div className="space-y-2 max-h-[31rem] overflow-y-auto pr-1">
+                      {siteBanners.map((banner) => (
+                        <div key={banner.id} className="border border-white/10 bg-black/20 rounded-sm p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-bold text-sm truncate">{banner.title || banner.text}</div>
+                              <div className="text-[11px] text-white/45 truncate">{banner.scope} · {banner.position} · Prio {banner.priority}</div>
+                              <div className="mt-1 text-[11px] text-white/45">Views {banner.stats?.impressions || 0} · Klicks {banner.stats?.clicks || 0}</div>
+                            </div>
+                            <div className="flex gap-1 shrink-0">
+                              <button type="button" onClick={() => editBanner(banner)} className="px-2 py-1 border border-[#29B6E8]/35 text-[#29B6E8] rounded-sm text-[11px] font-bold uppercase">Edit</button>
+                              <button type="button" onClick={() => deleteSiteBanner(banner)} className="px-2 py-1 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm text-[11px] font-bold uppercase"><Trash2 className="w-3 h-3" /></button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {siteBanners.length === 0 && <div className="text-sm text-white/35 py-6 text-center">Noch keine separaten Banner angelegt.</div>}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             <p className="text-xs text-white/45">Impressum, Datenschutz und Vereinsdaten liegen im Tab Rechtliches.</p>
@@ -1387,6 +1565,39 @@ export default function AdminSettingsPage() {
         </div>
       )}
     </AdminLayout>
+  );
+}
+
+function BannerPreview({ banner }) {
+  const text = banner.text || "Vorschau der Hinweisleiste";
+  const repeated = `${text}  •  `.repeat(6);
+  const isTicker = banner.mode === "ticker";
+  return (
+    <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3 overflow-hidden">
+      <div className="font-bold uppercase tracking-widest text-xs text-white/65">Vorschau</div>
+      <div className={`tls-site-banner tls-site-banner--${banner.tone || "info"} tls-site-banner--${banner.style || "neon"} relative`}>
+        <div className="tls-site-banner__inner">
+          <Activity className="w-4 h-4 shrink-0" />
+          <div className={`tls-site-banner__text ${isTicker ? "tls-site-banner__text--ticker" : ""}`}>
+            {isTicker ? (
+              <span className="tls-marquee-track" style={{ animationDuration: `${banner.speed_seconds || 22}s` }}>
+                <span>{repeated}</span>
+                <span aria-hidden="true">{repeated}</span>
+              </span>
+            ) : (
+              <span>{text}</span>
+            )}
+          </div>
+          {banner.link_label && <span className="tls-site-banner__link">{banner.link_label}</span>}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-[11px] text-white/45">
+        <div>Position: {banner.position}</div>
+        <div>Bereich: {banner.scope}</div>
+        <div>Zielgruppe: {banner.audience}</div>
+        <div>Template: {banner.template}</div>
+      </div>
+    </div>
   );
 }
 
