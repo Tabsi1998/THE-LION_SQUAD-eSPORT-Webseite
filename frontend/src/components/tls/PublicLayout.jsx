@@ -288,7 +288,8 @@ function SiteBanner({ banner, pathname, slot }) {
   const isTicker = (banner.mode || "ticker") === "ticker";
   const text = String(banner.text || "").trim();
   const repeated = `${text}  •  `;
-  const content = isTicker ? repeated.repeat(8) : text;
+  const content = repeated.repeat(8);
+  const speed = Math.max(8, Math.min(90, Number(banner.speed_seconds || 22)));
   const linkUrl = String(banner.link_url || "");
   const linkLabel = banner.link_label || "Mehr";
   const link = linkUrl
@@ -297,11 +298,18 @@ function SiteBanner({ banner, pathname, slot }) {
       : <Link to={linkUrl} className="tls-site-banner__link">{linkLabel}</Link>
     : null;
   return (
-    <div className={`tls-site-banner tls-site-banner--${tone} tls-site-banner--${style} tls-site-banner--pos-${position}`}>
+    <div className={`tls-site-banner tls-site-banner--${tone} tls-site-banner--${style} tls-site-banner--pos-${position}`} style={{ "--tls-marquee-duration": `${speed}s` }}>
       <div className="tls-site-banner__inner">
         <Megaphone className="w-4 h-4 shrink-0" />
         <div className={`tls-site-banner__text ${isTicker ? "tls-site-banner__text--ticker" : ""}`}>
-          <span>{content}</span>
+          {isTicker ? (
+            <span className="tls-marquee-track" aria-label={text}>
+              <span>{content}</span>
+              <span aria-hidden="true">{content}</span>
+            </span>
+          ) : (
+            <span>{text}</span>
+          )}
         </div>
         {link}
       </div>

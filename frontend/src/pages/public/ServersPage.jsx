@@ -286,7 +286,10 @@ function MaintenanceTape({ text }) {
     <div className="tls-maintenance-tape pointer-events-none absolute -left-10 right-auto top-8 z-10 w-[130%] rotate-[-8deg] border-y border-white/80 shadow-[0_10px_28px_rgba(0,0,0,0.45)]">
       <div className="tls-maintenance-tape__stripe" />
       <div className="tls-maintenance-tape__marquee">
-        <span>{repeated.repeat(8)}</span>
+        <span className="tls-marquee-track" aria-label={text || "Wartung"}>
+          <span>{repeated.repeat(8)}</span>
+          <span aria-hidden="true">{repeated.repeat(8)}</span>
+        </span>
       </div>
     </div>
   );

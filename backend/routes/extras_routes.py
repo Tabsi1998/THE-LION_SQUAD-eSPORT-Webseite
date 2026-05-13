@@ -80,6 +80,7 @@ class BrandingSettings(BaseModel):
     site_banner_text: Optional[str] = None
     site_banner_tone: Optional[Literal["info", "live", "warning", "success"]] = None
     site_banner_mode: Optional[Literal["ticker", "static"]] = None
+    site_banner_speed_seconds: Optional[int] = None
     site_banner_style: Optional[Literal["neon", "solid", "minimal"]] = None
     site_banner_position: Optional[Literal["below_nav", "bottom_fixed", "above_footer"]] = None
     site_banner_scope: Optional[Literal["all", "tournaments", "events", "news", "community", "servers", "members", "custom"]] = None
@@ -292,6 +293,7 @@ async def get_site_banner(response: Response, me: dict | None = Depends(get_opti
         "text": str(b.get("site_banner_text") or "").strip(),
         "tone": b.get("site_banner_tone") or "info",
         "mode": b.get("site_banner_mode") or "ticker",
+        "speed_seconds": max(8, min(90, int(b.get("site_banner_speed_seconds") or 22))),
         "style": b.get("site_banner_style") or "neon",
         "position": b.get("site_banner_position") or "below_nav",
         "scope": b.get("site_banner_scope") or "all",

@@ -253,11 +253,20 @@ img, video, canvas, svg {
   white-space: nowrap;
 }
 
-.tls-maintenance-tape__marquee span {
-  display: inline-block;
+.tls-marquee-track {
+  display: inline-flex;
+  width: max-content;
   min-width: max-content;
-  padding-left: 100%;
-  animation: tls-maintenance-marquee 14s linear infinite;
+  will-change: transform;
+}
+
+.tls-maintenance-tape__marquee .tls-marquee-track {
+  animation: tls-maintenance-marquee 16s linear infinite;
+}
+
+.tls-marquee-track > span {
+  flex: 0 0 auto;
+  padding-right: 1.5rem;
 }
 
 @keyframes tls-maintenance-stripes {
@@ -272,11 +281,11 @@ img, video, canvas, svg {
 
 @media (prefers-reduced-motion: reduce) {
   .tls-maintenance-tape__stripe,
-  .tls-maintenance-tape__marquee span {
+  .tls-maintenance-tape__marquee .tls-marquee-track {
     animation: none;
   }
-  .tls-maintenance-tape__marquee span {
-    padding-left: 0.85rem;
+  .tls-maintenance-tape__marquee .tls-marquee-track {
+    transform: none;
   }
 }
 
@@ -374,11 +383,8 @@ img, video, canvas, svg {
   white-space: nowrap;
 }
 
-.tls-site-banner__text--ticker span {
-  display: inline-block;
-  min-width: max-content;
-  padding-left: 100%;
-  animation: tls-site-banner-marquee 22s linear infinite;
+.tls-site-banner__text--ticker .tls-marquee-track {
+  animation: tls-site-banner-marquee var(--tls-marquee-duration, 22s) linear infinite;
 }
 
 .tls-site-banner__link {
@@ -427,11 +433,11 @@ img, video, canvas, svg {
 
 @media (prefers-reduced-motion: reduce) {
   .tls-site-banner::before,
-  .tls-site-banner__text--ticker span {
+  .tls-site-banner__text--ticker .tls-marquee-track {
     animation: none;
   }
-  .tls-site-banner__text--ticker span {
-    padding-left: 0;
+  .tls-site-banner__text--ticker .tls-marquee-track {
+    transform: none;
   }
 }
 

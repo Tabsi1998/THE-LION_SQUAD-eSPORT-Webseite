@@ -41,6 +41,20 @@ const STATUS_LABELS = {
   skipped: "übersprungen",
 };
 
+function toDateTimeInput(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 16);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function fromDateTimeInput(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
 function mailTemplateLabel(job) {
   return MAIL_TEMPLATE_LABELS[job?.template_key] || job?.template_key || "Mail";
 }
@@ -71,7 +85,7 @@ export default function AdminSettingsPage() {
     imprint: "", privacy_policy: "", legal_extra: "", privacy_extra: "",
     discord_invite_url: "", twitch_channel: "", twitch_client_id: "", twitch_client_secret: "",
     twitch_client_secret_masked: "", twitch_live_detection: true,
-    site_banner_enabled: false, site_banner_text: "", site_banner_tone: "info", site_banner_mode: "ticker",
+    site_banner_enabled: false, site_banner_text: "", site_banner_tone: "info", site_banner_mode: "ticker", site_banner_speed_seconds: 22,
     site_banner_style: "neon", site_banner_position: "below_nav", site_banner_scope: "all", site_banner_path: "",
     site_banner_audience: "all", site_banner_link_url: "", site_banner_link_label: "",
     site_banner_starts_at: "", site_banner_ends_at: "",
@@ -1245,6 +1259,9 @@ export default function AdminSettingsPage() {
                   ["admins", "Admins"],
                 ]} />
               </div>
+              {(brand.site_banner_mode || "ticker") === "ticker" && (
+                <BrandNumberField label="Laufgeschwindigkeit in Sekunden" value={brand.site_banner_speed_seconds || 22} min={8} max={90} onChange={(v) => setBrandField("site_banner_speed_seconds", v)} testId="brand-site-banner-speed" />
+              )}
               {(brand.site_banner_scope || "all") === "custom" && (
                 <BrandField label="Eigener URL-Pfad" value={brand.site_banner_path} onChange={(v) => setBrandField("site_banner_path", v)} testId="brand-site-banner-path" placeholder="/tournaments/gamers-heaven" />
               )}
@@ -1253,8 +1270,8 @@ export default function AdminSettingsPage() {
                 <BrandField label="Link-Text" value={brand.site_banner_link_label} onChange={(v) => setBrandField("site_banner_link_label", v)} testId="brand-site-banner-link-label" placeholder="Mehr anzeigen" />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <BrandField label="Anzeigen ab" value={brand.site_banner_starts_at} onChange={(v) => setBrandField("site_banner_starts_at", v)} testId="brand-site-banner-starts" placeholder="2026-06-20T10:00:00+02:00" />
-                <BrandField label="Anzeigen bis" value={brand.site_banner_ends_at} onChange={(v) => setBrandField("site_banner_ends_at", v)} testId="brand-site-banner-ends" placeholder="2026-06-21T23:59:00+02:00" />
+                <BrandDateTimeField label="Anzeigen ab" value={brand.site_banner_starts_at} onChange={(v) => setBrandField("site_banner_starts_at", v)} testId="brand-site-banner-starts" />
+                <BrandDateTimeField label="Anzeigen bis" value={brand.site_banner_ends_at} onChange={(v) => setBrandField("site_banner_ends_at", v)} testId="brand-site-banner-ends" />
               </div>
             </div>
             <p className="text-xs text-white/45">Impressum, Datenschutz und Vereinsdaten liegen im Tab Rechtliches.</p>
@@ -1389,6 +1406,24 @@ function BrandSelect({ label, value, onChange, testId, options }) {
       <select value={value || ""} onChange={(e) => onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
         {options.map(([key, labelText]) => <option key={key} value={key}>{labelText}</option>)}
       </select>
+    </label>
+  );
+}
+
+function BrandNumberField({ label, value, onChange, testId, min, max }) {
+  return (
+    <label className="block">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <input type="number" min={min} max={max} value={value || ""} onChange={(e) => onChange(Number(e.target.value || 0))} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+    </label>
+  );
+}
+
+function BrandDateTimeField({ label, value, onChange, testId }) {
+  return (
+    <label className="block">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <input type="datetime-local" value={toDateTimeInput(value)} onChange={(e) => onChange(fromDateTimeInput(e.target.value))} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
     </label>
   );
 }
