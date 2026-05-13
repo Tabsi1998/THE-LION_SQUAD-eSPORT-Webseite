@@ -5,7 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { Award, BarChart3, CalendarDays, CheckCircle2, Flag, Medal, MessageCircle, Star, Timer, Trophy, Users } from "lucide-react";
+import { Award, BarChart3, CalendarDays, CheckCircle2, CircleGauge, Flag, Medal, MessageCircle, ShieldCheck, Star, Timer, Trophy, Users, Zap } from "lucide-react";
 
 function rankColor(rank) {
   if (rank === 1) return "text-[#FFD700]";
@@ -18,29 +18,42 @@ const POINT_SOURCES = [
   {
     icon: Trophy,
     title: "Turniere",
+    tone: "gold",
     text: "Teilnahme zählt, Platzierungen zählen mehr. Siege, Podium und größere Teilnehmerfelder bringen sichtbar mehr Punkte.",
   },
   {
     icon: Timer,
     title: "Fast Lap",
+    tone: "blue",
     text: "Gültige Zeiten werden pro Strecke gewertet. Pole Positions, starke Ränge und veröffentlichte Challenges laufen in die Wertung.",
   },
   {
     icon: CheckCircle2,
     title: "Events",
+    tone: "green",
     text: "Wenn Admins oder Moderatoren deine Teilnahme per Check-in bestätigen, wird daraus ein Season-Eintrag.",
   },
   {
     icon: Star,
     title: "Achievements",
+    tone: "violet",
     text: "Achievements geben Profilpunkte und schalten weitere Ranglisten-Erfolge frei. Saisonpunkte erzeugen wiederum eigene Achievements.",
   },
   {
     icon: MessageCircle,
     title: "Community",
+    tone: "white",
     text: "Discord-, Stream-, Team- und Community-Aktivität kann über Achievements oder manuelle Admin-Wertungen Punkte bringen.",
   },
 ];
+
+const TONE = {
+  gold: "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]",
+  blue: "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#29B6E8]",
+  green: "border-[#10B981]/35 bg-[#10B981]/10 text-[#10B981]",
+  violet: "border-[#A855F7]/35 bg-[#A855F7]/10 text-[#A855F7]",
+  white: "border-white/15 bg-white/[0.04] text-white/70",
+};
 
 export default function SeasonPage() {
   const { slug } = useParams();
@@ -64,6 +77,13 @@ export default function SeasonPage() {
   const totalRatings = standings.reduce((sum, row) => sum + Number(row.events_count || 0), 0);
   const tournamentCount = s.tournament_ids?.length || 0;
   const fastLapCount = s.f1_challenge_ids?.length || 0;
+  const sourceCount = tournamentCount + fastLapCount;
+  const overviewItems = [
+    { icon: Trophy, label: "Platzierung", value: "Rang entscheidet", text: "Top-Plätze starten mit höheren Basispunkten.", tone: "gold" },
+    { icon: Users, label: "Teilnehmerfeld", value: `${standings.length || 0} Spieler`, text: "Große Felder erhöhen den Faktor der Wertung.", tone: "blue" },
+    { icon: Zap, label: "Boni", value: "Extra Punkte", text: "Check-in, Fair Play, Siege und Fast-Lap-Boni können dazukommen.", tone: "green" },
+    { icon: ShieldCheck, label: "Schutz", value: s.drop_worst ? `${s.drop_worst} Streichresultat(e)` : "Alles zählt", text: s.drop_worst ? "Die schwächsten Wertungen fallen aus der Gesamtwertung." : "Keine Wertung wird aktuell gestrichen.", tone: "violet" },
+  ];
   return (
     <PublicLayout>
       <div className="relative border-b border-white/10 bg-grid-dense overflow-hidden">
@@ -90,6 +110,22 @@ export default function SeasonPage() {
         </div>
       </div>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <section className="mb-8">
+          <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#29B6E8]">Übersicht</div>
+              <h2 className="mt-1 font-heading text-2xl md:text-3xl font-black uppercase">So funktioniert diese Season</h2>
+            </div>
+            <div className="inline-flex items-center gap-2 text-xs text-white/50 border border-white/10 bg-[#101010] rounded-sm px-3 py-2">
+              <CircleGauge className="w-4 h-4 text-[#29B6E8]" />
+              {sourceCount || "Alle"} Quellen in der Wertung
+            </div>
+          </div>
+          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
+            {overviewItems.map((item) => <OverviewCard key={item.label} {...item} />)}
+          </div>
+        </section>
+
         {topThree.length > 0 && (
           <section className="mb-8">
             <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
@@ -157,7 +193,7 @@ export default function SeasonPage() {
           </div>
         </section>
 
-        <section className="mt-8 grid md:grid-cols-2 gap-4">
+        <section className="mt-8 grid lg:grid-cols-[1.15fr_0.85fr] gap-4">
           <InfoPanel icon={Award} title="Punktewertung" text="Season-Punkte werden aus echten Wertungseinträgen berechnet: Turnier- und Fast-Lap-Ergebnisse, bestätigte Event-Teilnahme sowie manuelle Admin-Wertungen. Platz, Gewichtung, Teilnehmerfeld und Boni fließen in die Summe ein." />
           <InfoPanel icon={Medal} title="Streichresultate" text={s.drop_worst ? `${s.drop_worst} schlechteste Resultat(e) werden nicht in die Gesamtpunkte gerechnet.` : "Alle gewerteten Resultate zählen in die Gesamtwertung."} />
         </section>
@@ -172,6 +208,23 @@ function StatCard({ icon: Icon, label, value }) {
       <Icon className="w-4 h-4 text-[#29B6E8]" />
       <div className="mt-2 font-display text-3xl font-black">{value}</div>
       <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</div>
+    </div>
+  );
+}
+
+function OverviewCard({ icon: Icon, label, value, text, tone }) {
+  return (
+    <div className="border border-white/10 bg-[#121212] rounded-sm p-4 min-h-[142px]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</div>
+          <div className="mt-2 font-heading text-xl font-black uppercase leading-tight">{value}</div>
+        </div>
+        <div className={`w-10 h-10 shrink-0 rounded-sm border flex items-center justify-center ${TONE[tone] || TONE.white}`}>
+          <Icon className="w-5 h-5" />
+        </div>
+      </div>
+      <p className="mt-3 text-sm text-white/55 leading-relaxed">{text}</p>
     </div>
   );
 }
@@ -225,11 +278,13 @@ function MiniStat({ label, value }) {
   );
 }
 
-function PointSourceCard({ icon: Icon, title, text }) {
+function PointSourceCard({ icon: Icon, title, text, tone }) {
   return (
-    <div className="border border-white/10 bg-[#101010] rounded-sm p-4 min-h-[150px]">
-      <Icon className="w-5 h-5 text-[#FFD700]" />
-      <h3 className="mt-3 font-heading font-bold uppercase">{title}</h3>
+    <div className="border border-white/10 hover:border-white/20 bg-[#101010] rounded-sm p-4 min-h-[168px] transition">
+      <div className={`w-10 h-10 rounded-sm border flex items-center justify-center ${TONE[tone] || TONE.white}`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <h3 className="mt-4 font-heading font-bold uppercase">{title}</h3>
       <p className="mt-2 text-sm text-white/55 leading-relaxed">{text}</p>
     </div>
   );
@@ -237,8 +292,10 @@ function PointSourceCard({ icon: Icon, title, text }) {
 
 function InfoPanel({ icon: Icon, title, text }) {
   return (
-    <div className="border border-white/10 bg-[#101010] rounded-sm p-5 flex items-start gap-3">
-      <Icon className="w-5 h-5 text-[#FFD700] shrink-0 mt-0.5" />
+    <div className="border border-white/10 bg-[#101010] rounded-sm p-5 flex items-start gap-4">
+      <div className="w-11 h-11 rounded-sm border border-[#FFD700]/25 bg-[#FFD700]/10 flex items-center justify-center shrink-0">
+        <Icon className="w-5 h-5 text-[#FFD700]" />
+      </div>
       <div>
         <h3 className="font-heading font-bold uppercase">{title}</h3>
         <p className="mt-2 text-sm text-white/55 leading-relaxed">{text}</p>
