@@ -207,6 +207,13 @@ async def aggregate_leaderboard(
         if not season:
             return []
         season_id = season["id"]
+    else:
+        season = await db.seasons.find_one({"id": season_id}, {"_id": 0})
+
+    try:
+        drop_worst = max(int((season or {}).get("drop_worst") or 0), 0)
+    except (TypeError, ValueError):
+        drop_worst = 0
 
     match: dict = {"season_id": season_id}
     if source_type:
@@ -217,19 +224,43 @@ async def aggregate_leaderboard(
         match["user_id"] = {"$ne": None}
 
     group_field = "$team_id" if teams else "$user_id"
+    group_stage = {
+        "_id": group_field,
+        "total": {"$sum": "$total_points"},
+        "raw": {"$sum": "$raw_points"},
+        "events": {"$sum": 1},
+        "wins": {"$sum": {"$cond": [{"$eq": ["$rank", 1]}, 1, 0]}},
+    }
+    if drop_worst:
+        group_stage["entries"] = {
+            "$push": {
+                "total": "$total_points",
+                "raw": "$raw_points",
+            },
+        }
+
     pipeline = [
         {"$match": match},
-        {"$group": {
-            "_id": group_field,
-            "total": {"$sum": "$total_points"},
-            "raw": {"$sum": "$raw_points"},
-            "events": {"$sum": 1},
-            "wins": {"$sum": {"$cond": [{"$eq": ["$rank", 1]}, 1, 0]}},
-        }},
-        {"$sort": {"total": -1}},
-        {"$limit": limit * 2 if (only_members or only_community or rookie_only) else limit},
+        {"$group": group_stage},
     ]
-    rows = await db.season_points.aggregate(pipeline).to_list(limit * 5)
+    if not drop_worst:
+        pipeline.extend([
+            {"$sort": {"total": -1}},
+            {"$limit": limit * 2 if (only_members or only_community or rookie_only) else limit},
+        ])
+    rows_limit = max(limit * 5, 20000) if drop_worst else limit * 5
+    rows = await db.season_points.aggregate(pipeline).to_list(rows_limit)
+
+    if drop_worst:
+        for r in rows:
+            entries = r.get("entries") or []
+            if len(entries) > drop_worst:
+                kept = sorted(entries, key=lambda item: float(item.get("total") or 0), reverse=True)[: len(entries) - drop_worst]
+            else:
+                kept = entries
+            r["total"] = sum(float(item.get("total") or 0) for item in kept)
+            r["raw"] = sum(float(item.get("raw") or 0) for item in kept)
+        rows.sort(key=lambda item: item.get("total", 0), reverse=True)
 
     if teams:
         team_ids = [r["_id"] for r in rows]

@@ -459,6 +459,37 @@ class TestSeasonV2Leaderboard:
         dr = admin.delete(f"{BASE}/api/seasons/v2/entry/{eid}")
         assert dr.status_code == 200
 
+    def test_drop_worst_is_applied_to_v2_leaderboard(self, admin, active_season, community_user):
+        sid = active_season["id"]
+        previous_drop = active_season.get("drop_worst", 0)
+        source_type = f"drop_test_{uuid.uuid4().hex[:6]}"
+        uid = community_user.user["id"]
+        try:
+            pr = admin.patch(f"{BASE}/api/seasons/{sid}", json={"drop_worst": 1})
+            assert pr.status_code == 200, pr.text
+            high = admin.post(f"{BASE}/api/seasons/v2/award", json={
+                "user_id": uid, "source_type": source_type,
+                "rank": 1, "num_participants": 8, "weight": 1.0,
+                "source_name": "TEST drop high",
+            })
+            low = admin.post(f"{BASE}/api/seasons/v2/award", json={
+                "user_id": uid, "source_type": source_type,
+                "rank": 20, "num_participants": 8, "weight": 1.0,
+                "source_name": "TEST drop low",
+            })
+            assert high.status_code == 200, high.text
+            assert low.status_code == 200, low.text
+            _created_entries.extend([high.json()["id"], low.json()["id"]])
+
+            lb = admin.get(f"{BASE}/api/seasons/v2/leaderboard?season_id={sid}&source_type={source_type}&limit=10")
+            assert lb.status_code == 200, lb.text
+            row = next((item for item in lb.json()["standings"] if item["id"] == uid), None)
+            assert row, lb.text
+            assert row["events"] == 2
+            assert row["total_points"] == 100.0
+        finally:
+            admin.patch(f"{BASE}/api/seasons/{sid}", json={"drop_worst": previous_drop})
+
 
 class TestParticipantFactor:
     """Edge cases via live awards."""
