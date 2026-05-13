@@ -77,23 +77,13 @@ export default function ReferencesPage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_22rem] gap-8 items-end">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
-            <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase">Referenzen</h1>
-            <p className="mt-4 text-white/70 max-w-3xl">
-              Externe Turniere, Ligen und Events, bei denen THE LION SQUAD oder Vereinsspieler im Namen des Vereins angetreten sind.
-              Platzierungen, Lineups und Ergebnisquellen sind hier zentral verlinkt.
-            </p>
-          </div>
-          <div className="border border-[#29B6E8]/25 bg-[#071117] rounded-sm p-4">
-            <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">Aktueller Stand</div>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              <MiniStat label="Podest" value={summary.podiums || 0} />
-              <MiniStat label="Laufend" value={summary.active || 0} />
-              <MiniStat label="Spiele" value={summary.games || 0} />
-            </div>
-          </div>
+        <div>
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
+          <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase">Referenzen</h1>
+          <p className="mt-4 text-white/70 max-w-3xl">
+            Externe Turniere, Ligen und Events, bei denen THE LION SQUAD oder Vereinsspieler im Namen des Vereins angetreten sind.
+            Platzierungen, Lineups und Ergebnisquellen sind hier zentral verlinkt.
+          </p>
         </div>
 
         <div className="mt-8 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
@@ -197,15 +187,6 @@ function Stat({ label, value, icon: Icon, tone }) {
         {Icon && <Icon className={`w-4 h-4 ${color}`} />}
       </div>
       <div className={`mt-2 font-display text-3xl md:text-4xl font-black ${color}`}>{value}</div>
-    </div>
-  );
-}
-
-function MiniStat({ label, value }) {
-  return (
-    <div className="border border-white/10 bg-black/25 rounded-sm px-3 py-2">
-      <div className="text-[9px] uppercase tracking-widest text-white/40 font-bold">{label}</div>
-      <div className="font-display text-2xl font-black text-white tabular-nums">{value}</div>
     </div>
   );
 }
