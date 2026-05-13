@@ -18,7 +18,7 @@ const LEVEL_META = {
   2: { name: "Silber", color: "#C0C0C0", icon: "🥈" },
   3: { name: "Gold",   color: "#FFD700", icon: "🥇" },
   4: { name: "Platin", color: "#29B6E8", icon: "💎" },
-  5: { name: "Special",color: "#FF3B30", icon: "❤" },
+  5: { name: "Legendär", color: "#FF3B30", icon: "★" },
 };
 
 const CATEGORY_META = {
@@ -26,7 +26,7 @@ const CATEGORY_META = {
   tournament: { label: "Turnier",    icon: "Trophy",    accent: "#FFD700" },
   fastlap:    { label: "Fast Lap",   icon: "Flag",      accent: "#A855F7" },
   club:       { label: "Verein",     icon: "Crown",     accent: "#FFD700" },
-  special:    { label: "Special",    icon: "Sparkles",  accent: "#FF3B30" },
+  special:    { label: "Sonderauszeichnungen", icon: "Sparkles",  accent: "#FF3B30" },
   negative:   { label: "Fun / Negative", icon: "AlertTriangle", accent: "#FF3B30" },
 };
 
@@ -42,6 +42,16 @@ function groupAccent(group) {
   return group.accent_color && group.accent_color !== "#FF3B30"
     ? group.accent_color
     : SPECIAL_ACCENTS[seed % SPECIAL_ACCENTS.length];
+}
+
+function levelLabel(level, group, tier) {
+  if (tier?.level_name) return tier.level_name;
+  if (Number(level) === 5) {
+    if (group?.is_negative || group?.category === "negative") return "Geheim";
+    if (group?.is_special || group?.category === "special") return "Sonderauszeichnung";
+    return "Legendär";
+  }
+  return LEVEL_META[level]?.name || "?";
 }
 
 export function AchievementGroupsView({ groups = [], emptyText = "Noch keine Achievements freigeschaltet.", earnedOnly = false }) {
@@ -104,12 +114,13 @@ function GroupCard({ group, earnedOnly = false }) {
   const isNegative = Boolean(group.is_negative || group.category === "negative");
   const prestige = hasAny && !isNegative && highest?.level >= 4;
   const lockedPulse = !earnedOnly && !hasAny && !isNegative;
+  const highestLabel = highest ? levelLabel(highest.level, group, highest) : "";
 
   return (
     <motion.div
       layout
       data-testid={`achievement-group-${group.code}`}
-      className={`border rounded-sm bg-[#0F0F10] transition-all ${hasAny ? "border-white/15" : "border-white/5 opacity-80"} ${isNegative ? "bg-[#120A0A]" : ""}`}
+      className={`border rounded-sm bg-[#0F0F10] transition-all ${hasAny ? "border-white/15" : "border-white/5 opacity-80"} ${isNegative ? "bg-[#120A0A]" : ""} ${hasAny && !isNegative && highest?.level >= 5 ? "tls-achievement-card-legendary" : ""}`}
       style={hasAny ? { boxShadow: `inset 0 0 0 1px ${accent}22` } : undefined}
       animate={prestige
         ? { boxShadow: [`inset 0 0 0 1px ${accent}22`, `inset 0 0 0 1px ${accent}55, 0 0 22px ${accent}18`, `inset 0 0 0 1px ${accent}22`] }
@@ -145,7 +156,7 @@ function GroupCard({ group, earnedOnly = false }) {
                 className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border"
                 style={{ color: LEVEL_META[highest.level].color, borderColor: LEVEL_META[highest.level].color + "55" }}
               >
-                {isNegative ? "Geheim" : `${LEVEL_META[highest.level].icon} ${LEVEL_META[highest.level].name}`}
+                {isNegative ? "Geheim" : `${LEVEL_META[highest.level]?.icon || ""} ${highestLabel}`}
               </span>
             )}
             {!earnedOnly && !hasAny && nextLocked && (
@@ -184,7 +195,7 @@ function GroupCard({ group, earnedOnly = false }) {
             className="overflow-hidden"
           >
             <div className="border-t border-white/5 px-4 py-3 space-y-2" data-testid={`achievement-group-${group.code}-tiers`}>
-              {group.tiers.map(t => <TierRow key={t.code} tier={t} accent={accent} isNegative={isNegative} />)}
+              {group.tiers.map(t => <TierRow key={t.code} tier={t} group={group} accent={accent} isNegative={isNegative} />)}
             </div>
           </motion.div>
         )}
@@ -193,13 +204,14 @@ function GroupCard({ group, earnedOnly = false }) {
   );
 }
 
-function TierRow({ tier, accent, isNegative = false }) {
+function TierRow({ tier, group, accent, isNegative = false }) {
   const lvl = LEVEL_META[tier.level] || LEVEL_META[1];
+  const label = levelLabel(tier.level, group, tier);
   const TierIcon = Icons[pascal(tier.icon || "circle")] || Icons.Circle;
   return (
     <motion.div
       data-testid={`achievement-tier-${tier.code}`}
-      className={`flex items-center gap-3 p-2 rounded-sm border transition ${tier.earned ? "border-white/10 bg-white/[0.02]" : "border-white/5 opacity-60"}`}
+      className={`flex items-center gap-3 p-2 rounded-sm border transition ${tier.earned ? "border-white/10 bg-white/[0.02]" : "border-white/5 opacity-60"} ${tier.earned && tier.level >= 5 && !isNegative ? "tls-achievement-tier-legendary" : ""}`}
       style={tier.earned ? { boxShadow: `inset 2px 0 0 ${lvl.color}` } : undefined}
       animate={tier.earned && tier.level >= 4 && !isNegative
         ? { borderColor: [`${lvl.color}22`, `${lvl.color}66`, `${lvl.color}22`] }
@@ -226,7 +238,7 @@ function TierRow({ tier, accent, isNegative = false }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: lvl.color }}>
-            {isNegative ? "Geheim" : `${lvl.icon} ${lvl.name}`}
+            {isNegative ? "Geheim" : `${lvl.icon} ${label}`}
           </span>
           <span className={`text-sm font-semibold truncate ${tier.earned ? "text-white" : "text-white/55"}`}>{tier.name}</span>
           {tier.member_only && (

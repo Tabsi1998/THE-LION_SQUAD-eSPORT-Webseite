@@ -50,6 +50,18 @@ const BANNER_TEMPLATE_PRESETS = {
   discord: { title: "Discord", text: "Komm auf unseren Discord und bleib in der Community am Ball.", tone: "info", style: "minimal", link_label: "Discord öffnen", scope: "community" },
 };
 
+const BANNER_SCOPE_OPTIONS = [
+  ["all", "Ganze Website"],
+  ["tournaments", "Turniere"],
+  ["fastlap", "Fast Lap"],
+  ["events", "Events"],
+  ["news", "News"],
+  ["servers", "Server"],
+  ["community", "Community"],
+  ["members", "Verein"],
+  ["custom", "Eigener Pfad"],
+];
+
 function emptyBannerForm() {
   return {
     title: "",
@@ -70,6 +82,12 @@ function emptyBannerForm() {
     ends_at: "",
     template: "custom",
   };
+}
+
+function bannerTickerDuration(text, configuredSpeed) {
+  const saved = Number(configuredSpeed || 22);
+  const automatic = Math.ceil(String(text || "").length / 3.6);
+  return Math.max(8, Math.min(180, Math.max(saved, automatic)));
 }
 
 function toDateTimeInput(value) {
@@ -1338,14 +1356,14 @@ export default function AdminSettingsPage() {
                     <BrandSelect label="Design" value={bannerForm.style} onChange={(v) => setBannerField("style", v)} testId="site-banner-style" options={[["neon", "Neon"], ["solid", "Signal"], ["minimal", "Minimal"]]} />
                     <BrandSelect label="Animation" value={bannerForm.mode} onChange={(v) => setBannerField("mode", v)} testId="site-banner-mode" options={[["ticker", "Lauftext"], ["static", "Statisch"]]} />
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <BrandSelect label="Position" value={bannerForm.position} onChange={(v) => setBannerField("position", v)} testId="site-banner-position" options={[["below_nav", "Unter Navigation"], ["bottom_fixed", "Unten fixiert"], ["above_footer", "Über Footer"]]} />
-                    <BrandSelect label="Bereich" value={bannerForm.scope} onChange={(v) => setBannerField("scope", v)} testId="site-banner-scope" options={[["all", "Ganze Website"], ["tournaments", "Turniere"], ["events", "Events"], ["news", "News"], ["community", "Community"], ["servers", "Server"], ["members", "Verein"], ["custom", "Eigener Pfad"]]} />
                     <BrandSelect label="Zielgruppe" value={bannerForm.audience} onChange={(v) => setBannerField("audience", v)} testId="site-banner-audience" options={[["all", "Alle Besucher"], ["logged_in", "Eingeloggt"], ["members", "Vereinsmitglieder"], ["admins", "Admins"]]} />
                   </div>
+                  <BannerScopePicker value={bannerForm.scope} onChange={(v) => setBannerField("scope", v)} />
                   {bannerForm.scope === "custom" && <BrandField label="Eigener URL-Pfad" value={bannerForm.path} onChange={(v) => setBannerField("path", v)} testId="site-banner-path" placeholder="/tournaments/gamers-heaven" />}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <BrandNumberField label="Laufzeit Sek." value={bannerForm.speed_seconds || 22} min={8} max={90} onChange={(v) => setBannerField("speed_seconds", v)} testId="site-banner-speed" />
+                    <BrandNumberField label="Mindestlaufzeit Sek." value={bannerForm.speed_seconds || 22} min={8} max={180} onChange={(v) => setBannerField("speed_seconds", v)} testId="site-banner-speed" />
                     <BrandDateTimeField label="Anzeigen ab" value={bannerForm.starts_at} onChange={(v) => setBannerField("starts_at", v)} testId="site-banner-starts" />
                     <BrandDateTimeField label="Anzeigen bis" value={bannerForm.ends_at} onChange={(v) => setBannerField("ends_at", v)} testId="site-banner-ends" />
                   </div>
@@ -1507,6 +1525,7 @@ function BannerPreview({ banner }) {
   const text = banner.text || "Vorschau der Hinweisleiste";
   const repeated = `${text}  •  `.repeat(6);
   const isTicker = banner.mode === "ticker";
+  const duration = bannerTickerDuration(text, banner.speed_seconds);
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3 overflow-hidden">
       <div className="font-bold uppercase tracking-widest text-xs text-white/65">Vorschau</div>
@@ -1515,7 +1534,7 @@ function BannerPreview({ banner }) {
           <Activity className="w-4 h-4 shrink-0" />
           <div className={`tls-site-banner__text ${isTicker ? "tls-site-banner__text--ticker" : ""}`}>
             {isTicker ? (
-              <span className="tls-marquee-track" style={{ animationDuration: `${banner.speed_seconds || 22}s` }}>
+              <span className="tls-marquee-track" style={{ animationDuration: `${duration}s` }}>
                 <span>{repeated}</span>
                 <span aria-hidden="true">{repeated}</span>
               </span>
@@ -1528,9 +1547,37 @@ function BannerPreview({ banner }) {
       </div>
       <div className="grid grid-cols-2 gap-2 text-[11px] text-white/45">
         <div>Position: {banner.position}</div>
-        <div>Bereich: {banner.scope}</div>
+        <div>Bereich: {BANNER_SCOPE_OPTIONS.find(([key]) => key === banner.scope)?.[1] || banner.scope}</div>
         <div>Zielgruppe: {banner.audience}</div>
-        <div>Template: {banner.template}</div>
+        <div>Laufzeit: {duration}s</div>
+      </div>
+    </div>
+  );
+}
+
+function BannerScopePicker({ value, onChange }) {
+  const current = value || "all";
+  return (
+    <div>
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Bereich aktivieren</div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" data-testid="site-banner-scope">
+        {BANNER_SCOPE_OPTIONS.map(([key, label]) => {
+          const active = current === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onChange(key)}
+              data-testid={`site-banner-scope-${key}`}
+              className={`flex items-center gap-2 border px-3 py-2 rounded-sm text-left text-xs font-bold uppercase tracking-wider transition ${active ? "border-[#29B6E8]/65 bg-[#29B6E8]/12 text-[#29B6E8]" : "border-white/10 bg-[#0A0A0A] text-white/55 hover:border-white/25 hover:text-white"}`}
+            >
+              <span className={`w-4 h-4 border rounded-sm inline-flex items-center justify-center shrink-0 ${active ? "border-[#29B6E8] bg-[#29B6E8] text-black" : "border-white/20"}`}>
+                {active && <CheckCircle2 className="w-3 h-3" />}
+              </span>
+              <span className="truncate">{label}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

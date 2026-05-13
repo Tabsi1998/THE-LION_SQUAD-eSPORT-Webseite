@@ -171,24 +171,24 @@ function BoardDeputyCard({ position }) {
   const title = `${position.display_title || position.title_male}-Stv.`;
   if (!d) {
     return (
-      <div className="border border-dashed border-white/10 rounded-sm bg-[#0A0A0A] p-5 text-[11px] uppercase tracking-widest text-white/35 min-h-[6.5rem] flex items-center">
+      <div className="border border-dashed border-white/10 rounded-sm bg-[#0A0A0A] p-6 text-[11px] uppercase tracking-widest text-white/35 min-h-[10rem] flex items-center">
         {title} offen
       </div>
     );
   }
   return (
-    <Link to={d.profile_url || `/u/${d.username}`} className="group border border-white/10 rounded-sm bg-[#0A0A0A] p-5 flex items-center gap-4 min-h-[7.5rem] hover:border-[#FFD700]/40 hover:bg-[#121212] transition">
+    <Link to={d.profile_url || `/u/${d.username}`} className="group border border-white/10 rounded-sm bg-[#0A0A0A] p-6 flex items-center gap-5 min-h-[11.5rem] hover:border-[#FFD700]/40 hover:bg-[#121212] transition">
       {d.avatar_url ? (
-        <img src={resolveMediaUrl(d.avatar_url)} alt="" className="w-20 h-24 rounded-sm object-contain object-bottom bg-black border border-white/10" />
+        <img src={resolveMediaUrl(d.avatar_url)} alt="" className="w-28 h-32 rounded-sm object-contain object-bottom bg-black border border-white/10" />
       ) : (
-        <div className="w-20 h-24 rounded-sm bg-black border border-white/10 flex items-center justify-center">
-          <UserIcon className="w-7 h-7 text-white/35" />
+        <div className="w-28 h-32 rounded-sm bg-black border border-white/10 flex items-center justify-center">
+          <UserIcon className="w-8 h-8 text-white/35" />
         </div>
       )}
       <div className="min-w-0">
-        <div className="text-[10px] uppercase tracking-[0.18em] text-[#FFD700]/70 font-bold">{title}</div>
-        <div className="mt-1 font-heading text-lg font-black uppercase group-hover:text-[#FFD700] transition truncate">{personGamertag(d)}</div>
-        {personRealName(d) && <div className="text-xs text-white/55 truncate">{personRealName(d)}</div>}
+        <div className="text-[11px] uppercase tracking-[0.18em] text-[#FFD700]/70 font-bold">{title}</div>
+        <div className="mt-1 font-heading text-xl md:text-2xl font-black uppercase group-hover:text-[#FFD700] transition truncate">{personGamertag(d)}</div>
+        {personRealName(d) && <div className="text-sm text-white/55 truncate">{personRealName(d)}</div>}
       </div>
     </Link>
   );

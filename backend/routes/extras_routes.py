@@ -83,7 +83,7 @@ class BrandingSettings(BaseModel):
     site_banner_speed_seconds: Optional[int] = None
     site_banner_style: Optional[Literal["neon", "solid", "minimal"]] = None
     site_banner_position: Optional[Literal["below_nav", "bottom_fixed", "above_footer"]] = None
-    site_banner_scope: Optional[Literal["all", "tournaments", "events", "news", "community", "servers", "members", "custom"]] = None
+    site_banner_scope: Optional[Literal["all", "tournaments", "fastlap", "events", "news", "community", "servers", "members", "custom"]] = None
     site_banner_path: Optional[str] = None
     site_banner_audience: Optional[Literal["all", "logged_in", "members", "admins"]] = None
     site_banner_link_url: Optional[str] = None
@@ -106,7 +106,7 @@ BannerTone = Literal["info", "live", "warning", "success"]
 BannerMode = Literal["ticker", "static"]
 BannerStyle = Literal["neon", "solid", "minimal"]
 BannerPosition = Literal["below_nav", "bottom_fixed", "above_footer"]
-BannerScope = Literal["all", "tournaments", "events", "news", "community", "servers", "members", "custom"]
+BannerScope = Literal["all", "tournaments", "fastlap", "events", "news", "community", "servers", "members", "custom"]
 BannerAudience = Literal["all", "logged_in", "members", "admins"]
 BannerTemplate = Literal["custom", "live", "maintenance", "event", "registration", "discord"]
 
@@ -282,7 +282,7 @@ def _public_banner_doc(doc: dict, stats: dict | None = None) -> dict:
         "text": str(doc.get("text") or "").strip(),
         "tone": doc.get("tone") or "info",
         "mode": doc.get("mode") or "ticker",
-        "speed_seconds": max(8, min(90, int(doc.get("speed_seconds") or 22))),
+        "speed_seconds": max(8, min(180, int(doc.get("speed_seconds") or 22))),
         "style": doc.get("style") or "neon",
         "position": doc.get("position") or "below_nav",
         "scope": doc.get("scope") or "all",

@@ -6,7 +6,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 import { StatusBadge } from "@/components/tls/StatusBadge";
-import { AccountLevelPill, AccountLevelProgress, accountLevelFrameClass } from "@/components/tls/AccountLevel";
+import { AccountLevelPill, AccountLevelProgress, accountLevelFrameClass, accountLevelAuraClass } from "@/components/tls/AccountLevel";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameLabel } from "@/lib/gameLabels";
@@ -178,6 +178,7 @@ export default function PublicProfilePage() {
   const isPrivate = profile.privacy_public_profile === false;
   const joinedDate = profile.created_at ? new Date(profile.created_at) : null;
   const avatarFrame = accountLevelFrameClass(level.level);
+  const avatarAura = accountLevelAuraClass(level.level);
   const twitchChannel = normalizeTwitchChannel(profile.twitch_handle);
   const twitchUrl = twitchChannel ? `https://www.twitch.tv/${twitchChannel}` : "";
   const liveStream = twitchChannel
@@ -236,13 +237,15 @@ export default function PublicProfilePage() {
           <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Spieler", to: "/players" }, { label: profile.display_name || profile.username }]} className="mb-6" />
           <div className="flex flex-col md:flex-row gap-8 items-start">
             <div className="shrink-0">
-              {profile.avatar_url ? (
-                <img src={resolveMediaUrl(profile.avatar_url)} alt={profile.display_name} className={`w-32 h-32 md:w-40 md:h-40 rounded-sm border-2 ${avatarFrame} object-cover`} />
-              ) : (
-                <div className={`w-32 h-32 md:w-40 md:h-40 rounded-sm border-2 ${avatarFrame} bg-gradient-to-br from-[#29B6E8]/20 to-[#121212] flex items-center justify-center font-display font-black text-5xl text-[#29B6E8]`}>
-                  {(profile.display_name || profile.username || "?").slice(0, 2).toUpperCase()}
-                </div>
-              )}
+              <div className={avatarAura}>
+                {profile.avatar_url ? (
+                  <img src={resolveMediaUrl(profile.avatar_url)} alt={profile.display_name} className={`relative z-[1] w-32 h-32 md:w-40 md:h-40 rounded-sm border-2 ${avatarFrame} object-cover`} />
+                ) : (
+                  <div className={`relative z-[1] w-32 h-32 md:w-40 md:h-40 rounded-sm border-2 ${avatarFrame} bg-gradient-to-br from-[#29B6E8]/20 to-[#121212] flex items-center justify-center font-display font-black text-5xl text-[#29B6E8]`}>
+                    {(profile.display_name || profile.username || "?").slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">

@@ -264,6 +264,7 @@ function bannerMatchesPath(banner, pathname) {
   const scope = banner?.scope || "all";
   if (scope === "all") return true;
   if (scope === "tournaments") return path.startsWith("/tournaments") || path.startsWith("/tournament");
+  if (scope === "fastlap") return path.startsWith("/fastlap") || path.startsWith("/f1");
   if (scope === "events") return path.startsWith("/events") || path.startsWith("/event");
   if (scope === "news") return path.startsWith("/news");
   if (scope === "community") return ["/community", "/players", "/teams", "/servers"].some((prefix) => path.startsWith(prefix));
@@ -308,7 +309,7 @@ function SiteBanner({ banner, pathname, slot }) {
   const text = String(banner.text || "").trim();
   const repeated = `${text}  •  `;
   const content = repeated.repeat(8);
-  const speed = Math.max(8, Math.min(90, Number(banner.speed_seconds || 22)));
+  const speed = bannerTickerDuration(text, banner.speed_seconds);
   const linkUrl = String(banner.link_url || "");
   const linkLabel = banner.link_label || "Mehr";
   const trackClick = () => {
@@ -337,6 +338,12 @@ function SiteBanner({ banner, pathname, slot }) {
       </div>
     </div>
   );
+}
+
+function bannerTickerDuration(text, configuredSpeed) {
+  const saved = Number(configuredSpeed || 22);
+  const automatic = Math.ceil(String(text || "").length / 3.6);
+  return Math.max(8, Math.min(180, Math.max(saved, automatic)));
 }
 
 function getTwitchUrl(value) {

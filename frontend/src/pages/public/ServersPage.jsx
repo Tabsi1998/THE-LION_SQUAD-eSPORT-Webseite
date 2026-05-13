@@ -249,12 +249,12 @@ function ServerCard({ server }) {
             <div className="w-14 h-14 rounded-sm border border-white/10 bg-black/30 flex items-center justify-center overflow-hidden shrink-0">
               {iconUrl ? <img src={resolveMediaUrl(iconUrl)} alt="" className="w-full h-full object-contain p-2" /> : <Server className="w-6 h-6 text-[#29B6E8]" />}
             </div>
-            <div className="min-w-0 pt-0.5">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">
+            <div className="min-w-0 max-w-full pt-0.5">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold min-w-0">
                 <Gamepad2 className="w-3 h-3 shrink-0" />
                 <span className="truncate">{gameName(server)}</span>
               </div>
-              <h3 className="mt-1 pb-1 font-heading text-xl sm:text-2xl font-black uppercase leading-[1.08] break-normal hyphens-none [overflow-wrap:normal]">{server.name}</h3>
+              <h3 className="mt-1 pb-1 max-w-full font-heading text-xl sm:text-2xl font-black uppercase leading-[1.08] break-words hyphens-auto [overflow-wrap:anywhere]">{server.name}</h3>
             </div>
           </div>
           <span className={`shrink-0 border px-2 py-1 rounded-sm text-[10px] font-black uppercase tracking-widest ${statusClasses[status] || statusClasses.offline}`}>

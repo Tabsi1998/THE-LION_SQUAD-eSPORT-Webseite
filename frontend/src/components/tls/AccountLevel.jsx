@@ -33,6 +33,17 @@ export function accountAvatarFrameClass(level, isMember = false) {
   return isMember ? "border-[#FFD700]/50" : "border-white/15";
 }
 
+export function accountLevelAuraClass(level) {
+  const tier = accountLevelTier(level);
+  if (tier.key === "legendary") return "tls-profile-aura tls-profile-aura--legendary";
+  if (tier.key === "champion") return "tls-profile-aura tls-profile-aura--champion";
+  if (tier.key === "elite") return "tls-profile-aura tls-profile-aura--elite";
+  if (tier.key === "veteran") return "tls-profile-aura tls-profile-aura--veteran";
+  if (tier.key === "pro") return "tls-profile-aura tls-profile-aura--pro";
+  if (tier.key === "challenger") return "tls-profile-aura tls-profile-aura--challenger";
+  return "tls-profile-aura";
+}
+
 export function AccountLevelPill({ level, className = "" }) {
   const tier = accountLevelTier(level);
   return (
