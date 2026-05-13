@@ -54,7 +54,6 @@ export default function MemberProfilePage() {
                 ) : (
                   <div className="text-white/45 text-sm">Noch keine Biografie hinterlegt.</div>
                 )}
-                <MemberTwitchEmbed account={profile.linked_account} />
               </div>
               <aside className="space-y-4">
                 <InfoPanel title="Profil">
@@ -63,6 +62,7 @@ export default function MemberProfilePage() {
                   <InfoChips icon={Monitor} label="Plattformen" values={profile.platforms} />
                   <LinkedAccountCard account={profile.linked_account} />
                 </InfoPanel>
+                <MemberTwitchEmbed account={profile.linked_account} />
                 <Link to="/members" className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 border border-white/10 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white hover:bg-white/5">
                   <ArrowLeft className="w-4 h-4" /> Alle Mitglieder
                 </Link>
@@ -101,38 +101,51 @@ function MemberReferences({ profile }) {
   const stats = profile.reference_stats || {};
   if (!references.length) return null;
   return (
-    <section className="mt-8">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <section className="mt-10 border-t border-white/10 pt-8">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">
             <Trophy className="w-3.5 h-3.5" /> Referenzen
           </div>
           <h2 className="mt-1 font-heading text-2xl font-black uppercase">Vereinsplatzierungen</h2>
         </div>
-        <Link to="/references" className="inline-flex items-center gap-2 border border-[#29B6E8]/45 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:bg-[#29B6E8]/10 rounded-sm">
-          Alle Referenzen <ExternalLink className="w-3.5 h-3.5" />
+        <Link to="/references" className="inline-flex items-center gap-2 border border-white/10 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/65 hover:text-[#29B6E8] hover:border-[#29B6E8]/45 rounded-sm">
+          Alle Referenzen
         </Link>
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
-        <ReferenceStat label="Gold" value={stats.gold || 0} color="#FFD700" />
-        <ReferenceStat label="Silber" value={stats.silver || 0} color="#D8DDE5" />
-        <ReferenceStat label="Bronze" value={stats.bronze || 0} color="#CD7F32" />
-        <ReferenceStat label="Podest" value={stats.podiums || 0} color="#29B6E8" />
-        <ReferenceStat label="Solo" value={stats.solo || 0} />
-        <ReferenceStat label="Team" value={stats.team || 0} />
-      </div>
-      <div className="grid lg:grid-cols-2 gap-3">
-        {references.map((item) => <MemberReferenceCard key={item.id} item={item} />)}
+      <div className="grid xl:grid-cols-[18rem_minmax(0,1fr)] gap-5 items-start">
+        <ReferenceStatsPanel stats={stats} />
+        <div className="grid lg:grid-cols-2 gap-3">
+          {references.map((item) => <MemberReferenceCard key={item.id} item={item} />)}
+        </div>
       </div>
     </section>
   );
 }
 
-function ReferenceStat({ label, value, color = "#FFFFFF" }) {
+function ReferenceStatsPanel({ stats }) {
   return (
-    <div className="border border-white/10 bg-[#121212] rounded-sm px-3 py-2">
+    <aside className="border border-white/10 bg-[#101010] rounded-sm p-4 xl:sticky xl:top-24">
+      <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Bilanz</div>
+      <div className="mt-3 grid grid-cols-3 xl:grid-cols-1 gap-2">
+        <ReferenceStat label="Gold" value={stats.gold || 0} color="#FFD700" />
+        <ReferenceStat label="Silber" value={stats.silver || 0} color="#D8DDE5" />
+        <ReferenceStat label="Bronze" value={stats.bronze || 0} color="#CD7F32" />
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <ReferenceStat label="Podest" value={stats.podiums || 0} color="#29B6E8" small />
+        <ReferenceStat label="Solo" value={stats.solo || 0} small />
+        <ReferenceStat label="Team" value={stats.team || 0} small />
+      </div>
+    </aside>
+  );
+}
+
+function ReferenceStat({ label, value, color = "#FFFFFF", small = false }) {
+  return (
+    <div className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
       <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{label}</div>
-      <div className="font-display text-xl font-bold tabular-nums" style={{ color }}>{value}</div>
+      <div className={`font-display ${small ? "text-xl" : "text-2xl"} font-bold tabular-nums`} style={{ color }}>{value}</div>
     </div>
   );
 }
@@ -143,15 +156,15 @@ function MemberReferenceCard({ item }) {
   return (
     <Link to={`/references/${item.id}`} className="h-full block border border-white/10 bg-[#121212] rounded-sm hover:border-[#29B6E8]/55 transition">
       <div className="p-4 flex gap-4">
-        <div className={`w-16 shrink-0 border rounded-sm flex flex-col items-center justify-center ${referenceTone(item)}`}>
+        <div className={`w-14 shrink-0 border rounded-sm flex flex-col items-center justify-center ${referenceTone(item)}`}>
           {item.placement ? (
             <>
-              <Medal className="w-5 h-5 mb-1" />
-              <span className="font-display text-2xl font-black tabular-nums">{item.placement}.</span>
+              <Medal className="w-4 h-4 mb-1" />
+              <span className="font-display text-xl font-black tabular-nums">{item.placement}.</span>
             </>
           ) : (
             <>
-              <Trophy className="w-5 h-5 mb-1" />
+              <Trophy className="w-4 h-4 mb-1" />
               <span className="text-[10px] uppercase tracking-widest font-black">Dabei</span>
             </>
           )}
@@ -162,17 +175,18 @@ function MemberReferenceCard({ item }) {
             <span className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{gameLabel(item.game) || item.game_name || "Extern"}</span>
             {formatDate(item.start_date) && <span className="text-[10px] uppercase tracking-widest text-white/35">{formatDate(item.start_date)}</span>}
           </div>
-          <div className="mt-2 font-heading text-lg font-black uppercase leading-tight break-words">{item.title}</div>
+          <div className="mt-2 font-heading text-base font-black uppercase leading-tight break-words">{item.title}</div>
           <div className="mt-1 text-xs text-white/55 truncate">{item.team_name || item.organizer || "THE LION SQUAD"}</div>
           {(members.length > 0 || otherLineup.length > 0) && (
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {members.map((member) => (
+              {members.slice(0, 5).map((member) => (
                 <span key={member.profile_id || member.display_name} className="inline-flex items-center gap-1.5 border border-[#29B6E8]/25 bg-[#29B6E8]/10 rounded-sm px-2 py-1 text-xs text-white/75">
                   {member.avatar_url ? <img src={resolveMediaUrl(member.avatar_url)} alt="" className="w-4 h-4 rounded-sm object-cover" /> : <Users className="w-3 h-3 text-white/35" />}
                   {member.display_name}
                 </span>
               ))}
-              {otherLineup.map((name) => <span key={name} className="border border-white/10 bg-black/30 rounded-sm px-2 py-1 text-xs text-white/50">{name}</span>)}
+              {otherLineup.slice(0, Math.max(5 - members.length, 0)).map((name) => <span key={name} className="border border-white/10 bg-black/30 rounded-sm px-2 py-1 text-xs text-white/50">{name}</span>)}
+              {members.length + otherLineup.length > 5 && <span className="border border-white/10 bg-black/30 rounded-sm px-2 py-1 text-xs text-white/40">+{members.length + otherLineup.length - 5}</span>}
             </div>
           )}
         </div>
@@ -223,35 +237,20 @@ function MemberTwitchEmbed({ account }) {
   if (!account?.show_twitch_embed || !account?.twitch_handle) return null;
   const twitchUrl = `https://www.twitch.tv/${account.twitch_handle}`;
   return (
-    <div className="mt-8" data-testid="member-profile-twitch-embed">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#9146FF]">
-            <Radio className="w-3.5 h-3.5" /> Twitch
-          </div>
-          <h2 className="mt-1 font-heading text-2xl font-black uppercase">Stream im Vereinsprofil</h2>
-          <p className="mt-1 text-xs text-white/45">
-            Eingebettet vom verknuepften normalen Profil {account.username ? `@${account.username}` : ""}.
-          </p>
+    <div data-testid="member-profile-twitch-embed" className="border border-white/10 bg-[#121212] rounded-sm p-4">
+      <div className="mb-3">
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#9146FF]">
+          <Radio className="w-3 h-3" /> Twitch
         </div>
-        <div className="flex flex-wrap gap-2">
-          {account.profile_url && (
-            <Link to={account.profile_url} className="inline-flex items-center gap-2 border border-[#29B6E8]/45 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:bg-[#29B6E8]/10 rounded-sm">
-              Normales Profil <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
-          )}
-          <a href={twitchUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 border border-[#9146FF]/50 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#b88cff] hover:bg-[#9146FF]/10 rounded-sm">
-            Twitch <ExternalLink className="w-3.5 h-3.5" />
-          </a>
-        </div>
+        <div className="mt-1 font-heading font-black uppercase text-sm">Stream</div>
       </div>
       <StreamEmbed source={{
         twitch_enabled: true,
         twitch_channel: account.twitch_handle,
         stream_platform: "twitch",
-        stream_title: "Twitch Stream",
+        stream_title: account.username ? `@${account.username}` : "Twitch",
         stream_url: twitchUrl,
-      }} />
+      }} compact showExternalLink={false} />
     </div>
   );
 }

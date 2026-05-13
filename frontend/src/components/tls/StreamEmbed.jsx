@@ -21,7 +21,7 @@ function normalizeTwitchChannel(value) {
   return raw.replace(/^@/, "").replace(/^twitch\.tv\//i, "").replace(/^www\.twitch\.tv\//i, "").split(/[/?#]/)[0].toLowerCase();
 }
 
-export function StreamEmbed({ source }) {
+export function StreamEmbed({ source, compact = false, showExternalLink = true }) {
   const { hasConsent, openSettings } = useCookieConsent();
   if (!source) return null;
   const enabled = source.has_live_stream === true || (source.twitch_enabled && source.twitch_channel);
@@ -53,14 +53,14 @@ export function StreamEmbed({ source }) {
 
   return (
     <div className="border border-[#FF3B30]/30 bg-[#0A0A0A] rounded-sm overflow-hidden min-w-0 max-w-full">
-      <div className="flex items-center gap-2 px-4 py-2 bg-[#FF3B30]/10 border-b border-[#FF3B30]/20">
-        <Radio className="w-4 h-4 text-[#FF3B30] animate-pulse" />
-        <span className="font-display tracking-widest font-bold text-sm text-[#FF3B30]">{source.stream_title || "LIVE STREAM"}</span>
+      <div className={`flex items-center gap-2 ${compact ? "px-3 py-1.5" : "px-4 py-2"} bg-[#FF3B30]/10 border-b border-[#FF3B30]/20`}>
+        <Radio className={`${compact ? "w-3.5 h-3.5" : "w-4 h-4"} text-[#FF3B30] animate-pulse`} />
+        <span className={`${compact ? "text-xs" : "text-sm"} font-display tracking-widest font-bold text-[#FF3B30] truncate`}>{source.stream_title || "LIVE STREAM"}</span>
         <span className="ml-auto text-[10px] uppercase tracking-widest text-white/50">{platform.toUpperCase()}</span>
-        {url && <a href={url} target="_blank" rel="noreferrer" data-testid="stream-open-external" className="text-[10px] uppercase tracking-widest text-white/70 hover:text-white inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Öffnen</a>}
+        {showExternalLink && url && <a href={url} target="_blank" rel="noreferrer" data-testid="stream-open-external" className="text-[10px] uppercase tracking-widest text-white/70 hover:text-white inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Öffnen</a>}
       </div>
       {embedSrc && hasConsent("external_media") ? (
-        <div className="aspect-video min-h-[180px] sm:min-h-0">
+        <div className={`aspect-video ${compact ? "min-h-[10rem]" : "min-h-[180px]"} sm:min-h-0`}>
           <iframe src={embedSrc} className="block w-full h-full border-0" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen frameBorder={0} title="Live Stream" />
         </div>
       ) : embedSrc ? (
