@@ -6,7 +6,7 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Clipboard, Mail, MessageSquare, MapPin, Send, Check } from "lucide-react";
+import { Mail, MessageSquare, MapPin, Send, Check } from "lucide-react";
 
 export default function ContactPage() {
   const { user } = useAuth();
@@ -46,12 +46,6 @@ export default function ContactPage() {
 
   const contactEmail = branding?.contact_email || "info@lionsquad.at";
 
-  const copyEmail = async () => {
-    if (!navigator.clipboard) return;
-    await navigator.clipboard.writeText(contactEmail).catch(() => null);
-    toast.success("E-Mail-Adresse kopiert.");
-  };
-
   return (
     <PublicLayout>
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -68,18 +62,11 @@ export default function ContactPage() {
             <h3 className="font-heading font-black uppercase text-base">Discord Server</h3>
             <p className="mt-1 text-sm text-white/60">Schnellster Weg zu uns.</p>
           </a>
-          <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
+          <a href={`mailto:${contactEmail}`} data-testid="contact-email-link" className="border border-white/10 hover:border-[#29B6E8]/60 rounded-sm bg-[#121212] p-5 transition group">
             <Mail className="w-6 h-6 text-[#29B6E8] mb-3" />
             <h3 className="font-heading font-black uppercase text-base">E-Mail direkt</h3>
-            <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2">
-              <a href={`mailto:${contactEmail}`} className="text-sm text-[#29B6E8] hover:text-white break-all transition">
-                {contactEmail}
-              </a>
-              <button type="button" onClick={copyEmail} className="inline-flex items-center gap-2 self-start px-3 py-1.5 border border-white/10 text-white/60 hover:text-white hover:border-[#29B6E8]/50 rounded-sm text-[11px] font-bold uppercase tracking-wider transition" title="E-Mail-Adresse kopieren">
-                <Clipboard className="w-3.5 h-3.5" /> Kopieren
-              </button>
-            </div>
-          </div>
+            <p className="mt-1 text-sm text-white/60 group-hover:text-white/80 break-all transition">{contactEmail}</p>
+          </a>
         </div>
 
         {/* Formular */}
