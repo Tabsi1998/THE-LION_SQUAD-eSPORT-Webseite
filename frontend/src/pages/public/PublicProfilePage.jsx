@@ -363,7 +363,7 @@ export default function PublicProfilePage() {
         )}
 
         {tab === "overview" && (
-          <div className="grid lg:grid-cols-3 gap-8">
+          <div className="grid lg:grid-cols-3 gap-8 min-w-0">
             {/* Recent achievements */}
             <div className="lg:col-span-2">
               <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Medal className="w-5 h-5 text-[#FFD700]" /> Letzte Achievements</h2>
@@ -389,23 +389,21 @@ export default function PublicProfilePage() {
                 <button onClick={() => setTab("badges")} className="mt-4 text-sm font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">Alle Achievements ansehen →</button>
               )}
             </div>
-            <div className="space-y-6">
+            <div className="space-y-6 min-w-0">
               {profile.show_twitch_embed && twitchChannel && (
-                <div data-testid="public-profile-twitch-embed">
+                <div data-testid="public-profile-twitch-embed" className="min-w-0 max-w-full">
                   <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2">
                     <svg className="w-5 h-5 text-[#9146FF]" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
                     Live auf Twitch
                   </h2>
                   {hasConsent("external_media") ? (
-                    <div className="border border-[#9146FF]/30 bg-black rounded-sm overflow-hidden aspect-video">
+                    <div className="w-full max-w-full border border-[#9146FF]/30 bg-black rounded-sm overflow-hidden aspect-video min-h-[180px] sm:min-h-0">
                       <iframe
                         title={`Twitch Stream ${twitchChannel}`}
                         src={twitchPlayerSrc(twitchChannel)}
-                        width="100%"
-                        height="100%"
+                        className="block w-full h-full border-0"
                         allow="autoplay; fullscreen; picture-in-picture"
                         allowFullScreen
-                        frameBorder="0"
                       />
                     </div>
                   ) : (

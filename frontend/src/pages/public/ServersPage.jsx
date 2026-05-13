@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Clipboard, ExternalLink, Gamepad2, KeyRound, Lock, Map, Server, Shield, Signal, Users } from "lucide-react";
+import { Clipboard, ExternalLink, Eye, Gamepad2, KeyRound, Lock, Map, Server, Shield, Signal, Users } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useAuth } from "@/context/AuthContext";
 import { api, resolveMediaUrl } from "@/lib/api";
@@ -145,6 +145,8 @@ function ServerSection({ title, items }) {
 }
 
 function ServerCard({ server }) {
+  const [revealedSecret, setRevealedSecret] = useState("");
+  const [secretLoading, setSecretLoading] = useState(false);
   const status = server.status || "offline";
   const max = Number(server.max_players || 0);
   const current = Number(server.player_count || 0);
@@ -160,17 +162,47 @@ function ServerCard({ server }) {
     await navigator.clipboard.writeText(server.address).catch(() => null);
     toast.success("Server-Adresse kopiert.");
   };
-  const copySecret = async () => {
-    if (!server.has_access_secret || !navigator.clipboard) return;
+
+  useEffect(() => {
+    if (!revealedSecret) return undefined;
+    const timer = window.setTimeout(() => setRevealedSecret(""), 10000);
+    return () => window.clearTimeout(timer);
+  }, [revealedSecret]);
+
+  const loadSecret = async () => {
+    if (!server.has_access_secret || secretLoading) return "";
+    setSecretLoading(true);
     try {
       const { data } = await api.get(`/game-servers/${server.id}/access`);
       if (!data?.access_secret) throw new Error("missing-secret");
-      await navigator.clipboard.writeText(data.access_secret);
-      toast.success(`${secretLabels[server.access_secret_kind] || "Zugang"} kopiert.`);
+      return data.access_secret;
     } catch {
       toast.error("Zugang konnte nicht geladen werden.");
+      return "";
+    } finally {
+      setSecretLoading(false);
     }
   };
+
+  const copySecret = async () => {
+    if (!navigator.clipboard) return;
+    const secret = await loadSecret();
+    if (!secret) return;
+    try {
+      await navigator.clipboard.writeText(secret);
+      toast.success(`${secretLabels[server.access_secret_kind] || "Zugang"} kopiert.`);
+    } catch {
+      toast.error("Zugang konnte nicht kopiert werden.");
+    }
+  };
+
+  const revealSecret = async () => {
+    const secret = await loadSecret();
+    if (!secret) return;
+    setRevealedSecret(secret);
+    toast.success("Zugang wird 10 Sekunden angezeigt.");
+  };
+
   const quickFacts = [
     { label: "Zugriff", value: accessText(server) },
     { label: "Spieler", value: playerText(server) },
@@ -181,7 +213,6 @@ function ServerCard({ server }) {
 
   return (
     <article className={`group relative overflow-hidden border rounded-sm bg-[#101010] min-h-[19rem] flex flex-col transition ${status === "maintenance" ? "border-[#FFD700]/45" : "border-white/10 hover:border-white/20"}`}>
-      {status === "maintenance" && <MaintenanceTape text={maintenanceBandText} />}
       <div className={`h-1 ${status === "online" ? "bg-[#00FF88]" : status === "maintenance" ? "bg-[#FFD700]" : status === "planned" ? "bg-[#29B6E8]" : "bg-white/10"}`} />
 
       <div className="p-5 flex flex-col grow">
@@ -195,14 +226,12 @@ function ServerCard({ server }) {
                 <Gamepad2 className="w-3 h-3 shrink-0" />
                 <span className="truncate">{gameName(server)}</span>
               </div>
-              <h3 className="mt-1 pb-1 font-heading text-xl sm:text-2xl font-black uppercase leading-[1.08] break-words hyphens-auto">{server.name}</h3>
+              <h3 className="mt-1 pb-1 font-heading text-xl sm:text-2xl font-black uppercase leading-[1.08] break-normal hyphens-none [overflow-wrap:normal]">{server.name}</h3>
             </div>
           </div>
-          {status !== "maintenance" && (
-            <span className={`shrink-0 border px-2 py-1 rounded-sm text-[10px] font-black uppercase tracking-widest ${statusClasses[status] || statusClasses.offline}`}>
-              {statusLabels[status] || status}
-            </span>
-          )}
+          <span className={`shrink-0 border px-2 py-1 rounded-sm text-[10px] font-black uppercase tracking-widest ${statusClasses[status] || statusClasses.offline}`}>
+            {statusLabels[status] || status}
+          </span>
         </div>
 
         {server.description && <p className="mt-4 text-sm leading-relaxed text-white/60 line-clamp-3">{server.description}</p>}
@@ -229,6 +258,8 @@ function ServerCard({ server }) {
           </div>
         )}
 
+        {status === "maintenance" && <MaintenanceTape text={maintenanceBandText} />}
+
         <div className="mt-auto pt-5 space-y-2">
           {server.address && (
             <button type="button" onClick={copyAddress} className="w-full text-left font-mono text-xs border border-white/10 bg-black/30 rounded-sm px-3 py-2 text-white/75 break-all hover:border-[#29B6E8]/50 hover:text-white transition inline-flex items-center justify-between gap-3">
@@ -239,15 +270,20 @@ function ServerCard({ server }) {
           {server.password_hint && <div className="text-xs text-[#FFD700]/80">{server.password_hint}</div>}
           {server.access_secret_kind && server.access_secret_kind !== "none" && (
             <div className="border border-[#FFD700]/25 bg-[#FFD700]/10 rounded-sm p-3">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[10px] uppercase tracking-widest text-[#FFD700] font-black">{server.access_label || secretLabels[server.access_secret_kind] || "Zugang"}</div>
-                  <div className="font-mono text-xs text-white/70 mt-1">{server.has_access_secret ? (server.access_secret_masked || "••••••") : "siehe Hinweis"}</div>
+                  <div className="font-mono text-xs text-white/70 mt-1 break-all">{server.has_access_secret ? (revealedSecret || server.access_secret_masked || "••••••") : "siehe Hinweis"}</div>
                 </div>
                 {server.has_access_secret && (
-                  <button type="button" onClick={copySecret} className="shrink-0 inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FFD700]/10">
-                    <KeyRound className="w-3.5 h-3.5" /> Kopieren
-                  </button>
+                  <div className="shrink-0 flex flex-wrap gap-2">
+                    <button type="button" onClick={revealSecret} disabled={secretLoading} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/75 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#FFD700]/45 hover:text-[#FFD700] disabled:opacity-50" title="Zugang 10 Sekunden anzeigen">
+                      <Eye className="w-3.5 h-3.5" /> Anzeigen
+                    </button>
+                    <button type="button" onClick={copySecret} disabled={secretLoading} className="inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FFD700]/10 disabled:opacity-50">
+                      <KeyRound className="w-3.5 h-3.5" /> Kopieren
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -281,10 +317,11 @@ function ServerCard({ server }) {
 }
 
 function MaintenanceTape({ text }) {
-  const repeated = `${text || "Wartung"}  •  `;
+  const repeated = `${text || "Wartung"}  •  Under Construction  •  `;
   return (
-    <div className="tls-maintenance-tape pointer-events-none absolute -left-10 right-auto top-8 z-10 w-[130%] rotate-[-8deg] border-y border-white/80 shadow-[0_10px_28px_rgba(0,0,0,0.45)]">
-      <div className="tls-maintenance-tape__stripe" />
+    <div className="tls-maintenance-tape pointer-events-none">
+      <div className="tls-maintenance-tape__stripe tls-maintenance-tape__stripe--one" />
+      <div className="tls-maintenance-tape__stripe tls-maintenance-tape__stripe--two" />
       <div className="tls-maintenance-tape__marquee">
         <span className="tls-marquee-track" aria-label={text || "Wartung"}>
           <span>{repeated.repeat(8)}</span>

@@ -52,7 +52,7 @@ export function StreamEmbed({ source }) {
   }
 
   return (
-    <div className="border border-[#FF3B30]/30 bg-[#0A0A0A] rounded-sm overflow-hidden">
+    <div className="border border-[#FF3B30]/30 bg-[#0A0A0A] rounded-sm overflow-hidden min-w-0 max-w-full">
       <div className="flex items-center gap-2 px-4 py-2 bg-[#FF3B30]/10 border-b border-[#FF3B30]/20">
         <Radio className="w-4 h-4 text-[#FF3B30] animate-pulse" />
         <span className="font-display tracking-widest font-bold text-sm text-[#FF3B30]">{source.stream_title || "LIVE STREAM"}</span>
@@ -60,8 +60,8 @@ export function StreamEmbed({ source }) {
         {url && <a href={url} target="_blank" rel="noreferrer" data-testid="stream-open-external" className="text-[10px] uppercase tracking-widest text-white/70 hover:text-white inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Öffnen</a>}
       </div>
       {embedSrc && hasConsent("external_media") ? (
-        <div className="aspect-video">
-          <iframe src={embedSrc} className="w-full h-full" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen frameBorder={0} title="Live Stream" />
+        <div className="aspect-video min-h-[180px] sm:min-h-0">
+          <iframe src={embedSrc} className="block w-full h-full border-0" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen frameBorder={0} title="Live Stream" />
         </div>
       ) : embedSrc ? (
         <div className="p-8 text-center">
