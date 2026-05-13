@@ -5,7 +5,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { toast } from "sonner";
-import { ExternalLink, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ExternalLink, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
 const emptyReference = {
   title: "",
@@ -42,7 +42,7 @@ const STATUS_OPTIONS = [["active", "Laufend"], ["planned", "Geplant"], ["complet
 const medalLabel = { gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const visibilityLabel = Object.fromEntries(VISIBILITY_OPTIONS);
 const statusLabel = Object.fromEntries(STATUS_OPTIONS);
-const DEFAULT_PLATFORM_TAGS = ["ALL", "XBO+PS", "PC", "PS", "XBO"];
+const DEFAULT_PLATFORM_TAGS = ["ALL", "Xbox", "PlayStation", "PC", "XBO+PS", "PS", "XBO"];
 const DEFAULT_TITLE_SEGMENTS = ["HC", "CORE", "S&D 4vs4", "S&D 2vs2", "S&Z 4vs4", "S&Z 2vs2", "LIGA A", "NEWCOMER LIGA"];
 
 function cleanSuggestion(value) {
@@ -71,17 +71,26 @@ function titleParts(title) {
   return { platforms, segments: [...segments, ...modeTokens] };
 }
 
-function buildReferenceSuggestions(items) {
+function helperList(helpers, key) {
+  return Array.isArray(helpers?.[key]) ? helpers[key] : [];
+}
+
+function helperPlatformKeys(helpers) {
+  return helperList(helpers, "platforms").map((item) => item?.key || item).filter(Boolean);
+}
+
+function buildReferenceSuggestions(items, helpers) {
   const parsedTitles = (items || []).map((item) => titleParts(item.title));
+  const auto = helpers?.auto || {};
   return {
     titles: uniqueSuggestions((items || []).map((item) => item.title), 160),
-    organizers: uniqueSuggestions((items || []).map((item) => item.organizer)),
-    gameNames: uniqueSuggestions((items || []).map((item) => item.game_name)),
-    teamNames: uniqueSuggestions((items || []).map((item) => item.team_name)),
-    placementLabels: uniqueSuggestions((items || []).map((item) => item.placement_label)),
-    locations: uniqueSuggestions((items || []).map((item) => item.location)),
-    platformTags: uniqueSuggestions([...DEFAULT_PLATFORM_TAGS, ...parsedTitles.flatMap((part) => part.platforms)], 20),
-    titleSegments: uniqueSuggestions([...DEFAULT_TITLE_SEGMENTS, ...parsedTitles.flatMap((part) => part.segments)], 28),
+    organizers: uniqueSuggestions([...helperList(helpers, "organizers"), ...helperList(auto, "organizers"), ...(items || []).map((item) => item.organizer)]),
+    gameNames: uniqueSuggestions([...helperList(helpers, "game_names"), ...helperList(auto, "game_names"), ...(items || []).map((item) => item.game_name)]),
+    teamNames: uniqueSuggestions([...helperList(helpers, "team_names"), ...helperList(auto, "team_names"), ...(items || []).map((item) => item.team_name)]),
+    placementLabels: uniqueSuggestions([...helperList(helpers, "placement_labels"), ...helperList(auto, "placement_labels"), ...(items || []).map((item) => item.placement_label)]),
+    locations: uniqueSuggestions([...helperList(helpers, "locations"), ...helperList(auto, "locations"), ...(items || []).map((item) => item.location)]),
+    platformTags: uniqueSuggestions([...helperPlatformKeys(helpers), ...helperPlatformKeys(auto), ...DEFAULT_PLATFORM_TAGS, ...parsedTitles.flatMap((part) => part.platforms)], 30),
+    titleSegments: uniqueSuggestions([...helperList(helpers, "title_segments"), ...helperList(auto, "title_segments"), ...DEFAULT_TITLE_SEGMENTS, ...parsedTitles.flatMap((part) => part.segments)], 40),
   };
 }
 
@@ -110,20 +119,23 @@ export default function AdminReferencesPage() {
   const [summary, setSummary] = useState({});
   const [games, setGames] = useState([]);
   const [memberProfiles, setMemberProfiles] = useState([]);
+  const [helperSettings, setHelperSettings] = useState(null);
   const [editing, setEditing] = useState(null);
   const confirm = useConfirm();
-  const suggestions = useMemo(() => buildReferenceSuggestions(items), [items]);
+  const suggestions = useMemo(() => buildReferenceSuggestions(items, helperSettings), [items, helperSettings]);
 
   const load = useCallback(async () => {
-    const [{ data: refs }, { data: gameRows }, { data: profileRows }] = await Promise.all([
+    const [{ data: refs }, { data: gameRows }, { data: profileRows }, { data: helpers }] = await Promise.all([
       api.get("/references/admin"),
       api.get("/games"),
       api.get("/membership/profiles/admin/all"),
+      api.get("/references/admin/helpers"),
     ]);
     setItems(refs.items || []);
     setSummary(refs.summary || {});
     setGames(gameRows || []);
     setMemberProfiles(profileRows || []);
+    setHelperSettings(helpers || null);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -159,6 +171,8 @@ export default function AdminReferencesPage() {
         <Stat label="Bronze" value={summary.bronze || 0} tone="bronze" />
         <Stat label="Spiele" value={summary.games || 0} />
       </div>
+
+      <ReferenceHelperAdmin helpers={helperSettings} onSaved={(helpers) => { setHelperSettings(helpers); load(); }} />
 
       <div className="space-y-3">
         {items.map((item) => (
@@ -212,6 +226,101 @@ function Stat({ label, value, tone }) {
       <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</div>
       <div className={`mt-1 font-display text-3xl font-black ${color}`}>{value}</div>
     </div>
+  );
+}
+
+function helpersToForm(helpers) {
+  return {
+    platforms: (helpers?.platforms || []).map((item) => `${item.key} = ${item.label}`).join("\n"),
+    organizers: (helpers?.organizers || []).join("\n"),
+    title_segments: (helpers?.title_segments || []).join("\n"),
+    game_names: (helpers?.game_names || []).join("\n"),
+    team_names: (helpers?.team_names || []).join("\n"),
+    placement_labels: (helpers?.placement_labels || []).join("\n"),
+    locations: (helpers?.locations || []).join("\n"),
+  };
+}
+
+function parseLines(value) {
+  return uniqueSuggestions(String(value || "").split(/\r?\n/), 160);
+}
+
+function parsePlatformLines(value) {
+  return String(value || "").split(/\r?\n/).map((line) => {
+    const raw = line.trim();
+    if (!raw) return null;
+    const match = raw.match(/^(.+?)(?:\s*[=:]\s*(.+))?$/);
+    const key = cleanSuggestion(match?.[1]);
+    const label = cleanSuggestion(match?.[2]) || key;
+    return key ? { key, label } : null;
+  }).filter(Boolean);
+}
+
+function ReferenceHelperAdmin({ helpers, onSaved }) {
+  const [form, setForm] = useState(helpersToForm(helpers));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setForm(helpersToForm(helpers));
+  }, [helpers]);
+
+  if (!helpers) return null;
+
+  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const save = async () => {
+    setSaving(true);
+    try {
+      const payload = {
+        platforms: parsePlatformLines(form.platforms),
+        organizers: parseLines(form.organizers),
+        title_segments: parseLines(form.title_segments),
+        game_names: parseLines(form.game_names),
+        team_names: parseLines(form.team_names),
+        placement_labels: parseLines(form.placement_labels),
+        locations: parseLines(form.locations),
+      };
+      const { data } = await api.patch("/references/admin/helpers", payload);
+      toast.success("Referenz-Helfer gespeichert.");
+      onSaved(data);
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <details className="mb-6 border border-white/10 bg-[#121212] rounded-sm">
+      <summary className="cursor-pointer px-4 py-3 text-sm font-bold uppercase tracking-wider text-white/75 hover:text-[#29B6E8]">
+        Referenz-Helfer verwalten
+      </summary>
+      <div className="border-t border-white/10 p-4 space-y-4">
+        <p className="text-sm text-white/55 max-w-3xl">
+          Manuelle Helfer bleiben gespeichert. Automatisch erkannte Werte aus Referenzen kommen zusätzlich dazu. Plattformen im Format <span className="font-mono text-white/80">Tag = Anzeige</span>, z.B. <span className="font-mono text-white/80">XBO = Xbox</span>.
+        </p>
+        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+          <HelperTextArea label="Plattformen" value={form.platforms} onChange={(v) => set("platforms", v)} rows={7} />
+          <HelperTextArea label="Veranstalter / Ligen" value={form.organizers} onChange={(v) => set("organizers", v)} rows={7} />
+          <HelperTextArea label="Modus-/Titel-Bausteine" value={form.title_segments} onChange={(v) => set("title_segments", v)} rows={7} />
+          <HelperTextArea label="Freie Spielnamen" value={form.game_names} onChange={(v) => set("game_names", v)} />
+          <HelperTextArea label="Team-/Lineup-Namen" value={form.team_names} onChange={(v) => set("team_names", v)} />
+          <HelperTextArea label="Platzierungslabels" value={form.placement_labels} onChange={(v) => set("placement_labels", v)} />
+          <HelperTextArea label="Orte" value={form.locations} onChange={(v) => set("locations", v)} />
+        </div>
+        <button type="button" onClick={save} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
+          <Save className="w-4 h-4" /> {saving ? "Speichere..." : "Helfer speichern"}
+        </button>
+      </div>
+    </details>
+  );
+}
+
+function HelperTextArea({ label, value, onChange, rows = 5 }) {
+  return (
+    <label className="block">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <textarea rows={rows} value={value || ""} onChange={(e) => onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono leading-relaxed" />
+    </label>
   );
 }
 

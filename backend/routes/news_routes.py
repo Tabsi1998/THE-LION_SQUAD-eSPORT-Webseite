@@ -554,8 +554,127 @@ def _reference_summary(items: list[dict]) -> dict:
     }
 
 
+REFERENCE_HELPER_DEFAULTS = {
+    "platforms": [
+        {"key": "ALL", "label": "Alle Plattformen"},
+        {"key": "Xbox", "label": "Xbox"},
+        {"key": "PlayStation", "label": "PlayStation"},
+        {"key": "PC", "label": "PC"},
+        {"key": "XBO", "label": "Xbox"},
+        {"key": "PS", "label": "PlayStation"},
+    ],
+    "title_segments": ["HC", "CORE", "S&D 4vs4", "S&D 2vs2", "S&Z 4vs4", "S&Z 2vs2", "LIGA A", "NEWCOMER LIGA"],
+    "organizers": [],
+    "game_names": [],
+    "team_names": ["THE LION SQUAD"],
+    "placement_labels": ["Teilnahme", "Top 3", "Podium", "Finale"],
+    "locations": ["Online"],
+}
+
+
+def _clean_helper_value(value) -> str:
+    return str(value or "").strip()
+
+
+def _unique_helper_values(values: list, limit: int = 120) -> list[str]:
+    seen: dict[str, str] = {}
+    for raw in values or []:
+        value = _clean_helper_value(raw)
+        if not value:
+            continue
+        key = value.casefold()
+        if key not in seen:
+            seen[key] = value
+    return sorted(seen.values(), key=lambda item: item.casefold())[:limit]
+
+
+def _normalize_platform_helpers(value) -> list[dict]:
+    rows = []
+    for raw in value or []:
+        if isinstance(raw, dict):
+            key = _clean_helper_value(raw.get("key"))
+            label = _clean_helper_value(raw.get("label")) or key
+        else:
+            key = _clean_helper_value(raw)
+            label = key
+        if key:
+            rows.append({"key": key, "label": label})
+    seen: dict[str, dict] = {}
+    for row in rows:
+        lookup = row["key"].casefold()
+        if lookup not in seen:
+            seen[lookup] = row
+    return list(seen.values())[:80]
+
+
+def _normalize_reference_helpers(doc: dict | None) -> dict:
+    raw = doc or {}
+    return {
+        "platforms": _normalize_platform_helpers(raw.get("platforms") or REFERENCE_HELPER_DEFAULTS["platforms"]),
+        "title_segments": _unique_helper_values((raw.get("title_segments") or []) + REFERENCE_HELPER_DEFAULTS["title_segments"]),
+        "organizers": _unique_helper_values(raw.get("organizers") or []),
+        "game_names": _unique_helper_values(raw.get("game_names") or []),
+        "team_names": _unique_helper_values((raw.get("team_names") or []) + REFERENCE_HELPER_DEFAULTS["team_names"]),
+        "placement_labels": _unique_helper_values((raw.get("placement_labels") or []) + REFERENCE_HELPER_DEFAULTS["placement_labels"]),
+        "locations": _unique_helper_values((raw.get("locations") or []) + REFERENCE_HELPER_DEFAULTS["locations"]),
+    }
+
+
+async def _get_reference_helpers(db) -> dict:
+    doc = await db.settings.find_one({"id": "reference_helpers"}, {"_id": 0})
+    return _normalize_reference_helpers(doc)
+
+
+def _reference_title_platforms(title: str | None) -> list[str]:
+    rest = _clean_helper_value(title)
+    platforms = []
+    match = re.match(r"^\[([^\]]+)\]\s*", rest)
+    while match:
+        platforms.append(_clean_helper_value(match.group(1)))
+        rest = rest[match.end():].strip()
+        match = re.match(r"^\[([^\]]+)\]\s*", rest)
+    return [item for item in platforms if item]
+
+
+def _reference_title_segments(title: str | None) -> list[str]:
+    raw = re.sub(r"\[[^\]]+\]\s*", " ", _clean_helper_value(title))
+    chunks = [part.strip() for part in re.split(r"\s+\|\s+|[-–—]", raw) if part.strip()]
+    tokens = [match.group(1).upper().replace("  ", " ") for match in re.finditer(r"\b(HC|CORE|S&D\s*\d+vs\d+|S&Z\s*\d+vs\d+|SEARCH\s*&\s*DESTROY)\b", raw, re.I)]
+    cleaned = [re.sub(r"season\s*#?\d+", "", chunk, flags=re.I).strip() for chunk in chunks]
+    return _unique_helper_values([part for part in cleaned + tokens if 2 <= len(part) <= 32], 40)
+
+
+def _platform_label(key: str, platform_helpers: list[dict]) -> str:
+    raw = _clean_helper_value(key)
+    lookup = {item["key"].casefold(): item["label"] for item in platform_helpers}
+    if raw.casefold() in lookup:
+        return lookup[raw.casefold()]
+    parts = [_clean_helper_value(part) for part in re.split(r"[+/,&]", raw) if _clean_helper_value(part)]
+    if len(parts) > 1:
+        return " + ".join(lookup.get(part.casefold(), part) for part in parts)
+    return raw
+
+
+def _reference_auto_helpers(items: list[dict]) -> dict:
+    platforms = [
+        {"key": platform, "label": _platform_label(platform, REFERENCE_HELPER_DEFAULTS["platforms"])}
+        for item in items
+        for platform in _reference_title_platforms(item.get("title"))
+    ]
+    return {
+        "platforms": _normalize_platform_helpers(platforms),
+        "title_segments": _unique_helper_values([segment for item in items for segment in _reference_title_segments(item.get("title"))]),
+        "organizers": _unique_helper_values([item.get("organizer") for item in items]),
+        "game_names": _unique_helper_values([item.get("game_name") for item in items]),
+        "team_names": _unique_helper_values([item.get("team_name") for item in items]),
+        "placement_labels": _unique_helper_values([item.get("placement_label") for item in items]),
+        "locations": _unique_helper_values([item.get("location") for item in items]),
+    }
+
+
 async def _enrich_references(items: list[dict]) -> list[dict]:
     db = get_db()
+    helpers = await _get_reference_helpers(db)
     game_ids = list({item.get("game_id") for item in items if item.get("game_id")})
     games = {}
     if game_ids:
@@ -600,6 +719,11 @@ async def _enrich_references(items: list[dict]) -> list[dict]:
             }
             item["game_name"] = item.get("game_name") or display_name
         item["medal"] = _medal_for_placement(item.get("placement"))
+        platforms = _reference_title_platforms(item.get("title"))
+        item["reference_meta"] = {
+            "platforms": [{"key": platform, "label": _platform_label(platform, helpers["platforms"])} for platform in platforms],
+            "title_segments": _reference_title_segments(item.get("title")),
+        }
         item["lineup_members"] = [
             {
                 **member,
@@ -763,6 +887,25 @@ async def admin_list_references(me: dict = Depends(require_admin())):
     refs = await db.references.find({}, {"_id": 0}).to_list(1000)
     refs = _sort_references(await _enrich_references(refs))
     return {"items": refs, "summary": _reference_summary(refs)}
+
+
+@router.get("/references/admin/helpers")
+async def admin_get_reference_helpers(me: dict = Depends(require_admin())):
+    db = get_db()
+    helpers = await _get_reference_helpers(db)
+    refs = await db.references.find({}, {"_id": 0}).to_list(1000)
+    return {**helpers, "auto": _reference_auto_helpers(refs)}
+
+
+@router.patch("/references/admin/helpers")
+async def admin_update_reference_helpers(body: dict, me: dict = Depends(require_admin())):
+    db = get_db()
+    helpers = _normalize_reference_helpers(body or {})
+    helpers["id"] = "reference_helpers"
+    helpers["updated_at"] = now_utc().isoformat()
+    await db.settings.update_one({"id": "reference_helpers"}, {"$set": helpers}, upsert=True)
+    helpers.pop("_id", None)
+    return _normalize_reference_helpers(helpers)
 
 
 @router.get("/references/{rid}")

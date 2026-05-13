@@ -61,16 +61,20 @@ function titleParts(item) {
     match = rest.match(/^\[([^\]]+)\]\s*/);
   }
   const segments = rest.split(/\s*\|\s*/).map((part) => part.trim()).filter(Boolean);
-  const chips = platforms.map(platformLabel);
+  const metaPlatforms = Array.isArray(item.reference_meta?.platforms) ? item.reference_meta.platforms : [];
+  const platformLabels = platforms.map((platform) => (
+    metaPlatforms.find((entry) => entry.key === platform)?.label || platformLabel(platform)
+  ));
+  const chips = platformLabels;
   if (segments[0]) {
     const format = segments[0].match(/\b(HC|CORE)\b/i)?.[1]?.toUpperCase();
     if (format) chips.push(format);
   }
   if (segments.length >= 3) {
     chips.push(segments[1]);
-    return { title: segments.slice(2).join(" | "), platforms, chips };
+    return { title: segments.slice(2).join(" | "), platforms, platformLabels, chips };
   }
-  return { title: rest || item.title, platforms, chips };
+  return { title: rest || item.title, platforms, platformLabels, chips };
 }
 
 function gameKey(item) {
@@ -94,9 +98,10 @@ function groupReferences(items) {
       });
     }
     const game = games.get(gKey);
-    const platform = titleParts(item).platforms[0] || "all";
+    const parts = titleParts(item);
+    const platform = parts.platforms[0] || "all";
     if (!game.platforms.has(platform)) {
-      game.platforms.set(platform, { key: platform, label: platformLabel(platform), items: [] });
+      game.platforms.set(platform, { key: platform, label: parts.platformLabels[0] || platformLabel(platform), items: [] });
     }
     game.platforms.get(platform).items.push(item);
   });
@@ -139,8 +144,9 @@ export default function ReferencesPage() {
   });
   const gameOptions = groupReferences(items).map((game) => ({ key: game.key, label: game.title, count: game.count }));
   const platformOptions = Array.from(new Map(items.map((item) => {
-    const platform = titleParts(item).platforms[0] || "all";
-    return [platform, { key: platform, label: platformLabel(platform) }];
+    const parts = titleParts(item);
+    const platform = parts.platforms[0] || "all";
+    return [platform, { key: platform, label: parts.platformLabels[0] || platformLabel(platform) }];
   })).values());
   const groupedItems = groupReferences(filteredItems);
 
