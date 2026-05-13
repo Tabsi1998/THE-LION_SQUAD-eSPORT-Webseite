@@ -410,19 +410,42 @@ async def resend_user_invite(user_id: str, me: dict = Depends(require_super())):
 
 
 @router.get("/public-list")
-async def list_public_users():
+async def list_public_users(
+    q: str | None = None,
+    limit: int = 2000,
+    offset: int = 0,
+    paged: bool = False,
+):
     """Public listing of all users with public profile (community + members).
 
     Phase C: enriches each user with `profile_completeness`, `achievements_count`
     and `top_achievement` (highest tier earned, ignoring negatives).
     """
     db = get_db()
-    users = await db.users.find(
-        {"privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}},
+    query: dict = {"privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}}
+    needle = (q or "").strip()
+    if needle:
+        escaped = re.escape(needle)
+        query["$or"] = [
+            {"username": {"$regex": escaped, "$options": "i"}},
+            {"display_name": {"$regex": escaped, "$options": "i"}},
+        ]
+    safe_limit = max(1, min(int(limit or 48), 2000 if not paged else 96))
+    safe_offset = max(0, int(offset or 0))
+    cursor = db.users.find(
+        query,
         {"_id": 0},
-    ).sort("created_at", -1).to_list(2000)
+    ).sort("created_at", -1)
+    if paged:
+        cursor = cursor.skip(safe_offset).limit(safe_limit)
+    else:
+        cursor = cursor.limit(safe_limit)
+    total = await db.users.count_documents(query) if paged else 0
+    users = await cursor.to_list(safe_limit)
     if not users:
-        return []
+        return {"items": [], "total": total, "limit": safe_limit, "offset": safe_offset} if paged else []
+    if not paged:
+        total = len(users)
     user_ids = [u["id"] for u in users]
     # Memberships for is_club_member flag
     memberships = {m["user_id"]: m for m in await db.memberships.find(
@@ -475,6 +498,8 @@ async def list_public_users():
             "top_achievement": top,
             "achievement_level": _achievement_level(total_points),
         })
+    if paged:
+        return {"items": out, "total": total, "limit": safe_limit, "offset": safe_offset}
     return out
 
 

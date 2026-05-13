@@ -71,8 +71,69 @@ function formatPublicDate(value) {
   return date.toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
 }
 
-function listText(value) {
-  return Array.isArray(value) ? value.filter(Boolean).join(", ") : String(value || "").trim();
+const ROLE_LABELS = {
+  player: "Spieler",
+  team_leader: "Teamleitung",
+  moderator: "Moderator",
+  tournament_admin: "Turnier-Admin",
+  club_admin: "Club-Admin",
+  superadmin: "Superadmin",
+};
+
+const MEMBERSHIP_TYPE_LABELS = {
+  ordinary: "Ordentliches Mitglied",
+  supporting: "Unterstuetzendes Mitglied",
+  honorary: "Ehrenmitglied",
+  youth: "Jugendmitglied",
+  guest: "Gastmitglied",
+  former: "Ehemaliges Mitglied",
+};
+
+const PLATFORM_LABELS = {
+  PC: "PC",
+  PS5: "PlayStation 5",
+  PS4: "PlayStation 4",
+  Xbox: "Xbox Series",
+  Xbox_One: "Xbox One",
+  Switch2: "Switch 2",
+  Switch: "Switch",
+  Mobile: "Mobile",
+  Steam_Deck: "Steam Deck",
+  VR: "VR",
+};
+
+const INPUT_DEVICE_LABELS = {
+  keyboard_mouse: "Tastatur + Maus",
+  controller: "Controller",
+  wheel: "Lenkrad",
+  fightstick: "Fightstick",
+  mobile_touch: "Touch / Mobile",
+  arcade: "Arcade Stick",
+};
+
+const SUBSCRIPTION_LABELS = {
+  nintendo_online: "Nintendo Online",
+  nintendo_online_expansion: "Nintendo Online + Expansion",
+  ps_plus_essential: "PS Plus Essential",
+  ps_plus_extra: "PS Plus Extra",
+  ps_plus_premium: "PS Plus Premium",
+  xbox_game_pass: "Xbox Game Pass",
+  xbox_game_pass_ultimate: "Xbox Game Pass Ultimate",
+  ea_play: "EA Play",
+  ea_play_pro: "EA Play Pro",
+  ubisoft_plus: "Ubisoft+",
+  geforce_now: "GeForce NOW",
+};
+
+function labelValue(value, labels = {}) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return labels[raw] || raw.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function listText(value, labels = {}) {
+  if (Array.isArray(value)) return value.filter(Boolean).map((item) => labelValue(item, labels)).join(", ");
+  return labelValue(value, labels);
 }
 
 function socialUrl(platform, value) {
@@ -297,7 +358,7 @@ export default function PublicProfilePage() {
                 {joinedDate && <span>· <Calendar className="w-3.5 h-3.5 inline mr-1" />Mitglied seit {joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" })}</span>}
                 {profile.role && profile.role !== "player" && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FFD700]/40 text-[#FFD700] text-[10px] uppercase tracking-widest rounded-sm">
-                    <Shield className="w-3 h-3" /> {profile.role.replace("_", " ")}
+                    <Shield className="w-3 h-3" /> {labelValue(profile.role, ROLE_LABELS)}
                   </span>
                 )}
               </div>
@@ -306,10 +367,10 @@ export default function PublicProfilePage() {
               {((profile.main_platforms?.length || 0) + (profile.input_devices?.length || 0) + (profile.gaming_subscriptions?.length || 0) > 0) && (
                 <div className="mt-4 flex flex-wrap gap-2" data-testid="profile-setup-chips">
                   {profile.main_platforms?.map((p) => (
-                    <span key={p} className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 bg-[#29B6E8]/10 text-[#29B6E8] border border-[#29B6E8]/20 rounded-sm">{p}</span>
+                    <span key={p} className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 bg-[#29B6E8]/10 text-[#29B6E8] border border-[#29B6E8]/20 rounded-sm">{labelValue(p, PLATFORM_LABELS)}</span>
                   ))}
                   {profile.input_devices?.map((d) => (
-                    <span key={d} className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 bg-white/5 text-white/70 border border-white/10 rounded-sm">{d.replace(/_/g, " ")}</span>
+                    <span key={d} className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 bg-white/5 text-white/70 border border-white/10 rounded-sm">{labelValue(d, INPUT_DEVICE_LABELS)}</span>
                   ))}
                   {profile.gaming_subscriptions?.length > 0 && (
                     <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 bg-[#FFD700]/10 text-[#FFD700] border border-[#FFD700]/20 rounded-sm">{profile.gaming_subscriptions.length} Abos</span>
@@ -541,14 +602,16 @@ export default function PublicProfilePage() {
 function PublicInfoPanel({ profile, joinedDate }) {
   const birthday = formatPublicDate(profile.birth_date);
   const location = [profile.city, profile.country].filter(Boolean).join(", ");
-  const membership = profile.membership?.membership_type || (profile.is_club_member ? "Vereinsmitglied" : "");
+  const membership = profile.membership?.membership_type
+    ? labelValue(profile.membership.membership_type, MEMBERSHIP_TYPE_LABELS)
+    : (profile.is_club_member ? "Vereinsmitglied" : "");
   const infoRows = [
     { label: "Name", value: profile.display_name || profile.username },
     { label: "Username", value: `@${profile.username}` },
     { label: "Mitglied seit", value: joinedDate ? joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" }) : "" },
     { label: "Geburtstag", value: birthday },
     { label: "Ort", value: location },
-    { label: "Rolle", value: profile.role && profile.role !== "player" ? profile.role.replace("_", " ") : "" },
+    { label: "Rolle", value: profile.role && profile.role !== "player" ? labelValue(profile.role, ROLE_LABELS) : "" },
     { label: "Mitgliedschaft", value: membership },
   ].filter((row) => row.value);
 
@@ -570,9 +633,9 @@ function PublicInfoPanel({ profile, joinedDate }) {
 
 function PublicSetupPanel({ profile }) {
   const setupRows = [
-    { label: "Plattformen", value: listText(profile.main_platforms?.length ? profile.main_platforms : profile.main_platform) },
-    { label: "Eingabe", value: listText(profile.input_devices) },
-    { label: "Abos", value: listText(profile.gaming_subscriptions) },
+    { label: "Plattformen", value: listText(profile.main_platforms?.length ? profile.main_platforms : profile.main_platform, PLATFORM_LABELS) },
+    { label: "Eingabe", value: listText(profile.input_devices, INPUT_DEVICE_LABELS) },
+    { label: "Abos", value: listText(profile.gaming_subscriptions, SUBSCRIPTION_LABELS) },
     { label: "Lieblingsspiele", value: listText(profile.favorite_games) },
   ].filter((row) => row.value);
 
@@ -595,11 +658,13 @@ function PublicSetupPanel({ profile }) {
 function ProfileInfoTab({ profile, joinedDate, socialLinks, gamingIds, isOwnProfile, onMessage }) {
   const birthday = formatPublicDate(profile.birth_date);
   const location = [profile.city, profile.country].filter(Boolean).join(", ");
-  const membership = profile.membership?.membership_type || (profile.is_club_member ? "Vereinsmitglied" : "");
+  const membership = profile.membership?.membership_type
+    ? labelValue(profile.membership.membership_type, MEMBERSHIP_TYPE_LABELS)
+    : (profile.is_club_member ? "Vereinsmitglied" : "");
   const setupRows = [
-    { label: "Plattformen", value: listText(profile.main_platforms || profile.main_platform) },
-    { label: "Eingabe", value: listText(profile.input_devices) },
-    { label: "Abos", value: listText(profile.gaming_subscriptions) },
+    { label: "Plattformen", value: listText(profile.main_platforms || profile.main_platform, PLATFORM_LABELS) },
+    { label: "Eingabe", value: listText(profile.input_devices, INPUT_DEVICE_LABELS) },
+    { label: "Abos", value: listText(profile.gaming_subscriptions, SUBSCRIPTION_LABELS) },
     { label: "Lieblingsspiele", value: listText(profile.favorite_games) },
   ].filter((row) => row.value);
   const infoRows = [
@@ -608,7 +673,7 @@ function ProfileInfoTab({ profile, joinedDate, socialLinks, gamingIds, isOwnProf
     { label: "Mitglied seit", value: joinedDate ? joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" }) : "" },
     { label: "Geburtstag", value: birthday },
     { label: "Ort", value: location },
-    { label: "Rolle", value: profile.role && profile.role !== "player" ? profile.role.replace("_", " ") : "" },
+    { label: "Rolle", value: profile.role && profile.role !== "player" ? labelValue(profile.role, ROLE_LABELS) : "" },
     { label: "Mitgliedschaft", value: membership },
   ].filter((row) => row.value);
 

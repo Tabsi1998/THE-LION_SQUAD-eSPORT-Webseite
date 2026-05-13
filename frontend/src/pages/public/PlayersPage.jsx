@@ -6,33 +6,46 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Search, Crown } from "lucide-react";
 import { AccountLevelPill, accountAvatarFrameClass, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 
+const PAGE_SIZE = 48;
+
 export default function PlayersPage() {
   const [list, setList] = useState([]);
   const [members, setMembers] = useState([]);
   const [q, setQ] = useState("");
   const [tab, setTab] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const load = useCallback(() => {
     setLoading(true);
+    const offset = (page - 1) * PAGE_SIZE;
     Promise.allSettled([
-      api.get("/users/public-list").catch(() => ({ data: [] })),
+      api.get("/users/public-list", {
+        params: { paged: true, limit: PAGE_SIZE, offset, q: q || undefined },
+      }).catch(() => ({ data: { items: [], total: 0 } })),
       api.get("/membership/public"),
     ]).then(([u, m]) => {
-      if (u.status === "fulfilled") setList(u.value.data || []);
+      if (u.status === "fulfilled") {
+        const payload = u.value.data || {};
+        setList(payload.items || []);
+        setTotal(Number(payload.total || 0));
+      }
       if (m.status === "fulfilled") setMembers(m.value.data || []);
       setLoading(false);
     });
-  }, []);
+  }, [page, q]);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["users", "membership", "achievements"]);
 
   const memberUsernames = new Set(members.map((m) => m.username));
   const filtered = (tab === "members" ? members : list).filter((p) => {
+    if (tab === "all") return true;
     if (!q) return true;
     const blob = `${p.username} ${p.display_name || ""}`.toLowerCase();
     return blob.includes(q.toLowerCase());
   });
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <PublicLayout>
@@ -52,7 +65,7 @@ export default function PlayersPage() {
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
             <input
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e) => { setQ(e.target.value); setPage(1); }}
               placeholder="Spieler suchen…"
               data-testid="players-search"
               className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] pl-9 pr-3 py-2 rounded-sm text-sm"
@@ -118,6 +131,16 @@ export default function PlayersPage() {
             </div>
           )}
         </div>
+        {tab === "all" && !loading && totalPages > 1 && (
+          <div className="mt-8 flex items-center justify-between gap-3 text-sm text-white/55">
+            <span>{total.toLocaleString("de-DE")} öffentliche Profile</span>
+            <div className="flex items-center gap-2">
+              <button type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="px-3 py-2 border border-white/10 rounded-sm disabled:opacity-40 hover:border-[#29B6E8]/50">Zurück</button>
+              <span className="text-xs uppercase tracking-widest">Seite {page} / {totalPages}</span>
+              <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="px-3 py-2 border border-white/10 rounded-sm disabled:opacity-40 hover:border-[#29B6E8]/50">Weiter</button>
+            </div>
+          </div>
+        )}
       </section>
     </PublicLayout>
   );
