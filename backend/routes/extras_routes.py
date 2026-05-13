@@ -242,32 +242,6 @@ def _parse_public_dt(value: str | None):
         return None
 
 
-def _banner_user_can_see(branding: dict, user: dict | None) -> bool:
-    if not branding.get("site_banner_enabled"):
-        return False
-    text = str(branding.get("site_banner_text") or "").strip()
-    if not text:
-        return False
-    now = now_utc()
-    starts_at = _parse_public_dt(branding.get("site_banner_starts_at"))
-    ends_at = _parse_public_dt(branding.get("site_banner_ends_at"))
-    if starts_at and starts_at > now:
-        return False
-    if ends_at and ends_at < now:
-        return False
-    audience = branding.get("site_banner_audience") or "all"
-    admin_roles = {"moderator", "tournament_admin", "club_admin", "superadmin"}
-    if audience == "all":
-        return True
-    if audience == "logged_in":
-        return bool(user)
-    if audience == "members":
-        return bool(user and (user.get("is_club_member") or user.get("role") in admin_roles))
-    if audience == "admins":
-        return bool(user and user.get("role") in admin_roles)
-    return False
-
-
 def _normalize_banner_link(value: str | None) -> str:
     link_url = str(value or "").strip()
     if link_url and not link_url.startswith(("http://", "https://", "/")):
@@ -323,32 +297,6 @@ def _public_banner_doc(doc: dict, stats: dict | None = None) -> dict:
             "impressions": int((stats or {}).get("impressions") or doc.get("impressions") or 0),
             "clicks": int((stats or {}).get("clicks") or doc.get("clicks") or 0),
         },
-    }
-
-
-def _legacy_branding_banner(branding: dict) -> dict | None:
-    if not branding.get("site_banner_enabled") or not str(branding.get("site_banner_text") or "").strip():
-        return None
-    return {
-        "id": "legacy-branding-banner",
-        "enabled": True,
-        "title": "Branding Hinweisleiste",
-        "text": branding.get("site_banner_text"),
-        "tone": branding.get("site_banner_tone") or "info",
-        "mode": branding.get("site_banner_mode") or "ticker",
-        "speed_seconds": branding.get("site_banner_speed_seconds") or 22,
-        "style": branding.get("site_banner_style") or "neon",
-        "position": branding.get("site_banner_position") or "below_nav",
-        "scope": branding.get("site_banner_scope") or "all",
-        "path": branding.get("site_banner_path") or "",
-        "audience": branding.get("site_banner_audience") or "all",
-        "link_url": branding.get("site_banner_link_url") or "",
-        "link_label": branding.get("site_banner_link_label") or "",
-        "starts_at": branding.get("site_banner_starts_at"),
-        "ends_at": branding.get("site_banner_ends_at"),
-        "priority": 40,
-        "template": "custom",
-        "source": "legacy",
     }
 
 
@@ -527,10 +475,10 @@ async def get_site_banner(response: Response, me: dict | None = Depends(get_opti
 async def list_site_banners(response: Response, me: dict | None = Depends(get_optional_user)):
     response.headers["Cache-Control"] = "no-store"
     db = get_db()
-    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
     manual = await db.site_banners.find({}, {"_id": 0}).sort([("priority", -1), ("updated_at", -1)]).to_list(100)
-    legacy = _legacy_branding_banner(branding)
-    all_docs = manual + ([legacy] if legacy else []) + await _auto_site_banners(db)
+    # The legacy branding banner is intentionally no longer emitted. The
+    # Banner-Manager owns public notice bars from here on.
+    all_docs = manual + await _auto_site_banners(db)
     active = [doc for doc in all_docs if _banner_active(doc, me)]
     stats_rows = await db.site_banner_stats.find({"id": {"$in": [doc["id"] for doc in active if doc.get("id")]}}, {"_id": 0}).to_list(200)
     stats = {row["id"]: row for row in stats_rows}

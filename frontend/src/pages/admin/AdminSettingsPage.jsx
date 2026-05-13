@@ -1277,7 +1277,7 @@ export default function AdminSettingsPage() {
       )}
 
       {tab === "brand" && (
-        <div className="max-w-2xl space-y-4">
+        <div className="max-w-7xl space-y-4">
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
             <BrandField label="Vereinsname" value={brand.club_name} onChange={(v) => setBrandField("club_name", v)} testId="brand-club-name" />
             <BrandField label="Tagline" value={brand.tagline} onChange={(v) => setBrandField("tagline", v)} testId="brand-tagline" />
@@ -1300,83 +1300,18 @@ export default function AdminSettingsPage() {
               <ImageUpload value={brand.mascot_url} onChange={(v) => setBrandField("mascot_url", v)} label="Maskottchen" testId="brand-mascot" variant="square" allowLibrary />
               <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Favicon / Browser Icon" testId="brand-favicon" variant="square" allowLibrary />
             </div>
-            <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
-              <div>
-                <div className="font-heading font-bold uppercase">Schnelle globale Hinweisleiste</div>
-                <p className="text-xs text-white/50 mt-1">Ein einfacher Legacy-Hinweis. Für mehrere Banner, Priorität, Vorschau und Statistik bitte den Banner-Manager darunter verwenden.</p>
-              </div>
-              <label className="flex items-start gap-2 text-sm">
-                <input type="checkbox" checked={!!brand.site_banner_enabled} onChange={(e) => setBrandField("site_banner_enabled", e.target.checked)} data-testid="brand-site-banner-enabled" className="accent-[#29B6E8] mt-1" />
-                <span>Hinweisleiste anzeigen</span>
-              </label>
-              <LegalTextArea label="Text" value={brand.site_banner_text} onChange={(v) => setBrandField("site_banner_text", v)} testId="brand-site-banner-text" rows={2} />
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <BrandSelect label="Stil" value={brand.site_banner_tone || "info"} onChange={(v) => setBrandField("site_banner_tone", v)} testId="brand-site-banner-tone" options={[
-                  ["info", "Info"],
-                  ["live", "Live"],
-                  ["warning", "Warnung"],
-                  ["success", "Erfolg"],
-                ]} />
-                <BrandSelect label="Animation" value={brand.site_banner_mode || "ticker"} onChange={(v) => setBrandField("site_banner_mode", v)} testId="brand-site-banner-mode" options={[
-                  ["ticker", "Lauftext"],
-                  ["static", "Statisch"],
-                ]} />
-                <BrandSelect label="Design" value={brand.site_banner_style || "neon"} onChange={(v) => setBrandField("site_banner_style", v)} testId="brand-site-banner-style" options={[
-                  ["neon", "Neon"],
-                  ["solid", "Signal"],
-                  ["minimal", "Minimal"],
-                ]} />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <BrandSelect label="Position" value={brand.site_banner_position || "below_nav"} onChange={(v) => setBrandField("site_banner_position", v)} testId="brand-site-banner-position" options={[
-                  ["below_nav", "Unter Navigation"],
-                  ["bottom_fixed", "Unten fixiert"],
-                  ["above_footer", "Über Footer"],
-                ]} />
-                <BrandSelect label="Bereich" value={brand.site_banner_scope || "all"} onChange={(v) => setBrandField("site_banner_scope", v)} testId="brand-site-banner-scope" options={[
-                  ["all", "Ganze Website"],
-                  ["tournaments", "Turniere"],
-                  ["events", "Events"],
-                  ["news", "News"],
-                  ["community", "Community"],
-                  ["servers", "Server"],
-                  ["members", "Verein"],
-                  ["custom", "Eigener Pfad"],
-                ]} />
-                <BrandSelect label="Zielgruppe" value={brand.site_banner_audience || "all"} onChange={(v) => setBrandField("site_banner_audience", v)} testId="brand-site-banner-audience" options={[
-                  ["all", "Alle Besucher"],
-                  ["logged_in", "Eingeloggt"],
-                  ["members", "Vereinsmitglieder"],
-                  ["admins", "Admins"],
-                ]} />
-              </div>
-              {(brand.site_banner_mode || "ticker") === "ticker" && (
-                <BrandNumberField label="Laufgeschwindigkeit in Sekunden" value={brand.site_banner_speed_seconds || 22} min={8} max={90} onChange={(v) => setBrandField("site_banner_speed_seconds", v)} testId="brand-site-banner-speed" />
-              )}
-              {(brand.site_banner_scope || "all") === "custom" && (
-                <BrandField label="Eigener URL-Pfad" value={brand.site_banner_path} onChange={(v) => setBrandField("site_banner_path", v)} testId="brand-site-banner-path" placeholder="/tournaments/gamers-heaven" />
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <BrandField label="Link URL" value={brand.site_banner_link_url} onChange={(v) => setBrandField("site_banner_link_url", v)} testId="brand-site-banner-link-url" placeholder="/events oder https://..." />
-                <BrandField label="Link-Text" value={brand.site_banner_link_label} onChange={(v) => setBrandField("site_banner_link_label", v)} testId="brand-site-banner-link-label" placeholder="Mehr anzeigen" />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <BrandDateTimeField label="Anzeigen ab" value={brand.site_banner_starts_at} onChange={(v) => setBrandField("site_banner_starts_at", v)} testId="brand-site-banner-starts" />
-                <BrandDateTimeField label="Anzeigen bis" value={brand.site_banner_ends_at} onChange={(v) => setBrandField("site_banner_ends_at", v)} testId="brand-site-banner-ends" />
-              </div>
-            </div>
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
                 <div>
                   <div className="font-heading font-bold uppercase">Banner-Manager</div>
-                  <p className="text-xs text-white/50 mt-1">Mehrere professionelle Hinweise mit Templates, Zielbereichen, Priorität, Vorschau und Klick-/Sichtungsstatistik.</p>
+                  <p className="text-xs text-white/50 mt-1">Mehrere Hinweise mit Templates, Zielbereichen, Priorität, Vorschau und Klick-/Sichtungsstatistik.</p>
                 </div>
                 <button type="button" onClick={resetBannerForm} className="inline-flex items-center justify-center gap-2 px-3 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider">
                   <Plus className="w-3.5 h-3.5" /> Neuer Banner
                 </button>
               </div>
 
-              <div className="grid xl:grid-cols-[1.1fr_0.9fr] gap-4">
+              <div className="grid xl:grid-cols-[minmax(0,1.08fr)_minmax(26rem,0.92fr)] gap-4">
                 <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="font-bold uppercase tracking-widest text-xs text-white/65">{editingBannerId ? "Banner bearbeiten" : "Neuer Banner"}</div>
@@ -1429,7 +1364,7 @@ export default function AdminSettingsPage() {
                 <div className="space-y-4">
                   <BannerPreview banner={bannerForm} />
                   <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
-                    <div className="font-bold uppercase tracking-widest text-xs text-white/65 mb-3">Aktive Banner</div>
+                    <div className="font-bold uppercase tracking-widest text-xs text-white/65 mb-3">Banner</div>
                     <div className="space-y-2 max-h-[31rem] overflow-y-auto pr-1">
                       {siteBanners.map((banner) => (
                         <div key={banner.id} className="border border-white/10 bg-black/20 rounded-sm p-3">

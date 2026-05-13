@@ -60,6 +60,12 @@ function datetimeInputValue(value) {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
+function datetimeInputToIso(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
 function toForm(server) {
   return {
     ...emptyForm,
@@ -98,7 +104,7 @@ function toPayload(form) {
     map_name: form.map_name || null,
     version: form.version || null,
     maintenance_note: form.maintenance_note || null,
-    maintenance_until: form.maintenance_until || null,
+    maintenance_until: datetimeInputToIso(form.maintenance_until),
     player_count: Number(form.player_count || 0),
     max_players: form.max_players === "" ? null : Number(form.max_players || 0),
     player_names: String(form.player_names_text || "").split(",").map((x) => x.trim()).filter(Boolean),

@@ -43,6 +43,30 @@ function formatDateTime(value) {
   return date.toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
 }
 
+function formatRemainingTime(target, now) {
+  if (!target) return "";
+  const date = new Date(target);
+  if (Number.isNaN(date.getTime())) return "";
+  const diff = date.getTime() - now;
+  if (diff <= 0) return "Ende erreicht";
+  const totalMinutes = Math.ceil(diff / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return `${days} T. ${hours} Std.`;
+  if (hours > 0) return `${hours} Std. ${minutes} Min.`;
+  return `${minutes} Min.`;
+}
+
+function maintenanceLabel(server, now) {
+  const note = String(server.maintenance_note || "").trim();
+  const remaining = formatRemainingTime(server.maintenance_until, now);
+  const parts = ["Wartung"];
+  if (note) parts.push(note);
+  if (remaining) parts.push(remaining === "Ende erreicht" ? remaining : `noch ${remaining}`);
+  return parts.join(" · ");
+}
+
 export default function ServersPage() {
   useDocumentTitle("Server", "Öffentliche und geschützte Community-Gameserver von THE LION SQUAD.");
   const { user, isClubMember } = useAuth();
@@ -147,16 +171,13 @@ function ServerSection({ title, items }) {
 function ServerCard({ server }) {
   const [revealedSecret, setRevealedSecret] = useState("");
   const [secretLoading, setSecretLoading] = useState(false);
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const status = server.status || "offline";
   const max = Number(server.max_players || 0);
   const current = Number(server.player_count || 0);
   const pct = max > 0 ? Math.min(100, Math.round((current / max) * 100)) : 0;
   const iconUrl = server.server_icon_url || server.game?.logo_url;
-  const maintenanceText = [
-    server.maintenance_note,
-    server.maintenance_until ? `bis ${formatDateTime(server.maintenance_until)}` : "",
-  ].filter(Boolean).join(" · ");
-  const maintenanceBandText = ["Wartung", maintenanceText].filter(Boolean).join(" · ");
+  const maintenanceBandText = maintenanceLabel(server, nowTick);
   const copyAddress = async () => {
     if (!server.address || !navigator.clipboard) return;
     await navigator.clipboard.writeText(server.address).catch(() => null);
@@ -168,6 +189,12 @@ function ServerCard({ server }) {
     const timer = window.setTimeout(() => setRevealedSecret(""), 10000);
     return () => window.clearTimeout(timer);
   }, [revealedSecret]);
+
+  useEffect(() => {
+    if (status !== "maintenance" || !server.maintenance_until) return undefined;
+    const timer = window.setInterval(() => setNowTick(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, [server.maintenance_until, status]);
 
   const loadSecret = async () => {
     if (!server.has_access_secret || secretLoading) return "";
@@ -214,6 +241,7 @@ function ServerCard({ server }) {
   return (
     <article className={`group relative overflow-hidden border rounded-sm bg-[#101010] min-h-[19rem] flex flex-col transition ${status === "maintenance" ? "border-[#FFD700]/45" : "border-white/10 hover:border-white/20"}`}>
       <div className={`h-1 ${status === "online" ? "bg-[#00FF88]" : status === "maintenance" ? "bg-[#FFD700]" : status === "planned" ? "bg-[#29B6E8]" : "bg-white/10"}`} />
+      {status === "maintenance" && <MaintenanceTape text={maintenanceBandText} />}
 
       <div className="p-5 flex flex-col grow">
         <div className="flex items-start justify-between gap-4">
@@ -257,8 +285,6 @@ function ServerCard({ server }) {
             Online: <span className="text-white/70">{server.player_names.slice(0, 6).join(", ")}</span>{server.player_names.length > 6 ? " …" : ""}
           </div>
         )}
-
-        {status === "maintenance" && <MaintenanceTape text={maintenanceBandText} />}
 
         <div className="mt-auto pt-5 space-y-2">
           {server.address && (
@@ -317,16 +343,17 @@ function ServerCard({ server }) {
 }
 
 function MaintenanceTape({ text }) {
-  const repeated = `${text || "Wartung"}  •  Under Construction  •  `;
+  const repeated = `${text || "Wartung"}  •  `;
   return (
     <div className="tls-maintenance-tape pointer-events-none">
-      <div className="tls-maintenance-tape__stripe tls-maintenance-tape__stripe--one" />
-      <div className="tls-maintenance-tape__stripe tls-maintenance-tape__stripe--two" />
-      <div className="tls-maintenance-tape__marquee">
-        <span className="tls-marquee-track" aria-label={text || "Wartung"}>
-          <span>{repeated.repeat(8)}</span>
-          <span aria-hidden="true">{repeated.repeat(8)}</span>
-        </span>
+      <div className="tls-maintenance-tape__rail">
+        <div className="tls-maintenance-tape__stripe" />
+        <div className="tls-maintenance-tape__marquee">
+          <span className="tls-marquee-track" aria-label={text || "Wartung"}>
+            <span>{repeated.repeat(10)}</span>
+            <span aria-hidden="true">{repeated.repeat(10)}</span>
+          </span>
+        </div>
       </div>
     </div>
   );
