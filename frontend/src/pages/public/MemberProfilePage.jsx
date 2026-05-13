@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Crown, ExternalLink, Gamepad2, Monitor, Radio, User as UserIcon } from "lucide-react";
+import { ArrowLeft, Crown, ExternalLink, Gamepad2, Medal, Monitor, Radio, Trophy, User as UserIcon, Users } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { AccountLevelPill, AccountLevelProgress, accountAvatarFrameClass, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 import { api, resolveMediaUrl } from "@/lib/api";
+import { gameLabel } from "@/lib/gameLabels";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function MemberProfilePage() {
@@ -54,6 +55,7 @@ export default function MemberProfilePage() {
                   <div className="text-white/45 text-sm">Noch keine Biografie hinterlegt.</div>
                 )}
                 <MemberTwitchEmbed account={profile.linked_account} />
+                <MemberReferences profile={profile} />
               </div>
               <aside className="space-y-4">
                 <InfoPanel title="Profil">
@@ -71,6 +73,112 @@ export default function MemberProfilePage() {
         )}
       </section>
     </PublicLayout>
+  );
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("de-DE", { dateStyle: "medium" });
+}
+
+function referencePlacementText(item) {
+  if (item.placement_label) return item.placement_label;
+  if (!item.placement) return "Teilnahme";
+  return `Platz ${item.placement}${item.participant_count ? ` von ${item.participant_count}` : ""}`;
+}
+
+function referenceTone(item) {
+  if (item.medal === "gold") return "border-[#FFD700]/45 bg-[#FFD700]/10 text-[#FFD700]";
+  if (item.medal === "silver") return "border-white/30 bg-white/10 text-white";
+  if (item.medal === "bronze") return "border-[#CD7F32]/45 bg-[#CD7F32]/10 text-[#CD7F32]";
+  return "border-[#29B6E8]/30 bg-[#29B6E8]/10 text-[#29B6E8]";
+}
+
+function MemberReferences({ profile }) {
+  const references = profile.references || [];
+  const stats = profile.reference_stats || {};
+  if (!references.length) return null;
+  return (
+    <section className="mt-8">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">
+            <Trophy className="w-3.5 h-3.5" /> Referenzen
+          </div>
+          <h2 className="mt-1 font-heading text-2xl font-black uppercase">Vereinsplatzierungen</h2>
+        </div>
+        <Link to="/references" className="inline-flex items-center gap-2 border border-[#29B6E8]/45 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:bg-[#29B6E8]/10 rounded-sm">
+          Alle Referenzen <ExternalLink className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
+        <ReferenceStat label="Gold" value={stats.gold || 0} color="#FFD700" />
+        <ReferenceStat label="Silber" value={stats.silver || 0} color="#D8DDE5" />
+        <ReferenceStat label="Bronze" value={stats.bronze || 0} color="#CD7F32" />
+        <ReferenceStat label="Podest" value={stats.podiums || 0} color="#29B6E8" />
+        <ReferenceStat label="Solo" value={stats.solo || 0} />
+        <ReferenceStat label="Team" value={stats.team || 0} />
+      </div>
+      <div className="space-y-3">
+        {references.map((item) => <MemberReferenceCard key={item.id} item={item} />)}
+      </div>
+    </section>
+  );
+}
+
+function ReferenceStat({ label, value, color = "#FFFFFF" }) {
+  return (
+    <div className="border border-white/10 bg-[#121212] rounded-sm px-3 py-2">
+      <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{label}</div>
+      <div className="font-display text-xl font-bold tabular-nums" style={{ color }}>{value}</div>
+    </div>
+  );
+}
+
+function MemberReferenceCard({ item }) {
+  const members = item.lineup_members || [];
+  const otherLineup = (item.lineup || []).filter(Boolean);
+  return (
+    <Link to={`/references/${item.id}`} className="block border border-white/10 bg-[#121212] rounded-sm hover:border-[#29B6E8]/55 transition">
+      <div className="p-4 flex gap-4">
+        <div className={`w-16 shrink-0 border rounded-sm flex flex-col items-center justify-center ${referenceTone(item)}`}>
+          {item.placement ? (
+            <>
+              <Medal className="w-5 h-5 mb-1" />
+              <span className="font-display text-2xl font-black tabular-nums">{item.placement}.</span>
+            </>
+          ) : (
+            <>
+              <Trophy className="w-5 h-5 mb-1" />
+              <span className="text-[10px] uppercase tracking-widest font-black">Dabei</span>
+            </>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`inline-flex px-2 py-1 border rounded-sm text-[10px] uppercase tracking-widest font-bold ${referenceTone(item)}`}>{referencePlacementText(item)}</span>
+            <span className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{gameLabel(item.game) || item.game_name || "Extern"}</span>
+            {formatDate(item.start_date) && <span className="text-[10px] uppercase tracking-widest text-white/35">{formatDate(item.start_date)}</span>}
+          </div>
+          <div className="mt-2 font-heading text-lg font-black uppercase leading-tight break-words">{item.title}</div>
+          <div className="mt-1 text-xs text-white/55 truncate">{item.team_name || item.organizer || "THE LION SQUAD"}</div>
+          {(members.length > 0 || otherLineup.length > 0) && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {members.map((member) => (
+                <span key={member.profile_id || member.display_name} className="inline-flex items-center gap-1.5 border border-[#29B6E8]/25 bg-[#29B6E8]/10 rounded-sm px-2 py-1 text-xs text-white/75">
+                  {member.avatar_url ? <img src={resolveMediaUrl(member.avatar_url)} alt="" className="w-4 h-4 rounded-sm object-cover" /> : <Users className="w-3 h-3 text-white/35" />}
+                  {member.display_name}
+                </span>
+              ))}
+              {otherLineup.map((name) => <span key={name} className="border border-white/10 bg-black/30 rounded-sm px-2 py-1 text-xs text-white/50">{name}</span>)}
+            </div>
+          )}
+        </div>
+        <ExternalLink className="w-4 h-4 text-white/25 shrink-0 mt-1" />
+      </div>
+    </Link>
   );
 }
 

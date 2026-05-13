@@ -664,33 +664,6 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
             {"$or": [{"id": {"$in": team_ids}}, {"member_ids": user_id}]},
             {"_id": 0},
         ).to_list(50)
-        member_profiles = await db.club_member_profiles.find(
-            {"user_id": user_id}, {"_id": 0, "id": 1}
-        ).to_list(50)
-        member_profile_ids = [profile["id"] for profile in member_profiles if profile.get("id")]
-        if member_profile_ids:
-            refs_raw = await db.references.find(
-                {"member_profile_ids": {"$in": member_profile_ids}, "is_active": {"$ne": False}},
-                {"_id": 0},
-            ).to_list(200)
-            refs_raw = [ref for ref in refs_raw if await user_can_see(None, ref.get("visibility") or "public")]
-            if refs_raw:
-                from routes.news_routes import _enrich_references, _sort_references
-                references = _sort_references(await _enrich_references(refs_raw))[:30]
-            else:
-                references = []
-        else:
-            references = []
-        ref_places = [int(ref["placement"]) for ref in references if ref.get("placement")]
-        stats["references"] = len(references)
-        stats["reference_gold"] = sum(1 for place in ref_places if place == 1)
-        stats["reference_silver"] = sum(1 for place in ref_places if place == 2)
-        stats["reference_bronze"] = sum(1 for place in ref_places if place == 3)
-        stats["reference_podiums"] = sum(1 for place in ref_places if place <= 3)
-        stats["reference_solo"] = sum(1 for ref in references if len(ref.get("lineup_members") or []) <= 1)
-        stats["reference_team"] = sum(1 for ref in references if len(ref.get("lineup_members") or []) > 1)
-    else:
-        references = []
     return {
         **base,
         "badges": badges,
@@ -699,7 +672,6 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
         "tournaments": tournaments,
         "f1_bests": f1_bests,
         "teams": teams,
-        "references": references,
         "socials": socials,
     }
 

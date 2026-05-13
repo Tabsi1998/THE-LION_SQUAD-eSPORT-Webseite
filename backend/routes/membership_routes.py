@@ -10,6 +10,7 @@ from services.membership_service import (
     is_active_member, derived_user_type, VALID_STATUSES, VALID_TYPES,
     ACTIVE_STATUSES,
 )
+from services.visibility import user_can_see
 from models import (
     MembershipUpdate, MemberBenefitCreate, MemberBenefitUpdate, now_utc, new_id,
 )
@@ -276,6 +277,37 @@ async def _attach_linked_accounts(db, rows: list[dict], items: list[dict], publi
             item.get("display_name") if item.get("display_name") != item.get("gamertag") else None
         )
     return items
+
+
+async def _attach_reference_stats(db, item: dict, profile_id: str) -> dict:
+    refs_raw = await db.references.find(
+        {"member_profile_ids": profile_id, "is_active": {"$ne": False}},
+        {"_id": 0},
+    ).to_list(200)
+    refs_raw = [ref for ref in refs_raw if await user_can_see(None, ref.get("visibility") or "public")]
+    if refs_raw:
+        from routes.news_routes import _enrich_references, _sort_references
+        references = _sort_references(await _enrich_references(refs_raw))[:30]
+    else:
+        references = []
+    placements = []
+    for ref in references:
+        try:
+            if ref.get("placement"):
+                placements.append(int(ref["placement"]))
+        except (TypeError, ValueError):
+            continue
+    item["references"] = references
+    item["reference_stats"] = {
+        "total": len(references),
+        "gold": sum(1 for place in placements if place == 1),
+        "silver": sum(1 for place in placements if place == 2),
+        "bronze": sum(1 for place in placements if place == 3),
+        "podiums": sum(1 for place in placements if place <= 3),
+        "solo": sum(1 for ref in references if len(ref.get("lineup_members") or []) <= 1),
+        "team": sum(1 for ref in references if len(ref.get("lineup_members") or []) > 1),
+    }
+    return item
 
 
 async def _normalize_linked_user_id(db, user_id: str | None, current_profile_id: str | None = None) -> str | None:
@@ -552,7 +584,8 @@ async def get_public_member_profile(slug: str):
         raise HTTPException(404, "Mitglied nicht gefunden.")
     board_titles = await _board_titles_by_profile_id(db)
     item = _public_profile(row, detail=True, board_title=board_titles.get(row["id"]))
-    return (await _attach_linked_accounts(db, [row], [item], public_only=True))[0]
+    item = (await _attach_linked_accounts(db, [row], [item], public_only=True))[0]
+    return await _attach_reference_stats(db, item, row["id"])
 
 
 @router.get("/profiles/admin/all")

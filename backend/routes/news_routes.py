@@ -564,19 +564,19 @@ async def _enrich_references(items: list[dict]) -> list[dict]:
     parents = {}
     if parent_ids:
         parents = {g["id"]: g for g in await db.games.find({"id": {"$in": parent_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "short_name": 1}).to_list(200)}
-    lineup_user_ids = list({
-        member.get("user_id")
+    lineup_profile_ids = list({
+        member.get("profile_id")
         for item in items
         for member in (item.get("lineup_members") or [])
-        if isinstance(member, dict) and member.get("user_id")
+        if isinstance(member, dict) and member.get("profile_id")
     })
-    users_by_id = {}
-    if lineup_user_ids:
-        users_by_id = {
-            user["id"]: user
-            for user in await db.users.find(
-                {"id": {"$in": lineup_user_ids}, "privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}},
-                {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
+    member_profiles_by_id = {}
+    if lineup_profile_ids:
+        member_profiles_by_id = {
+            profile["id"]: profile
+            for profile in await db.club_member_profiles.find(
+                {"id": {"$in": lineup_profile_ids}, "is_active": {"$ne": False}},
+                {"_id": 0, "id": 1, "slug": 1, "photo_url": 1, "gamertag": 1, "display_name": 1},
             ).to_list(500)
         }
     for item in items:
@@ -603,9 +603,16 @@ async def _enrich_references(items: list[dict]) -> list[dict]:
         item["lineup_members"] = [
             {
                 **member,
-                "username": users_by_id.get(member.get("user_id"), {}).get("username"),
-                "avatar_url": users_by_id.get(member.get("user_id"), {}).get("avatar_url"),
-                "profile_url": f"/u/{users_by_id[member.get('user_id')]['username']}" if users_by_id.get(member.get("user_id")) else None,
+                "display_name": (
+                    member_profiles_by_id.get(member.get("profile_id"), {}).get("gamertag")
+                    or member.get("display_name")
+                ),
+                "avatar_url": member_profiles_by_id.get(member.get("profile_id"), {}).get("photo_url"),
+                "profile_url": (
+                    f"/members/{member_profiles_by_id[member.get('profile_id')]['slug']}"
+                    if member_profiles_by_id.get(member.get("profile_id"), {}).get("slug")
+                    else None
+                ),
             }
             for member in (item.get("lineup_members") or [])
             if isinstance(member, dict)
