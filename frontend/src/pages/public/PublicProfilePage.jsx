@@ -14,7 +14,8 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   Trophy, Flag, Users as UsersIcon, Medal, Shield, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio, Gamepad2, Globe,
-  MessageSquare, UserPlus, UserCheck, X, Copy, Info,
+  MessageSquare, UserPlus, UserCheck, X, Copy, Info, User, AtSign, Cake, Crown,
+  Monitor, Keyboard, BadgeCheck, Heart,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -134,6 +135,11 @@ function labelValue(value, labels = {}) {
 function listText(value, labels = {}) {
   if (Array.isArray(value)) return value.filter(Boolean).map((item) => labelValue(item, labels)).join(", ");
   return labelValue(value, labels);
+}
+
+function listItems(value, labels = {}) {
+  const rawItems = Array.isArray(value) ? value : (value ? [value] : []);
+  return rawItems.filter(Boolean).map((item) => labelValue(item, labels));
 }
 
 function socialUrl(platform, value) {
@@ -606,23 +612,29 @@ function PublicInfoPanel({ profile, joinedDate }) {
     ? labelValue(profile.membership.membership_type, MEMBERSHIP_TYPE_LABELS)
     : (profile.is_club_member ? "Vereinsmitglied" : "");
   const infoRows = [
-    { label: "Name", value: profile.display_name || profile.username },
-    { label: "Username", value: `@${profile.username}` },
-    { label: "Mitglied seit", value: joinedDate ? joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" }) : "" },
-    { label: "Geburtstag", value: birthday },
-    { label: "Ort", value: location },
-    { label: "Rolle", value: profile.role && profile.role !== "player" ? labelValue(profile.role, ROLE_LABELS) : "" },
-    { label: "Mitgliedschaft", value: membership },
+    { label: "Name", value: profile.display_name || profile.username, icon: User, tone: "blue" },
+    { label: "Username", value: `@${profile.username}`, icon: AtSign, tone: "white" },
+    { label: "Mitglied seit", value: joinedDate ? joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" }) : "", icon: Calendar, tone: "green" },
+    { label: "Geburtstag", value: birthday, icon: Cake, tone: "gold" },
+    { label: "Ort", value: location, icon: MapPin, tone: "blue" },
+    { label: "Rolle", value: profile.role && profile.role !== "player" ? labelValue(profile.role, ROLE_LABELS) : "", icon: Shield, tone: "violet" },
+    { label: "Mitgliedschaft", value: membership, icon: Crown, tone: "gold" },
   ].filter((row) => row.value);
 
   return (
-    <section className="border border-white/10 bg-[#121212] rounded-sm p-5">
-      <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2">
-        <Info className="w-5 h-5 text-[#29B6E8]" /> Öffentliche Infos
-      </h2>
+    <section className="border border-white/10 bg-[#121212] rounded-sm p-5 overflow-hidden">
+      <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#29B6E8]">Profil</div>
+          <h2 className="mt-1 font-heading text-2xl font-bold uppercase flex items-center gap-2">
+            <Info className="w-5 h-5 text-[#29B6E8]" /> Öffentliche Infos
+          </h2>
+        </div>
+        <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">{infoRows.length} Freigaben</div>
+      </div>
       {infoRows.length ? (
-        <div className="grid sm:grid-cols-2 gap-3" data-testid="public-profile-info">
-          {infoRows.map((row) => <InfoValue key={row.label} label={row.label} value={row.value} />)}
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3" data-testid="public-profile-info">
+          {infoRows.map((row) => <ProfileInfoCard key={row.label} {...row} />)}
         </div>
       ) : (
         <EmptyState text="Keine öffentlichen Profildaten freigegeben." />
@@ -632,21 +644,27 @@ function PublicInfoPanel({ profile, joinedDate }) {
 }
 
 function PublicSetupPanel({ profile }) {
-  const setupRows = [
-    { label: "Plattformen", value: listText(profile.main_platforms?.length ? profile.main_platforms : profile.main_platform, PLATFORM_LABELS) },
-    { label: "Eingabe", value: listText(profile.input_devices, INPUT_DEVICE_LABELS) },
-    { label: "Abos", value: listText(profile.gaming_subscriptions, SUBSCRIPTION_LABELS) },
-    { label: "Lieblingsspiele", value: listText(profile.favorite_games) },
-  ].filter((row) => row.value);
+  const setupGroups = [
+    { label: "Plattformen", items: listItems(profile.main_platforms?.length ? profile.main_platforms : profile.main_platform, PLATFORM_LABELS), icon: Monitor, tone: "blue" },
+    { label: "Eingabe", items: listItems(profile.input_devices, INPUT_DEVICE_LABELS), icon: Keyboard, tone: "gold" },
+    { label: "Abos", items: listItems(profile.gaming_subscriptions, SUBSCRIPTION_LABELS), icon: BadgeCheck, tone: "green" },
+    { label: "Lieblingsspiele", items: listItems(profile.favorite_games), icon: Heart, tone: "violet" },
+  ].filter((group) => group.items.length);
 
   return (
     <section className="border border-white/10 bg-[#121212] rounded-sm p-5">
-      <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2">
-        <Gamepad2 className="w-5 h-5 text-[#FFD700]" /> Setup & Games
-      </h2>
-      {setupRows.length ? (
+      <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#FFD700]">Gaming</div>
+          <h2 className="mt-1 font-heading text-2xl font-bold uppercase flex items-center gap-2">
+            <Gamepad2 className="w-5 h-5 text-[#FFD700]" /> Setup & Games
+          </h2>
+        </div>
+        <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">{setupGroups.reduce((sum, group) => sum + group.items.length, 0)} Einträge</div>
+      </div>
+      {setupGroups.length ? (
         <div className="grid md:grid-cols-2 gap-3">
-          {setupRows.map((row) => <InfoValue key={row.label} label={row.label} value={row.value} />)}
+          {setupGroups.map((group) => <SetupGroupCard key={group.label} {...group} />)}
         </div>
       ) : (
         <EmptyState text="Keine Setup-Daten freigegeben." />
@@ -712,6 +730,51 @@ function ProfileInfoTab({ profile, joinedDate, socialLinks, gamingIds, isOwnProf
           <EmptyState text="Keine Setup-Daten freigegeben." />
         )}
       </section>
+    </div>
+  );
+}
+
+const PROFILE_TONES = {
+  blue: "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#29B6E8]",
+  gold: "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]",
+  green: "border-[#10B981]/35 bg-[#10B981]/10 text-[#10B981]",
+  violet: "border-[#A855F7]/35 bg-[#A855F7]/10 text-[#A855F7]",
+  white: "border-white/15 bg-white/[0.04] text-white/75",
+};
+
+function ProfileInfoCard({ icon: Icon, label, value, tone = "white" }) {
+  return (
+    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3 min-w-0 flex items-start gap-3">
+      <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${PROFILE_TONES[tone] || PROFILE_TONES.white}`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div className="min-w-0">
+        <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{label}</div>
+        <div className="mt-1 text-sm text-white/90 break-words">{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function SetupGroupCard({ icon: Icon, label, items, tone = "white" }) {
+  return (
+    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 min-w-0">
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${PROFILE_TONES[tone] || PROFILE_TONES.white}`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{label}</div>
+          <div className="font-heading text-base font-bold uppercase">{items.length} aktiv</div>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {items.map((item) => (
+          <span key={item} className="inline-flex items-center rounded-sm border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-white/75">
+            {item}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
