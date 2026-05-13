@@ -11,7 +11,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Copy, Edit, MessageSquare, Plus, Search, Send, Shield, Trash2, Users, UserPlus } from "lucide-react";
 
-const emptyTeam = { name: "", tag: "", description: "", logo_url: "", discord_link: "" };
+const emptyTeam = { name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "" };
 const TEAM_ROLE_LABELS = { leader: "Leader", co_leader: "Co-Leader", member: "Mitglied" };
 
 export default function TeamsPage() {
@@ -39,7 +39,7 @@ function TeamList() {
           <div>
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Teams</span>
             <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">Teams & Clans</h1>
-            <p className="mt-3 text-white/60 max-w-xl">Erstelle dein Team, teile den Join-Code und verwalte Logo, Beschreibung und Discord-Link.</p>
+            <p className="mt-3 text-white/60 max-w-xl">Erstelle dein Team, teile den Join-Code und verwalte Logo, Banner, Beschreibung und Discord-Link.</p>
           </div>
           {user ? (
             <button onClick={() => setEditing(emptyTeam)} data-testid="team-create-open" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm font-bold uppercase tracking-wider text-xs hover:bg-[#1E95C2]">
@@ -62,18 +62,28 @@ function TeamList() {
 
 function TeamCard({ team: t }) {
   return (
-    <Link to={`/teams/${t.id}`} data-testid={`team-card-${t.tag}`} className="group block border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-5 bg-[#121212] transition">
-      <div className="flex items-center gap-4">
-        <TeamLogo team={t} size="md" />
-        <div className="flex-1 min-w-0">
-          <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">[{t.tag}]</div>
-          <h3 className="font-heading text-xl font-bold group-hover:text-[#29B6E8] transition truncate">{t.name}</h3>
-          <div className="text-xs text-white/50 inline-flex items-center gap-1 mt-0.5">
-            <Users className="w-3.5 h-3.5" /> {t.member_count ?? t.member_ids?.length ?? 0} Mitglieder
+    <Link to={`/teams/${t.id}`} data-testid={`team-card-${t.tag}`} className="group block border border-white/10 hover:border-[#29B6E8]/60 rounded-sm bg-[#121212] overflow-hidden transition">
+      <div className="relative h-28 bg-[#0A0A0A] border-b border-white/10 overflow-hidden">
+        {t.banner_url ? (
+          <img src={resolveMediaUrl(t.banner_url)} alt="" className="w-full h-full object-cover opacity-75 group-hover:opacity-95 group-hover:scale-[1.02] transition duration-500" />
+        ) : (
+          <div className="w-full h-full bg-grid-dense" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-[#121212]/20 to-transparent" />
+      </div>
+      <div className="relative -mt-8 p-5">
+        <div className="flex items-center gap-4">
+          <TeamLogo team={t} size="md" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">[{t.tag}]</div>
+            <h3 className="font-heading text-xl font-bold group-hover:text-[#29B6E8] transition truncate">{t.name}</h3>
+            <div className="text-xs text-white/50 inline-flex items-center gap-1 mt-0.5">
+              <Users className="w-3.5 h-3.5" /> {t.member_count ?? t.member_ids?.length ?? 0} Mitglieder
+            </div>
           </div>
         </div>
+        {t.description && <p className="mt-3 text-sm text-white/60 line-clamp-2">{t.description}</p>}
       </div>
-      {t.description && <p className="mt-3 text-sm text-white/60 line-clamp-2">{t.description}</p>}
     </Link>
   );
 }
@@ -175,8 +185,10 @@ function TeamDetail({ id }) {
 
   return (
     <PublicLayout>
-      <div className="border-b border-white/10 bg-grid-dense">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="relative border-b border-white/10 bg-grid-dense overflow-hidden">
+        {team.banner_url && <img src={resolveMediaUrl(team.banner_url)} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/65 via-[#0A0A0A]/82 to-[#0A0A0A]" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <Link to="/teams" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Teams</Link>
           <div className="mt-5 flex flex-col md:flex-row gap-6 md:items-center">
             <TeamLogo team={team} size="lg" />
@@ -470,6 +482,7 @@ function TeamModal({ team, onClose, onSaved }) {
         tag: form.tag.trim().toUpperCase(),
         description: form.description || null,
         logo_url: form.logo_url || null,
+        banner_url: form.banner_url || null,
         discord_link: form.discord_link || null,
       };
       if (isNew) await api.post("/teams", payload);
@@ -492,6 +505,7 @@ function TeamModal({ team, onClose, onSaved }) {
           <Field label="Tag"><Input value={form.tag} onChange={(v) => set("tag", v.toUpperCase().slice(0, 8))} required testId="team-tag" placeholder="TLS" /></Field>
           <Field label="Beschreibung"><textarea value={form.description || ""} onChange={(e) => set("description", e.target.value)} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
           <Field label="Logo"><ImageUpload value={form.logo_url || ""} onChange={(v) => set("logo_url", v)} testId="team-logo" variant="square" allowLibrary /></Field>
+          <Field label="Banner"><ImageUpload value={form.banner_url || ""} onChange={(v) => set("banner_url", v)} testId="team-banner" variant="wide" allowLibrary /></Field>
           <Field label="Discord-Link"><Input value={form.discord_link || ""} onChange={(v) => set("discord_link", v)} placeholder="https://discord.gg/..." /></Field>
         </div>
         <div className="flex justify-end gap-2 p-5 border-t border-white/10">

@@ -202,6 +202,7 @@ def _team_summary(team: dict) -> dict:
         "tag": team.get("tag"),
         "description": team.get("description"),
         "logo_url": team.get("logo_url"),
+        "banner_url": team.get("banner_url"),
         "discord_link": team.get("discord_link"),
         "is_public": team.get("is_public", True),
         "member_count": len(team.get("member_ids") or []),
@@ -480,6 +481,7 @@ async def create_team(body: TeamCreate, me: dict = Depends(get_current_user)):
         "tag": body.tag,
         "description": body.description,
         "logo_url": body.logo_url,
+        "banner_url": body.banner_url,
         "discord_link": body.discord_link,
         "social_links": {},
         "leader_id": me["id"],
@@ -522,7 +524,7 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
             raise HTTPException(status_code=403, detail="Keine Berechtigung")
     if body.tag and body.tag != team.get("tag") and await db.teams.find_one({"tag": body.tag}):
         raise HTTPException(status_code=409, detail="Team-Tag bereits vergeben")
-    nullable_fields = {"description", "logo_url", "discord_link", "social_links"}
+    nullable_fields = {"description", "logo_url", "banner_url", "discord_link", "social_links"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     updates["updated_at"] = now_utc().isoformat()

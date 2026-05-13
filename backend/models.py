@@ -211,6 +211,7 @@ class TeamCreate(BaseModel):
     tag: str = Field(min_length=2, max_length=8)
     description: Optional[str] = None
     logo_url: Optional[str] = None
+    banner_url: Optional[str] = None
     discord_link: Optional[str] = None
 
 
@@ -219,6 +220,7 @@ class TeamUpdate(BaseModel):
     tag: Optional[str] = None
     description: Optional[str] = None
     logo_url: Optional[str] = None
+    banner_url: Optional[str] = None
     discord_link: Optional[str] = None
     social_links: Optional[dict] = None
 

@@ -1329,6 +1329,12 @@ function TeamsPanel() {
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
             {activeTeam && (
               <>
+                {activeTeam.banner_url && (
+                  <div className="relative -mx-5 -mt-5 mb-5 h-32 overflow-hidden border-b border-white/10">
+                    <img src={resolveMediaUrl(activeTeam.banner_url)} alt="" className="w-full h-full object-cover opacity-80" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#121212] to-transparent" />
+                  </div>
+                )}
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
                     <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">[{activeTeam.tag}]</div>
