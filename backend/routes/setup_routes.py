@@ -275,8 +275,8 @@ async def sitemap():
 
     static_paths = [
         "/", "/about", "/news", "/events", "/tournaments", "/fastlap", "/f1",
-        "/teams", "/players", "/servers", "/members", "/membership/join",
-        "/sponsors", "/partners", "/contact", "/galerie", "/references",
+        "/teams", "/players", "/servers", "/members", "/membership/join", "/membership/apply",
+        "/sponsors", "/partners", "/contact", "/board", "/values", "/galerie", "/references",
         "/privacy", "/imprint",
     ]
     urls: list[dict] = [
@@ -322,11 +322,18 @@ async def sitemap():
             urls.append({"loc": f"{base}/u/{u['username']}", "lastmod": u.get("updated_at"), "changefreq": "monthly", "priority": "0.4"})
     # public club member profiles
     async for m in db.club_member_profiles.find(
-        {"is_public": {"$ne": False}},
+        {"is_active": {"$ne": False}},
         {"slug": 1, "updated_at": 1, "_id": 0},
     ):
         if m.get("slug"):
             urls.append({"loc": f"{base}/members/{m['slug']}", "lastmod": m.get("updated_at"), "changefreq": "monthly", "priority": "0.55"})
+    # public teams
+    async for team in db.teams.find(
+        {"is_public": {"$ne": False}},
+        {"id": 1, "updated_at": 1, "_id": 0},
+    ):
+        if team.get("id"):
+            urls.append({"loc": f"{base}/teams/{team['id']}", "lastmod": team.get("updated_at"), "changefreq": "monthly", "priority": "0.55"})
     # public gallery albums
     async for a in db.gallery_albums.find(
         {"visibility": {"$in": ["public", None]}, "is_public": {"$ne": False}},

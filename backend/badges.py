@@ -105,9 +105,9 @@ async def award_achievement(user_id: str, tier_code: str, context: dict | None =
             user = await db.users.find_one({"id": user_id},
                                             {"display_name": 1, "username": 1}) or {}
             level_color = {1: 0xCD7F32, 2: 0xC0C0C0, 3: 0xFFD700, 4: 0x29B6E8, 5: 0xFF3B30}
-            level_name = {1: "Bronze", 2: "Silber", 3: "Gold", 4: "Platin", 5: "Special"}
+            level_name = _level_name(tier.get("level", 1), group)
             await send_discord(
-                f"🏆 {group['name']} · {level_name.get(tier['level'], '?')}",
+                f"🏆 {group['name']} · {level_name}",
                 f"**{user.get('display_name') or user.get('username') or 'Spieler'}** hat **{tier['name']}** freigeschaltet!\n_{tier.get('description','')}_",
                 color=level_color.get(tier["level"], 0x29B6E8),
                 fields=[{"name": "Punkte", "value": f"+{tier.get('points', 0)}", "inline": True}],
@@ -366,8 +366,14 @@ def _color_for_level(level: int) -> str:
     return {1: "#CD7F32", 2: "#C0C0C0", 3: "#FFD700", 4: "#29B6E8", 5: "#FF3B30"}.get(level, "#CD7F32")
 
 
-def _level_name(level: int) -> str:
-    return {1: "Bronze", 2: "Silber", 3: "Gold", 4: "Platin", 5: "Special"}.get(level, "?")
+def _level_name(level: int, group: dict | None = None) -> str:
+    if int(level or 1) == 5:
+        if group and group.get("is_negative"):
+            return "Geheim"
+        if group and (group.get("is_special") or group.get("category") == "special"):
+            return "Sonderauszeichnung"
+        return "Legendär"
+    return {1: "Bronze", 2: "Silber", 3: "Gold", 4: "Platin"}.get(int(level or 1), "?")
 
 
 def _safe_negative_description() -> str:
@@ -413,7 +419,7 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
             earned_doc = awarded_codes.get(t["code"])
             tier_payload = {
                 **t,
-                "level_name": _level_name(t.get("level", 1)),
+                "level_name": _level_name(t.get("level", 1), g),
                 "level_color": _color_for_level(t.get("level", 1)),
                 "earned": bool(earned_doc),
                 "earned_at": earned_doc["earned_at"] if earned_doc else None,
@@ -475,7 +481,7 @@ async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
             "secret": is_negative,
             "member_only": bool(t.get("member_only")),
             "condition_status": CONDITION_KEY_STATUS.get(t.get("condition_key")) if t.get("condition_key") else None,
-            "level_name": _level_name(t.get("level", 1)),
+            "level_name": _level_name(t.get("level", 1), g),
             "level_color": _color_for_level(t.get("level", 1)),
             "earned_at": a["earned_at"],
         })

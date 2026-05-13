@@ -12,6 +12,7 @@ function upsertMeta(selector, attrs) {
     el = document.createElement("meta");
     document.head.appendChild(el);
   }
+  if (el.getAttribute("data-tls-route-meta") === "true") return;
   Object.entries(attrs).forEach(([key, value]) => {
     if (value != null) el.setAttribute(key, value);
   });
@@ -25,6 +26,7 @@ function upsertLink(rel, href) {
     el.setAttribute("rel", rel);
     document.head.appendChild(el);
   }
+  if (el.getAttribute("data-tls-route-meta") === "true") return;
   el.setAttribute("href", href);
 }
 

@@ -407,6 +407,7 @@ async def list_public_users():
     # Achievements (excl. negative groups)
     neg_codes = [g["code"] async for g in db.achievement_groups.find(
         {"is_negative": True}, {"_id": 0, "code": 1})]
+    group_map = {g["code"]: g async for g in db.achievement_groups.find({}, {"_id": 0})}
     awards = await db.user_achievements.find(
         {"user_id": {"$in": user_ids}, "group_code": {"$nin": neg_codes}},
         {"_id": 0}).to_list(20000)
@@ -433,7 +434,7 @@ async def list_public_users():
                     "code": t["code"],
                     "name": t["name"],
                     "level": t["level"],
-                    "level_name": _level_name(t["level"]),
+                    "level_name": _level_name(t["level"], group_map.get(t.get("group_code"))),
                     "level_color": _color_for_level(t["level"]),
                     "points": t.get("points", 0),
                     "icon": t.get("icon"),

@@ -20,6 +20,11 @@ function upsertMeta(selector, attrs) {
   return el;
 }
 
+function markRouteManaged(el) {
+  if (el) el.setAttribute("data-tls-route-meta", "true");
+  return el;
+}
+
 function upsertCanonical() {
   let el = document.querySelector('link[rel="canonical"]');
   if (!el) {
@@ -40,6 +45,7 @@ function snapshot(elements, attrs = ["content", "href"]) {
 function restore(snapshotItems) {
   snapshotItems.forEach(({ el, values }) => {
     if (!el) return;
+    el.removeAttribute("data-tls-route-meta");
     Object.entries(values).forEach(([attr, value]) => {
       if (value == null) el.removeAttribute(attr);
       else el.setAttribute(attr, value);
@@ -67,13 +73,17 @@ export function useDocumentTitle(title, description, options = {}) {
     const ogDesc = upsertMeta('meta[property="og:description"]', { property: "og:description" });
     const ogUrl = upsertMeta('meta[property="og:url"]', { property: "og:url" });
     const ogImage = upsertMeta('meta[property="og:image"]', { property: "og:image" });
+    const ogSecureImage = upsertMeta('meta[property="og:image:secure_url"]', { property: "og:image:secure_url" });
     const ogImageAlt = upsertMeta('meta[property="og:image:alt"]', { property: "og:image:alt" });
     const twitterCard = upsertMeta('meta[name="twitter:card"]', { name: "twitter:card" });
     const twitterTitle = upsertMeta('meta[name="twitter:title"]', { name: "twitter:title" });
     const twitterDesc = upsertMeta('meta[name="twitter:description"]', { name: "twitter:description" });
     const twitterImage = upsertMeta('meta[name="twitter:image"]', { name: "twitter:image" });
+    const twitterImageAlt = upsertMeta('meta[name="twitter:image:alt"]', { name: "twitter:image:alt" });
     const canonical = upsertCanonical();
-    const previous = snapshot([descTag, ogType, ogTitle, ogDesc, ogUrl, ogImage, ogImageAlt, twitterCard, twitterTitle, twitterDesc, twitterImage, canonical]);
+    const routeManaged = [descTag, ogType, ogTitle, ogDesc, ogUrl, ogImage, ogSecureImage, ogImageAlt, twitterCard, twitterTitle, twitterDesc, twitterImage, twitterImageAlt, canonical];
+    const previous = snapshot(routeManaged);
+    routeManaged.forEach(markRouteManaged);
 
     document.title = fullTitle;
     if (description) descTag.setAttribute("content", description);
@@ -83,8 +93,10 @@ export function useDocumentTitle(title, description, options = {}) {
     ogUrl.setAttribute("content", canonicalHref);
     if (image) {
       ogImage.setAttribute("content", image);
+      ogSecureImage.setAttribute("content", image);
       ogImageAlt.setAttribute("content", fullTitle);
       twitterImage.setAttribute("content", image);
+      twitterImageAlt.setAttribute("content", fullTitle);
     }
     twitterCard.setAttribute("content", "summary_large_image");
     twitterTitle.setAttribute("content", fullTitle);

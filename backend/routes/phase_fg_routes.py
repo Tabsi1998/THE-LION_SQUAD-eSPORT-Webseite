@@ -468,20 +468,31 @@ async def page_meta(slug: str):
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
     if not page:
         raise HTTPException(404, "Seite nicht gefunden.")
-    org_name = branding.get("club_name") or "THE LION SQUAD — eSPORTS"
+    org_name = branding.get("club_name") or "THE LION SQUAD - eSPORTS"
+    base = (branding.get("domain") or os.environ.get("PUBLIC_URL", "")).strip().rstrip("/")
+    if base and not base.startswith(("http://", "https://")):
+        base = "https://" + base
+    canonical = f"{base}/{slug}".rstrip("/") if base else f"/{slug}"
+    image = branding.get("og_image_url") or branding.get("mascot_url") or branding.get("logo_url") or "/assets/brand/tls-mascot.png"
     json_ld = {
         "@context": "https://schema.org",
         "@type": "WebPage",
         "name": page["title"],
         "description": page.get("meta_description") or page.get("title"),
+        "url": canonical,
+        "image": image,
         "isPartOf": {
             "@type": "WebSite",
             "name": org_name,
-            "url": branding.get("domain") or "",
+            "url": base,
         },
     }
     return {
         "title": f"{page['title']} · {org_name}",
         "description": page.get("meta_description") or page["title"],
+        "canonical": canonical,
+        "image": image,
+        "site_name": org_name,
+        "type": "website",
         "json_ld": json_ld,
     }

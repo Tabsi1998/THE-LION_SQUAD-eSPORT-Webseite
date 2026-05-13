@@ -88,6 +88,8 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         return await season_meta(db, slug, meta, origin)
     if first in {"gallery", "galerie"} and slug:
         return await gallery_meta(db, slug, meta, origin)
+    if first == "teams" and slug:
+        return await team_meta(db, slug, meta, origin)
     if first == "members" and slug:
         return await member_profile_meta(db, slug, meta, origin)
     if first in {"u", "players"} and slug:
@@ -95,6 +97,8 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
 
     static = static_page_meta(first, meta)
     if static:
+        if first == "membership" and len(parts) > 1:
+            return static_page_meta("/".join(parts[:2]), meta) or static
         return static
     return meta
 
@@ -246,6 +250,31 @@ async def gallery_meta(db, slug: str, base: dict, origin: str) -> dict:
     return meta
 
 
+async def team_meta(db, team_id: str, base: dict, origin: str) -> dict:
+    team = await db.teams.find_one({"id": team_id, "is_public": {"$ne": False}}, {"_id": 0})
+    if not team:
+        raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+    title = team.get("name") or team.get("tag") or "Team"
+    image = absolute_url(team.get("logo_url") or base["image"], origin)
+    meta = {
+        **base,
+        "title": f"{title} · Team · {base['site_name']}",
+        "description": clean_text(team.get("description") or f"Teamprofil von {title}."),
+        "image": image,
+        "type": "profile",
+    }
+    meta["json_ld"] = {
+        "@context": "https://schema.org",
+        "@type": "SportsTeam",
+        "name": title,
+        "description": meta["description"],
+        "url": meta["canonical"],
+        "image": image,
+        "memberOf": {"@type": "Organization", "name": base["site_name"], "url": origin},
+    }
+    return meta
+
+
 async def member_profile_meta(db, slug: str, base: dict, origin: str) -> dict:
     profile = await db.club_member_profiles.find_one({"slug": slug, "is_active": {"$ne": False}}, {"_id": 0})
     if not profile:
@@ -286,7 +315,11 @@ def static_page_meta(slug: str, base: dict) -> dict | None:
         "tournaments": ("Turniere", "Turniere, Brackets, Spielpläne und Ranglisten von THE LION SQUAD."),
         "fastlap": ("Fast Lap", "Fast-Lap-Challenges, Leaderboards und Racing-Events."),
         "references": ("Referenzen", "Externe Turniere, Ligen, Platzierungen und Erfolge des Vereins."),
+        "teams": ("Teams", "Teams, Squads und Community-Gruppen von THE LION SQUAD."),
         "members": ("Vereinsmitglieder", "Öffentliche Profile der Vereinsmitglieder von THE LION SQUAD."),
+        "membership": ("Mitgliedschaft", "Mitglied werden bei THE LION SQUAD."),
+        "membership/join": ("Mitglied werden", "Informationen zur Mitgliedschaft bei THE LION SQUAD."),
+        "membership/apply": ("Mitgliedschaft beantragen", "Mitgliedschaft bei THE LION SQUAD online beantragen."),
         "community": ("Community", "Community, Mitglieder und Teams rund um THE LION SQUAD."),
         "servers": ("Server", "Öffentliche und geschützte Community-Gameserver von THE LION SQUAD."),
         "sponsors": ("Sponsoren", "Partner und Sponsoren von THE LION SQUAD."),
@@ -294,6 +327,8 @@ def static_page_meta(slug: str, base: dict) -> dict | None:
         "gallery": ("Galerie", "Fotos und Eindrücke von Events und Community-Abenden."),
         "galerie": ("Galerie", "Fotos und Eindrücke von Events und Community-Abenden."),
         "about": ("Verein", "Wer wir sind, wofür wir stehen und was THE LION SQUAD ausmacht."),
+        "board": ("Vorstand", "Vorstand und Ansprechpartner von THE LION SQUAD."),
+        "values": ("Werte & Ziele", "Werte, Ziele und Vereinsphilosophie von THE LION SQUAD."),
         "contact": ("Kontakt", "Kontakt zu THE LION SQUAD für Anfragen, Kooperationen und Sponsoring."),
     }
     item = labels.get(slug)

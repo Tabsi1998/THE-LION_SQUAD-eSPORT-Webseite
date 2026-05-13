@@ -15,14 +15,14 @@ import {
   Search, UserPlus, ShieldOff, Eye, EyeOff, Crown,
 } from "lucide-react";
 
-const LEVEL_NAMES = { 1: "Bronze", 2: "Silber", 3: "Gold", 4: "Platin", 5: "Special" };
+const LEVEL_NAMES = { 1: "Bronze", 2: "Silber", 3: "Gold", 4: "Platin", 5: "Legendär" };
 const LEVEL_COLORS = { 1: "#CD7F32", 2: "#C0C0C0", 3: "#FFD700", 4: "#29B6E8", 5: "#FF3B30" };
 const CATEGORIES = [
   { value: "match", label: "Spiel" },
   { value: "tournament", label: "Turnier" },
   { value: "fastlap", label: "Fast Lap" },
   { value: "club", label: "Verein" },
-  { value: "special", label: "Special" },
+  { value: "special", label: "Sonderauszeichnung" },
   { value: "negative", label: "Negative" },
 ];
 
@@ -34,7 +34,7 @@ export default function AdminAchievementsPage() {
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Phase B · v4</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Achievements</h1>
       <p className="mt-2 text-white/55 text-sm max-w-2xl">
-        Verwalte alle Achievement-Gruppen, Stufen, Special-Awards und Negative-Vorfälle.
+        Verwalte alle Achievement-Gruppen, Stufen, Sonderauszeichnungen und Negative-Vorfälle.
         Negative/Fun-Awards bleiben bis zur Freischaltung geheim und erscheinen danach im Profil.
       </p>
 
@@ -125,7 +125,7 @@ function GroupsTab() {
                     </button>
                   </td>
                   <td className="px-4 py-3 text-[10px] uppercase tracking-widest space-x-2">
-                    {g.is_special && <span className="text-[#FFD700]">Special</span>}
+                    {g.is_special && <span className="text-[#FFD700]">Sonderauszeichnung</span>}
                     {g.is_negative && <span className="text-[#FF3B30]">Negative</span>}
                     {g.is_admin_created && <span className="text-[#29B6E8]">Eigen</span>}
                   </td>
@@ -193,7 +193,7 @@ function GroupForm({ group, onClose, onSaved }) {
         <Field label="Beschreibung"><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input" /></Field>
         <div className="flex flex-wrap gap-4 text-sm pt-2">
           <Check label="Öffentlich sichtbar" checked={form.public} onChange={(v) => setForm({ ...form, public: v })} testId="group-public" />
-          <Check label="Special (Admin-curated)" checked={form.is_special} onChange={(v) => setForm({ ...form, is_special: v })} />
+          <Check label="Sonderauszeichnung (manuell kuratiert)" checked={form.is_special} onChange={(v) => setForm({ ...form, is_special: v })} />
           <Check label="Negativ/Fun (bis Freischaltung geheim)" checked={form.is_negative} onChange={(v) => setForm({ ...form, is_negative: v })} testId="group-negative" />
         </div>
         <div className="flex justify-end gap-2 pt-3">
