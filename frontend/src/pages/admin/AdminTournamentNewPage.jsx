@@ -36,6 +36,7 @@ export default function AdminTournamentNewPage() {
     check_in_from: "", check_in_until: "",
     start_date: "", end_date: "",
     status: "draft",
+    site_banner_enabled: false,
     best_of: 1, bronze_match: false, seeding_mode: "random",
     is_public: true, rules: "", prize_pool: "",
     banner_url: "",
@@ -134,6 +135,10 @@ export default function AdminTournamentNewPage() {
             <label className="flex items-start gap-2 text-sm text-white/75">
               <input type="checkbox" checked={form.registration_enabled} onChange={(e) => set("registration_enabled", e.target.checked)} data-testid="new-tr-reg-enabled" className="accent-[#29B6E8] mt-1" />
               <span>Öffentliche Anmeldung grundsätzlich erlauben</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-white/75">
+              <input type="checkbox" checked={form.site_banner_enabled} onChange={(e) => set("site_banner_enabled", e.target.checked)} data-testid="new-tr-site-banner" className="accent-[#FFD700] mt-1" />
+              <span>Automatisches Turnier-Hinweisbanner für dieses Turnier anzeigen</span>
             </label>
           </div>
           <Details title="Weitere Zeiten und Sonderfälle">

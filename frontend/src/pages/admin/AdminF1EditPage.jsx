@@ -430,6 +430,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
     show_club_reference_times: challenge.show_club_reference_times !== false,
     unlimited_attempts: challenge.unlimited_attempts !== false,
     max_attempts: challenge.max_attempts || 0,
+    site_banner_enabled: !!challenge.site_banner_enabled,
   });
   const [events, setEvents] = useState([]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -497,6 +498,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.registration_enabled} onChange={(e)=>set("registration_enabled", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Online-Einreichung öffentlich anzeigen</span></label>
         <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.unlimited_attempts} onChange={(e)=>set("unlimited_attempts", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Unbegrenzte Versuche</span></label>
+        <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.site_banner_enabled} onChange={(e)=>set("site_banner_enabled", e.target.checked)} className="accent-[#FFD700] mt-1"/><span>Automatisches Fast-Lap-Hinweisbanner anzeigen</span></label>
       </div>
       <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 space-y-3">
         <div>

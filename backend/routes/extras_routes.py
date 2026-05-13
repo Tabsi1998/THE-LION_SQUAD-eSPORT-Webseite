@@ -311,29 +311,8 @@ def _parse_dt_any(value):
 async def _auto_site_banners(db) -> list[dict]:
     now = now_utc()
     items: list[dict] = []
-    live = await db.live_streams.find({}, {"_id": 0}).sort("viewer_count", -1).to_list(3)
-    for stream in live:
-        name = stream.get("display_name") or stream.get("username") or stream.get("twitch_login") or "Stream"
-        items.append({
-            "id": f"auto-stream-{stream.get('stream_id') or stream.get('twitch_login')}",
-            "source": "auto",
-            "template": "live",
-            "enabled": True,
-            "priority": 90,
-            "text": f"{name} ist live: {stream.get('title') or 'Live-Stream'}",
-            "tone": "live",
-            "mode": "ticker",
-            "speed_seconds": 22,
-            "style": "solid",
-            "position": "below_nav",
-            "scope": "all",
-            "audience": "all",
-            "link_url": stream.get("stream_url") or "",
-            "link_label": "Stream öffnen",
-        })
-
     servers = await db.game_servers.find(
-        {"status": "maintenance", "is_active": {"$ne": False}},
+        {"status": "maintenance", "site_banner_enabled": True, "is_active": {"$ne": False}},
         {"_id": 0, "id": 1, "name": 1, "maintenance_note": 1, "maintenance_until": 1, "visibility": 1},
     ).sort("sort_order", 1).to_list(3)
     for server in servers:
@@ -362,7 +341,7 @@ async def _auto_site_banners(db) -> list[dict]:
         })
 
     tournaments = await db.tournaments.find(
-        {"status": {"$in": ["registration_open", "check_in", "scheduled", "registration_closed"]}, "is_public": {"$ne": False}},
+        {"status": {"$in": ["registration_open", "check_in", "scheduled", "registration_closed"]}, "site_banner_enabled": True, "is_public": {"$ne": False}},
         {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1},
     ).sort("start_date", 1).to_list(10)
     for t in tournaments:
@@ -394,6 +373,38 @@ async def _auto_site_banners(db) -> list[dict]:
             "audience": "all",
             "link_url": f"/tournaments/{t.get('slug') or t.get('id')}",
             "link_label": "Zum Turnier",
+        })
+
+    fastlaps = await db.f1_challenges.find(
+        {"status": {"$in": ["registration_open", "check_in", "scheduled", "registration_closed"]}, "site_banner_enabled": True, "visibility": {"$ne": "internal"}},
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1},
+    ).sort("start_date", 1).to_list(10)
+    for challenge in fastlaps:
+        start_dt = _parse_dt_any(challenge.get("start_date"))
+        if challenge.get("status") == "registration_open":
+            text = f"Fast-Lap Einreichung offen: {challenge.get('title') or 'Challenge'}"
+            template, tone, priority = "registration", "success", 75
+        elif start_dt and now <= start_dt and (start_dt - now).total_seconds() <= 24 * 3600:
+            text = f"Fast-Lap startet bald: {challenge.get('title') or 'Challenge'}"
+            template, tone, priority = "event", "info", 70
+        else:
+            continue
+        items.append({
+            "id": f"auto-fastlap-{template}-{challenge.get('id')}",
+            "source": "auto",
+            "template": template,
+            "enabled": True,
+            "priority": priority,
+            "text": text,
+            "tone": tone,
+            "mode": "ticker",
+            "speed_seconds": 24,
+            "style": "neon",
+            "position": "below_nav",
+            "scope": "fastlap",
+            "audience": "all",
+            "link_url": f"/fastlap/{challenge.get('slug') or challenge.get('id')}",
+            "link_label": "Zur Challenge",
         })
     return items
 

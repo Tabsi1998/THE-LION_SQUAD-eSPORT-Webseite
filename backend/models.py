@@ -444,6 +444,7 @@ class TournamentCreate(BaseModel):
     # Phase 7
     season_weight: float = 2.0
     visibility: Literal["public", "community", "members", "internal"] = "public"
+    site_banner_enabled: bool = False
     # Optional initial status — admin can publish straight to 'scheduled'.
     status: Optional[TournamentStatus] = None
 
@@ -494,6 +495,7 @@ class TournamentUpdate(BaseModel):
     show_chat: Optional[bool] = None
     season_weight: Optional[float] = None
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None
+    site_banner_enabled: Optional[bool] = None
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
 
@@ -706,6 +708,7 @@ class F1ChallengeCreate(BaseModel):
     # Phase 7 weighting
     season_weight: float = 1.0  # default = "Fast-Lap-Challenge"
     visibility: Literal["public", "community", "members", "internal"] = "public"
+    site_banner_enabled: bool = False
     status: Optional[TournamentStatus] = None
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
@@ -745,6 +748,7 @@ class F1ChallengeUpdate(BaseModel):
     show_chat: Optional[bool] = None
     season_weight: Optional[float] = None
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None
+    site_banner_enabled: Optional[bool] = None
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
 

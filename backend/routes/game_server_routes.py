@@ -136,6 +136,7 @@ class GameServerPayload(BaseModel):
     version: Optional[str] = Field(default=None, max_length=80)
     maintenance_note: Optional[str] = Field(default=None, max_length=300)
     maintenance_until: Optional[str] = None
+    site_banner_enabled: bool = False
     player_count: int = Field(default=0, ge=0)
     max_players: Optional[int] = Field(default=None, ge=0)
     player_names: list[str] = Field(default_factory=list)
@@ -170,6 +171,7 @@ class GameServerPatch(BaseModel):
     version: Optional[str] = Field(default=None, max_length=80)
     maintenance_note: Optional[str] = Field(default=None, max_length=300)
     maintenance_until: Optional[str] = None
+    site_banner_enabled: Optional[bool] = None
     player_count: Optional[int] = Field(default=None, ge=0)
     max_players: Optional[int] = Field(default=None, ge=0)
     player_names: Optional[list[str]] = None

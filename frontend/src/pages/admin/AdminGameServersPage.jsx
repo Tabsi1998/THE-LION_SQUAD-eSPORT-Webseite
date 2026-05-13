@@ -28,6 +28,7 @@ const emptyForm = {
   version: "",
   maintenance_note: "",
   maintenance_until: "",
+  site_banner_enabled: false,
   player_count: 0,
   max_players: "",
   player_names_text: "",
@@ -105,6 +106,7 @@ function toPayload(form) {
     version: form.version || null,
     maintenance_note: form.maintenance_note || null,
     maintenance_until: datetimeInputToIso(form.maintenance_until),
+    site_banner_enabled: !!form.site_banner_enabled,
     player_count: Number(form.player_count || 0),
     max_players: form.max_players === "" ? null : Number(form.max_players || 0),
     player_names: String(form.player_names_text || "").split(",").map((x) => x.trim()).filter(Boolean),
@@ -406,6 +408,10 @@ export default function AdminGameServersPage() {
             )}
             <Field label="Wartungsnotiz" value={form.maintenance_note} onChange={(v) => set("maintenance_note", v)} placeholder="z.B. Mod-Update, neue Map..." />
             <Field label="Wartung bis" type="datetime-local" value={form.maintenance_until} onChange={(v) => set("maintenance_until", v)} />
+            <label className="flex items-start gap-2 mt-6 text-sm text-white/75">
+              <input type="checkbox" checked={form.site_banner_enabled} onChange={(e) => set("site_banner_enabled", e.target.checked)} className="accent-[#FFD700] mt-1" />
+              <span><strong className="text-white">Wartungsbanner anzeigen</strong><br /><span className="text-xs text-white/50">Nur wenn dieser Haken aktiv ist und der Server auf Wartung steht.</span></span>
+            </label>
             <Field label="Sortierung" type="number" value={form.sort_order} onChange={(v) => set("sort_order", v)} />
             <Field label="Regel-Link" value={form.rules_url} onChange={(v) => set("rules_url", v)} />
             <Field label="Allgemeiner Hinweis" value={form.password_hint} onChange={(v) => set("password_hint", v)} placeholder="z.B. Modpack vorher installieren" />
@@ -441,6 +447,7 @@ export default function AdminGameServersPage() {
                   <Badge label={statusLabels[server.status] || server.status} tone={server.status === "online" ? "green" : server.status === "maintenance" ? "gold" : "muted"} />
                   <Badge label={visibilityLabels[server.visibility] || server.visibility} tone={server.visibility === "members" ? "gold" : server.visibility === "public" ? "cyan" : "muted"} />
                   {server.access_secret_kind && server.access_secret_kind !== "none" && <Badge label={secretLabels[server.access_secret_kind] || "Zugang"} tone="gold" />}
+                  {server.status === "maintenance" && server.site_banner_enabled && <Badge label="Banner aktiv" tone="gold" />}
                   {server.is_active === false && <Badge label="Inaktiv" tone="red" />}
                 </div>
               </div>

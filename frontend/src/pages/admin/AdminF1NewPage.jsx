@@ -24,6 +24,7 @@ export default function AdminF1NewPage() {
     registration_enabled: false, registration_open_from: "", registration_open_until: "",
     block_club_member_results: false, allow_club_reference_times: true, show_club_reference_times: true,
     start_date: "", end_date: "", status: "draft",
+    site_banner_enabled: false,
     is_championship: false,
     twitch_channel: "", twitch_enabled: false,
     prize_places: [],
@@ -104,6 +105,10 @@ export default function AdminF1NewPage() {
           <label className="flex items-start gap-2 text-sm text-white/75">
             <input type="checkbox" checked={form.registration_enabled} onChange={(e) => set("registration_enabled", e.target.checked)} data-testid="f1-new-reg-enabled" className="accent-[#29B6E8] mt-1" />
             <span>Online-Einreichung auf der öffentlichen Seite anzeigen</span>
+          </label>
+          <label className="flex items-start gap-2 text-sm text-white/75">
+            <input type="checkbox" checked={form.site_banner_enabled} onChange={(e) => set("site_banner_enabled", e.target.checked)} data-testid="f1-new-site-banner" className="accent-[#FFD700] mt-1" />
+            <span>Automatisches Fast-Lap-Hinweisbanner für diese Challenge anzeigen</span>
           </label>
           <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 space-y-3">
             <div>
