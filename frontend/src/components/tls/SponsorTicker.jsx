@@ -42,6 +42,10 @@ function repeatForLoop(items, minItems) {
   return Array.from({ length: repeats }, () => items).flat();
 }
 
+function marqueeDuration(itemCount, secondsPerItem, minSeconds) {
+  return Math.max(minSeconds, itemCount * secondsPerItem);
+}
+
 export function SponsorTicker({ className = "", compact = false, placement = "home", spotlight = false }) {
   const [sponsors, setSponsors] = useState([]);
   const load = useCallback(async () => {
@@ -60,7 +64,11 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
   if (!logoSponsors.length) return null;
   const shouldMarquee = logoSponsors.length >= (compact ? 3 : spotlight ? 2 : 3);
   const loopItems = shouldMarquee ? repeatForLoop(logoSponsors, compact ? 14 : spotlight ? 8 : 10) : logoSponsors;
-  const speed = compact ? Math.max(24, logoSponsors.length * 8) : spotlight ? Math.max(34, logoSponsors.length * 12) : 48;
+  const speed = compact
+    ? marqueeDuration(loopItems.length, 7, 72)
+    : spotlight
+      ? marqueeDuration(loopItems.length, 8, 64)
+      : marqueeDuration(loopItems.length, 6, 60);
   const shellClass = compact
     ? "bg-transparent"
     : spotlight
@@ -138,7 +146,7 @@ export function SponsorGrid({ max = 4, placement = "tv", marquee = false, classN
   if (!logoSponsors.length) return null;
   const shouldMarquee = marquee && logoSponsors.length > max;
   const items = shouldMarquee ? repeatForLoop(logoSponsors, Math.max(10, max * 4)) : logoSponsors.slice(0, max);
-  const speed = Math.max(26, logoSponsors.length * 7);
+  const speed = marqueeDuration(items.length, 5.5, 72);
   const renderLogo = (s, index, groupIndex = 0, duplicate = false) => (
     <a key={`${groupIndex}-${sponsorKey(s)}-${index}`} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" tabIndex={duplicate ? -1 : undefined} className={`inline-flex items-center justify-center shrink-0 opacity-80 hover:opacity-100 transition ${s.tier === "main" ? "h-9 w-36 sm:h-10 sm:w-52" : s.tier === "platinum" ? "h-8 w-32 sm:h-9 sm:w-48" : "h-8 w-28 sm:w-44"}`} title={s.name}>
       <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-h-full max-w-full w-auto h-auto" />
