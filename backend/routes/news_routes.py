@@ -459,7 +459,7 @@ async def list_sponsors(placement: Optional[str] = None):
     sp = [s for s in sp if _sponsor_is_public_active(s)]
     # Apply placement filter
     if placement == "home":
-        sp = [s for s in sp if s["show_on_home"] and s["tier"] == "main"]
+        sp = [s for s in sp if s["show_on_home"]]
     elif placement == "footer":
         sp = [s for s in sp if s["show_on_footer"]]
     elif placement == "events":
