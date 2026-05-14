@@ -47,7 +47,6 @@ export function PublicLayout({ children }) {
   const tagline = branding?.tagline || "eSports";
   const twitchUrl = getTwitchUrl(branding?.twitch_channel);
   const socialLinks = getFooterSocialLinks(branding, twitchUrl);
-  const contactSocials = socialLinks.filter((social) => ["discord", "whatsapp"].includes(social.platform));
 
   return (
     <div className="min-h-screen max-w-full overflow-x-clip bg-[#0A0A0A] text-white flex flex-col">
@@ -168,61 +167,14 @@ export function PublicLayout({ children }) {
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="bottom_fixed" />
       <footer className="border-t border-white/10 bg-[#0A0A0A] mt-24 min-w-0 max-w-full overflow-x-clip">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          {/* Reihe 1 — Brand + 4 Link-Spalten */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-12 gap-8">
-            <div className="col-span-2 md:col-span-3 lg:col-span-4">
-              <Logo size="lg" asLink={false} />
-              <p className="mt-4 text-white/60 text-sm max-w-md">
-                <strong className="text-white">{clubName} — {tagline}.</strong> Die offizielle Vereinsplattform für Community, Mitglieder, Events, Turniere und Fast-Lap-Challenges. Online &amp; offline. Ein Rudel.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2" data-testid="footer-socials">
-                {socialLinks.map((social, index) => (
-                  <a key={`${social.platform}-${index}`} href={social.url} target="_blank" rel="noreferrer" data-testid={`footer-${social.platform}`} aria-label={social.label} title={social.label} className={`w-9 h-9 inline-flex items-center justify-center border border-white/10 rounded-sm text-white/70 transition ${social.hoverClass}`}>
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d={social.path} /></svg>
-                  </a>
-                ))}
-              </div>
-            </div>
-            <div className="lg:col-span-2">
-              <h4 className="font-heading font-bold text-white uppercase tracking-wider text-xs">Verein</h4>
-              <ul className="mt-3 space-y-2 text-sm text-white/60">
-                <li><Link to="/about" className="hover:text-[#29B6E8] transition">Über uns</Link></li>
-                <li><Link to="/board" className="hover:text-[#29B6E8] transition">Vorstand</Link></li>
-                <li><Link to="/values" className="hover:text-[#29B6E8] transition">Werte &amp; Ziele</Link></li>
-                <li><Link to="/members" className="hover:text-[#29B6E8] transition">Vereinsmitglieder</Link></li>
-                <li><Link to="/membership/join" className="hover:text-[#29B6E8] transition">Mitglied werden</Link></li>
-                <li><Link to="/galerie" className="hover:text-[#29B6E8] transition">Galerie</Link></li>
-                <li><Link to="/references" className="hover:text-[#29B6E8] transition">Referenzen</Link></li>
-              </ul>
-            </div>
-            <div className="lg:col-span-2">
-              <h4 className="font-heading font-bold text-white uppercase tracking-wider text-xs">eSports</h4>
-              <ul className="mt-3 space-y-2 text-sm text-white/60">
-                <li><Link to="/tournaments" className="hover:text-[#29B6E8] transition">Turniere</Link></li>
-                <li><Link to="/fastlap" className="hover:text-[#29B6E8] transition">Fast Lap</Link></li>
-                <li><Link to="/events" className="hover:text-[#29B6E8] transition">Events</Link></li>
-                <li><Link to="/seasons/current" className="hover:text-[#29B6E8] transition">Season Pass</Link></li>
-              </ul>
-            </div>
-            <div className="lg:col-span-2">
-              <h4 className="font-heading font-bold text-white uppercase tracking-wider text-xs">Community</h4>
-              <ul className="mt-3 space-y-2 text-sm text-white/60">
-                <li><Link to="/community" className="hover:text-[#29B6E8] transition">Community-Übersicht</Link></li>
-                <li><Link to="/servers" className="hover:text-[#29B6E8] transition">Server</Link></li>
-                <li><Link to="/players" className="hover:text-[#29B6E8] transition">Community-Spieler</Link></li>
-                <li><Link to="/teams" className="hover:text-[#29B6E8] transition">Teams</Link></li>
-              </ul>
-            </div>
-            <div className="lg:col-span-2">
-              <h4 className="font-heading font-bold text-white uppercase tracking-wider text-xs">Kontakt</h4>
-              <ul className="mt-3 space-y-2 text-sm text-white/60">
-                <li><Link to="/contact" className="hover:text-[#29B6E8] transition">Kontaktformular</Link></li>
-                <li><Link to="/sponsors" className="hover:text-[#29B6E8] transition">Sponsoren</Link></li>
-                <li><Link to="/partners" className="hover:text-[#29B6E8] transition">Partner</Link></li>
-                {contactSocials.map((social) => (
-                  <li key={social.platform}><a href={social.url} target="_blank" rel="noreferrer" className="hover:text-[#29B6E8] transition">{social.label}</a></li>
-                ))}
-              </ul>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <Logo size="lg" asLink={false} />
+            <div className="flex flex-wrap gap-2 md:justify-end" data-testid="footer-socials">
+              {socialLinks.map((social, index) => (
+                <a key={`${social.platform}-${index}`} href={social.url} target="_blank" rel="noreferrer" data-testid={`footer-${social.platform}`} aria-label={social.label} title={social.label} className={`w-9 h-9 inline-flex items-center justify-center border border-white/10 rounded-sm text-white/70 transition ${social.hoverClass}`}>
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d={social.path} /></svg>
+                </a>
+              ))}
             </div>
           </div>
           <SponsorTicker compact placement="footer" className="mt-10 pt-8 border-t border-white/5" />
