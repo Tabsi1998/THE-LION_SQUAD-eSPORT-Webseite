@@ -274,8 +274,8 @@ async def sitemap():
     base = _normalise_base_url(branding.get("domain"))
 
     static_paths = [
-        "/", "/about", "/news", "/events", "/tournaments", "/fastlap", "/f1",
-        "/teams", "/players", "/servers", "/members", "/membership/join", "/membership/apply",
+        "/", "/about", "/news", "/events", "/tournaments", "/fastlap",
+        "/community", "/teams", "/players", "/servers", "/members", "/membership/join",
         "/sponsors", "/partners", "/contact", "/board", "/values", "/galerie", "/references",
         "/privacy", "/imprint",
     ]

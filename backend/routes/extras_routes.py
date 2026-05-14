@@ -985,7 +985,7 @@ async def submit_indexnow(body: IndexNowSubmitBody, me: dict = Depends(require_a
     payload = {
         "host": host,
         "key": key,
-        "keyLocation": f"{domain}/indexnow-key.txt",
+        "keyLocation": f"{domain}/{key}.txt",
         "urlList": urls[:100],
     }
     async with httpx.AsyncClient(timeout=10) as client:

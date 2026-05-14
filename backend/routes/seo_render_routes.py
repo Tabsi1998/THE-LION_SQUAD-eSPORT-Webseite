@@ -26,11 +26,12 @@ DEFAULT_OG_IMAGE = "/assets/brand/og-default.png"
 async def seo_preview(path: str, request: Request):
     meta = await resolve_meta(path, request)
     html = render_preview_html(meta)
+    robots = meta.get("robots") or "index, follow"
     return HTMLResponse(
         content=html,
         headers={
             "Cache-Control": "public, max-age=300",
-            "X-Robots-Tag": "index, follow",
+            "X-Robots-Tag": robots,
         },
     )
 
@@ -66,6 +67,7 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         "site_name": site_name,
         "type": "website",
         "locale": "de_AT",
+        "robots": "index, follow",
         "google_site_verification": branding.get("google_site_verification") or "",
         "msvalidate_01": branding.get("msvalidate_01") or "",
         "json_ld": website_json_ld(origin, site_name, default_description, default_image, branding),
@@ -101,7 +103,10 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
     static = static_page_meta(first, meta)
     if static:
         if first == "membership" and len(parts) > 1:
-            return static_page_meta("/".join(parts[:2]), meta) or static
+            membership_meta = static_page_meta("/".join(parts[:2]), meta) or static
+            if "/".join(parts[:2]) == "membership/apply":
+                membership_meta["robots"] = "noindex, follow"
+            return membership_meta
         return static
     return meta
 
@@ -178,7 +183,10 @@ async def tournament_meta(db, slug: str, suffix: str, base: dict, origin: str) -
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     suffix_label = {"bracket": "Turnierbaum", "matches": "Spielplan", "standings": "Rangliste"}.get(suffix)
     title = tournament.get("title") or "Turnier"
-    description = clean_text(tournament.get("description") or tournament.get("rules") or title)
+    description = enrich_short_description(
+        tournament.get("description") or tournament.get("rules"),
+        f"{title}: Turnierdetails mit Anmeldung, Ablauf, Regeln, Spielplan und Community-Wertung bei THE LION SQUAD eSports.",
+    )
     image = absolute_url(tournament.get("banner_url") or base["image"], origin)
     meta = {
         **base,
@@ -206,7 +214,14 @@ async def fastlap_meta(db, slug: str, base: dict, origin: str) -> dict:
     challenge = await db.f1_challenges.find_one({"$or": [{"slug": slug}, {"id": slug}]}, {"_id": 0})
     if not challenge or challenge.get("status") == "draft" or not is_public_visibility(challenge):
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
-    description = clean_text(challenge.get("description") or challenge.get("rules") or challenge.get("title"))
+    title = challenge.get("title") or "Fast-Lap-Challenge"
+    description = enrich_short_description(
+        challenge.get("description") or challenge.get("rules"),
+        f"{title}: Fast-Lap-Challenge mit Strecken, Regeln, Leaderboard, Teilnahmeinfos und aktuellen Bestzeiten bei THE LION SQUAD eSports.",
+        min_len=125,
+    )
+    if title not in description:
+        description = clean_text(f"{title}: {description}", max_len=220)
     image = absolute_url(challenge.get("banner_url") or base["image"], origin)
     meta = {
         **base,
@@ -262,7 +277,10 @@ async def team_meta(db, team_id: str, base: dict, origin: str) -> dict:
     meta = {
         **base,
         "title": f"{title} · Team · {base['site_name']}",
-        "description": clean_text(team.get("description") or f"Teamprofil von {title}."),
+        "description": enrich_short_description(
+            team.get("description"),
+            f"{title}: Oeffentliches Teamprofil mit Mitgliedern, Community-Bezug und eSports-Aktivitaeten bei THE LION SQUAD.",
+        ),
         "image": image,
         "type": "profile",
     }
@@ -283,10 +301,14 @@ async def member_profile_meta(db, slug: str, base: dict, origin: str) -> dict:
     if not profile:
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     image = absolute_url(profile.get("avatar_url") or profile.get("banner_url") or base["image"], origin)
+    label = profile.get("display_name") or profile.get("gamertag") or "Vereinsmitglied"
     meta = {
         **base,
         "title": f"{profile.get('display_name') or profile.get('gamertag')} · {base['site_name']}",
-        "description": clean_text(profile.get("bio") or "Vereinsmitglied bei THE LION SQUAD eSports."),
+        "description": enrich_short_description(
+            profile.get("bio"),
+            f"{label} ist Vereinsmitglied bei THE LION SQUAD eSports. Oeffentliches Profil mit Gaming-Aktivitaeten, Community-Rolle und Vereinsbezug.",
+        ),
         "image": image,
         "type": "profile",
     }
@@ -303,7 +325,10 @@ async def user_profile_meta(db, username: str, base: dict, origin: str) -> dict:
     meta = {
         **base,
         "title": f"{label} · Community · {base['site_name']}",
-        "description": clean_text(user.get("bio") or f"Community-Profil von {label}."),
+        "description": enrich_short_description(
+            user.get("bio"),
+            f"Oeffentliches Community-Profil von {label} bei THE LION SQUAD eSports mit Gaming-Infos, Aktivitaet und Community-Bezug.",
+        ),
         "image": image,
         "type": "profile",
     }
@@ -342,6 +367,11 @@ def static_page_meta(slug: str, base: dict) -> dict | None:
     if not item:
         return None
     title, description = item
+    description = enrich_short_description(
+        description,
+        f"{title}: Informationen, Inhalte und aktuelle Details von THE LION SQUAD eSports aus Tirol.",
+        min_len=80,
+    )
     meta = {**base, "title": f"{title} · {base['site_name']}", "description": description}
     meta["json_ld"] = webpage_json_ld(meta)
     return meta
@@ -356,6 +386,7 @@ def render_preview_html(meta: dict) -> str:
     site_name = escape(meta["site_name"])
     type_ = escape(meta.get("type") or "website")
     locale = escape(meta.get("locale") or "de_AT")
+    robots = escape(meta.get("robots") or "index, follow")
     json_ld = escape(json.dumps(meta.get("json_ld") or webpage_json_ld(meta), ensure_ascii=False))
     optional = []
     if meta.get("published_time"):
@@ -374,6 +405,7 @@ def render_preview_html(meta: dict) -> str:
     <title>{title}</title>
     <link rel="canonical" href="{canonical}" />
     <meta name="description" content="{description}" />
+    <meta name="robots" content="{robots}" />
     <meta property="og:type" content="{type_}" />
     <meta property="og:locale" content="{locale}" />
     <meta property="og:site_name" content="{site_name}" />
@@ -451,6 +483,18 @@ def clean_text(value: str | None, max_len: int = 180) -> str:
 
 def is_public_visibility(item: dict) -> bool:
     return (item.get("visibility") or "public") == "public"
+
+
+def enrich_short_description(value: str | None, fallback: str, min_len: int = 90, max_len: int = 220) -> str:
+    text = clean_text(value, max_len=max_len)
+    fallback_text = clean_text(fallback, max_len=max_len)
+    if text == "THE LION SQUAD - eSPORTS":
+        return fallback_text
+    if len(text) >= min_len:
+        return text
+    if fallback_text and fallback_text not in text:
+        return clean_text(f"{text} {fallback_text}", max_len=max_len)
+    return fallback_text or text
 
 
 def is_published_now(item: dict) -> bool:
