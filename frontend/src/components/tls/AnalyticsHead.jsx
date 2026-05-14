@@ -38,6 +38,11 @@ function ensureGoogleTag() {
   return window.gtag;
 }
 
+function analyticsDebugMode() {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).has("ga_debug");
+}
+
 function setGoogleConsent(state) {
   if (typeof window === "undefined") return;
   const gtag = ensureGoogleTag();
@@ -64,11 +69,21 @@ function injectGoogleAnalytics(measurementId) {
       [GOOGLE_SCRIPT_ID_ATTR]: id,
     });
   }
-  gtag("js", new Date());
+  if (window.__tlsGoogleTagStarted !== id) {
+    gtag("js", new Date());
+    window.__tlsGoogleTagStarted = id;
+  }
+}
+
+function configureGoogleAnalytics(measurementId) {
+  const id = String(measurementId || "").trim();
+  if (!id || typeof window === "undefined") return;
+  const gtag = ensureGoogleTag();
   gtag("config", id, {
     anonymize_ip: true,
     send_page_view: false,
   });
+  window.__tlsGoogleConfiguredFor = id;
 }
 
 function injectPlausible(domain) {
@@ -107,6 +122,7 @@ export function AnalyticsHead() {
     if (provider === "google" && settings.google_analytics_id) {
       injectGoogleAnalytics(settings.google_analytics_id);
       setGoogleConsent(analyticsConsent ? "granted" : "denied");
+      if (analyticsConsent) configureGoogleAnalytics(settings.google_analytics_id);
     } else if (provider === "plausible" && settings.plausible_domain) {
       setGoogleConsent("denied");
       if (analyticsConsent) injectPlausible(settings.plausible_domain);
@@ -119,13 +135,17 @@ export function AnalyticsHead() {
 
   useEffect(() => {
     if (!hasConsent("analytics") || settings?.analytics_provider !== "google" || !settings?.google_analytics_id || typeof window === "undefined") return;
+    setGoogleConsent("granted");
+    configureGoogleAnalytics(settings.google_analytics_id);
     const gtag = ensureGoogleTag();
-    gtag("event", "page_view", {
+    const event = {
       page_title: document.title,
       page_location: window.location.href,
       page_path: `${location.pathname}${location.search}`,
       send_to: settings.google_analytics_id,
-    });
+    };
+    if (analyticsDebugMode()) event.debug_mode = true;
+    gtag("event", "page_view", event);
   }, [hasConsent, location.pathname, location.search, settings]);
 
   return null;
