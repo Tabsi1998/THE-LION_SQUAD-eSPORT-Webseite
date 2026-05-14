@@ -20,6 +20,8 @@ DARK = colors.HexColor("#121212")
 MUTED = colors.HexColor("#A1A1AA")
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+FRONTEND_BRAND_DIR = REPO_ROOT / "frontend" / "public" / "assets" / "brand"
 
 
 def _base_styles():
@@ -50,12 +52,13 @@ def _page_bg(canvas, doc):
     # Thin cyan line top
     canvas.setFillColor(CYAN)
     canvas.rect(0, doc.pagesize[1] - 4, doc.pagesize[0], 4, fill=1, stroke=0)
+    _draw_brand_header(canvas, doc, getattr(doc, "tls_pdf_branding", {}))
     _draw_sponsor_footer(canvas, doc, getattr(doc, "tls_pdf_sponsors", []))
     # Footer
     canvas.setFillColor(MUTED)
     canvas.setFont("Helvetica", 7)
-    canvas.drawString(2 * cm, 1 * cm, "THE LION SQUAD eSports · Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
-    canvas.drawRightString(doc.pagesize[0] - 2 * cm, 1 * cm, f"Page {doc.page}")
+    canvas.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
+    canvas.drawRightString(doc.pagesize[0] - 2 * cm, 0.72 * cm, f"Page {doc.page}")
     canvas.restoreState()
 
 
@@ -74,6 +77,17 @@ def _local_upload_path(url: str | None) -> Path | None:
     return None
 
 
+def _brand_asset_path(url: str | None) -> Path | None:
+    raw = str(url or "").strip()
+    if not raw:
+        return None
+    path = urlparse(raw).path or raw
+    if path.startswith("/assets/brand/"):
+        candidate = FRONTEND_BRAND_DIR / Path(path).name
+        return candidate if candidate.is_file() else None
+    return _local_upload_path(raw)
+
+
 def _draw_logo(canvas, path: Path, x: float, y: float, max_w: float, max_h: float) -> bool:
     try:
         img = ImageReader(str(path))
@@ -89,22 +103,55 @@ def _draw_logo(canvas, path: Path, x: float, y: float, max_w: float, max_h: floa
         return False
 
 
+def _draw_brand_header(canvas, doc, branding: dict | None):
+    branding = branding or {}
+    page_w, page_h = doc.pagesize
+    logo_path = (
+        _brand_asset_path(branding.get("logo_url"))
+        or _brand_asset_path(branding.get("mascot_url"))
+        or _brand_asset_path("/assets/brand/tls-wordmark.png")
+    )
+    x = 2 * cm
+    y = page_h - 1.85 * cm
+    if not (logo_path and _draw_logo(canvas, logo_path, x, y, 4.8 * cm, 1.1 * cm)):
+        canvas.setFillColor(WHITE)
+        canvas.setFont("Helvetica-Bold", 10)
+        canvas.drawString(x, y + 0.42 * cm, "THE LION SQUAD")
+        canvas.setFillColor(CYAN)
+        canvas.setFont("Helvetica-Bold", 6)
+        canvas.drawString(x, y + 0.16 * cm, "E-SPORTS")
+
+    domain = str(branding.get("domain") or "lionsquad.at").replace("https://", "").replace("http://", "").strip("/")
+    canvas.setFillColor(colors.HexColor("#64748B"))
+    canvas.setFont("Helvetica-Bold", 6)
+    canvas.drawRightString(page_w - 2 * cm, y + 0.48 * cm, domain.upper())
+    canvas.setStrokeColor(colors.HexColor("#1F2937"))
+    canvas.setLineWidth(0.4)
+    canvas.line(2 * cm, page_h - 2.08 * cm, page_w - 2 * cm, page_h - 2.08 * cm)
+
+
 def _draw_sponsor_footer(canvas, doc, sponsors: list | None):
     sponsors = [s for s in (sponsors or []) if s.get("name") or s.get("logo_url")]
     if not sponsors:
         return
     page_w = doc.pagesize[0]
-    max_items = 7 if page_w > 22 * cm else 5
+    max_items = 8 if page_w > 22 * cm else 6
     sponsors = sponsors[:max_items]
+    band_top = 2.85 * cm
+    canvas.setFillColor(colors.HexColor("#080808"))
+    canvas.rect(0, 0.95 * cm, page_w, band_top - 0.95 * cm, fill=1, stroke=0)
+    canvas.setStrokeColor(colors.HexColor("#1F2937"))
+    canvas.setLineWidth(0.4)
+    canvas.line(2 * cm, band_top, page_w - 2 * cm, band_top)
     canvas.setFillColor(CYAN)
-    canvas.setFont("Helvetica-Bold", 5.5)
-    canvas.drawCentredString(page_w / 2, 1.95 * cm, "PRESENTED BY OUR PARTNERS")
-    gap = 3 * mm
+    canvas.setFont("Helvetica-Bold", 6)
+    canvas.drawCentredString(page_w / 2, 2.46 * cm, "PRESENTED BY OUR PARTNERS")
+    gap = 4 * mm
     available_w = page_w - 4 * cm
-    slot_w = min(4.2 * cm, (available_w - gap * (len(sponsors) - 1)) / max(1, len(sponsors)))
-    slot_h = 7 * mm
+    slot_w = min(4.8 * cm, (available_w - gap * (len(sponsors) - 1)) / max(1, len(sponsors)))
+    slot_h = 9.5 * mm
     start_x = (page_w - (slot_w * len(sponsors) + gap * (len(sponsors) - 1))) / 2
-    y = 1.22 * cm
+    y = 1.38 * cm
     for index, sponsor in enumerate(sponsors):
         x = start_x + index * (slot_w + gap)
         logo_path = _local_upload_path(sponsor.get("logo_url"))
@@ -112,15 +159,16 @@ def _draw_sponsor_footer(canvas, doc, sponsors: list | None):
         if not drawn:
             canvas.setFillColor(WHITE)
             canvas.setFont("Helvetica-Bold", 6.5)
-            canvas.drawCentredString(x + slot_w / 2, y + 2.5 * mm, str(sponsor.get("name") or "")[:28])
+            canvas.drawCentredString(x + slot_w / 2, y + 3.5 * mm, str(sponsor.get("name") or "")[:28])
 
 
-def _doc(buffer, title: str, orientation="portrait", sponsors: list | None = None):
+def _doc(buffer, title: str, orientation="portrait", sponsors: list | None = None, branding: dict | None = None):
     size = landscape(A4) if orientation == "landscape" else A4
     doc = SimpleDocTemplate(buffer, pagesize=size, title=title,
                               leftMargin=2 * cm, rightMargin=2 * cm,
-                              topMargin=2 * cm, bottomMargin=2.45 * cm)
+                              topMargin=2.75 * cm, bottomMargin=3.35 * cm)
     doc.tls_pdf_sponsors = sponsors or []
+    doc.tls_pdf_branding = branding or {}
     return doc
 
 
@@ -143,9 +191,9 @@ def _table_style():
     ])
 
 
-def pdf_participants(tournament: dict, registrations: list, pdf_sponsors: list | None = None) -> bytes:
+def pdf_participants(tournament: dict, registrations: list, pdf_sponsors: list | None = None, pdf_branding: dict | None = None) -> bytes:
     buf = io.BytesIO()
-    doc = _doc(buf, f"Teilnehmer - {tournament.get('title','')}", sponsors=pdf_sponsors)
+    doc = _doc(buf, f"Teilnehmer - {tournament.get('title','')}", sponsors=pdf_sponsors, branding=pdf_branding)
     styles = _base_styles()
     story = []
     _header(story, styles, "Teilnehmerliste", tournament.get("title", ""))
@@ -165,9 +213,9 @@ def pdf_participants(tournament: dict, registrations: list, pdf_sponsors: list |
     return buf.getvalue()
 
 
-def pdf_f1_leaderboard(challenge: dict, track: dict, entries: list, pdf_sponsors: list | None = None) -> bytes:
+def pdf_f1_leaderboard(challenge: dict, track: dict, entries: list, pdf_sponsors: list | None = None, pdf_branding: dict | None = None) -> bytes:
     buf = io.BytesIO()
-    doc = _doc(buf, f"F1 {challenge.get('title','')} - {track.get('name','') if track else ''}", sponsors=pdf_sponsors)
+    doc = _doc(buf, f"F1 {challenge.get('title','')} - {track.get('name','') if track else ''}", sponsors=pdf_sponsors, branding=pdf_branding)
     styles = _base_styles()
     story = []
     _header(story, styles, f"F1 Fast Lap · {track.get('name','')}", challenge.get("title", ""))
@@ -185,9 +233,9 @@ def pdf_f1_leaderboard(challenge: dict, track: dict, entries: list, pdf_sponsors
     return buf.getvalue()
 
 
-def pdf_matches(tournament: dict, matches: list, reg_map: dict, pdf_sponsors: list | None = None) -> bytes:
+def pdf_matches(tournament: dict, matches: list, reg_map: dict, pdf_sponsors: list | None = None, pdf_branding: dict | None = None) -> bytes:
     buf = io.BytesIO()
-    doc = _doc(buf, f"Matchplan - {tournament.get('title','')}", "landscape", sponsors=pdf_sponsors)
+    doc = _doc(buf, f"Matchplan - {tournament.get('title','')}", "landscape", sponsors=pdf_sponsors, branding=pdf_branding)
     styles = _base_styles()
     story = []
     _header(story, styles, "Matchplan", tournament.get("title", ""))
@@ -211,9 +259,9 @@ def pdf_matches(tournament: dict, matches: list, reg_map: dict, pdf_sponsors: li
     return buf.getvalue()
 
 
-def pdf_standings(tournament: dict, rows: list, pdf_sponsors: list | None = None) -> bytes:
+def pdf_standings(tournament: dict, rows: list, pdf_sponsors: list | None = None, pdf_branding: dict | None = None) -> bytes:
     buf = io.BytesIO()
-    doc = _doc(buf, f"Standings - {tournament.get('title','')}", sponsors=pdf_sponsors)
+    doc = _doc(buf, f"Standings - {tournament.get('title','')}", sponsors=pdf_sponsors, branding=pdf_branding)
     styles = _base_styles()
     story = []
     _header(story, styles, "Standings", tournament.get("title", ""))
@@ -231,9 +279,9 @@ def pdf_standings(tournament: dict, rows: list, pdf_sponsors: list | None = None
     return buf.getvalue()
 
 
-def pdf_checkin(tournament: dict, registrations: list, pdf_sponsors: list | None = None) -> bytes:
+def pdf_checkin(tournament: dict, registrations: list, pdf_sponsors: list | None = None, pdf_branding: dict | None = None) -> bytes:
     buf = io.BytesIO()
-    doc = _doc(buf, f"Check-in - {tournament.get('title','')}", sponsors=pdf_sponsors)
+    doc = _doc(buf, f"Check-in - {tournament.get('title','')}", sponsors=pdf_sponsors, branding=pdf_branding)
     styles = _base_styles()
     story = []
     _header(story, styles, "Check-in Liste", tournament.get("title", ""))

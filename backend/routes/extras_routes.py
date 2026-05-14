@@ -1618,6 +1618,13 @@ async def _pdf_sponsors(db):
     return rows
 
 
+async def _pdf_branding(db):
+    return await db.settings.find_one(
+        {"id": "branding"},
+        {"_id": 0, "logo_url": 1, "mascot_url": 1, "domain": 1, "site_title": 1, "club_name": 1},
+    ) or {}
+
+
 @pdf_router.get("/tournaments/{slug_or_id}/participants.pdf")
 async def pdf_tournament_participants(slug_or_id: str, me: dict = Depends(require_admin())):
     db = get_db()
@@ -1631,7 +1638,8 @@ async def pdf_tournament_participants(slug_or_id: str, me: dict = Depends(requir
         if r.get("team_id"):
             r["team"] = teams.get(r["team_id"], {})
     sponsors = await _pdf_sponsors(db)
-    data = pdf_participants(t, regs, pdf_sponsors=sponsors)
+    branding = await _pdf_branding(db)
+    data = pdf_participants(t, regs, pdf_sponsors=sponsors, pdf_branding=branding)
     return _pdf_response(data, f"teilnehmer_{t['slug']}.pdf")
 
 
@@ -1643,7 +1651,8 @@ async def pdf_tournament_checkin(slug_or_id: str, me: dict = Depends(require_adm
         raise HTTPException(status_code=404)
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     sponsors = await _pdf_sponsors(db)
-    return _pdf_response(pdf_checkin(t, regs, pdf_sponsors=sponsors), f"checkin_{t['slug']}.pdf")
+    branding = await _pdf_branding(db)
+    return _pdf_response(pdf_checkin(t, regs, pdf_sponsors=sponsors, pdf_branding=branding), f"checkin_{t['slug']}.pdf")
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/matches.pdf")
@@ -1656,7 +1665,8 @@ async def pdf_tournament_matches(slug_or_id: str, me: dict = Depends(require_adm
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     reg_map = {r["id"]: r for r in regs}
     sponsors = await _pdf_sponsors(db)
-    return _pdf_response(pdf_matches(t, matches, reg_map, pdf_sponsors=sponsors), f"matches_{t['slug']}.pdf")
+    branding = await _pdf_branding(db)
+    return _pdf_response(pdf_matches(t, matches, reg_map, pdf_sponsors=sponsors, pdf_branding=branding), f"matches_{t['slug']}.pdf")
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/standings.pdf")
@@ -1669,7 +1679,8 @@ async def pdf_tournament_standings(slug_or_id: str):
     from routes.tournament_routes import standings as st_fn
     rows = await st_fn(t["id"])
     sponsors = await _pdf_sponsors(db)
-    return _pdf_response(pdf_standings(t, rows, pdf_sponsors=sponsors), f"standings_{t['slug']}.pdf")
+    branding = await _pdf_branding(db)
+    return _pdf_response(pdf_standings(t, rows, pdf_sponsors=sponsors, pdf_branding=branding), f"standings_{t['slug']}.pdf")
 
 
 @pdf_router.get("/f1/{slug_or_id}/leaderboard.pdf")
@@ -1679,7 +1690,8 @@ async def pdf_f1_lb(slug_or_id: str, track_id: Optional[str] = None):
     from routes.f1_routes import leaderboard as f1_lb
     lb = await f1_lb(c["id"], track_id)
     sponsors = await _pdf_sponsors(db)
-    return _pdf_response(pdf_f1_leaderboard(c, lb.get("track"), lb.get("entries", []), pdf_sponsors=sponsors),
+    branding = await _pdf_branding(db)
+    return _pdf_response(pdf_f1_leaderboard(c, lb.get("track"), lb.get("entries", []), pdf_sponsors=sponsors, pdf_branding=branding),
                           f"f1_{c['slug']}.pdf")
 
 
@@ -1695,7 +1707,8 @@ async def pdf_f1_championship(slug_or_id: str):
              "points": r.get("points", 0)} for r in (cs.get("standings") or [])]
     fake_tournament = {"title": (c.get("title") or "F1") + " · Championship", "slug": c.get("slug")}
     sponsors = await _pdf_sponsors(db)
-    return _pdf_response(pdf_standings(fake_tournament, rows, pdf_sponsors=sponsors),
+    branding = await _pdf_branding(db)
+    return _pdf_response(pdf_standings(fake_tournament, rows, pdf_sponsors=sponsors, pdf_branding=branding),
                           f"f1_championship_{c.get('slug') or slug_or_id}.pdf")
 
 
