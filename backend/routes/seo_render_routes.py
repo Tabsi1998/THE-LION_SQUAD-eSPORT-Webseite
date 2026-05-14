@@ -313,26 +313,30 @@ async def user_profile_meta(db, username: str, base: dict, origin: str) -> dict:
 
 def static_page_meta(slug: str, base: dict) -> dict | None:
     labels = {
-        "news": ("News", "Aktuelle News, Ergebnisse und Updates von THE LION SQUAD."),
-        "events": ("Events", "Events, Vereinsabende, LANs und öffentliche Termine von THE LION SQUAD."),
+        "news": ("News", "Aktuelle News, Ergebnisse, Ankündigungen und Community-Updates von THE LION SQUAD eSports aus Tirol."),
+        "events": ("Events", "Events, Vereinsabende, LANs, Messen und öffentliche Termine von THE LION SQUAD eSports im Überblick."),
         "tournaments": ("Turniere", "Turniere, Brackets, Spielpläne und Ranglisten von THE LION SQUAD."),
         "fastlap": ("Fast Lap", "Fast-Lap-Challenges, Leaderboards und Racing-Events."),
+        "f1": ("F1 Fast Lap", "Formel-1-Fast-Lap-Challenges, aktuelle Strecken und Bestenlisten von THE LION SQUAD eSports."),
         "references": ("Referenzen", "Externe Turniere, Ligen, Platzierungen und Erfolge des Vereins."),
         "teams": ("Teams", "Teams, Squads und Community-Gruppen von THE LION SQUAD."),
+        "players": ("Community-Spieler", "Öffentliche Spielerprofile, Community-Mitglieder und aktive eSports-Profile von THE LION SQUAD."),
         "members": ("Vereinsmitglieder", "Öffentliche Profile der Vereinsmitglieder von THE LION SQUAD."),
-        "membership": ("Mitgliedschaft", "Mitglied werden bei THE LION SQUAD."),
-        "membership/join": ("Mitglied werden", "Informationen zur Mitgliedschaft bei THE LION SQUAD."),
-        "membership/apply": ("Mitgliedschaft beantragen", "Mitgliedschaft bei THE LION SQUAD online beantragen."),
+        "membership": ("Mitgliedschaft", "Mitglied werden bei THE LION SQUAD: Informationen zu Verein, Community, Vorteilen und Ablauf."),
+        "membership/join": ("Mitglied werden", "Alle Informationen zur Mitgliedschaft bei THE LION SQUAD, zum Beitritt und zur Community im Verein."),
+        "membership/apply": ("Mitgliedschaft beantragen", "Online Mitgliedschaft bei THE LION SQUAD beantragen und Teil der eSports-Community werden."),
         "community": ("Community", "Community, Mitglieder und Teams rund um THE LION SQUAD."),
         "servers": ("Server", "Öffentliche und geschützte Community-Gameserver von THE LION SQUAD."),
-        "sponsors": ("Sponsoren", "Partner und Sponsoren von THE LION SQUAD."),
-        "partners": ("Partner", "Partnernetzwerk von THE LION SQUAD."),
+        "sponsors": ("Sponsoren", "Partner, Hauptsponsoren und Unterstützer von THE LION SQUAD eSports und unserer Events."),
+        "partners": ("Partner", "Partnernetzwerk, Kooperationen und gemeinsame Projekte von THE LION SQUAD eSports aus Tirol."),
         "gallery": ("Galerie", "Fotos und Eindrücke von Events und Community-Abenden."),
         "galerie": ("Galerie", "Fotos und Eindrücke von Events und Community-Abenden."),
         "about": ("Verein", "Wer wir sind, wofür wir stehen und was THE LION SQUAD ausmacht."),
         "board": ("Vorstand", "Vorstand und Ansprechpartner von THE LION SQUAD."),
         "values": ("Werte & Ziele", "Werte, Ziele und Vereinsphilosophie von THE LION SQUAD."),
         "contact": ("Kontakt", "Kontakt zu THE LION SQUAD für Anfragen, Kooperationen und Sponsoring."),
+        "privacy": ("Datenschutz", "Datenschutzerklärung von THE LION SQUAD eSports mit Informationen zu Cookies, Diensten und Rechten."),
+        "imprint": ("Impressum", "Impressum, Vereinsangaben, Kontaktinformationen und rechtliche Hinweise von THE LION SQUAD eSports."),
     }
     item = labels.get(slug)
     if not item:
