@@ -1575,7 +1575,7 @@ export default function AdminSettingsPage() {
               <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
                 <div>
                   <div className="font-heading font-bold uppercase">Analytics</div>
-                  <p className="text-xs text-white/50 mt-1">Bei Google Analytics nur die Measurement-ID eintragen, z.B. G-3X155KW480. Das Google-Tag wird nach Statistik-Zustimmung geladen und sendet SPA-Seitenaufrufe automatisch.</p>
+                  <p className="text-xs text-white/50 mt-1">Bei Google Analytics nur die Measurement-ID eintragen, z.B. G-3X155KW480. Das Google-Tag wird automatisch mit Consent Mode eingebunden und erst nach Statistik-Zustimmung aktiv gemessen.</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <BrandSelect label="Analytics" value={brand.analytics_provider || ""} onChange={(v) => setBrandField("analytics_provider", v)} testId="brand-analytics-provider" options={[["", "Aus"], ["google", "Google Analytics"], ["plausible", "Plausible"]]} />

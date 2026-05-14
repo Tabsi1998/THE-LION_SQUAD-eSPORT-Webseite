@@ -38,17 +38,24 @@ function analyticsDebugMode() {
   return new URLSearchParams(window.location.search).has("ga_debug");
 }
 
-function setGoogleDisabled(measurementId, disabled) {
+function setGoogleConsent(state, mode = "update") {
   if (typeof window === "undefined") return;
-  const id = String(measurementId || "").trim();
-  if (id) window[`ga-disable-${id}`] = disabled;
+  const gtag = ensureGoogleTag();
+  const granted = state === "granted";
+  gtag("consent", mode, {
+    analytics_storage: granted ? "granted" : "denied",
+    ad_storage: "denied",
+    ad_user_data: "denied",
+    ad_personalization: "denied",
+    security_storage: "granted",
+  });
 }
 
 function injectGoogleAnalytics(measurementId) {
   const id = String(measurementId || "").trim();
   if (!id) return;
   const gtag = ensureGoogleTag();
-  setGoogleDisabled(id, false);
+  setGoogleConsent("granted", "default");
   const escapedId = typeof CSS !== "undefined" && CSS.escape ? CSS.escape(id) : id.replace(/"/g, '\\"');
   const existing = document.querySelector(`[${SCRIPT_ATTR}="true"][${GOOGLE_SCRIPT_ID_ATTR}="${escapedId}"]`);
   if (!existing) {
@@ -67,7 +74,6 @@ function injectGoogleAnalytics(measurementId) {
 function configureGoogleAnalytics(measurementId) {
   const id = String(measurementId || "").trim();
   if (!id || typeof window === "undefined") return;
-  if (window.__tlsGoogleConfiguredFor === id) return;
   const gtag = ensureGoogleTag();
   const config = {
     anonymize_ip: true,
@@ -113,13 +119,16 @@ export function AnalyticsHead() {
     const analyticsConsent = hasConsent("analytics");
     const provider = settings.analytics_provider || "";
     if (!analyticsConsent) {
-      if (settings.google_analytics_id) setGoogleDisabled(settings.google_analytics_id, true);
+      if (typeof window !== "undefined" && typeof window.gtag === "function") {
+        setGoogleConsent("denied");
+      }
       resetGoogleState();
       return undefined;
     }
 
     if (provider === "google" && settings.google_analytics_id) {
       injectGoogleAnalytics(settings.google_analytics_id);
+      setGoogleConsent("granted");
       configureGoogleAnalytics(settings.google_analytics_id);
     } else if (provider === "plausible" && settings.plausible_domain) {
       injectPlausible(settings.plausible_domain);
@@ -133,7 +142,7 @@ export function AnalyticsHead() {
 
   useEffect(() => {
     if (!hasConsent("analytics") || settings?.analytics_provider !== "google" || !settings?.google_analytics_id || typeof window === "undefined") return;
-    setGoogleDisabled(settings.google_analytics_id, false);
+    setGoogleConsent("granted");
     configureGoogleAnalytics(settings.google_analytics_id);
     const gtag = ensureGoogleTag();
     const event = {
