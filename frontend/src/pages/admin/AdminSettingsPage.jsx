@@ -7,7 +7,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
-import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye, Search, Plus } from "lucide-react";
+import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye, Search, Plus, Share2 } from "lucide-react";
 
 const MAIL_TEMPLATE_LABELS = {
   user_invite: "Einladungsmail",
@@ -725,7 +725,7 @@ export default function AdminSettingsPage() {
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Einstellungen</h1>
 
       <div className="flex gap-1 mb-6 border-b border-white/10 overflow-x-auto">
-        {[["email", "Resend", Mail], ["smtp", "SMTP", Server], ["newsletter", "Newsletter", Mail], ["queue", "Mail-Queue", Inbox], ["discord", "Discord", MessageSquare], ["twitch", "Twitch", Radio], ["brand", "Branding", Palette], ["legal", "Rechtliches", FileText], ["system", "Status", Activity], ["logs", "Versandlogs", Send]].map(([k, l, Icn]) => (
+        {[["email", "Resend", Mail], ["smtp", "SMTP", Server], ["newsletter", "Newsletter", Mail], ["queue", "Mail-Queue", Inbox], ["discord", "Discord", MessageSquare], ["twitch", "Twitch", Radio], ["brand", "Branding", Palette], ["socials", "Socials", Share2], ["seo", "SEO & Analytics", Search], ["legal", "Rechtliches", FileText], ["system", "Status", Activity], ["logs", "Versandlogs", Send]].map(([k, l, Icn]) => (
           <button key={k} onClick={() => setTab(k)} data-testid={`settings-tab-${k}`}
             className={`px-4 py-3 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap ${tab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
             <Icn className="w-3.5 h-3.5" />{l}
@@ -1425,58 +1425,10 @@ export default function AdminSettingsPage() {
               <BrandField label="Zeitzone" value={brand.timezone} onChange={(v) => setBrandField("timezone", v)} testId="brand-tz" />
               <BrandField label="Kontakt E-Mail" value={brand.contact_email} onChange={(v) => setBrandField("contact_email", v)} testId="brand-contact-email" />
             </div>
-            <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-heading font-bold uppercase">Social Links</div>
-                  <p className="text-xs text-white/50 mt-1">Diese Liste steuert die Icons im Footer und wird fuer Social/SEO-Erkennung verwendet.</p>
-                </div>
-                <button type="button" onClick={addSocialLink} className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider">
-                  <Plus className="w-3.5 h-3.5" /> Link
-                </button>
-              </div>
-              <div className="space-y-2">
-                {(brand.social_links || []).map((social, index) => (
-                  <div key={`${social.platform}-${index}`} className="grid grid-cols-1 lg:grid-cols-[10rem_minmax(8rem,12rem)_minmax(0,1fr)_auto_auto] gap-2 items-end border border-white/10 bg-black/20 rounded-sm p-3">
-                    <BrandSelect label="Plattform" value={social.platform || "custom"} onChange={(v) => setSocialLink(index, "platform", v)} testId={`brand-social-platform-${index}`} options={SOCIAL_PLATFORM_OPTIONS} />
-                    <BrandField label="Label" value={social.label || ""} onChange={(v) => setSocialLink(index, "label", v)} testId={`brand-social-label-${index}`} />
-                    <BrandField label="URL" value={social.url || ""} onChange={(v) => setSocialLink(index, "url", v)} testId={`brand-social-url-${index}`} placeholder="https://..." />
-                    <label className="inline-flex items-center gap-2 text-sm h-10">
-                      <input type="checkbox" checked={social.enabled !== false} onChange={(e) => setSocialLink(index, "enabled", e.target.checked)} className="accent-[#29B6E8]" />
-                      Aktiv
-                    </label>
-                    <button type="button" onClick={() => removeSocialLink(index)} className="h-10 px-3 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm inline-flex items-center justify-center">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-                {!(brand.social_links || []).length && <div className="text-sm text-white/40 border border-dashed border-white/10 rounded-sm p-4">Noch keine Social Links gepflegt.</div>}
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <BrandSelect label="Analytics" value={brand.analytics_provider || ""} onChange={(v) => setBrandField("analytics_provider", v)} testId="brand-analytics-provider" options={[["", "Aus"], ["google", "Google Analytics"], ["plausible", "Plausible"]]} />
-              <BrandField label="Google Measurement ID" value={brand.google_analytics_id} onChange={(v) => setBrandField("google_analytics_id", v)} testId="brand-ga-id" placeholder="G-XXXXXXXXXX" />
-              <BrandField label="Plausible Domain" value={brand.plausible_domain} onChange={(v) => setBrandField("plausible_domain", v)} testId="brand-plausible-domain" placeholder="lionsquad.at" />
-            </div>
-            <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
-              <div>
-                <div className="font-heading font-bold uppercase">Suchmaschinen-Verknuepfung</div>
-                <p className="text-xs text-white/50 mt-1">Meta-Verifikation fuer Google Search Console und Bing Webmaster Tools. IndexNow sendet Startseite und Sitemap aktiv an Microsoft/Bing-kompatible Suchmaschinen.</p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <BrandField label="Google Site Verification" value={brand.google_site_verification} onChange={(v) => setBrandField("google_site_verification", v)} testId="brand-google-verification" />
-                <BrandField label="Bing msvalidate.01" value={brand.msvalidate_01} onChange={(v) => setBrandField("msvalidate_01", v)} testId="brand-bing-verification" />
-                <BrandField label="IndexNow Key" value={brand.indexnow_key} onChange={(v) => setBrandField("indexnow_key", v)} testId="brand-indexnow-key" />
-              </div>
-              <button type="button" onClick={submitIndexNow} disabled={!brand.indexnow_key} className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
-                IndexNow senden
-              </button>
-            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ImageUpload value={brand.logo_url} onChange={(v) => setBrandField("logo_url", v)} label="Vereinslogo" testId="brand-logo" variant="square" allowLibrary />
               <ImageUpload value={brand.mascot_url} onChange={(v) => setBrandField("mascot_url", v)} label="Maskottchen" testId="brand-mascot" variant="square" allowLibrary />
               <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Favicon / Browser Icon" testId="brand-favicon" variant="square" allowLibrary />
-              <ImageUpload value={brand.og_image_url} onChange={(v) => setBrandField("og_image_url", v)} label="Social Share Bild" testId="brand-og-image" variant="wide" allowLibrary />
             </div>
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
@@ -1567,6 +1519,86 @@ export default function AdminSettingsPage() {
             </div>
             <p className="text-xs text-white/45">Impressum, Datenschutz und Vereinsdaten liegen im Tab Rechtliches.</p>
             <button onClick={saveBrand} disabled={imageUploadBusy || savingBrand} data-testid="brand-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingBrand ? "Speichere..." : "Speichern"}</button>
+          </div>
+        </div>
+      )}
+
+      {tab === "socials" && (
+        <div className="max-w-7xl space-y-4">
+          <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Footer & SEO</span>
+                <h2 className="font-heading text-2xl font-black uppercase mt-1">Social Links</h2>
+                <p className="text-sm text-white/55 mt-2 max-w-2xl">
+                  Diese Liste steuert die Icons im Footer und die Social-Erkennung fuer Suchmaschinen. Nur aktive Links mit URL werden ausgespielt.
+                </p>
+              </div>
+              <button type="button" onClick={addSocialLink} className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider">
+                <Plus className="w-3.5 h-3.5" /> Link
+              </button>
+            </div>
+            <div className="space-y-2">
+              {(brand.social_links || []).map((social, index) => (
+                <div key={`${social.platform}-${index}`} className="grid grid-cols-1 lg:grid-cols-[10rem_minmax(8rem,12rem)_minmax(0,1fr)_auto_auto] gap-2 items-end border border-white/10 bg-black/20 rounded-sm p-3">
+                  <BrandSelect label="Plattform" value={social.platform || "custom"} onChange={(v) => setSocialLink(index, "platform", v)} testId={`brand-social-platform-${index}`} options={SOCIAL_PLATFORM_OPTIONS} />
+                  <BrandField label="Label" value={social.label || ""} onChange={(v) => setSocialLink(index, "label", v)} testId={`brand-social-label-${index}`} />
+                  <BrandField label="URL" value={social.url || ""} onChange={(v) => setSocialLink(index, "url", v)} testId={`brand-social-url-${index}`} placeholder="https://..." />
+                  <label className="inline-flex items-center gap-2 text-sm h-10">
+                    <input type="checkbox" checked={social.enabled !== false} onChange={(e) => setSocialLink(index, "enabled", e.target.checked)} className="accent-[#29B6E8]" />
+                    Aktiv
+                  </label>
+                  <button type="button" onClick={() => removeSocialLink(index)} className="h-10 px-3 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm inline-flex items-center justify-center">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              {!(brand.social_links || []).length && <div className="text-sm text-white/40 border border-dashed border-white/10 rounded-sm p-4">Noch keine Social Links gepflegt.</div>}
+            </div>
+            <button onClick={saveBrand} disabled={imageUploadBusy || savingBrand} data-testid="socials-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingBrand ? "Speichere..." : "Socials speichern"}</button>
+          </div>
+        </div>
+      )}
+
+      {tab === "seo" && (
+        <div className="max-w-7xl space-y-4">
+          <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-5">
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Indexierung</span>
+              <h2 className="font-heading text-2xl font-black uppercase mt-1">SEO & Analytics</h2>
+              <p className="text-sm text-white/55 mt-2 max-w-2xl">
+                Share-Bild, Analytics, Google Search Console, Bing Webmaster Tools und IndexNow liegen hier gebuendelt.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-4">
+              <ImageUpload value={brand.og_image_url} onChange={(v) => setBrandField("og_image_url", v)} label="Social Share Bild" testId="brand-og-image" variant="wide" allowLibrary />
+              <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
+                <div>
+                  <div className="font-heading font-bold uppercase">Analytics</div>
+                  <p className="text-xs text-white/50 mt-1">Wird erst nach Cookie-Zustimmung fuer Statistik geladen.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <BrandSelect label="Analytics" value={brand.analytics_provider || ""} onChange={(v) => setBrandField("analytics_provider", v)} testId="brand-analytics-provider" options={[["", "Aus"], ["google", "Google Analytics"], ["plausible", "Plausible"]]} />
+                  <BrandField label="Google Measurement ID" value={brand.google_analytics_id} onChange={(v) => setBrandField("google_analytics_id", v)} testId="brand-ga-id" placeholder="G-XXXXXXXXXX" />
+                  <BrandField label="Plausible Domain" value={brand.plausible_domain} onChange={(v) => setBrandField("plausible_domain", v)} testId="brand-plausible-domain" placeholder="lionsquad.at" />
+                </div>
+              </div>
+            </div>
+            <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
+              <div>
+                <div className="font-heading font-bold uppercase">Suchmaschinen-Verknuepfung</div>
+                <p className="text-xs text-white/50 mt-1">Meta-Verifikation fuer Google Search Console und Bing Webmaster Tools. IndexNow sendet Startseite und Sitemap aktiv an Microsoft/Bing-kompatible Suchmaschinen.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <BrandField label="Google Site Verification" value={brand.google_site_verification} onChange={(v) => setBrandField("google_site_verification", v)} testId="brand-google-verification" />
+                <BrandField label="Bing msvalidate.01" value={brand.msvalidate_01} onChange={(v) => setBrandField("msvalidate_01", v)} testId="brand-bing-verification" />
+                <BrandField label="IndexNow Key" value={brand.indexnow_key} onChange={(v) => setBrandField("indexnow_key", v)} testId="brand-indexnow-key" />
+              </div>
+              <button type="button" onClick={submitIndexNow} disabled={!brand.indexnow_key} className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+                IndexNow senden
+              </button>
+            </div>
+            <button onClick={saveBrand} disabled={imageUploadBusy || savingBrand} data-testid="seo-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingBrand ? "Speichere..." : "SEO & Analytics speichern"}</button>
           </div>
         </div>
       )}
