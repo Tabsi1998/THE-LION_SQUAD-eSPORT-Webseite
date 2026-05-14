@@ -65,7 +65,6 @@ function injectGoogleAnalytics(measurementId) {
     });
   }
   gtag("js", new Date());
-  setGoogleConsent("granted");
   gtag("config", id, {
     anonymize_ip: true,
     send_page_view: false,
@@ -102,16 +101,17 @@ export function AnalyticsHead() {
   useEffect(() => {
     removeAnalyticsScripts();
     if (!settings) return undefined;
-    if (!hasConsent("analytics")) {
-      setGoogleConsent("denied");
-      return undefined;
-    }
 
+    const analyticsConsent = hasConsent("analytics");
     const provider = settings.analytics_provider || "";
     if (provider === "google" && settings.google_analytics_id) {
       injectGoogleAnalytics(settings.google_analytics_id);
+      setGoogleConsent(analyticsConsent ? "granted" : "denied");
     } else if (provider === "plausible" && settings.plausible_domain) {
-      injectPlausible(settings.plausible_domain);
+      setGoogleConsent("denied");
+      if (analyticsConsent) injectPlausible(settings.plausible_domain);
+    } else {
+      setGoogleConsent("denied");
     }
 
     return removeAnalyticsScripts;
