@@ -68,9 +68,9 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${FRONTEND_BIND:-0.0.0.0}:${FRONTEND_PORT:-3000}:8080"
+      - "${FRONTEND_BIND:-0.0.0.0}:${FRONTEND_PORT:-3000}:80"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
       interval: 15s
       timeout: 5s
       retries: 5

@@ -190,9 +190,9 @@ Backend/API:   127.0.0.1:8001
 ```
 
 Docker Compose veroeffentlicht diese Host-Ports weiterhin standardmaessig. Der
-Frontend-Container lauscht intern auf Port `8080`; das ist nur relevant, wenn ein
-Reverse Proxy direkt im Docker-Netz auf den Service `frontend` statt auf den Host-Port zeigt.
-In dem Fall ist das interne Ziel `frontend:8080`.
+Frontend-Container lauscht intern auf Port `80`; wenn ein Reverse Proxy direkt im
+Docker-Netz auf den Service `frontend` statt auf den Host-Port zeigt, ist das interne
+Ziel `frontend:80`.
 
 Empfohlen fuer reine Reverse-Proxy-Setups auf demselben Host:
 
