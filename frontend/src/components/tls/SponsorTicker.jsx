@@ -36,6 +36,12 @@ function uniqueLogoSponsors(sponsors) {
   });
 }
 
+function repeatForLoop(items, minItems) {
+  if (!items.length) return [];
+  const repeats = Math.max(1, Math.ceil(minItems / items.length));
+  return Array.from({ length: repeats }, () => items).flat();
+}
+
 export function SponsorTicker({ className = "", compact = false, placement = "home", spotlight = false }) {
   const [sponsors, setSponsors] = useState([]);
   const load = useCallback(async () => {
@@ -53,7 +59,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
   const logoSponsors = uniqueLogoSponsors(sponsors);
   if (!logoSponsors.length) return null;
   const shouldMarquee = logoSponsors.length >= (compact ? 3 : spotlight ? 2 : 3);
-  const items = shouldMarquee ? [...logoSponsors, ...logoSponsors] : logoSponsors;
+  const loopItems = shouldMarquee ? repeatForLoop(logoSponsors, compact ? 14 : spotlight ? 8 : 10) : logoSponsors;
   const speed = compact ? Math.max(24, logoSponsors.length * 8) : spotlight ? Math.max(34, logoSponsors.length * 12) : 48;
   const shellClass = compact
     ? "bg-transparent"
@@ -65,6 +71,22 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
     : spotlight
       ? "h-20 w-72 sm:h-24 sm:w-[28rem] md:h-28 md:w-[34rem]"
       : null;
+  const gapClass = compact ? "gap-5 sm:gap-8 md:gap-12" : spotlight ? "gap-14" : "gap-16";
+  const groupPaddingClass = compact ? "pr-5 sm:pr-8 md:pr-12" : spotlight ? "pr-14" : "pr-16";
+  const verticalClass = compact ? "py-2" : spotlight ? "py-6 md:py-7" : "py-5";
+  const renderLogo = (s, i, groupIndex = 0, duplicate = false) => (
+    <a
+      key={`${groupIndex}-${sponsorKey(s)}-${i}`}
+      href={s.link || undefined}
+      target={s.link ? "_blank" : undefined}
+      rel="noreferrer"
+      tabIndex={duplicate ? -1 : undefined}
+      className={`inline-flex items-center justify-center shrink-0 opacity-80 hover:opacity-100 transition ${itemClass || tierBox[s.tier] || tierBox.bronze}`}
+      title={s.name}
+    >
+      <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-h-full max-w-full w-auto h-auto" />
+    </a>
+  );
   return (
     <section className={`relative max-w-full overflow-hidden ${shellClass} ${className}`} data-testid="sponsor-ticker">
       {!compact && (
@@ -79,21 +101,19 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
         style={shouldMarquee ? { maskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)" } : undefined}
       >
         <div
-          className={`flex items-center ${compact ? "gap-5 sm:gap-8 md:gap-12 py-2" : spotlight ? "gap-14 py-6 md:py-7" : "gap-16 py-5"} ${shouldMarquee ? "whitespace-nowrap group-hover:[animation-play-state:paused]" : "justify-center flex-wrap px-4"}`}
+          className={`flex items-center ${verticalClass} ${shouldMarquee ? "whitespace-nowrap group-hover:[animation-play-state:paused]" : `justify-center flex-wrap px-4 ${gapClass}`}`}
           style={shouldMarquee ? { animation: `tls-marquee ${speed}s linear infinite`, width: "max-content" } : undefined}
         >
-          {items.map((s, i) => (
-            <a
-              key={`${sponsorKey(s)}-${i}`}
-              href={s.link || undefined}
-              target={s.link ? "_blank" : undefined}
-              rel="noreferrer"
-              className={`inline-flex items-center justify-center shrink-0 opacity-80 hover:opacity-100 transition ${itemClass || tierBox[s.tier] || tierBox.bronze}`}
-              title={s.name}
-            >
-              <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-h-full max-w-full w-auto h-auto" />
-            </a>
-          ))}
+          {shouldMarquee ? (
+            <>
+              <div className={`flex shrink-0 items-center ${gapClass} ${groupPaddingClass}`}>
+                {loopItems.map((s, i) => renderLogo(s, i, 0))}
+              </div>
+              <div className={`flex shrink-0 items-center ${gapClass} ${groupPaddingClass}`} aria-hidden="true">
+                {loopItems.map((s, i) => renderLogo(s, i, 1, true))}
+              </div>
+            </>
+          ) : loopItems.map((s, i) => renderLogo(s, i))}
         </div>
       </div>
       <style>{`@keyframes tls-marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }`}</style>
@@ -117,8 +137,13 @@ export function SponsorGrid({ max = 4, placement = "tv", marquee = false, classN
   const logoSponsors = uniqueLogoSponsors(sponsors);
   if (!logoSponsors.length) return null;
   const shouldMarquee = marquee && logoSponsors.length > max;
-  const items = shouldMarquee ? [...logoSponsors, ...logoSponsors] : logoSponsors.slice(0, max);
+  const items = shouldMarquee ? repeatForLoop(logoSponsors, Math.max(10, max * 4)) : logoSponsors.slice(0, max);
   const speed = Math.max(26, logoSponsors.length * 7);
+  const renderLogo = (s, index, groupIndex = 0, duplicate = false) => (
+    <a key={`${groupIndex}-${sponsorKey(s)}-${index}`} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" tabIndex={duplicate ? -1 : undefined} className={`inline-flex items-center justify-center shrink-0 opacity-80 hover:opacity-100 transition ${s.tier === "main" ? "h-9 w-36 sm:h-10 sm:w-52" : s.tier === "platinum" ? "h-8 w-32 sm:h-9 sm:w-48" : "h-8 w-28 sm:w-44"}`} title={s.name}>
+      <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-h-full max-w-full w-auto h-auto" />
+    </a>
+  );
   return (
     <div
       className={`min-w-0 ${shouldMarquee ? "relative overflow-hidden" : "flex items-center justify-end"} ${className}`}
@@ -126,14 +151,19 @@ export function SponsorGrid({ max = 4, placement = "tv", marquee = false, classN
       style={shouldMarquee ? { maskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)" } : undefined}
     >
       <div
-        className={`flex items-center gap-7 ${shouldMarquee ? "w-max whitespace-nowrap" : ""}`}
+        className={`flex items-center ${shouldMarquee ? "w-max whitespace-nowrap" : "gap-7"}`}
         style={shouldMarquee ? { animation: `tls-marquee ${speed}s linear infinite` } : undefined}
       >
-        {items.map((s, index) => (
-          <a key={`${sponsorKey(s)}-${index}`} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" className={`inline-flex items-center justify-center shrink-0 opacity-80 hover:opacity-100 transition ${s.tier === "main" ? "h-9 w-36 sm:h-10 sm:w-52" : s.tier === "platinum" ? "h-8 w-32 sm:h-9 sm:w-48" : "h-8 w-28 sm:w-44"}`} title={s.name}>
-            <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-h-full max-w-full w-auto h-auto" />
-          </a>
-        ))}
+        {shouldMarquee ? (
+          <>
+            <div className="flex shrink-0 items-center gap-7 pr-7">
+              {items.map((s, index) => renderLogo(s, index, 0))}
+            </div>
+            <div className="flex shrink-0 items-center gap-7 pr-7" aria-hidden="true">
+              {items.map((s, index) => renderLogo(s, index, 1, true))}
+            </div>
+          </>
+        ) : items.map((s, index) => renderLogo(s, index))}
       </div>
       {shouldMarquee && <style>{`@keyframes tls-marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }`}</style>}
     </div>

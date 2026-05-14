@@ -8,7 +8,7 @@ import { openCookieSettings } from "@/components/tls/CookieConsent";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Menu, X, User, LogOut, Shield, Crown, Megaphone } from "lucide-react";
+import { Menu, X, User, LogOut, Shield, Crown, Megaphone, ArrowUp } from "lucide-react";
 import { useCallback, useMemo, useState, useEffect } from "react";
 
 export function PublicLayout({ children }) {
@@ -17,6 +17,7 @@ export function PublicLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [branding, setBranding] = useState(getCachedBranding());
   const [siteBanners, setSiteBanners] = useState([]);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const loadBranding = useCallback(async () => {
     try {
       const { data } = await api.get("/settings/public");
@@ -41,8 +42,15 @@ export function PublicLayout({ children }) {
   useApiInvalidation(loadBranding, ["settings", "branding"]);
   useEffect(() => { loadSiteBanner(); }, [loadSiteBanner, user?.id, isClubMember, isAdmin]);
   useApiInvalidation(loadSiteBanner, ["settings", "branding"]);
+  useEffect(() => {
+    const updateScrollTopVisibility = () => setShowScrollTop(window.scrollY > 520);
+    updateScrollTopVisibility();
+    window.addEventListener("scroll", updateScrollTopVisibility, { passive: true });
+    return () => window.removeEventListener("scroll", updateScrollTopVisibility);
+  }, []);
   const nav = useNavigate();
   const closeMobile = () => setMobileOpen(false);
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
   const clubName = branding?.club_name || "THE LION SQUAD";
   const tagline = branding?.tagline || "eSports";
   const twitchUrl = getTwitchUrl(branding?.twitch_channel);
@@ -192,6 +200,18 @@ export function PublicLayout({ children }) {
           </div>
         </div>
       </footer>
+      {showScrollTop && (
+        <button
+          type="button"
+          onClick={scrollToTop}
+          className="md:hidden fixed bottom-5 right-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-sm border border-[#29B6E8]/45 bg-[#0A0A0A]/90 text-[#29B6E8] shadow-[0_0_18px_rgba(41,182,232,0.22)] backdrop-blur transition hover:bg-[#29B6E8] hover:text-black"
+          aria-label="Nach oben"
+          title="Nach oben"
+          data-testid="mobile-scroll-top"
+        >
+          <ArrowUp className="h-5 w-5" />
+        </button>
+      )}
     </div>
   );
 }
