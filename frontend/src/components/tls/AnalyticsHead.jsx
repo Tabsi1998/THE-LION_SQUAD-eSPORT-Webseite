@@ -11,6 +11,12 @@ function removeAnalyticsScripts() {
   document.querySelectorAll(`[${SCRIPT_ATTR}="true"]`).forEach((node) => node.remove());
 }
 
+function resetGoogleState() {
+  if (typeof window === "undefined") return;
+  delete window.__tlsGoogleConfiguredFor;
+  delete window.__tlsGoogleTagStarted;
+}
+
 function appendScript(attrs) {
   const script = document.createElement("script");
   script.setAttribute(SCRIPT_ATTR, "true");
@@ -24,17 +30,6 @@ function appendScript(attrs) {
 function ensureGoogleTag() {
   window.dataLayer = window.dataLayer || [];
   window.gtag = window.gtag || function gtag(){ window.dataLayer.push(arguments); };
-  if (!window.__tlsGoogleConsentDefault) {
-    window.gtag("consent", "default", {
-      analytics_storage: "denied",
-      ad_storage: "denied",
-      ad_user_data: "denied",
-      ad_personalization: "denied",
-      security_storage: "granted",
-      wait_for_update: 500,
-    });
-    window.__tlsGoogleConsentDefault = true;
-  }
   return window.gtag;
 }
 
@@ -43,11 +38,11 @@ function analyticsDebugMode() {
   return new URLSearchParams(window.location.search).has("ga_debug");
 }
 
-function setGoogleConsent(state) {
+function setGoogleConsent(state, mode = "update") {
   if (typeof window === "undefined") return;
   const gtag = ensureGoogleTag();
   const granted = state === "granted";
-  gtag("consent", "update", {
+  gtag("consent", mode, {
     analytics_storage: granted ? "granted" : "denied",
     ad_storage: "denied",
     ad_user_data: "denied",
@@ -60,6 +55,7 @@ function injectGoogleAnalytics(measurementId) {
   const id = String(measurementId || "").trim();
   if (!id) return;
   const gtag = ensureGoogleTag();
+  setGoogleConsent("granted", "default");
   const escapedId = typeof CSS !== "undefined" && CSS.escape ? CSS.escape(id) : id.replace(/"/g, '\\"');
   const existing = document.querySelector(`[${SCRIPT_ATTR}="true"][${GOOGLE_SCRIPT_ID_ATTR}="${escapedId}"]`);
   if (!existing) {
@@ -79,10 +75,13 @@ function configureGoogleAnalytics(measurementId) {
   const id = String(measurementId || "").trim();
   if (!id || typeof window === "undefined") return;
   const gtag = ensureGoogleTag();
-  gtag("config", id, {
+  const config = {
     anonymize_ip: true,
     send_page_view: false,
-  });
+    cookie_domain: "auto",
+  };
+  if (analyticsDebugMode()) config.debug_mode = true;
+  gtag("config", id, config);
   window.__tlsGoogleConfiguredFor = id;
 }
 
@@ -119,18 +118,26 @@ export function AnalyticsHead() {
 
     const analyticsConsent = hasConsent("analytics");
     const provider = settings.analytics_provider || "";
-    if (provider === "google" && settings.google_analytics_id) {
-      injectGoogleAnalytics(settings.google_analytics_id);
-      setGoogleConsent(analyticsConsent ? "granted" : "denied");
-      if (analyticsConsent) configureGoogleAnalytics(settings.google_analytics_id);
-    } else if (provider === "plausible" && settings.plausible_domain) {
-      setGoogleConsent("denied");
-      if (analyticsConsent) injectPlausible(settings.plausible_domain);
-    } else {
-      setGoogleConsent("denied");
+    if (!analyticsConsent) {
+      if (typeof window !== "undefined" && typeof window.gtag === "function") {
+        setGoogleConsent("denied");
+      }
+      resetGoogleState();
+      return undefined;
     }
 
-    return removeAnalyticsScripts;
+    if (provider === "google" && settings.google_analytics_id) {
+      injectGoogleAnalytics(settings.google_analytics_id);
+      setGoogleConsent("granted");
+      configureGoogleAnalytics(settings.google_analytics_id);
+    } else if (provider === "plausible" && settings.plausible_domain) {
+      injectPlausible(settings.plausible_domain);
+    }
+
+    return () => {
+      removeAnalyticsScripts();
+      resetGoogleState();
+    };
   }, [hasConsent, settings]);
 
   useEffect(() => {
