@@ -103,6 +103,8 @@ async def init_indexes():
     await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
     await db.login_attempts.create_index("identifier")
     await db.login_attempts.create_index("created_at", expireAfterSeconds=3600)
+    await db.rate_limits.create_index("key")
+    await db.rate_limits.create_index("created_at", expireAfterSeconds=86400)
     await db.refresh_tokens.create_index("id", unique=True)
     await db.refresh_tokens.create_index("jti", unique=True)
     await db.refresh_tokens.create_index("user_id")

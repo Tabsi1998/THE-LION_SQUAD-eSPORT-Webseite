@@ -4,6 +4,8 @@ from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime, timezone, date
 import uuid
 
+MIN_PASSWORD_LENGTH = 10
+
 
 def now_utc():
     return datetime.now(timezone.utc)
@@ -24,7 +26,7 @@ DirectMessagePrivacy = Literal["everyone", "friends", "team_members", "club_memb
 class UserRegister(BaseModel):
     username: str = Field(min_length=3, max_length=32)
     email: EmailStr
-    password: str = Field(min_length=6, max_length=128)
+    password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=128)
     display_name: Optional[str] = None
     birth_date: Optional[str] = None  # ISO date string
     gender: Optional[Literal["male", "female", "diverse"]] = None
@@ -42,7 +44,7 @@ class UserLogin(BaseModel):
 class AdminUserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=32)
     email: EmailStr
-    password: Optional[str] = Field(default=None, min_length=6, max_length=128)
+    password: Optional[str] = Field(default=None, min_length=MIN_PASSWORD_LENGTH, max_length=128)
     display_name: Optional[str] = None
     gender: Optional[Literal["male", "female", "diverse"]] = None
     role: Role = "player"
@@ -197,12 +199,12 @@ class ForgotPasswordBody(BaseModel):
 
 class ResetPasswordBody(BaseModel):
     token: str
-    new_password: str = Field(min_length=6, max_length=128)
+    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=128)
 
 
 class ChangePasswordBody(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=6, max_length=128)
+    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=128)
 
 
 # ---------- Teams ----------

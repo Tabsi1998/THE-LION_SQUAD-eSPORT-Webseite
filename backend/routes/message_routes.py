@@ -1,6 +1,6 @@
 """Direct user-to-user messaging routes."""
 import re
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from auth import get_current_user
@@ -8,6 +8,7 @@ from database import get_db
 from models import new_id, now_utc
 from services.friend_service import are_friends
 from services.notification_preferences import send_user_template
+from services.rate_limit import enforce_rate_limit
 from services.user_notifications import build_public_url, create_user_notification
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
@@ -228,8 +229,9 @@ async def get_direct_thread(user_id: str, me: dict = Depends(get_current_user)):
 
 
 @router.post("/direct/{user_id}")
-async def send_direct_message(user_id: str, body: DirectMessageCreate, me: dict = Depends(get_current_user)):
+async def send_direct_message(user_id: str, body: DirectMessageCreate, request: Request, me: dict = Depends(get_current_user)):
     db = get_db()
+    await enforce_rate_limit(request, "messages:direct:user", limit=60, window_seconds=3600, subject=me["id"])
     recipient = await _get_active_user(db, user_id)
     can_send, hint = await _message_permission(db, me, recipient)
     if not can_send:

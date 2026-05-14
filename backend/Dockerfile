@@ -10,6 +10,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+RUN useradd --create-home --shell /usr/sbin/nologin appuser \
+    && mkdir -p /app/backend/uploads \
+    && chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8001
 

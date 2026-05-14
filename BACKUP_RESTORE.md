@@ -2,6 +2,48 @@
 
 ## Automated backup
 
+Empfohlene Variante auf dem Server:
+
+```bash
+cd /root/THE-LION_SQUAD-eSPORT-Webseite
+BACKUP_DIR=/opt/tls-arena/backups bash scripts/backup.sh
+```
+
+Das Skript erstellt:
+
+- einen MongoDB-Dump als `tls_<db>_<timestamp>.archive.gz`
+- ein Upload-Archiv als `tls_uploads_<timestamp>.tar.gz`
+- ein Manifest mit Git-Commit, Dateinamen und optionalen SHA256-Pruefsummen
+
+Standardwerte:
+
+```bash
+BACKUP_DIR=/opt/tls-arena/backups
+RETENTION_DAYS=14
+DB_NAME=aus .env oder tls_arena
+UPLOADS_VOLUME=automatisch erkannt oder the-lion_squad-esport-webseite_uploads_data
+```
+
+Wenn dein Compose-Projektname vom Repository-Namen abweicht, setze das Upload-Volume explizit:
+
+```bash
+UPLOADS_VOLUME=deinprojekt_uploads_data bash scripts/backup.sh
+```
+
+Cron-Beispiel:
+
+```cron
+15 3 * * * cd /root/THE-LION_SQUAD-eSPORT-Webseite && BACKUP_DIR=/opt/tls-arena/backups bash scripts/backup.sh >> /var/log/tls-backup.log 2>&1
+```
+
+Optional vor einem Update:
+
+```bash
+PRE_UPDATE_BACKUP=true ./update.sh u
+```
+
+Die alte Minimalvariante ohne Projektskript:
+
 ```bash
 # Daily MongoDB dump (put into /etc/cron.daily/tls-arena-backup)
 #!/bin/bash
@@ -55,11 +97,7 @@ sudo docker compose start backend
 At least once after setup and after major releases:
 
 ```bash
-mkdir -p /tmp/tls-restore-test
-cp tls_arena_backup.archive.gz /tmp/tls-restore-test/
-cp tls_uploads_backup.tar.gz /tmp/tls-restore-test/
-gzip -t /tmp/tls-restore-test/tls_arena_backup.archive.gz
-tar -tzf /tmp/tls-restore-test/tls_uploads_backup.tar.gz >/dev/null
+bash scripts/restore-check.sh tls_arena_backup.archive.gz tls_uploads_backup.tar.gz
 ```
 
 Also verify in the admin UI:

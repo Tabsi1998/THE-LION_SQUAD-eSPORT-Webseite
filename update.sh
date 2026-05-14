@@ -64,6 +64,12 @@ if [ -d .git ]; then
   git pull --ff-only || warn "Git pull failed — continuing with local code."
 fi
 
+# Optional backup before containers are recreated.
+if [ "${PRE_UPDATE_BACKUP:-false}" = "true" ]; then
+  info "Creating pre-update backup..."
+  bash scripts/backup.sh
+fi
+
 # 2. Rebuild
 info "Rebuilding containers…"
 docker compose pull mongodb 2>/dev/null || true

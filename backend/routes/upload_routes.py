@@ -9,11 +9,12 @@ import uuid
 import pathlib
 import logging
 from io import BytesIO
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
 from PIL import Image, ImageChops, UnidentifiedImageError
 from auth import require_admin, get_current_user
 from database import get_db
 from models import new_id, now_utc
+from services.rate_limit import enforce_rate_limit
 
 logger = logging.getLogger("tls-arena.uploads")
 UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
@@ -141,10 +142,9 @@ def _trim_empty_borders(img: Image.Image) -> tuple[Image.Image, bool]:
     return _crop_with_padding(rgba, mask.getbbox())
 
 
-@router.post("/image")
-async def upload_image(
-    file: UploadFile = File(...),
-    me: dict = Depends(get_current_user),
+async def _upload_image_impl(
+    file: UploadFile,
+    me: dict,
     trim_empty_borders: bool = False,
     media_scope: str = "user",
 ):
@@ -247,16 +247,30 @@ async def upload_image(
     return {"url": url, "filename": filename, "size": len(data), "original_size": original_size, "media_scope": media_scope}
 
 
+@router.post("/image")
+async def upload_image(
+    request: Request,
+    file: UploadFile = File(...),
+    me: dict = Depends(get_current_user),
+    trim_empty_borders: bool = False,
+    media_scope: str = "user",
+):
+    await enforce_rate_limit(request, "uploads:image:user", limit=30, window_seconds=3600, subject=me["id"])
+    return await _upload_image_impl(file, me, trim_empty_borders, media_scope)
+
+
 @router.post("/sponsor-logo")
-async def upload_sponsor_logo(file: UploadFile = File(...), me: dict = Depends(require_admin())):
+async def upload_sponsor_logo(request: Request, file: UploadFile = File(...), me: dict = Depends(require_admin())):
     """Admin-only convenience alias for sponsor logos."""
-    return await upload_image(file, me, trim_empty_borders=True, media_scope="sponsor")
+    await enforce_rate_limit(request, "uploads:image:user", limit=30, window_seconds=3600, subject=me["id"])
+    return await _upload_image_impl(file, me, trim_empty_borders=True, media_scope="sponsor")
 
 
 @router.post("/logo")
-async def upload_logo(file: UploadFile = File(...), me: dict = Depends(require_admin())):
+async def upload_logo(request: Request, file: UploadFile = File(...), me: dict = Depends(require_admin())):
     """Admin-only logo upload with automatic whitespace trimming."""
-    return await upload_image(file, me, trim_empty_borders=True, media_scope="branding")
+    await enforce_rate_limit(request, "uploads:image:user", limit=30, window_seconds=3600, subject=me["id"])
+    return await _upload_image_impl(file, me, trim_empty_borders=True, media_scope="branding")
 
 
 @router.post("/migrate-external-images")
@@ -318,9 +332,10 @@ _EXT_BY_MIME = {
 
 
 @router.post("/document")
-async def upload_document(file: UploadFile = File(...), me: dict = Depends(require_admin())):
+async def upload_document(request: Request, file: UploadFile = File(...), me: dict = Depends(require_admin())):
     """Upload an arbitrary document (PDF, DOCX, XLSX, ZIP, ...).
     Stores it outside the public static tree and returns a storage key."""
+    await enforce_rate_limit(request, "uploads:document:user", limit=20, window_seconds=3600, subject=me["id"])
     if file.content_type not in ALLOWED_DOC:
         raise HTTPException(status_code=400, detail=f"Dateityp nicht erlaubt: {file.content_type}")
     data = await file.read()

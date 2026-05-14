@@ -95,8 +95,8 @@ async def main():
     print(f"\n{BOLD}[2/6]{RESET} Superadmin Account")
     admin_email = ask("Admin E-Mail", os.environ.get("ADMIN_EMAIL", "admin@lionsquad.at"))
     while True:
-        admin_pw = ask("Admin Passwort (min. 8 Zeichen)", secret=True,
-                        validator=lambda v: len(v) >= 8)
+        admin_pw = ask("Admin Passwort (min. 10 Zeichen)", secret=True,
+                        validator=lambda v: len(v) >= 10)
         admin_pw2 = ask("Passwort bestätigen", secret=True)
         if admin_pw == admin_pw2:
             break

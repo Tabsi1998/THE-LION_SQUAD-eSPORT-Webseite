@@ -10,7 +10,7 @@ import bcrypt
 
 from database import get_db
 from auth import require_admin, require_super, get_current_user
-from models import now_utc, new_id
+from models import MIN_PASSWORD_LENGTH, now_utc, new_id
 
 router = APIRouter(prefix="/api/setup", tags=["setup"])
 HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -213,8 +213,8 @@ async def complete_setup(body: SetupWizardBody, me: dict = Depends(require_super
 
     # Admin password change
     if body.new_admin_password:
-        if len(body.new_admin_password) < 8:
-            raise HTTPException(400, "Passwort muss mindestens 8 Zeichen lang sein.")
+        if len(body.new_admin_password) < MIN_PASSWORD_LENGTH:
+            raise HTTPException(400, f"Passwort muss mindestens {MIN_PASSWORD_LENGTH} Zeichen lang sein.")
         pw_hash = bcrypt.hashpw(body.new_admin_password.encode(), bcrypt.gensalt()).decode()
         await db.users.update_one({"id": me["id"]}, {"$set": {
             "password_hash": pw_hash, "updated_at": now_iso,

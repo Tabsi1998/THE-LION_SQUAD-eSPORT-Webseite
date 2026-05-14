@@ -52,7 +52,7 @@ export default function RegisterPage() {
         <form onSubmit={submit} className="mt-8 space-y-4">
           <Field label="Benutzername *" value={form.username} onChange={set("username")} required testId="register-username" />
           <Field label="E-Mail *" type="email" value={form.email} onChange={set("email")} required testId="register-email" />
-          <Field label="Passwort *" type="password" value={form.password} onChange={set("password")} required testId="register-password" />
+          <Field label="Passwort *" type="password" value={form.password} onChange={set("password")} required minLength={10} testId="register-password" />
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Discord (optional)" value={form.discord_name} onChange={set("discord_name")} />
             <Field label="Geburtsdatum (optional)" type="date" value={form.birth_date} onChange={set("birth_date")} />
@@ -101,7 +101,7 @@ export default function RegisterPage() {
   );
 }
 
-function Field({ label, value, onChange, type = "text", required, testId }) {
+function Field({ label, value, onChange, type = "text", required, minLength, testId }) {
   return (
     <label className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
@@ -110,6 +110,7 @@ function Field({ label, value, onChange, type = "text", required, testId }) {
         value={value}
         onChange={onChange}
         required={required}
+        minLength={minLength}
         data-testid={testId}
         className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2.5 rounded-sm text-white focus:outline-none"
       />

@@ -84,7 +84,7 @@ export default function SetupWizardPage() {
   const validateStep = () => {
     if (step === 1 && !data.club_name) { toast.error("Vereinsname ist Pflicht"); return false; }
     if (step === 2 && data.new_admin_password) {
-      if (data.new_admin_password.length < 8) { toast.error("Passwort min. 8 Zeichen"); return false; }
+      if (data.new_admin_password.length < 10) { toast.error("Passwort min. 10 Zeichen"); return false; }
       if (data.new_admin_password !== data.new_admin_password_confirm) { toast.error("Passwörter stimmen nicht überein"); return false; }
     }
     return true;
@@ -201,7 +201,7 @@ export default function SetupWizardPage() {
               <p className="text-white/60 text-sm mb-4">
                 Optional — leer lassen um das aktuelle Passwort beizubehalten.
               </p>
-              <Field type="password" label="Neues Passwort (min. 8 Zeichen)" testId="wizard-new-pw" value={data.new_admin_password} onChange={(v) => upd("new_admin_password", v)} />
+              <Field type="password" label="Neues Passwort (min. 10 Zeichen)" testId="wizard-new-pw" value={data.new_admin_password} onChange={(v) => upd("new_admin_password", v)} />
               <Field type="password" label="Passwort bestätigen" testId="wizard-new-pw-confirm" value={data.new_admin_password_confirm} onChange={(v) => upd("new_admin_password_confirm", v)} />
             </div>
           )}

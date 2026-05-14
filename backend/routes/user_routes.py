@@ -14,7 +14,10 @@ from services.notification_preferences import (
     OPTIONAL_EMAIL_PREFERENCES,
     public_preferences_payload,
 )
-from models import AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate, now_utc, new_id
+from models import (
+    AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate,
+    MIN_PASSWORD_LENGTH, now_utc, new_id,
+)
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -339,8 +342,8 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
         raise HTTPException(status_code=409, detail="Username oder E-Mail bereits vergeben")
     user_id = new_id()
     manual_password = (body.password or "").strip()
-    if not body.send_invite and len(manual_password) < 6:
-        raise HTTPException(status_code=422, detail="Passwort muss mindestens 6 Zeichen haben, wenn keine Einladung gesendet wird.")
+    if not body.send_invite and len(manual_password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(status_code=422, detail=f"Passwort muss mindestens {MIN_PASSWORD_LENGTH} Zeichen haben, wenn keine Einladung gesendet wird.")
     password_setup_required = bool(body.send_invite)
     doc = {
         "id": user_id,

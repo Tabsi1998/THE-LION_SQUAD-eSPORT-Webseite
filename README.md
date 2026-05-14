@@ -125,6 +125,18 @@ curl https://lionsquad.at/api/health
 docker compose ps
 ```
 
+Backup vor groesseren Updates:
+
+```bash
+BACKUP_DIR=/opt/tls-arena/backups bash scripts/backup.sh
+```
+
+Oder direkt im Update-Ablauf:
+
+```bash
+PRE_UPDATE_BACKUP=true ./update.sh u
+```
+
 Lokaler Schnellcheck vor Commit oder groesseren Deployments:
 
 ```powershell
@@ -176,6 +188,36 @@ Wenn Nginx Proxy Manager auf dem Docker-Host laeuft:
 Frontend Ziel: 127.0.0.1:3000
 Backend/API:   127.0.0.1:8001
 ```
+
+Docker Compose veroeffentlicht diese Host-Ports weiterhin standardmaessig. Der
+Frontend-Container lauscht intern auf Port `8080`; das ist nur relevant, wenn ein
+Reverse Proxy direkt im Docker-Netz auf den Service `frontend` statt auf den Host-Port zeigt.
+In dem Fall ist das interne Ziel `frontend:8080`.
+
+Empfohlen fuer reine Reverse-Proxy-Setups auf demselben Host:
+
+```env
+FRONTEND_BIND=127.0.0.1
+BACKEND_BIND=127.0.0.1
+TRUST_PROXY_HEADERS=true
+```
+
+## Analytics
+
+Google Analytics wird erst aktiv, wenn im Cookie-Banner `Statistik` erlaubt wurde
+oder `Alle akzeptieren` gewaehlt wurde. Fehlende oder schwankende Werte koennen daher
+durch abgelehnte/abgelaufene Einwilligung, Browser-Tracking-Schutz, Adblocker,
+Debug-/Realtime-Verzoegerungen in Google Analytics oder eine falsche Measurement-ID
+entstehen.
+
+Fuer einen Live-Test:
+
+1. Im Adminbereich unter `Einstellungen -> SEO & Analytics` `Google Analytics` waehlen.
+2. Nur die Measurement-ID eintragen, z.B. `G-3X155KW480`.
+3. Seite in einem normalen Browserfenster mit `?ga_debug` oeffnen.
+4. Cookie-Einstellung `Statistik` erlauben.
+5. In der Browser-Konsole `window.__tlsAnalyticsStatus` pruefen und in Google Analytics
+   `Realtime` oder `DebugView` beobachten.
 
 ## Admin Erststart
 

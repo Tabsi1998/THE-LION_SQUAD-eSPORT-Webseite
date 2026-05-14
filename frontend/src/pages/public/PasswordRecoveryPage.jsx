@@ -52,8 +52,8 @@ export function ResetPasswordPage() {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (password.length < 6) {
-      toast.error("Passwort muss mindestens 6 Zeichen haben.");
+    if (password.length < 10) {
+      toast.error("Passwort muss mindestens 10 Zeichen haben.");
       return;
     }
     if (password !== confirm) {
@@ -79,7 +79,7 @@ export function ResetPasswordPage() {
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4">
-          <Field label="Neues Passwort" type="password" value={password} onChange={setPassword} required testId="reset-password" />
+          <Field label="Neues Passwort" type="password" value={password} onChange={setPassword} required minLength={10} testId="reset-password" />
           <Field label="Passwort wiederholen" type="password" value={confirm} onChange={setConfirm} required testId="reset-password-confirm" />
           <button disabled={loading} data-testid="reset-submit" className="w-full py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition">
             {loading ? "Speichere..." : "Passwort speichern"}
@@ -103,7 +103,7 @@ function AuthShell({ title, subtitle, children }) {
   );
 }
 
-function Field({ label, value, onChange, type = "text", required, testId }) {
+function Field({ label, value, onChange, type = "text", required, minLength, testId }) {
   return (
     <label className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
@@ -112,6 +112,7 @@ function Field({ label, value, onChange, type = "text", required, testId }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
+        minLength={minLength}
         data-testid={testId}
         className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2.5 rounded-sm text-white placeholder:text-white/30 focus:outline-none"
       />

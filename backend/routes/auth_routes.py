@@ -14,6 +14,7 @@ from models import (
     UserRegister, UserLogin, ForgotPasswordBody, ResetPasswordBody, ChangePasswordBody,
     now_utc, new_id,
 )
+from services.rate_limit import enforce_rate_limit, get_client_ip
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -35,12 +36,7 @@ async def _check_brute_force(db, identifier: str):
 
 
 def _client_identifier(request: Request, email: str) -> str:
-    """Key brute-force counter by X-Forwarded-For (first hop) to survive behind proxies,
-    fall back to direct client host + email."""
-    xff = request.headers.get("x-forwarded-for", "")
-    first = xff.split(",")[0].strip() if xff else ""
-    ip = first or (request.client.host if request.client else "unknown")
-    return f"{ip}:{email}"
+    return f"{get_client_ip(request)}:{email}"
 
 
 async def _record_failed(db, identifier: str):
@@ -68,8 +64,7 @@ async def _issue_session(db, response: Response, user: dict, request: Request):
         "created_at": now_utc(),
         "expires_at": refresh_expires_at(),
         "user_agent": request.headers.get("user-agent"),
-        "ip": request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-              or (request.client.host if request.client else None),
+        "ip": get_client_ip(request),
     })
     set_auth_cookies(response, access, refresh)
 
@@ -90,6 +85,7 @@ async def _revoke_refresh(db, token: str):
 
 @router.post("/register")
 async def register(body: UserRegister, request: Request, response: Response):
+    await enforce_rate_limit(request, "auth:register:ip", limit=5, window_seconds=3600)
     db = get_db()
     if not body.accept_privacy or not body.accept_terms:
         raise HTTPException(status_code=400, detail="Datenschutz und Nutzungsbedingungen müssen akzeptiert werden.")
@@ -225,9 +221,11 @@ async def refresh(request: Request, response: Response):
 
 
 @router.post("/forgot-password")
-async def forgot_password(body: ForgotPasswordBody):
+async def forgot_password(body: ForgotPasswordBody, request: Request):
     db = get_db()
     email = body.email.lower().strip()
+    await enforce_rate_limit(request, "auth:forgot:ip", limit=8, window_seconds=900)
+    await enforce_rate_limit(request, "auth:forgot:email", limit=5, window_seconds=3600, subject=email)
     user = await db.users.find_one({"email": email})
     # Always return ok to prevent user enumeration
     if user:
@@ -248,7 +246,8 @@ async def forgot_password(body: ForgotPasswordBody):
 
 
 @router.post("/reset-password")
-async def reset_password(body: ResetPasswordBody):
+async def reset_password(body: ResetPasswordBody, request: Request):
+    await enforce_rate_limit(request, "auth:reset:ip", limit=20, window_seconds=900)
     db = get_db()
     doc = await db.password_reset_tokens.find_one({"token_hash": hash_token(body.token), "used": False})
     if not doc:
@@ -267,6 +266,14 @@ async def reset_password(body: ResetPasswordBody):
                   "updated_at": now_utc().isoformat()}},
     )
     await db.password_reset_tokens.update_one({"id": doc["id"]}, {"$set": {"used": True}})
+    await db.refresh_tokens.update_many(
+        {"user_id": doc["user_id"], "revoked": {"$ne": True}},
+        {"$set": {
+            "revoked": True,
+            "revoked_at": now_utc(),
+            "revocation_reason": "password_reset",
+        }},
+    )
     return {"ok": True}
 
 
@@ -280,5 +287,13 @@ async def change_password(body: ChangePasswordBody, user: dict = Depends(get_cur
         {"id": user["id"]},
         {"$set": {"password_hash": hash_password(body.new_password),
                   "updated_at": now_utc().isoformat()}},
+    )
+    await db.refresh_tokens.update_many(
+        {"user_id": user["id"], "revoked": {"$ne": True}},
+        {"$set": {
+            "revoked": True,
+            "revoked_at": now_utc(),
+            "revocation_reason": "password_change",
+        }},
     )
     return {"ok": True}

@@ -99,9 +99,22 @@ Vor groesseren Aenderungen:
 
 ```bash
 docker compose ps
+BACKUP_DIR=/opt/tls-arena/backups bash scripts/backup.sh
 ```
 
 Dann nach `BACKUP_RESTORE.md` arbeiten.
+
+Optional kann das Update-Script direkt vorher ein Backup ausloesen:
+
+```bash
+PRE_UPDATE_BACKUP=true ./update.sh u
+```
+
+Backup-Dateien vor einem Restore immer strukturell pruefen:
+
+```bash
+bash scripts/restore-check.sh /opt/tls-arena/backups/tls_arena_YYYYMMDD_HHMMSS.archive.gz /opt/tls-arena/backups/tls_uploads_YYYYMMDD_HHMMSS.tar.gz
+```
 
 Niemals ohne Absicht:
 

@@ -20,8 +20,19 @@ jobs:
           pip install -r backend/requirements-dev.txt
       - name: Compile backend
         run: python -m compileall -q backend
+      - name: Audit backend dependencies
+        run: pip-audit -r backend/requirements.txt
       - name: Run backend smoke tests
-        run: python -m pytest backend/tests/test_public_phase.py
+        run: >
+          python -m pytest
+          backend/tests/test_public_phase.py
+          backend/tests/test_match_v2_results_unit.py
+          backend/tests/test_bracket_engine_unit.py
+          backend/tests/test_custom_bracket_unit.py
+          backend/tests/test_tournament_permissions_unit.py
+          backend/tests/test_achievement_catalog_audit.py
+          backend/tests/test_birthday_mailer_unit.py
+          backend/tests/test_notification_preferences.py
 
   frontend:
     runs-on: ubuntu-latest
@@ -35,6 +46,9 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: yarn install --frozen-lockfile
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: yarn audit:high
       - name: Build frontend
         working-directory: frontend
         run: yarn build

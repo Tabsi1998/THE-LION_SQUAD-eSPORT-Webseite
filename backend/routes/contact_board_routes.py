@@ -5,13 +5,16 @@
 - /api/board: dynamic vorstand positions (defaults seeded, admin can add/disable
   /assign members).
 """
-from fastapi import APIRouter, Depends, HTTPException
+from html import escape
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Literal, List
 
 from database import get_db
 from auth import require_admin, get_optional_user as get_current_user_optional
 from models import now_utc, new_id
+from services.rate_limit import enforce_rate_limit
 
 # ---------- Contact ----------
 contact_router = APIRouter(prefix="/api/contact", tags=["contact"])
@@ -47,17 +50,22 @@ class ContactSubmit(BaseModel):
 
 
 @contact_router.post("/submit")
-async def submit_contact(body: ContactSubmit, me=Depends(get_current_user_optional)):
+async def submit_contact(body: ContactSubmit, request: Request, me=Depends(get_current_user_optional)):
     if not body.accept_privacy:
         raise HTTPException(400, "Datenschutz-Zustimmung erforderlich.")
+    await enforce_rate_limit(request, "contact:submit:ip", limit=5, window_seconds=900)
     db = get_db()
+    name = body.name.strip()
+    email = str(body.email).lower()
+    subject = body.subject.strip().replace("\r", " ").replace("\n", " ")
+    message = body.message.strip()
     doc = {
         "id": new_id(),
-        "name": body.name.strip(),
-        "email": body.email.lower(),
+        "name": name,
+        "email": email,
         "topic": body.topic,
-        "subject": body.subject.strip(),
-        "message": body.message.strip(),
+        "subject": subject,
+        "message": message,
         "related_id": body.related_id,
         "status": "new",
         "user_id": me.get("id") if me else None,
@@ -71,25 +79,32 @@ async def submit_contact(body: ContactSubmit, me=Depends(get_current_user_option
     from email_service import _wrap
     from services.mail_queue import enqueue_mail
     from routes.phase_ef_routes import render_template
-    topic_label = TOPIC_LABELS.get(body.topic, body.topic)
-    first_name = body.name.strip().split()[0] if body.name.strip() else "dort"
+    topic_label = escape(TOPIC_LABELS.get(body.topic, body.topic))
+    first_name = name.split()[0] if name else "dort"
+    safe_name = escape(name)
+    safe_email = escape(email)
+    safe_subject = escape(subject)
+    safe_message = escape(message)
+    safe_message_preview = escape(message[:1000])
+    safe_first_name = escape(first_name)
+    safe_topic_label = escape(topic_label)
     fallback_user_html = _wrap(
         "Wir haben deine Nachricht erhalten",
-        f"<p>Hallo {first_name},</p>"
-        f"<p>danke für deine Nachricht zum Thema <strong>{topic_label}</strong>. Wir melden uns so bald wie möglich.</p>"
+        f"<p>Hallo {safe_first_name},</p>"
+        f"<p>danke für deine Nachricht zum Thema <strong>{safe_topic_label}</strong>. Wir melden uns so bald wie möglich.</p>"
         "<p>Falls dein Anliegen dringend ist, findest du uns auch auf Discord.</p>"
         "<hr style='border:0;border-top:1px solid #1F2937;margin:20px 0;'/>"
         "<p style='color:#6B7280;font-size:12px'>Deine Nachricht (Kopie):</p>"
-        f"<blockquote style='margin:8px 0;padding:8px 12px;border-left:3px solid #29B6E8;color:#9CA3AF;font-size:13px'>{body.message[:1000]}</blockquote>",
+        f"<blockquote style='margin:8px 0;padding:8px 12px;border-left:3px solid #29B6E8;color:#9CA3AF;font-size:13px'>{safe_message_preview}</blockquote>",
     )
     user_subj, user_html = await render_template(
         "contact_auto_reply",
         {"name": first_name, "topic": topic_label},
-        fallback_subject=f"Bestätigung: Wir haben deine Nachricht erhalten — {body.subject[:80]}",
+        fallback_subject=f"Bestätigung: Wir haben deine Nachricht erhalten — {subject[:80]}",
         fallback_html=fallback_user_html,
     )
     await enqueue_mail(
-        to=body.email,
+        to=email,
         subject=user_subj,
         html=user_html,
         template_key="contact_autoreply",
@@ -103,15 +118,15 @@ async def submit_contact(body: ContactSubmit, me=Depends(get_current_user_option
         admin_to = admin.get("email") if admin else None
     if admin_to:
         admin_html = _wrap(
-            f"Neue Nachricht: {topic_label}",
-            f"<p><strong>Name:</strong> {body.name}<br/><strong>E-Mail:</strong> {body.email}<br/><strong>Thema:</strong> {topic_label}</p>"
-            f"<p><strong>Betreff:</strong> {body.subject}</p>"
-            f"<blockquote style='margin:8px 0;padding:8px 12px;border-left:3px solid #29B6E8;color:#D1D5DB'>{body.message}</blockquote>"
+            f"Neue Nachricht: {safe_topic_label}",
+            f"<p><strong>Name:</strong> {safe_name}<br/><strong>E-Mail:</strong> {safe_email}<br/><strong>Thema:</strong> {safe_topic_label}</p>"
+            f"<p><strong>Betreff:</strong> {safe_subject}</p>"
+            f"<blockquote style='margin:8px 0;padding:8px 12px;border-left:3px solid #29B6E8;color:#D1D5DB'>{safe_message}</blockquote>"
             f"<p style='color:#6B7280;font-size:12px'>ID: {doc['id']}</p>",
         )
         await enqueue_mail(
             to=admin_to,
-            subject=f"[TLS Kontakt] {topic_label}: {body.subject[:60]}",
+            subject=f"[TLS Kontakt] {topic_label}: {subject[:60]}",
             html=admin_html,
             template_key="contact_admin_notify",
             meta={"contact_id": doc["id"]},

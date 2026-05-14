@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { setCachedBranding } from "@/lib/brandingEvents";
+import { isGoogleMeasurementId, normalizeAnalyticsPayload } from "@/lib/analyticsConfig";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload, useImageUploadBusy } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -143,7 +144,7 @@ function smtpPayload(source) {
 }
 
 function brandPayload(source = {}) {
-  const payload = { ...source };
+  const payload = normalizeAnalyticsPayload(source);
   if (!payload.twitch_client_secret) delete payload.twitch_client_secret;
   delete payload.twitch_client_secret_masked;
   return payload;
@@ -396,6 +397,9 @@ export default function AdminSettingsPage() {
   const saveBrand = async () => {
     if (savingBrand) return;
     if (imageUploadBusy) return toast.error("Bild-Upload läuft noch. Bitte kurz warten und dann speichern.");
+    if (brand.analytics_provider === "google" && !isGoogleMeasurementId(brand.google_analytics_id)) {
+      return toast.error("Bitte eine gueltige Google Measurement ID eintragen, z.B. G-3X155KW480.");
+    }
     setSavingBrand(true);
     try {
       loadSeqRef.current += 1;
@@ -1575,7 +1579,7 @@ export default function AdminSettingsPage() {
               <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
                 <div>
                   <div className="font-heading font-bold uppercase">Analytics</div>
-                  <p className="text-xs text-white/50 mt-1">Bei Google Analytics nur die Measurement-ID eintragen, z.B. G-3X155KW480. Das Google-Tag wird automatisch mit Consent Mode eingebunden und erst nach Statistik-Zustimmung aktiv gemessen.</p>
+                  <p className="text-xs text-white/50 mt-1">Bei Google Analytics nur die Measurement-ID eintragen, z.B. G-3X155KW480. Das Google-Tag wird automatisch mit Consent Mode eingebunden und erst nach Statistik-Zustimmung aktiv gemessen. Fuer DebugView die Seite mit ?ga_debug oeffnen.</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <BrandSelect label="Analytics" value={brand.analytics_provider || ""} onChange={(v) => setBrandField("analytics_provider", v)} testId="brand-analytics-provider" options={[["", "Aus"], ["google", "Google Analytics"], ["plausible", "Plausible"]]} />
