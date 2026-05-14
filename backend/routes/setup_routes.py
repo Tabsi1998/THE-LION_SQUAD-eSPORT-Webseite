@@ -401,6 +401,7 @@ async def web_manifest():
     name = branding.get("site_title") or name
     description = branding.get("site_description") or "THE LION SQUAD - eSPORTS"
     icon = branding.get("favicon_url") or branding.get("mascot_url") or branding.get("logo_url") or "/assets/brand/tls-mascot.png"
+    default_screenshot = branding.get("og_image_url") or "/assets/brand/og-default.png"
     manifest = {
         "name": name,
         "short_name": "TLS",
@@ -413,6 +414,9 @@ async def web_manifest():
         "icons": [
             {"src": icon, "sizes": "192x192", "purpose": "any"},
             {"src": icon, "sizes": "512x512", "purpose": "any maskable"},
+        ],
+        "screenshots": [
+            {"src": default_screenshot, "sizes": "1200x630", "type": "image/png", "form_factor": "wide"},
         ],
     }
     return Response(content=json.dumps(manifest), media_type="application/manifest+json")

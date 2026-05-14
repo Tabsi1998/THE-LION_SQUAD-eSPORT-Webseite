@@ -78,6 +78,9 @@ export function useSeoPage(slug) {
       if (image) {
         upsertMeta('meta[property="og:image"]', { property: "og:image", content: image });
         upsertMeta('meta[property="og:image:secure_url"]', { property: "og:image:secure_url", content: image });
+        upsertMeta('meta[property="og:image:type"]', { property: "og:image:type", content: "image/png" });
+        upsertMeta('meta[property="og:image:width"]', { property: "og:image:width", content: "1200" });
+        upsertMeta('meta[property="og:image:height"]', { property: "og:image:height", content: "630" });
         upsertMeta('meta[property="og:image:alt"]', { property: "og:image:alt", content: title });
         upsertMeta('meta[name="twitter:image"]', { name: "twitter:image", content: image });
         upsertMeta('meta[name="twitter:image:alt"]', { name: "twitter:image:alt", content: title });
@@ -112,6 +115,9 @@ export function useSeoPage(slug) {
       document.querySelector('meta[property="og:site_name"]'),
       document.querySelector('meta[property="og:image"]'),
       document.querySelector('meta[property="og:image:secure_url"]'),
+      document.querySelector('meta[property="og:image:type"]'),
+      document.querySelector('meta[property="og:image:width"]'),
+      document.querySelector('meta[property="og:image:height"]'),
       document.querySelector('meta[property="og:image:alt"]'),
       document.querySelector('meta[name="twitter:card"]'),
       document.querySelector('meta[name="twitter:title"]'),

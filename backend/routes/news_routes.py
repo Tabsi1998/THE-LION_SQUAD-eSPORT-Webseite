@@ -368,14 +368,17 @@ async def news_meta():
 
 _TIER_ORDER = {"main": 0, "platinum": 1, "gold": 2, "silver": 3, "bronze": 4}
 _LEGACY_TIER_MAP = {"supporter": "bronze", "partner": "bronze"}
-_SPONSOR_PLACEMENT_FIELDS = ("show_on_home", "show_on_footer", "show_on_events", "show_on_tv", "show_in_emails")
+_SPONSOR_PLACEMENT_FIELDS = (
+    "show_on_home", "show_on_footer", "show_on_events",
+    "show_on_tv", "show_on_pdf", "show_in_emails",
+)
 _SPONSOR_CONTRACT_STATUSES = {"planned", "active", "paused", "expired", "cancelled"}
 _TIER_PLACEMENT_DEFAULTS = {
-    "main": {"show_on_home": True, "show_on_footer": True, "show_on_events": False, "show_on_tv": True, "show_in_emails": True},
-    "platinum": {"show_on_home": True, "show_on_footer": True, "show_on_events": False, "show_on_tv": True, "show_in_emails": False},
-    "gold": {"show_on_home": False, "show_on_footer": True, "show_on_events": False, "show_on_tv": False, "show_in_emails": False},
-    "silver": {"show_on_home": False, "show_on_footer": True, "show_on_events": False, "show_on_tv": False, "show_in_emails": False},
-    "bronze": {"show_on_home": False, "show_on_footer": False, "show_on_events": False, "show_on_tv": False, "show_in_emails": False},
+    "main": {"show_on_home": True, "show_on_footer": True, "show_on_events": False, "show_on_tv": True, "show_on_pdf": True, "show_in_emails": True},
+    "platinum": {"show_on_home": False, "show_on_footer": True, "show_on_events": False, "show_on_tv": True, "show_on_pdf": False, "show_in_emails": False},
+    "gold": {"show_on_home": False, "show_on_footer": True, "show_on_events": False, "show_on_tv": False, "show_on_pdf": False, "show_in_emails": False},
+    "silver": {"show_on_home": False, "show_on_footer": True, "show_on_events": False, "show_on_tv": False, "show_on_pdf": False, "show_in_emails": False},
+    "bronze": {"show_on_home": False, "show_on_footer": False, "show_on_events": False, "show_on_tv": False, "show_on_pdf": False, "show_in_emails": False},
 }
 
 
@@ -446,7 +449,7 @@ def _sponsor_defaults(doc: dict) -> dict:
 
 @router.get("/sponsors")
 async def list_sponsors(placement: Optional[str] = None):
-    """Public list. ?placement=home/footer/events/tv/emails filters by enabled placement."""
+    """Public list. ?placement=home/footer/events/tv/pdf/emails filters by enabled placement."""
     db = get_db()
     q = {"is_active": {"$ne": False}}
     sp = await db.sponsors.find(q, {"_id": 0}).to_list(500)
@@ -456,13 +459,15 @@ async def list_sponsors(placement: Optional[str] = None):
     sp = [s for s in sp if _sponsor_is_public_active(s)]
     # Apply placement filter
     if placement == "home":
-        sp = [s for s in sp if s["show_on_home"]]
+        sp = [s for s in sp if s["show_on_home"] and s["tier"] == "main"]
     elif placement == "footer":
         sp = [s for s in sp if s["show_on_footer"]]
     elif placement == "events":
         sp = [s for s in sp if s["show_on_events"]]
     elif placement == "tv":
         sp = [s for s in sp if s["show_on_tv"]]
+    elif placement == "pdf":
+        sp = [s for s in sp if s["show_on_pdf"]]
     elif placement == "emails":
         sp = [s for s in sp if s["show_in_emails"]]
     # Sort by tier then order_index

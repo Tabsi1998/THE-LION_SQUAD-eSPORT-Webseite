@@ -63,6 +63,29 @@ const BANNER_SCOPE_OPTIONS = [
   ["custom", "Eigener Pfad"],
 ];
 
+const SOCIAL_PLATFORM_OPTIONS = [
+  ["discord", "Discord"],
+  ["whatsapp", "WhatsApp Kanal"],
+  ["facebook", "Facebook"],
+  ["instagram", "Instagram"],
+  ["tiktok", "TikTok"],
+  ["youtube", "YouTube"],
+  ["twitch", "Twitch"],
+  ["custom", "Eigener Link"],
+];
+
+function defaultSocialLinks() {
+  return [
+    { platform: "discord", label: "Discord", url: "https://discord.com/invite/thelionsquadesports", enabled: true },
+    { platform: "whatsapp", label: "WhatsApp Kanal", url: "https://whatsapp.com/channel/0029VaaWufTGU3BNG6VOxo1I", enabled: true },
+    { platform: "facebook", label: "Facebook", url: "https://www.facebook.com/thelionsquadesports", enabled: true },
+    { platform: "instagram", label: "Instagram", url: "https://instagram.com/thelionsquadesports", enabled: true },
+    { platform: "tiktok", label: "TikTok", url: "https://www.tiktok.com/@thelionsquadesports", enabled: true },
+    { platform: "youtube", label: "YouTube", url: "https://www.youtube.com/@TheLionSquadeSports", enabled: true },
+    { platform: "twitch", label: "Twitch", url: "https://www.twitch.tv/the_lion_squad_esports", enabled: true },
+  ];
+}
+
 function emptyBannerForm() {
   return {
     title: "",
@@ -159,7 +182,7 @@ export default function AdminSettingsPage() {
   const [sendingNewsletter, setSendingNewsletter] = useState(false);
   const [brand, setBrand] = useState({
     club_name: "", tagline: "", site_title: "THE LION SQUAD - eSPORTS", site_description: "", primary_color: "#29B6E8",
-    logo_url: "", mascot_url: "", favicon_url: "", contact_email: "", domain: "", timezone: "Europe/Vienna",
+    logo_url: "", mascot_url: "", favicon_url: "", og_image_url: "/assets/brand/og-default.png", contact_email: "", domain: "", timezone: "Europe/Vienna",
     legal_name: "", legal_form: "eingetragener Verein nach österreichischem Vereinsrecht", zvr_number: "",
     street_address: "", address_extra: "", postal_code: "", city: "", state: "Tirol", country: "Oesterreich",
     registered_seat: "", register_authority: "", representative_name: "", representative_role: "",
@@ -167,6 +190,10 @@ export default function AdminSettingsPage() {
     vat_number: "", tournament_terms_url: "", paid_tournaments_enabled: false,
     imprint: "", privacy_policy: "", legal_extra: "", privacy_extra: "",
     discord_invite_url: "", twitch_channel: "", twitch_client_id: "", twitch_client_secret: "",
+    whatsapp_channel_url: "https://whatsapp.com/channel/0029VaaWufTGU3BNG6VOxo1I",
+    social_links: defaultSocialLinks(),
+    analytics_provider: "", google_analytics_id: "", plausible_domain: "",
+    google_site_verification: "", msvalidate_01: "", indexnow_key: "",
     twitch_client_secret_masked: "", twitch_live_detection: true,
     site_banner_enabled: false, site_banner_text: "", site_banner_tone: "info", site_banner_mode: "ticker", site_banner_speed_seconds: 22,
     site_banner_style: "neon", site_banner_position: "below_nav", site_banner_scope: "all", site_banner_path: "",
@@ -303,6 +330,34 @@ export default function AdminSettingsPage() {
     setBrand((prev) => ({ ...prev, [key]: value }));
   };
 
+  const setSocialLink = (index, key, value) => {
+    brandDirtyRef.current = true;
+    setBrand((prev) => ({
+      ...prev,
+      social_links: (prev.social_links || []).map((social, i) => {
+        if (i !== index) return social;
+        const next = { ...social, [key]: value };
+        if (key === "platform" && (!next.label || SOCIAL_PLATFORM_OPTIONS.some(([, label]) => label === next.label))) {
+          next.label = SOCIAL_PLATFORM_OPTIONS.find(([platform]) => platform === value)?.[1] || "Eigener Link";
+        }
+        return next;
+      }),
+    }));
+  };
+
+  const addSocialLink = () => {
+    brandDirtyRef.current = true;
+    setBrand((prev) => ({
+      ...prev,
+      social_links: [...(prev.social_links || []), { platform: "custom", label: "Link", url: "", enabled: true }],
+    }));
+  };
+
+  const removeSocialLink = (index) => {
+    brandDirtyRef.current = true;
+    setBrand((prev) => ({ ...prev, social_links: (prev.social_links || []).filter((_, i) => i !== index) }));
+  };
+
   const setDiscordField = (key, value) => {
     discordDirtyRef.current = true;
     setDiscord((prev) => ({ ...prev, [key]: value }));
@@ -358,6 +413,14 @@ export default function AdminSettingsPage() {
     }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
     finally { setSavingBrand(false); }
+  };
+  const submitIndexNow = async () => {
+    try {
+      const { data } = await api.post("/settings/indexnow/submit", { urls: ["/", "/sitemap.xml"] });
+      toast.success(`IndexNow gesendet (${data.submitted || 0} URLs).`);
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "IndexNow konnte nicht gesendet werden.");
+    }
   };
   const setBannerField = (key, value) => setBannerForm((prev) => ({ ...prev, [key]: value }));
   const applyBannerTemplate = (template) => {
@@ -1362,14 +1425,58 @@ export default function AdminSettingsPage() {
               <BrandField label="Zeitzone" value={brand.timezone} onChange={(v) => setBrandField("timezone", v)} testId="brand-tz" />
               <BrandField label="Kontakt E-Mail" value={brand.contact_email} onChange={(v) => setBrandField("contact_email", v)} testId="brand-contact-email" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <BrandField label="Discord Einladung" value={brand.discord_invite_url} onChange={(v) => setBrandField("discord_invite_url", v)} testId="brand-discord-invite" />
-              <BrandField label="Twitch Channel" value={brand.twitch_channel} onChange={(v) => setBrandField("twitch_channel", v)} testId="brand-twitch-channel" />
+            <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-heading font-bold uppercase">Social Links</div>
+                  <p className="text-xs text-white/50 mt-1">Diese Liste steuert die Icons im Footer und wird fuer Social/SEO-Erkennung verwendet.</p>
+                </div>
+                <button type="button" onClick={addSocialLink} className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider">
+                  <Plus className="w-3.5 h-3.5" /> Link
+                </button>
+              </div>
+              <div className="space-y-2">
+                {(brand.social_links || []).map((social, index) => (
+                  <div key={`${social.platform}-${index}`} className="grid grid-cols-1 lg:grid-cols-[10rem_minmax(8rem,12rem)_minmax(0,1fr)_auto_auto] gap-2 items-end border border-white/10 bg-black/20 rounded-sm p-3">
+                    <BrandSelect label="Plattform" value={social.platform || "custom"} onChange={(v) => setSocialLink(index, "platform", v)} testId={`brand-social-platform-${index}`} options={SOCIAL_PLATFORM_OPTIONS} />
+                    <BrandField label="Label" value={social.label || ""} onChange={(v) => setSocialLink(index, "label", v)} testId={`brand-social-label-${index}`} />
+                    <BrandField label="URL" value={social.url || ""} onChange={(v) => setSocialLink(index, "url", v)} testId={`brand-social-url-${index}`} placeholder="https://..." />
+                    <label className="inline-flex items-center gap-2 text-sm h-10">
+                      <input type="checkbox" checked={social.enabled !== false} onChange={(e) => setSocialLink(index, "enabled", e.target.checked)} className="accent-[#29B6E8]" />
+                      Aktiv
+                    </label>
+                    <button type="button" onClick={() => removeSocialLink(index)} className="h-10 px-3 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm inline-flex items-center justify-center">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+                {!(brand.social_links || []).length && <div className="text-sm text-white/40 border border-dashed border-white/10 rounded-sm p-4">Noch keine Social Links gepflegt.</div>}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <BrandSelect label="Analytics" value={brand.analytics_provider || ""} onChange={(v) => setBrandField("analytics_provider", v)} testId="brand-analytics-provider" options={[["", "Aus"], ["google", "Google Analytics"], ["plausible", "Plausible"]]} />
+              <BrandField label="Google Measurement ID" value={brand.google_analytics_id} onChange={(v) => setBrandField("google_analytics_id", v)} testId="brand-ga-id" placeholder="G-XXXXXXXXXX" />
+              <BrandField label="Plausible Domain" value={brand.plausible_domain} onChange={(v) => setBrandField("plausible_domain", v)} testId="brand-plausible-domain" placeholder="lionsquad.at" />
+            </div>
+            <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
+              <div>
+                <div className="font-heading font-bold uppercase">Suchmaschinen-Verknuepfung</div>
+                <p className="text-xs text-white/50 mt-1">Meta-Verifikation fuer Google Search Console und Bing Webmaster Tools. IndexNow sendet Startseite und Sitemap aktiv an Microsoft/Bing-kompatible Suchmaschinen.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <BrandField label="Google Site Verification" value={brand.google_site_verification} onChange={(v) => setBrandField("google_site_verification", v)} testId="brand-google-verification" />
+                <BrandField label="Bing msvalidate.01" value={brand.msvalidate_01} onChange={(v) => setBrandField("msvalidate_01", v)} testId="brand-bing-verification" />
+                <BrandField label="IndexNow Key" value={brand.indexnow_key} onChange={(v) => setBrandField("indexnow_key", v)} testId="brand-indexnow-key" />
+              </div>
+              <button type="button" onClick={submitIndexNow} disabled={!brand.indexnow_key} className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+                IndexNow senden
+              </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ImageUpload value={brand.logo_url} onChange={(v) => setBrandField("logo_url", v)} label="Vereinslogo" testId="brand-logo" variant="square" allowLibrary />
               <ImageUpload value={brand.mascot_url} onChange={(v) => setBrandField("mascot_url", v)} label="Maskottchen" testId="brand-mascot" variant="square" allowLibrary />
               <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Favicon / Browser Icon" testId="brand-favicon" variant="square" allowLibrary />
+              <ImageUpload value={brand.og_image_url} onChange={(v) => setBrandField("og_image_url", v)} label="Social Share Bild" testId="brand-og-image" variant="wide" allowLibrary />
             </div>
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">

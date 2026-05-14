@@ -301,11 +301,20 @@ Saisons, Galerie-Alben sowie Profile liefern dynamische Meta-Daten aus:
 - Open-Graph-Tags fuer WhatsApp, Discord, Facebook, LinkedIn und aehnliche Dienste
 - Twitter/X Summary Card
 - JSON-LD fuer Google und andere Suchmaschinen
+- Google-Search-Console-Verifikation per `google-site-verification`
+- Bing-Webmaster-Tools-Verifikation per `msvalidate.01`
+- optionaler IndexNow-Push fuer Bing/Microsoft-kompatible Suchmaschinen
 
 Normale Besucher bekommen weiterhin die React-App. Bekannte Crawler/Bots werden
 ueber Nginx auf `/api/seo/preview?path=/...` geleitet und erhalten eine kleine
 HTML-Seite mit passenden Meta-Tags. Dadurch koennen geteilte Links auch dann
 korrekt erkannt werden, wenn der Dienst kein JavaScript ausfuehrt.
+
+Im Adminbereich unter `Einstellungen -> Branding` koennen die Search-Console-
+und Bing-Verifikationscodes, Analytics, das Social-Share-Bild sowie die
+Social-Link-Liste fuer Footer und SEO gepflegt werden. Wenn ein `IndexNow Key`
+hinterlegt ist, kann die Startseite samt Sitemap direkt an IndexNow gesendet
+werden.
 
 Wichtig fuer saubere Share-Bilder:
 

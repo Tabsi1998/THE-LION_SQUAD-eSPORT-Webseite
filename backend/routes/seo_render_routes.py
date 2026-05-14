@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api/seo", tags=["seo"])
 STAFF_HIDDEN_STATUSES = {"draft", "archived", "cancelled"}
 MARKDOWN_RE = re.compile(r"(!?\[[^\]]*\]\([^)]+\)|[`*_>#~-]+|\r?\n+)")
 HTML_RE = re.compile(r"<[^>]+>")
+DEFAULT_OG_IMAGE = "/assets/brand/og-default.png"
 
 
 @router.get("/preview")
@@ -52,7 +53,7 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         or "THE LION SQUAD - eSPORTS: Turniere, News, Events und Community."
     )
     default_image = absolute_url(
-        branding.get("og_image_url") or branding.get("mascot_url") or branding.get("logo_url") or "/assets/brand/tls-mascot.png",
+        branding.get("og_image_url") or DEFAULT_OG_IMAGE,
         origin,
     )
 
@@ -65,7 +66,9 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         "site_name": site_name,
         "type": "website",
         "locale": "de_AT",
-        "json_ld": website_json_ld(origin, site_name, default_description, default_image),
+        "google_site_verification": branding.get("google_site_verification") or "",
+        "msvalidate_01": branding.get("msvalidate_01") or "",
+        "json_ld": website_json_ld(origin, site_name, default_description, default_image, branding),
     }
 
     parts = [part for part in path.strip("/").split("/") if part]
@@ -355,6 +358,10 @@ def render_preview_html(meta: dict) -> str:
         optional.append(f'<meta property="article:published_time" content="{escape(str(meta["published_time"]))}" />')
     if meta.get("modified_time"):
         optional.append(f'<meta property="article:modified_time" content="{escape(str(meta["modified_time"]))}" />')
+    if meta.get("google_site_verification"):
+        optional.append(f'<meta name="google-site-verification" content="{escape(str(meta["google_site_verification"]))}" />')
+    if meta.get("msvalidate_01"):
+        optional.append(f'<meta name="msvalidate.01" content="{escape(str(meta["msvalidate_01"]))}" />')
     return f"""<!doctype html>
 <html lang="de">
   <head>
@@ -371,11 +378,15 @@ def render_preview_html(meta: dict) -> str:
     <meta property="og:url" content="{url}" />
     <meta property="og:image" content="{image}" />
     <meta property="og:image:secure_url" content="{image}" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="{title}" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="{title}" />
     <meta name="twitter:description" content="{description}" />
     <meta name="twitter:image" content="{image}" />
+    <meta name="twitter:image:alt" content="{title}" />
     {"".join(optional)}
     <script type="application/ld+json">{json_ld}</script>
   </head>
@@ -451,8 +462,23 @@ def is_published_now(item: dict) -> bool:
     return dt.astimezone(timezone.utc) <= datetime.now(timezone.utc)
 
 
-def website_json_ld(origin: str, name: str, description: str, image: str) -> dict:
-    return {
+def website_json_ld(origin: str, name: str, description: str, image: str, branding: dict | None = None) -> dict:
+    branding = branding or {}
+    same_as = [
+        branding.get("discord_invite_url"),
+        branding.get("whatsapp_channel_url"),
+        branding.get("facebook_url"),
+        branding.get("instagram_url"),
+        branding.get("tiktok_url"),
+        branding.get("youtube_url"),
+    ]
+    twitch = branding.get("twitch_channel")
+    if twitch:
+        same_as.append(twitch if str(twitch).startswith(("http://", "https://")) else f"https://www.twitch.tv/{str(twitch).lstrip('@')}")
+    for social in branding.get("social_links") or []:
+        if isinstance(social, dict) and social.get("enabled") is not False:
+            same_as.append(social.get("url"))
+    data = {
         "@context": "https://schema.org",
         "@type": "WebSite",
         "name": name,
@@ -465,6 +491,10 @@ def website_json_ld(origin: str, name: str, description: str, image: str) -> dic
             "query-input": "required name=search_term_string",
         },
     }
+    cleaned = list(dict.fromkeys([url for url in same_as if url]))
+    if cleaned:
+        data["sameAs"] = cleaned
+    return data
 
 
 def webpage_json_ld(meta: dict) -> dict:

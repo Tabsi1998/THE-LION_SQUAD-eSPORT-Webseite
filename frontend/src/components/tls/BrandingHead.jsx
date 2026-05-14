@@ -5,6 +5,7 @@ import { onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { TLS_MASCOT } from "@/components/tls/Logo";
 
 const DEFAULT_TITLE = "THE LION SQUAD - eSPORTS";
+const DEFAULT_OG_IMAGE = "/assets/brand/og-default.png";
 
 function upsertMeta(selector, attrs) {
   let el = document.head.querySelector(selector);
@@ -38,7 +39,7 @@ function applyBranding(data) {
   const description = data.site_description || "THE LION SQUAD - eSPORTS";
   const themeColor = data.primary_color || "#29B6E8";
   const icon = data.favicon_url || data.mascot_url || data.logo_url || TLS_MASCOT;
-  const image = resolveMediaUrl(data.og_image_url || data.mascot_url || data.logo_url || TLS_MASCOT);
+  const image = resolveMediaUrl(data.og_image_url || DEFAULT_OG_IMAGE);
   const origin = data.domain || (typeof window !== "undefined" ? window.location.origin : "");
 
   if (!document.title || document.title === DEFAULT_TITLE || /React App|Vereinsplattform/i.test(document.title)) {
@@ -58,11 +59,21 @@ function applyBranding(data) {
   upsertMeta('meta[property="og:url"]', { property: "og:url", content: origin });
   upsertMeta('meta[property="og:image"]', { property: "og:image", content: image });
   upsertMeta('meta[property="og:image:secure_url"]', { property: "og:image:secure_url", content: image });
+  upsertMeta('meta[property="og:image:type"]', { property: "og:image:type", content: "image/png" });
+  upsertMeta('meta[property="og:image:width"]', { property: "og:image:width", content: "1200" });
+  upsertMeta('meta[property="og:image:height"]', { property: "og:image:height", content: "630" });
   upsertMeta('meta[property="og:image:alt"]', { property: "og:image:alt", content: siteTitle });
   upsertMeta('meta[name="twitter:card"]', { name: "twitter:card", content: "summary_large_image" });
   upsertMeta('meta[name="twitter:title"]', { name: "twitter:title", content: siteTitle });
   upsertMeta('meta[name="twitter:description"]', { name: "twitter:description", content: description });
   upsertMeta('meta[name="twitter:image"]', { name: "twitter:image", content: image });
+  upsertMeta('meta[name="twitter:image:alt"]', { name: "twitter:image:alt", content: siteTitle });
+  if (data.google_site_verification) {
+    upsertMeta('meta[name="google-site-verification"]', { name: "google-site-verification", content: data.google_site_verification });
+  }
+  if (data.msvalidate_01) {
+    upsertMeta('meta[name="msvalidate.01"]', { name: "msvalidate.01", content: data.msvalidate_01 });
+  }
 }
 
 export function BrandingHead() {

@@ -6,6 +6,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Literal
 from datetime import datetime, timezone
 import io
+import httpx
 
 from database import get_db
 from auth import require_admin, require_super, get_current_user, get_optional_user
@@ -19,6 +20,25 @@ from pdf_service import (
 # ---------- Settings ----------
 settings_router = APIRouter(prefix="/api/settings", tags=["settings"])
 
+DEFAULT_SOCIAL_LINKS = [
+    {"platform": "discord", "label": "Discord", "url": "https://discord.com/invite/thelionsquadesports", "enabled": True},
+    {"platform": "whatsapp", "label": "WhatsApp Kanal", "url": "https://whatsapp.com/channel/0029VaaWufTGU3BNG6VOxo1I", "enabled": True},
+    {"platform": "facebook", "label": "Facebook", "url": "https://www.facebook.com/thelionsquadesports", "enabled": True},
+    {"platform": "instagram", "label": "Instagram", "url": "https://instagram.com/thelionsquadesports", "enabled": True},
+    {"platform": "tiktok", "label": "TikTok", "url": "https://www.tiktok.com/@thelionsquadesports", "enabled": True},
+    {"platform": "youtube", "label": "YouTube", "url": "https://www.youtube.com/@TheLionSquadeSports", "enabled": True},
+    {"platform": "twitch", "label": "Twitch", "url": "https://www.twitch.tv/the_lion_squad_esports", "enabled": True},
+]
+
+SOCIAL_LEGACY_FIELDS = {
+    "discord": "discord_invite_url",
+    "whatsapp": "whatsapp_channel_url",
+    "facebook": "facebook_url",
+    "instagram": "instagram_url",
+    "tiktok": "tiktok_url",
+    "youtube": "youtube_url",
+}
+
 
 class EmailSettings(BaseModel):
     resend_api_key: Optional[str] = None
@@ -26,6 +46,13 @@ class EmailSettings(BaseModel):
     sender_email: Optional[str] = None
     reply_to_email: Optional[str] = None
     enabled: bool = True
+
+
+class SocialLinkSettings(BaseModel):
+    platform: Optional[str] = None
+    label: Optional[str] = None
+    url: Optional[str] = None
+    enabled: Optional[bool] = True
 
 
 class BrandingSettings(BaseModel):
@@ -37,6 +64,7 @@ class BrandingSettings(BaseModel):
     logo_url: Optional[str] = None
     mascot_url: Optional[str] = None
     favicon_url: Optional[str] = None
+    og_image_url: Optional[str] = None
     domain: Optional[str] = None
     timezone: Optional[str] = None
     contact_email: Optional[str] = None
@@ -67,11 +95,19 @@ class BrandingSettings(BaseModel):
     privacy_extra: Optional[str] = None
     discord_invite_url: Optional[str] = None
     twitch_channel: Optional[str] = None
+    analytics_provider: Optional[Literal["", "google", "plausible"]] = None
+    google_analytics_id: Optional[str] = None
+    plausible_domain: Optional[str] = None
+    google_site_verification: Optional[str] = None
+    msvalidate_01: Optional[str] = None
+    indexnow_key: Optional[str] = None
+    whatsapp_channel_url: Optional[str] = None
     # Social channels (Phase X — full social presence)
     facebook_url: Optional[str] = None
     instagram_url: Optional[str] = None
     tiktok_url: Optional[str] = None
     youtube_url: Optional[str] = None
+    social_links: Optional[List[SocialLinkSettings]] = None
     # Phase E — Twitch Helix credentials
     twitch_client_id: Optional[str] = None
     twitch_client_secret: Optional[str] = None
@@ -100,6 +136,10 @@ class NewsletterTriggerBody(BaseModel):
     kind: Literal["news", "event"]
     id: str
     force: bool = False
+
+
+class IndexNowSubmitBody(BaseModel):
+    urls: Optional[List[str]] = None
 
 
 BannerTone = Literal["info", "live", "warning", "success"]
@@ -185,6 +225,62 @@ def _hide_branding_secrets(settings: dict) -> dict:
         out["twitch_client_secret_masked"] = "********"
         out.pop("twitch_client_secret", None)
     return out
+
+
+def _twitch_url(value: str | None) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return "https://www.twitch.tv/the_lion_squad_esports"
+    if raw.startswith(("http://", "https://")):
+        return raw
+    return f"https://www.twitch.tv/{raw.lstrip('@')}"
+
+
+def _normalize_social_link(item: dict) -> dict | None:
+    platform = str(item.get("platform") or "").strip().lower()
+    label = str(item.get("label") or platform or "Link").strip()
+    url = str(item.get("url") or "").strip()
+    if not url:
+        return None
+    return {
+        "platform": platform or "custom",
+        "label": label,
+        "url": url,
+        "enabled": item.get("enabled") is not False,
+    }
+
+
+def _social_links_from_branding(settings: dict) -> list[dict]:
+    raw = settings.get("social_links")
+    if isinstance(raw, list) and raw:
+        links = [_normalize_social_link(item) for item in raw if isinstance(item, dict)]
+        return [link for link in links if link]
+    links = []
+    for default in DEFAULT_SOCIAL_LINKS:
+        item = dict(default)
+        field = SOCIAL_LEGACY_FIELDS.get(item["platform"])
+        if field:
+            item["url"] = settings.get(field) or item["url"]
+        elif item["platform"] == "twitch":
+            item["url"] = _twitch_url(settings.get("twitch_channel"))
+        normalized = _normalize_social_link(item)
+        if normalized:
+            links.append(normalized)
+    return links
+
+
+def _sync_legacy_social_fields(updates: dict) -> None:
+    raw = updates.get("social_links")
+    if not isinstance(raw, list):
+        return
+    normalized = [_normalize_social_link(item) for item in raw if isinstance(item, dict)]
+    updates["social_links"] = [item for item in normalized if item]
+    for item in updates["social_links"]:
+        platform = item.get("platform")
+        if platform in SOCIAL_LEGACY_FIELDS:
+            updates[SOCIAL_LEGACY_FIELDS[platform]] = item.get("url") or ""
+        elif platform == "twitch" and item.get("url"):
+            updates["twitch_channel"] = item["url"]
 
 
 def _normalize_setting_value(value):
@@ -435,6 +531,7 @@ async def public_settings(response: Response):
         "logo_url": b.get("logo_url"),
         "mascot_url": b.get("mascot_url"),
         "favicon_url": b.get("favicon_url"),
+        "og_image_url": b.get("og_image_url") or "/assets/brand/og-default.png",
         "domain": domain,
         "timezone": b.get("timezone") or "Europe/Vienna",
         "contact_email": contact_email,
@@ -465,10 +562,18 @@ async def public_settings(response: Response):
         "privacy_extra": b.get("privacy_extra") or "",
         "discord_invite_url": b.get("discord_invite_url") or "https://discord.com/invite/thelionsquadesports",
         "twitch_channel": b.get("twitch_channel") or "the_lion_squad_esports",
+        "whatsapp_channel_url": b.get("whatsapp_channel_url") or "https://whatsapp.com/channel/0029VaaWufTGU3BNG6VOxo1I",
+        "analytics_provider": b.get("analytics_provider") or "",
+        "google_analytics_id": b.get("google_analytics_id") or "",
+        "plausible_domain": b.get("plausible_domain") or "",
+        "google_site_verification": b.get("google_site_verification") or "",
+        "msvalidate_01": b.get("msvalidate_01") or "",
+        "indexnow_key": b.get("indexnow_key") or "",
         "facebook_url": b.get("facebook_url") or "https://www.facebook.com/thelionsquadesports",
         "instagram_url": b.get("instagram_url") or "https://instagram.com/thelionsquadesports",
         "tiktok_url": b.get("tiktok_url") or "https://www.tiktok.com/@thelionsquadesports",
         "youtube_url": b.get("youtube_url") or "https://www.youtube.com/@TheLionSquadeSports",
+        "social_links": _social_links_from_branding(b),
     }
 
 
@@ -831,6 +936,7 @@ async def get_branding(response: Response, me: dict = Depends(require_admin())):
         "site_title": "THE LION SQUAD - eSPORTS",
         "discord_invite_url": "https://discord.com/invite/thelionsquadesports",
         "twitch_channel": "the_lion_squad_esports",
+        "whatsapp_channel_url": "https://whatsapp.com/channel/0029VaaWufTGU3BNG6VOxo1I",
         "facebook_url": "https://www.facebook.com/thelionsquadesports",
         "instagram_url": "https://instagram.com/thelionsquadesports",
         "tiktok_url": "https://www.tiktok.com/@thelionsquadesports",
@@ -839,6 +945,7 @@ async def get_branding(response: Response, me: dict = Depends(require_admin())):
     for k, v in defaults.items():
         if not saved.get(k):
             saved[k] = v
+    saved["social_links"] = _social_links_from_branding(saved)
     return _hide_branding_secrets(saved)
 
 
@@ -848,6 +955,7 @@ async def update_branding(body: BrandingSettings, me: dict = Depends(require_adm
     nullable_fields = set(BrandingSettings.model_fields.keys())
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    _sync_legacy_social_fields(updates)
     current = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
     changed_fields = _changed_setting_fields(current, updates)
     if not changed_fields:
@@ -859,6 +967,42 @@ async def update_branding(body: BrandingSettings, me: dict = Depends(require_adm
     await _audit_settings_change(db, "settings.branding.update", "branding", me["id"], changed_fields)
     saved = await db.settings.find_one({"id": "branding"}, {"_id": 0})
     return _hide_branding_secrets(saved) if saved else {"ok": True}
+
+
+@settings_router.post("/indexnow/submit")
+async def submit_indexnow(body: IndexNowSubmitBody, me: dict = Depends(require_admin())):
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
+    key = (branding.get("indexnow_key") or "").strip()
+    if not key:
+        raise HTTPException(400, "IndexNow-Key fehlt. Bitte im Branding hinterlegen.")
+    domain = (branding.get("domain") or "https://lionsquad.at").strip().rstrip("/")
+    if not domain.startswith(("http://", "https://")):
+        domain = "https://" + domain
+    host = domain.replace("https://", "").replace("http://", "").split("/")[0]
+    urls = body.urls or [domain, f"{domain}/sitemap.xml"]
+    urls = [u if str(u).startswith(("http://", "https://")) else f"{domain}/{str(u).lstrip('/')}" for u in urls]
+    payload = {
+        "host": host,
+        "key": key,
+        "keyLocation": f"{domain}/indexnow-key.txt",
+        "urlList": urls[:100],
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post("https://api.indexnow.org/indexnow", json=payload)
+    if r.status_code >= 400:
+        raise HTTPException(r.status_code, f"IndexNow fehlgeschlagen: {r.text[:300]}")
+    return {"ok": True, "submitted": len(payload["urlList"]), "status": r.status_code}
+
+
+@settings_router.get("/indexnow-key.txt")
+async def indexnow_key_file():
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
+    key = (branding.get("indexnow_key") or "").strip()
+    if not key:
+        raise HTTPException(404, "IndexNow-Key nicht gesetzt")
+    return Response(content=key, media_type="text/plain")
 
 
 @settings_router.get("/email/logs")
@@ -1443,6 +1587,37 @@ def _pdf_response(data: bytes, filename: str):
     )
 
 
+_PDF_SPONSOR_TIER_ORDER = {"main": 0, "platinum": 1, "gold": 2, "silver": 3, "bronze": 4}
+
+
+def _sponsor_date(value) -> str | None:
+    raw = str(value or "").strip()
+    return raw[:10] if raw else None
+
+
+def _sponsor_active_for_pdf(sponsor: dict) -> bool:
+    if sponsor.get("is_active") is False or sponsor.get("show_on_pdf") is not True:
+        return False
+    status = str(sponsor.get("contract_status") or "active").strip().lower()
+    if status in {"paused", "cancelled"}:
+        return False
+    today = datetime.now(timezone.utc).date().isoformat()
+    start = _sponsor_date(sponsor.get("contract_start"))
+    end = _sponsor_date(sponsor.get("contract_end"))
+    return not ((start and start > today) or (end and end < today))
+
+
+async def _pdf_sponsors(db):
+    rows = await db.sponsors.find(
+        {"is_active": {"$ne": False}, "show_on_pdf": True},
+        {"_id": 0, "name": 1, "logo_url": 1, "link": 1, "tier": 1, "order_index": 1,
+         "is_active": 1, "contract_status": 1, "contract_start": 1, "contract_end": 1, "show_on_pdf": 1},
+    ).to_list(50)
+    rows = [s for s in rows if _sponsor_active_for_pdf(s)]
+    rows.sort(key=lambda s: (_PDF_SPONSOR_TIER_ORDER.get(s.get("tier"), 99), s.get("order_index") or 0, s.get("name") or ""))
+    return rows
+
+
 @pdf_router.get("/tournaments/{slug_or_id}/participants.pdf")
 async def pdf_tournament_participants(slug_or_id: str, me: dict = Depends(require_admin())):
     db = get_db()
@@ -1455,7 +1630,8 @@ async def pdf_tournament_participants(slug_or_id: str, me: dict = Depends(requir
     for r in regs:
         if r.get("team_id"):
             r["team"] = teams.get(r["team_id"], {})
-    data = pdf_participants(t, regs)
+    sponsors = await _pdf_sponsors(db)
+    data = pdf_participants(t, regs, pdf_sponsors=sponsors)
     return _pdf_response(data, f"teilnehmer_{t['slug']}.pdf")
 
 
@@ -1466,7 +1642,8 @@ async def pdf_tournament_checkin(slug_or_id: str, me: dict = Depends(require_adm
     if not t:
         raise HTTPException(status_code=404)
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
-    return _pdf_response(pdf_checkin(t, regs), f"checkin_{t['slug']}.pdf")
+    sponsors = await _pdf_sponsors(db)
+    return _pdf_response(pdf_checkin(t, regs, pdf_sponsors=sponsors), f"checkin_{t['slug']}.pdf")
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/matches.pdf")
@@ -1478,7 +1655,8 @@ async def pdf_tournament_matches(slug_or_id: str, me: dict = Depends(require_adm
     matches = await db.matches.find({"tournament_id": t["id"]}, {"_id": 0}).sort("round", 1).to_list(2000)
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     reg_map = {r["id"]: r for r in regs}
-    return _pdf_response(pdf_matches(t, matches, reg_map), f"matches_{t['slug']}.pdf")
+    sponsors = await _pdf_sponsors(db)
+    return _pdf_response(pdf_matches(t, matches, reg_map, pdf_sponsors=sponsors), f"matches_{t['slug']}.pdf")
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/standings.pdf")
@@ -1490,7 +1668,8 @@ async def pdf_tournament_standings(slug_or_id: str):
     # Reuse standings logic
     from routes.tournament_routes import standings as st_fn
     rows = await st_fn(t["id"])
-    return _pdf_response(pdf_standings(t, rows), f"standings_{t['slug']}.pdf")
+    sponsors = await _pdf_sponsors(db)
+    return _pdf_response(pdf_standings(t, rows, pdf_sponsors=sponsors), f"standings_{t['slug']}.pdf")
 
 
 @pdf_router.get("/f1/{slug_or_id}/leaderboard.pdf")
@@ -1499,7 +1678,8 @@ async def pdf_f1_lb(slug_or_id: str, track_id: Optional[str] = None):
     c = await _public_f1_challenge_or_404(slug_or_id)
     from routes.f1_routes import leaderboard as f1_lb
     lb = await f1_lb(c["id"], track_id)
-    return _pdf_response(pdf_f1_leaderboard(c, lb.get("track"), lb.get("entries", [])),
+    sponsors = await _pdf_sponsors(db)
+    return _pdf_response(pdf_f1_leaderboard(c, lb.get("track"), lb.get("entries", []), pdf_sponsors=sponsors),
                           f"f1_{c['slug']}.pdf")
 
 
@@ -1514,7 +1694,8 @@ async def pdf_f1_championship(slug_or_id: str):
              "won": r.get("wins", 0), "lost": (r.get("races", 0) - r.get("wins", 0)),
              "points": r.get("points", 0)} for r in (cs.get("standings") or [])]
     fake_tournament = {"title": (c.get("title") or "F1") + " · Championship", "slug": c.get("slug")}
-    return _pdf_response(pdf_standings(fake_tournament, rows),
+    sponsors = await _pdf_sponsors(db)
+    return _pdf_response(pdf_standings(fake_tournament, rows, pdf_sponsors=sponsors),
                           f"f1_championship_{c.get('slug') or slug_or_id}.pdf")
 
 

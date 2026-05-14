@@ -8,6 +8,7 @@ import { BrandingHead } from "@/components/tls/BrandingHead";
 import { ApiInvalidationBridge } from "@/components/tls/ApiInvalidationBridge";
 import { ScrollManager } from "@/components/tls/ScrollManager";
 import { CookieConsentProvider } from "@/components/tls/CookieConsent";
+import { AnalyticsHead } from "@/components/tls/AnalyticsHead";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 import { AppErrorBoundary } from "@/components/tls/AppErrorBoundary";
 
@@ -123,6 +124,7 @@ function App() {
         <CookieConsentProvider>
           <ConfirmDialogProvider>
             <BrandingHead />
+            <AnalyticsHead />
             <ApiInvalidationBridge />
             <ScrollManager />
             <Toaster theme="dark" position="top-right" richColors />

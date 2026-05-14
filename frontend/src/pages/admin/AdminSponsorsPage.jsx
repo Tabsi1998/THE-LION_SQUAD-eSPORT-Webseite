@@ -21,11 +21,11 @@ const STATUS_CLASSES = {
   inactive: "bg-[#FF3B30]/10 text-[#FF3B30]",
 };
 const TIER_DEFAULTS = {
-  main: { show_on_home: true, show_on_footer: true, show_on_events: false, show_on_tv: true, show_in_emails: true },
-  platinum: { show_on_home: true, show_on_footer: true, show_on_events: false, show_on_tv: true, show_in_emails: false },
-  gold: { show_on_home: false, show_on_footer: true, show_on_events: false, show_on_tv: false, show_in_emails: false },
-  silver: { show_on_home: false, show_on_footer: true, show_on_events: false, show_on_tv: false, show_in_emails: false },
-  bronze: { show_on_home: false, show_on_footer: false, show_on_events: false, show_on_tv: false, show_in_emails: false },
+  main: { show_on_home: true, show_on_footer: true, show_on_events: false, show_on_tv: true, show_on_pdf: true, show_in_emails: true },
+  platinum: { show_on_home: false, show_on_footer: true, show_on_events: false, show_on_tv: true, show_on_pdf: false, show_in_emails: false },
+  gold: { show_on_home: false, show_on_footer: true, show_on_events: false, show_on_tv: false, show_on_pdf: false, show_in_emails: false },
+  silver: { show_on_home: false, show_on_footer: true, show_on_events: false, show_on_tv: false, show_on_pdf: false, show_in_emails: false },
+  bronze: { show_on_home: false, show_on_footer: false, show_on_events: false, show_on_tv: false, show_on_pdf: false, show_in_emails: false },
 };
 
 const PLACEMENT_LABELS = [
@@ -33,6 +33,7 @@ const PLACEMENT_LABELS = [
   ["show_on_footer", "Footer"],
   ["show_on_events", "Events"],
   ["show_on_tv", "TV"],
+  ["show_on_pdf", "PDF"],
   ["show_in_emails", "E-Mail"],
 ];
 
@@ -199,6 +200,7 @@ export default function AdminSponsorsPage() {
                     {s.show_on_footer && <span className="text-[9px] px-1.5 py-0.5 bg-white/10 text-white/70 rounded-sm font-bold uppercase tracking-widest">Footer</span>}
                     {s.show_on_events && <span className="text-[9px] px-1.5 py-0.5 bg-[#FFD700]/15 text-[#FFD700] rounded-sm font-bold uppercase tracking-widest">Events</span>}
                     {s.show_on_tv && <span className="text-[9px] px-1.5 py-0.5 bg-[#9F7AEA]/15 text-[#BFA6FF] rounded-sm font-bold uppercase tracking-widest">TV</span>}
+                    {s.show_on_pdf && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#8EE6FF] rounded-sm font-bold uppercase tracking-widest">PDF</span>}
                     {s.show_in_emails && <span className="text-[9px] px-1.5 py-0.5 bg-[#18C29C]/15 text-[#18C29C] rounded-sm font-bold uppercase tracking-widest">E-Mail</span>}
                     {s.is_active === false && <span className="text-[9px] px-1.5 py-0.5 bg-[#FF3B30]/15 text-[#FF3B30] rounded-sm font-bold uppercase tracking-widest">Inaktiv</span>}
                   </div>
@@ -255,6 +257,7 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
     show_on_footer: sponsor ? sponsor?.show_on_footer === true : initialDefaults.show_on_footer,
     show_on_events: sponsor ? sponsor?.show_on_events === true : initialDefaults.show_on_events,
     show_on_tv: sponsor ? sponsor?.show_on_tv === true : initialDefaults.show_on_tv,
+    show_on_pdf: sponsor ? sponsor?.show_on_pdf === true : initialDefaults.show_on_pdf,
     show_in_emails: sponsor ? sponsor?.show_in_emails === true : initialDefaults.show_in_emails,
     event_ids: sponsor?.event_ids || [],
     order_index: sponsor?.order_index ?? 0,
@@ -355,6 +358,10 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
           <label className="inline-flex items-center gap-2">
             <input type="checkbox" checked={form.show_on_tv === true} onChange={(e) => setPlacement("show_on_tv", e.target.checked)} data-testid="sponsor-show-tv" className="accent-[#9F7AEA]" />
             TV / Anzeige
+          </label>
+          <label className="inline-flex items-center gap-2">
+            <input type="checkbox" checked={form.show_on_pdf === true} onChange={(e) => setPlacement("show_on_pdf", e.target.checked)} data-testid="sponsor-show-pdf" className="accent-[#29B6E8]" />
+            PDFs
           </label>
           <label className="inline-flex items-center gap-2">
             <input type="checkbox" checked={form.show_in_emails === true} onChange={(e) => setPlacement("show_in_emails", e.target.checked)} data-testid="sponsor-show-emails" className="accent-[#18C29C]" />

@@ -3,6 +3,7 @@ import { resolveMediaUrl } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated } from "@/lib/brandingEvents";
 
 const DEFAULT_SITE_TITLE = "THE LION SQUAD - eSPORTS";
+const DEFAULT_OG_IMAGE = "/assets/brand/og-default.png";
 
 function titleBase(branding) {
   return branding?.site_title || DEFAULT_SITE_TITLE;
@@ -63,7 +64,7 @@ export function useDocumentTitle(title, description, options = {}) {
     const base = titleBase(branding);
     const fullTitle = title ? `${title} · ${base}` : base;
     const canonicalHref = options.canonical || window.location.href.split("#")[0];
-    const image = options.image ? resolveMediaUrl(options.image) : null;
+    const image = resolveMediaUrl(options.image || DEFAULT_OG_IMAGE);
     const type = options.type || "website";
     const previousTitle = document.title;
 
@@ -74,6 +75,9 @@ export function useDocumentTitle(title, description, options = {}) {
     const ogUrl = upsertMeta('meta[property="og:url"]', { property: "og:url" });
     const ogImage = upsertMeta('meta[property="og:image"]', { property: "og:image" });
     const ogSecureImage = upsertMeta('meta[property="og:image:secure_url"]', { property: "og:image:secure_url" });
+    const ogImageType = upsertMeta('meta[property="og:image:type"]', { property: "og:image:type" });
+    const ogImageWidth = upsertMeta('meta[property="og:image:width"]', { property: "og:image:width" });
+    const ogImageHeight = upsertMeta('meta[property="og:image:height"]', { property: "og:image:height" });
     const ogImageAlt = upsertMeta('meta[property="og:image:alt"]', { property: "og:image:alt" });
     const twitterCard = upsertMeta('meta[name="twitter:card"]', { name: "twitter:card" });
     const twitterTitle = upsertMeta('meta[name="twitter:title"]', { name: "twitter:title" });
@@ -81,7 +85,7 @@ export function useDocumentTitle(title, description, options = {}) {
     const twitterImage = upsertMeta('meta[name="twitter:image"]', { name: "twitter:image" });
     const twitterImageAlt = upsertMeta('meta[name="twitter:image:alt"]', { name: "twitter:image:alt" });
     const canonical = upsertCanonical();
-    const routeManaged = [descTag, ogType, ogTitle, ogDesc, ogUrl, ogImage, ogSecureImage, ogImageAlt, twitterCard, twitterTitle, twitterDesc, twitterImage, twitterImageAlt, canonical];
+    const routeManaged = [descTag, ogType, ogTitle, ogDesc, ogUrl, ogImage, ogSecureImage, ogImageType, ogImageWidth, ogImageHeight, ogImageAlt, twitterCard, twitterTitle, twitterDesc, twitterImage, twitterImageAlt, canonical];
     const previous = snapshot(routeManaged);
     routeManaged.forEach(markRouteManaged);
 
@@ -91,13 +95,14 @@ export function useDocumentTitle(title, description, options = {}) {
     ogTitle.setAttribute("content", fullTitle);
     if (description) ogDesc.setAttribute("content", description);
     ogUrl.setAttribute("content", canonicalHref);
-    if (image) {
-      ogImage.setAttribute("content", image);
-      ogSecureImage.setAttribute("content", image);
-      ogImageAlt.setAttribute("content", fullTitle);
-      twitterImage.setAttribute("content", image);
-      twitterImageAlt.setAttribute("content", fullTitle);
-    }
+    ogImage.setAttribute("content", image);
+    ogSecureImage.setAttribute("content", image);
+    ogImageType.setAttribute("content", "image/png");
+    ogImageWidth.setAttribute("content", "1200");
+    ogImageHeight.setAttribute("content", "630");
+    ogImageAlt.setAttribute("content", fullTitle);
+    twitterImage.setAttribute("content", image);
+    twitterImageAlt.setAttribute("content", fullTitle);
     twitterCard.setAttribute("content", "summary_large_image");
     twitterTitle.setAttribute("content", fullTitle);
     if (description) twitterDesc.setAttribute("content", description);

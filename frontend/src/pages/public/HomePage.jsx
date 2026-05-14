@@ -84,6 +84,7 @@ export default function HomePage() {
       </section>
 
       <LiveStreamSlider />
+      <SponsorTicker placement="home" spotlight />
 
       {state && (primaryNews || timeline.length > 0) && (
         <section className="border-b border-white/10 bg-[#080808]/35">
@@ -124,9 +125,6 @@ export default function HomePage() {
           </div>
         </section>
       )}
-
-      <SponsorTicker />
-
       <HomeExplore />
 
     </PublicLayout>

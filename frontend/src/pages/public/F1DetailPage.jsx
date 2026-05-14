@@ -188,9 +188,9 @@ export default function F1DetailPage() {
                     }`}
                   >
                     {tr.image_url ? (
-                      <img src={resolveMediaUrl(tr.image_url)} alt="" className="w-14 h-10 object-cover rounded-sm" />
+                      <img src={resolveMediaUrl(tr.image_url)} alt="" className="w-20 h-12 object-contain rounded-sm bg-black/40 border border-white/5" />
                     ) : (
-                      <div className="w-14 h-10 rounded-sm bg-[#0A0A0A] border border-white/5" />
+                      <div className="w-20 h-12 rounded-sm bg-[#0A0A0A] border border-white/5" />
                     )}
                     <div className="min-w-0">
                       <div className="font-heading font-bold truncate">{tr.name}</div>
@@ -202,8 +202,8 @@ export default function F1DetailPage() {
             </aside>
             <div className="lg:col-span-3">
               {board?.track?.image_url ? (
-                <div className="mb-4 rounded-sm overflow-hidden border border-white/10">
-                  <img src={resolveMediaUrl(board.track.image_url)} alt={board.track.name} className="w-full h-48 object-cover" />
+                <div className="mb-5 rounded-sm overflow-hidden border border-white/10 bg-[#050505] aspect-[21/9] flex items-center justify-center">
+                  <img src={resolveMediaUrl(board.track.image_url)} alt={board.track.name} className="w-full h-full object-contain" />
                 </div>
               ) : null}
               <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">

@@ -120,7 +120,7 @@ export default function BracketTVPage() {
             ))}
           </div>
         )}
-        <SponsorGrid max={4} />
+        <SponsorGrid max={4} marquee className="flex-1 max-w-[52vw]" />
       </footer>
     </div>
   );

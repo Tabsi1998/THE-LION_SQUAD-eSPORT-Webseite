@@ -862,6 +862,7 @@ class SponsorCreate(BaseModel):
     show_on_footer: Optional[bool] = None
     show_on_events: Optional[bool] = None
     show_on_tv: Optional[bool] = None
+    show_on_pdf: Optional[bool] = None
     show_in_emails: Optional[bool] = None
     event_ids: List[str] = []
     order_index: int = 0
@@ -885,6 +886,7 @@ class SponsorUpdate(BaseModel):
     show_on_footer: Optional[bool] = None
     show_on_events: Optional[bool] = None
     show_on_tv: Optional[bool] = None
+    show_on_pdf: Optional[bool] = None
     show_in_emails: Optional[bool] = None
     event_ids: Optional[List[str]] = None
     order_index: Optional[int] = None
