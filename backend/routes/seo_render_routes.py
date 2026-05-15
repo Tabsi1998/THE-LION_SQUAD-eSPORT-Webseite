@@ -347,6 +347,15 @@ def static_page_meta(slug: str, base: dict) -> dict | None:
     return meta
 
 
+def json_ld_script_content(data: dict) -> str:
+    return (
+        json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+        .replace("</", "<\\/")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
+
+
 def render_preview_html(meta: dict) -> str:
     title = escape(meta["title"])
     description = escape(meta["description"])
@@ -356,7 +365,7 @@ def render_preview_html(meta: dict) -> str:
     site_name = escape(meta["site_name"])
     type_ = escape(meta.get("type") or "website")
     locale = escape(meta.get("locale") or "de_AT")
-    json_ld = escape(json.dumps(meta.get("json_ld") or webpage_json_ld(meta), ensure_ascii=False))
+    json_ld = json_ld_script_content(meta.get("json_ld") or webpage_json_ld(meta))
     optional = []
     if meta.get("published_time"):
         optional.append(f'<meta property="article:published_time" content="{escape(str(meta["published_time"]))}" />')
