@@ -64,7 +64,6 @@ class BrandingSettings(BaseModel):
     logo_url: Optional[str] = None
     mascot_url: Optional[str] = None
     favicon_url: Optional[str] = None
-    og_image_url: Optional[str] = None
     domain: Optional[str] = None
     timezone: Optional[str] = None
     contact_email: Optional[str] = None
@@ -531,7 +530,6 @@ async def public_settings(response: Response):
         "logo_url": b.get("logo_url"),
         "mascot_url": b.get("mascot_url"),
         "favicon_url": b.get("favicon_url"),
-        "og_image_url": b.get("og_image_url") or "/assets/brand/og-default.png",
         "domain": domain,
         "timezone": b.get("timezone") or "Europe/Vienna",
         "contact_email": contact_email,

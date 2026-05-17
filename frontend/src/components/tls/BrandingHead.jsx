@@ -5,7 +5,7 @@ import { onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 
 const DEFAULT_TITLE = "THE LION SQUAD - eSPORTS";
 const DEFAULT_FAVICON = "/assets/brand/tls-favicon.png";
-const DEFAULT_OG_IMAGE = "/assets/brand/og-default.png";
+const DEFAULT_SHARE_IMAGE = "/assets/brand/tls-wordmark.png";
 
 function upsertMeta(selector, attrs) {
   let el = document.head.querySelector(selector);
@@ -38,7 +38,7 @@ function applyBranding(data) {
   const siteTitle = data.site_title || DEFAULT_TITLE;
   const description = data.site_description || "THE LION SQUAD - eSPORTS";
   const themeColor = data.primary_color || "#29B6E8";
-  const image = resolveMediaUrl(data.og_image_url || DEFAULT_OG_IMAGE);
+  const image = resolveMediaUrl(data.logo_url || data.mascot_url || DEFAULT_SHARE_IMAGE);
   const origin = data.domain || (typeof window !== "undefined" ? window.location.origin : "");
 
   if (!document.title || document.title === DEFAULT_TITLE || /React App|Vereinsplattform/i.test(document.title)) {

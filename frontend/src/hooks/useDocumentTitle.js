@@ -3,7 +3,7 @@ import { resolveMediaUrl } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated } from "@/lib/brandingEvents";
 
 const DEFAULT_SITE_TITLE = "THE LION SQUAD - eSPORTS";
-const DEFAULT_OG_IMAGE = "/assets/brand/og-default.png";
+const DEFAULT_SHARE_IMAGE = "/assets/brand/tls-wordmark.png";
 
 function titleBase(branding) {
   return branding?.site_title || DEFAULT_SITE_TITLE;
@@ -64,7 +64,7 @@ export function useDocumentTitle(title, description, options = {}) {
     const base = titleBase(branding);
     const fullTitle = title ? `${title} · ${base}` : base;
     const canonicalHref = options.canonical || window.location.href.split("#")[0];
-    const image = resolveMediaUrl(options.image || DEFAULT_OG_IMAGE);
+    const image = resolveMediaUrl(options.image || branding?.logo_url || branding?.mascot_url || DEFAULT_SHARE_IMAGE);
     const type = options.type || "website";
     const previousTitle = document.title;
 

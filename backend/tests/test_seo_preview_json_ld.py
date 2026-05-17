@@ -61,7 +61,12 @@ def test_preview_json_ld_escapes_script_end_marker():
 
 class _Settings:
     async def find_one(self, *args, **kwargs):
-        return {"domain": "https://lionsquad.at", "club_name": "THE LION SQUAD"}
+        return {
+            "domain": "https://lionsquad.at",
+            "club_name": "THE LION SQUAD",
+            "logo_url": "/api/static/uploads/logo.png",
+            "mascot_url": "/api/static/uploads/mascot.png",
+        }
 
 
 class _Db:
@@ -91,4 +96,5 @@ def test_seo_preview_known_static_path_still_resolves(monkeypatch):
     meta = asyncio.run(resolve_meta("/about", request))
 
     assert meta["canonical"] == "https://lionsquad.at/about"
+    assert meta["image"] == "https://lionsquad.at/api/static/uploads/logo.png"
     assert meta["json_ld"]["@type"] == "WebPage"

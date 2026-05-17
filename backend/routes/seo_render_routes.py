@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/seo", tags=["seo"])
 STAFF_HIDDEN_STATUSES = {"draft", "archived", "cancelled"}
 MARKDOWN_RE = re.compile(r"(!?\[[^\]]*\]\([^)]+\)|[`*_>#~-]+|\r?\n+)")
 HTML_RE = re.compile(r"<[^>]+>")
-DEFAULT_OG_IMAGE = "/assets/brand/og-default.png"
+DEFAULT_SHARE_IMAGE = "/assets/brand/tls-wordmark.png"
 
 
 @router.get("/preview")
@@ -53,11 +53,11 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         or "THE LION SQUAD - eSPORTS: Turniere, News, Events und Community."
     )
     default_image = absolute_url(
-        branding.get("og_image_url") or DEFAULT_OG_IMAGE,
+        branding.get("logo_url") or branding.get("mascot_url") or DEFAULT_SHARE_IMAGE,
         origin,
     )
     default_logo = absolute_url(
-        branding.get("logo_url") or branding.get("favicon_url") or "/assets/brand/tls-favicon.png",
+        branding.get("logo_url") or branding.get("mascot_url") or "/assets/brand/tls-favicon.png",
         origin,
     )
 

@@ -31,7 +31,7 @@ PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
 PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 ADMIN_MEDIA_OWNER_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
 IMAGE_REFERENCE_FIELDS = [
-    ("settings", {"id": "branding"}, ["logo_url", "mascot_url", "favicon_url", "og_image_url"]),
+    ("settings", {"id": "branding"}, ["logo_url", "mascot_url", "favicon_url"]),
     ("settings", {"id": "discord"}, ["avatar_url"]),
     ("users", {}, ["avatar_url", "banner_url"]),
     ("teams", {}, ["logo_url", "banner_url"]),
@@ -474,7 +474,7 @@ async def page_meta(slug: str):
     if base and not base.startswith(("http://", "https://")):
         base = "https://" + base
     canonical = f"{base}/{slug}".rstrip("/") if base else f"/{slug}"
-    image = branding.get("og_image_url") or "/assets/brand/og-default.png"
+    image = branding.get("logo_url") or branding.get("mascot_url") or "/assets/brand/tls-wordmark.png"
     if image and not image.startswith(("http://", "https://")) and base:
         image = f"{base}{image if image.startswith('/') else '/' + image}"
     json_ld = {

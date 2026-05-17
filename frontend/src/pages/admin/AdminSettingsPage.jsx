@@ -183,7 +183,7 @@ export default function AdminSettingsPage() {
   const [sendingNewsletter, setSendingNewsletter] = useState(false);
   const [brand, setBrand] = useState({
     club_name: "", tagline: "", site_title: "THE LION SQUAD - eSPORTS", site_description: "", primary_color: "#29B6E8",
-    logo_url: "", mascot_url: "", favicon_url: "", og_image_url: "/assets/brand/og-default.png", contact_email: "", domain: "", timezone: "Europe/Vienna",
+    logo_url: "", mascot_url: "", favicon_url: "", contact_email: "", domain: "", timezone: "Europe/Vienna",
     legal_name: "", legal_form: "eingetragener Verein nach österreichischem Vereinsrecht", zvr_number: "",
     street_address: "", address_extra: "", postal_code: "", city: "", state: "Tirol", country: "Oesterreich",
     registered_seat: "", register_authority: "", representative_name: "", representative_role: "",
@@ -1571,12 +1571,10 @@ export default function AdminSettingsPage() {
               <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Indexierung</span>
               <h2 className="font-heading text-2xl font-black uppercase mt-1">SEO & Analytics</h2>
               <p className="text-sm text-white/55 mt-2 max-w-2xl">
-                Share-Bild, Analytics, Google Search Console, Bing Webmaster Tools und IndexNow liegen hier gebuendelt.
+                Analytics, Google Search Console, Bing Webmaster Tools und IndexNow liegen hier gebuendelt. Social-Share-Bilder kommen automatisch aus dem jeweiligen Seitenbild oder aus Logo/Maskottchen.
               </p>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-4">
-              <ImageUpload value={brand.og_image_url} onChange={(v) => setBrandField("og_image_url", v)} label="Social Share Bild" testId="brand-og-image" variant="wide" allowLibrary />
-              <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
+            <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
                 <div>
                   <div className="font-heading font-bold uppercase">Analytics</div>
                   <p className="text-xs text-white/50 mt-1">Bei Google Analytics nur die Measurement-ID eintragen, z.B. G-3X155KW480. Das Google-Tag wird automatisch mit Consent Mode eingebunden und erst nach Statistik-Zustimmung aktiv gemessen. Fuer DebugView die Seite mit ?ga_debug oeffnen.</p>
@@ -1586,7 +1584,6 @@ export default function AdminSettingsPage() {
                   <BrandField label="Google Measurement ID" value={brand.google_analytics_id} onChange={(v) => setBrandField("google_analytics_id", v)} testId="brand-ga-id" placeholder="G-XXXXXXXXXX" />
                   <BrandField label="Plausible Domain" value={brand.plausible_domain} onChange={(v) => setBrandField("plausible_domain", v)} testId="brand-plausible-domain" placeholder="lionsquad.at" />
                 </div>
-              </div>
             </div>
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
               <div>
