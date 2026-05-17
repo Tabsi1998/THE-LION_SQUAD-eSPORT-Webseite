@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { api } from "@/lib/api";
-import { isGoogleMeasurementId, normalizeGoogleMeasurementId } from "@/lib/analyticsConfig";
+import { isGoogleMeasurementId, normalizeGoogleMeasurementId, normalizePlausibleDomain } from "@/lib/analyticsConfig";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
@@ -101,6 +101,7 @@ function configureGoogleAnalytics(measurementId) {
 }
 
 function injectPlausible(domain) {
+  window.plausible = window.plausible || function plausible(){ (window.plausible.q = window.plausible.q || []).push(arguments); };
   appendScript({
     defer: "true",
     src: "https://plausible.io/js/script.js",
@@ -135,7 +136,7 @@ export function AnalyticsHead() {
     }
 
     const analyticsConsent = hasConsent("analytics");
-    const provider = settings.analytics_provider || "";
+    const provider = String(settings.analytics_provider || "").trim().toLowerCase();
     if (!analyticsConsent) {
       setGoogleConsent("denied", "default");
       resetGoogleState();
@@ -154,8 +155,13 @@ export function AnalyticsHead() {
       configureGoogleAnalytics(measurementId);
       publishAnalyticsStatus({ state: "active", provider, measurement_id: measurementId });
     } else if (provider === "plausible" && settings.plausible_domain) {
-      injectPlausible(settings.plausible_domain);
-      publishAnalyticsStatus({ state: "active", provider, domain: settings.plausible_domain });
+      const domain = normalizePlausibleDomain(settings.plausible_domain);
+      if (!domain) {
+        publishAnalyticsStatus({ state: "blocked", reason: "invalid_plausible_domain", provider, domain: settings.plausible_domain });
+        return undefined;
+      }
+      injectPlausible(domain);
+      publishAnalyticsStatus({ state: "active", provider, domain });
     } else {
       publishAnalyticsStatus({ state: "disabled", provider });
     }
@@ -167,7 +173,8 @@ export function AnalyticsHead() {
   }, [hasConsent, settings]);
 
   useEffect(() => {
-    if (!hasConsent("analytics") || settings?.analytics_provider !== "google" || !settings?.google_analytics_id || typeof window === "undefined") return;
+    const provider = String(settings?.analytics_provider || "").trim().toLowerCase();
+    if (!hasConsent("analytics") || provider !== "google" || !settings?.google_analytics_id || typeof window === "undefined") return;
     const measurementId = normalizeGoogleMeasurementId(settings.google_analytics_id);
     if (!isGoogleMeasurementId(measurementId)) return;
     setGoogleConsent("granted");
@@ -182,6 +189,15 @@ export function AnalyticsHead() {
     if (analyticsDebugMode()) event.debug_mode = true;
     gtag("event", "page_view", event);
     publishAnalyticsStatus({ state: "page_view_sent", provider: "google", measurement_id: measurementId, page_path: event.page_path, debug_mode: !!event.debug_mode });
+  }, [hasConsent, location.pathname, location.search, settings]);
+
+  useEffect(() => {
+    const provider = String(settings?.analytics_provider || "").trim().toLowerCase();
+    const domain = normalizePlausibleDomain(settings?.plausible_domain);
+    if (!hasConsent("analytics") || provider !== "plausible" || !domain || typeof window === "undefined") return;
+    window.plausible = window.plausible || function plausible(){ (window.plausible.q = window.plausible.q || []).push(arguments); };
+    window.plausible("pageview");
+    publishAnalyticsStatus({ state: "page_view_sent", provider: "plausible", domain, page_path: `${location.pathname}${location.search}` });
   }, [hasConsent, location.pathname, location.search, settings]);
 
   return null;
