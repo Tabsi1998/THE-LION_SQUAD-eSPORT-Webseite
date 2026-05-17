@@ -400,7 +400,7 @@ async def web_manifest():
     name = branding.get("club_name") or "THE LION SQUAD"
     name = branding.get("site_title") or name
     description = branding.get("site_description") or "THE LION SQUAD - eSPORTS"
-    icon = branding.get("favicon_url") or branding.get("mascot_url") or branding.get("logo_url") or "/assets/brand/tls-mascot.png"
+    icon = branding.get("favicon_url") or "/assets/brand/tls-favicon.png"
     default_screenshot = branding.get("og_image_url") or "/assets/brand/og-default.png"
     manifest = {
         "name": name,

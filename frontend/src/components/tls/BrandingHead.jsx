@@ -2,9 +2,9 @@ import { useCallback, useEffect } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
-import { TLS_MASCOT } from "@/components/tls/Logo";
 
 const DEFAULT_TITLE = "THE LION SQUAD - eSPORTS";
+const DEFAULT_FAVICON = "/assets/brand/tls-favicon.png";
 const DEFAULT_OG_IMAGE = "/assets/brand/og-default.png";
 
 function upsertMeta(selector, attrs) {
@@ -38,7 +38,7 @@ function applyBranding(data) {
   const siteTitle = data.site_title || DEFAULT_TITLE;
   const description = data.site_description || "THE LION SQUAD - eSPORTS";
   const themeColor = data.primary_color || "#29B6E8";
-  const icon = data.favicon_url || data.mascot_url || data.logo_url || TLS_MASCOT;
+  const icon = data.favicon_url || DEFAULT_FAVICON;
   const image = resolveMediaUrl(data.og_image_url || DEFAULT_OG_IMAGE);
   const origin = data.domain || (typeof window !== "undefined" ? window.location.origin : "");
 

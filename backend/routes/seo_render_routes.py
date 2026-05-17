@@ -56,11 +56,16 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         branding.get("og_image_url") or DEFAULT_OG_IMAGE,
         origin,
     )
+    default_logo = absolute_url(
+        branding.get("logo_url") or branding.get("favicon_url") or "/assets/brand/tls-favicon.png",
+        origin,
+    )
 
     meta = {
         "title": branding.get("site_title") or "THE LION SQUAD - eSPORTS",
         "description": default_description,
         "image": default_image,
+        "logo": default_logo,
         "url": canonical,
         "canonical": canonical,
         "site_name": site_name,
@@ -68,7 +73,7 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         "locale": "de_AT",
         "google_site_verification": branding.get("google_site_verification") or "",
         "msvalidate_01": branding.get("msvalidate_01") or "",
-        "json_ld": website_json_ld(origin, site_name, default_description, default_image, branding),
+        "json_ld": website_json_ld(origin, site_name, default_description, default_image, default_logo, branding),
     }
 
     parts = [part for part in path.strip("/").split("/") if part]
@@ -101,9 +106,14 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
     static = static_page_meta(first, meta)
     if static:
         if first == "membership" and len(parts) > 1:
-            return static_page_meta("/".join(parts[:2]), meta) or static
+            specific = static_page_meta("/".join(parts[:2]), meta)
+            if specific:
+                return specific
+            raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+        if first == "membership":
+            raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
         return static
-    return meta
+    raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
 
 
 async def news_meta(db, slug: str, base: dict, origin: str) -> dict:
@@ -130,7 +140,7 @@ async def news_meta(db, slug: str, base: dict, origin: str) -> dict:
         "datePublished": post.get("published_at") or post.get("created_at"),
         "dateModified": post.get("updated_at") or post.get("published_at") or post.get("created_at"),
         "author": {"@type": "Organization", "name": base["site_name"]},
-        "publisher": {"@type": "Organization", "name": base["site_name"], "logo": {"@type": "ImageObject", "url": base["image"]}},
+        "publisher": {"@type": "Organization", "name": base["site_name"], "logo": {"@type": "ImageObject", "url": base.get("logo") or base["image"]}},
         "mainEntityOfPage": meta["canonical"],
     }
     return meta
@@ -475,7 +485,7 @@ def is_published_now(item: dict) -> bool:
     return dt.astimezone(timezone.utc) <= datetime.now(timezone.utc)
 
 
-def website_json_ld(origin: str, name: str, description: str, image: str, branding: dict | None = None) -> dict:
+def website_json_ld(origin: str, name: str, description: str, image: str, logo: str | None = None, branding: dict | None = None) -> dict:
     branding = branding or {}
     same_as = [
         branding.get("discord_invite_url"),
@@ -498,6 +508,12 @@ def website_json_ld(origin: str, name: str, description: str, image: str, brandi
         "url": origin,
         "description": description,
         "image": image,
+        "publisher": {
+            "@type": "Organization",
+            "name": name,
+            "url": origin,
+            "logo": {"@type": "ImageObject", "url": logo or image},
+        },
         "potentialAction": {
             "@type": "SearchAction",
             "target": f"{origin}/news?q={{search_term_string}}",

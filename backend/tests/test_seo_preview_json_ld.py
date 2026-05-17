@@ -1,11 +1,17 @@
 import json
 import re
 import sys
+import asyncio
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+from fastapi import HTTPException
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from routes.seo_render_routes import render_preview_html
+import routes.seo_render_routes as seo_render_routes
+from routes.seo_render_routes import render_preview_html, resolve_meta
 
 
 def test_preview_json_ld_is_parseable_script_json():
@@ -51,3 +57,38 @@ def test_preview_json_ld_escapes_script_end_marker():
     assert match
     assert "<\\/script>" in match.group(1)
     assert json.loads(match.group(1))["name"] == "</script>"
+
+
+class _Settings:
+    async def find_one(self, *args, **kwargs):
+        return {"domain": "https://lionsquad.at", "club_name": "THE LION SQUAD"}
+
+
+class _Db:
+    settings = _Settings()
+
+
+def test_seo_preview_unknown_path_returns_404(monkeypatch):
+    monkeypatch.setattr(seo_render_routes, "get_db", lambda: _Db())
+    request = SimpleNamespace(
+        headers={},
+        url=SimpleNamespace(scheme="https", netloc="lionsquad.at"),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(resolve_meta("/elements/blockquote/", request))
+
+    assert exc.value.status_code == 404
+
+
+def test_seo_preview_known_static_path_still_resolves(monkeypatch):
+    monkeypatch.setattr(seo_render_routes, "get_db", lambda: _Db())
+    request = SimpleNamespace(
+        headers={},
+        url=SimpleNamespace(scheme="https", netloc="lionsquad.at"),
+    )
+
+    meta = asyncio.run(resolve_meta("/about", request))
+
+    assert meta["canonical"] == "https://lionsquad.at/about"
+    assert meta["json_ld"]["@type"] == "WebPage"
