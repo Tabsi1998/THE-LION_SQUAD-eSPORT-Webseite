@@ -233,7 +233,7 @@ GameKind = Literal["standalone", "series", "edition"]
 
 class GameCreate(BaseModel):
     name: str
-    slug: str
+    slug: Optional[str] = None
     kind: GameKind = "standalone"
     parent_game_id: Optional[str] = None
     identity_source_game_id: Optional[str] = None
@@ -291,7 +291,7 @@ EventVisibility = Literal["public", "community", "members", "internal"]
 
 class EventCreate(BaseModel):
     name: str
-    slug: str
+    slug: Optional[str] = None
     description: Optional[str] = None
     event_type: EventType = "general"
     visibility: EventVisibility = "public"
@@ -330,6 +330,7 @@ class EventCreate(BaseModel):
 
 class EventUpdate(BaseModel):
     name: Optional[str] = None
+    slug: Optional[str] = None
     description: Optional[str] = None
     event_type: Optional[EventType] = None
     visibility: Optional[EventVisibility] = None
@@ -405,7 +406,7 @@ def _empty_stream_platform_to_none(value):
 
 class TournamentCreate(BaseModel):
     title: str
-    slug: str
+    slug: Optional[str] = None
     description: Optional[str] = None
     game_id: str
     platform: Optional[str] = None
@@ -677,7 +678,7 @@ class F1TrackUpdate(BaseModel):
 
 class F1ChallengeCreate(BaseModel):
     title: str
-    slug: str
+    slug: Optional[str] = None
     description: Optional[str] = None
     game_id: Optional[str] = None
     event_id: Optional[str] = None
@@ -720,6 +721,7 @@ class F1ChallengeCreate(BaseModel):
 
 class F1ChallengeUpdate(BaseModel):
     title: Optional[str] = None
+    slug: Optional[str] = None
     description: Optional[str] = None
     status: Optional[TournamentStatus] = None
     event_id: Optional[str] = None
@@ -809,7 +811,7 @@ NewsVisibility = Literal["public", "community", "members", "internal"]
 
 class NewsCreate(BaseModel):
     title: str
-    slug: str
+    slug: Optional[str] = None
     excerpt: Optional[str] = None
     content: str
     banner_url: Optional[str] = None
@@ -827,6 +829,7 @@ class NewsCreate(BaseModel):
 
 class NewsUpdate(BaseModel):
     title: Optional[str] = None
+    slug: Optional[str] = None
     excerpt: Optional[str] = None
     content: Optional[str] = None
     banner_url: Optional[str] = None
@@ -1022,7 +1025,7 @@ class DocumentUpdate(BaseModel):
 
 class GalleryAlbumCreate(BaseModel):
     title: str
-    slug: str
+    slug: Optional[str] = None
     description: Optional[str] = None
     cover_url: Optional[str] = None
     event_id: Optional[str] = None

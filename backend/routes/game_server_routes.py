@@ -1,6 +1,5 @@
 """Community game server directory and admin maintenance."""
 import os
-import re
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
@@ -10,6 +9,7 @@ from pydantic import BaseModel, Field
 from auth import get_optional_user, require_admin
 from database import get_db
 from models import new_id, now_utc
+from services.slug_utils import slug_source_for_update, slugify, unique_slug
 
 
 ServerVisibility = Literal["public", "community", "members", "internal"]
@@ -36,8 +36,7 @@ DEMO_GAME_SERVER_SLUGS = {item["slug"] for item in DEMO_GAME_SERVERS}
 
 
 def _slugify(value: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", (value or "").lower()).strip("-")
-    return slug[:80] or f"server-{new_id()[:8]}"
+    return slugify(value, fallback=f"server-{new_id()[:8]}", max_length=80)
 
 
 def _is_admin(user: dict | None) -> bool:
@@ -57,20 +56,6 @@ def _can_view(server: dict, user: dict | None) -> bool:
     if visibility == "members":
         return bool(user and (user.get("is_club_member") or _is_admin(user)))
     return False
-
-
-async def _unique_slug(db, base: str, current_id: str | None = None) -> str:
-    slug = _slugify(base)
-    candidate = slug
-    i = 2
-    while True:
-        query = {"slug": candidate}
-        if current_id:
-            query["id"] = {"$ne": current_id}
-        if not await db.game_servers.find_one(query, {"_id": 1}):
-            return candidate
-        candidate = f"{slug}-{i}"
-        i += 1
 
 
 async def _game_lookup(db, game_ids: list[str]) -> dict[str, dict]:
@@ -274,7 +259,7 @@ async def diagnose_game_server_route(server_id: str, me: dict = Depends(require_
 async def create_game_server(body: GameServerPayload, me: dict = Depends(require_admin())):
     db = get_db()
     data = body.model_dump()
-    data["slug"] = await _unique_slug(db, data.get("slug") or data["name"])
+    data["slug"] = await unique_slug(db.game_servers, data.get("slug") or data["name"], fallback="server", max_length=80)
     now = now_utc().isoformat()
     doc = {
         **data,
@@ -304,10 +289,9 @@ async def update_game_server(server_id: str, body: GameServerPatch, me: dict = D
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
-    if "slug" in updates:
-        updates["slug"] = await _unique_slug(db, updates.get("slug") or existing.get("name") or server_id, server_id)
-    if "name" in updates and not updates.get("slug") and not existing.get("slug"):
-        updates["slug"] = await _unique_slug(db, updates["name"], server_id)
+    slug_source = slug_source_for_update(raw, existing, "name", fallback="server")
+    if slug_source is not None:
+        updates["slug"] = await unique_slug(db.game_servers, slug_source, current_id=server_id, fallback="server", max_length=80)
     if not updates:
         raise HTTPException(400, "Keine Änderungen.")
     updates["updated_at"] = now_utc().isoformat()

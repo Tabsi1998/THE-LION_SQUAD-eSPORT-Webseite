@@ -24,6 +24,7 @@ from database import get_db
 from auth import get_current_user, require_admin
 from models import now_utc, new_id
 from services.content_embed_service import resolve_content_embeds
+from services.slug_utils import unique_slug
 
 
 # ============= Streams (public + admin) =============
@@ -172,7 +173,7 @@ async def public_get_page(slug: str):
 
 
 class PageCreate(BaseModel):
-    slug: str = Field(min_length=1, max_length=80, pattern=r"^[a-z0-9\-]+$")
+    slug: Optional[str] = Field(default=None, max_length=80)
     title: str
     body_md: str = ""
     meta_description: Optional[str] = None
@@ -195,9 +196,9 @@ async def admin_list_pages(me: dict = Depends(require_admin())):
 @admin_pages_router.post("")
 async def admin_create_page(body: PageCreate, me: dict = Depends(require_admin())):
     db = get_db()
-    if await db.cms_pages.find_one({"slug": body.slug}):
-        raise HTTPException(409, "Slug bereits vergeben.")
-    doc = {**body.model_dump(), "id": body.slug, "is_default": False,
+    doc = body.model_dump()
+    doc["slug"] = await unique_slug(db.cms_pages, doc.get("slug") or doc.get("title"), fallback="seite", max_length=80)
+    doc = {**doc, "id": doc["slug"], "is_default": False,
            "created_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(),
            "created_by": me["id"]}
     await db.cms_pages.insert_one(doc)

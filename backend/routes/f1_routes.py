@@ -8,6 +8,7 @@ from database import get_db
 from auth import get_current_user, require_admin, require_role, get_optional_user
 from services.visibility import user_can_see
 from services.public_phase import derive_public_phase
+from services.slug_utils import slug_source_for_update, unique_slug
 from models import (
     F1ChallengeCreate, F1ChallengeUpdate, F1TrackCreate, F1TrackUpdate,
     F1LapTimeCreate, F1LapTimeUpdate,
@@ -243,9 +244,8 @@ async def get_challenge(slug_or_id: str, include_draft: bool = False, user=Depen
 @router.post("/challenges")
 async def create_challenge(body: F1ChallengeCreate, me: dict = Depends(require_admin())):
     db = get_db()
-    if await db.f1_challenges.find_one({"slug": body.slug}):
-        raise HTTPException(status_code=409, detail="Slug bereits vergeben")
     doc = body.model_dump()
+    doc["slug"] = await unique_slug(db.f1_challenges, doc.get("slug") or doc.get("title"), fallback="fastlap")
     _normalize_reference_settings(doc)
     doc["id"] = new_id()
     doc["status"] = doc.get("status") or "draft"
@@ -279,6 +279,9 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
         "registration_open_from", "registration_open_until", "start_date", "end_date",
     }
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    slug_source = slug_source_for_update(raw, existing, "title", fallback="fastlap")
+    if slug_source is not None:
+        updates["slug"] = await unique_slug(db.f1_challenges, slug_source, current_id=cid, fallback="fastlap")
     if updates.get("block_club_member_results") is True:
         updates["allow_club_reference_times"] = True
     elif updates.get("allow_club_reference_times") is False and (

@@ -9,6 +9,7 @@ from services.content_embed_service import resolve_content_embeds
 from services.public_phase import derive_public_phase
 from services.sponsor_utils import dedupe_public_sponsors
 from services.notification_preferences import enqueue_newsletter_for_item
+from services.slug_utils import slug_source_for_update, unique_slug
 from models import EventCreate, EventUpdate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -530,9 +531,8 @@ async def update_event_registration(event_id: str, registration_id: str, body: E
 @router.post("")
 async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
     db = get_db()
-    if await db.events.find_one({"slug": body.slug}):
-        raise HTTPException(status_code=409, detail="Slug bereits vergeben")
     doc = body.model_dump()
+    doc["slug"] = await unique_slug(db.events, doc.get("slug") or doc.get("name"), fallback="event")
     doc["id"] = new_id()
     if not doc.get("status"):
         doc["status"] = "draft"
@@ -575,6 +575,9 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    slug_source = slug_source_for_update(raw, existing, "name", fallback="event")
+    if slug_source is not None:
+        updates["slug"] = await unique_slug(db.events, slug_source, current_id=event_id, fallback="event")
     for k in ("start_date", "end_date", "door_time", "registration_opens_at", "registration_closes_at"):
         if updates.get(k):
             updates[k] = updates[k].isoformat()

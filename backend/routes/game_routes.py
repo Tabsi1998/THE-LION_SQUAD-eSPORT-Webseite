@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import require_admin
+from services.slug_utils import slug_source_for_update, unique_slug
 from models import GameCreate, GameUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/games", tags=["games"])
@@ -88,11 +89,8 @@ async def get_game(slug_or_id: str):
 @router.post("")
 async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
     db = get_db()
-    slug = body.slug.strip().lower()
-    if await db.games.find_one({"slug": slug}):
-        raise HTTPException(status_code=409, detail="Slug bereits vergeben")
     doc = body.model_dump()
-    doc["slug"] = slug
+    doc["slug"] = await unique_slug(db.games, doc.get("slug") or doc.get("name"), fallback="spiel")
     if doc.get("parent_game_id") and not await db.games.find_one({"id": doc["parent_game_id"]}, {"id": 1}):
         raise HTTPException(status_code=404, detail="Hauptspiel nicht gefunden")
     if doc.get("identity_source_game_id") and not await db.games.find_one({"id": doc["identity_source_game_id"]}, {"id": 1}):
@@ -109,14 +107,15 @@ async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
 @router.patch("/{game_id}")
 async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require_admin())):
     db = get_db()
+    current = await db.games.find_one({"id": game_id}, {"_id": 0})
+    if not current:
+        raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
     nullable_fields = {"short_name", "logo_url", "cover_url", "genre", "parent_game_id", "identity_source_game_id"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
-    if "slug" in updates:
-        updates["slug"] = updates["slug"].strip().lower()
-        existing = await db.games.find_one({"slug": updates["slug"], "id": {"$ne": game_id}}, {"_id": 0, "id": 1})
-        if existing:
-            raise HTTPException(status_code=409, detail="Slug bereits vergeben")
+    slug_source = slug_source_for_update(raw, current, "name", fallback="spiel")
+    if slug_source is not None:
+        updates["slug"] = await unique_slug(db.games, slug_source, current_id=game_id, fallback="spiel")
     if updates.get("parent_game_id"):
         if updates["parent_game_id"] == game_id:
             raise HTTPException(status_code=400, detail="Ein Spiel kann nicht sein eigenes Hauptspiel sein")
@@ -130,8 +129,6 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
     updates["updated_at"] = now_utc().isoformat()
     await db.games.update_one({"id": game_id}, {"$set": updates})
     game = await db.games.find_one({"id": game_id}, {"_id": 0})
-    if not game:
-        raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
     return game
 
 

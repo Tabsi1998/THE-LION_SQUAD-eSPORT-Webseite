@@ -2,7 +2,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from datetime import date
-import re
 from database import get_db
 from auth import get_current_user, require_admin, get_optional_user
 from services.membership_service import (
@@ -11,6 +10,7 @@ from services.membership_service import (
     ACTIVE_STATUSES,
 )
 from services.visibility import user_can_see
+from services.slug_utils import slugify
 from models import (
     MembershipUpdate, MemberBenefitCreate, MemberBenefitUpdate, now_utc, new_id,
 )
@@ -69,8 +69,7 @@ async def _audit(actor_id: str, action: str, target_id: str, data: dict | None =
 
 
 def _slugify(value: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", str(value or "").lower()).strip("-")
-    return slug[:80] or "mitglied"
+    return slugify(value, fallback="mitglied", max_length=80)
 
 
 def _clean_list(values: list[str] | None) -> list[str]:
@@ -657,6 +656,8 @@ async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUp
         update["real_name"] = _clean_name(update.get("real_name"))
     if "slug" in update:
         update["slug"] = await _unique_profile_slug(db, update["slug"] or existing.get("display_name") or "mitglied", profile_id)
+    elif "display_name" in update:
+        update["slug"] = await _unique_profile_slug(db, update["display_name"] or existing.get("display_name") or "mitglied", profile_id)
     if "games" in update:
         update["games"] = _clean_list(update["games"])
     if "platforms" in update:

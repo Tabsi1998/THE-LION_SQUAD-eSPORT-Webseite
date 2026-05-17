@@ -15,6 +15,7 @@ from database import get_db
 from auth import require_admin, get_optional_user as get_current_user_optional
 from models import now_utc, new_id
 from services.rate_limit import enforce_rate_limit
+from services.slug_utils import slug_source_for_update, slugify, unique_slug
 
 # ---------- Contact ----------
 contact_router = APIRouter(prefix="/api/contact", tags=["contact"])
@@ -226,9 +227,7 @@ class BoardPositionUpdate(BaseModel):
 
 
 def _slugify(value: str) -> str:
-    import re
-    v = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-    return v or "position"
+    return slugify(value, fallback="position", max_length=80)
 
 
 def _board_person_from_profile(profile: dict) -> dict:
@@ -313,9 +312,7 @@ async def list_board_positions(active_only: bool = False, me=Depends(get_current
 @board_router.post("")
 async def create_position(body: BoardPositionCreate, me: dict = Depends(require_admin())):
     db = get_db()
-    slug = body.slug or _slugify(body.title_male)
-    if await db.board_positions.find_one({"slug": slug}):
-        raise HTTPException(409, "Slug bereits vergeben.")
+    slug = await unique_slug(db.board_positions, body.slug or body.title_male, fallback="position", max_length=80)
     doc = {
         "id": new_id(), "slug": slug, "is_default": False, "user_id": None, "deputy_user_id": None,
         "created_at": now_utc().isoformat(), **body.model_dump(),
@@ -330,16 +327,20 @@ async def create_position(body: BoardPositionCreate, me: dict = Depends(require_
 @board_router.patch("/{pid}")
 async def update_position(pid: str, body: BoardPositionUpdate, me: dict = Depends(require_admin())):
     db = get_db()
+    existing = await db.board_positions.find_one({"id": pid}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Position nicht gefunden.")
     updates = body.model_dump(exclude_unset=True)
+    slug_source = slug_source_for_update(updates, existing, "title_male", fallback="position")
+    if slug_source is not None:
+        updates["slug"] = await unique_slug(db.board_positions, slug_source, current_id=pid, fallback="position", max_length=80)
     # Convert "" → None to clear assignments
     for k in ("user_id", "deputy_user_id"):
         if k in updates and updates[k] == "":
             updates[k] = None
         elif k in updates and updates[k]:
             updates[k] = await _normalize_board_assignee(db, updates[k])
-    res = await db.board_positions.update_one({"id": pid}, {"$set": updates})
-    if res.matched_count == 0:
-        raise HTTPException(404, "Position nicht gefunden.")
+    await db.board_positions.update_one({"id": pid}, {"$set": updates})
     return await db.board_positions.find_one({"id": pid}, {"_id": 0})
 
 

@@ -19,6 +19,7 @@ from services.tournament_permissions import (
     require_tournament_staff_permission,
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
+from services.slug_utils import slug_source_for_update, unique_slug
 from models import (
     TournamentCreate, TournamentUpdate, RegistrationCreate, RegistrationUpdate,
     RegistrationAdminCreate,
@@ -668,12 +669,11 @@ async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = 
 @router.post("")
 async def create_tournament(body: TournamentCreate, me: dict = Depends(require_admin())):
     db = get_db()
-    if await db.tournaments.find_one({"slug": body.slug}):
-        raise HTTPException(status_code=409, detail="Slug bereits vergeben")
     # Validate game
     if not await db.games.find_one({"id": body.game_id}):
         raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
     doc = body.model_dump()
+    doc["slug"] = await unique_slug(db.tournaments, doc.get("slug") or doc.get("title"), fallback="turnier")
     # ISO-serialize datetimes
     for k in ["registration_open_from", "registration_open_until", "check_in_from",
               "check_in_until", "start_date", "end_date"]:
@@ -695,10 +695,6 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
 async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends(require_admin())):
     db = get_db()
     tid = await _resolve_tid(tid)
-    if body.slug:
-        duplicate = await db.tournaments.find_one({"slug": body.slug, "id": {"$ne": tid}}, {"id": 1})
-        if duplicate:
-            raise HTTPException(status_code=409, detail="Slug bereits vergeben")
     if body.game_id and not await db.games.find_one({"id": body.game_id}, {"id": 1}):
         raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
     existing = await db.tournaments.find_one({"id": tid}, {"_id": 0})
@@ -713,6 +709,9 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         "banner_url", "stream_platform", "stream_url", "stream_title",
     }
     updates = {k: v for k, v in raw_updates.items() if v is not None or k in nullable_fields}
+    slug_source = slug_source_for_update(raw_updates, existing, "title", fallback="turnier")
+    if slug_source is not None:
+        updates["slug"] = await unique_slug(db.tournaments, slug_source, current_id=tid, fallback="turnier")
     if "team_mode" in updates or "team_size" in updates:
         normalized_team_settings = _normalize_team_settings({
             "team_mode": updates.get("team_mode", existing.get("team_mode") or "solo"),

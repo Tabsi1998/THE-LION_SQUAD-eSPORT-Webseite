@@ -10,6 +10,7 @@ from services.content_embed_service import resolve_content_embeds
 from services.sponsor_utils import dedupe_public_sponsors
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.user_notifications import create_user_notification
+from services.slug_utils import slug_source_for_update, unique_slug
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
     PartnerCreate, PartnerUpdate, ReferenceCreate, ReferenceUpdate,
@@ -256,9 +257,8 @@ async def admin_list_news(me: dict = Depends(require_admin())):
 @router.post("/news")
 async def create_news(body: NewsCreate, me: dict = Depends(require_admin())):
     db = get_db()
-    if await db.news_posts.find_one({"slug": body.slug}):
-        raise HTTPException(status_code=409, detail="Slug bereits vergeben.")
     doc = body.model_dump()
+    doc["slug"] = await unique_slug(db.news_posts, doc.get("slug") or doc.get("title"), fallback="news")
     if doc.get("published_at"):
         doc["published_at"] = doc["published_at"].isoformat()
     doc["mentioned_user_ids"] = await _mentioned_user_ids_from_content(doc.get("content"), doc.get("mentioned_user_ids") or [])
@@ -298,6 +298,9 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_adm
     update = body.model_dump(exclude_unset=True)
     if not update:
         raise HTTPException(400, "Keine Änderungen.")
+    slug_source = slug_source_for_update(update, existing, "title", fallback="news")
+    if slug_source is not None:
+        update["slug"] = await unique_slug(db.news_posts, slug_source, current_id=nid, fallback="news")
     if update.get("published_at"):
         update["published_at"] = update["published_at"].isoformat()
     if "content" in update or "mentioned_user_ids" in update:
@@ -1032,11 +1035,8 @@ async def admin_get_album(aid: str, me: dict = Depends(require_admin())):
 @router.post("/gallery")
 async def create_album(body: GalleryAlbumCreate, me: dict = Depends(require_admin())):
     db = get_db()
-    slug = (body.slug or "").strip().lower()
-    if await db.gallery_albums.find_one({"slug": slug}):
-        raise HTTPException(409, f"Slug bereits vergeben: {slug}")
     doc = body.model_dump()
-    doc["slug"] = slug
+    doc["slug"] = await unique_slug(db.gallery_albums, doc.get("slug") or doc.get("title"), fallback="album")
     if doc.get("taken_at"):
         doc["taken_at"] = doc["taken_at"].isoformat()
     doc["id"] = new_id()
@@ -1052,15 +1052,13 @@ async def create_album(body: GalleryAlbumCreate, me: dict = Depends(require_admi
 @router.patch("/gallery/{aid}")
 async def update_album(aid: str, body: GalleryAlbumUpdate, me: dict = Depends(require_admin())):
     db = get_db()
-    album = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0, "id": 1})
+    album = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0, "id": 1, "slug": 1, "title": 1})
     if not album:
         raise HTTPException(404, "Album nicht gefunden.")
     update = body.model_dump(exclude_unset=True)
-    if "slug" in update and update["slug"]:
-        update["slug"] = update["slug"].strip().lower()
-        existing = await db.gallery_albums.find_one({"slug": update["slug"], "id": {"$ne": album["id"]}}, {"_id": 0, "id": 1})
-        if existing:
-            raise HTTPException(409, f"Slug bereits vergeben: {update['slug']}")
+    slug_source = slug_source_for_update(update, album, "title", fallback="album")
+    if slug_source is not None:
+        update["slug"] = await unique_slug(db.gallery_albums, slug_source, current_id=album["id"], fallback="album")
     if update.get("taken_at"):
         update["taken_at"] = update["taken_at"].isoformat()
     update["updated_at"] = now_utc().isoformat()

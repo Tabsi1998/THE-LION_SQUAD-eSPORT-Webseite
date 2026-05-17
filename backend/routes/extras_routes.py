@@ -11,6 +11,7 @@ import httpx
 from database import get_db
 from auth import require_admin, require_super, get_current_user, get_optional_user
 from services.visibility import user_can_see
+from services.slug_utils import slug_source_for_update, unique_slug
 from models import now_utc, new_id
 from email_service import send_template, _get_email_config
 from pdf_service import (
@@ -1081,7 +1082,7 @@ season_router = APIRouter(prefix="/api/seasons", tags=["seasons"])
 
 class SeasonCreate(BaseModel):
     name: str
-    slug: str
+    slug: Optional[str] = None
     description: Optional[str] = None
     kind: Literal["season", "circuit"] = "season"
     tournament_ids: List[str] = []
@@ -1146,9 +1147,8 @@ async def get_season(slug_or_id: str):
 @season_router.post("")
 async def create_season(body: SeasonCreate, me: dict = Depends(require_admin())):
     db = get_db()
-    if await db.seasons.find_one({"slug": body.slug}):
-        raise HTTPException(status_code=409, detail="Slug bereits vergeben")
     doc = body.model_dump()
+    doc["slug"] = await unique_slug(db.seasons, doc.get("slug") or doc.get("name"), fallback="season")
     for k in ["start_date", "end_date"]:
         if doc.get(k):
             doc[k] = doc[k].isoformat()
@@ -1172,14 +1172,9 @@ async def update_season(sid: str, body: SeasonUpdate, me: dict = Depends(require
     nullable_fields = {"description", "banner_url", "start_date", "end_date"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
-    if "slug" in updates and updates["slug"]:
-        updates["slug"] = updates["slug"].strip().lower()
-        existing = await db.seasons.find_one(
-            {"slug": updates["slug"], "id": {"$ne": current["id"]}},
-            {"_id": 0, "id": 1},
-        )
-        if existing:
-            raise HTTPException(409, "Slug bereits vergeben")
+    slug_source = slug_source_for_update(raw, current, "name", fallback="season")
+    if slug_source is not None:
+        updates["slug"] = await unique_slug(db.seasons, slug_source, current_id=current["id"], fallback="season")
     for k in ["start_date", "end_date"]:
         if k in updates:
             updates[k] = updates[k].isoformat() if updates[k] else None
