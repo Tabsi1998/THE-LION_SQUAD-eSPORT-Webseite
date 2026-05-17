@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import require_admin
-from services.slug_utils import slug_source_for_update, unique_slug
+from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import GameCreate, GameUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/games", tags=["games"])
@@ -78,7 +78,7 @@ async def list_games():
 @router.get("/{slug_or_id}")
 async def get_game(slug_or_id: str):
     db = get_db()
-    game = await db.games.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    game, _ = await find_by_slug_or_history(db.games, slug_or_id, {"_id": 0})
     if not game:
         raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
     games = await db.games.find({}, {"_id": 0}).to_list(200)
@@ -116,6 +116,7 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
     slug_source = slug_source_for_update(raw, current, "name", fallback="spiel")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.games, slug_source, current_id=game_id, fallback="spiel")
+        apply_slug_history(current, updates)
     if updates.get("parent_game_id"):
         if updates["parent_game_id"] == game_id:
             raise HTTPException(status_code=400, detail="Ein Spiel kann nicht sein eigenes Hauptspiel sein")

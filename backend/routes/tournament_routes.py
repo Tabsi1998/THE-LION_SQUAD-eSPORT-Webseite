@@ -1,6 +1,7 @@
 """Tournament + bracket routes."""
 import re
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import RedirectResponse
 from typing import Optional
 from datetime import datetime, timezone
 import math
@@ -19,7 +20,7 @@ from services.tournament_permissions import (
     require_tournament_staff_permission,
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
-from services.slug_utils import slug_source_for_update, unique_slug
+from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import (
     TournamentCreate, TournamentUpdate, RegistrationCreate, RegistrationUpdate,
     RegistrationAdminCreate,
@@ -515,9 +516,7 @@ async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
 async def _resolve_tid(slug_or_id: str) -> str:
     """Resolve slug to id if needed. Returns id or raises 404."""
     db = get_db()
-    t = await db.tournaments.find_one(
-        {"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"id": 1}
-    )
+    t, _ = await find_by_slug_or_history(db.tournaments, slug_or_id, {"id": 1})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     return t["id"]
@@ -567,7 +566,7 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
 @router.get("/{slug_or_id}")
 async def get_tournament(slug_or_id: str, include_draft: bool = False, user=Depends(get_optional_user)):
     db = get_db()
-    t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    t, was_old_slug = await find_by_slug_or_history(db.tournaments, slug_or_id, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     is_admin = user and user.get("role") in STAFF_ROLES
@@ -578,6 +577,8 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, user=Depe
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if not (is_admin or is_assigned) and not await user_can_see(user, t.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Turnier ist nicht sichtbar")
+    if was_old_slug and t.get("slug"):
+        return RedirectResponse(url=f"/api/tournaments/{t['slug']}", status_code=301)
     await _enrich_tournament(t, user)
     if t.get("event_id"):
         related_f1_query = {"event_id": t["event_id"]}
@@ -712,6 +713,7 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     slug_source = slug_source_for_update(raw_updates, existing, "title", fallback="turnier")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.tournaments, slug_source, current_id=tid, fallback="turnier")
+        apply_slug_history(existing, updates)
     if "team_mode" in updates or "team_size" in updates:
         normalized_team_settings = _normalize_team_settings({
             "team_mode": updates.get("team_mode", existing.get("team_mode") or "solo"),

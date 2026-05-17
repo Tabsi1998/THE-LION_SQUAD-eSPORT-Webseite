@@ -4,6 +4,7 @@ import { CalendarClock } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
 
@@ -69,6 +70,7 @@ export default function TournamentSchedulePage() {
     image: tournament.banner_url,
     canonical: tournament.slug ? `${window.location.origin}/tournaments/${tournament.slug}/matches` : undefined,
   });
+  useCanonicalSlugRedirect(slug, tournament.slug, "/tournaments", "/matches");
 
   if (!data) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE SPIELPLAN …</div></PublicLayout>;
 

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from auth import get_optional_user, require_admin
 from database import get_db
 from models import new_id, now_utc
-from services.slug_utils import slug_source_for_update, slugify, unique_slug
+from services.slug_utils import apply_slug_history, slug_source_for_update, slugify, unique_slug
 
 
 ServerVisibility = Literal["public", "community", "members", "internal"]
@@ -292,6 +292,7 @@ async def update_game_server(server_id: str, body: GameServerPatch, me: dict = D
     slug_source = slug_source_for_update(raw, existing, "name", fallback="server")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.game_servers, slug_source, current_id=server_id, fallback="server", max_length=80)
+        apply_slug_history(existing, updates)
     if not updates:
         raise HTTPException(400, "Keine Änderungen.")
     updates["updated_at"] = now_utc().isoformat()

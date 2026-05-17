@@ -4,7 +4,7 @@ import { API, api, formatMemberSince, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Crown, Gift, FileText, Bell, Calendar, Hash, Newspaper, Download, ArrowRight, User } from "lucide-react";
+import { Crown, Gift, FileText, Bell, Calendar, Hash, Newspaper, Eye, ArrowRight, User } from "lucide-react";
 
 export default function MemberAreaPage() {
   const { user } = useAuth();
@@ -65,7 +65,7 @@ export default function MemberAreaPage() {
         <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Tile to="/members/membership" icon={User} title="Mitgliedschaft" subtitle="Status, Nummer, Verlauf" testId="tile-membership" />
           <Tile to="/members/benefits" icon={Gift} title="Vorteile" subtitle={`${benefits.length} verfügbar`} testId="tile-benefits" />
-          <Tile to="/members/documents" icon={Download} title="Dokumente" subtitle={`${docs.length} Downloads`} testId="tile-documents" />
+          <Tile to="/members/documents" icon={FileText} title="Dokumente" subtitle={`${docs.length} freigegeben`} testId="tile-documents" />
           <Tile to="/members/news" icon={Newspaper} title="Interne News" subtitle={`${internalNews.length} aktuell`} testId="tile-news" />
         </div>
 
@@ -95,7 +95,7 @@ export default function MemberAreaPage() {
 
             <Section title="Vereinsdokumente" icon={FileText} more={{ to: "/members/documents", label: "Alle Dokumente" }}>
               {docs.length === 0 ? (
-                <Empty text="Vorstandsdokumente, Protokolle und Downloads werden hier zentral abgelegt." />
+                <Empty text="Vorstandsdokumente, Protokolle und Vereinsunterlagen werden hier zentral abgelegt." />
               ) : (
                 <div className="space-y-2">
                   {docs.slice(0, 4).map((d) => (
@@ -105,7 +105,7 @@ export default function MemberAreaPage() {
                         <div className="font-bold text-sm text-white truncate">{d.title}</div>
                         <div className="text-[10px] text-white/40 uppercase tracking-wider">{d.original_filename}</div>
                       </div>
-                      <a href={`${API}/documents/${d.id}/download`} target="_blank" rel="noreferrer" download className="text-xs text-[#FFD700] font-bold uppercase tracking-wider hover:underline">↓</a>
+                      <a href={`${API}/documents/${d.id}/view`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-[#FFD700] font-bold uppercase tracking-wider hover:underline"><Eye className="w-3 h-3" /> ansehen</a>
                     </div>
                   ))}
                 </div>

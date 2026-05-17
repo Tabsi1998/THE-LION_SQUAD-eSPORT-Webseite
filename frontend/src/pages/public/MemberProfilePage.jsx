@@ -8,6 +8,7 @@ import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { AccountLevelPill, AccountLevelProgress, accountAvatarFrameClass, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { gameLabel } from "@/lib/gameLabels";
+import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function MemberProfilePage() {
@@ -19,6 +20,7 @@ export default function MemberProfilePage() {
     type: "profile",
     canonical: profile?.slug ? `${window.location.origin}/members/${profile.slug}` : undefined,
   });
+  useCanonicalSlugRedirect(slug, profile?.slug, "/members");
 
   useEffect(() => {
     setLoading(true);

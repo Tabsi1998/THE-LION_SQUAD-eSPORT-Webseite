@@ -5,6 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatTournamentFormat } from "@/lib/tournamentLabels";
 import { Tv } from "lucide-react";
@@ -17,6 +18,7 @@ export default function TournamentBracketPage() {
     image: tournament?.banner_url,
     canonical: tournament?.slug ? `${window.location.origin}/tournaments/${tournament.slug}/bracket` : undefined,
   });
+  useCanonicalSlugRedirect(slug, tournament?.slug, "/tournaments", "/bracket");
 
   const load = useCallback(async () => {
     const { data: t } = await api.get(`/tournaments/${slug}`);

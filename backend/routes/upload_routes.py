@@ -364,7 +364,12 @@ async def upload_document(request: Request, file: UploadFile = File(...), me: di
         ext = pathlib.Path(file.filename).suffix.lower()
     filename = f"{uuid.uuid4().hex}{ext or ''}"
     path = PRIVATE_DOC_DIR / filename
-    path.write_bytes(data)
+    try:
+        PRIVATE_DOC_DIR.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    except OSError as exc:
+        logger.error("[uploads] failed to write document %s: %s", path, exc)
+        raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR pruefen.")
     return {
         "url": "",
         "storage_key": filename,

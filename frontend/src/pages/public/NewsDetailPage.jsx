@@ -5,6 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Pin, ArrowLeft, Calendar, Trophy, Users, Flag } from "lucide-react";
 
@@ -17,6 +18,7 @@ export default function NewsDetailPage() {
     type: "article",
     canonical: post?.slug ? `${window.location.origin}/news/${post.slug}` : undefined,
   });
+  useCanonicalSlugRedirect(slug, post?.slug, "/news");
 
   const load = useCallback(() => {
     api.get(`/news/${slug}`).then(({ data }) => {

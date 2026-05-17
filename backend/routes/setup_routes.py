@@ -41,6 +41,21 @@ def _image_mime_from_url(value: str | None) -> str:
     return "image/png"
 
 
+def _same_media_url(a: str | None, b: str | None) -> bool:
+    if not a or not b:
+        return False
+    clean_a = re.sub(r"^https?://[^/]+", "", str(a).strip()).split("?", 1)[0]
+    clean_b = re.sub(r"^https?://[^/]+", "", str(b).strip()).split("?", 1)[0]
+    return clean_a == clean_b
+
+
+def _effective_favicon_url(branding: dict) -> str:
+    custom = branding.get("favicon_url")
+    if custom and not _same_media_url(custom, branding.get("mascot_url")):
+        return custom
+    return "/assets/brand/tls-favicon.png?v=20260517"
+
+
 def _truthy_mail_config(mail: dict, legacy_email: dict) -> bool:
     provider = mail.get("provider") or ("resend" if legacy_email.get("resend_api_key") else "")
     if provider == "resend":
@@ -411,7 +426,7 @@ async def web_manifest():
     name = branding.get("club_name") or "THE LION SQUAD"
     name = branding.get("site_title") or name
     description = branding.get("site_description") or "THE LION SQUAD - eSPORTS"
-    icon = branding.get("favicon_url") or branding.get("mascot_url") or "/assets/brand/tls-favicon.png"
+    icon = _effective_favicon_url(branding)
     default_screenshot = branding.get("logo_url") or branding.get("mascot_url") or "/assets/brand/tls-wordmark.png"
     manifest = {
         "name": name,

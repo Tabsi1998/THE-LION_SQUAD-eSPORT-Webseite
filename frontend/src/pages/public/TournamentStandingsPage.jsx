@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function TournamentStandingsPage() {
@@ -13,6 +14,7 @@ export default function TournamentStandingsPage() {
     image: t?.banner_url,
     canonical: t?.slug ? `${window.location.origin}/tournaments/${t.slug}/standings` : undefined,
   });
+  useCanonicalSlugRedirect(slug, t?.slug, "/tournaments", "/standings");
 
   const load = useCallback(async () => {
     const { data: tr } = await api.get(`/tournaments/${slug}`);

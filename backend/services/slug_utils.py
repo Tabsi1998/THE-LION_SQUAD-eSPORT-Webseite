@@ -47,6 +47,25 @@ def slug_source_for_update(raw: dict, existing: dict, name_field: str, fallback:
     return None
 
 
+def apply_slug_history(existing: dict, updates: dict, *, max_items: int = 25) -> None:
+    """Remember the previous slug when an update changes it.
+
+    The current slug is always kept out of the history, so reverting to an older
+    slug does not create redirect loops.
+    """
+    new_slug = updates.get("slug")
+    old_slug = existing.get("slug")
+    if not new_slug or not old_slug or new_slug == old_slug:
+        return
+
+    history = []
+    for item in existing.get("slug_history") or []:
+        item = str(item or "").strip()
+        if item and item not in {new_slug, old_slug} and item not in history:
+            history.append(item)
+    updates["slug_history"] = [old_slug, *history][:max_items]
+
+
 def _candidate_with_suffix(base: str, suffix: int, max_length: int) -> str:
     suffix_text = f"-{suffix}"
     trimmed = base[: max_length - len(suffix_text)].rstrip("-")
@@ -65,3 +84,11 @@ async def unique_slug(collection, source: Any, *, current_id: str | None = None,
             return candidate
         candidate = _candidate_with_suffix(base, suffix, max_length)
         suffix += 1
+
+
+async def find_by_slug_or_history(collection, slug_or_id: str, projection: dict | None = None) -> tuple[dict | None, bool]:
+    doc = await collection.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, projection)
+    if doc:
+        return doc, False
+    doc = await collection.find_one({"slug_history": slug_or_id}, projection)
+    return doc, bool(doc)

@@ -6,6 +6,7 @@ import { onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 const DEFAULT_TITLE = "THE LION SQUAD - eSPORTS";
 const DEFAULT_FAVICON = "/assets/brand/tls-favicon.png";
 const DEFAULT_SHARE_IMAGE = "/assets/brand/tls-wordmark.png";
+const FAVICON_VERSION = "20260517";
 
 function upsertMeta(selector, attrs) {
   let el = document.head.querySelector(selector);
@@ -19,15 +20,58 @@ function upsertMeta(selector, attrs) {
   });
 }
 
-function upsertLink(rel, href) {
+function versionedAsset(href) {
+  if (!href) return "";
+  if (href.includes("/assets/brand/tls-favicon.png") && !href.includes("?")) return `${href}?v=${FAVICON_VERSION}`;
+  return href;
+}
+
+function sameMediaUrl(a, b) {
+  if (!a || !b) return false;
+  const clean = (value) => String(value).trim().split("?", 1)[0].replace(/^https?:\/\/[^/]+/i, "");
+  return clean(a) === clean(b);
+}
+
+function pickFavicon(data) {
+  const custom = data?.favicon_url || "";
+  const mascot = data?.mascot_url || "";
+  if (custom && !sameMediaUrl(custom, mascot)) return resolveMediaUrl(custom);
+  return resolveMediaUrl(DEFAULT_FAVICON);
+}
+
+function upsertLink(rel, href, attrs = {}) {
   if (!href) return;
-  let el = document.head.querySelector(`link[rel="${rel}"]`);
+  const existing = [...document.head.querySelectorAll(`link[rel="${rel}"]`)]
+    .filter((node) => node.getAttribute("data-tls-route-meta") !== "true");
+  const nodes = existing.length ? existing : [document.createElement("link")];
+  nodes.forEach((el) => {
+    if (!el.parentNode) {
+      el.setAttribute("rel", rel);
+      document.head.appendChild(el);
+    }
+    Object.entries(attrs).forEach(([key, value]) => {
+      if (value != null && value !== "") el.setAttribute(key, value);
+      else el.removeAttribute(key);
+    });
+    el.setAttribute("href", href);
+  });
+}
+
+function ensureSingleIconLink(rel, href, attrs = {}) {
+  if (!href) return;
+  const existing = [...document.head.querySelectorAll(`link[rel="${rel}"]`)]
+    .filter((node) => node.getAttribute("data-tls-route-meta") !== "true");
+  let el = existing[0];
   if (!el) {
     el = document.createElement("link");
     el.setAttribute("rel", rel);
     document.head.appendChild(el);
   }
-  if (el.getAttribute("data-tls-route-meta") === "true") return;
+  existing.slice(1).forEach((node) => node.remove());
+  Object.entries(attrs).forEach(([key, value]) => {
+    if (value != null && value !== "") el.setAttribute(key, value);
+    else el.removeAttribute(key);
+  });
   el.setAttribute("href", href);
 }
 
@@ -53,15 +97,15 @@ function applyBranding(data) {
   const description = data.site_description || "THE LION SQUAD - eSPORTS";
   const themeColor = data.primary_color || "#29B6E8";
   const image = resolveMediaUrl(data.logo_url || data.mascot_url || DEFAULT_SHARE_IMAGE);
-  const favicon = resolveMediaUrl(data.favicon_url || data.mascot_url || DEFAULT_FAVICON);
+  const favicon = versionedAsset(pickFavicon(data));
   const origin = data.domain || (typeof window !== "undefined" ? window.location.origin : "");
 
   if (!document.title || document.title === DEFAULT_TITLE || /React App|Vereinsplattform/i.test(document.title)) {
     document.title = siteTitle;
   }
 
-  upsertLink("icon", favicon);
-  upsertLink("apple-touch-icon", favicon);
+  ensureSingleIconLink("icon", favicon, { type: imageMimeType(favicon) || "image/png", sizes: "512x512" });
+  upsertLink("apple-touch-icon", favicon, { sizes: "512x512" });
   upsertLink("manifest", "/api/manifest.webmanifest");
 
   upsertMeta('meta[name="application-name"]', { name: "application-name", content: name });

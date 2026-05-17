@@ -7,6 +7,7 @@ import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { RichContent } from "@/components/tls/RichContent";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { formatTournamentFormat } from "@/lib/tournamentLabels";
@@ -63,6 +64,7 @@ export default function EventDetailPage() {
     type: "event",
     canonical: e?.slug ? `${window.location.origin}/events/${e.slug}` : undefined,
   });
+  useCanonicalSlugRedirect(slug, e?.slug, "/events");
 
   const load = useCallback(() => {
     return api.get(`/events/${slug}`).then(({ data }) => {

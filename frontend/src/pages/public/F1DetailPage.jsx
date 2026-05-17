@@ -7,6 +7,7 @@ import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { Tv, Trophy, Flag, Download, FileDown, Calendar } from "lucide-react";
 import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
@@ -23,6 +24,7 @@ export default function F1DetailPage() {
     image: challenge?.banner_url,
     canonical: challenge?.slug ? `${window.location.origin}/fastlap/${challenge.slug}` : undefined,
   });
+  useCanonicalSlugRedirect(slug, challenge?.slug, "/fastlap");
 
   const loadChallenge = useCallback(async () => {
     const { data } = await api.get(`/f1/challenges/${slug}`);

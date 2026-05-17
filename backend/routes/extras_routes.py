@@ -1,7 +1,7 @@
 """Admin settings (email config, branding), Seasons/Circuits, Widgets, DSGVO, Audit Logs, PDF exports."""
 import secrets as secrets_lib
 from fastapi import APIRouter, HTTPException, Depends, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Literal
 from datetime import datetime, timezone
@@ -11,7 +11,7 @@ import httpx
 from database import get_db
 from auth import require_admin, require_super, get_current_user, get_optional_user
 from services.visibility import user_can_see
-from services.slug_utils import slug_source_for_update, unique_slug
+from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import now_utc, new_id
 from email_service import send_template, _get_email_config
 from pdf_service import (
@@ -1134,9 +1134,11 @@ async def featured_season():
 @season_router.get("/{slug_or_id}")
 async def get_season(slug_or_id: str):
     db = get_db()
-    s = await db.seasons.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    s, was_old_slug = await find_by_slug_or_history(db.seasons, slug_or_id, {"_id": 0})
     if not s:
         raise HTTPException(status_code=404, detail="Saison nicht gefunden")
+    if was_old_slug and s.get("slug"):
+        return RedirectResponse(url=f"/api/seasons/{s['slug']}", status_code=301)
     tids, fids = await _resolve_season_sources(s)
     s["tournaments"] = await db.tournaments.find({"id": {"$in": tids}}, {"_id": 0}).to_list(200)
     s["f1_challenges"] = await db.f1_challenges.find({"id": {"$in": fids}},
@@ -1175,6 +1177,7 @@ async def update_season(sid: str, body: SeasonUpdate, me: dict = Depends(require
     slug_source = slug_source_for_update(raw, current, "name", fallback="season")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.seasons, slug_source, current_id=current["id"], fallback="season")
+        apply_slug_history(current, updates)
     for k in ["start_date", "end_date"]:
         if k in updates:
             updates[k] = updates[k].isoformat() if updates[k] else None
@@ -1309,9 +1312,11 @@ async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
 async def season_standings(slug_or_id: str):
     """Aggregate standings over all season point sources."""
     db = get_db()
-    s = await db.seasons.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    s, was_old_slug = await find_by_slug_or_history(db.seasons, slug_or_id, {"_id": 0})
     if not s:
         raise HTTPException(status_code=404, detail="Saison nicht gefunden")
+    if was_old_slug and s.get("slug"):
+        return RedirectResponse(url=f"/api/seasons/{s['slug']}/standings", status_code=301)
     if await db.season_points.count_documents({"season_id": s["id"]}):
         from services.season_service import aggregate_leaderboard
         rows = await aggregate_leaderboard(season_id=s["id"], limit=500)
@@ -1414,7 +1419,7 @@ widget_router = APIRouter(prefix="/api/widgets", tags=["widgets"])
 
 async def _public_f1_challenge_or_404(slug_or_id: str) -> dict:
     db = get_db()
-    c = await db.f1_challenges.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    c, _ = await find_by_slug_or_history(db.f1_challenges, slug_or_id, {"_id": 0})
     if not c or c.get("status") == "draft" or (c.get("visibility") or "public") != "public":
         raise HTTPException(status_code=404)
     return c
@@ -1422,7 +1427,7 @@ async def _public_f1_challenge_or_404(slug_or_id: str) -> dict:
 
 async def _public_tournament_or_404(slug_or_id: str) -> dict:
     db = get_db()
-    t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    t, _ = await find_by_slug_or_history(db.tournaments, slug_or_id, {"_id": 0})
     if (
         not t
         or t.get("status") == "draft"

@@ -1,5 +1,6 @@
 """Membership routes — admin can mark users as official club members."""
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from datetime import date
 from database import get_db
@@ -10,7 +11,7 @@ from services.membership_service import (
     ACTIVE_STATUSES,
 )
 from services.visibility import user_can_see
-from services.slug_utils import slugify
+from services.slug_utils import apply_slug_history, find_by_slug_or_history, slugify
 from models import (
     MembershipUpdate, MemberBenefitCreate, MemberBenefitUpdate, now_utc, new_id,
 )
@@ -576,11 +577,13 @@ async def list_public_member_profiles():
 @router.get("/profiles/{slug}")
 async def get_public_member_profile(slug: str):
     db = get_db()
-    row = await db.club_member_profiles.find_one(
-        {"slug": slug, "is_active": {"$ne": False}}, {"_id": 0}
-    )
+    row, was_old_slug = await find_by_slug_or_history(db.club_member_profiles, slug, {"_id": 0})
     if not row:
         raise HTTPException(404, "Mitglied nicht gefunden.")
+    if row.get("is_active") is False:
+        raise HTTPException(404, "Mitglied nicht gefunden.")
+    if was_old_slug and row.get("slug"):
+        return RedirectResponse(url=f"/api/membership/profiles/{row['slug']}", status_code=301)
     board_titles = await _board_titles_by_profile_id(db)
     item = _public_profile(row, detail=True, board_title=board_titles.get(row["id"]))
     item = (await _attach_linked_accounts(db, [row], [item], public_only=True))[0]
@@ -658,6 +661,7 @@ async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUp
         update["slug"] = await _unique_profile_slug(db, update["slug"] or existing.get("display_name") or "mitglied", profile_id)
     elif "display_name" in update:
         update["slug"] = await _unique_profile_slug(db, update["display_name"] or existing.get("display_name") or "mitglied", profile_id)
+    apply_slug_history(existing, update)
     if "games" in update:
         update["games"] = _clean_list(update["games"])
     if "platforms" in update:

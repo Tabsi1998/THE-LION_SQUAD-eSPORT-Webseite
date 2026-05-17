@@ -9,9 +9,10 @@ from html import escape
 from urllib.parse import unquote, urlparse
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from database import get_db
+from services.slug_utils import find_by_slug_or_history
 from services.visibility import user_can_see
 
 router = APIRouter(prefix="/api/seo", tags=["seo"])
@@ -20,10 +21,29 @@ STAFF_HIDDEN_STATUSES = {"draft", "archived", "cancelled"}
 MARKDOWN_RE = re.compile(r"(!?\[[^\]]*\]\([^)]+\)|[`*_>#~-]+|\r?\n+)")
 HTML_RE = re.compile(r"<[^>]+>")
 DEFAULT_SHARE_IMAGE = "/assets/brand/tls-wordmark.png"
+DEFAULT_FAVICON = "/assets/brand/tls-favicon.png?v=20260517"
+
+
+def same_media_url(a: str | None, b: str | None) -> bool:
+    if not a or not b:
+        return False
+    clean_a = re.sub(r"^https?://[^/]+", "", str(a).strip()).split("?", 1)[0]
+    clean_b = re.sub(r"^https?://[^/]+", "", str(b).strip()).split("?", 1)[0]
+    return clean_a == clean_b
+
+
+def effective_favicon_url(branding: dict) -> str:
+    custom = branding.get("favicon_url")
+    if custom and not same_media_url(custom, branding.get("mascot_url")):
+        return custom
+    return DEFAULT_FAVICON
 
 
 @router.get("/preview")
 async def seo_preview(path: str, request: Request):
+    redirect_url = await resolve_slug_redirect(path, request)
+    if redirect_url:
+        return RedirectResponse(url=redirect_url, status_code=301)
     meta = await resolve_meta(path, request)
     html = render_preview_html(meta)
     return HTMLResponse(
@@ -37,8 +57,74 @@ async def seo_preview(path: str, request: Request):
 
 @router.get("/meta")
 async def seo_meta(path: str, request: Request):
+    redirect_url = await resolve_slug_redirect(path, request)
+    if redirect_url:
+        return JSONResponse({"redirect": redirect_url, "canonical": redirect_url})
     meta = await resolve_meta(path, request)
     return JSONResponse(meta)
+
+
+async def resolve_slug_redirect(raw_path: str, request: Request) -> str | None:
+    path = normalize_path(raw_path)
+    parts = [part for part in path.strip("/").split("/") if part]
+    if len(parts) < 2:
+        return None
+
+    first = parts[0].lower()
+    slug = unquote(parts[1])
+    suffix = "/" + "/".join(parts[2:]) if len(parts) > 2 else ""
+    db = get_db()
+
+    route_map = {
+        "news": (db.news_posts, "/news"),
+        "events": (db.events, "/events"),
+        "tournaments": (db.tournaments, "/tournaments"),
+        "fastlap": (db.f1_challenges, "/fastlap"),
+        "f1": (db.f1_challenges, "/fastlap"),
+        "seasons": (db.seasons, "/seasons"),
+        "gallery": (db.gallery_albums, "/galerie"),
+        "galerie": (db.gallery_albums, "/galerie"),
+        "members": (db.club_member_profiles, "/members"),
+    }
+    item = route_map.get(first)
+    if not item:
+        return None
+
+    collection, public_prefix = item
+    doc, _ = await find_by_slug_or_history(collection, slug, {"_id": 0})
+    current_slug = doc.get("slug") if doc else None
+    if not current_slug or current_slug == slug:
+        return None
+    if not await is_redirectable_public_doc(first, doc):
+        return None
+
+    if first in {"news", "events", "fastlap", "f1", "seasons", "gallery", "galerie", "members"}:
+        suffix = ""
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
+    origin = public_origin(request, branding)
+    return f"{origin}{public_prefix}/{current_slug}{suffix}"
+
+
+async def is_redirectable_public_doc(route: str, doc: dict) -> bool:
+    if route == "news":
+        return bool(doc.get("published", True) and is_public_visibility(doc) and is_published_now(doc))
+    if route == "events":
+        return bool(doc.get("status") != "draft" and is_public_visibility(doc))
+    if route == "tournaments":
+        return bool(
+            doc.get("status") != "draft"
+            and doc.get("is_public") is not False
+            and await user_can_see(None, doc.get("visibility") or "public")
+        )
+    if route in {"fastlap", "f1"}:
+        return bool(doc.get("status") != "draft" and is_public_visibility(doc))
+    if route == "seasons":
+        return bool(doc.get("status") != "draft")
+    if route in {"gallery", "galerie"}:
+        return bool(doc.get("published", True) and is_public_visibility(doc))
+    if route == "members":
+        return bool(doc.get("is_active") is not False)
+    return True
 
 
 async def resolve_meta(raw_path: str, request: Request) -> dict:
@@ -60,10 +146,7 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         branding.get("logo_url") or branding.get("mascot_url") or "/assets/brand/tls-favicon.png",
         origin,
     )
-    favicon = absolute_url(
-        branding.get("favicon_url") or branding.get("mascot_url") or "/assets/brand/tls-favicon.png",
-        origin,
-    )
+    favicon = absolute_url(effective_favicon_url(branding), origin)
 
     meta = {
         "title": branding.get("site_title") or "THE LION SQUAD - eSPORTS",
@@ -122,16 +205,19 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
 
 
 async def news_meta(db, slug: str, base: dict, origin: str) -> dict:
-    post = await db.news_posts.find_one({"$or": [{"slug": slug}, {"id": slug}]}, {"_id": 0})
+    post, _ = await find_by_slug_or_history(db.news_posts, slug, {"_id": 0})
     if not post or not post.get("published", True) or not is_public_visibility(post) or not is_published_now(post):
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     description = clean_text(post.get("excerpt") or post.get("content") or post.get("title"))
     image = absolute_url(post.get("banner_url") or base["image"], origin)
+    canonical = f"{origin}/news/{post.get('slug') or slug}"
     meta = {
         **base,
         "title": f"{post.get('title')} · {base['site_name']}",
         "description": description,
         "image": image,
+        "url": canonical,
+        "canonical": canonical,
         "type": "article",
         "published_time": post.get("published_at") or post.get("created_at"),
         "modified_time": post.get("updated_at"),
@@ -152,17 +238,20 @@ async def news_meta(db, slug: str, base: dict, origin: str) -> dict:
 
 
 async def event_meta(db, slug: str, base: dict, origin: str) -> dict:
-    event = await db.events.find_one({"$or": [{"slug": slug}, {"id": slug}]}, {"_id": 0})
+    event, _ = await find_by_slug_or_history(db.events, slug, {"_id": 0})
     if not event or event.get("status") == "draft" or not is_public_visibility(event):
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     description = clean_text(event.get("description") or event.get("program") or event.get("name"))
     image = absolute_url(event.get("banner_url") or base["image"], origin)
     place = event.get("location") or "THE LION SQUAD"
+    canonical = f"{origin}/events/{event.get('slug') or slug}"
     meta = {
         **base,
         "title": f"{event.get('name')} · {base['site_name']}",
         "description": description,
         "image": image,
+        "url": canonical,
+        "canonical": canonical,
         "type": "event",
     }
     meta["json_ld"] = {
@@ -183,7 +272,7 @@ async def event_meta(db, slug: str, base: dict, origin: str) -> dict:
 
 
 async def tournament_meta(db, slug: str, suffix: str, base: dict, origin: str) -> dict:
-    tournament = await db.tournaments.find_one({"$or": [{"slug": slug}, {"id": slug}]}, {"_id": 0})
+    tournament, _ = await find_by_slug_or_history(db.tournaments, slug, {"_id": 0})
     if (
         not tournament
         or tournament.get("status") == "draft"
@@ -195,11 +284,16 @@ async def tournament_meta(db, slug: str, suffix: str, base: dict, origin: str) -
     title = tournament.get("title") or "Turnier"
     description = clean_text(tournament.get("description") or tournament.get("rules") or title)
     image = absolute_url(tournament.get("banner_url") or base["image"], origin)
+    current_slug = tournament.get("slug") or slug
+    suffix_path = f"/{suffix}" if suffix else ""
+    canonical = f"{origin}/tournaments/{current_slug}{suffix_path}"
     meta = {
         **base,
         "title": f"{title}{' · ' + suffix_label if suffix_label else ''} · {base['site_name']}",
         "description": description,
         "image": image,
+        "url": canonical,
+        "canonical": canonical,
         "type": "website",
     }
     meta["json_ld"] = {
@@ -216,21 +310,24 @@ async def tournament_meta(db, slug: str, suffix: str, base: dict, origin: str) -
     }
     parents = [("Turniere", "/tournaments")]
     if suffix_label:
-        parents.append((title, f"/tournaments/{slug}"))
+        parents.append((title, f"/tournaments/{current_slug}"))
     return add_breadcrumbs(meta, origin, parents, suffix_label or title)
 
 
 async def fastlap_meta(db, slug: str, base: dict, origin: str) -> dict:
-    challenge = await db.f1_challenges.find_one({"$or": [{"slug": slug}, {"id": slug}]}, {"_id": 0})
+    challenge, _ = await find_by_slug_or_history(db.f1_challenges, slug, {"_id": 0})
     if not challenge or challenge.get("status") == "draft" or not is_public_visibility(challenge):
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     description = clean_text(challenge.get("description") or challenge.get("rules") or challenge.get("title"))
     image = absolute_url(challenge.get("banner_url") or base["image"], origin)
+    canonical = f"{origin}/fastlap/{challenge.get('slug') or slug}"
     meta = {
         **base,
         "title": f"{challenge.get('title')} · {base['site_name']}",
         "description": description,
         "image": image,
+        "url": canonical,
+        "canonical": canonical,
         "type": "website",
     }
     meta["json_ld"] = webpage_json_ld(meta)
@@ -238,16 +335,19 @@ async def fastlap_meta(db, slug: str, base: dict, origin: str) -> dict:
 
 
 async def season_meta(db, slug: str, base: dict, origin: str) -> dict:
-    season = await db.seasons.find_one({"$or": [{"slug": slug}, {"id": slug}]}, {"_id": 0})
+    season, _ = await find_by_slug_or_history(db.seasons, slug, {"_id": 0})
     if not season or season.get("status") == "draft":
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     description = clean_text(season.get("description") or season.get("name"))
     image = absolute_url(season.get("banner_url") or base["image"], origin)
+    canonical = f"{origin}/seasons/{season.get('slug') or slug}"
     meta = {
         **base,
         "title": f"{season.get('name')} · {base['site_name']}",
         "description": description,
         "image": image,
+        "url": canonical,
+        "canonical": canonical,
         "type": "website",
     }
     meta["json_ld"] = webpage_json_ld(meta)
@@ -255,16 +355,19 @@ async def season_meta(db, slug: str, base: dict, origin: str) -> dict:
 
 
 async def gallery_meta(db, slug: str, base: dict, origin: str) -> dict:
-    album = await db.gallery_albums.find_one({"$or": [{"slug": slug}, {"id": slug}]}, {"_id": 0})
+    album, _ = await find_by_slug_or_history(db.gallery_albums, slug, {"_id": 0})
     if not album or not album.get("published", True) or not is_public_visibility(album):
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     photo = await db.gallery_photos.find_one({"album_id": album.get("id")}, {"_id": 0}, sort=[("order_index", 1)])
     image = absolute_url(album.get("cover_url") or (photo or {}).get("thumbnail_url") or (photo or {}).get("image_url") or base["image"], origin)
+    canonical = f"{origin}/galerie/{album.get('slug') or slug}"
     meta = {
         **base,
         "title": f"{album.get('title')} · Galerie · {base['site_name']}",
         "description": clean_text(album.get("description") or "Fotos und Eindrücke von THE LION SQUAD."),
         "image": image,
+        "url": canonical,
+        "canonical": canonical,
         "type": "website",
     }
     meta["json_ld"] = webpage_json_ld(meta)
@@ -297,15 +400,18 @@ async def team_meta(db, team_id: str, base: dict, origin: str) -> dict:
 
 
 async def member_profile_meta(db, slug: str, base: dict, origin: str) -> dict:
-    profile = await db.club_member_profiles.find_one({"slug": slug, "is_active": {"$ne": False}}, {"_id": 0})
-    if not profile:
+    profile, _ = await find_by_slug_or_history(db.club_member_profiles, slug, {"_id": 0})
+    if not profile or profile.get("is_active") is False:
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     image = absolute_url(profile.get("photo_url") or profile.get("cover_url") or profile.get("avatar_url") or profile.get("banner_url") or base["image"], origin)
+    canonical = f"{origin}/members/{profile.get('slug') or slug}"
     meta = {
         **base,
         "title": f"{profile.get('display_name') or profile.get('gamertag')} · {base['site_name']}",
         "description": clean_text(profile.get("bio") or "Vereinsmitglied bei THE LION SQUAD eSports."),
         "image": image,
+        "url": canonical,
+        "canonical": canonical,
         "type": "profile",
     }
     meta["json_ld"] = webpage_json_ld(meta)

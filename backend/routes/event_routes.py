@@ -1,5 +1,6 @@
 """Event routes — Vereins-CMS Phase 3."""
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import RedirectResponse
 from typing import Optional
 from datetime import datetime, timezone
 from database import get_db
@@ -9,7 +10,7 @@ from services.content_embed_service import resolve_content_embeds
 from services.public_phase import derive_public_phase
 from services.sponsor_utils import dedupe_public_sponsors
 from services.notification_preferences import enqueue_newsletter_for_item
-from services.slug_utils import slug_source_for_update, unique_slug
+from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import EventCreate, EventUpdate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -72,9 +73,9 @@ def _published_now(post: dict) -> bool:
     return not published_at or published_at <= now_utc()
 
 
-async def _find_event(slug_or_id: str) -> dict | None:
+async def _find_event(slug_or_id: str) -> tuple[dict | None, bool]:
     db = get_db()
-    return await db.events.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    return await find_by_slug_or_history(db.events, slug_or_id, {"_id": 0})
 
 
 def _registration_seats(registration: dict) -> int:
@@ -336,7 +337,7 @@ async def event_meta():
 @router.get("/{slug_or_id}")
 async def get_event(slug_or_id: str, include_draft: bool = False, user: dict | None = Depends(get_optional_user)):
     db = get_db()
-    event = await _find_event(slug_or_id)
+    event, was_old_slug = await _find_event(slug_or_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
     is_admin = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
@@ -344,6 +345,8 @@ async def get_event(slug_or_id: str, include_draft: bool = False, user: dict | N
         raise HTTPException(404, "Event nicht gefunden.")
     if not await _user_can_see(user, event.get("visibility") or "public"):
         raise HTTPException(403, "Event ist nicht sichtbar.")
+    if was_old_slug and event.get("slug"):
+        return RedirectResponse(url=f"/api/events/{event['slug']}", status_code=301)
     # Attach tournaments and f1 challenges
     event["tournaments"] = await _filter_related(
         await db.tournaments.find({"event_id": event["id"]}, {"_id": 0}).to_list(200),
@@ -381,7 +384,7 @@ async def get_event(slug_or_id: str, include_draft: bool = False, user: dict | N
 @router.get("/{event_id}/registrations")
 async def list_event_registrations(event_id: str, me: dict = Depends(require_admin())):
     db = get_db()
-    event = await _find_event(event_id)
+    event, _ = await _find_event(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
     regs = await db.event_registrations.find(
@@ -399,7 +402,7 @@ async def list_event_registrations(event_id: str, me: dict = Depends(require_adm
 async def register_for_event(event_id: str, body: EventRegistrationCreate,
                              me: dict = Depends(get_current_user)):
     db = get_db()
-    event = await _find_event(event_id)
+    event, _ = await _find_event(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
     if event.get("status") == "draft" and me.get("role") not in STAFF_ROLES:
@@ -461,7 +464,7 @@ async def register_for_event(event_id: str, body: EventRegistrationCreate,
 @router.delete("/{event_id}/registrations/me")
 async def cancel_my_event_registration(event_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
-    event = await _find_event(event_id)
+    event, _ = await _find_event(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
     reg = await db.event_registrations.find_one(
@@ -491,7 +494,7 @@ async def cancel_my_event_registration(event_id: str, me: dict = Depends(get_cur
 async def update_event_registration(event_id: str, registration_id: str, body: EventRegistrationUpdate,
                                     me: dict = Depends(require_admin())):
     db = get_db()
-    event = await _find_event(event_id)
+    event, _ = await _find_event(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
     current = await db.event_registrations.find_one(
@@ -578,6 +581,7 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
     slug_source = slug_source_for_update(raw, existing, "name", fallback="event")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.events, slug_source, current_id=event_id, fallback="event")
+        apply_slug_history(existing, updates)
     for k in ("start_date", "end_date", "door_time", "registration_opens_at", "registration_closes_at"):
         if updates.get(k):
             updates[k] = updates[k].isoformat()

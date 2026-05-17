@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { API, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { FileText, Download, Pin, ArrowLeft, Search } from "lucide-react";
+import { FileText, Download, Pin, ArrowLeft, Search, Eye } from "lucide-react";
 
 const CATEGORY_LABELS = {
   statutes: "Statuten", minutes: "Protokolle", form: "Formular",
@@ -60,9 +60,9 @@ export default function MemberDocumentsPage() {
           <ArrowLeft className="w-3.5 h-3.5" /> Mitgliederbereich
         </Link>
         <span className="mt-6 text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700] block">EXKLUSIV</span>
-        <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">Vereinsdokumente & Downloads</h1>
+        <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">Vereinsdokumente</h1>
         <p className="mt-3 text-white/60 max-w-2xl">
-          Statuten, Protokolle, Formulare, Vereinsleitlinien und Mitglieder-Downloads — zentral abgelegt und immer aktuell.
+          Statuten, Protokolle, Formulare und Vereinsleitlinien - zentral abgelegt, direkt einsehbar und immer aktuell.
         </p>
 
         <div className="mt-8 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
@@ -123,7 +123,7 @@ function Group({ label, docs }) {
 function DocRow({ d }) {
   const c = CATEGORY_COLORS[d.category] || "#29B6E8";
   return (
-    <div data-testid={`doc-row-${d.id}`} className="border border-white/10 hover:border-white/25 rounded-sm bg-[#121212] p-4 flex items-center gap-4 transition">
+    <div data-testid={`doc-row-${d.id}`} className="border border-white/10 hover:border-white/25 rounded-sm bg-[#121212] p-4 flex flex-col sm:flex-row sm:items-center gap-4 transition">
       <div className="w-12 h-12 shrink-0 rounded-sm flex items-center justify-center" style={{ background: `${c}15`, border: `1px solid ${c}40` }}>
         <FileText className="w-5 h-5" style={{ color: c }} />
       </div>
@@ -137,19 +137,30 @@ function DocRow({ d }) {
         <div className="mt-2 flex items-center gap-3 text-[10px] text-white/40 uppercase tracking-wider">
           {d.original_filename && <span>{d.original_filename}</span>}
           {d.file_size && <span>{fmtSize(d.file_size)}</span>}
-          {d.download_count > 0 && <span>{d.download_count} Downloads</span>}
+          {d.view_count > 0 && <span>{d.view_count} Ansichten</span>}
+          {d.allow_download && d.download_count > 0 && <span>{d.download_count} Downloads</span>}
         </div>
       </div>
       <a
-        href={`${API}/documents/${d.id}/download`}
+        href={`${API}/documents/${d.id}/view`}
         target="_blank"
         rel="noreferrer"
-        download={d.original_filename || true}
-        data-testid={`doc-download-${d.id}`}
-        className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] border border-[#FFD700]/40 font-bold uppercase tracking-wider text-xs rounded-sm transition"
+        data-testid={`doc-view-${d.id}`}
+        className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] border border-[#FFD700]/40 font-bold uppercase tracking-wider text-xs rounded-sm transition"
       >
-        <Download className="w-3.5 h-3.5" /> Laden
+        <Eye className="w-3.5 h-3.5" /> Ansehen
       </a>
+      {d.allow_download && (
+        <a
+          href={`${API}/documents/${d.id}/download`}
+          target="_blank"
+          rel="noreferrer"
+          data-testid={`doc-download-${d.id}`}
+          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/60 hover:text-white font-bold uppercase tracking-wider text-xs rounded-sm transition"
+        >
+          <Download className="w-3.5 h-3.5" /> Download
+        </a>
+      )}
     </div>
   );
 }

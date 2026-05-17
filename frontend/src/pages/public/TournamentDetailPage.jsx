@@ -17,6 +17,7 @@ import { formatDateTime, getRegistrationState } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { formatTeamMode, formatTournamentFormat } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
+import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function TournamentDetailPage() {
@@ -33,6 +34,7 @@ export default function TournamentDetailPage() {
     image: t?.banner_url,
     canonical: t?.slug ? `${window.location.origin}/tournaments/${t.slug}` : undefined,
   });
+  useCanonicalSlugRedirect(slug, t?.slug, "/tournaments");
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/tournaments/${slug}`);

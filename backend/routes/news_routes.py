@@ -1,6 +1,7 @@
 """News, Sponsors & Gallery routes — Vereins-CMS Phase 3."""
 import re
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import RedirectResponse
 from typing import Optional
 from datetime import datetime, timezone
 from database import get_db
@@ -10,7 +11,7 @@ from services.content_embed_service import resolve_content_embeds
 from services.sponsor_utils import dedupe_public_sponsors
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.user_notifications import create_user_notification
-from services.slug_utils import slug_source_for_update, unique_slug
+from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
     PartnerCreate, PartnerUpdate, ReferenceCreate, ReferenceUpdate,
@@ -199,7 +200,7 @@ async def list_news(
 @router.get("/news/{slug_or_id}")
 async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_user)):
     db = get_db()
-    p = await db.news_posts.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    p, was_old_slug = await find_by_slug_or_history(db.news_posts, slug_or_id, {"_id": 0})
     if not p:
         raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
     is_staff = bool(user and user.get("role") in STAFF_ROLES)
@@ -209,6 +210,8 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
         raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
     if not await _user_can_see(user, p.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Nicht sichtbar.")
+    if was_old_slug and p.get("slug"):
+        return RedirectResponse(url=f"/api/news/{p['slug']}", status_code=301)
     # Resolve linked entities
     db = get_db()
     if p.get("linked_event_ids"):
@@ -301,6 +304,7 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_adm
     slug_source = slug_source_for_update(update, existing, "title", fallback="news")
     if slug_source is not None:
         update["slug"] = await unique_slug(db.news_posts, slug_source, current_id=nid, fallback="news")
+        apply_slug_history(existing, update)
     if update.get("published_at"):
         update["published_at"] = update["published_at"].isoformat()
     if "content" in update or "mentioned_user_ids" in update:
@@ -1000,11 +1004,13 @@ async def list_albums(
 @router.get("/gallery/{slug_or_id}")
 async def get_album(slug_or_id: str, user: dict | None = Depends(get_optional_user)):
     db = get_db()
-    a = await db.gallery_albums.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    a, was_old_slug = await find_by_slug_or_history(db.gallery_albums, slug_or_id, {"_id": 0})
     if not a or not a.get("published", True):
         raise HTTPException(404, "Album nicht gefunden.")
     if not await _user_can_see(user, a.get("visibility") or "public"):
         raise HTTPException(403, "Nicht sichtbar.")
+    if was_old_slug and a.get("slug"):
+        return RedirectResponse(url=f"/api/gallery/{a['slug']}", status_code=301)
     a["photos"] = await db.gallery_photos.find({"album_id": a["id"]}, {"_id": 0}).sort("order_index", 1).to_list(2000)
     if a.get("event_id"):
         event = await _visible_event_summary(a["event_id"], user)
@@ -1059,6 +1065,7 @@ async def update_album(aid: str, body: GalleryAlbumUpdate, me: dict = Depends(re
     slug_source = slug_source_for_update(update, album, "title", fallback="album")
     if slug_source is not None:
         update["slug"] = await unique_slug(db.gallery_albums, slug_source, current_id=album["id"], fallback="album")
+        apply_slug_history(album, update)
     if update.get("taken_at"):
         update["taken_at"] = update["taken_at"].isoformat()
     update["updated_at"] = now_utc().isoformat()

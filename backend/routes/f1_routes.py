@@ -3,12 +3,12 @@ import io
 import csv
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from database import get_db
 from auth import get_current_user, require_admin, require_role, get_optional_user
 from services.visibility import user_can_see
 from services.public_phase import derive_public_phase
-from services.slug_utils import slug_source_for_update, unique_slug
+from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import (
     F1ChallengeCreate, F1ChallengeUpdate, F1TrackCreate, F1TrackUpdate,
     F1LapTimeCreate, F1LapTimeUpdate,
@@ -55,9 +55,7 @@ def _iso(dt):
 
 async def _resolve_cid(slug_or_id: str) -> str:
     db = get_db()
-    c = await db.f1_challenges.find_one(
-        {"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"id": 1}
-    )
+    c, _ = await find_by_slug_or_history(db.f1_challenges, slug_or_id, {"id": 1})
     if not c:
         raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
     return c["id"]
@@ -179,10 +177,10 @@ async def _visible_event_summary(event_id: str, user: dict | None, include_draft
     return event
 
 
-async def _get_visible_challenge(slug_or_id: str, user: dict | None = None, include_draft: bool = False) -> dict:
+async def _get_visible_challenge_record(slug_or_id: str, user: dict | None = None, include_draft: bool = False) -> tuple[dict, bool]:
     db = get_db()
     user = _auth_user(user)
-    c = await db.f1_challenges.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    c, was_old_slug = await find_by_slug_or_history(db.f1_challenges, slug_or_id, {"_id": 0})
     if not c:
         raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
     if c.get("status") == "draft" and not _is_staff(user):
@@ -190,6 +188,11 @@ async def _get_visible_challenge(slug_or_id: str, user: dict | None = None, incl
     if not await user_can_see(user, c.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Challenge ist nicht sichtbar")
     c["public_phase"] = derive_public_phase(c, "f1")
+    return c, was_old_slug
+
+
+async def _get_visible_challenge(slug_or_id: str, user: dict | None = None, include_draft: bool = False) -> dict:
+    c, _ = await _get_visible_challenge_record(slug_or_id, user, include_draft=include_draft)
     return c
 
 
@@ -229,7 +232,9 @@ async def list_challenges(status: str | None = None, limit: int = 100, include_d
 @router.get("/challenges/{slug_or_id}")
 async def get_challenge(slug_or_id: str, include_draft: bool = False, user=Depends(get_optional_user)):
     db = get_db()
-    c = await _get_visible_challenge(slug_or_id, user, include_draft=include_draft)
+    c, was_old_slug = await _get_visible_challenge_record(slug_or_id, user, include_draft=include_draft)
+    if was_old_slug and c.get("slug"):
+        return RedirectResponse(url=f"/api/f1/challenges/{c['slug']}", status_code=301)
     await _annotate_reference_policy(c, include_counts=True)
     tracks = await db.f1_tracks.find({"challenge_id": c["id"]}, {"_id": 0}).sort("order_index", 1).to_list(100)
     c["tracks"] = tracks
@@ -282,6 +287,7 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
     slug_source = slug_source_for_update(raw, existing, "title", fallback="fastlap")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.f1_challenges, slug_source, current_id=cid, fallback="fastlap")
+        apply_slug_history(existing, updates)
     if updates.get("block_club_member_results") is True:
         updates["allow_club_reference_times"] = True
     elif updates.get("allow_club_reference_times") is False and (

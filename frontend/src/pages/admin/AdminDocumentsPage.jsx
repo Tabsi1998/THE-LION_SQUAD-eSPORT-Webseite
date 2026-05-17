@@ -4,7 +4,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Plus, Save, X, Trash2, FileText, Pin, UploadCloud } from "lucide-react";
+import { Plus, Save, X, Trash2, FileText, Pin, UploadCloud, Eye, Download } from "lucide-react";
 
 const parseUploadMb = (value, fallback) => {
   const parsed = Number(value);
@@ -80,7 +80,8 @@ export default function AdminDocumentsPage() {
                   <th className="text-left px-4 py-3">Kategorie</th>
                   <th className="text-left px-4 py-3">Sichtbar</th>
                   <th className="text-left px-4 py-3">Größe</th>
-                  <th className="text-left px-4 py-3">Downloads</th>
+                  <th className="text-left px-4 py-3">Nutzung</th>
+                  <th className="text-left px-4 py-3">Download</th>
                   <th className="text-center px-4 py-3">Aktion</th>
                 </tr>
               </thead>
@@ -97,9 +98,13 @@ export default function AdminDocumentsPage() {
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">{CATEGORY_LABELS[d.category] || d.category}</td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-white/60 font-bold">{d.visibility}</td>
                     <td className="px-4 py-3 text-xs text-white/65">{fmtSize(d.file_size)}</td>
-                    <td className="px-4 py-3 text-xs text-white/55">{d.download_count || 0}</td>
+                    <td className="px-4 py-3 text-xs text-white/55">{d.view_count || 0} Ansicht(en) · {d.download_count || 0} Download(s)</td>
+                    <td className="px-4 py-3 text-[10px] uppercase tracking-widest font-bold">
+                      <span className={d.allow_download ? "text-[#00FF88]" : "text-white/35"}>{d.allow_download ? "erlaubt" : "inline"}</span>
+                    </td>
                     <td className="px-4 py-3 text-center space-x-1 whitespace-nowrap">
-                      <a href={`${API}/documents/${d.id}/download`} target="_blank" rel="noreferrer" className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white">Vorschau</a>
+                      <a href={`${API}/documents/${d.id}/view`} target="_blank" rel="noreferrer" className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Ansicht</a>
+                      <a href={`${API}/documents/${d.id}/download`} target="_blank" rel="noreferrer" className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white inline-flex items-center gap-1"><Download className="w-3 h-3" /> Datei</a>
                       <button onClick={() => setEditing(d)} data-testid={`doc-edit-${d.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10">Bearbeiten</button>
                       <button onClick={() => remove(d.id)} data-testid={`doc-delete-${d.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
                     </td>
@@ -131,6 +136,7 @@ function DocModal({ doc, meta, onClose, onSaved }) {
     mime: doc.mime || "",
     tags: (doc.tags || []).join(", "),
     pinned: doc.pinned ?? false,
+    allow_download: doc.allow_download ?? false,
     order_index: doc.order_index ?? 0,
   });
   const [uploading, setUploading] = useState(false);
@@ -243,6 +249,13 @@ function DocModal({ doc, meta, onClose, onSaved }) {
               <Pin className="w-3 h-3 text-[#FFD700]" /> Anpinnen
             </label>
           </div>
+          <label className="flex items-start gap-3 border border-white/10 rounded-sm bg-[#0A0A0A] p-3 text-sm text-white/70">
+            <input type="checkbox" checked={form.allow_download} onChange={(e) => set("allow_download", e.target.checked)} className="accent-[#FFD700] mt-1" />
+            <span>
+              <span className="block font-bold text-white">Download erlauben</span>
+              <span className="block text-xs text-white/45 mt-0.5">Standard ist nur Inline-Ansicht. Aktivieren, wenn Mitglieder die Datei bewusst herunterladen sollen.</span>
+            </span>
+          </label>
         </div>
         <div className="flex gap-3 p-5 border-t border-white/10">
           <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm">Abbrechen</button>

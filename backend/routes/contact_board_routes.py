@@ -15,7 +15,7 @@ from database import get_db
 from auth import require_admin, get_optional_user as get_current_user_optional
 from models import now_utc, new_id
 from services.rate_limit import enforce_rate_limit
-from services.slug_utils import slug_source_for_update, slugify, unique_slug
+from services.slug_utils import apply_slug_history, slug_source_for_update, slugify, unique_slug
 
 # ---------- Contact ----------
 contact_router = APIRouter(prefix="/api/contact", tags=["contact"])
@@ -334,6 +334,7 @@ async def update_position(pid: str, body: BoardPositionUpdate, me: dict = Depend
     slug_source = slug_source_for_update(updates, existing, "title_male", fallback="position")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.board_positions, slug_source, current_id=pid, fallback="position", max_length=80)
+        apply_slug_history(existing, updates)
     # Convert "" → None to clear assignments
     for k in ("user_id", "deputy_user_id"):
         if k in updates and updates[k] == "":

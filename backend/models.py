@@ -1006,6 +1006,7 @@ class DocumentCreate(BaseModel):
     tags: List[str] = []
     order_index: int = 0
     pinned: bool = False
+    allow_download: bool = False
 
 
 class DocumentUpdate(BaseModel):
@@ -1021,6 +1022,7 @@ class DocumentUpdate(BaseModel):
     tags: Optional[List[str]] = None
     order_index: Optional[int] = None
     pinned: Optional[bool] = None
+    allow_download: Optional[bool] = None
 
 
 class GalleryAlbumCreate(BaseModel):

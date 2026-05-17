@@ -4,6 +4,7 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Award, BarChart3, CalendarDays, CheckCircle2, CircleGauge, Flag, Medal, MessageCircle, ShieldCheck, Star, Timer, Trophy, Users, Zap } from "lucide-react";
 
@@ -63,6 +64,7 @@ export default function SeasonPage() {
     image: season?.banner_url,
     canonical: season?.slug ? `${window.location.origin}/seasons/${season.slug}` : undefined,
   });
+  useCanonicalSlugRedirect(slug, season?.slug, "/seasons");
   const load = useCallback(async () => {
     const { data: st } = await api.get(`/seasons/${slug}/standings`);
     setData(st);
