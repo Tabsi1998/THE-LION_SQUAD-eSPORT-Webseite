@@ -38,7 +38,6 @@ function applyBranding(data) {
   const siteTitle = data.site_title || DEFAULT_TITLE;
   const description = data.site_description || "THE LION SQUAD - eSPORTS";
   const themeColor = data.primary_color || "#29B6E8";
-  const icon = data.favicon_url || DEFAULT_FAVICON;
   const image = resolveMediaUrl(data.og_image_url || DEFAULT_OG_IMAGE);
   const origin = data.domain || (typeof window !== "undefined" ? window.location.origin : "");
 
@@ -46,8 +45,8 @@ function applyBranding(data) {
     document.title = siteTitle;
   }
 
-  upsertLink("icon", resolveMediaUrl(icon));
-  upsertLink("apple-touch-icon", resolveMediaUrl(icon));
+  upsertLink("icon", "/favicon.ico");
+  upsertLink("apple-touch-icon", resolveMediaUrl(DEFAULT_FAVICON));
   upsertLink("manifest", "/api/manifest.webmanifest");
 
   upsertMeta('meta[name="application-name"]', { name: "application-name", content: name });
