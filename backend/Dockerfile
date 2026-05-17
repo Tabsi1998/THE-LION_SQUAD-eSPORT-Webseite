@@ -11,11 +11,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
-    && mkdir -p /app/backend/uploads \
-    && chown -R appuser:appuser /app
+    && mkdir -p /app/backend/uploads /app/backend/uploads/public /app/backend/uploads/documents \
+    && chown -R appuser:appuser /app \
+    && chmod +x /app/docker-entrypoint.py
 
-USER appuser
+USER root
 
 EXPOSE 8001
 
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["python", "/app/docker-entrypoint.py"]

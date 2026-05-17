@@ -145,9 +145,10 @@ async def _with_email_sponsors(html: str) -> str:
 
 
 def tpl_registration(display_name: str) -> tuple[str, str]:
-    return "Willkommen im Rudel", _wrap(
-        "Willkommen, " + (display_name or "Löwe"),
+    return "Willkommen in der Community", _wrap(
+        "Willkommen in der Community, " + (display_name or "Community-Mitglied"),
         "<p>Dein Account auf der Website von THE LION SQUAD eSports ist bereit. Ab jetzt kannst du dich fuer Turniere anmelden, Teams gruenden und die F1 Fast Lap Challenge mitfahren.</p>"
+        "<p>Die offizielle Aufnahme in den Verein ist davon getrennt und erfolgt erst nach einer freigeschalteten Mitgliedschaft.</p>"
         "<p>Viel Erfolg!</p>",
     )
 
