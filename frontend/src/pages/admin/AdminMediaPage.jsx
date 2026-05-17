@@ -11,6 +11,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import {
   Image as ImageIcon, FileText, Trash2, Copy, ExternalLink, Search, RefreshCw, Upload,
+  RotateCcw, RotateCw,
 } from "lucide-react";
 
 const BACKEND = API_BASE;
@@ -33,6 +34,11 @@ const fmtBytes = (n) => {
   return `${(n / 1024 / 1024).toFixed(2)} MB`;
 };
 
+const cacheBustedMediaUrl = (url, item) => {
+  const stamp = encodeURIComponent(item?.mtime || item?.updated_at || item?.size || "");
+  return stamp ? `${url}?v=${stamp}` : url;
+};
+
 function BrokenImageState({ compact = false }) {
   return (
     <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2 text-center text-[#FF3B30]/80">
@@ -44,6 +50,7 @@ function BrokenImageState({ compact = false }) {
 
 function MediaImage({ src, alt, className, compact = false }) {
   const [error, setError] = useState(false);
+  useEffect(() => setError(false), [src]);
   if (error) return <BrokenImageState compact={compact} />;
   return <img src={src} alt={alt} className={className} loading="lazy" onError={() => setError(true)} />;
 }
@@ -123,6 +130,23 @@ export default function AdminMediaPage() {
       toast.success("URL in Zwischenablage kopiert");
     } catch {
       toast.error("Kopieren fehlgeschlagen");
+    }
+  };
+
+  const rotateImage = async (it, degrees) => {
+    try {
+      const { data } = await api.post(`/admin/media/${encodeURIComponent(it.filename)}/rotate`, { degrees });
+      const updated = {
+        ...it,
+        size: data?.size ?? it.size,
+        mtime: data?.updated_at || new Date().toISOString(),
+      };
+      setSelected(updated);
+      setItems((rows) => rows.map((row) => (row.filename === it.filename ? { ...row, ...updated } : row)));
+      toast.success("Bild gedreht.");
+      load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Bild konnte nicht gedreht werden.");
     }
   };
 
@@ -353,6 +377,7 @@ export default function AdminMediaPage() {
             {filtered.map((it) => {
               const isImg = IMG_EXT.has(it.ext);
               const fullUrl = `${BACKEND}${it.url}`;
+              const previewUrl = cacheBustedMediaUrl(fullUrl, it);
               return (
                 <div
                   key={it.filename}
@@ -363,7 +388,7 @@ export default function AdminMediaPage() {
                   <div className="aspect-square bg-[#0A0A0A] flex items-center justify-center overflow-hidden">
                     {isImg ? (
                       <MediaImage
-                        src={fullUrl}
+                        src={previewUrl}
                         alt={it.filename}
                         className="w-full h-full object-cover group-hover:scale-105 transition"
                         compact
@@ -396,6 +421,8 @@ export default function AdminMediaPage() {
           item={selected}
           onClose={() => setSelected(null)}
           onCopy={() => copyUrl(selected)}
+          onRotateLeft={() => rotateImage(selected, -90)}
+          onRotateRight={() => rotateImage(selected, 90)}
           onDelete={() => del(selected)}
         />
       )}
@@ -403,9 +430,11 @@ export default function AdminMediaPage() {
   );
 }
 
-function MediaDetailModal({ item, onClose, onCopy, onDelete }) {
+function MediaDetailModal({ item, onClose, onCopy, onRotateLeft, onRotateRight, onDelete }) {
   const isImg = IMG_EXT.has(item.ext);
+  const canRotate = ["png", "jpg", "jpeg", "webp"].includes(item.ext);
   const fullUrl = `${BACKEND}${item.url}`;
+  const previewUrl = cacheBustedMediaUrl(fullUrl, item);
   return (
     <div
       className="fixed inset-0 z-50 bg-black/80 backdrop-blur p-4 overflow-y-auto"
@@ -425,7 +454,7 @@ function MediaDetailModal({ item, onClose, onCopy, onDelete }) {
 
         <div className="bg-[#0A0A0A] rounded-sm p-3 flex items-center justify-center min-h-[300px]">
           {isImg ? (
-            <MediaImage src={fullUrl} alt={item.filename} className="max-h-[60vh] object-contain" />
+            <MediaImage src={previewUrl} alt={item.filename} className="max-h-[60vh] object-contain" />
           ) : (
             <div className="flex flex-col items-center gap-3 text-white/50 py-12">
               <FileText className="w-16 h-16" />
@@ -486,6 +515,24 @@ function MediaDetailModal({ item, onClose, onCopy, onDelete }) {
         )}
 
         <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-white/10">
+          {isImg && canRotate && (
+            <>
+              <button
+                onClick={onRotateLeft}
+                data-testid="media-rotate-left"
+                className="px-4 py-2 border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Links
+              </button>
+              <button
+                onClick={onRotateRight}
+                data-testid="media-rotate-right"
+                className="px-4 py-2 border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"
+              >
+                <RotateCw className="w-3.5 h-3.5" /> Rechts
+              </button>
+            </>
+          )}
           <button
             onClick={onCopy}
             data-testid="media-copy-url"

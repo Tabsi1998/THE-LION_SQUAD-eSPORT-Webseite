@@ -39,15 +39,31 @@ def _upload_status() -> dict:
     doc_dir = upload_dir / "documents"
     checks = []
     for label, path in (("uploads", upload_dir), ("public", public_dir), ("documents", doc_dir)):
-        exists = path.exists()
+        error = ""
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            probe = path / ".tls-write-test"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink(missing_ok=True)
+        except Exception as exc:
+            error = str(exc)
+            try:
+                (path / ".tls-write-test").unlink(missing_ok=True)
+            except Exception:
+                pass
+        exists = path.exists() and path.is_dir()
         writable = os.access(path, os.W_OK) if exists else False
+        write_test = exists and not error
         checks.append({
             "label": label,
             "path": str(path),
             "exists": exists,
             "writable": writable,
+            "write_test": write_test,
+            "ok": exists and writable and write_test,
+            "error": error,
         })
-    return {"ok": all(c["exists"] and c["writable"] for c in checks), "checks": checks}
+    return {"ok": all(c["ok"] for c in checks), "checks": checks}
 
 
 @router.get("/system-status")

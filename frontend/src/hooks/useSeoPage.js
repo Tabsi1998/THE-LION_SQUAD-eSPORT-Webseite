@@ -35,6 +35,19 @@ function upsertCanonical(href) {
   return el;
 }
 
+function removeMeta(selector) {
+  document.head.querySelector(selector)?.remove();
+}
+
+function imageMimeType(value) {
+  const path = String(value || "").split("?")[0].toLowerCase();
+  if (path.endsWith(".png")) return "image/png";
+  if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
+  if (path.endsWith(".webp")) return "image/webp";
+  if (path.endsWith(".gif")) return "image/gif";
+  return "";
+}
+
 function snapshot(elements) {
   return elements.filter(Boolean).map((el) => ({
     el,
@@ -78,9 +91,11 @@ export function useSeoPage(slug) {
       if (image) {
         upsertMeta('meta[property="og:image"]', { property: "og:image", content: image });
         upsertMeta('meta[property="og:image:secure_url"]', { property: "og:image:secure_url", content: image });
-        upsertMeta('meta[property="og:image:type"]', { property: "og:image:type", content: "image/png" });
-        upsertMeta('meta[property="og:image:width"]', { property: "og:image:width", content: "1200" });
-        upsertMeta('meta[property="og:image:height"]', { property: "og:image:height", content: "630" });
+        const type = imageMimeType(image);
+        if (type) upsertMeta('meta[property="og:image:type"]', { property: "og:image:type", content: type });
+        else removeMeta('meta[property="og:image:type"]');
+        removeMeta('meta[property="og:image:width"]');
+        removeMeta('meta[property="og:image:height"]');
         upsertMeta('meta[property="og:image:alt"]', { property: "og:image:alt", content: title });
         upsertMeta('meta[name="twitter:image"]', { name: "twitter:image", content: image });
         upsertMeta('meta[name="twitter:image:alt"]', { name: "twitter:image:alt", content: title });

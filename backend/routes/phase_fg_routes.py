@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
+from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel
 
 from database import get_db
@@ -68,6 +69,10 @@ TEXT_IMAGE_RE = re.compile(
 # ============= Media Browser =============
 media_router = APIRouter(prefix="/api/media", tags=["media"])
 admin_media_router = APIRouter(prefix="/api/admin/media", tags=["cms-admin"])
+
+
+class RotateMediaBody(BaseModel):
+    degrees: int = 90
 
 
 def _filename_from_media_value(value: Any) -> str | None:
@@ -273,6 +278,67 @@ async def _clear_media_references(url: str) -> int:
     return cleared
 
 
+def _media_file_path(filename: str) -> Path:
+    if "/" in filename or "\\" in filename or ".." in filename or filename.startswith("."):
+        raise HTTPException(400, "Ungueltiger Dateiname.")
+    p = PUBLIC_UPLOAD_DIR / filename
+    if not p.exists():
+        p = UPLOAD_DIR / filename
+    if not p.exists() or not p.is_file() or p.suffix.lower() not in PUBLIC_IMAGE_EXTS:
+        raise HTTPException(404, "Datei nicht gefunden.")
+    return p
+
+
+@admin_media_router.post("/{filename}/rotate")
+async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = Depends(require_admin())):
+    """Rotate an uploaded public image in place."""
+    p = _media_file_path(filename)
+    ext = p.suffix.lower()
+    if ext not in {".png", ".jpg", ".jpeg", ".webp"}:
+        raise HTTPException(400, "Dieses Bildformat kann hier nicht gedreht werden.")
+    degrees = int(round((body.degrees or 0) / 90) * 90)
+    if degrees % 360 == 0:
+        stat = p.stat()
+        return {"ok": True, "filename": filename, "url": f"/api/static/uploads/{filename}", "size": stat.st_size}
+    try:
+        with Image.open(p) as source:
+            img = ImageOps.exif_transpose(source)
+            rotated = img.rotate(-degrees, expand=True)
+        save_kwargs: dict[str, Any] = {}
+        if ext in {".jpg", ".jpeg"}:
+            rotated = rotated.convert("RGB")
+            image_format = "JPEG"
+            save_kwargs = {"quality": 88, "optimize": True}
+        elif ext == ".png":
+            rotated = rotated.convert("RGBA" if rotated.mode in ("RGBA", "LA", "P") else "RGB")
+            image_format = "PNG"
+            save_kwargs = {"optimize": True}
+        else:
+            if rotated.mode not in ("RGB", "RGBA"):
+                rotated = rotated.convert("RGBA" if "A" in rotated.getbands() else "RGB")
+            image_format = "WEBP"
+            save_kwargs = {"quality": 88, "method": 6}
+        rotated.save(p, format=image_format, **save_kwargs)
+    except UnidentifiedImageError:
+        raise HTTPException(400, "Ungueltige Bilddatei.")
+    except OSError as exc:
+        raise HTTPException(500, f"Drehen fehlgeschlagen: {exc}")
+
+    stat = p.stat()
+    updated_at = now_utc().isoformat()
+    await get_db().media_uploads.update_many(
+        {"filename": filename},
+        {"$set": {"size": stat.st_size, "updated_at": updated_at}},
+    )
+    return {
+        "ok": True,
+        "filename": filename,
+        "url": f"/api/static/uploads/{filename}",
+        "size": stat.st_size,
+        "updated_at": updated_at,
+    }
+
+
 @admin_media_router.delete("/{filename}")
 async def admin_delete_media(filename: str, me: dict = Depends(require_admin())):
     """Delete a file from upload dir. Path-traversal protected."""
@@ -443,18 +509,51 @@ async def robots():
     base = (branding.get("domain") or "").rstrip("/") or os.environ.get("PUBLIC_URL", "").rstrip("/")
     if base and not base.startswith(("http://", "https://")):
         base = "https://" + base
-    body = [
-        "User-agent: *",
+    private_rules = [
         "Allow: /",
+        "Allow: /api/static/uploads/",
+        "Allow: /api/manifest.webmanifest",
         "Disallow: /admin/",
         "Disallow: /display/",
         "Disallow: /api/",
         "Disallow: /login",
         "Disallow: /register",
+    ]
+    search_agents = [
+        "Googlebot",
+        "Google-InspectionTool",
+        "GoogleOther",
+        "Bingbot",
+        "DuckDuckBot",
+        "Applebot",
+        "OAI-SearchBot",
+        "ChatGPT-User",
+        "Claude-SearchBot",
+        "Claude-User",
+        "PerplexityBot",
+        "Perplexity-User",
+    ]
+    training_agents = [
+        "GPTBot",
+        "Google-Extended",
+        "ClaudeBot",
+        "anthropic-ai",
+        "CCBot",
+    ]
+    body = [
+        "User-agent: *",
+        *private_rules,
+        "",
+    ]
+    for agent in search_agents:
+        body.extend([f"User-agent: {agent}", *private_rules, ""])
+    for agent in training_agents:
+        body.extend([f"User-agent: {agent}", "Disallow: /", ""])
+    body.extend([
         f"Sitemap: {base}/sitemap.xml" if base else "Sitemap: /sitemap.xml",
         f"Sitemap: {base}/sitemap-news.xml" if base else "Sitemap: /sitemap-news.xml",
-    ]
-    return Response(content="\n".join(filter(None, body)), media_type="text/plain")
+    ])
+    return Response(content="\n".join(body).strip() + "\n", media_type="text/plain")
 
 
 # ============= JSON-LD endpoint per CMS page =============

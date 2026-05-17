@@ -36,6 +36,19 @@ function upsertCanonical() {
   return el;
 }
 
+function removeMeta(selector) {
+  document.querySelector(selector)?.remove();
+}
+
+function imageMimeType(value) {
+  const path = String(value || "").split("?")[0].toLowerCase();
+  if (path.endsWith(".png")) return "image/png";
+  if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
+  if (path.endsWith(".webp")) return "image/webp";
+  if (path.endsWith(".gif")) return "image/gif";
+  return "";
+}
+
 function snapshot(elements, attrs = ["content", "href"]) {
   return elements.map((el) => ({
     el,
@@ -76,8 +89,6 @@ export function useDocumentTitle(title, description, options = {}) {
     const ogImage = upsertMeta('meta[property="og:image"]', { property: "og:image" });
     const ogSecureImage = upsertMeta('meta[property="og:image:secure_url"]', { property: "og:image:secure_url" });
     const ogImageType = upsertMeta('meta[property="og:image:type"]', { property: "og:image:type" });
-    const ogImageWidth = upsertMeta('meta[property="og:image:width"]', { property: "og:image:width" });
-    const ogImageHeight = upsertMeta('meta[property="og:image:height"]', { property: "og:image:height" });
     const ogImageAlt = upsertMeta('meta[property="og:image:alt"]', { property: "og:image:alt" });
     const twitterCard = upsertMeta('meta[name="twitter:card"]', { name: "twitter:card" });
     const twitterTitle = upsertMeta('meta[name="twitter:title"]', { name: "twitter:title" });
@@ -85,7 +96,7 @@ export function useDocumentTitle(title, description, options = {}) {
     const twitterImage = upsertMeta('meta[name="twitter:image"]', { name: "twitter:image" });
     const twitterImageAlt = upsertMeta('meta[name="twitter:image:alt"]', { name: "twitter:image:alt" });
     const canonical = upsertCanonical();
-    const routeManaged = [descTag, ogType, ogTitle, ogDesc, ogUrl, ogImage, ogSecureImage, ogImageType, ogImageWidth, ogImageHeight, ogImageAlt, twitterCard, twitterTitle, twitterDesc, twitterImage, twitterImageAlt, canonical];
+    const routeManaged = [descTag, ogType, ogTitle, ogDesc, ogUrl, ogImage, ogSecureImage, ogImageType, ogImageAlt, twitterCard, twitterTitle, twitterDesc, twitterImage, twitterImageAlt, canonical];
     const previous = snapshot(routeManaged);
     routeManaged.forEach(markRouteManaged);
 
@@ -97,9 +108,11 @@ export function useDocumentTitle(title, description, options = {}) {
     ogUrl.setAttribute("content", canonicalHref);
     ogImage.setAttribute("content", image);
     ogSecureImage.setAttribute("content", image);
-    ogImageType.setAttribute("content", "image/png");
-    ogImageWidth.setAttribute("content", "1200");
-    ogImageHeight.setAttribute("content", "630");
+    const imageType = imageMimeType(image);
+    if (imageType) ogImageType.setAttribute("content", imageType);
+    else ogImageType.removeAttribute("content");
+    removeMeta('meta[property="og:image:width"]');
+    removeMeta('meta[property="og:image:height"]');
     ogImageAlt.setAttribute("content", fullTitle);
     twitterImage.setAttribute("content", image);
     twitterImageAlt.setAttribute("content", fullTitle);

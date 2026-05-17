@@ -30,6 +30,17 @@ def _domain_from_url(value: str | None) -> str:
     return base.replace("https://", "").replace("http://", "").split("/")[0]
 
 
+def _image_mime_from_url(value: str | None) -> str:
+    path = str(value or "").split("?", 1)[0].lower()
+    if path.endswith(".png"):
+        return "image/png"
+    if path.endswith((".jpg", ".jpeg")):
+        return "image/jpeg"
+    if path.endswith(".webp"):
+        return "image/webp"
+    return "image/png"
+
+
 def _truthy_mail_config(mail: dict, legacy_email: dict) -> bool:
     provider = mail.get("provider") or ("resend" if legacy_email.get("resend_api_key") else "")
     if provider == "resend":
@@ -400,7 +411,7 @@ async def web_manifest():
     name = branding.get("club_name") or "THE LION SQUAD"
     name = branding.get("site_title") or name
     description = branding.get("site_description") or "THE LION SQUAD - eSPORTS"
-    icon = "/assets/brand/tls-favicon.png"
+    icon = branding.get("favicon_url") or branding.get("mascot_url") or "/assets/brand/tls-favicon.png"
     default_screenshot = branding.get("logo_url") or branding.get("mascot_url") or "/assets/brand/tls-wordmark.png"
     manifest = {
         "name": name,
@@ -412,11 +423,11 @@ async def web_manifest():
         "background_color": "#0A0A0A",
         "theme_color": branding.get("primary_color") or "#29B6E8",
         "icons": [
-            {"src": icon, "sizes": "192x192", "purpose": "any"},
-            {"src": icon, "sizes": "512x512", "purpose": "any maskable"},
+            {"src": icon, "sizes": "192x192", "type": _image_mime_from_url(icon), "purpose": "any"},
+            {"src": icon, "sizes": "512x512", "type": _image_mime_from_url(icon), "purpose": "any maskable"},
         ],
         "screenshots": [
-            {"src": default_screenshot, "sizes": "1200x630", "type": "image/png", "form_factor": "wide"},
+            {"src": default_screenshot, "sizes": "1200x630", "type": _image_mime_from_url(default_screenshot), "form_factor": "wide"},
         ],
     }
     return Response(content=json.dumps(manifest), media_type="application/manifest+json")

@@ -31,6 +31,20 @@ function upsertLink(rel, href) {
   el.setAttribute("href", href);
 }
 
+function removeMeta(selector) {
+  const el = document.head.querySelector(selector);
+  if (el?.getAttribute("data-tls-route-meta") !== "true") el?.remove();
+}
+
+function imageMimeType(value) {
+  const path = String(value || "").split("?")[0].toLowerCase();
+  if (path.endsWith(".png")) return "image/png";
+  if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
+  if (path.endsWith(".webp")) return "image/webp";
+  if (path.endsWith(".gif")) return "image/gif";
+  return "";
+}
+
 function applyBranding(data) {
   if (!data) return;
 
@@ -39,14 +53,15 @@ function applyBranding(data) {
   const description = data.site_description || "THE LION SQUAD - eSPORTS";
   const themeColor = data.primary_color || "#29B6E8";
   const image = resolveMediaUrl(data.logo_url || data.mascot_url || DEFAULT_SHARE_IMAGE);
+  const favicon = resolveMediaUrl(data.favicon_url || data.mascot_url || DEFAULT_FAVICON);
   const origin = data.domain || (typeof window !== "undefined" ? window.location.origin : "");
 
   if (!document.title || document.title === DEFAULT_TITLE || /React App|Vereinsplattform/i.test(document.title)) {
     document.title = siteTitle;
   }
 
-  upsertLink("icon", "/favicon.ico");
-  upsertLink("apple-touch-icon", resolveMediaUrl(DEFAULT_FAVICON));
+  upsertLink("icon", favicon);
+  upsertLink("apple-touch-icon", favicon);
   upsertLink("manifest", "/api/manifest.webmanifest");
 
   upsertMeta('meta[name="application-name"]', { name: "application-name", content: name });
@@ -58,9 +73,11 @@ function applyBranding(data) {
   upsertMeta('meta[property="og:url"]', { property: "og:url", content: origin });
   upsertMeta('meta[property="og:image"]', { property: "og:image", content: image });
   upsertMeta('meta[property="og:image:secure_url"]', { property: "og:image:secure_url", content: image });
-  upsertMeta('meta[property="og:image:type"]', { property: "og:image:type", content: "image/png" });
-  upsertMeta('meta[property="og:image:width"]', { property: "og:image:width", content: "1200" });
-  upsertMeta('meta[property="og:image:height"]', { property: "og:image:height", content: "630" });
+  const imageType = imageMimeType(image);
+  if (imageType) upsertMeta('meta[property="og:image:type"]', { property: "og:image:type", content: imageType });
+  else removeMeta('meta[property="og:image:type"]');
+  removeMeta('meta[property="og:image:width"]');
+  removeMeta('meta[property="og:image:height"]');
   upsertMeta('meta[property="og:image:alt"]', { property: "og:image:alt", content: siteTitle });
   upsertMeta('meta[name="twitter:card"]', { name: "twitter:card", content: "summary_large_image" });
   upsertMeta('meta[name="twitter:title"]', { name: "twitter:title", content: siteTitle });

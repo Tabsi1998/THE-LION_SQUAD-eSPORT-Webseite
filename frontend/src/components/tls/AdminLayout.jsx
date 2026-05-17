@@ -7,7 +7,7 @@ import {
   ExternalLink, Menu, X, Settings as SettingsIcon,
   ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon,
   Award, Inbox, UserCheck, Medal,
-  FolderOpen, AlertTriangle, Handshake,
+  FolderOpen, FileText, AlertTriangle, Handshake,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -20,6 +20,7 @@ export function AdminLayout({ children }) {
     { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
     { to: "/admin/members", label: "Mitglieder", icon: Crown },
     { to: "/admin/benefits", label: "Mitgliedervorteile", icon: Gift },
+    { to: "/admin/documents", label: "Dokumente", icon: FileText },
     { to: "/admin/users", label: "Benutzer", icon: UsersIcon },
     { to: "/admin/tournaments", label: "Turniere", icon: Trophy },
     { to: "/admin/f1", label: "Fast Lap", icon: Flag },

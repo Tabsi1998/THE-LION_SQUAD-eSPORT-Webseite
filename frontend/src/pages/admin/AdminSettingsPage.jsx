@@ -1662,7 +1662,7 @@ export default function AdminSettingsPage() {
             <SystemCard title="Datenbank" ok={systemStatus?.database?.ok} detail={systemStatus?.database?.error || "MongoDB Ping"} />
             <SystemCard title="SMTP / Mail" ok={systemStatus?.smtp?.ok} detail={`${systemStatus?.smtp?.provider || "-"} ${systemStatus?.smtp?.host || ""}`} problem={systemStatus?.smtp?.latest_problem?.error} />
             <SystemCard title="Discord" ok={systemStatus?.discord?.ok} detail={systemStatus?.discord?.configured ? "Webhook konfiguriert" : "Kein Webhook"} problem={systemStatus?.discord?.latest?.error} />
-            <SystemCard title="Uploads" ok={systemStatus?.uploads?.ok} detail={(systemStatus?.uploads?.checks || []).map((c) => `${c.label}: ${c.exists && c.writable ? "OK" : "NO"}`).join(" · ")} />
+            <SystemCard title="Uploads" ok={systemStatus?.uploads?.ok} detail={(systemStatus?.uploads?.checks || []).map((c) => `${c.label}: ${c.ok ? "OK" : "NO"}`).join(" · ")} />
             <SystemCard title="Scheduler" ok={systemStatus?.scheduler?.running} detail={(systemStatus?.scheduler?.jobs || []).map((j) => `${j.id}: ${j.next_run_time ? new Date(j.next_run_time).toLocaleString("de-DE") : "-"}`).join(" · ")} />
             <SystemCard title="Mail-Queue" ok={(systemStatus?.mail_queue?.failed || 0) === 0} detail={systemStatus?.mail_queue ? `pending ${systemStatus.mail_queue.pending || 0} · failed ${systemStatus.mail_queue.failed || 0} · sent ${systemStatus.mail_queue.sent || 0}` : "-"} />
           </div>
@@ -1674,7 +1674,8 @@ export default function AdminSettingsPage() {
                   <div key={c.label} className="grid md:grid-cols-[120px_1fr_120px] gap-2 border-b border-white/5 pb-2">
                     <span className="text-white/70">{c.label}</span>
                     <span className="font-mono text-white/50 break-all">{c.path}</span>
-                    <span className={c.exists && c.writable ? "text-[#00FF88]" : "text-[#FF3B30]"}>{c.exists && c.writable ? "beschreibbar" : "pruefen"}</span>
+                    <span className={c.ok ? "text-[#00FF88]" : "text-[#FF3B30]"}>{c.ok ? "beschreibbar" : "nicht beschreibbar"}</span>
+                    {c.error && <span className="md:col-start-2 md:col-span-2 text-[#FF3B30] break-words">{c.error}</span>}
                   </div>
                 ))}
               </div>

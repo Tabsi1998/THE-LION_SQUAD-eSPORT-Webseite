@@ -10,7 +10,7 @@ import pathlib
 import logging
 from io import BytesIO
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
-from PIL import Image, ImageChops, UnidentifiedImageError
+from PIL import Image, ImageChops, ImageOps, UnidentifiedImageError
 from auth import require_admin, get_current_user
 from database import get_db
 from models import new_id, now_utc
@@ -175,6 +175,7 @@ async def _upload_image_impl(
                     detail=f"Nur PNG, JPG oder WebP erlaubt. Erkannt: {detected_format or declared_content_type or 'unbekannt'}",
                 )
             content_type, ext = PIL_IMAGE_FORMATS[detected_format]
+            img = ImageOps.exif_transpose(img)
             if declared_content_type and declared_content_type not in ALLOWED_IMAGE:
                 logger.info(
                     "[uploads] accepted image with browser content-type %s after detecting %s (%s)",

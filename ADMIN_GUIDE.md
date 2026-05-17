@@ -70,6 +70,23 @@ Empfohlene Pflege:
 - Eventbilder als echtes Event-Cover hochladen.
 - Sponsorenlogos moeglichst transparent oder sauber freigestellt hochladen.
 - Vereinsmitgliederbilder mit transparentem Hintergrund funktionieren gut, weil die Karten darauf ausgelegt sind.
+- Falls ein Foto nach dem Upload falsch gedreht ist: `Admin -> Medien` oeffnen, Bild anklicken und mit `Links` oder `Rechts` drehen.
+
+### Mitglieder-Dokumente
+
+Dokumente fuer Mitglieder werden getrennt von oeffentlichen Bildern gespeichert und nicht direkt als statische Datei ausgeliefert.
+
+Empfohlener Ablauf:
+
+1. `Admin -> Dokumente` oeffnen.
+2. `Neues Dokument` waehlen und Datei hochladen.
+3. Titel, Kategorie und Sichtbarkeit pflegen.
+4. Sichtbarkeit waehlen:
+   - `public`: oeffentlich
+   - `community`: eingeloggte Community
+   - `members`: aktive Vereinsmitglieder und Admins
+   - `internal`: nur Admins
+5. Speichern. Mitglieder finden freigegebene Dokumente unter `Mitgliederbereich -> Dokumente`.
 
 ## Mitglieder, Vereinsmitglieder und Vorstand
 

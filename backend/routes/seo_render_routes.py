@@ -60,12 +60,17 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         branding.get("logo_url") or branding.get("mascot_url") or "/assets/brand/tls-favicon.png",
         origin,
     )
+    favicon = absolute_url(
+        branding.get("favicon_url") or branding.get("mascot_url") or "/assets/brand/tls-favicon.png",
+        origin,
+    )
 
     meta = {
         "title": branding.get("site_title") or "THE LION SQUAD - eSPORTS",
         "description": default_description,
         "image": default_image,
         "logo": default_logo,
+        "favicon": favicon,
         "url": canonical,
         "canonical": canonical,
         "site_name": site_name,
@@ -295,7 +300,7 @@ async def member_profile_meta(db, slug: str, base: dict, origin: str) -> dict:
     profile = await db.club_member_profiles.find_one({"slug": slug, "is_active": {"$ne": False}}, {"_id": 0})
     if not profile:
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
-    image = absolute_url(profile.get("avatar_url") or profile.get("banner_url") or base["image"], origin)
+    image = absolute_url(profile.get("photo_url") or profile.get("cover_url") or profile.get("avatar_url") or profile.get("banner_url") or base["image"], origin)
     meta = {
         **base,
         "title": f"{profile.get('display_name') or profile.get('gamertag')} · {base['site_name']}",
@@ -373,6 +378,7 @@ def render_preview_html(meta: dict) -> str:
     title = escape(meta["title"])
     description = escape(meta["description"])
     image = escape(meta["image"])
+    favicon = escape(meta.get("favicon") or meta.get("logo") or "/favicon.ico")
     url = escape(meta["url"])
     canonical = escape(meta["canonical"])
     site_name = escape(meta["site_name"])
@@ -380,6 +386,9 @@ def render_preview_html(meta: dict) -> str:
     locale = escape(meta.get("locale") or "de_AT")
     json_ld = json_ld_script_content(meta.get("json_ld") or webpage_json_ld(meta))
     optional = []
+    image_type = image_mime_type(meta.get("image"))
+    if image_type:
+        optional.append(f'<meta property="og:image:type" content="{escape(image_type)}" />')
     if meta.get("published_time"):
         optional.append(f'<meta property="article:published_time" content="{escape(str(meta["published_time"]))}" />')
     if meta.get("modified_time"):
@@ -394,6 +403,8 @@ def render_preview_html(meta: dict) -> str:
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
+    <link rel="icon" href="{favicon}" />
+    <link rel="apple-touch-icon" href="{favicon}" />
     <link rel="canonical" href="{canonical}" />
     <meta name="description" content="{description}" />
     <meta property="og:type" content="{type_}" />
@@ -404,9 +415,6 @@ def render_preview_html(meta: dict) -> str:
     <meta property="og:url" content="{url}" />
     <meta property="og:image" content="{image}" />
     <meta property="og:image:secure_url" content="{image}" />
-    <meta property="og:image:type" content="image/png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="{title}" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="{title}" />
@@ -458,6 +466,17 @@ def absolute_url(value: str | None, origin: str) -> str:
     elif not raw.startswith("/"):
         raw = f"/{raw}"
     return f"{origin}{raw}"
+
+
+def image_mime_type(value: str | None) -> str:
+    ext = os.path.splitext(urlparse(str(value or "")).path.lower())[1]
+    return {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+    }.get(ext, "")
 
 
 def clean_text(value: str | None, max_len: int = 180) -> str:
