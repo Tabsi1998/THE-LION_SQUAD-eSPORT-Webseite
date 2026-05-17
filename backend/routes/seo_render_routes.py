@@ -108,11 +108,11 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         if first == "membership" and len(parts) > 1:
             specific = static_page_meta("/".join(parts[:2]), meta)
             if specific:
-                return specific
+                return add_breadcrumbs(specific, origin, [("Mitgliedschaft", "/membership")])
             raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
         if first == "membership":
             raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
-        return static
+        return add_breadcrumbs(static, origin)
     raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
 
 
@@ -143,7 +143,7 @@ async def news_meta(db, slug: str, base: dict, origin: str) -> dict:
         "publisher": {"@type": "Organization", "name": base["site_name"], "logo": {"@type": "ImageObject", "url": base.get("logo") or base["image"]}},
         "mainEntityOfPage": meta["canonical"],
     }
-    return meta
+    return add_breadcrumbs(meta, origin, [("News", "/news")], post.get("title"))
 
 
 async def event_meta(db, slug: str, base: dict, origin: str) -> dict:
@@ -174,7 +174,7 @@ async def event_meta(db, slug: str, base: dict, origin: str) -> dict:
         "organizer": {"@type": "Organization", "name": event.get("organizer_name") or base["site_name"], "url": event.get("organizer_url") or origin},
         "url": meta["canonical"],
     }
-    return meta
+    return add_breadcrumbs(meta, origin, [("Events", "/events")], event.get("name"))
 
 
 async def tournament_meta(db, slug: str, suffix: str, base: dict, origin: str) -> dict:
@@ -209,7 +209,10 @@ async def tournament_meta(db, slug: str, suffix: str, base: dict, origin: str) -
         "organizer": {"@type": "Organization", "name": base["site_name"], "url": origin},
         "url": meta["canonical"],
     }
-    return meta
+    parents = [("Turniere", "/tournaments")]
+    if suffix_label:
+        parents.append((title, f"/tournaments/{slug}"))
+    return add_breadcrumbs(meta, origin, parents, suffix_label or title)
 
 
 async def fastlap_meta(db, slug: str, base: dict, origin: str) -> dict:
@@ -226,7 +229,7 @@ async def fastlap_meta(db, slug: str, base: dict, origin: str) -> dict:
         "type": "website",
     }
     meta["json_ld"] = webpage_json_ld(meta)
-    return meta
+    return add_breadcrumbs(meta, origin, [("Fast Lap", "/fastlap")], challenge.get("title"))
 
 
 async def season_meta(db, slug: str, base: dict, origin: str) -> dict:
@@ -243,7 +246,7 @@ async def season_meta(db, slug: str, base: dict, origin: str) -> dict:
         "type": "website",
     }
     meta["json_ld"] = webpage_json_ld(meta)
-    return meta
+    return add_breadcrumbs(meta, origin, [("Season Pass", "/seasons")], season.get("name"))
 
 
 async def gallery_meta(db, slug: str, base: dict, origin: str) -> dict:
@@ -260,7 +263,7 @@ async def gallery_meta(db, slug: str, base: dict, origin: str) -> dict:
         "type": "website",
     }
     meta["json_ld"] = webpage_json_ld(meta)
-    return meta
+    return add_breadcrumbs(meta, origin, [("Galerie", "/galerie")], album.get("title"))
 
 
 async def team_meta(db, team_id: str, base: dict, origin: str) -> dict:
@@ -285,7 +288,7 @@ async def team_meta(db, team_id: str, base: dict, origin: str) -> dict:
         "image": image,
         "memberOf": {"@type": "Organization", "name": base["site_name"], "url": origin},
     }
-    return meta
+    return add_breadcrumbs(meta, origin, [("Teams", "/teams")], title)
 
 
 async def member_profile_meta(db, slug: str, base: dict, origin: str) -> dict:
@@ -301,7 +304,7 @@ async def member_profile_meta(db, slug: str, base: dict, origin: str) -> dict:
         "type": "profile",
     }
     meta["json_ld"] = webpage_json_ld(meta)
-    return meta
+    return add_breadcrumbs(meta, origin, [("Vereinsmitglieder", "/members")], profile.get("display_name") or profile.get("gamertag"))
 
 
 async def user_profile_meta(db, username: str, base: dict, origin: str) -> dict:
@@ -318,7 +321,7 @@ async def user_profile_meta(db, username: str, base: dict, origin: str) -> dict:
         "type": "profile",
     }
     meta["json_ld"] = webpage_json_ld(meta)
-    return meta
+    return add_breadcrumbs(meta, origin, [("Community-Spieler", "/players")], label)
 
 
 def static_page_meta(slug: str, base: dict) -> dict | None:
@@ -524,6 +527,68 @@ def website_json_ld(origin: str, name: str, description: str, image: str, logo: 
     if cleaned:
         data["sameAs"] = cleaned
     return data
+
+
+def add_breadcrumbs(meta: dict, origin: str, parents: list[tuple[str, str]] | None = None, current_label: str | None = None) -> dict:
+    trail: list[tuple[str, str]] = [("Startseite", origin)]
+    for label, href in parents or []:
+        if label and href:
+            url = breadcrumb_url(origin, href)
+            if trail[-1][1] != url:
+                trail.append((label, url))
+
+    current_url = meta.get("canonical") or meta.get("url")
+    if current_url and trail[-1][1] != current_url:
+        trail.append(((current_label or title_without_site(meta)).strip() or "Seite", current_url))
+
+    if len(trail) <= 1:
+        return meta
+
+    breadcrumb = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": index,
+                "name": label,
+                "item": url,
+            }
+            for index, (label, url) in enumerate(trail, start=1)
+        ],
+    }
+    meta["breadcrumbs"] = [{"name": label, "url": url} for label, url in trail]
+    meta["json_ld"] = json_ld_graph(meta.get("json_ld") or webpage_json_ld(meta), breadcrumb)
+    return meta
+
+
+def breadcrumb_url(origin: str, href: str) -> str:
+    raw = str(href or "").strip()
+    if raw.startswith(("http://", "https://")):
+        return raw.rstrip("/") or raw
+    if not raw.startswith("/"):
+        raw = f"/{raw}"
+    if raw == "/":
+        return origin
+    return f"{origin}{raw.rstrip('/')}"
+
+
+def title_without_site(meta: dict) -> str:
+    title = str(meta.get("title") or "").strip()
+    if not title:
+        return "Seite"
+    return title.rsplit(" · ", 1)[0].strip() or title
+
+
+def json_ld_graph(primary: dict, breadcrumb: dict) -> dict:
+    primary_node = dict(primary or {})
+    breadcrumb_node = dict(breadcrumb or {})
+    primary_node.pop("@context", None)
+    breadcrumb_node.pop("@context", None)
+    return {
+        "@context": "https://schema.org",
+        "@graph": [primary_node, breadcrumb_node],
+    }
 
 
 def webpage_json_ld(meta: dict) -> dict:

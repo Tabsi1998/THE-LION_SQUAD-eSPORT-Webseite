@@ -97,4 +97,9 @@ def test_seo_preview_known_static_path_still_resolves(monkeypatch):
 
     assert meta["canonical"] == "https://lionsquad.at/about"
     assert meta["image"] == "https://lionsquad.at/api/static/uploads/logo.png"
-    assert meta["json_ld"]["@type"] == "WebPage"
+    graph_types = {item["@type"] for item in meta["json_ld"]["@graph"]}
+    assert graph_types == {"WebPage", "BreadcrumbList"}
+    assert meta["breadcrumbs"] == [
+        {"name": "Startseite", "url": "https://lionsquad.at"},
+        {"name": "Verein", "url": "https://lionsquad.at/about"},
+    ]
