@@ -413,6 +413,7 @@ class TournamentCreate(BaseModel):
     platform: Optional[str] = None
     event_id: Optional[str] = None
     format: TournamentFormat = "single_elim"
+    format_label: Optional[str] = None
     team_mode: TeamMode = "solo"
     team_size: int = 1
     substitutes_allowed: bool = False
@@ -465,6 +466,7 @@ class TournamentUpdate(BaseModel):
     platform: Optional[str] = None
     event_id: Optional[str] = None
     format: Optional[TournamentFormat] = None
+    format_label: Optional[str] = None
     status: Optional[TournamentStatus] = None
     team_mode: Optional[TeamMode] = None
     team_size: Optional[int] = None

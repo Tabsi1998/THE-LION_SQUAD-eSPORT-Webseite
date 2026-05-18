@@ -3,7 +3,7 @@ import { PhaseBadge } from "./PhaseBadge";
 import { Calendar, Users, Trophy } from "lucide-react";
 import { formatDate, getRegistrationState } from "@/lib/datetime";
 import { resolveMediaUrl } from "@/lib/api";
-import { formatTournamentFormat } from "@/lib/tournamentLabels";
+import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 
 export function TournamentCard({ tournament, index = 0 }) {
   const t = tournament;
@@ -27,7 +27,7 @@ export function TournamentCard({ tournament, index = 0 }) {
         <div className="absolute top-3 inset-x-3 flex flex-col items-start gap-1.5 sm:flex-row sm:items-start sm:justify-between">
           <PhaseBadge phase={t.public_phase} status={t.status} className="max-w-full sm:max-w-[68%]" />
           <span className="max-w-full sm:max-w-[48%] text-[10px] font-bold uppercase tracking-wider text-[#29B6E8] bg-[#29B6E8]/10 border border-[#29B6E8]/30 px-2 py-1 rounded-sm leading-tight break-words">
-            {formatTournamentFormat(t.format)}
+            {formatTournamentDisplay(t)}
           </span>
         </div>
       </div>

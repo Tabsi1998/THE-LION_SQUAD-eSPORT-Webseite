@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { formatTournamentFormat } from "@/lib/tournamentLabels";
+import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 
 export default function AdminTournamentsPage() {
@@ -80,7 +80,7 @@ export default function AdminTournamentsPage() {
                   <Link to={`/admin/tournaments/${t.id}`} className="font-semibold hover:text-[#29B6E8]">{t.title}</Link>
                 </td>
                 <td className="px-4 py-3 text-white/70">{gameLabel(t.game) || "—"}</td>
-                <td className="px-4 py-3 text-white/70">{formatTournamentFormat(t.format)}</td>
+                <td className="px-4 py-3 text-white/70">{formatTournamentDisplay(t)}</td>
                 <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
                 <td className="px-4 py-3 text-right">{t.participant_count}/{t.max_participants}</td>
                 <td className="px-4 py-3 text-right">

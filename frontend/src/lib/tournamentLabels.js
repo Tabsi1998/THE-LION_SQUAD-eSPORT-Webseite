@@ -176,6 +176,15 @@ export function formatTournamentFormat(value) {
   return TOURNAMENT_FORMAT_LABELS[value] || fallbackLabel(value);
 }
 
+export function formatTournamentDisplay(tournamentOrFormat) {
+  if (tournamentOrFormat && typeof tournamentOrFormat === "object") {
+    const customLabel = String(tournamentOrFormat.format_label || tournamentOrFormat.format_display_name || "").trim();
+    if (customLabel) return customLabel;
+    return formatTournamentFormat(tournamentOrFormat.format);
+  }
+  return formatTournamentFormat(tournamentOrFormat);
+}
+
 export function formatStageType(value) {
   return STAGE_TYPE_LABELS[value] || fallbackLabel(value);
 }

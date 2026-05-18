@@ -5,7 +5,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { motion } from "framer-motion";
 import { Calendar, Users, MapPin, ArrowRight, Flame, Flag, Trophy } from "lucide-react";
 import { PhaseBadge } from "./PhaseBadge";
-import { formatTournamentFormat } from "@/lib/tournamentLabels";
+import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 
 /**
  * CurrentEventHero — Prominent hero card on home.
@@ -116,7 +116,7 @@ export function CurrentEventHero() {
               <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-xs">
                 <span className="text-[10px] uppercase tracking-widest text-white/40">{kind === "f1" ? "Modus" : "Format"}</span>
                 <span className="font-heading font-bold uppercase text-[#29B6E8]">
-                  {kind === "f1" ? (item.is_championship ? "Meisterschaft" : "Einzeltag") : formatTournamentFormat(item.format)}
+                  {kind === "f1" ? (item.is_championship ? "Meisterschaft" : "Einzeltag") : formatTournamentDisplay(item)}
                 </span>
               </div>
             </div>

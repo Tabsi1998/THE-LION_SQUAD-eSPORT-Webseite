@@ -15,7 +15,7 @@ import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
 import { formatDateTime, getRegistrationState } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
-import { formatTeamMode, formatTournamentFormat } from "@/lib/tournamentLabels";
+import { formatTeamMode, formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -156,7 +156,7 @@ export default function TournamentDetailPage() {
           <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "eSports", to: "/tournaments" }, { label: "Turniere", to: "/tournaments" }, { label: t.title }]} className="mb-4" />
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <PhaseBadge phase={t.public_phase} status={t.status} size="lg" />
-            <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1">{formatTournamentFormat(t.format)}</span>
+            <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1">{formatTournamentDisplay(t)}</span>
             {t.game && <span className="text-white/60 text-sm">· {gameLabel(t.game)}</span>}
           </div>
           <h1 data-testid="tournament-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{t.title}</h1>
@@ -166,7 +166,7 @@ export default function TournamentDetailPage() {
             <InfoTile icon={Calendar} label="Start" value={formatDateTime(t.start_date)} />
             <InfoTile icon={Users} label={isTeamTournament ? "Teams" : "Teilnehmer"} value={`${t.participant_count}/${t.max_participants}`} />
             <InfoTile icon={Gamepad2} label="Plattform" value={t.platform || "—"} />
-            <InfoTile icon={Trophy} label="Format" value={formatTournamentFormat(t.format)} />
+            <InfoTile icon={Trophy} label="Format" value={formatTournamentDisplay(t)} />
           </div>
 
           <div className={`mt-5 border rounded-sm px-4 py-3 text-sm max-w-3xl ${

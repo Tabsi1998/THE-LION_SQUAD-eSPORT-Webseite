@@ -21,6 +21,7 @@ const PRIZE_GROUP_OPTIONS = [
   ["loser", "Loser-Bracket"],
   ["special", "Sonderpreis"],
 ];
+const BRONZE_FORMATS = new Set(["single_elim"]);
 
 export default function AdminTournamentNewPage() {
   const nav = useNavigate();
@@ -28,7 +29,7 @@ export default function AdminTournamentNewPage() {
   const [events, setEvents] = useState([]);
   const [form, setForm] = useState({
     title: "", slug: "", description: "", game_id: "",
-    platform: "", event_id: "", format: "single_elim",
+    platform: "", event_id: "", format: "single_elim", format_label: "",
     team_mode: "solo", team_size: 1,
     max_participants: 16, min_participants: 2,
     registration_enabled: true, is_invite_only: false, block_club_member_registration: false,
@@ -60,6 +61,7 @@ export default function AdminTournamentNewPage() {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setTeamMode = (value) => setForm((f) => ({ ...f, team_mode: value, team_size: value === "solo" ? 1 : Math.max(2, Number(f.team_size) || 2) }));
+  const setFormat = (value) => setForm((f) => ({ ...f, format: value, bronze_match: BRONZE_FORMATS.has(value) ? f.bronze_match : false }));
   const addPrizeTop3 = (group) => set("prize_places", [
     ...(form.prize_places || []),
     ...[1, 2, 3].map((place) => ({ group, place, label: `${place}. Platz`, value: "" })),
@@ -72,6 +74,8 @@ export default function AdminTournamentNewPage() {
       const payload = { ...form };
       payload.team_mode = payload.team_mode === "solo" ? "solo" : "team";
       payload.team_size = payload.team_mode === "solo" ? 1 : Number(payload.team_size || 2);
+      payload.format_label = (payload.format_label || "").trim() || null;
+      if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
       if (!payload.event_id) delete payload.event_id;
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
       // Filter empty prize places
@@ -115,7 +119,8 @@ export default function AdminTournamentNewPage() {
           <Select label="Spiel *" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} required testId="new-tr-game" />
         </Row>
         <Row>
-          <Select label="Format" value={form.format} onChange={(v) => set("format", v)} options={TOURNAMENT_FORMAT_OPTIONS} testId="new-tr-format" />
+          <Select label="Format" value={form.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} testId="new-tr-format" />
+          <Field label="Format-Anzeigename" value={form.format_label} onChange={(v) => set("format_label", v)} placeholder="z.B. Gamers Heaven F1 Heat" testId="new-tr-format-label" />
           <Select label="Teilnahme" value={form.team_mode} onChange={setTeamMode} options={[["solo", "Einzelspieler"], ["team", "Team"]]} testId="new-tr-mode" />
         </Row>
         <Row>
@@ -175,10 +180,12 @@ export default function AdminTournamentNewPage() {
             <Field label="Best of" type="number" value={form.best_of} onChange={(v) => set("best_of", Number(v))} testId="new-tr-bestof" />
             <Select label="Seeding" value={form.seeding_mode} onChange={(v) => set("seeding_mode", v)} options={[["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]]} testId="new-tr-seeding" />
           </Row>
-          <label className="mt-3 flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.bronze_match} onChange={(e) => set("bronze_match", e.target.checked)} data-testid="new-tr-bronze" className="accent-[#29B6E8]" />
-            <span>Spiel um Platz 3 ermitteln</span>
-          </label>
+          {BRONZE_FORMATS.has(form.format) && (
+            <label className="mt-3 flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.bronze_match} onChange={(e) => set("bronze_match", e.target.checked)} data-testid="new-tr-bronze" className="accent-[#29B6E8]" />
+              <span>Spiel um Platz 3 ermitteln</span>
+            </label>
+          )}
         </Details>
 
         {/* Structured Prize Places */}

@@ -1050,6 +1050,9 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
         raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
     doc = body.model_dump()
     doc["slug"] = await unique_slug(db.tournaments, doc.get("slug") or doc.get("title"), fallback="turnier")
+    doc["format_label"] = (doc.get("format_label") or "").strip() or None
+    if doc.get("format") != "single_elim":
+        doc["bronze_match"] = False
     # ISO-serialize datetimes
     for k in ["registration_open_from", "registration_open_until", "check_in_from",
               "check_in_until", "start_date", "end_date"]:
@@ -1077,12 +1080,17 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
     existing = await _ensure_tournament_unlocked(db, tid)
     raw_updates = body.model_dump(exclude_unset=True)
+    if "format_label" in raw_updates:
+        raw_updates["format_label"] = (raw_updates.get("format_label") or "").strip() or None
+    effective_format = raw_updates.get("format", existing.get("format"))
+    if effective_format != "single_elim":
+        raw_updates["bronze_match"] = False
     nullable_fields = {
         "description", "platform", "event_id", "registration_open_from",
         "registration_open_until", "check_in_from", "check_in_until",
         "start_date", "end_date", "rules", "prize_pool", "prize_places",
         "stream_link", "twitch_channel", "discord_link", "location",
-        "banner_url", "stream_platform", "stream_url", "stream_title",
+        "banner_url", "stream_platform", "stream_url", "stream_title", "format_label",
     }
     updates = {k: v for k, v in raw_updates.items() if v is not None or k in nullable_fields}
     slug_source = slug_source_for_update(raw_updates, existing, "title", fallback="turnier")

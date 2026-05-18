@@ -7,7 +7,7 @@ import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { formatTournamentFormat } from "@/lib/tournamentLabels";
+import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { Tv } from "lucide-react";
 
 export default function TournamentBracketPage() {
@@ -46,7 +46,7 @@ export default function TournamentBracketPage() {
             <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">{t.title}</h1>
             <div className="mt-2 flex gap-2 items-center">
               <PhaseBadge phase={t.public_phase} status={t.status} />
-              <span className="text-white/40 text-sm">{formatTournamentFormat(t.format)}</span>
+              <span className="text-white/40 text-sm">{formatTournamentDisplay(t)}</span>
             </div>
           </div>
           <Link to={`/display/bracket/${t.id}`} target="_blank" data-testid="bracket-tv-link" className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10 text-sm">

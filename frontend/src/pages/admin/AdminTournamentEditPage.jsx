@@ -24,7 +24,7 @@ import {
   formatMatchType,
   formatRegistrationStatus,
   formatStageType,
-  formatTournamentFormat,
+  formatTournamentDisplay,
 } from "@/lib/tournamentLabels";
 
 const TOURNAMENT_STATUS_OPTIONS = [
@@ -86,7 +86,37 @@ LA=[L:A:3,L:A:4,L:B:3,L:B:4]`;
 const CUSTOM_STAGE_TYPES = new Set(["custom_bracket", "ffa_custom_bracket"]);
 const AUTO_STAGE_TYPES = new Set(["single_elimination", "double_elimination", "custom_bracket", "ffa_custom_bracket"]);
 const FFA_STAGE_TYPES = new Set(["simple", "ffa_single_elimination", "ffa_custom_bracket", "ffa_league"]);
-const BRONZE_FORMATS = new Set(["single_elim", "custom_bracket", "ffa_custom_bracket"]);
+const BRONZE_FORMATS = new Set(["single_elim"]);
+const MATCH_SECTION_ORDER = ["WB", "winner", "MAIN", "main", "LB", "loser", "BRONZE", "bronze", "GF", "grand_final", "FINAL", "final", "round_robin"];
+
+function matchSectionKey(match) {
+  return match?.section || match?.bracket || "MAIN";
+}
+
+function sectionSortIndex(section) {
+  const key = String(section || "MAIN").toLowerCase();
+  const idx = MATCH_SECTION_ORDER.findIndex((item) => String(item).toLowerCase() === key);
+  return idx === -1 ? 99 : idx;
+}
+
+function matchSortValue(match) {
+  return [
+    sectionSortIndex(matchSectionKey(match)),
+    Number(match?.round ?? match?.round_index ?? 0),
+    Number(match?.order ?? match?.match_index ?? match?.number ?? 0),
+    String(match?.match_key || match?.id || ""),
+  ];
+}
+
+function sortMatchesForPlan(a, b) {
+  const av = matchSortValue(a);
+  const bv = matchSortValue(b);
+  for (let i = 0; i < av.length; i += 1) {
+    if (av[i] < bv[i]) return -1;
+    if (av[i] > bv[i]) return 1;
+  }
+  return 0;
+}
 
 function stationDisplay(match, stations = []) {
   if (!match) return "";
@@ -502,7 +532,7 @@ export default function AdminTournamentEditPage() {
           <div className="mt-2 flex items-center gap-3 flex-wrap">
             <StatusBadge status={t.status} />
             {t.locked_at && <span className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700] text-[10px] font-bold uppercase tracking-widest rounded-sm">Gesperrt</span>}
-            <span className="text-white/60 text-sm">{formatTournamentFormat(t.format)}</span>
+            <span className="text-white/60 text-sm">{formatTournamentDisplay(t)}</span>
             <Link to={`/tournaments/${t.slug || t.id}`} target="_blank" className="text-[#29B6E8] text-xs uppercase tracking-wider font-bold hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Öffentliche Seite</Link>
           </div>
         </div>
@@ -900,6 +930,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
 
 function StageCard({ tournamentId, stage, matches, regById, stations = [], isModerator, showSettings = false, showMatchList = true, onChanged, onDelete, onSaveResult, onSaveMatchMeta }) {
   const settings = stage.settings || {};
+  const [activeSection, setActiveSection] = useState("all");
   const [form, setForm] = useState({
     name: stage.name || "",
     match_type: stage.match_type || "ffa",
@@ -984,6 +1015,23 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], isMod
     acc[m.status || "pending"] = (acc[m.status || "pending"] || 0) + 1;
     return acc;
   }, {});
+  const sortedMatches = [...matches].sort(sortMatchesForPlan);
+  const sectionGroups = sortedMatches.reduce((acc, match) => {
+    const key = matchSectionKey(match);
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(match);
+    return acc;
+  }, {});
+  const sectionTabs = Object.keys(sectionGroups)
+    .sort((a, b) => sectionSortIndex(a) - sectionSortIndex(b) || String(a).localeCompare(String(b)))
+    .map((key) => ({ key, label: formatBracketSection(key), count: sectionGroups[key].length }));
+  const hasActiveSection = activeSection === "all" || sectionTabs.some((tab) => tab.key === activeSection);
+  useEffect(() => {
+    if (!hasActiveSection) {
+      setActiveSection("all");
+    }
+  }, [hasActiveSection]);
+  const visibleMatches = activeSection === "all" ? sortedMatches : (sectionGroups[activeSection] || []);
 
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
@@ -1039,24 +1087,49 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], isMod
             )}
           </div>
         )}
-        {showMatchList && <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-3 items-start">
-          {matches.map((match) => (
-            <MatchV2Card
-              key={match.id}
-              match={match}
-              regById={regById}
-              stations={stations}
-              canEdit={isModerator}
-              onSaveResult={onSaveResult}
-              onSaveMatchMeta={onSaveMatchMeta}
-            />
-          ))}
-          {matches.length === 0 && (
-            <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-8 text-center text-white/40">
-              Keine Spiele generiert.
+        {showMatchList && (
+          <div className="space-y-3">
+            {sectionTabs.length > 1 && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveSection("all")}
+                  className={`px-3 py-2 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${activeSection === "all" ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white"}`}
+                >
+                  Alle <span className="ml-1 text-white/40">{sortedMatches.length}</span>
+                </button>
+                {sectionTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveSection(tab.key)}
+                    className={`px-3 py-2 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${activeSection === tab.key ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white"}`}
+                  >
+                    {tab.label} <span className="ml-1 text-white/40">{tab.count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-3 items-start">
+              {visibleMatches.map((match) => (
+                <MatchV2Card
+                  key={match.id}
+                  match={match}
+                  regById={regById}
+                  stations={stations}
+                  canEdit={isModerator}
+                  onSaveResult={onSaveResult}
+                  onSaveMatchMeta={onSaveMatchMeta}
+                />
+              ))}
+              {visibleMatches.length === 0 && (
+                <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-8 text-center text-white/40">
+                  Keine Spiele generiert.
+                </div>
+              )}
             </div>
-          )}
-        </div>}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1279,6 +1352,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     platform: source.platform || "",
     event_id: source.event_id || "",
     format: source.format || "single_elim",
+    format_label: source.format_label || "",
     status: source.status || "draft",
     team_mode: source.team_mode === "solo" ? "solo" : "team",
     team_size: source.team_mode === "solo" ? 1 : (source.team_size || 2),
@@ -1325,6 +1399,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     platform: tournament.platform || "",
     event_id: tournament.event_id || "",
     format: tournament.format || "single_elim",
+    format_label: tournament.format_label || "",
     status: tournament.status || "draft",
     team_mode: tournament.team_mode === "solo" ? "solo" : "team",
     team_size: tournament.team_mode === "solo" ? 1 : (tournament.team_size || 2),
@@ -1414,6 +1489,8 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
         const payload = { ...source };
         if (!payload.event_id) payload.event_id = null;
         if (!payload.stream_platform) payload.stream_platform = null;
+        payload.format_label = (payload.format_label || "").trim() || null;
+        if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
         normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
         ["team_size", "max_participants", "min_participants", "best_of", "match_duration_minutes"].forEach((key) => {
           if (payload[key] !== "" && payload[key] != null) payload[key] = Number(payload[key]);
@@ -1493,6 +1570,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
         </p>
         <div className="grid md:grid-cols-3 gap-3">
           <SelectField label="Turnierstruktur" value={f.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} />
+          <Fld label="Format-Anzeigename" value={f.format_label} onChange={(v)=>set("format_label",v)} placeholder="z.B. Gamers Heaven F1 Heat" testId="tr-edit-format-label"/>
           <SelectField label="Teilnahme" value={f.team_mode} onChange={setTeamMode} options={TEAM_MODE_OPTIONS} />
           {f.team_mode !== "solo" && <Fld label="Spieler pro Team" type="number" min="2" max="6" value={f.team_size} onChange={(v)=>set("team_size",v)} testId="tr-edit-team-size"/>}
           <Fld label={f.team_mode === "solo" ? "Min Spieler" : "Min Teams"} type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>
@@ -1758,8 +1836,8 @@ function MatchResultControls({ match, a, b, onSave }) {
   );
 }
 
-function Fld({ label, value, onChange, type="text", testId, min, max }) {
-  return (<label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><input type={type} min={min} max={max} value={value ?? ""} onChange={(e)=>onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"/></label>);
+function Fld({ label, value, onChange, type="text", testId, min, max, placeholder }) {
+  return (<label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><input type={type} min={min} max={max} placeholder={placeholder} value={value ?? ""} onChange={(e)=>onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"/></label>);
 }
 function Txt({ label, value, onChange, testId }) {
   return (<div className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><MarkdownEditor value={value ?? ""} onChange={onChange} rows={5} testId={testId} /></div>);
