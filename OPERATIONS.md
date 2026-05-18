@@ -93,6 +93,41 @@ Reverse Proxy:
 - Body size mindestens 60 MB
 - keine aggressive Bild-/HTML-Cache-Regel auf `/api/uploads/*`
 
+## SEO, Crawler und Search Console
+
+Die Website trennt bewusst zwischen indexierbaren Vereins-/Content-Seiten und nicht wichtigen
+Profil-/Systemseiten.
+
+Indexierbar und in der Sitemap:
+
+- Startseite, Verein, Vorstand, Werte, Kontakt, Sponsoren, Partner, Galerie, Referenzen
+- News, Events, Turniere, Fast-Lap-Challenges, Seasons
+- offizielle Vereinsmitglieder unter `/members/<slug>`
+- oeffentliche Teams unter `/teams/<id>`
+
+Nicht aktiv in der Sitemap:
+
+- registrierte Community-Profile unter `/u/<username>`
+- die Community-Spieler-Uebersicht `/players`
+- rechtliche Pflichtseiten `/imprint` und `/privacy`
+- interne Bereiche wie `/dashboard`, `/profile`, `/privacy-account`, `/members/area`, `/admin`
+
+Community-Profile und rechtliche Pflichtseiten bleiben erreichbar, setzen aber `noindex, follow`
+in der SEO-Preview und im Frontend-Meta. Die `robots.txt` sperrt nur interne/private Bereiche,
+damit Suchmaschinen Noindex-Hinweise auf erreichbaren Seiten lesen koennen.
+
+Nach SEO-Aenderungen:
+
+```bash
+curl -fsS https://lionsquad.at/sitemap.xml | head
+curl -fsS https://lionsquad.at/robots.txt
+curl -I -A "Googlebot" "https://lionsquad.at/u/beispiel"
+```
+
+Danach in der Google Search Console die betroffenen URLs pruefen und "Fehlerbehebung validieren".
+Google kann Aenderungen innerhalb von Stunden sehen, sichtbare Suchergebnisse koennen aber Tage
+bis Wochen nachziehen.
+
 ## Backup
 
 Vor groesseren Aenderungen:

@@ -79,8 +79,10 @@ export function useDocumentTitle(title, description, options = {}) {
     const canonicalHref = options.canonical || window.location.href.split("#")[0];
     const image = resolveMediaUrl(options.image || branding?.logo_url || branding?.mascot_url || DEFAULT_SHARE_IMAGE);
     const type = options.type || "website";
+    const robots = options.robots || "index, follow";
     const previousTitle = document.title;
 
+    const robotsTag = upsertMeta('meta[name="robots"]', { name: "robots" });
     const descTag = upsertMeta('meta[name="description"]', { name: "description" });
     const ogType = upsertMeta('meta[property="og:type"]', { property: "og:type" });
     const ogTitle = upsertMeta('meta[property="og:title"]', { property: "og:title" });
@@ -96,11 +98,12 @@ export function useDocumentTitle(title, description, options = {}) {
     const twitterImage = upsertMeta('meta[name="twitter:image"]', { name: "twitter:image" });
     const twitterImageAlt = upsertMeta('meta[name="twitter:image:alt"]', { name: "twitter:image:alt" });
     const canonical = upsertCanonical();
-    const routeManaged = [descTag, ogType, ogTitle, ogDesc, ogUrl, ogImage, ogSecureImage, ogImageType, ogImageAlt, twitterCard, twitterTitle, twitterDesc, twitterImage, twitterImageAlt, canonical];
+    const routeManaged = [robotsTag, descTag, ogType, ogTitle, ogDesc, ogUrl, ogImage, ogSecureImage, ogImageType, ogImageAlt, twitterCard, twitterTitle, twitterDesc, twitterImage, twitterImageAlt, canonical];
     const previous = snapshot(routeManaged);
     routeManaged.forEach(markRouteManaged);
 
     document.title = fullTitle;
+    robotsTag.setAttribute("content", robots);
     if (description) descTag.setAttribute("content", description);
     ogType.setAttribute("content", type);
     ogTitle.setAttribute("content", fullTitle);
@@ -124,5 +127,5 @@ export function useDocumentTitle(title, description, options = {}) {
       document.title = previousTitle;
       restore(previous);
     };
-  }, [title, description, branding, options.canonical, options.image, options.type]);
+  }, [title, description, branding, options.canonical, options.image, options.robots, options.type]);
 }

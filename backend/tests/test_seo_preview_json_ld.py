@@ -59,6 +59,21 @@ def test_preview_json_ld_escapes_script_end_marker():
     assert json.loads(match.group(1))["name"] == "</script>"
 
 
+def test_preview_html_emits_robots_meta():
+    html = render_preview_html({
+        "title": "Profil",
+        "description": "Noindex test",
+        "image": "https://lionsquad.at/og.png",
+        "url": "https://lionsquad.at/u/example",
+        "canonical": "https://lionsquad.at/u/example",
+        "site_name": "THE LION SQUAD - eSPORTS",
+        "robots": "noindex, follow",
+        "json_ld": {"@context": "https://schema.org", "@type": "WebPage", "name": "Profil"},
+    })
+
+    assert '<meta name="robots" content="noindex, follow" />' in html
+
+
 class _Settings:
     async def find_one(self, *args, **kwargs):
         return {
@@ -103,3 +118,17 @@ def test_seo_preview_known_static_path_still_resolves(monkeypatch):
         {"name": "Startseite", "url": "https://lionsquad.at"},
         {"name": "Verein", "url": "https://lionsquad.at/about"},
     ]
+
+
+def test_seo_preview_legal_and_players_are_noindex(monkeypatch):
+    monkeypatch.setattr(seo_render_routes, "get_db", lambda: _Db())
+    request = SimpleNamespace(
+        headers={},
+        url=SimpleNamespace(scheme="https", netloc="lionsquad.at"),
+    )
+
+    privacy = asyncio.run(resolve_meta("/privacy", request))
+    players = asyncio.run(resolve_meta("/players", request))
+
+    assert privacy["robots"] == "noindex, follow"
+    assert players["robots"] == "noindex, follow"

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Search, Crown } from "lucide-react";
 import { AccountLevelPill, accountAvatarFrameClass, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 
@@ -16,6 +17,9 @@ export default function PlayersPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  useDocumentTitle("Community-Spieler", "Oeffentliche Community-Profile registrierter Benutzer.", {
+    robots: "noindex, follow",
+  });
 
   const load = useCallback(() => {
     setLoading(true);

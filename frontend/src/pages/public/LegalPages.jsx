@@ -4,8 +4,9 @@ import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
-const UPDATED_AT = "05.05.2026";
+const UPDATED_AT = "18.05.2026";
 
 function useBranding() {
   const [branding, setBranding] = useState({});
@@ -31,6 +32,8 @@ function addressLines(branding) {
 }
 
 function LegalArticle({ title, intro, children }) {
+  useDocumentTitle(title, intro, { robots: "noindex, follow" });
+
   return (
     <PublicLayout>
       <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -278,6 +281,31 @@ export function PrivacyPage() {
           die Sichtbarkeit ihres öffentlichen Profils im Profilbereich einschränken. Negative oder
           geheime Fun-/Negative-Achievements werden erst nach Freischaltung im Profil angezeigt.
         </p>
+        <p>
+          Öffentliche Community-Profile registrierter Benutzer werden nicht in die Sitemap aufgenommen
+          und mit einem technischen Noindex-Hinweis für Suchmaschinen versehen. Sichtbar bleiben sie
+          nur, wenn die Profilfreigabe aktiv ist. Offizielle Vereinsmitglieder-Profile werden separat
+          gepflegt und können als Teil der Vereinsdarstellung öffentlich auffindbar sein.
+        </p>
+      </Section>
+
+      <Section title="Suchmaschinen und Crawler">
+        <p>
+          Öffentliche Vereinsseiten, News, Events, Turniere, Fast-Lap-Challenges, Galerie, Teams,
+          Sponsoren, Partner und offizielle Vereinsmitglieder können von Suchmaschinen erfasst
+          werden. Interne Bereiche, Accounts, private Mitgliederbereiche, Dokumente sowie rechtliche
+          Pflichtseiten werden nicht aktiv zur Indexierung eingereicht bzw. mit Noindex oder
+          Zugriffsbeschränkungen versehen.
+        </p>
+      </Section>
+
+      <Section title="Mitgliederdokumente">
+        <p>
+          Dokumente im Mitgliederbereich sind nicht öffentlich. Sie sind nur für berechtigte
+          Vorstands-/Adminrollen und aktive Vereinsmitglieder vorgesehen. Standardmäßig werden
+          Dokumente inline zur Ansicht bereitgestellt; ein Download wird nur angeboten, wenn dies
+          für das jeweilige Dokument freigegeben ist.
+        </p>
       </Section>
 
       <Section title="Kontaktformular und Mitgliedsantrag">
@@ -321,6 +349,10 @@ export function PrivacyPage() {
           Funktionen sind geschützte Bereiche nicht nutzbar. Tracking- oder Marketing-Cookies sind
           für den Betrieb dieser Plattform nicht erforderlich.
         </p>
+        <p>
+          Statistikdienste wie Google Analytics oder Plausible werden nur verwendet, wenn sie im
+          Adminbereich aktiviert und von Besuchern im Cookie-/Consent-Dialog erlaubt wurden.
+        </p>
       </Section>
 
       <Section title="Empfänger und Auftragsverarbeiter">
@@ -350,7 +382,8 @@ export function PrivacyPage() {
         <p>
           Passwörter werden nicht im Klartext gespeichert, sondern gehasht. Zugriffe auf geschützte
           Bereiche erfolgen rollenbasiert. Zusätzlich kommen Schutzmaßnahmen wie CSRF-Schutz,
-          Zugriffsbeschränkungen, private Dokumentdownloads, SMTP-Diagnose und Audit-Logs zum Einsatz.
+          Zugriffsbeschränkungen, private Dokumentansichten, optional freigegebene Downloads,
+          SMTP-Diagnose und Audit-Logs zum Einsatz.
         </p>
       </Section>
 

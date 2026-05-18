@@ -46,11 +46,12 @@ async def seo_preview(path: str, request: Request):
         return RedirectResponse(url=redirect_url, status_code=301)
     meta = await resolve_meta(path, request)
     html = render_preview_html(meta)
+    robots = meta.get("robots") or "index, follow"
     return HTMLResponse(
         content=html,
         headers={
             "Cache-Control": "public, max-age=300",
-            "X-Robots-Tag": "index, follow",
+            "X-Robots-Tag": robots,
         },
     )
 
@@ -159,6 +160,7 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         "site_name": site_name,
         "type": "website",
         "locale": "de_AT",
+        "robots": "index, follow",
         "google_site_verification": branding.get("google_site_verification") or "",
         "msvalidate_01": branding.get("msvalidate_01") or "",
         "json_ld": website_json_ld(origin, site_name, default_description, default_image, default_logo, branding),
@@ -380,11 +382,14 @@ async def team_meta(db, team_id: str, base: dict, origin: str) -> dict:
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     title = team.get("name") or team.get("tag") or "Team"
     image = absolute_url(team.get("logo_url") or base["image"], origin)
+    canonical = f"{origin}/teams/{team.get('id') or team_id}"
     meta = {
         **base,
         "title": f"{title} · Team · {base['site_name']}",
         "description": clean_text(team.get("description") or f"Teamprofil von {title}."),
         "image": image,
+        "url": canonical,
+        "canonical": canonical,
         "type": "profile",
     }
     meta["json_ld"] = {
@@ -424,6 +429,7 @@ async def user_profile_meta(db, username: str, base: dict, origin: str) -> dict:
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     label = user.get("display_name") or user.get("username")
     image = absolute_url(user.get("avatar_url") or user.get("banner_url") or base["image"], origin)
+    canonical = f"{origin}/u/{user.get('username') or username}"
     meta = {
         **base,
         "title": f"{label} · Community · {base['site_name']}",
@@ -431,6 +437,9 @@ async def user_profile_meta(db, username: str, base: dict, origin: str) -> dict:
         "image": image,
         "type": "profile",
     }
+    meta["url"] = canonical
+    meta["canonical"] = canonical
+    meta["robots"] = "noindex, follow"
     meta["json_ld"] = webpage_json_ld(meta)
     return add_breadcrumbs(meta, origin, [("Community-Spieler", "/players")], label)
 
@@ -467,6 +476,8 @@ def static_page_meta(slug: str, base: dict) -> dict | None:
         return None
     title, description = item
     meta = {**base, "title": f"{title} · {base['site_name']}", "description": description}
+    if slug in {"players", "privacy", "imprint"}:
+        meta["robots"] = "noindex, follow"
     meta["json_ld"] = webpage_json_ld(meta)
     return meta
 
@@ -490,6 +501,7 @@ def render_preview_html(meta: dict) -> str:
     site_name = escape(meta["site_name"])
     type_ = escape(meta.get("type") or "website")
     locale = escape(meta.get("locale") or "de_AT")
+    robots = escape(meta.get("robots") or "index, follow")
     json_ld = json_ld_script_content(meta.get("json_ld") or webpage_json_ld(meta))
     optional = []
     image_type = image_mime_type(meta.get("image"))
@@ -513,6 +525,7 @@ def render_preview_html(meta: dict) -> str:
     <link rel="apple-touch-icon" href="{favicon}" />
     <link rel="canonical" href="{canonical}" />
     <meta name="description" content="{description}" />
+    <meta name="robots" content="{robots}" />
     <meta property="og:type" content="{type_}" />
     <meta property="og:locale" content="{locale}" />
     <meta property="og:site_name" content="{site_name}" />

@@ -234,6 +234,7 @@ export default function PublicProfilePage() {
   useDocumentTitle(profile?.display_name || profile?.username || "Community-Profil", profile?.bio || "Community-Profil bei THE LION SQUAD eSports.", {
     image: profile?.avatar_url || profile?.banner_url,
     type: "profile",
+    robots: "noindex, follow",
     canonical: profile?.username ? `${window.location.origin}/u/${profile.username}` : undefined,
   });
   const { hasConsent, openSettings } = useCookieConsent();

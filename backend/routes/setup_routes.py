@@ -301,9 +301,8 @@ async def sitemap():
 
     static_paths = [
         "/", "/about", "/news", "/events", "/tournaments", "/fastlap", "/f1",
-        "/teams", "/players", "/servers", "/members", "/membership/join", "/membership/apply",
+        "/teams", "/servers", "/members", "/membership/join", "/membership/apply",
         "/sponsors", "/partners", "/contact", "/board", "/values", "/galerie", "/references",
-        "/privacy", "/imprint",
     ]
     urls: list[dict] = [
         {
@@ -339,13 +338,6 @@ async def sitemap():
         slug = n.get("slug") or n.get("id")
         if slug:
             urls.append({"loc": f"{base}/news/{slug}", "lastmod": n.get("updated_at") or n.get("published_at") or n.get("created_at"), "changefreq": "monthly", "priority": "0.85"})
-    # public profiles
-    async for u in db.users.find(
-        {"privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}},
-        {"username": 1, "updated_at": 1, "_id": 0},
-    ):
-        if u.get("username"):
-            urls.append({"loc": f"{base}/u/{u['username']}", "lastmod": u.get("updated_at"), "changefreq": "monthly", "priority": "0.4"})
     # public club member profiles
     async for m in db.club_member_profiles.find(
         {"is_active": {"$ne": False}},

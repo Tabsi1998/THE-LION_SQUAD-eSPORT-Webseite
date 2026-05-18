@@ -122,10 +122,10 @@ function NavDropdown({ item, isClubMember }) {
       </button>
       {open && (
         <div
-          className="absolute left-0 top-full pt-2 z-50 min-w-[220px]"
+          className="absolute left-0 top-full pt-2 z-[80] min-w-[220px]"
           data-testid={`nav-${item.label.toLowerCase()}-dropdown`}
         >
-          <div className="border border-white/10 bg-[#0F0F10]/95 backdrop-blur-xl rounded-sm shadow-xl shadow-black/50 py-2">
+          <div className="border border-white/10 bg-[#0A0A0A] rounded-sm shadow-2xl shadow-black/80 py-2">
             {visibleChildren.map((c, idx) => (
               <div key={c.to}>
                 {c.divider && idx > 0 && <div className="my-1 mx-3 border-t border-white/10" />}
