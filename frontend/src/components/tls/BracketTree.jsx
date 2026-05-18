@@ -186,7 +186,9 @@ function formatNodeDateTime(value) {
 }
 
 function getStationLabel(match) {
-  return match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
+  const station = match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
+  if (!station) return "";
+  return /^station\b/i.test(station) ? station : `Station ${station}`;
 }
 
 function MatchMeta({ match, compact = false }) {
@@ -198,7 +200,7 @@ function MatchMeta({ match, compact = false }) {
     <div className={`border-t border-white/5 bg-[#050505]/40 ${compact ? "px-2.5 py-1" : "px-3 py-1.5"} text-[10px] uppercase tracking-wider text-white/45 flex flex-wrap gap-x-3 gap-y-1`}>
       {time && <span>{time}</span>}
       {duration && <span>{duration} Min.</span>}
-      {station && <span className="text-[#29B6E8]">Station {station}</span>}
+      {station && <span className="text-[#29B6E8]">{station}</span>}
     </div>
   );
 }

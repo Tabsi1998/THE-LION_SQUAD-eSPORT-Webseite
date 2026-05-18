@@ -171,7 +171,7 @@ function RoundColumn({ column, regMap }) {
 function TvMatchCard({ match, regMap }) {
   const isV2 = Array.isArray(match.slots);
   const statusTone = getStatusTone(match.status);
-  const station = match.station_name || match.station_label || match.station_id;
+  const station = stationLabel(match);
 
   return (
     <article className={`border ${statusTone.border} ${statusTone.bg} rounded-sm overflow-hidden`}>
@@ -209,7 +209,7 @@ function TvMatchCard({ match, regMap }) {
 
       {(station || match.duration_minutes) && (
         <div className="px-2.5 py-1.5 border-t border-white/5 flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider text-white/42">
-          <span className="truncate">{station ? `Station ${station}` : "Keine Station"}</span>
+          <span className="truncate">{station || "Keine Station"}</span>
           {match.duration_minutes && <span className="shrink-0">{match.duration_minutes} Min.</span>}
         </div>
       )}
@@ -250,6 +250,12 @@ function ParticipantRow({ participant, result, score, isWinner, position, side }
       </div>
     </div>
   );
+}
+
+function stationLabel(match) {
+  const station = match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
+  if (!station) return "";
+  return /^station\b/i.test(station) ? station : `Station ${station}`;
 }
 
 function buildTvViews(data) {
