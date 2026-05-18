@@ -323,7 +323,12 @@ export default function AdminTournamentEditPage() {
       };
       const { data } = await api.post(`/tournaments/${id}/registrations`, payload);
       const replacement = data.replacement;
-      toast.success(replacement ? `Teilnehmer hinzugefügt und ${replacement.legacy_matches + replacement.v2_matches} Spielplätze ersetzt.` : "Teilnehmer hinzugefügt.");
+      const autoBracketUpdate = data.auto_bracket_update;
+      toast.success(replacement
+        ? `Teilnehmer hinzugefügt und ${replacement.legacy_matches + replacement.v2_matches} Spielplätze ersetzt.`
+        : autoBracketUpdate?.match_count
+          ? `Teilnehmer hinzugefügt. Vorschau mit ${autoBracketUpdate.participant_count} Teilnehmern neu gemischt.`
+          : "Teilnehmer hinzugefügt.");
       setParticipantForm({ user_id: "", team_id: "", display_name: "", ingame_name: "", discord: "", status: "approved", seed: "", replace_registration_id: "" });
       load();
     } catch (err) {
