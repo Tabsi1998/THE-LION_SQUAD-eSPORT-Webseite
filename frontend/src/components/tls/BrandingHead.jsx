@@ -6,7 +6,7 @@ import { onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 const DEFAULT_TITLE = "THE LION SQUAD - eSPORTS";
 const DEFAULT_FAVICON = "/assets/brand/tls-favicon.png";
 const DEFAULT_SHARE_IMAGE = "/assets/brand/tls-wordmark.png";
-const FAVICON_VERSION = "20260518";
+const FAVICON_VERSION = "20260518b";
 
 function upsertMeta(selector, attrs) {
   let el = document.head.querySelector(selector);
@@ -26,16 +26,9 @@ function versionedAsset(href) {
   return href;
 }
 
-function sameMediaUrl(a, b) {
-  if (!a || !b) return false;
-  const clean = (value) => String(value).trim().split("?", 1)[0].replace(/^https?:\/\/[^/]+/i, "");
-  return clean(a) === clean(b);
-}
-
 function pickFavicon(data) {
   const custom = data?.favicon_url || "";
-  const mascot = data?.mascot_url || "";
-  if (custom && !sameMediaUrl(custom, mascot)) return resolveMediaUrl(custom);
+  if (custom) return resolveMediaUrl(custom);
   return resolveMediaUrl(DEFAULT_FAVICON);
 }
 

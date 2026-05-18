@@ -21,20 +21,12 @@ STAFF_HIDDEN_STATUSES = {"draft", "archived", "cancelled"}
 MARKDOWN_RE = re.compile(r"(!?\[[^\]]*\]\([^)]+\)|[`*_>#~-]+|\r?\n+)")
 HTML_RE = re.compile(r"<[^>]+>")
 DEFAULT_SHARE_IMAGE = "/assets/brand/tls-wordmark.png"
-DEFAULT_FAVICON = "/assets/brand/tls-favicon.png?v=20260518"
-
-
-def same_media_url(a: str | None, b: str | None) -> bool:
-    if not a or not b:
-        return False
-    clean_a = re.sub(r"^https?://[^/]+", "", str(a).strip()).split("?", 1)[0]
-    clean_b = re.sub(r"^https?://[^/]+", "", str(b).strip()).split("?", 1)[0]
-    return clean_a == clean_b
+DEFAULT_FAVICON = "/assets/brand/tls-favicon.png?v=20260518b"
 
 
 def effective_favicon_url(branding: dict) -> str:
     custom = branding.get("favicon_url")
-    if custom and not same_media_url(custom, branding.get("mascot_url")):
+    if custom:
         return custom
     return DEFAULT_FAVICON
 
