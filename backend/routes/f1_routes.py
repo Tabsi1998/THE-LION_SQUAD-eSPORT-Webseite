@@ -563,7 +563,7 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_r
     was_new_leader = False
     if not body.is_invalid and score_scope != "club_reference":
         try:
-            from discord_service import send_discord
+            from discord_service import send_public_discord
             effective = body.time_ms + int((body.penalty_seconds or 0) * 1000)
             # Find current P1
             others = await db.f1_lap_times.find(
@@ -581,7 +581,8 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_r
                 was_new_leader = True
                 u = await db.users.find_one({"id": body.user_id}, {"display_name": 1, "username": 1}) or {}
                 tr = await db.f1_tracks.find_one({"id": body.track_id}, {"name": 1}) or {}
-                await send_discord(
+                await send_public_discord(
+                    c,
                     f"🏁 Neue Bestzeit · {c.get('title') or 'Fast Lap'}",
                     f"**{u.get('display_name') or u.get('username') or 'Fahrer'}** führt jetzt auf **{tr.get('name') or '–'}**!",
                     color=0xFFD700,

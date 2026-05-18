@@ -2105,7 +2105,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
     # Discord trigger
     if prev != status and status in ("registration_open", "live", "completed", "results_published"):
         try:
-            from discord_service import send_discord
+            from discord_service import send_public_discord
             colors = {"registration_open": 0x00FF88, "live": 0x29B6E8,
                       "completed": 0xFFD700, "results_published": 0xFFD700}
             labels = {"registration_open": "Anmeldung offen", "live": "Jetzt live",
@@ -2115,9 +2115,10 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
             url = f"/tournaments/{t.get('slug') or tid}"
             fields = []
             if game and game.get("name"): fields.append({"name": "Spiel", "value": game["name"], "inline": True})
-            if t.get("format"): fields.append({"name": "Format", "value": t["format"].replace("_", " ").title(), "inline": True})
+            if t.get("format"): fields.append({"name": "Format", "value": (t.get("format_label") or t["format"].replace("_", " ").title()), "inline": True})
             if t.get("max_participants"): fields.append({"name": "Teilnehmer", "value": f"max. {t['max_participants']}", "inline": True})
-            await send_discord(
+            await send_public_discord(
+                t,
                 f"🏆 {t.get('title') or 'Turnier'} · {labels[status]}",
                 t.get("description") or "",
                 color=colors[status], url=url, fields=fields,

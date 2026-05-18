@@ -10,6 +10,7 @@ from models import now_utc, new_id
 
 logger = logging.getLogger("tls-arena.discord")
 VALID_WEBHOOK_HOSTS = {"discord.com", "discordapp.com", "canary.discord.com", "ptb.discord.com"}
+PRIVATE_DISCORD_VISIBILITIES = {"members", "internal"}
 
 
 def is_valid_discord_webhook_url(url: str) -> bool:
@@ -18,6 +19,14 @@ def is_valid_discord_webhook_url(url: str) -> bool:
         return False
     parts = [p for p in parsed.path.split("/") if p]
     return len(parts) >= 4 and parts[0] == "api" and parts[1] == "webhooks"
+
+
+def should_post_to_public_discord(item: dict | None) -> bool:
+    """Return whether a content object is safe for the public Discord webhook."""
+    item = item or {}
+    if item.get("is_public") is False:
+        return False
+    return (item.get("visibility") or "public") not in PRIVATE_DISCORD_VISIBILITIES
 
 
 def _normalize_base_url(value: str | None) -> str:
@@ -152,3 +161,12 @@ async def send_discord(title: str, description: str = "", *,
         log["error"] = str(e)[:300]
         await db.email_logs.insert_one(log)
         return {"ok": False, "reason": str(e)}
+
+
+async def send_public_discord(item: dict | None, title: str, description: str = "", *,
+                              color: int = 0x29B6E8, url: str = None,
+                              fields: list = None, event_key: str = "custom") -> dict:
+    """Send to the public Discord webhook only for publicly visible content."""
+    if not should_post_to_public_discord(item):
+        return {"ok": False, "reason": "private_visibility"}
+    return await send_discord(title, description, color=color, url=url, fields=fields, event_key=event_key)
