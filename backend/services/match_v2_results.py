@@ -52,15 +52,63 @@ def _result_score_for_ranking(entry: dict) -> int | float:
     return score
 
 
-def _auto_rank_results(raw_results: list[dict]) -> list[dict]:
+def _time_for_ranking(entry: dict) -> int | float | None:
+    value = entry.get("time_ms")
+    if value in (None, ""):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise MatchV2ResultError(f"Ungueltiger Zeitwert: {value}")
+    if number < 0:
+        raise MatchV2ResultError("time_ms darf nicht negativ sein")
+    return number
+
+
+def _ranking_mode(match: dict) -> str:
+    settings = match.get("settings") or {}
+    raw = (settings.get("calculation") or settings.get("score_type") or "points")
+    mode = str(raw).strip().lower().replace("-", "_").replace(" ", "_")
+    if mode in {"time", "time_ms", "fastest", "fastest_lap", "lowest_time", "best_time"}:
+        return "time"
+    if mode in {"lower_score", "lowest_score", "low_score", "strokes", "penalty_points"}:
+        return "lower_score"
+    return "higher_score"
+
+
+def _auto_rank_results(match: dict, raw_results: list[dict]) -> list[dict]:
+    mode = _ranking_mode(match)
+
+    def sort_key(item: tuple[int, dict]) -> tuple:
+        index, entry = item
+        if mode == "time":
+            time_ms = _time_for_ranking(entry)
+            return (
+                bool(entry.get("forfeit")),
+                bool(entry.get("dnf")),
+                time_ms is None,
+                time_ms if time_ms is not None else float("inf"),
+                -_result_score_for_ranking(entry),
+                index,
+            )
+        if mode == "lower_score":
+            score = _result_score_for_ranking(entry)
+            return (
+                bool(entry.get("forfeit")),
+                bool(entry.get("dnf")),
+                score,
+                index,
+            )
+        return (
+            bool(entry.get("forfeit")),
+            bool(entry.get("dnf")),
+            -_result_score_for_ranking(entry),
+            index,
+        )
+
     ranked = sorted(
         enumerate(raw_results),
-        key=lambda item: (
-            bool(item[1].get("forfeit")),
-            bool(item[1].get("dnf")),
-            -_result_score_for_ranking(item[1]),
-            item[0],
-        ),
+        key=sort_key,
     )
     next_rows = [dict(entry) for entry in raw_results]
     for rank, (idx, _) in enumerate(ranked, start=1):
@@ -75,7 +123,7 @@ def normalize_v2_results(match: dict, raw_results: list[dict]) -> list[dict]:
     if len(raw_results) != len(participants):
         raise MatchV2ResultError("Ergebnisliste muss alle belegten Teilnehmer enthalten")
     if any(entry.get("rank") in (None, "") for entry in raw_results):
-        raw_results = _auto_rank_results(raw_results)
+        raw_results = _auto_rank_results(match, raw_results)
 
     seen_regs: set[str] = set()
     seen_ranks: set[int] = set()

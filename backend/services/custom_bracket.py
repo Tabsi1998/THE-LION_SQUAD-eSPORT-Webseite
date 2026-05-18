@@ -221,22 +221,33 @@ def _match_key(index: int) -> str:
             return key
 
 
-def _auto_single_elim_schema(slot_count: int) -> str:
+def _auto_single_elim_schema(slot_count: int, bronze_match: bool = False) -> str:
     bracket_size = _next_power_of_two(max(2, slot_count))
     sources = [str(seed) for seed in _seed_positions(bracket_size)]
     lines = ["[WB]"]
     next_key_index = 0
     round_num = 1
+    round_keys: list[list[str]] = []
     while len(sources) > 1:
         lines.append(f"# Runde {round_num}")
         next_sources = []
+        keys_this_round: list[str] = []
         for idx in range(0, len(sources), 2):
             key = _match_key(next_key_index)
             next_key_index += 1
             lines.append(f"{key}=[{sources[idx]},{sources[idx + 1]}]")
+            keys_this_round.append(key)
             next_sources.append(f"W:{key}:1")
+        round_keys.append(keys_this_round)
         sources = next_sources
         round_num += 1
+    if bronze_match and len(round_keys) >= 2 and len(round_keys[-2]) >= 2:
+        semifinals = round_keys[-2]
+        key = _match_key(next_key_index)
+        lines.append("")
+        lines.append("[BRONZE]")
+        lines.append("# Spiel um Platz 3")
+        lines.append(f"{key}=[L:{semifinals[0]}:2,L:{semifinals[1]}:2]")
     return "\n".join(lines)
 
 
@@ -316,7 +327,7 @@ def _resolve_schema(tournament: dict, stage: dict, registrations: list[dict], pr
         return schema
     if (stage.get("stage_type") or "") == "single_elimination":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
-        return _auto_single_elim_schema(size)
+        return _auto_single_elim_schema(size, bool(tournament.get("bronze_match")))
     if (stage.get("stage_type") or "") == "double_elimination":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
         return _auto_double_elim_schema(size)

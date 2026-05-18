@@ -98,12 +98,24 @@ def generate_single_elimination(tournament_id: str, registrations: List[dict],
                                   duration_minutes=duration_minutes))
         round_matches.append(ms)
 
+    bronze = None
+    if bronze_match and rounds >= 2:
+        bronze = _make_match(tournament_id, rounds, "Bronze Match", "bronze", 0, best_of=best_of,
+                             duration_minutes=duration_minutes)
+
     # Link round r match -> round r+1
     for r in range(rounds - 1):
         for i, m in enumerate(round_matches[r]):
             parent = round_matches[r + 1][i // 2]
             m["next_match_id"] = parent["id"]
             m["next_match_slot"] = "a" if i % 2 == 0 else "b"
+
+    # Bronze match (3rd place): losers of the two semifinals.
+    if bronze:
+        semifinals = round_matches[-2]
+        for i, m in enumerate(semifinals[:2]):
+            m["next_loser_match_id"] = bronze["id"]
+            m["next_loser_slot"] = "a" if i == 0 else "b"
 
     # Fill round 1 participants
     for i, m in enumerate(round_matches[0]):
@@ -125,10 +137,7 @@ def generate_single_elimination(tournament_id: str, registrations: List[dict],
 
     all_matches = [m for rm in round_matches for m in rm]
 
-    # Bronze match (3rd place) - losers of semis
-    if bronze_match and rounds >= 2:
-        bronze = _make_match(tournament_id, rounds, "Bronze Match", "bronze", 0, best_of=best_of,
-                             duration_minutes=duration_minutes)
+    if bronze:
         all_matches.append(bronze)
 
     return all_matches

@@ -1007,6 +1007,8 @@ async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = 
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament = await _get_visible_tournament(tid, me)
+    if _is_tournament_locked(tournament):
+        raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
     if not await _can_use_tournament_chat(tournament, me):
         raise HTTPException(status_code=403, detail="Turnier-Chat ist nur für Teilnehmer und Turnierleitung sichtbar")
     text = body.message.strip()

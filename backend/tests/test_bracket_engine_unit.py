@@ -11,7 +11,7 @@ models_stub.new_id = lambda: str(uuid4())
 models_stub.now_utc = lambda: datetime.now(timezone.utc)
 sys.modules.setdefault("models", models_stub)
 
-from bracket_engine import generate_bracket
+from bracket_engine import generate_bracket, generate_single_elimination
 
 
 def test_legacy_preview_bracket_uses_seed_placeholders():
@@ -35,3 +35,18 @@ def test_legacy_preview_bracket_uses_seed_placeholders():
     assert all(match["is_preview"] for match in matches)
     assert all(match["duration_minutes"] == 12 for match in matches)
     assert matches[0]["participant_a_id"].startswith("preview-seed-")
+
+
+def test_single_elimination_bronze_match_receives_semifinal_losers():
+    registrations = [
+        {"id": f"r{i}", "status": "approved", "seed": i}
+        for i in range(1, 5)
+    ]
+
+    matches = generate_single_elimination("t1", registrations, bronze_match=True, seeding_mode="manual")
+    bronze = next(match for match in matches if match["bracket"] == "bronze")
+    semifinals = [match for match in matches if match["round_name"] == "Halbfinale"]
+
+    assert len(matches) == 4
+    assert {match["next_loser_match_id"] for match in semifinals} == {bronze["id"]}
+    assert {match["next_loser_slot"] for match in semifinals} == {"a", "b"}

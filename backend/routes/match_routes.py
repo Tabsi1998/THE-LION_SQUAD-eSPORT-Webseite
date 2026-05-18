@@ -464,6 +464,7 @@ async def list_match_chat(match_id: str, user: dict | None = Depends(get_optiona
 async def post_match_chat(match_id: str, body: MatchChatCreate, me: dict = Depends(get_current_user)):
     db = get_db()
     match, _collection = await _find_match_any(match_id)
+    await _ensure_match_tournament_unlocked(db, match)
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen im Matchchat schreiben")
     now_iso = now_utc().isoformat()

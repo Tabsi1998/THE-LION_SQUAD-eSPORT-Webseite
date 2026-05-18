@@ -200,6 +200,19 @@ export default function AdminTournamentEditPage() {
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["tournaments", "matches", "stations"]);
 
+  const autoAssignStations = async ({ silent = false, reload = true } = {}) => {
+    if (!stations.length) return null;
+    try {
+      const { data } = await api.post(`/stations/auto-assign?tournament_id=${encodeURIComponent(id)}`);
+      if (!silent) toast.success(`${data.assigned || 0} Match${Number(data.assigned) === 1 ? "" : "es"} automatisch Stationen zugewiesen.`);
+      if (reload) load();
+      return data;
+    } catch (e) {
+      if (!silent) toast.error(formatRequestError(e, "Stationen konnten nicht automatisch zugewiesen werden."));
+      return null;
+    }
+  };
+
   const generateLegacyBracket = async ({ preview = false, force = false } = {}) => {
     try {
       const params = new URLSearchParams();
@@ -208,6 +221,7 @@ export default function AdminTournamentEditPage() {
       const suffix = params.toString() ? `?${params.toString()}` : "";
       const { data } = await api.post(`/tournaments/${id}/generate-bracket${suffix}`);
       toast.success(data.preview ? `Vorschau mit ${data.match_count} Spielen generiert.` : `Turnierbaum mit ${data.match_count} Spielen generiert.`);
+      if (!data.preview) await autoAssignStations({ silent: true, reload: false });
       load();
     } catch (e) {
       if (e.response?.status === 409 && !force) {
@@ -279,6 +293,7 @@ export default function AdminTournamentEditPage() {
       const suffix = params.toString() ? `?${params.toString()}` : "";
       const { data } = await api.post(`/tournaments/${id}/bracket/from-format${suffix}`, structure || {});
       toast.success(data.preview ? `Turnierbaum-Vorschau mit ${data.match_count} Spielen neu aufgebaut.` : `Turnierbaum mit ${data.match_count} Spielen neu aufgebaut.`);
+      if (!data.preview) await autoAssignStations({ silent: true, reload: false });
       load();
     } catch (e) {
       if (e.response?.status === 409 && !force) {
@@ -505,6 +520,9 @@ export default function AdminTournamentEditPage() {
           </button>}
           {isModerator && <button onClick={() => rebuildFromFormat({ preview: false })} data-testid="admin-tr-generate" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2">
             <Zap className="w-3.5 h-3.5" /> Turnierbaum generieren
+          </button>}
+          {isModerator && stations.length > 0 && <button onClick={() => autoAssignStations()} data-testid="admin-tr-auto-stations" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
+            <Zap className="w-3.5 h-3.5" /> Stationen automatisch
           </button>}
           {isModerator && <button onClick={reset} data-testid="admin-tr-reset" className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-sm hover:border-[#FF3B30]/60 hover:text-[#FF3B30] inline-flex items-center gap-2">
             <RefreshCw className="w-3.5 h-3.5" /> Zurücksetzen
@@ -1074,14 +1092,35 @@ function MatchV2Card({ match, regById, stations = [], canEdit, onSaveResult, onS
 }
 
 function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
+  const rawMode = String(match.settings?.calculation || match.settings?.score_type || "points").toLowerCase().replace(/[-\s]/g, "_");
+  const rankingMode = ["time", "time_ms", "fastest", "fastest_lap", "lowest_time", "best_time"].includes(rawMode)
+    ? "time"
+    : ["lower_score", "lowest_score", "low_score", "strokes", "penalty_points"].includes(rawMode)
+      ? "lower_score"
+      : "higher_score";
+  const valueLabel = rankingMode === "time" ? "Zeit (ms)" : rankingMode === "lower_score" ? "Score (niedrig gewinnt)" : "Punkte";
+  const valueHelp = rankingMode === "time"
+    ? "Bei aktiver Automatik gewinnt die schnellste Zeit. DNF und Forfeit landen automatisch hinten."
+    : rankingMode === "lower_score"
+      ? "Bei aktiver Automatik gewinnt der niedrigste Score. DNF und Forfeit landen automatisch hinten."
+      : "Bei aktiver Automatik wird Platz 1 aus den hoechsten Punkten berechnet. DNF und Forfeit landen automatisch hinten.";
   const autoRankRows = (nextRows) => {
     const ranked = [...nextRows]
       .map((row, index) => ({ row, index }))
       .sort((a, b) => {
         if (!!a.row.forfeit !== !!b.row.forfeit) return a.row.forfeit ? 1 : -1;
         if (!!a.row.dnf !== !!b.row.dnf) return a.row.dnf ? 1 : -1;
+        if (rankingMode === "time") {
+          const timeA = a.row.time_ms === "" ? null : Number(a.row.time_ms);
+          const timeB = b.row.time_ms === "" ? null : Number(b.row.time_ms);
+          const missingA = timeA == null || Number.isNaN(timeA);
+          const missingB = timeB == null || Number.isNaN(timeB);
+          if (missingA !== missingB) return missingA ? 1 : -1;
+          if (timeA !== timeB) return timeA - timeB;
+        }
         const scoreA = a.row.score === "" ? 0 : Number(a.row.score) || 0;
         const scoreB = b.row.score === "" ? 0 : Number(b.row.score) || 0;
+        if (rankingMode === "lower_score" && scoreA !== scoreB) return scoreA - scoreB;
         if (scoreA !== scoreB) return scoreB - scoreA;
         return a.index - b.index;
       });
@@ -1091,12 +1130,13 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
   const initialRows = () => {
     const existing = (match.results || []).length
       ? [...match.results].sort((a, b) => (a.rank || 0) - (b.rank || 0))
-      : filledSlots.map((slot, index) => ({ registration_id: slot.registration_id, rank: index + 1, score: "", dnf: false, forfeit: false, note: "" }));
+      : filledSlots.map((slot, index) => ({ registration_id: slot.registration_id, rank: index + 1, score: "", time_ms: "", dnf: false, forfeit: false, note: "" }));
     const byReg = Object.fromEntries(existing.map((row) => [row.registration_id, row]));
     return filledSlots.map((slot, index) => ({
       registration_id: slot.registration_id,
       rank: byReg[slot.registration_id]?.rank || index + 1,
       score: byReg[slot.registration_id]?.score ?? byReg[slot.registration_id]?.points ?? "",
+      time_ms: byReg[slot.registration_id]?.time_ms ?? "",
       dnf: !!byReg[slot.registration_id]?.dnf,
       forfeit: !!byReg[slot.registration_id]?.forfeit,
       note: byReg[slot.registration_id]?.note || "",
@@ -1122,6 +1162,7 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
       registration_id: row.registration_id,
       rank: Number(row.rank) || 1,
       score: row.score === "" ? null : Number(row.score),
+      time_ms: row.time_ms === "" ? null : Number(row.time_ms),
       dnf: !!row.dnf,
       forfeit: !!row.forfeit,
       note: row.note || null,
@@ -1132,11 +1173,11 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
     <div className="mt-4 border-t border-white/10 pt-3 space-y-3">
       <div>
         <div className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">Ergebnis eintragen</div>
-        <p className="mt-1 text-[11px] text-white/45">Bei aktiver Automatik wird Platz 1 aus den höchsten Punkten berechnet. DNF und Forfeit landen automatisch hinten.</p>
+        <p className="mt-1 text-[11px] text-white/45">{valueHelp}</p>
         <div className="mt-2 flex items-center gap-3 flex-wrap">
           <label className="inline-flex items-center gap-2 text-[11px] text-white/60">
             <input type="checkbox" checked={autoRank} onChange={(e)=>setAutoRank(e.target.checked)} className="accent-[#29B6E8]" />
-            Platzierung aus Punkten berechnen
+            Platzierung automatisch berechnen
           </label>
           <button type="button" onClick={recalcRanks} className="text-[10px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">Jetzt berechnen</button>
         </div>
@@ -1144,7 +1185,7 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
       <div className="hidden sm:grid grid-cols-12 gap-2 text-[10px] font-bold uppercase tracking-widest text-white/35">
         <div className="col-span-3">Teilnehmer</div>
         <div className="col-span-2">Platz</div>
-        <div className="col-span-3">Punkte</div>
+        <div className="col-span-3">{valueLabel}</div>
         <div className="col-span-2">Status</div>
         <div className="col-span-2">Wertung</div>
       </div>
@@ -1152,7 +1193,9 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
         <div key={row.registration_id} className="grid grid-cols-12 gap-2 items-center">
           <div className="col-span-3 text-xs truncate">{labelFor(row.registration_id)}</div>
           <input type="number" min="1" value={row.rank} onChange={(e)=>update(row.registration_id, { rank: e.target.value })} disabled={autoRank} className="col-span-2 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs disabled:opacity-60" aria-label="Platzierung" placeholder="Platz" />
-          <input type="number" min="0" value={row.score} onChange={(e)=>update(row.registration_id, { score: e.target.value })} className="col-span-3 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Punkte oder Score" placeholder="Punkte/Score" />
+          {rankingMode === "time"
+            ? <input type="number" min="0" value={row.time_ms} onChange={(e)=>update(row.registration_id, { time_ms: e.target.value })} className="col-span-3 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Zeit in Millisekunden" placeholder="Zeit ms" />
+            : <input type="number" min="0" value={row.score} onChange={(e)=>update(row.registration_id, { score: e.target.value })} className="col-span-3 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Punkte oder Score" placeholder={rankingMode === "lower_score" ? "Score" : "Punkte"} />}
           <label className="col-span-2 text-[10px] text-white/60 truncate"><input type="checkbox" checked={row.dnf} onChange={(e)=>update(row.registration_id, { dnf: e.target.checked })} className="accent-[#29B6E8]" /> Nicht beendet</label>
           <label className="col-span-2 text-[10px] text-white/60 truncate"><input type="checkbox" checked={row.forfeit} onChange={(e)=>update(row.registration_id, { forfeit: e.target.checked })} className="accent-[#FF3B30]" /> Forfeit</label>
         </div>

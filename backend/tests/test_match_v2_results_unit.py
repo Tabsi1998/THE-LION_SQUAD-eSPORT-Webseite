@@ -61,6 +61,35 @@ def test_normalize_v2_results_requires_all_filled_slots():
         normalize_v2_results(_source_match(), RESULTS[:3])
 
 
+def test_normalize_v2_results_auto_ranks_fastest_time_when_configured():
+    match = _source_match()
+    match["settings"] = {"calculation": "time"}
+
+    results = normalize_v2_results(match, [
+        {"registration_id": "r1", "time_ms": 65500},
+        {"registration_id": "r2", "time_ms": 61200},
+        {"registration_id": "r3", "time_ms": 70000},
+        {"registration_id": "r4", "time_ms": 64000},
+    ])
+
+    assert [row["registration_id"] for row in results] == ["r2", "r4", "r1", "r3"]
+    assert [row["rank"] for row in results] == [1, 2, 3, 4]
+
+
+def test_normalize_v2_results_auto_ranks_lower_score_when_configured():
+    match = _source_match()
+    match["settings"] = {"calculation": "lower_score"}
+
+    results = normalize_v2_results(match, [
+        {"registration_id": "r1", "score": 9},
+        {"registration_id": "r2", "score": 4},
+        {"registration_id": "r3", "score": 12},
+        {"registration_id": "r4", "score": 6},
+    ])
+
+    assert [row["registration_id"] for row in results] == ["r2", "r4", "r1", "r3"]
+
+
 def test_v2_result_application_fills_advancement_slots():
     source = _source_match()
     winner_target = _target("m-b", "B")

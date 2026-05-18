@@ -253,6 +253,7 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
     match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
     if not match:
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    await _ensure_match_tournament_unlocked(db, match)
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen Termine vorschlagen")
     acting_reg = await _acting_registration_for_match(match, me)
@@ -369,6 +370,7 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, me: dict = Depen
     match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
     if not match:
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    await _ensure_match_tournament_unlocked(db, match)
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen im Matchchat schreiben")
     now_iso = now_utc().isoformat()
