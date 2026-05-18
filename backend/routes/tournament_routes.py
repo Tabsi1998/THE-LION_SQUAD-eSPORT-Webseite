@@ -38,6 +38,8 @@ router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 REGISTRATION_CHECKIN_STATUSES = {"approved", "checked_in", "no_show"}
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
+LEGACY_AUTO_PREVIEW_FORMATS = {"single_elim", "double_elim", "round_robin", "league"}
+MAX_INITIAL_PREVIEW_MATCHES = 512
 
 
 class TournamentChatCreate(BaseModel):
@@ -65,6 +67,34 @@ def _preview_seed_reg(seed: int, tid: str) -> dict:
 def _preview_registrations_for_tournament(t: dict) -> list[dict]:
     count = _next_power_of_two(max(2, int(t.get("max_participants") or 2)))
     return [_preview_seed_reg(seed, t["id"]) for seed in range(1, count + 1)]
+
+
+def _estimate_legacy_preview_matches(tournament: dict) -> int:
+    fmt = tournament.get("format") or "single_elim"
+    count = _next_power_of_two(max(2, int(tournament.get("max_participants") or 2)))
+    if fmt == "single_elim":
+        return max(1, count - 1) + (1 if tournament.get("bronze_match") and count >= 4 else 0)
+    if fmt == "double_elim":
+        rounds = int(math.log2(count))
+        loser_rounds = max(1, 2 * (rounds - 1))
+        loser_matches = 0
+        current = max(1, count // 4)
+        for round_index in range(loser_rounds):
+            loser_matches += max(1, current)
+            if round_index % 2 == 1:
+                current = max(1, current // 2)
+        return max(1, count - 1) + loser_matches + 2
+    if fmt == "round_robin":
+        return (count * (count - 1)) // 2
+    if fmt == "league":
+        return count * (count - 1)
+    return 0
+
+
+def _can_create_initial_legacy_preview(tournament: dict) -> bool:
+    if (tournament.get("format") or "single_elim") not in LEGACY_AUTO_PREVIEW_FORMATS:
+        return False
+    return 0 < _estimate_legacy_preview_matches(tournament) <= MAX_INITIAL_PREVIEW_MATCHES
 
 
 def _iso(dt):
@@ -398,6 +428,23 @@ async def _generate_legacy_bracket_docs(db, tournament: dict, actor_id: str | No
     return {"ok": True, "match_count": len(matches), "preview": preview}
 
 
+async def _create_initial_bracket_preview(db, tournament: dict, actor_id: str | None) -> dict | None:
+    """Create a non-destructive empty bracket preview right after tournament creation."""
+    if not _can_create_initial_legacy_preview(tournament):
+        return None
+    try:
+        return await _generate_legacy_bracket_docs(
+            db,
+            tournament,
+            actor_id,
+            preview=True,
+            force=False,
+            set_live=False,
+        )
+    except HTTPException:
+        return None
+
+
 async def _replace_registration_in_open_matches(db, tid: str, old_reg_id: str, new_reg: dict,
                                                 actor_id: str | None) -> dict:
     new_reg_id = new_reg["id"]
@@ -687,7 +734,9 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
     doc["updated_at"] = now_utc().isoformat()
     doc["created_by"] = me["id"]
     await db.tournaments.insert_one(doc)
+    auto_preview = await _create_initial_bracket_preview(db, doc, me.get("id"))
     doc.pop("_id", None)
+    doc["auto_generated_bracket"] = auto_preview
     return doc
 
 

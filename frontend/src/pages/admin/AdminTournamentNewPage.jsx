@@ -85,7 +85,9 @@ export default function AdminTournamentNewPage() {
         }));
       if (payload.prize_places.length === 0) payload.prize_places = null;
       const { data } = await api.post("/tournaments", payload);
-      toast.success("Turnier erstellt.");
+      toast.success(data?.auto_generated_bracket?.match_count
+        ? `Turnier erstellt. Vorschau mit ${data.auto_generated_bracket.match_count} Spielen angelegt.`
+        : "Turnier erstellt.");
       nav(`/admin/tournaments/${data.id}`);
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
