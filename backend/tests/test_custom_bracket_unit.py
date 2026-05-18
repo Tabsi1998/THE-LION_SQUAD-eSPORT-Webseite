@@ -147,3 +147,25 @@ def test_v2_generator_builds_auto_single_elim_schema_and_byes():
     assert by_key["A"]["results"][0]["registration_id"] == "r1"
     assert by_key["C"]["slots"][0]["registration_id"] == "r1"
     assert all(match["duration_minutes"] == 9 for match in matches)
+
+
+def test_v2_generator_builds_auto_double_elim_schema():
+    tournament = {"id": "t1", "seeding_mode": "manual", "max_participants": 8, "match_duration_minutes": 12}
+    stage = {
+        "id": "s1",
+        "number": 1,
+        "stage_type": "double_elimination",
+        "match_type": "duel",
+        "settings": {},
+    }
+    registrations = [
+        {"id": f"r{i}", "user_id": f"u{i}", "status": "approved", "seed": i}
+        for i in range(1, 9)
+    ]
+
+    matches = build_matches_v2_from_schema(tournament, stage, registrations, preview=True)
+    sections = {match["section"] for match in matches}
+
+    assert {"WB", "LB", "GF"} <= sections
+    assert any(match["match_key"] == "GF" for match in matches)
+    assert all(match["match_type"] == "duel" for match in matches)

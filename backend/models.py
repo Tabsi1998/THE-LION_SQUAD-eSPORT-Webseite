@@ -385,7 +385,8 @@ class EventRegistrationUpdate(BaseModel):
 # ---------- Tournaments ----------
 TournamentFormat = Literal[
     "single_elim", "double_elim", "round_robin", "swiss",
-    "groups", "ffa", "battle_royale", "league", "time_trial", "grand_prix"
+    "groups", "ffa", "battle_royale", "league", "time_trial", "grand_prix",
+    "custom_bracket", "ffa_custom_bracket",
 ]
 # Unified status vocabulary across Events / Tournaments / Challenges / Fast-Lap.
 # `scheduled` = announced but not open/live yet.

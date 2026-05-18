@@ -240,6 +240,75 @@ def _auto_single_elim_schema(slot_count: int) -> str:
     return "\n".join(lines)
 
 
+def _auto_double_elim_schema(slot_count: int) -> str:
+    bracket_size = _next_power_of_two(max(2, slot_count))
+    if bracket_size == 2:
+        return "[WB]\n# Winner Bracket\nA=[1,2]\n\n[GF]\n# Finale\nGF=[W:A:1,L:A:2]"
+
+    lines = ["[WB]"]
+    sources = [str(seed) for seed in _seed_positions(bracket_size)]
+    next_key_index = 0
+    wb_rounds: list[list[str]] = []
+    round_num = 1
+    while len(sources) > 1:
+        lines.append(f"# Winner Runde {round_num}")
+        round_keys: list[str] = []
+        next_sources = []
+        for idx in range(0, len(sources), 2):
+            key = _match_key(next_key_index)
+            next_key_index += 1
+            lines.append(f"{key}=[{sources[idx]},{sources[idx + 1]}]")
+            round_keys.append(key)
+            next_sources.append(f"W:{key}:1")
+        wb_rounds.append(round_keys)
+        sources = next_sources
+        round_num += 1
+
+    lines.append("")
+    lines.append("[LB]")
+    lb_key_index = 0
+    lb_prev: list[str] = []
+    first_wb = wb_rounds[0]
+    lines.append("# Loser Runde 1")
+    for idx in range(0, len(first_wb), 2):
+        key = f"L{_match_key(lb_key_index)}"
+        lb_key_index += 1
+        lines.append(f"{key}=[L:{first_wb[idx]}:2,L:{first_wb[idx + 1]}:2]")
+        lb_prev.append(key)
+
+    lb_round_num = 2
+    for wb_round in wb_rounds[1:]:
+        drop_round: list[str] = []
+        lines.append(f"# Loser Runde {lb_round_num}")
+        lb_round_num += 1
+        for idx, wb_key in enumerate(wb_round):
+            if idx >= len(lb_prev):
+                break
+            key = f"L{_match_key(lb_key_index)}"
+            lb_key_index += 1
+            lines.append(f"{key}=[W:{lb_prev[idx]}:1,L:{wb_key}:2]")
+            drop_round.append(key)
+        lb_prev = drop_round
+        if len(lb_prev) > 1:
+            collapse_round: list[str] = []
+            lines.append(f"# Loser Runde {lb_round_num}")
+            lb_round_num += 1
+            for idx in range(0, len(lb_prev), 2):
+                key = f"L{_match_key(lb_key_index)}"
+                lb_key_index += 1
+                lines.append(f"{key}=[W:{lb_prev[idx]}:1,W:{lb_prev[idx + 1]}:1]")
+                collapse_round.append(key)
+            lb_prev = collapse_round
+
+    wb_final = wb_rounds[-1][0]
+    lb_final = lb_prev[0]
+    lines.append("")
+    lines.append("[GF]")
+    lines.append("# Grand Final")
+    lines.append(f"GF=[W:{wb_final}:1,W:{lb_final}:1]")
+    return "\n".join(lines)
+
+
 def _resolve_schema(tournament: dict, stage: dict, registrations: list[dict], preview: bool) -> str | None:
     settings = stage.get("settings") or {}
     schema = settings.get("schema") or settings.get("custom_schema") or settings.get("bracket_schema")
@@ -248,6 +317,9 @@ def _resolve_schema(tournament: dict, stage: dict, registrations: list[dict], pr
     if (stage.get("stage_type") or "") == "single_elimination":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
         return _auto_single_elim_schema(size)
+    if (stage.get("stage_type") or "") == "double_elimination":
+        size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
+        return _auto_double_elim_schema(size)
     return None
 
 

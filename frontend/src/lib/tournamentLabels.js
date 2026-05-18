@@ -9,6 +9,8 @@ export const TOURNAMENT_FORMAT_LABELS = {
   league: "Liga",
   time_trial: "Zeitfahren",
   grand_prix: "Rennserie",
+  custom_bracket: "Freier Turnierbaum",
+  ffa_custom_bracket: "Mehrspieler freier Turnierbaum",
 };
 
 export const TOURNAMENT_FORMAT_OPTIONS = [
@@ -22,6 +24,8 @@ export const TOURNAMENT_FORMAT_OPTIONS = [
   ["league", TOURNAMENT_FORMAT_LABELS.league],
   ["time_trial", TOURNAMENT_FORMAT_LABELS.time_trial],
   ["grand_prix", TOURNAMENT_FORMAT_LABELS.grand_prix],
+  ["custom_bracket", TOURNAMENT_FORMAT_LABELS.custom_bracket],
+  ["ffa_custom_bracket", TOURNAMENT_FORMAT_LABELS.ffa_custom_bracket],
 ];
 
 export const STAGE_TYPE_LABELS = {

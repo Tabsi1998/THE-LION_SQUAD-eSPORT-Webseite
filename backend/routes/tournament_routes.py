@@ -47,6 +47,13 @@ class TournamentChatCreate(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
 
 
+class TournamentBracketStructurePayload(BaseModel):
+    stage_type: Optional[str] = None
+    match_type: Optional[str] = None
+    name: Optional[str] = None
+    settings: dict = Field(default_factory=dict)
+
+
 def _next_power_of_two(n: int) -> int:
     return 1 if n <= 1 else 2 ** math.ceil(math.log2(n))
 
@@ -108,9 +115,39 @@ def _estimate_legacy_preview_matches(tournament: dict) -> int:
 
 
 def _can_create_initial_legacy_preview(tournament: dict) -> bool:
+    if (tournament.get("format") or "single_elim") in {"custom_bracket", "ffa_custom_bracket"}:
+        return True
     if (tournament.get("format") or "single_elim") not in LEGACY_AUTO_PREVIEW_FORMATS:
         return False
     return 0 < _estimate_legacy_preview_matches(tournament) <= MAX_INITIAL_PREVIEW_MATCHES
+
+
+def _stage_defaults_for_tournament_format(tournament: dict, body: TournamentBracketStructurePayload | None = None) -> dict | None:
+    fmt = (tournament.get("format") or "single_elim")
+    settings = dict((body.settings if body else {}) or {})
+    stage_type = (body.stage_type if body else None) or {
+        "single_elim": "single_elimination",
+        "double_elim": "double_elimination",
+        "custom_bracket": "custom_bracket",
+        "ffa_custom_bracket": "ffa_custom_bracket",
+    }.get(fmt)
+    if not stage_type:
+        return None
+    match_type = (body.match_type if body else None) or ("ffa" if stage_type.startswith("ffa_") else "duel")
+    settings.setdefault("match_size", 4 if match_type == "ffa" else 2)
+    settings.setdefault("min_players", 2)
+    settings.setdefault("qualifiers_per_match", 2 if match_type == "ffa" else 1)
+    settings.setdefault("duration_minutes", int(tournament.get("match_duration_minutes") or 30))
+    settings.setdefault("score_type", "points")
+    settings.setdefault("calculation", "points")
+    return {
+        "name": (body.name if body and body.name else "Turnierbaum"),
+        "number": 1,
+        "stage_type": stage_type,
+        "match_type": match_type,
+        "settings": settings,
+        "status": "pending",
+    }
 
 
 def _iso(dt):
@@ -1778,9 +1815,10 @@ async def generate(tid: str, preview: bool = False, force: bool = False,
 
 
 @router.post("/{tid}/bracket/from-format")
-async def rebuild_bracket_from_tournament_format(tid: str, preview: bool = True, force: bool = False,
+async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBracketStructurePayload | None = None,
+                                                 preview: bool = True, force: bool = False,
                                                  me: dict = Depends(get_current_user)):
-    """Use the tournament format as the single source of truth and rebuild the bracket preview."""
+    """Use the tournament structure as the single source of truth and rebuild the bracket preview."""
     db = get_db()
     tid = await _resolve_tid(tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
@@ -1794,6 +1832,14 @@ async def rebuild_bracket_from_tournament_format(tid: str, preview: bool = True,
 
     legacy_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
     v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    existing_stage = await db.tournament_stages.find_one({"tournament_id": tid}, {"_id": 0}, sort=[("number", 1)])
+    if body is None and existing_stage:
+        body = TournamentBracketStructurePayload(
+            name=existing_stage.get("name") or "Turnierbaum",
+            stage_type=existing_stage.get("stage_type"),
+            match_type=existing_stage.get("match_type"),
+            settings=existing_stage.get("settings") or {},
+        )
     has_real_legacy = any(not match.get("is_preview") for match in legacy_matches)
     has_real_v2 = any(not match.get("is_preview") for match in v2_matches)
     if (has_real_legacy or has_real_v2) and not force:
@@ -1805,6 +1851,51 @@ async def rebuild_bracket_from_tournament_format(tid: str, preview: bool = True,
     if v2_match_ids:
         await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
     await db.tournament_stages.delete_many({"tournament_id": tid})
+
+    stage_defaults = _stage_defaults_for_tournament_format(tournament, body)
+    if stage_defaults:
+        stage = {
+            **stage_defaults,
+            "id": new_id(),
+            "tournament_id": tid,
+            "created_at": now_utc().isoformat(),
+            "updated_at": now_utc().isoformat(),
+            "created_by": me["id"],
+        }
+        registrations = await db.tournament_registrations.find(
+            {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+            {"_id": 0},
+        ).to_list(5000)
+        try:
+            matches = build_matches_v2_from_schema(tournament, stage, registrations, preview=preview)
+        except BracketSchemaError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        if not matches:
+            raise HTTPException(status_code=400, detail="Die Struktur erzeugt keine Spiele.")
+        await db.tournament_stages.insert_one(stage)
+        await db.matches_v2.insert_many(matches)
+        await _audit_tournament_action(
+            db,
+            "tournament.bracket.rebuild_from_structure",
+            me.get("id"),
+            tid,
+            {
+                "format": tournament.get("format"),
+                "stage_type": stage.get("stage_type"),
+                "match_type": stage.get("match_type"),
+                "preview": preview,
+                "force": force,
+                "match_count": len(matches),
+            },
+        )
+        return {
+            "ok": True,
+            "engine": "stages",
+            "stage_id": stage["id"],
+            "match_count": len(matches),
+            "preview": preview,
+            "participant_count": len(registrations),
+        }
 
     result = await _generate_legacy_bracket_docs(
         db,

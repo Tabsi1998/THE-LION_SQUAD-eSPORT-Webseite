@@ -52,6 +52,8 @@ const TOURNAMENT_FORMAT_OPTIONS = [
   ["league", "Liga"],
   ["time_trial", "Zeitfahren"],
   ["grand_prix", "Rennserie"],
+  ["custom_bracket", "Freier Turnierbaum"],
+  ["ffa_custom_bracket", "Mehrspieler freier Turnierbaum"],
 ];
 
 const TEAM_MODE_OPTIONS = [["solo", "Einzelspieler"], ["team", "Team"]];
@@ -307,14 +309,14 @@ export default function AdminTournamentEditPage() {
       toast.error(formatRequestError(e, "Check-in konnte nicht gespeichert werden."));
     }
   };
-  const rebuildFromFormat = async ({ preview = true, force = false } = {}) => {
+  const rebuildFromFormat = async ({ preview = true, force = false, structure = null } = {}) => {
     try {
       const params = new URLSearchParams();
       if (preview) params.set("preview", "true");
       if (force) params.set("force", "true");
       const suffix = params.toString() ? `?${params.toString()}` : "";
-      const { data } = await api.post(`/tournaments/${id}/bracket/from-format${suffix}`);
-      toast.success(data.preview ? `Format-Vorschau mit ${data.match_count} Spielen neu aufgebaut.` : `Turnierbaum mit ${data.match_count} Spielen neu aufgebaut.`);
+      const { data } = await api.post(`/tournaments/${id}/bracket/from-format${suffix}`, structure || {});
+      toast.success(data.preview ? `Turnierbaum-Vorschau mit ${data.match_count} Spielen neu aufgebaut.` : `Turnierbaum mit ${data.match_count} Spielen neu aufgebaut.`);
       load();
     } catch (e) {
       if (e.response?.status === 409 && !force) {
@@ -324,7 +326,7 @@ export default function AdminTournamentEditPage() {
           confirmLabel: "Neu bauen",
           tone: "danger",
         });
-        if (ok) return rebuildFromFormat({ preview, force: true });
+        if (ok) return rebuildFromFormat({ preview, force: true, structure });
       }
       toast.error(formatRequestError(e, "Turnierbaum konnte nicht aus dem Format neu aufgebaut werden."));
     }
@@ -493,14 +495,11 @@ export default function AdminTournamentEditPage() {
               <div className="mt-1 text-[10px] text-white/40">Manuell nur für Ausnahmen; Zeitplan automatisiert.</div>
             </div>
           )}
-          {isModerator && !hasFlexibleStructure && <button onClick={() => generateLegacyBracket({ preview: true })} data-testid="admin-tr-preview" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
+          {isModerator && <button onClick={() => rebuildFromFormat({ preview: true })} data-testid="admin-tr-preview" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
             <Eye className="w-3.5 h-3.5" /> Vorschau
           </button>}
-          {isModerator && !hasFlexibleStructure && <button onClick={() => generateLegacyBracket({ preview: false })} data-testid="admin-tr-generate" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2">
+          {isModerator && <button onClick={() => rebuildFromFormat({ preview: false })} data-testid="admin-tr-generate" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2">
             <Zap className="w-3.5 h-3.5" /> Turnierbaum generieren
-          </button>}
-          {isModerator && hasFlexibleStructure && <button onClick={() => rebuildFromFormat({ preview: true })} data-testid="admin-tr-rebuild-format" className="px-4 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#FFD700]/10 inline-flex items-center gap-2">
-            <Zap className="w-3.5 h-3.5" /> Aus Format neu bauen
           </button>}
           {isModerator && <button onClick={reset} data-testid="admin-tr-reset" className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-sm hover:border-[#FF3B30]/60 hover:text-[#FF3B30] inline-flex items-center gap-2">
             <RefreshCw className="w-3.5 h-3.5" /> Zurücksetzen
@@ -520,14 +519,14 @@ export default function AdminTournamentEditPage() {
       </div>
 
       <div className="flex gap-2 mb-5 border-b border-white/10 overflow-x-auto">
-        {["participants", "bracket", ...(hasFlexibleStructure ? [] : ["matches"]), "stages", ...(t.format === "groups" ? ["groups"] : []), ...(isAdmin ? ["staff"] : []), "edit"].map((s) => (
+        {["participants", "bracket", "stages", ...(t.format === "groups" ? ["groups"] : []), ...(isAdmin ? ["staff"] : []), "edit"].map((s) => (
           <button
             key={s}
             data-testid={`admin-tr-tab-${s}`}
             onClick={() => setTab(s)}
             className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${tab === s ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}
           >
-            {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Turnierbaum" : s === "matches" ? "Spiele" : s === "stages" ? "Matchplan" : s === "groups" ? "Gruppen" : s === "staff" ? "Team" : "Bearbeiten"}
+            {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Turnierbaum" : s === "stages" ? "Matchplan" : s === "groups" ? "Gruppen" : s === "staff" ? "Team" : "Bearbeiten"}
           </button>
         ))}
       </div>
@@ -605,7 +604,7 @@ export default function AdminTournamentEditPage() {
         </div>
       )}
 
-      {tab === "matches" && bracket?.matches && (
+      {tab === "stages" && !hasFlexibleStructure && bracket?.matches && (
         <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[720px]">
@@ -647,7 +646,7 @@ export default function AdminTournamentEditPage() {
           </div>
         </div>
       )}
-      {tab === "stages" && (
+      {tab === "stages" && hasFlexibleStructure && (
         <TournamentStagesPanel
           tournamentId={t.id}
           stages={stages}
@@ -665,14 +664,8 @@ export default function AdminTournamentEditPage() {
           key={t.updated_at || t.id}
           tournament={t}
           stages={stages}
-          matches={matchesV2}
-          registrations={regs}
-          isAdmin={isAdmin}
-          isModerator={isModerator}
           onSaved={load}
           onRebuildFromFormat={rebuildFromFormat}
-          onSaveResult={updateMatchV2Result}
-          onSaveMatchMeta={updateMatchV2Schedule}
         />
       )}
       {tab === "staff" && isAdmin && (
@@ -1222,7 +1215,7 @@ function MatchScheduleControls({ match, onSave }) {
   );
 }
 
-function TournamentEditForm({ tournament, stages = [], matches = [], registrations = [], isAdmin, isModerator, onSaved, onRebuildFromFormat, onSaveResult, onSaveMatchMeta }) {
+function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat }) {
   const dt = toDateTimeLocalInput;
   const [games, setGames] = useState([]);
   const [events, setEvents] = useState([]);
@@ -1318,11 +1311,46 @@ function TournamentEditForm({ tournament, stages = [], matches = [], registratio
     show_chat: !!tournament.show_chat,
     season_weight: tournament.season_weight ?? 2,
   });
+  const firstStage = stages[0] || null;
+  const stageSettings = firstStage?.settings || {};
+  const [structure, setStructure] = useState({
+    stage_type: firstStage?.stage_type || (tournament.format === "double_elim" ? "double_elimination" : tournament.format === "ffa_custom_bracket" ? "ffa_custom_bracket" : tournament.format === "custom_bracket" ? "custom_bracket" : "single_elimination"),
+    match_type: firstStage?.match_type || (tournament.format === "ffa_custom_bracket" ? "ffa" : "duel"),
+    match_size: stageSettings.match_size || (tournament.format === "ffa_custom_bracket" ? 4 : 2),
+    min_players: stageSettings.min_players || 2,
+    qualifiers_per_match: stageSettings.qualifiers_per_match || (tournament.format === "ffa_custom_bracket" ? 2 : 1),
+    duration_minutes: stageSettings.duration_minutes || tournament.match_duration_minutes || 30,
+    schema: stageSettings.schema || (tournament.format === "ffa_custom_bracket" ? DEFAULT_FFA_SCHEMA : ""),
+  });
   useEffect(() => {
     api.get("/games").then(({ data }) => setGames(data || [])).catch(() => setGames([]));
     api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(() => setEvents([]));
   }, []);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
+  const setStructureField = (k, v) => setStructure((x) => ({ ...x, [k]: v }));
+  const setFormat = (value) => {
+    set("format", value);
+    setStructure((current) => {
+      if (value === "double_elim") return { ...current, stage_type: "double_elimination", match_type: "duel", match_size: 2, min_players: 2, qualifiers_per_match: 1 };
+      if (value === "custom_bracket") return { ...current, stage_type: "custom_bracket", match_type: "duel", match_size: 2, min_players: 2, qualifiers_per_match: 1 };
+      if (value === "ffa_custom_bracket") return { ...current, stage_type: "ffa_custom_bracket", match_type: "ffa", match_size: current.match_size || 4, min_players: 2, qualifiers_per_match: current.qualifiers_per_match || 2, schema: current.schema || DEFAULT_FFA_SCHEMA };
+      return { ...current, stage_type: "single_elimination", match_type: "duel", match_size: 2, min_players: 2, qualifiers_per_match: 1 };
+    });
+  };
+  const structurePayload = () => ({
+    name: "Turnierbaum",
+    stage_type: structure.stage_type,
+    match_type: structure.match_type,
+    settings: {
+      match_size: Number(structure.match_size) || (structure.match_type === "ffa" ? 4 : 2),
+      min_players: Number(structure.min_players) || 2,
+      qualifiers_per_match: Number(structure.qualifiers_per_match) || (structure.match_type === "ffa" ? 2 : 1),
+      duration_minutes: Number(structure.duration_minutes) || Number(f.match_duration_minutes) || 30,
+      schema: structure.schema || "",
+      score_type: "points",
+      calculation: "points",
+    },
+  });
   const setTeamMode = (value) => setF((current) => ({
     ...current,
     team_mode: value,
@@ -1354,7 +1382,7 @@ function TournamentEditForm({ tournament, stages = [], matches = [], registratio
       const patch = buildDirtyPayload(payload, normalizeTournamentPayload(formFromTournament()));
       if (!hasPayloadChanges(patch)) {
         if (rebuildPreview) {
-          await onRebuildFromFormat?.({ preview: true, force: true });
+          await onRebuildFromFormat?.({ preview: true, force: true, structure: structurePayload() });
           return;
         }
         toast.info("Keine Änderungen zum Speichern.");
@@ -1363,7 +1391,7 @@ function TournamentEditForm({ tournament, stages = [], matches = [], registratio
       await api.patch(`/tournaments/${tournament.id}`, patch);
       toast.success("Gespeichert.");
       if (rebuildPreview) {
-        await onRebuildFromFormat?.({ preview: true, force: true });
+        await onRebuildFromFormat?.({ preview: true, force: true, structure: structurePayload() });
       } else {
         onSaved();
       }
@@ -1412,7 +1440,7 @@ function TournamentEditForm({ tournament, stages = [], matches = [], registratio
           Teilnahme legt fest, wer sich anmelden darf: Einzelspieler melden sich selbst an, bei Team meldet ein Team-Leader oder Co-Leader das Team an.
         </p>
         <div className="grid md:grid-cols-3 gap-3">
-          <SelectField label="Format" value={f.format} onChange={(v)=>set("format",v)} options={TOURNAMENT_FORMAT_OPTIONS} />
+          <SelectField label="Turnierstruktur" value={f.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} />
           <SelectField label="Teilnahme" value={f.team_mode} onChange={setTeamMode} options={TEAM_MODE_OPTIONS} />
           {f.team_mode !== "solo" && <Fld label="Spieler pro Team" type="number" min="2" max="6" value={f.team_size} onChange={(v)=>set("team_size",v)} testId="tr-edit-team-size"/>}
           <Fld label={f.team_mode === "solo" ? "Min Spieler" : "Min Teams"} type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>
@@ -1430,21 +1458,22 @@ function TournamentEditForm({ tournament, stages = [], matches = [], registratio
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.substitutes_allowed} onChange={(e)=>set("substitutes_allowed",e.target.checked)} className="accent-[#29B6E8]"/><span>Ersatzspieler erlauben</span></label>
           </div>
         </Details>
+        {["custom_bracket", "ffa_custom_bracket"].includes(f.format) && (
+          <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Freier Turnierbaum</div>
+            <div className="grid md:grid-cols-3 gap-3">
+              {f.format === "ffa_custom_bracket" && <Fld label="SpielgrÃ¶ÃŸe" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size" />}
+              <Fld label="Min Spieler" type="number" value={structure.min_players} onChange={(v)=>setStructureField("min_players", v)} testId="tr-edit-stage-min" />
+              {f.format === "ffa_custom_bracket" && <Fld label="Qualifizierte" type="number" value={structure.qualifiers_per_match} onChange={(v)=>setStructureField("qualifiers_per_match", v)} testId="tr-edit-stage-qualifiers" />}
+              <Fld label="Spieldauer Min." type="number" value={structure.duration_minutes} onChange={(v)=>setStructureField("duration_minutes", v)} testId="tr-edit-stage-duration" />
+            </div>
+            <label className="block">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
+              <textarea value={structure.schema} onChange={(e)=>setStructureField("schema", e.target.value)} rows={12} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" data-testid="tr-edit-structure-schema" />
+            </label>
+          </div>
+        )}
       </div>
-      {isAdmin && (
-        <TournamentStagesPanel
-          tournamentId={tournament.id}
-          stages={stages}
-          matches={matches}
-          registrations={registrations}
-          isAdmin={isAdmin}
-          isModerator={isModerator}
-          mode="settings"
-          onChanged={onSaved}
-          onSaveResult={onSaveResult}
-          onSaveMatchMeta={onSaveMatchMeta}
-        />
-      )}
       <Details title="Preise">
         <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} />
         <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
