@@ -26,6 +26,7 @@ from bracket_engine import advance_match_winner
 from match_rules import loser_for_winner, match_allows_draw, validate_winner_id
 from services.match_notifications import notify_match_result_confirmed
 from services.match_v2_results import MatchV2ResultError, build_v2_result_application
+from services.station_labels import attach_station_info
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
@@ -271,6 +272,7 @@ async def _match_participants(match: dict, user: dict | None) -> list[dict]:
 async def _match_page_payload(match: dict, collection: str, user: dict | None = None) -> dict:
     db = get_db()
     match = await _refresh_schedule_escalation(match, collection)
+    await attach_station_info(db, [match])
     tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0})
     stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0})
     proposals = await db.match_schedule_proposals.find(

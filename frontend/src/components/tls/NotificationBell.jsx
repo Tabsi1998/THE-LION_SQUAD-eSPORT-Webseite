@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Bell, Check, Inbox, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -22,23 +23,49 @@ function notificationDate(value) {
 
 export function NotificationBell() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("unread");
   const [items, setItems] = useState([]);
   const boxRef = useRef(null);
+  const knownIdsRef = useRef(new Set());
+  const didPrimeRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!user) {
       setItems([]);
+      knownIdsRef.current = new Set();
+      didPrimeRef.current = false;
       return;
     }
     try {
       const { data } = await api.get("/admin/notifications");
-      setItems(Array.isArray(data) ? data : []);
+      const rows = Array.isArray(data) ? data : [];
+      setItems(rows);
+      if (didPrimeRef.current) {
+        rows
+          .filter((item) => item.kind === "match_reminder" && !item.read && item.id && !knownIdsRef.current.has(item.id))
+          .slice(0, 3)
+          .forEach((item) => {
+            toast.info(item.title || "Match-Erinnerung", {
+              description: item.body || "Dein Match startet bald.",
+              duration: 15000,
+              action: item.url ? {
+                label: "Oeffnen",
+                onClick: async () => {
+                  try { await api.post(`/admin/notifications/${item.id}/read`); } catch {}
+                  navigate(item.url);
+                },
+              } : undefined,
+            });
+          });
+      }
+      knownIdsRef.current = new Set(rows.map((item) => item.id).filter(Boolean));
+      didPrimeRef.current = true;
     } catch {
       setItems([]);
     }
-  }, [user]);
+  }, [navigate, user]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {

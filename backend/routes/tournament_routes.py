@@ -10,6 +10,7 @@ from database import get_db
 from auth import get_current_user, require_admin, get_optional_user
 from services.visibility import user_can_see
 from services.public_phase import derive_public_phase
+from services.station_labels import attach_station_info
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     PARTICIPANT_STAFF_ROLES,
@@ -2129,6 +2130,8 @@ async def get_bracket(tid: str, user=Depends(get_optional_user)):
     matches = await db.matches.find({"tournament_id": t["id"]}, {"_id": 0}).sort("round", 1).to_list(1000)
     stages = await db.tournament_stages.find({"tournament_id": t["id"]}, {"_id": 0}).sort("number", 1).to_list(200)
     matches_v2 = await db.matches_v2.find({"tournament_id": t["id"]}, {"_id": 0}).sort([("stage_number", 1), ("round", 1), ("order", 1)]).to_list(3000)
+    await attach_station_info(db, matches)
+    await attach_station_info(db, matches_v2)
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     regs = [_public_registration(r, user, is_staff) for r in regs]
     known_reg_ids = {r.get("id") for r in regs}

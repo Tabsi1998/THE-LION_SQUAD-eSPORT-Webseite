@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from database import get_db
 from match_rules import participant_source_ids
 from models import now_utc
+from services.user_notifications import create_user_notification
 
 logger = logging.getLogger("tls.match_reminders")
 
@@ -72,7 +73,7 @@ async def _station_label(match: dict) -> str:
         parts.append(station["device_type"])
     if station.get("notes"):
         parts.append(station["notes"])
-    return " · ".join(parts)
+    return " - ".join(parts)
 
 
 def _opponent_label(participants: list[dict], user: dict) -> str:
@@ -103,6 +104,7 @@ async def schedule_match_reminders() -> dict:
         })),
     ]
     queued = 0
+    notifications = 0
     for collection_name, cursor in queries:
         async for m in cursor:
             try:
@@ -127,6 +129,33 @@ async def schedule_match_reminders() -> dict:
                     # Match this lead time? (within ±window)
                     if abs(diff_min - lead_min) > window:
                         continue
+                    if label == "10m":
+                        dedupe_notification = f"match_reminder:{m.get('id')}:{p.get('id')}:web:{label}"
+                        exists = await db.notifications.find_one(
+                            {
+                                "user_id": p.get("id"),
+                                "kind": "match_reminder",
+                                "meta.dedupe_key": dedupe_notification,
+                            },
+                            {"_id": 1},
+                        )
+                        if not exists:
+                            station_part = f" an {station}" if station else ""
+                            await create_user_notification(
+                                p.get("id"),
+                                "Match startet in 10 Minuten",
+                                f"{t.get('title', 'Turnier')} gegen {opp_name} um {when_str}{station_part}.",
+                                url=url,
+                                kind="match_reminder",
+                                meta={
+                                    "dedupe_key": dedupe_notification,
+                                    "match_id": m.get("id"),
+                                    "tournament_id": m.get("tournament_id"),
+                                    "lead_time": label,
+                                    "station": station,
+                                },
+                            )
+                            notifications += 1
                     if not p.get("email"):
                         continue
                     from services.notification_preferences import send_user_template
@@ -141,6 +170,6 @@ async def schedule_match_reminders() -> dict:
                         dedupe_key=dedupe,
                     )
                     queued += 1
-    if queued:
-        logger.info(f"[match-reminders] queued {queued} mails")
-    return {"queued": queued}
+    if queued or notifications:
+        logger.info(f"[match-reminders] queued {queued} mails, created {notifications} web notifications")
+    return {"queued": queued, "notifications": notifications}

@@ -178,6 +178,29 @@ function StageSection({ section, rounds, regMap, podiumMap, compact, viewMode, o
   );
 }
 
+function formatNodeDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+}
+
+function getStationLabel(match) {
+  return match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
+}
+
+function MatchMeta({ match, compact = false }) {
+  const time = formatNodeDateTime(match?.scheduled_at);
+  const station = getStationLabel(match);
+  if (!time && !station) return null;
+  return (
+    <div className={`border-t border-white/5 bg-[#050505]/40 ${compact ? "px-2.5 py-1" : "px-3 py-1.5"} text-[10px] uppercase tracking-wider text-white/45 flex flex-wrap gap-x-3 gap-y-1`}>
+      {time && <span>{time}</span>}
+      {station && <span className="text-[#29B6E8]">Station {station}</span>}
+    </div>
+  );
+}
+
 function V2DuelNode({ match, regMap, podiumMap, compact = false, onClick }) {
   const resultMap = new Map((match.results || []).map((r) => [r.registration_id, r]));
   const slots = [...(match.slots || [])].slice(0, 2);
@@ -210,6 +233,7 @@ function V2DuelNode({ match, regMap, podiumMap, compact = false, onClick }) {
           />
         );
       })}
+      <MatchMeta match={match} compact={compact} />
       <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-white/40 border-t border-white/5 flex items-center justify-between font-display">
         <span>{match.match_key || "Spiel"}</span>
         <span>{formatMatchStatus(match.status)}</span>
@@ -235,6 +259,7 @@ function HeatNode({ match, regMap, podiumMap, compact = false, onClick }) {
         </div>
         <span className="text-[10px] uppercase tracking-wider text-white/45">{formatMatchStatus(match.status)}</span>
       </div>
+      <MatchMeta match={match} compact={compact} />
       {(match.slots || []).map((slot) => {
         const reg = regMap.get(slot.registration_id);
         const result = resultMap.get(slot.registration_id);
@@ -312,6 +337,7 @@ function BracketNode({ match, regMap, podiumMap, compact = false, onClick }) {
         avatar={b?.user?.avatar_url}
         compact={compact}
       />
+      <MatchMeta match={match} compact={compact} />
       <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-white/40 border-t border-white/5 flex items-center justify-between font-display">
         <span>Spiel #{match.match_index + 1}</span>
         <span>{formatMatchStatus(match.status)}</span>

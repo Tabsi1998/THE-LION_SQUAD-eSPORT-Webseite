@@ -13,6 +13,10 @@ function formatDateTime(value) {
   return new Date(value).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
 }
 
+function stationLabel(match) {
+  return match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
+}
+
 function participantLabel(slot, registrations) {
   const reg = registrations[slot.registration_id] || {};
   return reg.display_name || reg.ingame_name || reg.user?.display_name || slot.source?.raw || "Offen";
@@ -96,6 +100,9 @@ export default function TournamentSchedulePage() {
                       <span className="text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">{formatMatchStatus(match.schedule_status || match.status)}</span>
                     </div>
                     <div className="mt-3 text-sm text-white/55">{formatDateTime(match.scheduled_at)}</div>
+                    {stationLabel(match) && (
+                      <div className="mt-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">Station {stationLabel(match)}</div>
+                    )}
                   </Link>
                 ))}
               </div>

@@ -20,6 +20,10 @@ function formatDateTime(value) {
   return new Date(value).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
 }
 
+function stationLabel(match) {
+  return match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
+}
+
 function toLocalInput(value) {
   if (!value) return "";
   const d = new Date(value);
@@ -132,6 +136,9 @@ export default function MatchPage() {
             <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Terminstatus</div>
             <div className="mt-1 font-heading font-black uppercase text-[#FFD700]">{scheduleLabels[match.schedule_status] || "Noch offen"}</div>
             <div className="mt-1 text-sm text-white/65">{formatDateTime(match.scheduled_at)}</div>
+            {stationLabel(match) && (
+              <div className="mt-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">Station {stationLabel(match)}</div>
+            )}
           </div>
         </div>
 

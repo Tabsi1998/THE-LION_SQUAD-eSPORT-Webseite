@@ -86,7 +86,16 @@ LA=[L:A:3,L:A:4,L:B:3,L:B:4]`;
 const CUSTOM_STAGE_TYPES = new Set(["custom_bracket", "ffa_custom_bracket"]);
 const AUTO_STAGE_TYPES = new Set(["single_elimination", "double_elimination", "custom_bracket", "ffa_custom_bracket"]);
 const FFA_STAGE_TYPES = new Set(["simple", "ffa_single_elimination", "ffa_custom_bracket", "ffa_league"]);
-const BRONZE_FORMATS = new Set(["single_elim", "custom_bracket"]);
+const BRONZE_FORMATS = new Set(["single_elim", "custom_bracket", "ffa_custom_bracket"]);
+
+function stationDisplay(match, stations = []) {
+  if (!match) return "";
+  const direct = match.station_label || match.station_name || match.station?.name;
+  if (direct) return direct;
+  const station = stations.find((item) => item.id === match.station_id);
+  if (station) return station.name || station.label || station.id;
+  return match.station_id || "";
+}
 
 function matchTypeForStage(stageType) {
   return FFA_STAGE_TYPES.has(stageType) ? "ffa" : "duel";
@@ -638,6 +647,7 @@ export default function AdminTournamentEditPage() {
                 <th className="text-left px-4 py-3">Teilnehmer A</th>
                 <th className="text-left px-4 py-3">Teilnehmer B</th>
                 <th className="text-center px-4 py-3">Ergebnis</th>
+                <th className="text-left px-4 py-3">Station</th>
                 <th className="text-left px-4 py-3">Status</th>
                 <th className="text-right px-4 py-3">Aktion</th>
               </tr>
@@ -652,6 +662,7 @@ export default function AdminTournamentEditPage() {
                     <td className="px-4 py-3">{a?.display_name || "Offen"}</td>
                     <td className="px-4 py-3">{b?.display_name || "Offen"}</td>
                     <td className="px-4 py-3 text-center font-display font-bold">{m.score_a} : {m.score_b}</td>
+                    <td className="px-4 py-3 text-white/60">{stationDisplay(m, stations) || "Offen"}</td>
                     <td className="px-4 py-3"><StatusBadge status={m.status} /></td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex flex-col items-end gap-2">
@@ -837,7 +848,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spieltyp</div>
                 <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{formatMatchType(form.match_type)}</div>
               </div>
-              {config.showMatchSize && <Fld label="Spielgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />}
+              {config.showMatchSize && <Fld label="Spielgroesse" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />}
               {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId="stage-new-min" />}
               {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId="stage-new-qualifiers" />}
               <Fld label="Spieldauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId="stage-new-duration" />
@@ -1011,7 +1022,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], isMod
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spieltyp</div>
                 <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{formatMatchType(form.match_type)}</div>
               </div>
-              {config.showMatchSize && <Fld label="Spielgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId={`stage-size-${stage.id}`} />}
+              {config.showMatchSize && <Fld label="Spielgroesse" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId={`stage-size-${stage.id}`} />}
               {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId={`stage-min-${stage.id}`} />}
               {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId={`stage-qualifiers-${stage.id}`} />}
               <Fld label="Spieldauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId={`stage-duration-${stage.id}`} />
@@ -1063,6 +1074,10 @@ function MatchV2Card({ match, regById, stations = [], canEdit, onSaveResult, onS
         <div>
           <div className="text-[10px] uppercase tracking-widest text-white/40">{formatBracketSection(match.section)} · {match.round_name}</div>
           <div className="font-heading font-bold uppercase">{match.match_key}</div>
+          <div className="mt-1 text-[10px] uppercase tracking-wider text-white/45">
+            {match.scheduled_at ? formatDateTime(match.scheduled_at) : "Termin offen"}
+            {stationDisplay(match, stations) ? <span className="text-[#29B6E8]"> - Station {stationDisplay(match, stations)}</span> : null}
+          </div>
           <a href={`/matches/${match.id}`} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-[10px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">Öffentliche Matchseite</a>
         </div>
         <StatusBadge status={match.status || "pending"} />
@@ -1244,7 +1259,7 @@ function MatchScheduleControls({ match, stations = [], onSave }) {
       )}
       {(match.scheduled_at || match.duration_minutes || match.settings?.duration_minutes || match.station_id) && (
         <div className="text-[11px] text-white/45">
-          Gespeichert: {match.scheduled_at ? formatDateTime(match.scheduled_at) : "keine Startzeit"} · Dauer {match.duration_minutes ?? match.settings?.duration_minutes ?? "offen"} Min.
+          Gespeichert: {match.scheduled_at ? formatDateTime(match.scheduled_at) : "keine Startzeit"} - Dauer {match.duration_minutes ?? match.settings?.duration_minutes ?? "offen"} Min.{stationDisplay(match, stations) ? ` - Station ${stationDisplay(match, stations)}` : ""}
         </div>
       )}
       <button type="button" onClick={() => onSave(match, { scheduled_at: scheduledAt, duration_minutes: duration, station_id: stationId })} className="px-3 py-2 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Planung speichern</button>
@@ -1499,7 +1514,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
             <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Freier Turnierbaum</div>
             <div className="grid md:grid-cols-3 gap-3">
-              {f.format === "ffa_custom_bracket" && <Fld label="Spielgröße" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size" />}
+              {f.format === "ffa_custom_bracket" && <Fld label="Spielgroesse" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size" />}
               {f.format === "ffa_custom_bracket" && <Fld label="Qualifizierte" type="number" value={structure.qualifiers_per_match} onChange={(v)=>setStructureField("qualifiers_per_match", v)} testId="tr-edit-stage-qualifiers" />}
             </div>
             <label className="block">
