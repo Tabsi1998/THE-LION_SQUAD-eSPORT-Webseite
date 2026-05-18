@@ -119,11 +119,11 @@ export default function BracketTVPage() {
       <footer className="shrink-0 px-8 py-3 border-t border-white/10 flex items-center justify-between gap-4 bg-[#0A0A0A]/90 backdrop-blur-sm z-10">
         <div className="flex items-center gap-4 min-w-0">
           <div className="bg-white p-1.5 rounded-sm shrink-0">
-            <QRCodeSVG value={publicUrl} size={50} bgColor="#ffffff" fgColor="#0A0A0A" />
+            <QRCodeSVG value={publicUrl} size={92} bgColor="#ffffff" fgColor="#0A0A0A" />
           </div>
           <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">Jetzt mitfiebern</div>
-            <div className="text-sm text-white/80 truncate font-mono">{publicUrl.replace(/^https?:\/\//, "")}</div>
+            <div className="text-sm text-white/70 truncate">QR scannen und Turnierbaum öffnen</div>
           </div>
         </div>
         {views.length > 1 && (
