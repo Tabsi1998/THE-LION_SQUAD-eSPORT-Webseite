@@ -16,6 +16,7 @@ from models import now_utc, new_id
 from email_service import send_template, _get_email_config
 from pdf_service import (
     pdf_participants, pdf_f1_leaderboard, pdf_matches, pdf_standings, pdf_checkin,
+    pdf_station_signs,
 )
 
 # ---------- Settings ----------
@@ -1676,6 +1677,21 @@ async def pdf_tournament_matches(slug_or_id: str, me: dict = Depends(require_adm
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
     return _pdf_response(pdf_matches(t, matches, reg_map, pdf_sponsors=sponsors, pdf_branding=branding), f"matches_{t['slug']}.pdf")
+
+
+@pdf_router.get("/tournaments/{slug_or_id}/stations.pdf")
+async def pdf_tournament_station_signs(slug_or_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    if not t:
+        raise HTTPException(status_code=404)
+    stations = await db.stations.find({"tournament_id": t["id"]}, {"_id": 0}).sort("name", 1).to_list(500)
+    sponsors = await _pdf_sponsors(db)
+    branding = await _pdf_branding(db)
+    return _pdf_response(
+        pdf_station_signs(t, stations, pdf_sponsors=sponsors, pdf_branding=branding),
+        f"stationen_{t['slug']}.pdf",
+    )
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/standings.pdf")

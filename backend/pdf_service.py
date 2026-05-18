@@ -9,6 +9,8 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm, mm
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas as pdf_canvas
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak,
 )
@@ -293,4 +295,86 @@ def pdf_checkin(tournament: dict, registrations: list, pdf_sponsors: list | None
     t.setStyle(_table_style())
     story.append(t)
     doc.build(story, onFirstPage=_page_bg, onLaterPages=_page_bg)
+    return buf.getvalue()
+
+
+def _fit_font_size(text: str, max_width: float, font_name: str = "Helvetica-Bold", start: int = 72, minimum: int = 28) -> int:
+    value = str(text or "").strip() or "Station"
+    size = start
+    while size > minimum and stringWidth(value, font_name, size) > max_width:
+        size -= 2
+    return size
+
+
+def pdf_station_signs(tournament: dict, stations: list, pdf_sponsors: list | None = None, pdf_branding: dict | None = None) -> bytes:
+    """One print-friendly A4 page per station for event signage."""
+    buf = io.BytesIO()
+    c = pdf_canvas.Canvas(buf, pagesize=A4, pageCompression=1)
+    page_w, page_h = A4
+
+    class _Doc:
+        pagesize = A4
+        page = 1
+
+    doc = _Doc()
+    branding = pdf_branding or {}
+    sponsors = pdf_sponsors or []
+    rows = stations or [{"name": "Station", "device_type": "", "notes": ""}]
+
+    for page, station in enumerate(rows, 1):
+        doc.page = page
+        c.setFillColor(BLACK)
+        c.rect(0, 0, page_w, page_h, fill=1, stroke=0)
+        c.setFillColor(CYAN)
+        c.rect(0, page_h - 4, page_w, 4, fill=1, stroke=0)
+        _draw_brand_header(c, doc, branding)
+
+        c.setStrokeColor(colors.HexColor("#1F2937"))
+        c.setLineWidth(1)
+        c.roundRect(2 * cm, 3.65 * cm, page_w - 4 * cm, page_h - 6.25 * cm, 8, stroke=1, fill=0)
+
+        station_name = str(station.get("name") or station.get("label") or station.get("id") or "Station").strip()
+        device = str(station.get("device_type") or "").strip()
+        notes = str(station.get("notes") or "").strip()
+        tournament_title = str(tournament.get("title") or "THE LION SQUAD Event").strip()
+
+        c.setFillColor(CYAN)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawCentredString(page_w / 2, page_h - 4.05 * cm, "SPIELSTATION")
+
+        c.setFillColor(WHITE)
+        name_font_size = _fit_font_size(station_name.upper(), page_w - 5 * cm, start=74, minimum=36)
+        c.setFont("Helvetica-Bold", name_font_size)
+        c.drawCentredString(page_w / 2, page_h / 2 + 2.0 * cm, station_name.upper())
+
+        if device:
+            c.setFillColor(CYAN)
+            c.setFont("Helvetica-Bold", 22)
+            c.drawCentredString(page_w / 2, page_h / 2 + 0.45 * cm, device.upper())
+
+        c.setFillColor(colors.HexColor("#E5E7EB"))
+        c.setFont("Helvetica-Bold", 16)
+        c.drawCentredString(page_w / 2, page_h / 2 - 1.1 * cm, tournament_title[:72])
+
+        if notes:
+            c.setFillColor(MUTED)
+            c.setFont("Helvetica", 12)
+            c.drawCentredString(page_w / 2, page_h / 2 - 2.15 * cm, notes[:96])
+
+        c.setStrokeColor(CYAN)
+        c.setLineWidth(1.5)
+        c.line(4.2 * cm, page_h / 2 - 3.1 * cm, page_w - 4.2 * cm, page_h / 2 - 3.1 * cm)
+
+        c.setFillColor(colors.HexColor("#64748B"))
+        c.setFont("Helvetica-Bold", 8)
+        c.drawCentredString(page_w / 2, 3.18 * cm, "THE LION SQUAD eSPORTS")
+
+        _draw_sponsor_footer(c, doc, sponsors)
+        c.setFillColor(MUTED)
+        c.setFont("Helvetica", 7)
+        c.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
+        c.drawRightString(page_w - 2 * cm, 0.72 * cm, f"Station {page}/{len(rows)}")
+        c.showPage()
+
+    c.save()
     return buf.getvalue()
