@@ -156,11 +156,11 @@ function StageSection({ section, rounds, regMap, compact, viewMode, onMatchClick
         : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:flex gap-4 md:gap-6 xl:overflow-x-auto pb-4"
       }>
         {roundNums.map((rn) => (
-          <div key={rn} className={isTv ? "flex flex-col min-w-0 gap-2" : `flex flex-col min-w-0 ${compact ? "xl:min-w-[220px]" : "xl:min-w-[280px]"} gap-4`}>
+          <div key={rn} className={isTv ? "flex flex-col min-w-0 gap-2" : `flex flex-col min-w-0 self-stretch ${compact ? "xl:min-w-[220px]" : "xl:min-w-[280px]"} gap-4`}>
             <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 px-2">
               {formatRoundName(rounds[rn][0].round_name, rn)}
             </div>
-            <div className="flex flex-col gap-3">
+            <div className={isTv ? "flex flex-col gap-2" : "flex flex-col justify-around flex-1 gap-3"}>
               {rounds[rn].map((match) => {
                 const isDuel = (match.match_type || "duel") === "duel" && (match.slots || []).length <= 2;
                 return isDuel ? (
