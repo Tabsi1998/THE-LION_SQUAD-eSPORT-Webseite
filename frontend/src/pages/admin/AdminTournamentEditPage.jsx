@@ -133,6 +133,7 @@ export default function AdminTournamentEditPage() {
   const [users, setUsers] = useState([]);
   const [stages, setStages] = useState([]);
   const [matchesV2, setMatchesV2] = useState([]);
+  const [stations, setStations] = useState([]);
   const [teams, setTeams] = useState([]);
   const [participantForm, setParticipantForm] = useState({
     user_id: "",
@@ -155,15 +156,18 @@ export default function AdminTournamentEditPage() {
     const { data: b } = await api.get(`/tournaments/${id}/bracket`);
     setBracket(b);
     try {
-      const [{ data: st }, { data: mv2 }] = await Promise.all([
+      const [{ data: st }, { data: mv2 }, stationResponse] = await Promise.all([
         api.get(`/tournaments/${id}/stages`),
         api.get(`/tournaments/${id}/matches-v2`),
+        (isAdmin || isModerator) ? api.get(`/stations?tournament_id=${id}`).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
       ]);
       setStages(st || []);
       setMatchesV2(mv2 || []);
+      setStations(stationResponse.data || []);
     } catch {
       setStages([]);
       setMatchesV2([]);
+      setStations([]);
     }
     if (data.format === "groups") {
       try { const { data: g } = await api.get(`/tournaments/${id}/groups`); setGroups(g || []); }
@@ -341,6 +345,24 @@ export default function AdminTournamentEditPage() {
       toast.error(formatRequestError(e, "Turnierstatus konnte nicht gespeichert werden."));
     }
   };
+  const setTournamentLock = async (locked) => {
+    const ok = await confirm({
+      title: locked ? "Turnier sperren?" : "Turnier entsperren?",
+      description: locked
+        ? "Danach sind Ergebnisse, Teilnehmer, Spielzeiten und Stationen nur noch lesbar. Loeschen bleibt moeglich."
+        : "Danach kann die Turnierleitung wieder Aenderungen vornehmen.",
+      confirmLabel: locked ? "Sperren" : "Entsperren",
+      tone: locked ? "danger" : "info",
+    });
+    if (!ok) return;
+    try {
+      await api.post(`/tournaments/${id}/${locked ? "lock" : "unlock"}`);
+      toast.success(locked ? "Turnier gesperrt." : "Turnier entsperrt.");
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, locked ? "Turnier konnte nicht gesperrt werden." : "Turnier konnte nicht entsperrt werden."));
+    }
+  };
   const updateMatchResult = async (m, scoreA, scoreB, winnerId) => {
     try {
       await api.patch(`/matches/${m.id}`, {
@@ -356,28 +378,42 @@ export default function AdminTournamentEditPage() {
   const updateMatchSchedule = async (match, payload) => {
     try {
       const scheduledAt = payload.scheduled_at ? fromDateTimeLocal(payload.scheduled_at) : null;
+      const stationChanged = (payload.station_id || "") !== (match.station_id || "");
+      if (stationChanged && payload.station_id) {
+        await api.post(`/stations/${payload.station_id}/assign/${match.id}`);
+      } else if (stationChanged && match.station_id) {
+        await api.post(`/stations/${match.station_id}/clear`);
+      }
       const body = {
         scheduled_at: scheduledAt,
         duration_minutes: payload.duration_minutes === "" ? null : Number(payload.duration_minutes),
+        station_id: payload.station_id || null,
       };
       if (scheduledAt && ["pending", "ready", "preview"].includes(match.status)) body.status = "scheduled";
       await api.patch(`/matches/${match.id}`, body);
-      toast.success("Spielzeit gespeichert.");
+      toast.success("Matchplanung gespeichert.");
       load();
     } catch (err) {
-      toast.error(formatRequestError(err, "Spielzeit konnte nicht gespeichert werden."));
+      toast.error(formatRequestError(err, "Matchplanung konnte nicht gespeichert werden."));
     }
   };
   const updateMatchV2Schedule = async (match, payload) => {
     try {
+      const stationChanged = (payload.station_id || "") !== (match.station_id || "");
+      if (stationChanged && payload.station_id) {
+        await api.post(`/stations/${payload.station_id}/assign/${match.id}`);
+      } else if (stationChanged && match.station_id) {
+        await api.post(`/stations/${match.station_id}/clear`);
+      }
       await api.patch(`/matches-v2/${match.id}`, {
         scheduled_at: payload.scheduled_at ? fromDateTimeLocal(payload.scheduled_at) : null,
         duration_minutes: payload.duration_minutes === "" ? null : Number(payload.duration_minutes),
+        station_id: payload.station_id || null,
       });
-      toast.success("Spielzeit gespeichert.");
+      toast.success("Matchplanung gespeichert.");
       load();
     } catch (err) {
-      toast.error(formatRequestError(err, "Spielzeit konnte nicht gespeichert werden."));
+      toast.error(formatRequestError(err, "Matchplanung konnte nicht gespeichert werden."));
     }
   };
   const updateMatchV2Result = async (match, results, meta = {}) => {
@@ -440,6 +476,7 @@ export default function AdminTournamentEditPage() {
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">{t.title}</h1>
           <div className="mt-2 flex items-center gap-3 flex-wrap">
             <StatusBadge status={t.status} />
+            {t.locked_at && <span className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700] text-[10px] font-bold uppercase tracking-widest rounded-sm">Gesperrt</span>}
             <span className="text-white/60 text-sm">{formatTournamentFormat(t.format)}</span>
             <Link to={`/tournaments/${t.slug || t.id}`} target="_blank" className="text-[#29B6E8] text-xs uppercase tracking-wider font-bold hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Öffentliche Seite</Link>
           </div>
@@ -452,6 +489,16 @@ export default function AdminTournamentEditPage() {
               </select>
               <div className="mt-1 text-[10px] text-white/40">Manuell nur für Ausnahmen; Zeitplan automatisiert.</div>
             </div>
+          )}
+          {isAdmin && ["completed", "results_published", "archived", "cancelled"].includes(t.status) && (
+            <button
+              type="button"
+              onClick={() => setTournamentLock(!t.locked_at)}
+              data-testid="admin-tr-lock"
+              className={`px-4 py-2 border font-bold uppercase tracking-wider rounded-sm text-sm ${t.locked_at ? "border-[#00FF88]/40 text-[#00FF88] hover:bg-[#00FF88]/10" : "border-[#FFD700]/50 text-[#FFD700] hover:bg-[#FFD700]/10"}`}
+            >
+              {t.locked_at ? "Entsperren" : "Sperren"}
+            </button>
           )}
           {isModerator && <button onClick={() => rebuildFromFormat({ preview: true })} data-testid="admin-tr-preview" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
             <Eye className="w-3.5 h-3.5" /> Vorschau
@@ -592,7 +639,7 @@ export default function AdminTournamentEditPage() {
                         {isModerator && a && b && (
                           <MatchResultControls match={m} a={a} b={b} onSave={updateMatchResult} />
                         )}
-                        {isModerator && <MatchScheduleControls match={m} onSave={updateMatchSchedule} />}
+                        {isModerator && <MatchScheduleControls match={m} stations={stations} onSave={updateMatchSchedule} />}
                         <Link to={`/matches/${m.id}`} className="text-[#29B6E8] text-xs font-bold uppercase hover:text-white">Öffnen →</Link>
                       </div>
                     </td>
@@ -610,6 +657,7 @@ export default function AdminTournamentEditPage() {
           stages={stages}
           matches={matchesV2}
           registrations={regs}
+          stations={stations}
           isAdmin={false}
           isModerator={isModerator}
           onChanged={load}
@@ -690,7 +738,7 @@ function ParticipantAddForm({ form, tournament, users, teams, noShowRegistration
   );
 }
 
-function TournamentStagesPanel({ tournamentId, stages, matches, registrations, isAdmin, isModerator, onChanged, onSaveResult, onSaveMatchMeta, mode = "operations" }) {
+function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], isAdmin, isModerator, onChanged, onSaveResult, onSaveMatchMeta, mode = "operations" }) {
   const showSettings = isAdmin && mode === "settings";
   const showMatchList = mode !== "settings";
   const [createOpen, setCreateOpen] = useState(stages.length === 0);
@@ -800,6 +848,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
             stage={stage}
             matches={matches.filter((m) => m.stage_id === stage.id)}
             regById={regById}
+            stations={stations}
             isModerator={isModerator}
             showSettings={showSettings}
             showMatchList={showMatchList}
@@ -819,7 +868,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
   );
 }
 
-function StageCard({ tournamentId, stage, matches, regById, isModerator, showSettings = false, showMatchList = true, onChanged, onDelete, onSaveResult, onSaveMatchMeta }) {
+function StageCard({ tournamentId, stage, matches, regById, stations = [], isModerator, showSettings = false, showMatchList = true, onChanged, onDelete, onSaveResult, onSaveMatchMeta }) {
   const settings = stage.settings || {};
   const [form, setForm] = useState({
     name: stage.name || "",
@@ -960,12 +1009,13 @@ function StageCard({ tournamentId, stage, matches, regById, isModerator, showSet
             )}
           </div>
         )}
-        {showMatchList && <div className="space-y-3">
+        {showMatchList && <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-3 items-start">
           {matches.map((match) => (
             <MatchV2Card
               key={match.id}
               match={match}
               regById={regById}
+              stations={stations}
               canEdit={isModerator}
               onSaveResult={onSaveResult}
               onSaveMatchMeta={onSaveMatchMeta}
@@ -982,7 +1032,7 @@ function StageCard({ tournamentId, stage, matches, regById, isModerator, showSet
   );
 }
 
-function MatchV2Card({ match, regById, canEdit, onSaveResult, onSaveMatchMeta }) {
+function MatchV2Card({ match, regById, stations = [], canEdit, onSaveResult, onSaveMatchMeta }) {
   const filledSlots = (match.slots || []).filter((slot) => slot.status === "filled" && slot.registration_id);
   const labelFor = (registrationId) => {
     const reg = regById[registrationId];
@@ -1015,7 +1065,7 @@ function MatchV2Card({ match, regById, canEdit, onSaveResult, onSaveMatchMeta })
           ))}
         </div>
       )}
-      {canEdit && <MatchScheduleControls match={match} onSave={onSaveMatchMeta} />}
+      {canEdit && <MatchScheduleControls match={match} stations={stations} onSave={onSaveMatchMeta} />}
       {canEdit && filledSlots.length > 0 && (
         <MatchV2ResultControls match={match} filledSlots={filledSlots} labelFor={labelFor} onSaveResult={onSaveResult} />
       )}
@@ -1113,16 +1163,18 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
   );
 }
 
-function MatchScheduleControls({ match, onSave }) {
+function MatchScheduleControls({ match, stations = [], onSave }) {
   const [scheduledAt, setScheduledAt] = useState(toDateTimeLocalInput(match.scheduled_at));
   const [duration, setDuration] = useState(match.duration_minutes ?? match.settings?.duration_minutes ?? "");
+  const [stationId, setStationId] = useState(match.station_id || "");
   useEffect(() => {
     setScheduledAt(toDateTimeLocalInput(match.scheduled_at));
     setDuration(match.duration_minutes ?? match.settings?.duration_minutes ?? "");
-  }, [match.id, match.scheduled_at, match.duration_minutes, match.updated_at, match.settings?.duration_minutes]);
+    setStationId(match.station_id || "");
+  }, [match.id, match.scheduled_at, match.duration_minutes, match.station_id, match.updated_at, match.settings?.duration_minutes]);
   return (
     <div className="mt-3 w-full max-w-md border border-white/10 bg-[#0A0A0A] rounded-sm p-3 space-y-2">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-white/50">Zeitplanung</div>
+      <div className="text-[10px] font-bold uppercase tracking-widest text-white/50">Matchplanung</div>
       <div className="grid sm:grid-cols-[1fr_7rem] gap-2">
         <label className="block">
           <span className="block text-[10px] text-white/45 mb-1">Startdatum & Uhrzeit</span>
@@ -1133,12 +1185,25 @@ function MatchScheduleControls({ match, onSave }) {
           <input type="number" min="1" value={duration} onChange={(e)=>setDuration(e.target.value)} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" placeholder="z.B. 30" aria-label="Dauer in Minuten" />
         </label>
       </div>
-      {(match.scheduled_at || match.duration_minutes || match.settings?.duration_minutes) && (
+      {stations.length > 0 && (
+        <label className="block">
+          <span className="block text-[10px] text-white/45 mb-1">Station</span>
+          <select value={stationId} onChange={(e)=>setStationId(e.target.value)} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Station">
+            <option value="">Keine Station</option>
+            {stations.map((station) => (
+              <option key={station.id} value={station.id}>
+                {station.name || station.label || station.id}{station.status && station.status !== "free" ? ` · ${station.status}` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {(match.scheduled_at || match.duration_minutes || match.settings?.duration_minutes || match.station_id) && (
         <div className="text-[11px] text-white/45">
           Gespeichert: {match.scheduled_at ? formatDateTime(match.scheduled_at) : "keine Startzeit"} · Dauer {match.duration_minutes ?? match.settings?.duration_minutes ?? "offen"} Min.
         </div>
       )}
-      <button type="button" onClick={() => onSave(match, { scheduled_at: scheduledAt, duration_minutes: duration })} className="px-3 py-2 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Zeit speichern</button>
+      <button type="button" onClick={() => onSave(match, { scheduled_at: scheduledAt, duration_minutes: duration, station_id: stationId })} className="px-3 py-2 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Planung speichern</button>
     </div>
   );
 }
@@ -1391,7 +1456,6 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
             <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Freier Turnierbaum</div>
             <div className="grid md:grid-cols-3 gap-3">
               {f.format === "ffa_custom_bracket" && <Fld label="Spielgröße" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size" />}
-              <Fld label="Min Spieler" type="number" value={structure.min_players} onChange={(v)=>setStructureField("min_players", v)} testId="tr-edit-stage-min" />
               {f.format === "ffa_custom_bracket" && <Fld label="Qualifizierte" type="number" value={structure.qualifiers_per_match} onChange={(v)=>setStructureField("qualifiers_per_match", v)} testId="tr-edit-stage-qualifiers" />}
               <Fld label="Spieldauer Min." type="number" value={structure.duration_minutes} onChange={(v)=>setStructureField("duration_minutes", v)} testId="tr-edit-stage-duration" />
             </div>

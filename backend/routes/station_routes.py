@@ -14,6 +14,13 @@ from services.tournament_permissions import (
 from services.user_notifications import create_user_notification
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
+TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
+
+
+async def _ensure_tournament_unlocked(db, tournament_id: str) -> None:
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "locked_at": 1})
+    if tournament and tournament.get("locked_at"):
+        raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
 STATION_ASSIGN_ROLES = {"organizer", "referee", "station_manager"}
 
 
@@ -132,6 +139,8 @@ async def create_station(body: StationCreate, me: dict = Depends(require_admin()
     doc = body.model_dump()
     if doc.get("tournament_id") and not await db.tournaments.find_one({"id": doc["tournament_id"]}, {"id": 1}):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if doc.get("tournament_id"):
+        await _ensure_tournament_unlocked(db, doc["tournament_id"])
     doc["id"] = new_id()
     doc["status"] = "free"
     doc["current_match_id"] = None
@@ -149,8 +158,13 @@ async def update_station(sid: str, body: StationUpdate, me: dict = Depends(requi
     db = get_db()
     nullable = {"tournament_id", "event_id", "game_id", "notes", "current_match_id", "current_match_type"}
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None or k in nullable}
+    current = await db.stations.find_one({"id": sid}, {"_id": 0})
+    if current and current.get("tournament_id"):
+        await _ensure_tournament_unlocked(db, current["tournament_id"])
     if updates.get("tournament_id") and not await db.tournaments.find_one({"id": updates["tournament_id"]}, {"id": 1}):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if updates.get("tournament_id"):
+        await _ensure_tournament_unlocked(db, updates["tournament_id"])
     updates["updated_at"] = now_utc().isoformat()
     await db.stations.update_one({"id": sid}, {"$set": updates})
     s = await db.stations.find_one({"id": sid}, {"_id": 0})
@@ -189,6 +203,8 @@ async def bulk_create_stations(body: dict, me: dict = Depends(require_admin())):
     tournament_id = body.get("tournament_id")
     if tournament_id and not await db.tournaments.find_one({"id": tournament_id}, {"id": 1}):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if tournament_id:
+        await _ensure_tournament_unlocked(db, tournament_id)
     count = int(body.get("count") or 0)
     if count < 1 or count > 64:
         raise HTTPException(status_code=400, detail="Anzahl muss zwischen 1 und 64 liegen")
@@ -225,6 +241,7 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
     db = get_db()
     if not await db.tournaments.find_one({"id": tournament_id}, {"id": 1}):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    await _ensure_tournament_unlocked(db, tournament_id)
     await require_tournament_staff_permission(me, tournament_id, STATION_ASSIGN_ROLES, "tournament")
     stations = await db.stations.find({
         "tournament_id": tournament_id,
@@ -260,6 +277,7 @@ async def assign_match(sid: str, match_id: str, start_now: bool = False,
     collection_name, match = await _find_match_for_station(db, match_id)
     if not match:
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    await _ensure_tournament_unlocked(db, match["tournament_id"])
     await _require_station_permission(me, match["tournament_id"], sid)
     await _assign_match_to_station(db, station, match, collection_name, start_now=start_now)
     return {"ok": True}
@@ -274,6 +292,7 @@ async def clear_station(sid: str, me: dict = Depends(get_current_user)):
     if s and s.get("current_match_id"):
         collection_name, match = await _find_match_for_station(db, s["current_match_id"])
         if match:
+            await _ensure_tournament_unlocked(db, match["tournament_id"])
             await _require_station_permission(me, match["tournament_id"], sid)
         elif not is_global_tournament_admin(me):
             raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Station")
@@ -289,5 +308,8 @@ async def clear_station(sid: str, me: dict = Depends(get_current_user)):
 @router.delete("/{sid}")
 async def delete_station(sid: str, me: dict = Depends(require_admin())):
     db = get_db()
+    station = await db.stations.find_one({"id": sid}, {"_id": 0})
+    if station and station.get("tournament_id"):
+        await _ensure_tournament_unlocked(db, station["tournament_id"])
     await db.stations.delete_one({"id": sid})
     return {"ok": True}

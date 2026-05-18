@@ -27,10 +27,17 @@ from services.visibility import user_can_see
 
 router = APIRouter(prefix="/api/matches-v2", tags=["matches-v2"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
 
 
 def _is_staff(user: dict | None) -> bool:
     return bool(user and user.get("role") in STAFF_ROLES)
+
+
+async def _ensure_match_tournament_unlocked(db, match: dict) -> None:
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "locked_at": 1})
+    if tournament and tournament.get("locked_at"):
+        raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
 
 
 async def _user_registration_for_match(match: dict, user: dict | None) -> dict | None:
@@ -394,6 +401,7 @@ async def update_match_v2(match_id: str, body: MatchV2Update,
     match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
     if not match:
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    await _ensure_match_tournament_unlocked(db, match)
     await require_tournament_staff_permission(me, match["tournament_id"], CHECKIN_STAFF_ROLES, "match", match_id)
     nullable_fields = {"scheduled_at", "station_id", "admin_note", "map", "best_of", "duration_minutes"}
     raw = body.model_dump(exclude_unset=True)
@@ -416,6 +424,7 @@ async def submit_match_v2_result(match_id: str, body: MatchV2ResultSubmit,
     match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
     if not match:
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    await _ensure_match_tournament_unlocked(db, match)
     await _require_v2_result_permission(me, match)
     stage_matches = await db.matches_v2.find(
         {"stage_id": match["stage_id"]},

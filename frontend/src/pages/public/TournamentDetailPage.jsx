@@ -27,6 +27,7 @@ export default function TournamentDetailPage() {
   const { user } = useAuth();
   const [t, setT] = useState(null);
   const [regs, setRegs] = useState([]);
+  const [standings, setStandings] = useState([]);
   const [myReg, setMyReg] = useState(null);
   const [myTeams, setMyTeams] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -48,6 +49,16 @@ export default function TournamentDetailPage() {
     const teams = teamsResponse.data || [];
     setRegs(r);
     setMyTeams(teams);
+    if (["completed", "results_published", "archived"].includes(data.status)) {
+      try {
+        const { data: rows } = await api.get(`/tournaments/${data.id}/standings`);
+        setStandings(rows || []);
+      } catch {
+        setStandings([]);
+      }
+    } else {
+      setStandings([]);
+    }
     const teamIds = new Set(teams.map((team) => team.id));
     setMyReg(user ? r.find((x) => x.user_id === user.id || x.is_mine || (x.team_id && teamIds.has(x.team_id))) || null : null);
   }, [slug, user]);
@@ -127,6 +138,10 @@ export default function TournamentDetailPage() {
   const clubMemberBlocked = !!user?.is_club_member && !!t.block_club_member_registration;
   const canSelfRegister = registration.canRegister && !clubMemberBlocked;
   const canSelfUnregister = !!myReg && (myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role)) && !["checked_in", "no_show", "rejected"].includes(myReg.status) && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
+  const podiumRows = standings
+    .filter((row) => Number(row.rank) >= 1 && Number(row.rank) <= 3)
+    .sort((a, b) => Number(a.rank) - Number(b.rank))
+    .slice(0, 3);
 
   return (
     <PublicLayout>
@@ -247,6 +262,14 @@ export default function TournamentDetailPage() {
             <section>
               <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Preise</h2>
               <PrizeList prizePlaces={t.prize_places} prizePool={t.prize_pool} />
+            </section>
+          )}
+          {podiumRows.length > 0 && (
+            <section>
+              <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Podium</h2>
+              <div className="grid sm:grid-cols-3 gap-3">
+                {podiumRows.map((row) => <PodiumCard key={row.registration_id || row.display_name || row.rank} row={row} />)}
+              </div>
             </section>
           )}
           {(t.has_live_stream || (t.twitch_enabled && t.twitch_channel)) && (
@@ -414,6 +437,28 @@ function TournamentChat({ tournament, user }) {
         )}
       </div>
     </section>
+  );
+}
+
+function PodiumCard({ row }) {
+  const rank = Number(row.rank) || 0;
+  const styles = {
+    1: "border-[#FFD700]/60 bg-[#FFD700]/10 text-[#FFD700]",
+    2: "border-white/35 bg-white/10 text-white",
+    3: "border-[#CD7F32]/55 bg-[#CD7F32]/10 text-[#CD7F32]",
+  };
+  const label = rank === 1 ? "Gold" : rank === 2 ? "Silber" : rank === 3 ? "Bronze" : "Platz";
+  return (
+    <div className={`rounded-sm border p-4 ${styles[rank] || "border-white/10 bg-[#121212] text-white"}`}>
+      <div className="text-[10px] font-bold uppercase tracking-widest">{label}</div>
+      <div className="mt-2 flex items-baseline gap-2">
+        <span className="font-heading text-4xl font-black">#{rank}</span>
+        <span className="min-w-0 truncate font-bold text-white">{row.display_name || row.ingame_name || row.user?.display_name || "Teilnehmer"}</span>
+      </div>
+      <div className="mt-2 text-xs text-white/50">
+        {row.points != null ? `${row.points} Punkte` : row.wins != null ? `${row.wins} Siege` : "Finalplatzierung"}
+      </div>
+    </div>
   );
 }
 

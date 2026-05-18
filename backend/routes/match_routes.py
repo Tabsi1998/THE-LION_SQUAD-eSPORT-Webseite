@@ -36,6 +36,13 @@ USER_PUBLIC_PROJECTION = {
     "display_name": 1,
     "avatar_url": 1,
 }
+TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
+
+
+async def _ensure_match_tournament_unlocked(db, match: dict) -> None:
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "locked_at": 1})
+    if tournament and tournament.get("locked_at"):
+        raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
 
 
 def _is_staff(user: dict | None) -> bool:
@@ -495,6 +502,7 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
     match, collection = await _find_match_any(match_id)
     if collection != "matches_v2":
         raise HTTPException(status_code=400, detail="Dieses Ergebnisformular ist fuer Mehrspieler-Heats vorgesehen")
+    await _ensure_match_tournament_unlocked(db, match)
     await _require_result_permission(me, match)
     stage_matches = await db.matches_v2.find(
         {"stage_id": match["stage_id"]},
@@ -586,6 +594,7 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
     m = await db.matches.find_one({"id": match_id})
     if not m:
         raise HTTPException(status_code=404)
+    await _ensure_match_tournament_unlocked(db, m)
     previous_result_signature = (
         m.get("status"),
         m.get("winner_id"),
@@ -683,6 +692,7 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
     m = await db.matches.find_one({"id": match_id})
     if not m:
         raise HTTPException(status_code=404)
+    await _ensure_match_tournament_unlocked(db, m)
     # Verify user is participant
     reg_ids = [m.get("participant_a_id"), m.get("participant_b_id")]
     my_reg = await db.tournament_registrations.find_one(
@@ -754,6 +764,7 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
     m = await db.matches.find_one({"id": match_id})
     if not m:
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    await _ensure_match_tournament_unlocked(db, m)
     if not _is_staff(me) and not await _user_registration_for_match(m, me):
         raise HTTPException(status_code=403, detail="Nicht Teilnehmer dieses Matches")
     await db.matches.update_one({"id": match_id}, {
@@ -782,6 +793,7 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(get_current_user
     m = await db.matches.find_one({"id": match_id})
     if not m:
         raise HTTPException(status_code=404)
+    await _ensure_match_tournament_unlocked(db, m)
     await require_tournament_staff_permission(me, m["tournament_id"], RESULT_STAFF_ROLES)
     note = (body.get("note") or body.get("reason") or "").strip()
     if len(note) < 5:

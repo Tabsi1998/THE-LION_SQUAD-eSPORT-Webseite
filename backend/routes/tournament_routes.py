@@ -41,6 +41,8 @@ MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 LEGACY_AUTO_PREVIEW_FORMATS = {"single_elim", "double_elim", "round_robin", "league"}
 MAX_INITIAL_PREVIEW_MATCHES = 512
 BRACKET_REFRESH_LOCKED_STATUSES = {"check_in", "live", "paused", "completed", "results_published", "archived", "cancelled"}
+TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
+LOCKABLE_TOURNAMENT_STATUSES = {"completed", "results_published", "archived", "cancelled"}
 
 
 class TournamentChatCreate(BaseModel):
@@ -176,6 +178,19 @@ def _is_staff(user: dict | None) -> bool:
 
 async def _is_tournament_staff(tid: str, user: dict | None, roles: set[str] | None = None) -> bool:
     return await has_tournament_staff_permission(user, tid, roles or READ_STAFF_ROLES)
+
+
+def _is_tournament_locked(tournament: dict | None) -> bool:
+    return bool(tournament and tournament.get("locked_at"))
+
+
+async def _ensure_tournament_unlocked(db, tid: str) -> dict:
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if _is_tournament_locked(tournament):
+        raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
+    return tournament
 
 
 async def _user_tournament_participation_ids(db, user: dict | None) -> set[str]:
@@ -1057,9 +1072,7 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     tid = await _resolve_tid(tid)
     if body.game_id and not await db.games.find_one({"id": body.game_id}, {"id": 1}):
         raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
-    existing = await db.tournaments.find_one({"id": tid}, {"_id": 0})
-    if not existing:
-        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    existing = await _ensure_tournament_unlocked(db, tid)
     raw_updates = body.model_dump(exclude_unset=True)
     nullable_fields = {
         "description", "platform", "event_id", "registration_open_from",
@@ -1088,6 +1101,38 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     await db.tournaments.update_one({"id": tid}, {"$set": updates})
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     return t
+
+
+@router.post("/{tid}/lock")
+async def lock_tournament(tid: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    tournament = await _ensure_tournament_unlocked(db, tid)
+    if tournament.get("status") not in LOCKABLE_TOURNAMENT_STATUSES:
+        raise HTTPException(status_code=400, detail="Nur beendete, veroeffentlichte, archivierte oder abgesagte Turniere koennen gesperrt werden.")
+    now = now_utc().isoformat()
+    await db.tournaments.update_one(
+        {"id": tid},
+        {"$set": {"locked_at": now, "locked_by": me.get("id"), "updated_at": now}},
+    )
+    await _audit_tournament_action(db, "tournament.lock", me.get("id"), tid, {"status": tournament.get("status")})
+    return {"ok": True, "locked_at": now}
+
+
+@router.post("/{tid}/unlock")
+async def unlock_tournament(tid: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    now = now_utc().isoformat()
+    await db.tournaments.update_one(
+        {"id": tid},
+        {"$unset": {"locked_at": "", "locked_by": ""}, "$set": {"updated_at": now}},
+    )
+    await _audit_tournament_action(db, "tournament.unlock", me.get("id"), tid, {"previous_locked_at": tournament.get("locked_at")})
+    return {"ok": True}
 
 
 @router.delete("/{tid}")
@@ -1174,6 +1219,8 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
     db = get_db()
     tid = await _resolve_tid(tid)
     t = await _get_visible_tournament(tid, me)
+    if _is_tournament_locked(t):
+        raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
     registration_error = _registration_error(t)
     if registration_error:
         raise HTTPException(status_code=400, detail=registration_error)
@@ -1246,10 +1293,8 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
                                     me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    tournament = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
-    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
 
     payload = body.model_dump()
     user = None
@@ -1356,6 +1401,7 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
                                me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     updates["updated_at"] = now_utc().isoformat()
@@ -1381,6 +1427,7 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
     """
     db = get_db()
     tid = await _resolve_tid(tid)
+    await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, CHECKIN_STAFF_ROLES)
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
     if not reg:
@@ -1413,6 +1460,7 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
 async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await _ensure_tournament_unlocked(db, tid)
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid})
     if not reg:
         raise HTTPException(status_code=404)
@@ -1598,6 +1646,7 @@ async def create_tournament_stage(tid: str, body: TournamentStageCreate,
                                   me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     doc = body.model_dump()
     if doc.get("number") is None:
@@ -1635,6 +1684,7 @@ async def update_tournament_stage(tid: str, stage_id: str, body: TournamentStage
                                   me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     current = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not current:
@@ -1664,6 +1714,7 @@ async def update_tournament_stage(tid: str, stage_id: str, body: TournamentStage
 async def delete_tournament_stage(tid: str, stage_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not stage:
@@ -1702,6 +1753,7 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
                                             me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not tournament:
@@ -1761,6 +1813,7 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
 async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await _ensure_tournament_unlocked(db, tid)
     reg = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": me["id"]})
     if not reg:
         team_ids = [
@@ -1807,10 +1860,8 @@ async def generate(tid: str, preview: bool = False, force: bool = False,
                    me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    t = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
-    t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
-    if not t:
-        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     return await _generate_legacy_bracket_docs(db, t, me.get("id"), preview=preview, force=force, set_live=not preview)
 
 
@@ -1821,10 +1872,8 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
     """Use the tournament structure as the single source of truth and rebuild the bracket preview."""
     db = get_db()
     tid = await _resolve_tid(tid)
+    tournament = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
-    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if not _can_create_initial_legacy_preview(tournament):
         raise HTTPException(status_code=400, detail="FÃ¼r dieses Format gibt es keinen automatischen Format-Bracket-Generator.")
     if tournament.get("status") in ("live", "paused", "completed", "results_published", "archived") and not force:
@@ -1919,10 +1968,8 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
 async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    t = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
-    t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
-    if not t:
-        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if t.get("status") in ("live", "completed", "results_published") and not force:
         raise HTTPException(
             status_code=409,
@@ -1949,6 +1996,7 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
 async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
     db = get_db()
     tid = await _resolve_tid(tid)
+    await _ensure_tournament_unlocked(db, tid)
     status = body.get("status")
     allowed = {
         "draft", "scheduled", "registration_open", "registration_closed",
