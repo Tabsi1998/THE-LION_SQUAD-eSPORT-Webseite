@@ -936,7 +936,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
             <span>{formatStageType(stage.stage_type)}</span>
             <span>·</span>
             <span>{matches.length} Spiele</span>
-            {matches.some((m) => m.is_preview) && <span>· Vorschau ohne Teilnehmer</span>}
+            {matches.some((m) => m.is_preview) && <span>· Vorschau / Draft</span>}
             {Object.entries(statusCounts).map(([status, count]) => <span key={status}>· {count} {formatMatchStatus(status)}</span>)}
           </div>
         </div>

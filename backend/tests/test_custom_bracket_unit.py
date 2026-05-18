@@ -99,6 +99,31 @@ def test_v2_generator_can_build_preview_without_registrations():
     assert {slot["status"] for slot in matches[0]["slots"]} == {"preview"}
 
 
+def test_v2_preview_fills_registered_players_and_keeps_free_slots():
+    tournament = {"id": "t1", "seeding_mode": "manual", "max_participants": 4}
+    stage = {
+        "id": "s1",
+        "number": 1,
+        "stage_type": "single_elimination",
+        "match_type": "duel",
+        "settings": {},
+    }
+    registrations = [
+        {"id": "r1", "user_id": "u1", "status": "approved", "seed": 1},
+        {"id": "r2", "user_id": "u2", "status": "checked_in", "seed": 2},
+        {"id": "r-wait", "user_id": "u-wait", "status": "waitlist", "seed": 3},
+    ]
+
+    matches = build_matches_v2_from_schema(tournament, stage, registrations, preview=True)
+    slots = [slot for match in matches for slot in match["slots"]]
+
+    assert len(matches) == 3
+    assert all(match["is_preview"] for match in matches)
+    assert {"r1", "r2"} <= {slot.get("registration_id") for slot in slots}
+    assert "r-wait" not in {slot.get("registration_id") for slot in slots}
+    assert any(slot["status"] == "preview" for slot in slots)
+
+
 def test_v2_generator_builds_auto_single_elim_schema_and_byes():
     tournament = {"id": "t1", "seeding_mode": "manual", "max_participants": 4, "match_duration_minutes": 9}
     stage = {
