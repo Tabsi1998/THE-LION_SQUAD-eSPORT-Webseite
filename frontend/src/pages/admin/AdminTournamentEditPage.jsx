@@ -527,7 +527,7 @@ export default function AdminTournamentEditPage() {
             onClick={() => setTab(s)}
             className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${tab === s ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}
           >
-            {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Turnierbaum" : s === "matches" ? "Spiele" : s === "stages" ? "Struktur" : s === "groups" ? "Gruppen" : s === "staff" ? "Team" : "Bearbeiten"}
+            {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Turnierbaum" : s === "matches" ? "Spiele" : s === "stages" ? "Matchplan" : s === "groups" ? "Gruppen" : s === "staff" ? "Team" : "Bearbeiten"}
           </button>
         ))}
       </div>
@@ -653,7 +653,7 @@ export default function AdminTournamentEditPage() {
           stages={stages}
           matches={matchesV2}
           registrations={regs}
-          isAdmin={isAdmin}
+          isAdmin={false}
           isModerator={isModerator}
           onChanged={load}
           onSaveResult={updateMatchV2Result}
@@ -661,7 +661,19 @@ export default function AdminTournamentEditPage() {
         />
       )}
       {tab === "edit" && (
-        <TournamentEditForm key={t.updated_at || t.id} tournament={t} onSaved={load} onRebuildFromFormat={rebuildFromFormat} />
+        <TournamentEditForm
+          key={t.updated_at || t.id}
+          tournament={t}
+          stages={stages}
+          matches={matchesV2}
+          registrations={regs}
+          isAdmin={isAdmin}
+          isModerator={isModerator}
+          onSaved={load}
+          onRebuildFromFormat={rebuildFromFormat}
+          onSaveResult={updateMatchV2Result}
+          onSaveMatchMeta={updateMatchV2Schedule}
+        />
       )}
       {tab === "staff" && isAdmin && (
         <TournamentStaffPanel tournamentId={t.id} staff={staff} users={users} onChanged={load} />
@@ -727,7 +739,9 @@ function ParticipantAddForm({ form, tournament, users, teams, noShowRegistration
   );
 }
 
-function TournamentStagesPanel({ tournamentId, stages, matches, registrations, isAdmin, isModerator, onChanged, onSaveResult, onSaveMatchMeta }) {
+function TournamentStagesPanel({ tournamentId, stages, matches, registrations, isAdmin, isModerator, onChanged, onSaveResult, onSaveMatchMeta, mode = "operations" }) {
+  const showSettings = isAdmin && mode === "settings";
+  const showMatchList = mode !== "settings";
   const [createOpen, setCreateOpen] = useState(stages.length === 0);
   const [form, setForm] = useState({
     name: "Phase 1",
@@ -800,7 +814,12 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
 
   return (
     <div className="space-y-5">
-      {isAdmin && (
+      {mode === "settings" && (
+        <div className="text-xs text-white/50 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
+          Erweiterte Bracket-Phasen sind nur fÃ¼r eigene Schemas oder Spezial-Brackets nÃ¶tig. Der Matchplan-Tab bleibt fÃ¼r Zeiten, Ergebnisse und operative Matcharbeit.
+        </div>
+      )}
+      {showSettings && (
         <div className="border border-white/10 bg-[#121212] rounded-sm">
           <button type="button" onClick={() => setCreateOpen((v) => !v)} className="w-full flex items-center justify-between px-5 py-4 text-left">
             <span className="font-heading font-bold uppercase">Phase anlegen</span>
@@ -845,8 +864,9 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
             stage={stage}
             matches={matches.filter((m) => m.stage_id === stage.id)}
             regById={regById}
-            isAdmin={isAdmin}
             isModerator={isModerator}
+            showSettings={showSettings}
+            showMatchList={showMatchList}
             onChanged={onChanged}
             onDelete={() => removeStage(stage)}
             onSaveResult={onSaveResult}
@@ -855,7 +875,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
         ))}
         {stages.length === 0 && (
           <div className="border border-white/10 bg-[#121212] rounded-sm p-10 text-center text-white/40">
-            Noch keine Struktur.
+            {mode === "settings" ? "Noch keine eigene Bracket-Phase." : "Noch keine Phasen. Lege eigene Bracket-Phasen im Bearbeiten-Tab an oder baue eine Format-Vorschau."}
           </div>
         )}
       </div>
@@ -863,7 +883,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
   );
 }
 
-function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator, onChanged, onDelete, onSaveResult, onSaveMatchMeta }) {
+function StageCard({ tournamentId, stage, matches, regById, isModerator, showSettings = false, showMatchList = true, onChanged, onDelete, onSaveResult, onSaveMatchMeta }) {
   const settings = stage.settings || {};
   const [form, setForm] = useState({
     name: stage.name || "",
@@ -980,18 +1000,18 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
             {Object.entries(statusCounts).map(([status, count]) => <span key={status}>· {count} {formatMatchStatus(status)}</span>)}
           </div>
         </div>
-        {isModerator && (
+        {(isModerator || showSettings) && (
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => generate({ preview: true })} disabled={!config.canGenerate} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Vorschau</button>
             <button type="button" onClick={() => generate({ preview: false })} disabled={!config.canGenerate} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Mit Teilnehmern generieren</button>
-            {isAdmin && <button type="button" onClick={save} className="px-3 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-xs font-bold">Speichern</button>}
-            {isAdmin && <button type="button" onClick={saveAndGeneratePreview} disabled={!config.canGenerate} className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Speichern & neu bauen</button>}
-            {isAdmin && <button type="button" onClick={onDelete} className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm uppercase tracking-wider text-xs font-bold">Löschen</button>}
+            {showSettings && <button type="button" onClick={save} className="px-3 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-xs font-bold">Speichern</button>}
+            {showSettings && <button type="button" onClick={saveAndGeneratePreview} disabled={!config.canGenerate} className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Speichern & neu bauen</button>}
+            {showSettings && <button type="button" onClick={onDelete} className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm uppercase tracking-wider text-xs font-bold">Löschen</button>}
           </div>
         )}
       </div>
-      <div className="grid lg:grid-cols-2 gap-5 p-5">
-        {isAdmin && (
+      <div className={`${showSettings && showMatchList ? "grid lg:grid-cols-2 gap-5" : "space-y-3"} p-5`}>
+        {showSettings && (
           <div className="space-y-3">
             <div className="grid sm:grid-cols-2 gap-3">
               <Fld label="Name" value={form.name} onChange={(v)=>set("name", v)} testId={`stage-name-${stage.id}`} />
@@ -1019,7 +1039,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
             )}
           </div>
         )}
-        <div className="space-y-3">
+        {showMatchList && <div className="space-y-3">
           {matches.map((match) => (
             <MatchV2Card
               key={match.id}
@@ -1035,7 +1055,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
               Keine Spiele generiert.
             </div>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   );
@@ -1202,7 +1222,7 @@ function MatchScheduleControls({ match, onSave }) {
   );
 }
 
-function TournamentEditForm({ tournament, onSaved, onRebuildFromFormat }) {
+function TournamentEditForm({ tournament, stages = [], matches = [], registrations = [], isAdmin, isModerator, onSaved, onRebuildFromFormat, onSaveResult, onSaveMatchMeta }) {
   const dt = toDateTimeLocalInput;
   const [games, setGames] = useState([]);
   const [events, setEvents] = useState([]);
@@ -1411,6 +1431,20 @@ function TournamentEditForm({ tournament, onSaved, onRebuildFromFormat }) {
           </div>
         </Details>
       </div>
+      {isAdmin && (
+        <TournamentStagesPanel
+          tournamentId={tournament.id}
+          stages={stages}
+          matches={matches}
+          registrations={registrations}
+          isAdmin={isAdmin}
+          isModerator={isModerator}
+          mode="settings"
+          onChanged={onSaved}
+          onSaveResult={onSaveResult}
+          onSaveMatchMeta={onSaveMatchMeta}
+        />
+      )}
       <Details title="Preise">
         <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} />
         <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
