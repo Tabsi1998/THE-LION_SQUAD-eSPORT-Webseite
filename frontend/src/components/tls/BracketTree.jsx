@@ -192,10 +192,12 @@ function getStationLabel(match) {
 function MatchMeta({ match, compact = false }) {
   const time = formatNodeDateTime(match?.scheduled_at);
   const station = getStationLabel(match);
-  if (!time && !station) return null;
+  const duration = match?.duration_minutes || match?.settings?.duration_minutes;
+  if (!time && !station && !duration) return null;
   return (
     <div className={`border-t border-white/5 bg-[#050505]/40 ${compact ? "px-2.5 py-1" : "px-3 py-1.5"} text-[10px] uppercase tracking-wider text-white/45 flex flex-wrap gap-x-3 gap-y-1`}>
       {time && <span>{time}</span>}
+      {duration && <span>{duration} Min.</span>}
       {station && <span className="text-[#29B6E8]">Station {station}</span>}
     </div>
   );
