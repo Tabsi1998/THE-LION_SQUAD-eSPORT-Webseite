@@ -15,6 +15,7 @@ from models import (
 )
 from services.match_v2_results import MatchV2ResultError, build_v2_result_application
 from services.match_notifications import notify_match_result_confirmed
+from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     READ_STAFF_ROLES,
@@ -412,6 +413,7 @@ async def update_match_v2(match_id: str, body: MatchV2Update,
         updates["scheduled_at"] = updates["scheduled_at"].isoformat() if updates["scheduled_at"] else None
     if updates.get("scheduled_at") and match.get("status") in {"pending", "ready", "preview"} and "status" not in updates:
         updates["status"] = "scheduled"
+    await ensure_station_slot_available(db, match, updates, "matches_v2")
     updates["updated_at"] = now_utc().isoformat()
     await db.matches_v2.update_one({"id": match_id}, {"$set": updates})
     updated = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
@@ -427,6 +429,7 @@ async def submit_match_v2_result(match_id: str, body: MatchV2ResultSubmit,
     if not match:
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
     await _ensure_match_tournament_unlocked(db, match)
+    await ensure_tournament_accepts_results(db, match["tournament_id"])
     await _require_v2_result_permission(me, match)
     stage_matches = await db.matches_v2.find(
         {"stage_id": match["stage_id"]},

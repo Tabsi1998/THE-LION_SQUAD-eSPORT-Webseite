@@ -165,7 +165,7 @@ def _apply_match_plan(matches: list[dict], plan: dict[tuple, dict], key_fn) -> l
         if not fields:
             continue
         match.update(fields)
-        if fields.get("scheduled_at") and not match.get("is_preview") and match.get("status") in {"pending", "ready", "scheduled"}:
+        if fields.get("scheduled_at") and match.get("status") in {"preview", "pending", "ready", "scheduled"}:
             match["status"] = "scheduled"
     return matches
 

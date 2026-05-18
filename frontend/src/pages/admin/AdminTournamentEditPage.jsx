@@ -536,6 +536,7 @@ export default function AdminTournamentEditPage() {
 
   if (!t) return <AdminLayout><div className="p-10 text-white/40">Lade…</div></AdminLayout>;
   const hasFlexibleStructure = stages.length > 0 || matchesV2.length > 0;
+  const canRecordResults = ["live", "paused"].includes(t.status);
 
   return (
     <AdminLayout>
@@ -710,7 +711,7 @@ export default function AdminTournamentEditPage() {
                     <td className="px-4 py-3"><StatusBadge status={m.status} /></td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex flex-col items-end gap-2">
-                        {isModerator && a && b && (
+                        {isModerator && canRecordResults && a && b && (
                           <MatchResultControls match={m} a={a} b={b} onSave={updateMatchResult} />
                         )}
                         {isModerator && <MatchScheduleControls match={m} stations={stations} defaultScheduledAt={t.start_date} onSave={updateMatchSchedule} />}
@@ -738,6 +739,7 @@ export default function AdminTournamentEditPage() {
           onChanged={load}
           onSaveResult={updateMatchV2Result}
           onSaveMatchMeta={updateMatchV2Schedule}
+          canRecordResults={canRecordResults}
         />
       )}
       {tab === "edit" && (
@@ -813,7 +815,7 @@ function ParticipantAddForm({ form, tournament, users, teams, noShowRegistration
   );
 }
 
-function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], tournamentStartDate = null, isAdmin, isModerator, onChanged, onSaveResult, onSaveMatchMeta, mode = "operations" }) {
+function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], tournamentStartDate = null, isAdmin, isModerator, canRecordResults = false, onChanged, onSaveResult, onSaveMatchMeta, mode = "operations" }) {
   const showSettings = isAdmin && mode === "settings";
   const showMatchList = mode !== "settings";
   const [createOpen, setCreateOpen] = useState(stages.length === 0);
@@ -926,6 +928,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
             stations={stations}
             tournamentStartDate={tournamentStartDate}
             isModerator={isModerator}
+            canRecordResults={canRecordResults}
             showSettings={showSettings}
             showMatchList={showMatchList}
             onChanged={onChanged}
@@ -944,7 +947,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
   );
 }
 
-function StageCard({ tournamentId, stage, matches, regById, stations = [], tournamentStartDate = null, isModerator, showSettings = false, showMatchList = true, onChanged, onDelete, onSaveResult, onSaveMatchMeta }) {
+function StageCard({ tournamentId, stage, matches, regById, stations = [], tournamentStartDate = null, isModerator, canRecordResults = false, showSettings = false, showMatchList = true, onChanged, onDelete, onSaveResult, onSaveMatchMeta }) {
   const settings = stage.settings || {};
   const [activeSection, setActiveSection] = useState("all");
   const [form, setForm] = useState({
@@ -1135,6 +1138,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
                   stations={stations}
                   tournamentStartDate={tournamentStartDate}
                   canEdit={isModerator}
+                  canRecordResults={canRecordResults}
                   onSaveResult={onSaveResult}
                   onSaveMatchMeta={onSaveMatchMeta}
                 />
@@ -1152,7 +1156,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
   );
 }
 
-function MatchV2Card({ match, regById, stations = [], tournamentStartDate = null, canEdit, onSaveResult, onSaveMatchMeta }) {
+function MatchV2Card({ match, regById, stations = [], tournamentStartDate = null, canEdit, canRecordResults = false, onSaveResult, onSaveMatchMeta }) {
   const filledSlots = (match.slots || []).filter((slot) => slot.status === "filled" && slot.registration_id);
   const labelFor = (registrationId) => {
     const reg = regById[registrationId];
@@ -1190,7 +1194,7 @@ function MatchV2Card({ match, regById, stations = [], tournamentStartDate = null
         </div>
       )}
       {canEdit && <MatchScheduleControls match={match} stations={stations} defaultScheduledAt={tournamentStartDate} onSave={onSaveMatchMeta} />}
-      {canEdit && filledSlots.length > 0 && (
+      {canEdit && canRecordResults && filledSlots.length > 0 && (
         <MatchV2ResultControls match={match} filledSlots={filledSlots} labelFor={labelFor} onSaveResult={onSaveResult} />
       )}
     </div>
@@ -1288,22 +1292,22 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
           <button type="button" onClick={recalcRanks} className="text-[10px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">Jetzt berechnen</button>
         </div>
       </div>
-      <div className="hidden sm:grid grid-cols-12 gap-2 text-[10px] font-bold uppercase tracking-widest text-white/35">
-        <div className="col-span-3">Teilnehmer</div>
-        <div className="col-span-2">Platz</div>
-        <div className="col-span-3">{valueLabel}</div>
-        <div className="col-span-2">Status</div>
-        <div className="col-span-2">Wertung</div>
+      <div className="hidden lg:grid lg:grid-cols-[minmax(10rem,1fr)_5rem_minmax(8rem,0.8fr)_9rem_7rem] gap-2 text-[10px] font-bold uppercase tracking-widest text-white/35">
+        <div>Teilnehmer</div>
+        <div>Platz</div>
+        <div>{valueLabel}</div>
+        <div>Status</div>
+        <div>Wertung</div>
       </div>
       {rows.map((row) => (
-        <div key={row.registration_id} className="grid grid-cols-12 gap-2 items-center">
-          <div className="col-span-3 text-xs truncate">{labelFor(row.registration_id)}</div>
-          <input type="number" min="1" value={row.rank} onChange={(e)=>update(row.registration_id, { rank: e.target.value })} disabled={autoRank} className="col-span-2 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs disabled:opacity-60" aria-label="Platzierung" placeholder="Platz" />
+        <div key={row.registration_id} className="grid gap-2 lg:grid-cols-[minmax(10rem,1fr)_5rem_minmax(8rem,0.8fr)_9rem_7rem] items-center rounded-sm border border-white/5 bg-[#0A0A0A] p-2 lg:border-0 lg:bg-transparent lg:p-0">
+          <div className="text-xs break-words">{labelFor(row.registration_id)}</div>
+          <input type="number" min="1" value={row.rank} onChange={(e)=>update(row.registration_id, { rank: e.target.value })} disabled={autoRank} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs disabled:opacity-60" aria-label="Platzierung" placeholder="Platz" />
           {rankingMode === "time"
-            ? <input type="number" min="0" value={row.time_ms} onChange={(e)=>update(row.registration_id, { time_ms: e.target.value })} className="col-span-3 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Zeit in Millisekunden" placeholder="Zeit ms" />
-            : <input type="number" min="0" value={row.score} onChange={(e)=>update(row.registration_id, { score: e.target.value })} className="col-span-3 bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Punkte oder Score" placeholder={rankingMode === "lower_score" ? "Score" : "Punkte"} />}
-          <label className="col-span-2 text-[10px] text-white/60 truncate"><input type="checkbox" checked={row.dnf} onChange={(e)=>update(row.registration_id, { dnf: e.target.checked })} className="accent-[#29B6E8]" /> Nicht beendet</label>
-          <label className="col-span-2 text-[10px] text-white/60 truncate"><input type="checkbox" checked={row.forfeit} onChange={(e)=>update(row.registration_id, { forfeit: e.target.checked })} className="accent-[#FF3B30]" /> Forfeit</label>
+            ? <input type="number" min="0" value={row.time_ms} onChange={(e)=>update(row.registration_id, { time_ms: e.target.value })} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Zeit in Millisekunden" placeholder="Zeit ms" />
+            : <input type="number" min="0" value={row.score} onChange={(e)=>update(row.registration_id, { score: e.target.value })} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Punkte oder Score" placeholder={rankingMode === "lower_score" ? "Score" : "Punkte"} />}
+          <label className="inline-flex items-center gap-2 text-[10px] text-white/60 whitespace-nowrap"><input type="checkbox" checked={row.dnf} onChange={(e)=>update(row.registration_id, { dnf: e.target.checked })} className="accent-[#29B6E8]" /> Nicht beendet</label>
+          <label className="inline-flex items-center gap-2 text-[10px] text-white/60 whitespace-nowrap"><input type="checkbox" checked={row.forfeit} onChange={(e)=>update(row.registration_id, { forfeit: e.target.checked })} className="accent-[#FF3B30]" /> Forfeit</label>
         </div>
       ))}
       <input value={note} onChange={(e)=>setNote(e.target.value)} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" placeholder="Notiz für Turnierleitung oder Schiedsrichter" />
@@ -1323,9 +1327,9 @@ function MatchScheduleControls({ match, stations = [], defaultScheduledAt = null
     setStationId(match.station_id || "");
   }, [match.id, match.scheduled_at, defaultScheduledAt, match.duration_minutes, match.station_id, match.updated_at, match.settings?.duration_minutes]);
   return (
-    <div className="mt-3 w-full max-w-md border border-white/10 bg-[#0A0A0A] rounded-sm p-3 space-y-2">
+    <div className="mt-3 w-full border border-white/10 bg-[#0A0A0A] rounded-sm p-3 space-y-3">
       <div className="text-[10px] font-bold uppercase tracking-widest text-white/50">Matchplanung</div>
-      <div className="grid sm:grid-cols-[1fr_7rem] gap-2">
+      <div className="grid md:grid-cols-[minmax(14rem,1fr)_8rem_minmax(12rem,1fr)] gap-3">
         <label className="block">
           <span className="block text-[10px] text-white/45 mb-1">Startdatum & Uhrzeit</span>
           <input type="datetime-local" value={scheduledAt} onChange={(e)=>setScheduledAt(e.target.value)} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Startdatum und Uhrzeit" />
@@ -1353,7 +1357,7 @@ function MatchScheduleControls({ match, stations = [], defaultScheduledAt = null
           Gespeichert: {match.scheduled_at ? formatDateTime(match.scheduled_at) : "keine Startzeit"} - Dauer {match.duration_minutes ?? match.settings?.duration_minutes ?? "offen"} Min.{stationDisplay(match, stations) ? ` - Station ${stationDisplay(match, stations)}` : ""}
         </div>
       )}
-      <button type="button" onClick={() => onSave(match, { scheduled_at: scheduledAt, duration_minutes: duration, station_id: stationId })} className="px-3 py-2 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Planung speichern</button>
+      <button type="button" onClick={() => onSave(match, { scheduled_at: scheduledAt, duration_minutes: duration, station_id: stationId })} className="w-full sm:w-auto px-4 py-2 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Planung speichern</button>
     </div>
   );
 }
@@ -1835,21 +1839,21 @@ function MatchResultControls({ match, a, b, onSave }) {
       ? b.id
       : "";
   return (
-    <div className="flex flex-wrap items-end justify-end gap-2">
+    <div className="w-full min-w-[18rem] grid sm:grid-cols-[minmax(6rem,1fr)_minmax(6rem,1fr)_minmax(9rem,1fr)_auto] items-end gap-2">
       <label className="block">
-        <span className="block text-[10px] text-white/45 mb-1 truncate max-w-20">{a.display_name || "Spieler A"}</span>
-        <input type="number" min="0" value={scoreA} onChange={(e)=>setScoreA(e.target.value)} className="w-16 bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Punkte A" placeholder="Punkte" />
+        <span className="block text-[10px] text-white/45 mb-1 break-words">{a.display_name || "Spieler A"}</span>
+        <input type="number" min="0" value={scoreA} onChange={(e)=>setScoreA(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Punkte A" placeholder="Punkte" />
       </label>
       <label className="block">
-        <span className="block text-[10px] text-white/45 mb-1 truncate max-w-20">{b.display_name || "Spieler B"}</span>
-        <input type="number" min="0" value={scoreB} onChange={(e)=>setScoreB(e.target.value)} className="w-16 bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Punkte B" placeholder="Punkte" />
+        <span className="block text-[10px] text-white/45 mb-1 break-words">{b.display_name || "Spieler B"}</span>
+        <input type="number" min="0" value={scoreB} onChange={(e)=>setScoreB(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Punkte B" placeholder="Punkte" />
       </label>
-      <select value={winnerId} onChange={(e)=>onSave(match, scoreA, scoreB, e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs max-w-[170px]" aria-label="Gewinner">
+      <select value={winnerId} onChange={(e)=>onSave(match, scoreA, scoreB, e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Gewinner">
         <option value="">Gewinner wählen</option>
         <option value={a.id}>{a.display_name || "A"}</option>
         <option value={b.id}>{b.display_name || "B"}</option>
       </select>
-      <button type="button" onClick={()=>onSave(match, scoreA, scoreB, winnerId)} className="px-2 py-1 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase">Speichern</button>
+      <button type="button" onClick={()=>onSave(match, scoreA, scoreB, winnerId)} className="px-3 py-1 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase">Speichern</button>
     </div>
   );
 }

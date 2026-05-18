@@ -25,6 +25,7 @@ from models import (
 from bracket_engine import advance_match_winner
 from match_rules import loser_for_winner, match_allows_draw, validate_winner_id
 from services.match_notifications import notify_match_result_confirmed
+from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
 from services.match_v2_results import MatchV2ResultError, build_v2_result_application
 from services.station_labels import attach_station_info
 
@@ -506,6 +507,7 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
     if collection != "matches_v2":
         raise HTTPException(status_code=400, detail="Dieses Ergebnisformular ist fuer Mehrspieler-Heats vorgesehen")
     await _ensure_match_tournament_unlocked(db, match)
+    await ensure_tournament_accepts_results(db, match["tournament_id"])
     await _require_result_permission(me, match)
     stage_matches = await db.matches_v2.find(
         {"stage_id": match["stage_id"]},
@@ -630,6 +632,10 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
     if final_status == "completed" and final_winner:
         validate_winner_id(m, final_winner)
         updates["loser_id"] = loser_for_winner(m, final_winner)
+    result_fields = {"winner_id", "score_a", "score_b"}
+    if final_status in {"completed", "waiting_result", "forfeit"} or result_fields.intersection(updates):
+        await ensure_tournament_accepts_results(db, m["tournament_id"])
+    await ensure_station_slot_available(db, m, updates, "matches")
     if not final_winner and "winner_id" in updates:
         updates["loser_id"] = None
     updates["updated_at"] = now_utc().isoformat()
@@ -697,6 +703,7 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
     if not m:
         raise HTTPException(status_code=404)
     await _ensure_match_tournament_unlocked(db, m)
+    await ensure_tournament_accepts_results(db, m["tournament_id"])
     # Verify user is participant
     reg_ids = [m.get("participant_a_id"), m.get("participant_b_id")]
     my_reg = await db.tournament_registrations.find_one(
@@ -798,6 +805,7 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(get_current_user
     if not m:
         raise HTTPException(status_code=404)
     await _ensure_match_tournament_unlocked(db, m)
+    await ensure_tournament_accepts_results(db, m["tournament_id"])
     await require_tournament_staff_permission(me, m["tournament_id"], RESULT_STAFF_ROLES)
     note = (body.get("note") or body.get("reason") or "").strip()
     if len(note) < 5:
