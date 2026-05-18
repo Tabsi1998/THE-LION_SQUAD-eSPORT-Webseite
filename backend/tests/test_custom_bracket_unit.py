@@ -180,6 +180,36 @@ def test_v2_auto_single_elim_adds_bronze_match_from_semifinal_losers():
     assert {source["rank"] for source in bronze_sources} == {2}
 
 
+def test_v2_custom_duel_schema_adds_bronze_match_when_final_is_clear():
+    tournament = {
+        "id": "t1",
+        "seeding_mode": "manual",
+        "max_participants": 4,
+        "bronze_match": True,
+    }
+    stage = {
+        "id": "s1",
+        "number": 1,
+        "stage_type": "custom_bracket",
+        "match_type": "duel",
+        "settings": {"schema": "[WB]\n# Halbfinale\nA=[1,2]\nB=[3,4]\n# Finale\nC=[W:A:1,W:B:1]"},
+    }
+    registrations = [
+        {"id": f"r{i}", "user_id": f"u{i}", "status": "approved", "seed": i}
+        for i in range(1, 5)
+    ]
+
+    matches = build_matches_v2_from_schema(tournament, stage, registrations, preview=True)
+    bronze = next(match for match in matches if match["section"] == "BRONZE")
+    bronze_sources = [slot["source"] for slot in bronze["slots"]]
+
+    assert len(matches) == 4
+    assert bronze["round_name"] == "Spiel um Platz 3"
+    assert [source["match_key"] for source in bronze_sources] == ["A", "B"]
+    assert {source["flow"] for source in bronze_sources} == {"L"}
+    assert {source["rank"] for source in bronze_sources} == {2}
+
+
 def test_v2_generator_builds_auto_double_elim_schema():
     tournament = {"id": "t1", "seeding_mode": "manual", "max_participants": 8, "match_duration_minutes": 12}
     stage = {

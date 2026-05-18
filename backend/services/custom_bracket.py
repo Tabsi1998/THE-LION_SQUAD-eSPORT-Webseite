@@ -320,10 +320,52 @@ def _auto_double_elim_schema(slot_count: int) -> str:
     return "\n".join(lines)
 
 
+def _with_custom_bronze_match(schema: str) -> str:
+    specs = parse_custom_bracket_schema(schema)
+    if any((spec.section or "").strip().lower() in {"bronze", "spiel um platz 3", "platz 3"} for spec in specs):
+        return schema
+
+    referenced = {
+        source["match_key"]
+        for spec in specs
+        for source in spec.sources
+        if source.get("type") == "rank"
+    }
+    finals = [spec for spec in specs if spec.key not in referenced]
+    if not finals:
+        return schema
+    rounds = infer_rounds(specs)
+    final = max(finals, key=lambda spec: (rounds.get(spec.key, 0), spec.order))
+    semifinal_sources = [
+        source for source in final.sources
+        if source.get("type") == "rank" and source.get("flow") == "W" and int(source.get("rank") or 0) == 1
+    ]
+    if len(semifinal_sources) != 2:
+        return schema
+
+    seen_keys = {spec.key for spec in specs}
+    next_index = len(specs)
+    key = _match_key(next_index)
+    while key in seen_keys:
+        next_index += 1
+        key = _match_key(next_index)
+    left = semifinal_sources[0]["match_key"]
+    right = semifinal_sources[1]["match_key"]
+    return "\n".join([
+        schema.rstrip(),
+        "",
+        "[BRONZE]",
+        "# Spiel um Platz 3",
+        f"{key}=[L:{left}:2,L:{right}:2]",
+    ])
+
+
 def _resolve_schema(tournament: dict, stage: dict, registrations: list[dict], preview: bool) -> str | None:
     settings = stage.get("settings") or {}
     schema = settings.get("schema") or settings.get("custom_schema") or settings.get("bracket_schema")
     if schema:
+        if bool(tournament.get("bronze_match")) and (stage.get("stage_type") or "") == "custom_bracket":
+            return _with_custom_bronze_match(schema)
         return schema
     if (stage.get("stage_type") or "") == "single_elimination":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))

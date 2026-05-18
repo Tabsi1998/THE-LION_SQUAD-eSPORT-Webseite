@@ -86,6 +86,7 @@ LA=[L:A:3,L:A:4,L:B:3,L:B:4]`;
 const CUSTOM_STAGE_TYPES = new Set(["custom_bracket", "ffa_custom_bracket"]);
 const AUTO_STAGE_TYPES = new Set(["single_elimination", "double_elimination", "custom_bracket", "ffa_custom_bracket"]);
 const FFA_STAGE_TYPES = new Set(["simple", "ffa_single_elimination", "ffa_custom_bracket", "ffa_league"]);
+const BRONZE_FORMATS = new Set(["single_elim", "custom_bracket"]);
 
 function matchTypeForStage(stageType) {
   return FFA_STAGE_TYPES.has(stageType) ? "ffa" : "duel";
@@ -1365,7 +1366,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const setStructureField = (k, v) => setStructure((x) => ({ ...x, [k]: v }));
   const setFormat = (value) => {
-    set("format", value);
+    setF((current) => ({ ...current, format: value, bronze_match: BRONZE_FORMATS.has(value) ? current.bronze_match : false }));
     setStructure((current) => {
       if (value === "double_elim") return { ...current, stage_type: "double_elimination", match_type: "duel", match_size: 2, min_players: 2, qualifiers_per_match: 1 };
       if (value === "custom_bracket") return { ...current, stage_type: "custom_bracket", match_type: "duel", match_size: 2, min_players: 2, qualifiers_per_match: 1 };
@@ -1381,7 +1382,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
       match_size: Number(structure.match_size) || (structure.match_type === "ffa" ? 4 : 2),
       min_players: Number(structure.min_players) || 2,
       qualifiers_per_match: Number(structure.qualifiers_per_match) || (structure.match_type === "ffa" ? 2 : 1),
-      duration_minutes: Number(structure.duration_minutes) || Number(f.match_duration_minutes) || 30,
+      duration_minutes: Number(f.match_duration_minutes) || 30,
       schema: structure.schema || "",
       score_type: "points",
       calculation: "points",
@@ -1486,11 +1487,11 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
           <div className="grid md:grid-cols-3 gap-3">
             <SelectField label="Seeding" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} />
             <Fld label="Best of" type="number" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"/>
-            <Fld label="Spieldauer Min." type="number" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"/>
+            <Fld label="Matchdauer Min." type="number" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"/>
             <Fld label="Season Gewicht" type="number" value={f.season_weight} onChange={(v)=>set("season_weight",v)} testId="tr-edit-season-weight"/>
           </div>
           <div className="mt-4 flex flex-wrap gap-4">
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.bronze_match} onChange={(e)=>set("bronze_match",e.target.checked)} className="accent-[#29B6E8]"/><span>Spiel um Platz 3</span></label>
+            {BRONZE_FORMATS.has(f.format) && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.bronze_match} onChange={(e)=>set("bronze_match",e.target.checked)} className="accent-[#29B6E8]"/><span>Spiel um Platz 3</span></label>}
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.substitutes_allowed} onChange={(e)=>set("substitutes_allowed",e.target.checked)} className="accent-[#29B6E8]"/><span>Ersatzspieler erlauben</span></label>
           </div>
         </Details>
@@ -1500,7 +1501,6 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
             <div className="grid md:grid-cols-3 gap-3">
               {f.format === "ffa_custom_bracket" && <Fld label="Spielgröße" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size" />}
               {f.format === "ffa_custom_bracket" && <Fld label="Qualifizierte" type="number" value={structure.qualifiers_per_match} onChange={(v)=>setStructureField("qualifiers_per_match", v)} testId="tr-edit-stage-qualifiers" />}
-              <Fld label="Spieldauer Min." type="number" value={structure.duration_minutes} onChange={(v)=>setStructureField("duration_minutes", v)} testId="tr-edit-stage-duration" />
             </div>
             <label className="block">
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
@@ -1533,7 +1533,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
       <div className="flex flex-wrap gap-3">
         <button onClick={() => save()} data-testid="tr-edit-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
         <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-save-rebuild" className="px-5 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10">
-          Speichern & Format-Vorschau neu bauen
+          Speichern & Struktur anwenden
         </button>
       </div>
     </div>
