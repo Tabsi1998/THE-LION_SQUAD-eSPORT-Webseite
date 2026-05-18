@@ -83,50 +83,8 @@ C=[W:A:1,W:A:2,W:B:1,W:B:2]
 [LB]
 # Runde 1
 LA=[L:A:3,L:A:4,L:B:3,L:B:4]`;
-const MARIO_KART_32_SCHEMA = `[WB]
-# Runde 1 (32 -> 16)
-A=[1,2,3,4]
-B=[5,6,7,8]
-C=[9,10,11,12]
-D=[13,14,15,16]
-E=[17,18,19,20]
-F=[21,22,23,24]
-G=[25,26,27,28]
-H=[29,30,31,32]
-
-# Runde 2 (16 -> 8)
-I=[W:A:1,W:A:2,W:B:1,W:B:2]
-J=[W:C:1,W:C:2,W:D:1,W:D:2]
-K=[W:E:1,W:E:2,W:F:1,W:F:2]
-L=[W:G:1,W:G:2,W:H:1,W:H:2]
-
-# Runde 3 (8 -> 4)
-M=[W:I:1,W:I:2,W:J:1,W:J:2]
-N=[W:K:1,W:K:2,W:L:1,W:L:2]
-
-# Sieger-Finale
-O=[W:M:1,W:M:2,W:N:1,W:N:2]
-
-[LB]
-# Runde 1 (16 -> 8)
-LA=[L:A:3,L:A:4,L:B:3,L:B:4]
-LB=[L:C:3,L:C:4,L:D:3,L:D:4]
-LC=[L:E:3,L:E:4,L:F:3,L:F:4]
-LD=[L:G:3,L:G:4,L:H:3,L:H:4]
-
-# Runde 2 (8 -> 4)
-LE=[W:LA:1,W:LA:2,W:LB:1,W:LB:2]
-LF=[W:LC:1,W:LC:2,W:LD:1,W:LD:2]
-
-# Hoffnungs-Finale
-LG=[W:LE:1,W:LE:2,W:LF:1,W:LF:2]`;
-const STAGE_PRESETS = [
-  ["custom", "Eigenes Schema", null],
-  ["mk8_8", "Mario Kart 8 Spieler", DEFAULT_FFA_SCHEMA],
-  ["mk8_32", "Mario Kart 32 Spieler", MARIO_KART_32_SCHEMA],
-];
 const CUSTOM_STAGE_TYPES = new Set(["custom_bracket", "ffa_custom_bracket"]);
-const AUTO_STAGE_TYPES = new Set(["single_elimination", "custom_bracket", "ffa_custom_bracket"]);
+const AUTO_STAGE_TYPES = new Set(["single_elimination", "double_elimination", "custom_bracket", "ffa_custom_bracket"]);
 const FFA_STAGE_TYPES = new Set(["simple", "ffa_single_elimination", "ffa_custom_bracket", "ffa_league"]);
 
 function matchTypeForStage(stageType) {
@@ -751,20 +709,6 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
   const config = stageConfigFor(form);
   const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
   const setStageType = (stageType) => setForm((current) => applyStageType(current, stageType));
-  const applyPreset = (key) => {
-    const preset = STAGE_PRESETS.find(([value]) => value === key);
-    if (!preset?.[2]) return;
-    setForm((current) => ({
-      ...current,
-      match_type: "ffa",
-      stage_type: "ffa_custom_bracket",
-      match_size: 4,
-      min_players: 2,
-          qualifiers_per_match: 2,
-          duration_minutes: current.duration_minutes || 30,
-          schema: preset[2],
-    }));
-  };
   const createStage = async (e) => {
     e.preventDefault();
     try {
@@ -821,7 +765,6 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, i
           {createOpen && (
             <form onSubmit={createStage} className="border-t border-white/10 p-5 grid md:grid-cols-3 gap-3">
               <Fld label="Name" value={form.name} onChange={(v)=>set("name", v)} testId="stage-new-name" />
-              <SelectField label="Vorlage" value="custom" onChange={applyPreset} options={STAGE_PRESETS.map(([v, l]) => [v, l])} />
               <SelectField label="Struktur-Typ" value={form.stage_type} onChange={setStageType} options={STAGE_TYPES} />
               <div className="block">
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spieltyp</div>
@@ -893,20 +836,6 @@ function StageCard({ tournamentId, stage, matches, regById, isModerator, showSet
   const config = stageConfigFor(form);
   const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
   const setStageType = (stageType) => setForm((current) => applyStageType(current, stageType));
-  const applyPreset = (key) => {
-    const preset = STAGE_PRESETS.find(([value]) => value === key);
-    if (!preset?.[2]) return;
-    setForm((current) => ({
-      ...current,
-      match_type: "ffa",
-      stage_type: "ffa_custom_bracket",
-      match_size: 4,
-      min_players: 2,
-      qualifiers_per_match: 2,
-      duration_minutes: current.duration_minutes || 30,
-      schema: preset[2],
-    }));
-  };
   const stagePayload = () => ({
     name: form.name || "Phase",
     match_type: form.match_type,
@@ -948,7 +877,7 @@ function StageCard({ tournamentId, stage, matches, regById, isModerator, showSet
   };
   const generate = async ({ preview = false, force = false } = {}) => {
     if (!config.canGenerate) {
-      toast.error("Für diesen Struktur-Typ ist aktuell noch kein automatischer Generator aktiv. Nutze einen freien Turnierbaum oder eine Vorlage.");
+      toast.error("Für diesen Struktur-Typ ist aktuell noch kein automatischer Generator aktiv.");
       return;
     }
     try {
@@ -1008,7 +937,6 @@ function StageCard({ tournamentId, stage, matches, regById, isModerator, showSet
           <div className="space-y-3">
             <div className="grid sm:grid-cols-2 gap-3">
               <Fld label="Name" value={form.name} onChange={(v)=>set("name", v)} testId={`stage-name-${stage.id}`} />
-              <SelectField label="Vorlage anwenden" value="custom" onChange={applyPreset} options={STAGE_PRESETS.map(([v, l]) => [v, l])} />
               <SelectField label="Status" value={form.status} onChange={(v)=>set("status", v)} options={STAGE_STATUS_OPTIONS} />
               <SelectField label="Struktur-Typ" value={form.stage_type} onChange={setStageType} options={STAGE_TYPES} />
               <div className="block">
@@ -1462,7 +1390,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
             <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Freier Turnierbaum</div>
             <div className="grid md:grid-cols-3 gap-3">
-              {f.format === "ffa_custom_bracket" && <Fld label="SpielgrÃ¶ÃŸe" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size" />}
+              {f.format === "ffa_custom_bracket" && <Fld label="Spielgröße" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size" />}
               <Fld label="Min Spieler" type="number" value={structure.min_players} onChange={(v)=>setStructureField("min_players", v)} testId="tr-edit-stage-min" />
               {f.format === "ffa_custom_bracket" && <Fld label="Qualifizierte" type="number" value={structure.qualifiers_per_match} onChange={(v)=>setStructureField("qualifiers_per_match", v)} testId="tr-edit-stage-qualifiers" />}
               <Fld label="Spieldauer Min." type="number" value={structure.duration_minutes} onChange={(v)=>setStructureField("duration_minutes", v)} testId="tr-edit-stage-duration" />

@@ -3,19 +3,19 @@ import { resolveMediaUrl } from "@/lib/api";
 import { formatBracketSection, formatMatchStatus, formatRoundName } from "@/lib/tournamentLabels";
 
 /**
- * Rendert klassische 1v1-Bäume und flexible Mehrspieler-Heats.
+ * Renders classic 1v1 brackets and flexible multiplayer heats.
  * `data` is the response from /api/tournaments/:id/bracket.
  */
 export function BracketTree({ data, compact = false, viewMode = "standard", onMatchClick }) {
   const { matches = [], matches_v2 = [], stages = [], registrations = [] } = data || {};
   const isTv = viewMode === "tv";
+  const podiumMap = useMemo(() => buildPodiumMap(matches, matches_v2), [matches, matches_v2]);
   const regMap = useMemo(() => {
     const m = new Map();
     for (const r of registrations) m.set(r.id, r);
     return m;
   }, [registrations]);
 
-  // Group by bracket + round
   const grouped = useMemo(() => {
     const g = {};
     for (const m of matches) {
@@ -33,7 +33,7 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
   }, [matches]);
 
   if (matches_v2.length > 0 || stages.length > 0) {
-    return <StageBracketTree stages={stages} matches={matches_v2} regMap={regMap} compact={compact} viewMode={viewMode} onMatchClick={onMatchClick} />;
+    return <StageBracketTree stages={stages} matches={matches_v2} regMap={regMap} podiumMap={podiumMap} compact={compact} viewMode={viewMode} onMatchClick={onMatchClick} />;
   }
 
   const renderBracket = (bracketKey, label) => {
@@ -59,7 +59,7 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
               </div>
               <div className={isTv ? "flex flex-col gap-2" : "flex flex-col justify-around flex-1 gap-3"}>
                 {rounds[rn].map((m) => (
-                  <BracketNode key={m.id} match={m} regMap={regMap} compact={compact || isTv} onClick={onMatchClick} />
+                  <BracketNode key={m.id} match={m} regMap={regMap} podiumMap={podiumMap} compact={compact || isTv} onClick={onMatchClick} />
                 ))}
               </div>
             </div>
@@ -80,7 +80,7 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
   );
 }
 
-function StageBracketTree({ stages, matches, regMap, compact = false, viewMode = "standard", onMatchClick }) {
+function StageBracketTree({ stages, matches, regMap, podiumMap, compact = false, viewMode = "standard", onMatchClick }) {
   const isTv = viewMode === "tv";
   const stagesForView = stages.length
     ? stages
@@ -125,6 +125,7 @@ function StageBracketTree({ stages, matches, regMap, compact = false, viewMode =
                 section={section}
                 rounds={stageSections[section]}
                 regMap={regMap}
+                podiumMap={podiumMap}
                 compact={compact}
                 viewMode={viewMode}
                 onMatchClick={onMatchClick}
@@ -142,7 +143,7 @@ function StageBracketTree({ stages, matches, regMap, compact = false, viewMode =
   );
 }
 
-function StageSection({ section, rounds, regMap, compact, viewMode, onMatchClick }) {
+function StageSection({ section, rounds, regMap, podiumMap, compact, viewMode, onMatchClick }) {
   const isTv = viewMode === "tv";
   const roundNums = Object.keys(rounds).map(Number).sort((a, b) => a - b);
   return (
@@ -164,9 +165,9 @@ function StageSection({ section, rounds, regMap, compact, viewMode, onMatchClick
               {rounds[rn].map((match) => {
                 const isDuel = (match.match_type || "duel") === "duel" && (match.slots || []).length <= 2;
                 return isDuel ? (
-                  <V2DuelNode key={match.id} match={match} regMap={regMap} compact={compact || isTv} onClick={onMatchClick} />
+                  <V2DuelNode key={match.id} match={match} regMap={regMap} podiumMap={podiumMap} compact={compact || isTv} onClick={onMatchClick} />
                 ) : (
-                  <HeatNode key={match.id} match={match} regMap={regMap} compact={compact || isTv} onClick={onMatchClick} />
+                  <HeatNode key={match.id} match={match} regMap={regMap} podiumMap={podiumMap} compact={compact || isTv} onClick={onMatchClick} />
                 );
               })}
             </div>
@@ -177,19 +178,20 @@ function StageSection({ section, rounds, regMap, compact, viewMode, onMatchClick
   );
 }
 
-function V2DuelNode({ match, regMap, compact = false, onClick }) {
+function V2DuelNode({ match, regMap, podiumMap, compact = false, onClick }) {
   const resultMap = new Map((match.results || []).map((r) => [r.registration_id, r]));
   const slots = [...(match.slots || [])].slice(0, 2);
   while (slots.length < 2) {
     slots.push({ slot: slots.length + 1, registration_id: null, status: "empty" });
   }
+  const nodePodium = topPodiumRank(slots.map((slot) => slot.registration_id), podiumMap);
 
   return (
     <button
       type="button"
       onClick={() => onClick?.(match)}
       data-testid={`bracket-match-v2-${match.id}`}
-      className="tls-bracket-node relative text-left rounded-sm overflow-hidden border border-white/10 hover:border-[#29B6E8]/60 transition-all group"
+      className={`tls-bracket-node relative text-left rounded-sm overflow-hidden border ${podiumBorderClass(nodePodium)} hover:border-[#29B6E8]/60 transition-all group`}
     >
       {slots.map((slot, index) => {
         const reg = regMap.get(slot.registration_id);
@@ -202,6 +204,7 @@ function V2DuelNode({ match, regMap, compact = false, onClick }) {
             label={reg?.display_name || user.display_name || reg?.ingame_name || (slot.registration_id ? "-" : slot.source?.raw || "Offen")}
             score={result?.score ?? result?.points ?? 0}
             isWinner={isWinner}
+            podiumRank={podiumMap?.get(slot.registration_id)}
             avatar={user.avatar_url || reg?.avatar_url}
             compact={compact}
           />
@@ -215,14 +218,15 @@ function V2DuelNode({ match, regMap, compact = false, onClick }) {
   );
 }
 
-function HeatNode({ match, regMap, compact = false, onClick }) {
+function HeatNode({ match, regMap, podiumMap, compact = false, onClick }) {
   const resultMap = new Map((match.results || []).map((r) => [r.registration_id, r]));
+  const nodePodium = topPodiumRank((match.slots || []).map((slot) => slot.registration_id), podiumMap);
   return (
     <button
       type="button"
       onClick={() => onClick?.(match)}
       data-testid={`bracket-heat-${match.id}`}
-      className="tls-bracket-node relative text-left rounded-sm overflow-hidden border border-white/10 hover:border-[#29B6E8]/60 transition-all group bg-[#0A0A0A]"
+      className={`tls-bracket-node relative text-left rounded-sm overflow-hidden border ${podiumBorderClass(nodePodium)} hover:border-[#29B6E8]/60 transition-all group bg-[#0A0A0A]`}
     >
       <div className={`${compact ? "px-2.5 py-1.5" : "px-3 py-2"} border-b border-white/5 flex items-center justify-between gap-2`}>
         <div>
@@ -242,6 +246,7 @@ function HeatNode({ match, regMap, compact = false, onClick }) {
             registration={reg}
             result={result}
             qualified={qualified}
+            podiumRank={podiumMap?.get(slot.registration_id)}
             compact={compact}
           />
         );
@@ -250,12 +255,13 @@ function HeatNode({ match, regMap, compact = false, onClick }) {
   );
 }
 
-function HeatRow({ slot, registration, result, qualified, compact = false }) {
+function HeatRow({ slot, registration, result, qualified, podiumRank, compact = false }) {
   const user = registration?.user || {};
-  const label = registration?.display_name || user.display_name || registration?.ingame_name || (slot.registration_id ? "—" : slot.source?.raw || "Offen");
+  const label = registration?.display_name || user.display_name || registration?.ingame_name || (slot.registration_id ? "-" : slot.source?.raw || "Offen");
   const score = result?.score ?? result?.points;
+  const podium = podiumMeta(podiumRank);
   return (
-    <div className={`flex items-center justify-between gap-2 ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} border-b border-white/5 last:border-b-0 ${qualified ? "bg-[#29B6E8]/10" : ""}`}>
+    <div className={`flex items-center justify-between gap-2 ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} border-b border-white/5 last:border-b-0 ${podium?.row || (qualified ? "bg-[#29B6E8]/10" : "")}`}>
       <div className="flex items-center gap-2 min-w-0">
         {user.avatar_url ? (
           <img src={resolveMediaUrl(user.avatar_url)} alt="" className="w-6 h-6 rounded-sm object-cover" />
@@ -263,43 +269,46 @@ function HeatRow({ slot, registration, result, qualified, compact = false }) {
           <div className="w-6 h-6 rounded-sm bg-white/5 border border-white/10" />
         )}
         <div className="min-w-0">
-          <div className={`${compact ? "text-xs" : "text-sm"} truncate ${qualified ? "text-[#29B6E8] font-semibold" : "text-white/80"}`}>{label}</div>
+          <div className={`${compact ? "text-xs" : "text-sm"} truncate ${podium?.text || (qualified ? "text-[#29B6E8] font-semibold" : "text-white/80")}`}>{label}</div>
           <div className="text-[10px] uppercase tracking-wider text-white/35">Platz {slot.slot}</div>
         </div>
       </div>
       <div className="text-right shrink-0">
-        <div className={`font-display font-bold ${qualified ? "text-[#29B6E8]" : "text-white/70"}`}>{result?.rank ? `#${result.rank}` : "—"}</div>
+        <div className={`font-display font-bold ${podium?.text || (qualified ? "text-[#29B6E8]" : "text-white/70")}`}>{podium ? podium.label : result?.rank ? `#${result.rank}` : "-"}</div>
         {score != null && <div className="text-[10px] text-white/45">{score} Pkt.</div>}
       </div>
     </div>
   );
 }
 
-function BracketNode({ match, regMap, compact = false, onClick }) {
+function BracketNode({ match, regMap, podiumMap, compact = false, onClick }) {
   const a = regMap.get(match.participant_a_id);
   const b = regMap.get(match.participant_b_id);
   const winnerA = match.winner_id && match.winner_id === match.participant_a_id;
   const winnerB = match.winner_id && match.winner_id === match.participant_b_id;
+  const nodePodium = topPodiumRank([match.participant_a_id, match.participant_b_id], podiumMap);
 
   return (
     <button
       type="button"
       onClick={() => onClick?.(match)}
       data-testid={`bracket-match-${match.id}`}
-      className="tls-bracket-node relative text-left rounded-sm overflow-hidden border border-white/10 hover:border-[#29B6E8]/60 transition-all group"
+      className={`tls-bracket-node relative text-left rounded-sm overflow-hidden border ${podiumBorderClass(nodePodium)} hover:border-[#29B6E8]/60 transition-all group`}
     >
       <Row
-        label={a?.display_name || a?.user?.display_name || a?.ingame_name || (match.participant_a_id ? "—" : "Offen")}
+        label={a?.display_name || a?.user?.display_name || a?.ingame_name || (match.participant_a_id ? "-" : "Offen")}
         score={match.score_a}
         isWinner={winnerA}
+        podiumRank={podiumMap?.get(match.participant_a_id)}
         avatar={a?.user?.avatar_url}
         compact={compact}
       />
       <div className="h-px bg-white/5" />
       <Row
-        label={b?.display_name || b?.user?.display_name || b?.ingame_name || (match.participant_b_id ? "—" : "Offen")}
+        label={b?.display_name || b?.user?.display_name || b?.ingame_name || (match.participant_b_id ? "-" : "Offen")}
         score={match.score_b}
         isWinner={winnerB}
+        podiumRank={podiumMap?.get(match.participant_b_id)}
         avatar={b?.user?.avatar_url}
         compact={compact}
       />
@@ -311,22 +320,151 @@ function BracketNode({ match, regMap, compact = false, onClick }) {
   );
 }
 
-function Row({ label, score, isWinner, avatar, compact = false }) {
+function Row({ label, score, isWinner, podiumRank, avatar, compact = false }) {
+  const podium = podiumMeta(podiumRank);
   return (
-    <div className={`flex items-center justify-between ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} ${isWinner ? "bg-[#29B6E8]/10" : ""}`}>
+    <div className={`flex items-center justify-between ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} ${podium?.row || (isWinner ? "bg-[#29B6E8]/10" : "")}`}>
       <div className="flex items-center gap-2 min-w-0">
         {avatar ? (
           <img src={resolveMediaUrl(avatar)} alt="" className="w-6 h-6 rounded-sm object-cover" />
         ) : (
           <div className="w-6 h-6 rounded-sm bg-white/5 border border-white/10" />
         )}
-        <span className={`${compact ? "text-xs" : "text-sm"} truncate ${isWinner ? "text-[#29B6E8] font-semibold" : "text-white/80"}`}>
+        <span className={`${compact ? "text-xs" : "text-sm"} truncate ${podium?.text || (isWinner ? "text-[#29B6E8] font-semibold" : "text-white/80")}`}>
           {label}
         </span>
       </div>
-      <span className={`font-display font-bold ${compact ? "text-base" : "text-lg"} ${isWinner ? "text-[#29B6E8]" : "text-white/60"}`}>
-        {score ?? 0}
-      </span>
+      <div className="flex items-center gap-2 shrink-0">
+        {podium && <span className={`px-1.5 py-0.5 rounded-sm border text-[10px] font-display font-bold ${podium.badge}`}>{podium.label}</span>}
+        <span className={`font-display font-bold ${compact ? "text-base" : "text-lg"} ${podium?.text || (isWinner ? "text-[#29B6E8]" : "text-white/60")}`}>
+          {score ?? 0}
+        </span>
+      </div>
     </div>
   );
+}
+
+function normalizeSection(section) {
+  return String(section || "MAIN").toLowerCase();
+}
+
+function isCompleted(match) {
+  return ["completed", "finished", "reported", "confirmed"].includes(String(match?.status || "").toLowerCase());
+}
+
+function isBronzeMatch(match) {
+  const haystack = [
+    match?.section,
+    match?.bracket,
+    match?.round_name,
+    match?.match_key,
+    match?.name,
+  ].filter(Boolean).join(" ").toLowerCase();
+  return haystack.includes("bronze") || haystack.includes("platz 3") || haystack.includes("third");
+}
+
+function buildPodiumMap(matches = [], matchesV2 = []) {
+  const podium = new Map();
+  const place = (id, rank) => {
+    if (!id || ![1, 2, 3].includes(rank)) return;
+    const current = podium.get(id);
+    if (!current || rank < current) podium.set(id, rank);
+  };
+
+  const maxRoundBySection = new Map();
+  for (const match of matchesV2) {
+    const section = normalizeSection(match.section);
+    const round = Number(match.round || 1);
+    maxRoundBySection.set(section, Math.max(maxRoundBySection.get(section) || 0, round));
+  }
+  const hasGrandFinal = matchesV2.some((match) => ["gf", "grand_final"].includes(normalizeSection(match.section)));
+
+  for (const match of matchesV2) {
+    if (!isCompleted(match) || !(match.results || []).length) continue;
+    const section = normalizeSection(match.section);
+    const round = Number(match.round || 1);
+    const finalSection = ["gf", "grand_final"].includes(section) || (!hasGrandFinal && ["main", "wb", "winner"].includes(section) && round === maxRoundBySection.get(section));
+    const lowerFinal = ["lb", "loser"].includes(section) && round === maxRoundBySection.get(section);
+
+    if (isBronzeMatch(match)) {
+      const winner = (match.results || []).find((result) => Number(result.rank) === 1 || result.qualified);
+      place(winner?.registration_id, 3);
+      continue;
+    }
+
+    if (finalSection) {
+      for (const result of match.results || []) {
+        const rank = Number(result.rank);
+        if ([1, 2, 3].includes(rank)) place(result.registration_id, rank);
+      }
+      continue;
+    }
+
+    if (lowerFinal) {
+      const loser = (match.results || []).find((result) => Number(result.rank) === 2);
+      place(loser?.registration_id, 3);
+    }
+  }
+
+  const maxRoundByBracket = new Map();
+  for (const match of matches) {
+    const bracket = normalizeSection(match.bracket || "winner");
+    const round = Number(match.round || 1);
+    maxRoundByBracket.set(bracket, Math.max(maxRoundByBracket.get(bracket) || 0, round));
+  }
+  const hasLegacyGrandFinal = matches.some((match) => ["gf", "grand_final"].includes(normalizeSection(match.bracket)));
+  for (const match of matches) {
+    if (!isCompleted(match) && !match.winner_id) continue;
+    const bracket = normalizeSection(match.bracket || "winner");
+    const finalMatch = ["gf", "grand_final"].includes(bracket) || (!hasLegacyGrandFinal && ["winner", "main"].includes(bracket) && Number(match.round || 1) === maxRoundByBracket.get(bracket));
+    if (isBronzeMatch(match)) {
+      place(match.winner_id, 3);
+    } else if (finalMatch) {
+      place(match.winner_id, 1);
+      const loserId = match.participant_a_id === match.winner_id ? match.participant_b_id : match.participant_a_id;
+      place(loserId, 2);
+    }
+  }
+
+  return podium;
+}
+
+function topPodiumRank(ids, podiumMap) {
+  const ranks = (ids || []).map((id) => podiumMap?.get(id)).filter(Boolean);
+  return ranks.length ? Math.min(...ranks) : null;
+}
+
+function podiumMeta(rank) {
+  if (rank === 1) {
+    return {
+      label: "#1",
+      row: "bg-[#FFD700]/15",
+      text: "text-[#FFD700] font-semibold",
+      badge: "border-[#FFD700]/50 bg-[#FFD700]/15 text-[#FFD700]",
+    };
+  }
+  if (rank === 2) {
+    return {
+      label: "#2",
+      row: "bg-white/10",
+      text: "text-white font-semibold",
+      badge: "border-white/35 bg-white/10 text-white",
+    };
+  }
+  if (rank === 3) {
+    return {
+      label: "#3",
+      row: "bg-[#CD7F32]/15",
+      text: "text-[#CD7F32] font-semibold",
+      badge: "border-[#CD7F32]/50 bg-[#CD7F32]/15 text-[#CD7F32]",
+    };
+  }
+  return null;
+}
+
+function podiumBorderClass(rank) {
+  if (rank === 1) return "border-[#FFD700]/45 shadow-[0_0_0_1px_rgba(255,215,0,0.08)]";
+  if (rank === 2) return "border-white/25";
+  if (rank === 3) return "border-[#CD7F32]/45";
+  return "border-white/10";
 }
