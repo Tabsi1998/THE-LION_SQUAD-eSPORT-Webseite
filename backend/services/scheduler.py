@@ -6,6 +6,7 @@ Runs recurring jobs in the FastAPI process:
   - tournament_reminders every 60 seconds
   - scheduled_news every 60 seconds
   - prize_expiry every 60 minutes
+  - f1_prize_reminders every 5 minutes
   - birthday_greetings every 6 hours
   - game_server_sync every 5 minutes
 
@@ -72,6 +73,16 @@ async def _safe_prize_expiry():
             logger.info(f"[scheduler] prize_expiry expired={n}")
     except Exception as exc:
         logger.exception(f"[scheduler] prize_expiry crash: {exc}")
+
+
+async def _safe_f1_prize_reminders():
+    try:
+        from services.f1_prize_reminder import schedule_f1_prize_reminders
+        res = await schedule_f1_prize_reminders()
+        if res.get("notifications"):
+            logger.info(f"[scheduler] f1_prize_reminders {res}")
+    except Exception as exc:
+        logger.exception(f"[scheduler] f1_prize_reminders crash: {exc}")
 
 
 async def _safe_birthday_greetings():
@@ -191,6 +202,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_prize_expiry, IntervalTrigger(minutes=60), id="prize_expiry",
                   max_instances=1, coalesce=True)
+    sched.add_job(_safe_f1_prize_reminders, IntervalTrigger(minutes=5), id="f1_prize_reminders",
+                  max_instances=1, coalesce=True)
     sched.add_job(_safe_birthday_greetings, IntervalTrigger(hours=6), id="birthday_greetings",
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_twitch_poll, IntervalTrigger(seconds=90), id="twitch_poll",
@@ -201,7 +214,7 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.start()
     _scheduler = sched
-    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · birthday 6h · twitch 90s · game_server_sync 60s)")
+    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · f1_prize_reminders 5m · birthday 6h · twitch 90s · game_server_sync 60s)")
     return sched
 
 
