@@ -21,14 +21,13 @@ STAFF_HIDDEN_STATUSES = {"draft", "archived", "cancelled"}
 MARKDOWN_RE = re.compile(r"(!?\[[^\]]*\]\([^)]+\)|[`*_>#~-]+|\r?\n+)")
 HTML_RE = re.compile(r"<[^>]+>")
 DEFAULT_SHARE_IMAGE = "/assets/brand/tls-wordmark.png"
-DEFAULT_FAVICON = "/assets/brand/tls-favicon.png?v=20260518b"
 
 
 def effective_favicon_url(branding: dict) -> str:
     custom = branding.get("favicon_url")
     if custom:
         return custom
-    return DEFAULT_FAVICON
+    return ""
 
 
 @router.get("/preview")
@@ -136,10 +135,11 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         origin,
     )
     default_logo = absolute_url(
-        branding.get("logo_url") or branding.get("mascot_url") or "/assets/brand/tls-favicon.png",
+        branding.get("logo_url") or branding.get("mascot_url") or DEFAULT_SHARE_IMAGE,
         origin,
     )
-    favicon = absolute_url(effective_favicon_url(branding), origin)
+    favicon_value = effective_favicon_url(branding)
+    favicon = absolute_url(favicon_value, origin) if favicon_value else ""
 
     meta = {
         "title": branding.get("site_title") or "THE LION SQUAD - eSPORTS",
@@ -487,7 +487,13 @@ def render_preview_html(meta: dict) -> str:
     title = escape(meta["title"])
     description = escape(meta["description"])
     image = escape(meta["image"])
-    favicon = escape(meta.get("favicon") or meta.get("logo") or "/favicon.ico")
+    favicon = escape(meta.get("favicon") or "")
+    favicon_links = (
+        f'<link rel="icon" href="{favicon}" />\n'
+        f'    <link rel="apple-touch-icon" href="{favicon}" />'
+        if favicon
+        else ""
+    )
     url = escape(meta["url"])
     canonical = escape(meta["canonical"])
     site_name = escape(meta["site_name"])
@@ -513,8 +519,7 @@ def render_preview_html(meta: dict) -> str:
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
-    <link rel="icon" href="{favicon}" />
-    <link rel="apple-touch-icon" href="{favicon}" />
+    {favicon_links}
     <link rel="canonical" href="{canonical}" />
     <meta name="description" content="{description}" />
     <meta name="robots" content="{robots}" />

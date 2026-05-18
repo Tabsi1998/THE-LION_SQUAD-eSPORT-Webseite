@@ -74,6 +74,37 @@ def test_preview_html_emits_robots_meta():
     assert '<meta name="robots" content="noindex, follow" />' in html
 
 
+def test_preview_html_omits_favicon_links_without_config():
+    html = render_preview_html({
+        "title": "Ohne Favicon",
+        "description": "Kein Browser-Icon gesetzt",
+        "image": "https://lionsquad.at/og.png",
+        "url": "https://lionsquad.at/test",
+        "canonical": "https://lionsquad.at/test",
+        "site_name": "THE LION SQUAD - eSPORTS",
+        "json_ld": {"@context": "https://schema.org", "@type": "WebPage", "name": "Ohne Favicon"},
+    })
+
+    assert 'rel="icon"' not in html
+    assert 'rel="apple-touch-icon"' not in html
+
+
+def test_preview_html_uses_configured_favicon_only():
+    html = render_preview_html({
+        "title": "Mit Favicon",
+        "description": "Custom Browser-Icon gesetzt",
+        "image": "https://lionsquad.at/og.png",
+        "favicon": "https://lionsquad.at/api/static/uploads/favicon.png",
+        "url": "https://lionsquad.at/test",
+        "canonical": "https://lionsquad.at/test",
+        "site_name": "THE LION SQUAD - eSPORTS",
+        "json_ld": {"@context": "https://schema.org", "@type": "WebPage", "name": "Mit Favicon"},
+    })
+
+    assert '<link rel="icon" href="https://lionsquad.at/api/static/uploads/favicon.png" />' in html
+    assert '<link rel="apple-touch-icon" href="https://lionsquad.at/api/static/uploads/favicon.png" />' in html
+
+
 class _Settings:
     async def find_one(self, *args, **kwargs):
         return {
@@ -111,6 +142,7 @@ def test_seo_preview_known_static_path_still_resolves(monkeypatch):
     meta = asyncio.run(resolve_meta("/about", request))
 
     assert meta["canonical"] == "https://lionsquad.at/about"
+    assert meta["favicon"] == ""
     assert meta["image"] == "https://lionsquad.at/api/static/uploads/logo.png"
     graph_types = {item["@type"] for item in meta["json_ld"]["@graph"]}
     assert graph_types == {"WebPage", "BreadcrumbList"}

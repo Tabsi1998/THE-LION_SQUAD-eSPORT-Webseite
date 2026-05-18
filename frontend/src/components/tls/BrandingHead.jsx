@@ -4,9 +4,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 
 const DEFAULT_TITLE = "THE LION SQUAD - eSPORTS";
-const DEFAULT_FAVICON = "/assets/brand/tls-favicon.png";
 const DEFAULT_SHARE_IMAGE = "/assets/brand/tls-wordmark.png";
-const FAVICON_VERSION = "20260518b";
 
 function upsertMeta(selector, attrs) {
   let el = document.head.querySelector(selector);
@@ -20,20 +18,23 @@ function upsertMeta(selector, attrs) {
   });
 }
 
-function versionedAsset(href) {
-  if (!href) return "";
-  if (href.includes("/assets/brand/tls-favicon.png") && !href.includes("?")) return `${href}?v=${FAVICON_VERSION}`;
-  return href;
-}
-
 function pickFavicon(data) {
   const custom = data?.favicon_url || "";
   if (custom) return resolveMediaUrl(custom);
-  return resolveMediaUrl(DEFAULT_FAVICON);
+  return "";
+}
+
+function removeLinks(rel) {
+  [...document.head.querySelectorAll(`link[rel="${rel}"]`)]
+    .filter((node) => node.getAttribute("data-tls-route-meta") !== "true")
+    .forEach((node) => node.remove());
 }
 
 function upsertLink(rel, href, attrs = {}) {
-  if (!href) return;
+  if (!href) {
+    removeLinks(rel);
+    return;
+  }
   const existing = [...document.head.querySelectorAll(`link[rel="${rel}"]`)]
     .filter((node) => node.getAttribute("data-tls-route-meta") !== "true");
   const nodes = existing.length ? existing : [document.createElement("link")];
@@ -51,7 +52,10 @@ function upsertLink(rel, href, attrs = {}) {
 }
 
 function ensureSingleIconLink(rel, href, attrs = {}) {
-  if (!href) return;
+  if (!href) {
+    removeLinks(rel);
+    return;
+  }
   const existing = [...document.head.querySelectorAll(`link[rel="${rel}"]`)]
     .filter((node) => node.getAttribute("data-tls-route-meta") !== "true");
   let el = existing[0];
@@ -90,15 +94,15 @@ function applyBranding(data) {
   const description = data.site_description || "THE LION SQUAD - eSPORTS";
   const themeColor = data.primary_color || "#29B6E8";
   const image = resolveMediaUrl(data.logo_url || data.mascot_url || DEFAULT_SHARE_IMAGE);
-  const favicon = versionedAsset(pickFavicon(data));
+  const favicon = pickFavicon(data);
   const origin = data.domain || (typeof window !== "undefined" ? window.location.origin : "");
 
   if (!document.title || document.title === DEFAULT_TITLE || /React App|Vereinsplattform/i.test(document.title)) {
     document.title = siteTitle;
   }
 
-  ensureSingleIconLink("icon", favicon, { type: imageMimeType(favicon) || "image/png", sizes: "512x512" });
-  upsertLink("apple-touch-icon", favicon, { sizes: "512x512" });
+  ensureSingleIconLink("icon", favicon, favicon ? { type: imageMimeType(favicon) || "image/png", sizes: "512x512" } : {});
+  upsertLink("apple-touch-icon", favicon, favicon ? { sizes: "512x512" } : {});
   upsertLink("manifest", "/api/manifest.webmanifest");
 
   upsertMeta('meta[name="application-name"]', { name: "application-name", content: name });

@@ -45,7 +45,7 @@ def _effective_favicon_url(branding: dict) -> str:
     custom = branding.get("favicon_url")
     if custom:
         return custom
-    return "/assets/brand/tls-favicon.png?v=20260518b"
+    return ""
 
 
 def _truthy_mail_config(mail: dict, legacy_email: dict) -> bool:
@@ -421,12 +421,13 @@ async def web_manifest():
         "display": "standalone",
         "background_color": "#0A0A0A",
         "theme_color": branding.get("primary_color") or "#29B6E8",
-        "icons": [
-            {"src": icon, "sizes": "192x192", "type": _image_mime_from_url(icon), "purpose": "any"},
-            {"src": icon, "sizes": "512x512", "type": _image_mime_from_url(icon), "purpose": "any maskable"},
-        ],
         "screenshots": [
             {"src": default_screenshot, "sizes": "1200x630", "type": _image_mime_from_url(default_screenshot), "form_factor": "wide"},
         ],
     }
+    if icon:
+        manifest["icons"] = [
+            {"src": icon, "sizes": "192x192", "type": _image_mime_from_url(icon), "purpose": "any"},
+            {"src": icon, "sizes": "512x512", "type": _image_mime_from_url(icon), "purpose": "any maskable"},
+        ]
     return Response(content=json.dumps(manifest), media_type="application/manifest+json")
