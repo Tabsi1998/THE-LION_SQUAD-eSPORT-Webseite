@@ -9,10 +9,11 @@ import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
-import { Tv, Trophy, Flag, Download, FileDown, Calendar } from "lucide-react";
+import { Tv, Trophy, Flag, Download, FileDown, Calendar, Trash2 } from "lucide-react";
 import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 
 export default function F1DetailPage() {
@@ -307,9 +308,12 @@ export default function F1DetailPage() {
 }
 
 function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
+  const confirm = useConfirm();
   const [users, setUsers] = useState([]);
+  const [times, setTimes] = useState([]);
   const [form, setForm] = useState({ user_id: "", time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "", score_scope: "official" });
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
   useEffect(() => {
@@ -318,6 +322,22 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
       .then(({ data }) => setUsers(data || []))
       .catch(() => setUsers([]));
   }, [challenge?.id]);
+
+  const loadTimes = useCallback(async () => {
+    if (!challenge?.id || !trackId) return;
+    try {
+      const { data } = await api.get(`/f1/challenges/${challenge.id}/times?track_id=${trackId}`);
+      setTimes((data || []).slice(0, 25));
+    } catch {
+      setTimes([]);
+    }
+  }, [challenge?.id, trackId]);
+
+  useEffect(() => {
+    loadTimes();
+  }, [loadTimes]);
+
+  useApiInvalidation(loadTimes, ["f1"]);
 
   const selectedUser = users.find((item) => item.id === form.user_id);
   const forceReferenceScope = !!challenge?.block_club_member_results && !!selectedUser?.is_club_member;
@@ -353,6 +373,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
       });
       toast.success("Zeit eingetragen.");
       setForm((current) => ({ ...current, time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "" }));
+      await loadTimes();
       onSaved();
     } catch (err) {
       toast.error(formatRequestError(err, "Zeit konnte nicht eingetragen werden."));
@@ -361,46 +382,104 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
     }
   };
 
+  const deleteTime = async (time) => {
+    const ok = await confirm({
+      title: "Zeit loeschen?",
+      description: `${time.user?.display_name || time.user?.username || "Fahrer"} - ${time.time_str} wird aus der Challenge entfernt.`,
+      confirmLabel: "Zeit loeschen",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setDeletingId(time.id);
+    try {
+      await api.delete(`/f1/times/${time.id}`);
+      toast.success("Zeit geloescht.");
+      await loadTimes();
+      onSaved();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Zeit konnte nicht geloescht werden."));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
-    <form onSubmit={submit} className="mb-5 border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4">
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeit erfassen</div>
-          <div className="text-xs text-white/45 mt-1">Direkt fuer Zeitnehmer, Schiedsrichter und Organisation.</div>
+    <div className="mb-5 border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4">
+      <form onSubmit={submit}>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeit erfassen</div>
+            <div className="text-xs text-white/45 mt-1">Direkt fuer Zeitnehmer, Schiedsrichter und Organisation.</div>
+          </div>
+          {currentUser && <div className="text-[10px] uppercase tracking-widest text-white/35">{currentUser.display_name || currentUser.username}</div>}
         </div>
-        {currentUser && <div className="text-[10px] uppercase tracking-widest text-white/35">{currentUser.display_name || currentUser.username}</div>}
+        <div className="grid md:grid-cols-[minmax(12rem,1fr)_9rem_11rem_8rem_auto] gap-2 items-end">
+          <label className="block">
+            <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Fahrer</span>
+            <select value={form.user_id} onChange={(e) => set("user_id", e.target.value)} required className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+              <option value="">- auswaehlen -</option>
+              {users.map((item) => <option key={item.id} value={item.id}>{item.display_name || item.username || item.email}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Zeit</span>
+            <input value={form.time_str} onChange={(e) => set("time_str", e.target.value)} required placeholder="1:24.587" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display tabular-nums" />
+          </label>
+          <label className="block">
+            <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Wertung</span>
+            <select value={form.score_scope} onChange={(e) => set("score_scope", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+              <option value="official" disabled={forceReferenceScope}>Offiziell</option>
+              <option value="club_reference">Referenz</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Strafe</span>
+            <input type="number" step="0.1" value={form.penalty_seconds} onChange={(e) => set("penalty_seconds", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
+          </label>
+          <button disabled={saving} className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">Speichern</button>
+        </div>
+        <div className="mt-2 grid md:grid-cols-2 gap-2">
+          <input value={form.proof_url} onChange={(e) => set("proof_url", e.target.value)} placeholder="Proof URL optional" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+          <input value={form.admin_note} onChange={(e) => set("admin_note", e.target.value)} placeholder={Number(form.penalty_seconds) > 0 ? "Begruendung fuer Strafe" : "Notiz optional"} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+        </div>
+        {forceReferenceScope && <div className="mt-2 text-[10px] text-[#FFD700] uppercase tracking-widest">Vereinsmitglied: nur Referenzzeit moeglich.</div>}
+      </form>
+
+      <div className="mt-4 border-t border-white/10 pt-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="text-[11px] font-bold uppercase tracking-widest text-white/55">Letzte Zeiten</div>
+          <div className="text-[10px] uppercase tracking-widest text-white/35">{times.length} Eintraege</div>
+        </div>
+        <div className="grid md:grid-cols-2 gap-2">
+          {times.slice(0, 8).map((time) => (
+            <div key={time.id} className={`border rounded-sm px-3 py-2 flex items-center justify-between gap-3 ${time.is_invalid ? "border-[#FF3B30]/35 bg-[#FF3B30]/5" : "border-white/10 bg-[#0A0A0A]/70"}`}>
+              <div className="min-w-0">
+                <div className="font-bold text-sm truncate">{time.user?.display_name || time.user?.username || "Unbekannt"}</div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wider text-white/42">
+                  <span>#{time.attempt_number || "-"}</span>
+                  {(time.score_scope || "official") === "club_reference" && <span className="text-[#FFD700]">Referenz</span>}
+                  {time.penalty_seconds > 0 && <span className="text-[#FF3B30]">+{time.penalty_seconds}s</span>}
+                  {time.proof_url && <a href={time.proof_url} target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">Proof</a>}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className={`font-display font-bold tabular-nums ${time.is_invalid ? "line-through text-white/40" : "text-white"}`}>{time.time_str}</span>
+                <button
+                  type="button"
+                  onClick={() => deleteTime(time)}
+                  disabled={deletingId === time.id}
+                  className="p-1.5 text-white/42 hover:text-[#FF3B30] disabled:opacity-40"
+                  title="Zeit loeschen"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+          {times.length === 0 && <div className="md:col-span-2 text-center py-5 text-sm text-white/40 border border-dashed border-white/10 rounded-sm">Noch keine Zeiten auf dieser Strecke.</div>}
+        </div>
       </div>
-      <div className="grid md:grid-cols-[minmax(12rem,1fr)_9rem_11rem_8rem_auto] gap-2 items-end">
-        <label className="block">
-          <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Fahrer</span>
-          <select value={form.user_id} onChange={(e) => set("user_id", e.target.value)} required className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-            <option value="">- auswaehlen -</option>
-            {users.map((item) => <option key={item.id} value={item.id}>{item.display_name || item.username || item.email}</option>)}
-          </select>
-        </label>
-        <label className="block">
-          <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Zeit</span>
-          <input value={form.time_str} onChange={(e) => set("time_str", e.target.value)} required placeholder="1:24.587" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display tabular-nums" />
-        </label>
-        <label className="block">
-          <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Wertung</span>
-          <select value={form.score_scope} onChange={(e) => set("score_scope", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-            <option value="official" disabled={forceReferenceScope}>Offiziell</option>
-            <option value="club_reference">Referenz</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Strafe</span>
-          <input type="number" step="0.1" value={form.penalty_seconds} onChange={(e) => set("penalty_seconds", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
-        </label>
-        <button disabled={saving} className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">Speichern</button>
-      </div>
-      <div className="mt-2 grid md:grid-cols-2 gap-2">
-        <input value={form.proof_url} onChange={(e) => set("proof_url", e.target.value)} placeholder="Proof URL optional" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-        <input value={form.admin_note} onChange={(e) => set("admin_note", e.target.value)} placeholder={Number(form.penalty_seconds) > 0 ? "Begruendung fuer Strafe" : "Notiz optional"} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-      </div>
-      {forceReferenceScope && <div className="mt-2 text-[10px] text-[#FFD700] uppercase tracking-widest">Vereinsmitglied: nur Referenzzeit moeglich.</div>}
-    </form>
+    </div>
   );
 }
 

@@ -147,6 +147,13 @@ export default function BracketTVPage() {
 
 function TvMatchBoard({ view }) {
   const regMap = useMemo(() => new Map((view.registrations || []).map((reg) => [reg.id, reg])), [view.registrations]);
+  if (!(view.columns || []).length) {
+    return (
+      <div className="h-full border border-white/10 bg-[#0A0A0A]/75 rounded-sm flex items-center justify-center text-white/45 font-display uppercase tracking-[0.25em]">
+        Keine geplanten offenen Spiele
+      </div>
+    );
+  }
 
   return (
     <div className="h-full grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">

@@ -110,12 +110,13 @@ export default function F1TVPage() {
             <h1 className="font-heading text-3xl md:text-5xl font-black uppercase leading-none mt-1">{challenge.title}</h1>
           </div>
         </div>
-        <div className="text-right">
+        <div className="flex items-center justify-end gap-5 min-w-[28vw]">
           {track?.image_url && (
-            <div className="hidden xl:flex ml-auto mb-3 w-56 h-28 border border-[#29B6E8]/25 bg-black/50 rounded-sm overflow-hidden items-center justify-center">
+            <div className="hidden xl:flex w-52 h-28 border border-[#29B6E8]/25 bg-black/50 rounded-sm overflow-hidden items-center justify-center shrink-0">
               <img src={resolveMediaUrl(track.image_url)} alt="" className="w-full h-full object-contain" />
             </div>
           )}
+          <div className="text-right min-w-0">
           <div className="text-[11px] uppercase tracking-[0.3em] text-white/50">Strecke {activeTrackIdx + 1} / {challenge.tracks?.length || 1}</div>
           <div className="font-heading text-3xl md:text-5xl font-black uppercase text-[#29B6E8]">{track?.name || "—"}</div>
           {track?.country && <div className="text-white/50 text-sm mt-1">{track.country}</div>}
@@ -137,6 +138,7 @@ export default function F1TVPage() {
               </button>
             </div>
           )}
+          </div>
         </div>
       </header>
       <DisplayStatusBanner error={boardError} lastUpdated={lastUpdated} label="Rangliste" onRetry={loadChallenge} compact />

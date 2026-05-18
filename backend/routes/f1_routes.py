@@ -541,13 +541,20 @@ async def _notify_f1_prize_winners(challenge: dict) -> int:
                 continue
             from services.user_notifications import create_user_notification
             prize_text = prize.get("value") or prize.get("label") or "ein Preis"
+            dedupe = f"f1_prize_final:{challenge['id']}:{track['id']}:{entry['user_id']}:{rank}"
+            exists = await db.notifications.find_one(
+                {"user_id": entry["user_id"], "kind": "f1_prize", "meta.dedupe_key": dedupe},
+                {"_id": 1},
+            )
+            if exists:
+                continue
             await create_user_notification(
                 entry["user_id"],
                 "Fast-Lap Gewinn",
                 f"{challenge.get('title') or 'Fast Lap'} - {track.get('name') or 'Strecke'}: Platz {rank}, {prize_text}. Bitte beim Team vor Ort melden.",
                 url=f"/fastlap/{challenge.get('slug') or challenge['id']}",
                 kind="f1_prize",
-                meta={"challenge_id": challenge["id"], "track_id": track["id"], "rank": rank},
+                meta={"dedupe_key": dedupe, "challenge_id": challenge["id"], "track_id": track["id"], "rank": rank},
             )
             notified += 1
     return notified
