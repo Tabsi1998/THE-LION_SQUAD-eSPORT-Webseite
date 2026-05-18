@@ -307,6 +307,21 @@ export default function AdminTournamentEditPage() {
       toast.error(formatRequestError(e, "Check-in konnte nicht gespeichert werden."));
     }
   };
+  const deleteParticipant = async (registration) => {
+    if (!await confirm({
+      title: "Teilnehmer entfernen?",
+      description: `${registration.display_name || registration.user?.display_name || registration.ingame_name || "Dieser Teilnehmer"} wird aus dem Turnier entfernt. Eine vorhandene Vorschau wird danach neu gemischt.`,
+      confirmLabel: "Entfernen",
+      tone: "danger",
+    })) return;
+    try {
+      await api.delete(`/tournaments/${id}/registrations/${registration.id}`);
+      toast.success("Teilnehmer entfernt.");
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Teilnehmer konnte nicht entfernt werden."));
+    }
+  };
   const setParticipantField = (key, value) => setParticipantForm((current) => ({ ...current, [key]: value }));
   const addParticipant = async (e) => {
     e.preventDefault();
@@ -540,6 +555,9 @@ export default function AdminTournamentEditPage() {
                       {isModerator && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                       )}
+                      {isModerator && (
+                        <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -647,7 +665,7 @@ export default function AdminTournamentEditPage() {
 function ParticipantAddForm({ form, tournament, users, teams, noShowRegistrations, onChange, onSubmit }) {
   const isTeamTournament = (tournament?.team_mode || "solo") !== "solo";
   const userOptions = [
-    ["", "Gast/manuell"],
+    ["", "Manueller Gast / kein Konto"],
     ...(users || []).map((u) => [u.id, `${u.display_name || u.username || u.email}${u.email ? ` · ${u.email}` : ""}`]),
   ];
   const teamOptions = [
@@ -663,7 +681,7 @@ function ParticipantAddForm({ form, tournament, users, teams, noShowRegistration
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">{isTeamTournament ? "Team hinzufügen" : "Teilnehmer hinzufügen"}</div>
-          <div className="text-xs text-white/45 mt-1">{isTeamTournament ? "Bei Team-Turnieren zählt jedes Team als Startplatz." : "Account bevorzugt, Gast nur für Sonderfälle."}</div>
+          <div className="text-xs text-white/45 mt-1">{isTeamTournament ? "Bei Team-Turnieren zählt jedes Team als Startplatz." : "Wähle ein Plattform-Konto aus. Nur wenn es keinen Account gibt, bleibt es ein manueller Gast."}</div>
         </div>
         <button type="submit" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs">Hinzufügen</button>
       </div>
@@ -671,7 +689,7 @@ function ParticipantAddForm({ form, tournament, users, teams, noShowRegistration
         {isTeamTournament ? (
           <SelectField label="Team" value={form.team_id} onChange={(v)=>onChange("team_id", v)} options={teamOptions} />
         ) : (
-          <SelectField label="Konto" value={form.user_id} onChange={(v)=>onChange("user_id", v)} options={userOptions} />
+          <SelectField label="Konto oder manueller Gast" value={form.user_id} onChange={(v)=>onChange("user_id", v)} options={userOptions} />
         )}
         <Fld label="Anzeigename" value={form.display_name} onChange={(v)=>onChange("display_name", v)} testId="participant-add-display" />
         <Fld label="Spielname" value={form.ingame_name} onChange={(v)=>onChange("ingame_name", v)} testId="participant-add-ingame" />

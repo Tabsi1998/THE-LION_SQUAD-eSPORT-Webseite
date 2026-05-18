@@ -252,6 +252,14 @@ Die Home-Seite zeigt kommende/relevante Inhalte dynamisch. Vergangene Inhalte so
 
 Turniere koennen mit Events verknuepft werden. Wenn es sinnvoll ist, sollte das Bracket im Eventkontext sichtbar sein.
 
+Teilnehmerverwaltung:
+
+- Angemeldete Spieler koennen sich vor Check-in/Turnierstart selbst wieder abmelden.
+- Nach Check-in, Live-Start oder bereits aktiven/gewerteten Spielen ist eine Abmeldung nur noch ueber Turnierleitung/Admin moeglich.
+- Turnierleitung/Admins koennen Teilnehmer im Adminbereich entfernen.
+- Beim manuellen Hinzufuegen sollte bevorzugt ein Plattform-Konto ausgewaehlt werden. Nur ohne vorhandenen Account bleibt es ein manueller Gast.
+- Bei internen oder nicht oeffentlichen Turnieren duerfen hinzugefuegte Account-Teilnehmer das Turnier sehen, auch wenn sie keine Vereinsmitglieder sind.
+
 ### Fast Lap
 
 Fast-Lap-Challenges brauchen normalerweise keine Online-Anmeldung.

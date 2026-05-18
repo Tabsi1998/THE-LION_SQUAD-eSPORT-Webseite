@@ -140,6 +140,32 @@ async def _is_tournament_staff(tid: str, user: dict | None, roles: set[str] | No
     return await has_tournament_staff_permission(user, tid, roles or READ_STAFF_ROLES)
 
 
+async def _user_tournament_participation_ids(db, user: dict | None) -> set[str]:
+    if not user:
+        return set()
+    team_ids = [
+        row["team_id"] for row in await db.team_members.find(
+            {"user_id": user["id"]},
+            {"_id": 0, "team_id": 1},
+        ).to_list(200)
+        if row.get("team_id")
+    ]
+    query = {
+        "status": {"$nin": ["rejected", "no_show"]},
+        "$or": [{"user_id": user["id"]}],
+    }
+    if team_ids:
+        query["$or"].append({"team_id": {"$in": team_ids}})
+    return set(await db.tournament_registrations.distinct("tournament_id", query))
+
+
+async def _user_participates_in_tournament(db, tid: str, user: dict | None) -> bool:
+    if not user:
+        return False
+    participant_ids = await _user_tournament_participation_ids(db, user)
+    return tid in participant_ids
+
+
 async def _can_use_tournament_chat(tournament: dict, user: dict | None) -> bool:
     if not user:
         return False
@@ -238,9 +264,10 @@ async def _get_visible_tournament(tid: str, user: dict | None) -> dict:
     is_assigned = await _is_tournament_staff(tid, user)
     if t.get("status") == "draft" and not (is_staff or is_assigned):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if t.get("is_public") is False and not (is_staff or is_assigned):
+    is_participant = await _user_participates_in_tournament(db, tid, user)
+    if t.get("is_public") is False and not (is_staff or is_assigned or is_participant):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if not (is_staff or is_assigned) and not await user_can_see(user, t.get("visibility") or "public"):
+    if not (is_staff or is_assigned or is_participant) and not await user_can_see(user, t.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Turnier ist nicht sichtbar")
     return t
 
@@ -640,6 +667,7 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     else:
         q["status"] = {"$ne": "draft"}
     assigned_visible_ids = assigned_ids if include_drafts else []
+    participant_visible_ids = await _user_tournament_participation_ids(db, user)
     if game_id:
         q["game_id"] = game_id
     if event_id:
@@ -649,6 +677,8 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
         visible = []
         for t in tournaments:
             if t.get("id") in assigned_visible_ids:
+                visible.append(t)
+            elif t.get("id") in participant_visible_ids:
                 visible.append(t)
             elif t.get("status") == "draft":
                 continue
@@ -668,11 +698,12 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, user=Depe
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     is_admin = user and user.get("role") in STAFF_ROLES
     is_assigned = await _is_tournament_staff(t["id"], user)
+    is_participant = await _user_participates_in_tournament(db, t["id"], user)
     if t.get("status") == "draft" and not (is_admin or is_assigned):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if not (is_admin or is_assigned) and t.get("is_public") is False:
+    if not (is_admin or is_assigned or is_participant) and t.get("is_public") is False:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if not (is_admin or is_assigned) and not await user_can_see(user, t.get("visibility") or "public"):
+    if not (is_admin or is_assigned or is_participant) and not await user_can_see(user, t.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Turnier ist nicht sichtbar")
     if was_old_slug and t.get("slug"):
         return RedirectResponse(url=f"/api/tournaments/{t['slug']}", status_code=301)
@@ -1156,13 +1187,41 @@ async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_curr
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid})
     if not reg:
         raise HTTPException(status_code=404)
-    if reg.get("user_id") != me["id"] and not await has_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES):
+    is_own_registration = reg.get("user_id") == me["id"]
+    is_team_manager = False
+    if reg.get("team_id"):
+        team = await db.teams.find_one({"id": reg["team_id"]}, {"_id": 0})
+        is_team_manager = bool(team and _can_register_team(team, me))
+    is_staff = await has_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
+    if not is_own_registration and not is_team_manager and not is_staff:
         raise HTTPException(status_code=403)
-    await db.tournament_registrations.delete_one({"id": reg_id})
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if (is_own_registration or is_team_manager) and not is_staff:
+        if reg.get("status") == "checked_in" or (tournament or {}).get("status") in {"live", "paused", "completed", "results_published", "archived"}:
+            raise HTTPException(status_code=409, detail="Abmeldung ist nach Check-in oder Turnierstart nur über die Turnierleitung möglich.")
+        legacy_blocked = await db.matches.count_documents({
+            "tournament_id": tid,
+            "$or": [{"participant_a_id": reg_id}, {"participant_b_id": reg_id}],
+            "status": {"$nin": ["preview", "pending", "ready", "scheduled", "cancelled"]},
+        })
+        v2_blocked = await db.matches_v2.count_documents({
+            "tournament_id": tid,
+            "slots.registration_id": reg_id,
+            "status": {"$nin": ["preview", "pending", "ready", "scheduled", "cancelled"]},
+        })
+        if legacy_blocked or v2_blocked:
+            raise HTTPException(status_code=409, detail="Abmeldung ist nicht mehr möglich, weil bereits Spiele aktiv oder gewertet sind.")
+    await db.tournament_registrations.delete_one({"id": reg_id})
     auto_bracket_update = None
     if tournament:
         auto_bracket_update = await _refresh_preview_bracket_after_registration(db, tournament, me.get("id"))
+    await _audit_tournament_action(
+        db,
+        "tournament.registration.delete",
+        me.get("id"),
+        tid,
+        {"registration_id": reg_id, "user_id": reg.get("user_id"), "self_unregister": (is_own_registration or is_team_manager) and not is_staff},
+    )
     return {"ok": True, "auto_bracket_update": auto_bracket_update}
 
 

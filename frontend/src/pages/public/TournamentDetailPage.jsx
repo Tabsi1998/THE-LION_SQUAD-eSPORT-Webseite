@@ -19,6 +19,7 @@ import { formatTeamMode, formatTournamentFormat } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 
 export default function TournamentDetailPage() {
   const { slug } = useParams();
@@ -30,6 +31,7 @@ export default function TournamentDetailPage() {
   const [myTeams, setMyTeams] = useState([]);
   const [loading, setLoading] = useState(false);
   const [registerModal, setRegisterModal] = useState(false);
+  const confirm = useConfirm();
   useDocumentTitle(t?.title || "Turnier", t?.description || "Turnier von THE LION SQUAD eSports.", {
     image: t?.banner_url,
     canonical: t?.slug ? `${window.location.origin}/tournaments/${t.slug}` : undefined,
@@ -95,6 +97,27 @@ export default function TournamentDetailPage() {
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
 
+  const handleUnregister = async () => {
+    if (!myReg) return;
+    const ok = await confirm({
+      title: "Vom Turnier abmelden?",
+      description: "Deine Anmeldung wird entfernt und dein Platz wird im Vorschau-Turnierbaum wieder frei.",
+      confirmLabel: "Abmelden",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setLoading(true);
+    try {
+      await api.delete(`/tournaments/${t.id}/registrations/${myReg.id}`);
+      toast.success("Du bist vom Turnier abgemeldet.");
+      load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Abmeldung fehlgeschlagen.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!t) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE …</div></PublicLayout>;
 
   const registration = getRegistrationState(t, "Anmeldung");
@@ -103,6 +126,7 @@ export default function TournamentDetailPage() {
   const canCheckIn = !!myReg && (!myReg.team_id || myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role));
   const clubMemberBlocked = !!user?.is_club_member && !!t.block_club_member_registration;
   const canSelfRegister = registration.canRegister && !clubMemberBlocked;
+  const canSelfUnregister = !!myReg && (myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role)) && !["checked_in", "no_show", "rejected"].includes(myReg.status) && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
 
   return (
     <PublicLayout>
@@ -179,6 +203,17 @@ export default function TournamentDetailPage() {
             {canCheckIn && myReg.status === "approved" && t.status === "check_in" && (
               <button onClick={handleCheckin} data-testid="tournament-checkin-btn" className="px-6 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#EAC200] transition">
                 Check-in
+              </button>
+            )}
+            {canSelfUnregister && (
+              <button
+                type="button"
+                onClick={handleUnregister}
+                disabled={loading}
+                data-testid="tournament-unregister-btn"
+                className="px-6 py-3 border border-[#FF3B30]/45 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FF3B30]/10 disabled:opacity-50 transition"
+              >
+                Abmelden
               </button>
             )}
             {myReg && <StatusBadge status={myReg.status} size="lg" />}
