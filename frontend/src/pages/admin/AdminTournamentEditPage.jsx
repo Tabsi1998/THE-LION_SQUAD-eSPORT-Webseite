@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { API, api, formatApiError, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
@@ -164,10 +164,11 @@ function applyStageType(current, stageType) {
 export default function AdminTournamentEditPage() {
   const { isAdmin, isModerator } = useAuth();
   const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [t, setT] = useState(null);
   const [regs, setRegs] = useState([]);
   const [bracket, setBracket] = useState(null);
-  const [tab, setTab] = useState("participants");
+  const [tab, setTab] = useState(searchParams.get("tab") || "participants");
   const [groups, setGroups] = useState([]);
   const [staff, setStaff] = useState([]);
   const [users, setUsers] = useState([]);
@@ -187,6 +188,21 @@ export default function AdminTournamentEditPage() {
   });
   const confirm = useConfirm();
   const prompt = usePrompt();
+
+  useEffect(() => {
+    const nextTab = searchParams.get("tab");
+    if (nextTab && nextTab !== tab) setTab(nextTab);
+  }, [searchParams, tab]);
+
+  const selectTab = (nextTab) => {
+    setTab(nextTab);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (nextTab === "participants") params.delete("tab");
+      else params.set("tab", nextTab);
+      return params;
+    }, { replace: true });
+  };
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/tournaments/${id}?include_draft=true`);
@@ -633,7 +649,7 @@ export default function AdminTournamentEditPage() {
           <button
             key={s}
             data-testid={`admin-tr-tab-${s}`}
-            onClick={() => setTab(s)}
+            onClick={() => selectTab(s)}
             className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${tab === s ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}
           >
             {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Turnierbaum" : s === "stages" ? "Matchplan" : s === "groups" ? "Gruppen" : s === "staff" ? "Team" : "Bearbeiten"}

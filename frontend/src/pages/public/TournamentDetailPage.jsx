@@ -239,7 +239,7 @@ export default function TournamentDetailPage() {
               Spielplan
             </Link>
             {t.can_manage_results && (
-              <Link to={`/admin/tournaments/${t.id}`} data-testid="tournament-result-entry-link" className="px-6 py-3 border border-[#FFD700]/45 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition">
+              <Link to={`/admin/tournaments/${t.id}?tab=stages`} data-testid="tournament-result-entry-link" className="px-6 py-3 border border-[#FFD700]/45 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition">
                 Ergebnisse eintragen
               </Link>
             )}

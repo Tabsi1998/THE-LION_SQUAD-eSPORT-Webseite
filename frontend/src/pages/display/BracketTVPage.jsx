@@ -32,7 +32,7 @@ export default function BracketTVPage() {
 
   const load = useCallback(async () => {
     try {
-      const { data: br } = await api.get(`/tournaments/${id}/bracket`);
+      const { data: br } = await api.get(`/tournaments/${id}/bracket/display`);
       setData(br);
       setLoadError(null);
       setLastUpdated(Date.now());
@@ -75,16 +75,16 @@ export default function BracketTVPage() {
 
   return (
     <div className="h-screen tv-bg text-white flex flex-col overflow-hidden">
-      <header className="shrink-0 flex items-center justify-between gap-6 px-8 py-4 border-b border-white/10">
-        <div className="flex items-center gap-4 min-w-0">
+      <header className="shrink-0 flex items-center justify-between gap-4 px-6 lg:px-8 py-3 lg:py-4 border-b border-white/10">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
           <MascotBadge className="w-12 h-12 shrink-0" />
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">THE LION SQUAD · LIVE</div>
-            <h1 className="font-heading text-2xl md:text-4xl font-black uppercase truncate">{t.title}</h1>
+            <h1 className="font-heading text-xl md:text-3xl 2xl:text-4xl font-black uppercase truncate">{t.title}</h1>
             {hasMatches && <div className="mt-1 text-xs uppercase tracking-[0.25em] text-white/50 truncate">{activeView.title}</div>}
           </div>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 lg:gap-3 shrink-0">
           <div className="hidden lg:flex items-center gap-1 border border-white/10 bg-[#0A0A0A]/80 rounded-sm p-1">
             {[
               ["active", "Aktuell"],

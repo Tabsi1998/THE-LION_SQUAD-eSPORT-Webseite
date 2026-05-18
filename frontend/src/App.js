@@ -243,7 +243,7 @@ function App() {
 
           {/* Display / TV */}
           <Route path="/display/f1/:id" element={<F1TVPage />} />
-          <Route path="/display/bracket/:id" element={<BracketTVPage />} />
+          <Route path="/display/bracket/:id" element={<ProtectedRoute requireModerator><BracketTVPage /></ProtectedRoute>} />
 
           {/* Error pages */}
           <Route path="/403" element={<ForbiddenPage />} />

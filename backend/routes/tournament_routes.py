@@ -2524,12 +2524,7 @@ async def export_match_plan_csv(tid: str, me: dict = Depends(get_current_user)):
     )
 
 
-@router.get("/{tid}/bracket")
-async def get_bracket(tid: str, user=Depends(get_optional_user)):
-    db = get_db()
-    tid = await _resolve_tid(tid)
-    t = await _get_visible_tournament(tid, user)
-    is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
+async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool) -> dict:
     t["public_phase"] = derive_public_phase(t, "tournament")
     matches = await db.matches.find({"tournament_id": t["id"]}, {"_id": 0}).sort("round", 1).to_list(1000)
     stages = await db.tournament_stages.find({"tournament_id": t["id"]}, {"_id": 0}).sort("number", 1).to_list(200)
@@ -2556,6 +2551,7 @@ async def get_bracket(tid: str, user=Depends(get_optional_user)):
             u = users.get(r["user_id"]) or {}
             r["user"] = {"id": u.get("id"), "username": u.get("username"),
                          "display_name": u.get("display_name"), "avatar_url": u.get("avatar_url")}
+    t["can_view_display"] = bool(is_staff)
     return {
         "tournament": t,
         "matches": matches,
@@ -2564,6 +2560,26 @@ async def get_bracket(tid: str, user=Depends(get_optional_user)):
         "matches_v2": matches_v2,
         "engine": "stage" if stages or matches_v2 else "legacy",
     }
+
+
+@router.get("/{tid}/bracket")
+async def get_bracket(tid: str, user=Depends(get_optional_user)):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    t = await _get_visible_tournament(tid, user)
+    is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
+    return await _build_bracket_payload(db, t, user, is_staff)
+
+
+@router.get("/{tid}/bracket/display")
+async def get_bracket_display(tid: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES)
+    t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not t:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    return await _build_bracket_payload(db, t, me, True)
 
 
 def _v2_standings(matches_v2: list[dict], regs: list[dict]) -> list[dict]:

@@ -49,9 +49,11 @@ export default function TournamentBracketPage() {
               <span className="text-white/40 text-sm">{formatTournamentDisplay(t)}</span>
             </div>
           </div>
-          <Link to={`/display/bracket/${t.id}`} target="_blank" data-testid="bracket-tv-link" className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10 text-sm">
-            <Tv className="w-4 h-4" /> TV-/Beamer-Ansicht
-          </Link>
+          {t.can_view_display && (
+            <Link to={`/display/bracket/${t.id}`} target="_blank" data-testid="bracket-tv-link" className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10 text-sm">
+              <Tv className="w-4 h-4" /> TV-/Beamer-Ansicht
+            </Link>
+          )}
         </div>
         {(data.matches?.length || 0) + (data.matches_v2?.length || 0) === 0 ? (
           <div className="border border-white/10 rounded-sm bg-[#121212] p-12 text-center">
