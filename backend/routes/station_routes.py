@@ -278,12 +278,12 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
     matches = await db.matches.find({
         "tournament_id": tournament_id,
         "station_id": {"$in": [None, ""]},
-        "status": {"$in": ["pending", "ready", "scheduled"]},
+        "status": {"$in": ["preview", "pending", "ready", "scheduled"]},
     }, {"_id": 0}).to_list(1000)
     matches_v2 = await db.matches_v2.find({
         "tournament_id": tournament_id,
         "station_id": {"$in": [None, ""]},
-        "status": {"$in": ["pending", "ready", "scheduled"]},
+        "status": {"$in": ["preview", "pending", "ready", "scheduled"]},
     }, {"_id": 0}).to_list(3000)
     candidates = [("matches", m) for m in matches] + [("matches_v2", m) for m in matches_v2]
     candidates.sort(key=lambda item: _match_sort_key(item[1]))

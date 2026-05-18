@@ -459,12 +459,6 @@ export default function AdminTournamentEditPage() {
   const updateMatchSchedule = async (match, payload) => {
     try {
       const scheduledAt = payload.scheduled_at ? fromDateTimeLocal(payload.scheduled_at) : null;
-      const stationChanged = (payload.station_id || "") !== (match.station_id || "");
-      if (stationChanged && payload.station_id) {
-        await api.post(`/stations/${payload.station_id}/assign/${match.id}`);
-      } else if (stationChanged && match.station_id) {
-        await api.post(`/stations/${match.station_id}/clear`);
-      }
       const body = {
         scheduled_at: scheduledAt,
         duration_minutes: payload.duration_minutes === "" ? null : Number(payload.duration_minutes),
@@ -480,12 +474,6 @@ export default function AdminTournamentEditPage() {
   };
   const updateMatchV2Schedule = async (match, payload) => {
     try {
-      const stationChanged = (payload.station_id || "") !== (match.station_id || "");
-      if (stationChanged && payload.station_id) {
-        await api.post(`/stations/${payload.station_id}/assign/${match.id}`);
-      } else if (stationChanged && match.station_id) {
-        await api.post(`/stations/${match.station_id}/clear`);
-      }
       await api.patch(`/matches-v2/${match.id}`, {
         scheduled_at: payload.scheduled_at ? fromDateTimeLocal(payload.scheduled_at) : null,
         duration_minutes: payload.duration_minutes === "" ? null : Number(payload.duration_minutes),
@@ -725,7 +713,7 @@ export default function AdminTournamentEditPage() {
                         {isModerator && a && b && (
                           <MatchResultControls match={m} a={a} b={b} onSave={updateMatchResult} />
                         )}
-                        {isModerator && <MatchScheduleControls match={m} stations={stations} onSave={updateMatchSchedule} />}
+                        {isModerator && <MatchScheduleControls match={m} stations={stations} defaultScheduledAt={t.start_date} onSave={updateMatchSchedule} />}
                         <Link to={`/matches/${m.id}`} className="text-[#29B6E8] text-xs font-bold uppercase hover:text-white">Öffnen →</Link>
                       </div>
                     </td>
@@ -744,6 +732,7 @@ export default function AdminTournamentEditPage() {
           matches={matchesV2}
           registrations={regs}
           stations={stations}
+          tournamentStartDate={t.start_date}
           isAdmin={false}
           isModerator={isModerator}
           onChanged={load}
@@ -824,7 +813,7 @@ function ParticipantAddForm({ form, tournament, users, teams, noShowRegistration
   );
 }
 
-function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], isAdmin, isModerator, onChanged, onSaveResult, onSaveMatchMeta, mode = "operations" }) {
+function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], tournamentStartDate = null, isAdmin, isModerator, onChanged, onSaveResult, onSaveMatchMeta, mode = "operations" }) {
   const showSettings = isAdmin && mode === "settings";
   const showMatchList = mode !== "settings";
   const [createOpen, setCreateOpen] = useState(stages.length === 0);
@@ -935,6 +924,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
             matches={matches.filter((m) => m.stage_id === stage.id)}
             regById={regById}
             stations={stations}
+            tournamentStartDate={tournamentStartDate}
             isModerator={isModerator}
             showSettings={showSettings}
             showMatchList={showMatchList}
@@ -954,7 +944,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
   );
 }
 
-function StageCard({ tournamentId, stage, matches, regById, stations = [], isModerator, showSettings = false, showMatchList = true, onChanged, onDelete, onSaveResult, onSaveMatchMeta }) {
+function StageCard({ tournamentId, stage, matches, regById, stations = [], tournamentStartDate = null, isModerator, showSettings = false, showMatchList = true, onChanged, onDelete, onSaveResult, onSaveMatchMeta }) {
   const settings = stage.settings || {};
   const [activeSection, setActiveSection] = useState("all");
   const [form, setForm] = useState({
@@ -1143,6 +1133,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], isMod
                   match={match}
                   regById={regById}
                   stations={stations}
+                  tournamentStartDate={tournamentStartDate}
                   canEdit={isModerator}
                   onSaveResult={onSaveResult}
                   onSaveMatchMeta={onSaveMatchMeta}
@@ -1161,7 +1152,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], isMod
   );
 }
 
-function MatchV2Card({ match, regById, stations = [], canEdit, onSaveResult, onSaveMatchMeta }) {
+function MatchV2Card({ match, regById, stations = [], tournamentStartDate = null, canEdit, onSaveResult, onSaveMatchMeta }) {
   const filledSlots = (match.slots || []).filter((slot) => slot.status === "filled" && slot.registration_id);
   const labelFor = (registrationId) => {
     const reg = regById[registrationId];
@@ -1198,7 +1189,7 @@ function MatchV2Card({ match, regById, stations = [], canEdit, onSaveResult, onS
           ))}
         </div>
       )}
-      {canEdit && <MatchScheduleControls match={match} stations={stations} onSave={onSaveMatchMeta} />}
+      {canEdit && <MatchScheduleControls match={match} stations={stations} defaultScheduledAt={tournamentStartDate} onSave={onSaveMatchMeta} />}
       {canEdit && filledSlots.length > 0 && (
         <MatchV2ResultControls match={match} filledSlots={filledSlots} labelFor={labelFor} onSaveResult={onSaveResult} />
       )}
@@ -1321,15 +1312,16 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
   );
 }
 
-function MatchScheduleControls({ match, stations = [], onSave }) {
-  const [scheduledAt, setScheduledAt] = useState(toDateTimeLocalInput(match.scheduled_at));
+function MatchScheduleControls({ match, stations = [], defaultScheduledAt = null, onSave }) {
+  const plannedValue = match.scheduled_at || defaultScheduledAt;
+  const [scheduledAt, setScheduledAt] = useState(toDateTimeLocalInput(plannedValue));
   const [duration, setDuration] = useState(match.duration_minutes ?? match.settings?.duration_minutes ?? "");
   const [stationId, setStationId] = useState(match.station_id || "");
   useEffect(() => {
-    setScheduledAt(toDateTimeLocalInput(match.scheduled_at));
+    setScheduledAt(toDateTimeLocalInput(match.scheduled_at || defaultScheduledAt));
     setDuration(match.duration_minutes ?? match.settings?.duration_minutes ?? "");
     setStationId(match.station_id || "");
-  }, [match.id, match.scheduled_at, match.duration_minutes, match.station_id, match.updated_at, match.settings?.duration_minutes]);
+  }, [match.id, match.scheduled_at, defaultScheduledAt, match.duration_minutes, match.station_id, match.updated_at, match.settings?.duration_minutes]);
   return (
     <div className="mt-3 w-full max-w-md border border-white/10 bg-[#0A0A0A] rounded-sm p-3 space-y-2">
       <div className="text-[10px] font-bold uppercase tracking-widest text-white/50">Matchplanung</div>

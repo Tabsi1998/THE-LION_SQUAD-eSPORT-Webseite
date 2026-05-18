@@ -44,6 +44,7 @@ MAX_INITIAL_PREVIEW_MATCHES = 512
 BRACKET_REFRESH_LOCKED_STATUSES = {"check_in", "live", "paused", "completed", "results_published", "archived", "cancelled"}
 TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
 LOCKABLE_TOURNAMENT_STATUSES = {"completed", "results_published", "archived", "cancelled"}
+MATCH_PLAN_FIELDS = ("scheduled_at", "duration_minutes", "station_id", "admin_note", "map", "best_of")
 
 
 class TournamentChatCreate(BaseModel):
@@ -123,6 +124,50 @@ def _can_create_initial_legacy_preview(tournament: dict) -> bool:
     if (tournament.get("format") or "single_elim") not in LEGACY_AUTO_PREVIEW_FORMATS:
         return False
     return 0 < _estimate_legacy_preview_matches(tournament) <= MAX_INITIAL_PREVIEW_MATCHES
+
+
+def _legacy_plan_key(match: dict) -> tuple:
+    return (
+        "legacy",
+        match.get("bracket") or "",
+        int(match.get("round") or 0),
+        int(match.get("match_index") if match.get("match_index") is not None else match.get("order") or match.get("position") or 0),
+    )
+
+
+def _v2_plan_key(match: dict) -> tuple:
+    return (
+        "v2",
+        int(match.get("stage_number") or 0),
+        match.get("section") or "",
+        match.get("match_key") or "",
+        int(match.get("round") or 0),
+        int(match.get("order") or match.get("position") or 0),
+    )
+
+
+def _collect_match_plan(legacy_matches: list[dict] | None = None, v2_matches: list[dict] | None = None) -> dict[tuple, dict]:
+    plan: dict[tuple, dict] = {}
+    for match in legacy_matches or []:
+        fields = {field: match.get(field) for field in MATCH_PLAN_FIELDS if match.get(field) is not None}
+        if fields:
+            plan[_legacy_plan_key(match)] = fields
+    for match in v2_matches or []:
+        fields = {field: match.get(field) for field in MATCH_PLAN_FIELDS if match.get(field) is not None}
+        if fields:
+            plan[_v2_plan_key(match)] = fields
+    return plan
+
+
+def _apply_match_plan(matches: list[dict], plan: dict[tuple, dict], key_fn) -> list[dict]:
+    for match in matches:
+        fields = plan.get(key_fn(match))
+        if not fields:
+            continue
+        match.update(fields)
+        if fields.get("scheduled_at") and not match.get("is_preview") and match.get("status") in {"pending", "ready", "scheduled"}:
+            match["status"] = "scheduled"
+    return matches
 
 
 def _stage_defaults_for_tournament_format(tournament: dict, body: TournamentBracketStructurePayload | None = None) -> dict | None:
@@ -485,6 +530,7 @@ async def _generate_legacy_bracket_docs(db, tournament: dict, actor_id: str | No
                                         set_live: bool = False) -> dict:
     tid = tournament["id"]
     existing_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    match_plan = _collect_match_plan(existing_matches, [])
     can_replace_preview = bool(existing_matches) and all(m.get("is_preview") for m in existing_matches)
     if existing_matches and not force and not can_replace_preview:
         raise HTTPException(status_code=409, detail="Bracket hat bereits Matches. Mit force=true neu generieren.")
@@ -502,6 +548,7 @@ async def _generate_legacy_bracket_docs(db, tournament: dict, actor_id: str | No
     matches = generate_bracket(tournament, registrations, preview=preview)
     if not matches:
         raise HTTPException(status_code=400, detail="Für dieses Format ist kein automatischer Bracket-Generator aktiv.")
+    _apply_match_plan(matches, match_plan, _legacy_plan_key)
 
     if existing_matches:
         await db.matches.delete_many({"tournament_id": tid})
@@ -547,7 +594,7 @@ async def _refresh_preview_bracket_after_registration(db, tournament: dict, acto
         return None
     tid = tournament["id"]
     existing_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
-    v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    match_plan = _collect_match_plan(existing_matches, [])
     if existing_matches and not all(m.get("is_preview") for m in existing_matches):
         return None
     registrations = await db.tournament_registrations.find(
@@ -560,6 +607,7 @@ async def _refresh_preview_bracket_after_registration(db, tournament: dict, acto
     matches = generate_bracket(tournament, preview_regs, preview=True)
     if not matches:
         return None
+    _apply_match_plan(matches, match_plan, _legacy_plan_key)
     if existing_matches:
         await db.matches.delete_many({"tournament_id": tid})
     await db.matches.insert_many(matches)
@@ -596,6 +644,7 @@ async def _refresh_stage_previews_after_registration(db, tournament: dict, actor
 
     for stage in stages:
         existing_matches = await db.matches_v2.find({"stage_id": stage["id"]}, {"_id": 0}).to_list(3000)
+        match_plan = _collect_match_plan([], existing_matches)
         if existing_matches and not all(match.get("is_preview") for match in existing_matches):
             continue
         if not existing_matches and not registrations:
@@ -606,6 +655,7 @@ async def _refresh_stage_previews_after_registration(db, tournament: dict, actor
             continue
         if not matches:
             continue
+        _apply_match_plan(matches, match_plan, _v2_plan_key)
 
         if existing_matches:
             match_ids = await db.matches_v2.distinct("id", {"stage_id": stage["id"]})
@@ -688,6 +738,7 @@ async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: s
     total_matches = 0
     for stage in stages:
         existing_matches = await db.matches_v2.find({"stage_id": stage["id"]}, {"_id": 0}).to_list(3000)
+        match_plan = _collect_match_plan([], existing_matches)
         if existing_matches and not all(match.get("is_preview") for match in existing_matches):
             continue
         try:
@@ -696,6 +747,7 @@ async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: s
             continue
         if not matches:
             continue
+        _apply_match_plan(matches, match_plan, _v2_plan_key)
         if existing_matches:
             match_ids = await db.matches_v2.distinct("id", {"stage_id": stage["id"]})
             if match_ids:
@@ -750,6 +802,7 @@ async def _finalize_bracket_for_checkin(db, tournament: dict, actor_id: str | No
         return finalized
 
     existing_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
     can_replace_preview = bool(existing_matches) and all(match.get("is_preview") for match in existing_matches)
     if existing_matches and not can_replace_preview:
         return None
@@ -812,6 +865,7 @@ async def _rebuild_checkin_bracket_after_staff_change(db, tournament: dict, acto
 
     legacy_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
     v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    match_plan = _collect_match_plan(legacy_matches, v2_matches)
     locked_legacy = [m.get("id") for m in legacy_matches if not _legacy_match_can_be_rebuilt(m)]
     locked_v2 = [m.get("id") for m in v2_matches if not _v2_match_can_be_rebuilt(m)]
     if locked_legacy or locked_v2:
@@ -851,6 +905,7 @@ async def _rebuild_checkin_bracket_after_staff_change(db, tournament: dict, acto
                 }
             if not matches:
                 continue
+            _apply_match_plan(matches, match_plan, _v2_plan_key)
             await db.matches_v2.insert_many(matches)
             await db.tournament_stages.update_one(
                 {"id": stage["id"]},
@@ -1918,6 +1973,7 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
     if not stage:
         raise HTTPException(status_code=404, detail="Stage nicht gefunden")
     existing_matches = await db.matches_v2.find({"stage_id": stage_id}, {"_id": 0}).to_list(3000)
+    match_plan = _collect_match_plan([], existing_matches)
     existing = len(existing_matches)
     can_replace_preview = bool(existing_matches) and all(m.get("is_preview") for m in existing_matches)
     if existing and not force and not can_replace_preview:
@@ -1937,6 +1993,7 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
         raise HTTPException(status_code=400, detail=str(exc))
     if not matches:
         raise HTTPException(status_code=400, detail="Schema erzeugt keine Matches")
+    _apply_match_plan(matches, match_plan, _v2_plan_key)
 
     if existing:
         match_ids = await db.matches_v2.distinct("id", {"stage_id": stage_id})
@@ -2037,6 +2094,7 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
 
     legacy_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
     v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    match_plan = _collect_match_plan(legacy_matches, v2_matches)
     existing_stage = await db.tournament_stages.find_one({"tournament_id": tid}, {"_id": 0}, sort=[("number", 1)])
     if body is None and existing_stage:
         body = TournamentBracketStructurePayload(
@@ -2077,6 +2135,7 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
             raise HTTPException(status_code=400, detail=str(exc))
         if not matches:
             raise HTTPException(status_code=400, detail="Die Struktur erzeugt keine Spiele.")
+        _apply_match_plan(matches, match_plan, _v2_plan_key)
         await db.tournament_stages.insert_one(stage)
         await db.matches_v2.insert_many(matches)
         await _audit_tournament_action(
