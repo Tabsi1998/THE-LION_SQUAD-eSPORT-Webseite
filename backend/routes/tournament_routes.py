@@ -1777,6 +1777,53 @@ async def generate(tid: str, preview: bool = False, force: bool = False,
     return await _generate_legacy_bracket_docs(db, t, me.get("id"), preview=preview, force=force, set_live=not preview)
 
 
+@router.post("/{tid}/bracket/from-format")
+async def rebuild_bracket_from_tournament_format(tid: str, preview: bool = True, force: bool = False,
+                                                 me: dict = Depends(get_current_user)):
+    """Use the tournament format as the single source of truth and rebuild the bracket preview."""
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if not _can_create_initial_legacy_preview(tournament):
+        raise HTTPException(status_code=400, detail="FÃ¼r dieses Format gibt es keinen automatischen Format-Bracket-Generator.")
+    if tournament.get("status") in ("live", "paused", "completed", "results_published", "archived") and not force:
+        raise HTTPException(status_code=409, detail="Laufende oder beendete Turniere brauchen force=true.")
+
+    legacy_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    has_real_legacy = any(not match.get("is_preview") for match in legacy_matches)
+    has_real_v2 = any(not match.get("is_preview") for match in v2_matches)
+    if (has_real_legacy or has_real_v2) and not force:
+        raise HTTPException(status_code=409, detail="Es gibt bereits echte Spiele. Mit force=true neu aufbauen.")
+
+    v2_match_ids = [match["id"] for match in v2_matches if match.get("id")]
+    await db.matches.delete_many({"tournament_id": tid})
+    await db.matches_v2.delete_many({"tournament_id": tid})
+    if v2_match_ids:
+        await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
+    await db.tournament_stages.delete_many({"tournament_id": tid})
+
+    result = await _generate_legacy_bracket_docs(
+        db,
+        tournament,
+        me.get("id"),
+        preview=preview,
+        force=False,
+        set_live=False,
+    )
+    await _audit_tournament_action(
+        db,
+        "tournament.bracket.rebuild_from_format",
+        me.get("id"),
+        tid,
+        {"format": tournament.get("format"), "preview": preview, "force": force, "match_count": result.get("match_count")},
+    )
+    return {**result, "engine": "legacy"}
+
+
 @router.post("/{tid}/reset-bracket")
 async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_current_user)):
     db = get_db()
@@ -1791,14 +1838,18 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
             detail="Bracket-Reset fuer laufende oder beendete Turniere braucht force=true",
         )
     match_count = await db.matches.count_documents({"tournament_id": tid})
+    v2_match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
     await db.matches.delete_many({"tournament_id": tid})
+    await db.matches_v2.delete_many({"tournament_id": tid})
+    if v2_match_ids:
+        await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
     await db.tournaments.update_one({"id": tid}, {"$set": {"status": "draft", "updated_at": now_utc().isoformat()}})
     await _audit_tournament_action(
         db,
         "tournament.bracket.reset",
         me.get("id"),
         tid,
-        {"previous_status": t.get("status"), "match_count": match_count, "force": force},
+        {"previous_status": t.get("status"), "match_count": match_count, "v2_match_count": len(v2_match_ids), "force": force},
     )
     return {"ok": True}
 

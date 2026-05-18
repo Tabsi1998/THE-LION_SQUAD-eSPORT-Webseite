@@ -161,14 +161,57 @@ function StageSection({ section, rounds, regMap, compact, viewMode, onMatchClick
               {formatRoundName(rounds[rn][0].round_name, rn)}
             </div>
             <div className="flex flex-col gap-3">
-              {rounds[rn].map((match) => (
-                <HeatNode key={match.id} match={match} regMap={regMap} compact={compact || isTv} onClick={onMatchClick} />
-              ))}
+              {rounds[rn].map((match) => {
+                const isDuel = (match.match_type || "duel") === "duel" && (match.slots || []).length <= 2;
+                return isDuel ? (
+                  <V2DuelNode key={match.id} match={match} regMap={regMap} compact={compact || isTv} onClick={onMatchClick} />
+                ) : (
+                  <HeatNode key={match.id} match={match} regMap={regMap} compact={compact || isTv} onClick={onMatchClick} />
+                );
+              })}
             </div>
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+function V2DuelNode({ match, regMap, compact = false, onClick }) {
+  const resultMap = new Map((match.results || []).map((r) => [r.registration_id, r]));
+  const slots = [...(match.slots || [])].slice(0, 2);
+  while (slots.length < 2) {
+    slots.push({ slot: slots.length + 1, registration_id: null, status: "empty" });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onClick?.(match)}
+      data-testid={`bracket-match-v2-${match.id}`}
+      className="tls-bracket-node relative text-left rounded-sm overflow-hidden border border-white/10 hover:border-[#29B6E8]/60 transition-all group"
+    >
+      {slots.map((slot, index) => {
+        const reg = regMap.get(slot.registration_id);
+        const user = reg?.user || {};
+        const result = resultMap.get(slot.registration_id);
+        const isWinner = result?.rank === 1 || result?.qualified;
+        return (
+          <Row
+            key={slot.slot || index}
+            label={reg?.display_name || user.display_name || reg?.ingame_name || (slot.registration_id ? "-" : slot.source?.raw || "Offen")}
+            score={result?.score ?? result?.points ?? 0}
+            isWinner={isWinner}
+            avatar={user.avatar_url || reg?.avatar_url}
+            compact={compact}
+          />
+        );
+      })}
+      <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-white/40 border-t border-white/5 flex items-center justify-between font-display">
+        <span>{match.match_key || "Spiel"}</span>
+        <span>{formatMatchStatus(match.status)}</span>
+      </div>
+    </button>
   );
 }
 

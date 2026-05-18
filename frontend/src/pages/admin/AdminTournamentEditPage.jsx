@@ -307,6 +307,28 @@ export default function AdminTournamentEditPage() {
       toast.error(formatRequestError(e, "Check-in konnte nicht gespeichert werden."));
     }
   };
+  const rebuildFromFormat = async ({ preview = true, force = false } = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if (preview) params.set("preview", "true");
+      if (force) params.set("force", "true");
+      const suffix = params.toString() ? `?${params.toString()}` : "";
+      const { data } = await api.post(`/tournaments/${id}/bracket/from-format${suffix}`);
+      toast.success(data.preview ? `Format-Vorschau mit ${data.match_count} Spielen neu aufgebaut.` : `Turnierbaum mit ${data.match_count} Spielen neu aufgebaut.`);
+      load();
+    } catch (e) {
+      if (e.response?.status === 409 && !force) {
+        const ok = await confirm({
+          title: "Turnierbaum aus Format neu bauen?",
+          description: "Vorhandene Struktur-/Vorschau-Daten werden durch das gewählte Turnierformat ersetzt.",
+          confirmLabel: "Neu bauen",
+          tone: "danger",
+        });
+        if (ok) return rebuildFromFormat({ preview, force: true });
+      }
+      toast.error(formatRequestError(e, "Turnierbaum konnte nicht aus dem Format neu aufgebaut werden."));
+    }
+  };
   const deleteParticipant = async (registration) => {
     if (!await confirm({
       title: "Teilnehmer entfernen?",
@@ -477,6 +499,9 @@ export default function AdminTournamentEditPage() {
           {isModerator && !hasFlexibleStructure && <button onClick={() => generateLegacyBracket({ preview: false })} data-testid="admin-tr-generate" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2">
             <Zap className="w-3.5 h-3.5" /> Turnierbaum generieren
           </button>}
+          {isModerator && hasFlexibleStructure && <button onClick={() => rebuildFromFormat({ preview: true })} data-testid="admin-tr-rebuild-format" className="px-4 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#FFD700]/10 inline-flex items-center gap-2">
+            <Zap className="w-3.5 h-3.5" /> Aus Format neu bauen
+          </button>}
           {isModerator && <button onClick={reset} data-testid="admin-tr-reset" className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-sm hover:border-[#FF3B30]/60 hover:text-[#FF3B30] inline-flex items-center gap-2">
             <RefreshCw className="w-3.5 h-3.5" /> Zurücksetzen
           </button>}
@@ -636,7 +661,7 @@ export default function AdminTournamentEditPage() {
         />
       )}
       {tab === "edit" && (
-        <TournamentEditForm key={t.updated_at || t.id} tournament={t} onSaved={load} />
+        <TournamentEditForm key={t.updated_at || t.id} tournament={t} onSaved={load} onRebuildFromFormat={rebuildFromFormat} />
       )}
       {tab === "staff" && isAdmin && (
         <TournamentStaffPanel tournamentId={t.id} staff={staff} users={users} onChanged={load} />
@@ -869,28 +894,43 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
       schema: preset[2],
     }));
   };
+  const stagePayload = () => ({
+    name: form.name || "Phase",
+    match_type: form.match_type,
+    stage_type: form.stage_type,
+    status: form.status,
+    settings: {
+      ...settings,
+      match_size: Number(form.match_size) || 4,
+      min_players: Number(form.min_players) || 2,
+      qualifiers_per_match: Number(form.qualifiers_per_match) || 1,
+      duration_minutes: Number(form.duration_minutes) || 30,
+      schema: form.schema || "",
+      score_type: settings.score_type || "points",
+      calculation: settings.calculation || "points",
+    },
+  });
   const save = async () => {
     try {
-      await api.patch(`/tournaments/${tournamentId}/stages/${stage.id}`, {
-        name: form.name || "Phase",
-        match_type: form.match_type,
-        stage_type: form.stage_type,
-        status: form.status,
-        settings: {
-          ...settings,
-          match_size: Number(form.match_size) || 4,
-          min_players: Number(form.min_players) || 2,
-          qualifiers_per_match: Number(form.qualifiers_per_match) || 1,
-          duration_minutes: Number(form.duration_minutes) || 30,
-          schema: form.schema || "",
-          score_type: settings.score_type || "points",
-          calculation: settings.calculation || "points",
-        },
-      });
+      await api.patch(`/tournaments/${tournamentId}/stages/${stage.id}`, stagePayload());
       toast.success("Phase gespeichert.");
       onChanged();
     } catch (err) {
       toast.error(formatRequestError(err, "Phase konnte nicht gespeichert werden."));
+    }
+  };
+  const saveAndGeneratePreview = async () => {
+    if (!config.canGenerate) {
+      toast.error("Für diesen Struktur-Typ ist aktuell noch kein automatischer Generator aktiv.");
+      return;
+    }
+    try {
+      await api.patch(`/tournaments/${tournamentId}/stages/${stage.id}`, stagePayload());
+      const { data } = await api.post(`/tournaments/${tournamentId}/stages/${stage.id}/generate?preview=true&force=true`);
+      toast.success(`Phase gespeichert und ${data.match_count} Vorschau-Spiele neu gebaut.`);
+      onChanged();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Phase konnte nicht gespeichert und neu gebaut werden."));
     }
   };
   const generate = async ({ preview = false, force = false } = {}) => {
@@ -945,6 +985,7 @@ function StageCard({ tournamentId, stage, matches, regById, isAdmin, isModerator
             <button type="button" onClick={() => generate({ preview: true })} disabled={!config.canGenerate} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Vorschau</button>
             <button type="button" onClick={() => generate({ preview: false })} disabled={!config.canGenerate} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Mit Teilnehmern generieren</button>
             {isAdmin && <button type="button" onClick={save} className="px-3 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-xs font-bold">Speichern</button>}
+            {isAdmin && <button type="button" onClick={saveAndGeneratePreview} disabled={!config.canGenerate} className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Speichern & neu bauen</button>}
             {isAdmin && <button type="button" onClick={onDelete} className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm uppercase tracking-wider text-xs font-bold">Löschen</button>}
           </div>
         )}
@@ -1161,7 +1202,7 @@ function MatchScheduleControls({ match, onSave }) {
   );
 }
 
-function TournamentEditForm({ tournament, onSaved }) {
+function TournamentEditForm({ tournament, onSaved, onRebuildFromFormat }) {
   const dt = toDateTimeLocalInput;
   const [games, setGames] = useState([]);
   const [events, setEvents] = useState([]);
@@ -1267,7 +1308,7 @@ function TournamentEditForm({ tournament, onSaved }) {
     team_mode: value,
     team_size: value === "solo" ? 1 : Math.max(2, Number(current.team_size) || 2),
   }));
-  const save = async () => {
+  const save = async ({ rebuildPreview = false } = {}) => {
     try {
       const normalizeTournamentPayload = (source) => {
         const payload = { ...source };
@@ -1292,12 +1333,20 @@ function TournamentEditForm({ tournament, onSaved }) {
       const payload = normalizeTournamentPayload(f);
       const patch = buildDirtyPayload(payload, normalizeTournamentPayload(formFromTournament()));
       if (!hasPayloadChanges(patch)) {
+        if (rebuildPreview) {
+          await onRebuildFromFormat?.({ preview: true, force: true });
+          return;
+        }
         toast.info("Keine Änderungen zum Speichern.");
         return;
       }
       await api.patch(`/tournaments/${tournament.id}`, patch);
       toast.success("Gespeichert.");
-      onSaved();
+      if (rebuildPreview) {
+        await onRebuildFromFormat?.({ preview: true, force: true });
+      } else {
+        onSaved();
+      }
     } catch (e) { toast.error(formatRequestError(e, "Turnier konnte nicht gespeichert werden.", { title: f.title })); }
   };
   return (
@@ -1383,7 +1432,12 @@ function TournamentEditForm({ tournament, onSaved }) {
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.show_chat} onChange={(e)=>set("show_chat",e.target.checked)} className="accent-[#9146FF]"/><span>Chat anzeigen</span></label>
         </div>
       </Details>
-      <button onClick={save} data-testid="tr-edit-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
+      <div className="flex flex-wrap gap-3">
+        <button onClick={() => save()} data-testid="tr-edit-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
+        <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-save-rebuild" className="px-5 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10">
+          Speichern & Format-Vorschau neu bauen
+        </button>
+      </div>
     </div>
   );
 }
