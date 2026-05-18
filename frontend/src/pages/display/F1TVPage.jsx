@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { MascotBadge } from "@/components/tls/Logo";
 import { SponsorGrid } from "@/components/tls/SponsorTicker";
 import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
@@ -111,6 +111,11 @@ export default function F1TVPage() {
           </div>
         </div>
         <div className="text-right">
+          {track?.image_url && (
+            <div className="hidden xl:flex ml-auto mb-3 w-56 h-28 border border-[#29B6E8]/25 bg-black/50 rounded-sm overflow-hidden items-center justify-center">
+              <img src={resolveMediaUrl(track.image_url)} alt="" className="w-full h-full object-contain" />
+            </div>
+          )}
           <div className="text-[11px] uppercase tracking-[0.3em] text-white/50">Strecke {activeTrackIdx + 1} / {challenge.tracks?.length || 1}</div>
           <div className="font-heading text-3xl md:text-5xl font-black uppercase text-[#29B6E8]">{track?.name || "—"}</div>
           {track?.country && <div className="text-white/50 text-sm mt-1">{track.country}</div>}
@@ -205,14 +210,14 @@ export default function F1TVPage() {
       <footer className="absolute bottom-0 left-0 right-0 px-8 py-4 border-t border-white/5 flex items-center justify-between gap-6 bg-[#0A0A0A]/80 backdrop-blur-sm">
         <div className="flex items-center gap-4 min-w-0">
           <div className="bg-white p-1.5 rounded-sm shrink-0">
-            <QRCodeSVG value={publicUrl} size={64} bgColor="#ffffff" fgColor="#0A0A0A" />
+            <QRCodeSVG value={publicUrl} size={92} bgColor="#ffffff" fgColor="#0A0A0A" />
           </div>
           <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">Join The Race</div>
-            <div className="text-sm text-white/80 truncate font-mono">{publicUrl.replace(/^https?:\/\//, "")}</div>
+            <div className="text-sm text-white/70 truncate">QR scannen und mitfahren</div>
           </div>
         </div>
-        <SponsorGrid max={3} marquee className="flex-1 max-w-[58vw]" />
+        <SponsorGrid max={3} marquee className="flex-1 max-w-[54vw]" />
       </footer>
     </div>
   );

@@ -238,6 +238,11 @@ export default function TournamentDetailPage() {
             <Link to={`/tournaments/${t.slug || t.id}/matches`} data-testid="tournament-schedule-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
               Spielplan
             </Link>
+            {t.can_manage_results && (
+              <Link to={`/admin/tournaments/${t.id}`} data-testid="tournament-result-entry-link" className="px-6 py-3 border border-[#FFD700]/45 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition">
+                Ergebnisse eintragen
+              </Link>
+            )}
             <Link to={`/tournaments/${t.slug || t.id}/standings`} data-testid="tournament-standings-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
               Rangliste
             </Link>

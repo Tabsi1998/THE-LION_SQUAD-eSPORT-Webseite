@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { API, api, formatMs, resolveMediaUrl } from "@/lib/api";
+import { API, api, formatRequestError, parseTimeStr, resolveMediaUrl } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
@@ -12,9 +13,11 @@ import { Tv, Trophy, Flag, Download, FileDown, Calendar } from "lucide-react";
 import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { toast } from "sonner";
 
 export default function F1DetailPage() {
   const { slug } = useParams();
+  const { user } = useAuth();
   const [challenge, setChallenge] = useState(null);
   const [activeTrack, setActiveTrack] = useState(null);
   const [board, setBoard] = useState(null);
@@ -208,6 +211,14 @@ export default function F1DetailPage() {
                   <img src={resolveMediaUrl(board.track.image_url)} alt={board.track.name} className="w-full h-full object-contain" />
                 </div>
               ) : null}
+              {challenge.can_manage_times && activeTrack && (
+                <InlineFastLapTimeEntry
+                  challenge={challenge}
+                  trackId={activeTrack}
+                  currentUser={user}
+                  onSaved={loadBoard}
+                />
+              )}
               <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
                 <div className="p-4 border-b border-white/10 flex items-center justify-between">
                   <h3 className="font-heading text-xl font-bold">{board?.track?.name || "—"}</h3>
@@ -292,6 +303,104 @@ export default function F1DetailPage() {
         )}
       </div>
     </PublicLayout>
+  );
+}
+
+function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
+  const [users, setUsers] = useState([]);
+  const [form, setForm] = useState({ user_id: "", time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "", score_scope: "official" });
+  const [saving, setSaving] = useState(false);
+  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+
+  useEffect(() => {
+    if (!challenge?.id) return;
+    api.get(`/f1/challenges/${challenge.id}/assignable-users`)
+      .then(({ data }) => setUsers(data || []))
+      .catch(() => setUsers([]));
+  }, [challenge?.id]);
+
+  const selectedUser = users.find((item) => item.id === form.user_id);
+  const forceReferenceScope = !!challenge?.block_club_member_results && !!selectedUser?.is_club_member;
+
+  useEffect(() => {
+    if (forceReferenceScope && form.score_scope !== "club_reference") {
+      setForm((current) => ({ ...current, score_scope: "club_reference" }));
+    }
+  }, [forceReferenceScope, form.score_scope]);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    const ms = parseTimeStr(form.time_str);
+    if (!ms) {
+      toast.error("Ungueltiges Zeitformat. Beispiel: 1:24.587");
+      return;
+    }
+    const penalty = Number(form.penalty_seconds) || 0;
+    if (penalty > 0 && (form.admin_note || "").trim().length < 5) {
+      toast.error("Bei Strafzeit ist eine Begruendung Pflicht.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.post(`/f1/challenges/${challenge.id}/times`, {
+        user_id: form.user_id,
+        track_id: trackId,
+        time_ms: ms,
+        penalty_seconds: penalty,
+        proof_url: form.proof_url || null,
+        admin_note: form.admin_note?.trim() || null,
+        score_scope: form.score_scope || "official",
+      });
+      toast.success("Zeit eingetragen.");
+      setForm((current) => ({ ...current, time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "" }));
+      onSaved();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Zeit konnte nicht eingetragen werden."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="mb-5 border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeit erfassen</div>
+          <div className="text-xs text-white/45 mt-1">Direkt fuer Zeitnehmer, Schiedsrichter und Organisation.</div>
+        </div>
+        {currentUser && <div className="text-[10px] uppercase tracking-widest text-white/35">{currentUser.display_name || currentUser.username}</div>}
+      </div>
+      <div className="grid md:grid-cols-[minmax(12rem,1fr)_9rem_11rem_8rem_auto] gap-2 items-end">
+        <label className="block">
+          <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Fahrer</span>
+          <select value={form.user_id} onChange={(e) => set("user_id", e.target.value)} required className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+            <option value="">- auswaehlen -</option>
+            {users.map((item) => <option key={item.id} value={item.id}>{item.display_name || item.username || item.email}</option>)}
+          </select>
+        </label>
+        <label className="block">
+          <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Zeit</span>
+          <input value={form.time_str} onChange={(e) => set("time_str", e.target.value)} required placeholder="1:24.587" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display tabular-nums" />
+        </label>
+        <label className="block">
+          <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Wertung</span>
+          <select value={form.score_scope} onChange={(e) => set("score_scope", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+            <option value="official" disabled={forceReferenceScope}>Offiziell</option>
+            <option value="club_reference">Referenz</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Strafe</span>
+          <input type="number" step="0.1" value={form.penalty_seconds} onChange={(e) => set("penalty_seconds", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
+        </label>
+        <button disabled={saving} className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">Speichern</button>
+      </div>
+      <div className="mt-2 grid md:grid-cols-2 gap-2">
+        <input value={form.proof_url} onChange={(e) => set("proof_url", e.target.value)} placeholder="Proof URL optional" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+        <input value={form.admin_note} onChange={(e) => set("admin_note", e.target.value)} placeholder={Number(form.penalty_seconds) > 0 ? "Begruendung fuer Strafe" : "Notiz optional"} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+      </div>
+      {forceReferenceScope && <div className="mt-2 text-[10px] text-[#FFD700] uppercase tracking-widest">Vereinsmitglied: nur Referenzzeit moeglich.</div>}
+    </form>
   );
 }
 

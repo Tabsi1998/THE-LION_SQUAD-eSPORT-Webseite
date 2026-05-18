@@ -28,6 +28,7 @@ export default function BracketTVPage() {
   const [loadError, setLoadError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [viewIndex, setViewIndex] = useState(0);
+  const [boardMode, setBoardMode] = useState("active");
 
   const load = useCallback(async () => {
     try {
@@ -47,10 +48,10 @@ export default function BracketTVPage() {
   }, [load]);
   useApiInvalidation(load, ["tournaments", "matches", "stations"]);
 
-  const views = useMemo(() => buildTvViews(data), [data]);
+  const views = useMemo(() => buildTvViews(data, boardMode), [data, boardMode]);
   useEffect(() => {
     setViewIndex(0);
-  }, [data?.tournament?.id, views.length]);
+  }, [data?.tournament?.id, views.length, boardMode]);
   useEffect(() => {
     if (views.length <= 1) return undefined;
     const iv = setInterval(() => setViewIndex((current) => (current + 1) % views.length), 11000);
@@ -83,7 +84,25 @@ export default function BracketTVPage() {
             {hasMatches && <div className="mt-1 text-xs uppercase tracking-[0.25em] text-white/50 truncate">{activeView.title}</div>}
           </div>
         </div>
-        <StatusBadge status={t.status} size="lg" />
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="hidden lg:flex items-center gap-1 border border-white/10 bg-[#0A0A0A]/80 rounded-sm p-1">
+            {[
+              ["active", "Aktuell"],
+              ["upcoming", "Naechste"],
+              ["tree", "Baum"],
+            ].map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setBoardMode(mode)}
+                className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-sm ${boardMode === mode ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <StatusBadge status={t.status} size="lg" />
+        </div>
       </header>
       <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label="Turnierbaum" onRetry={load} compact />
 
@@ -258,12 +277,24 @@ function stationLabel(match) {
   return /^station\b/i.test(station) ? station : `Station ${station}`;
 }
 
-function buildTvViews(data) {
+function buildTvViews(data, mode = "active") {
   if (!data) return [];
   const registrations = data.registrations || [];
   const columns = (data.matches_v2 || []).length > 0
     ? buildV2Columns(data)
     : buildLegacyColumns(data);
+  if (mode === "tree") {
+    const pages = chunk(expandColumnsForDisplay(columns), MAX_COLUMNS_PER_VIEW);
+    return pages.map((page, index) => ({
+      key: `tv-tree-${index}`,
+      title: pages.length > 1 ? `Ganzer Turnierbaum - Seite ${index + 1}/${pages.length}` : "Ganzer Turnierbaum",
+      columns: page,
+      registrations,
+    }));
+  }
+  if (mode === "upcoming") {
+    return buildUpcomingViews(data, registrations);
+  }
 
   const activeColumns = columns.filter((column) => !column.isComplete);
   const displayColumns = expandColumnsForDisplay(
@@ -396,6 +427,39 @@ function isMatchDone(match) {
   if (match.winner_id) return true;
   if ((match.results || []).length > 0 && ["completed", "archived"].includes(match.status)) return true;
   return false;
+}
+
+function buildUpcomingViews(data, registrations) {
+  const matches = [...(data.matches_v2 || []), ...(data.matches || [])]
+    .filter((match) => !isMatchDone(match))
+    .sort((a, b) => {
+      const ad = Date.parse(a.scheduled_at || "") || Number.MAX_SAFE_INTEGER;
+      const bd = Date.parse(b.scheduled_at || "") || Number.MAX_SAFE_INTEGER;
+      return (ad - bd)
+        || ((a.stage_number || 0) - (b.stage_number || 0))
+        || ((a.round || 0) - (b.round || 0))
+        || ((a.order ?? a.match_index ?? 0) - (b.order ?? b.match_index ?? 0));
+    });
+  if (!matches.length) {
+    return [{ key: "tv-upcoming-empty", title: "Naechste Spiele", columns: [], registrations }];
+  }
+  const matchChunks = chunk(matches, MAX_DUEL_MATCHES_PER_COLUMN);
+  const columns = matchChunks.map((items, index) => makeColumn({
+    key: `upcoming-${index}`,
+    stageNumber: 1,
+    section: "upcoming",
+    round: index + 1,
+    sectionLabel: "Matchplan",
+    roundLabel: `Naechste Spiele ${index + 1}`,
+    matches: items,
+  }));
+  const pages = chunk(columns, MAX_COLUMNS_PER_VIEW);
+  return pages.map((page, index) => ({
+    key: `tv-upcoming-${index}`,
+    title: pages.length > 1 ? `Naechste Spiele - Seite ${index + 1}/${pages.length}` : "Naechste Spiele",
+    columns: page,
+    registrations,
+  }));
 }
 
 function participantInfo(slot, regMap) {

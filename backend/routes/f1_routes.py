@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Response
 from fastapi.responses import RedirectResponse, StreamingResponse
 from database import get_db
-from auth import get_current_user, require_admin, require_role, get_optional_user
+from auth import get_current_user, require_admin, get_optional_user
 from services.visibility import user_can_see
 from services.public_phase import derive_public_phase
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
@@ -43,6 +43,7 @@ def _max_attempts(challenge: dict) -> int | None:
 
 router = APIRouter(prefix="/api/f1", tags=["f1"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+F1_RESULT_STAFF_ROLES = {"organizer", "referee", "scorekeeper"}
 
 
 def _iso(dt):
@@ -68,6 +69,47 @@ def _auth_user(user) -> dict | None:
 def _is_staff(user: dict | None) -> bool:
     user = _auth_user(user)
     return bool(user and user.get("role") in STAFF_ROLES)
+
+
+async def _has_f1_staff_permission(
+    user: dict | None,
+    challenge_id: str,
+    allowed_roles: set[str] | None = None,
+) -> bool:
+    user = _auth_user(user)
+    if _is_staff(user):
+        return True
+    if not user:
+        return False
+    query = {
+        "challenge_id": challenge_id,
+        "user_id": user["id"],
+        "is_active": {"$ne": False},
+    }
+    if allowed_roles:
+        query["role"] = {"$in": sorted(allowed_roles)}
+    db = get_db()
+    return bool(await db.f1_staff_assignments.find_one(query, {"_id": 0, "id": 1}))
+
+
+async def _require_f1_result_permission(user: dict | None, challenge_id: str) -> None:
+    if await _has_f1_staff_permission(user, challenge_id, F1_RESULT_STAFF_ROLES):
+        return
+    raise HTTPException(status_code=403, detail="Keine Fast-Lap-Berechtigung fuer diese Aktion")
+
+
+async def _enrich_f1_staff_assignments(assignments: list[dict]) -> list[dict]:
+    user_ids = list({row.get("user_id") for row in assignments if row.get("user_id")})
+    users = {}
+    if user_ids:
+        rows = await get_db().users.find(
+            {"id": {"$in": user_ids}},
+            {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1, "avatar_url": 1},
+        ).to_list(500)
+        users = {row["id"]: row for row in rows}
+    for row in assignments:
+        row["user"] = users.get(row.get("user_id"))
+    return assignments
 
 
 async def _is_active_club_member(user_id: str | None) -> bool:
@@ -183,9 +225,10 @@ async def _get_visible_challenge_record(slug_or_id: str, user: dict | None = Non
     c, was_old_slug = await find_by_slug_or_history(db.f1_challenges, slug_or_id, {"_id": 0})
     if not c:
         raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
-    if c.get("status") == "draft" and not _is_staff(user):
+    is_assigned = await _has_f1_staff_permission(user, c["id"], F1_RESULT_STAFF_ROLES)
+    if c.get("status") == "draft" and not (_is_staff(user) or is_assigned):
         raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
-    if not await user_can_see(user, c.get("visibility") or "public"):
+    if not (_is_staff(user) or is_assigned) and not await user_can_see(user, c.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Challenge ist nicht sichtbar")
     c["public_phase"] = derive_public_phase(c, "f1")
     return c, was_old_slug
@@ -236,6 +279,7 @@ async def get_challenge(slug_or_id: str, include_draft: bool = False, user=Depen
     if was_old_slug and c.get("slug"):
         return RedirectResponse(url=f"/api/f1/challenges/{c['slug']}", status_code=301)
     await _annotate_reference_policy(c, include_counts=True)
+    c["can_manage_times"] = await _has_f1_staff_permission(user, c["id"], F1_RESULT_STAFF_ROLES)
     tracks = await db.f1_tracks.find({"challenge_id": c["id"]}, {"_id": 0}).sort("order_index", 1).to_list(100)
     c["tracks"] = tracks
     c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", _official_time_query({"challenge_id": c["id"]})))
@@ -244,6 +288,102 @@ async def get_challenge(slug_or_id: str, include_draft: bool = False, user=Depen
         if event:
             c["event"] = event
     return c
+
+
+@router.get("/challenges/{cid}/assignable-users")
+async def assignable_users(cid: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    cid = await _resolve_cid(cid)
+    await _require_f1_result_permission(me, cid)
+    users = await db.users.find(
+        {},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1, "avatar_url": 1, "role": 1},
+    ).sort("display_name", 1).to_list(1000)
+    member_ids = set(await db.memberships.distinct("user_id", {"member_status": {"$in": ["active", "honorary"]}}))
+    for user in users:
+        user["is_club_member"] = user.get("id") in member_ids
+    return users
+
+
+@router.get("/challenges/{cid}/staff")
+async def list_challenge_staff(cid: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    cid = await _resolve_cid(cid)
+    if not _is_staff(me):
+        await _require_f1_result_permission(me, cid)
+    assignments = await db.f1_staff_assignments.find(
+        {"challenge_id": cid},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(500)
+    return await _enrich_f1_staff_assignments(assignments)
+
+
+@router.post("/challenges/{cid}/staff")
+async def create_challenge_staff(cid: str, body: dict, me: dict = Depends(require_admin())):
+    db = get_db()
+    cid = await _resolve_cid(cid)
+    user_id = body.get("user_id")
+    role = body.get("role") or "scorekeeper"
+    if role not in F1_RESULT_STAFF_ROLES:
+        raise HTTPException(status_code=400, detail="Ungueltige Fast-Lap-Rolle")
+    if not user_id or not await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=400, detail="Nutzer nicht gefunden")
+    existing = await db.f1_staff_assignments.find_one({
+        "challenge_id": cid,
+        "user_id": user_id,
+        "role": role,
+    })
+    if existing:
+        raise HTTPException(status_code=409, detail="Diese Zuweisung existiert bereits")
+    doc = {
+        "id": new_id(),
+        "challenge_id": cid,
+        "user_id": user_id,
+        "role": role,
+        "is_active": body.get("is_active") is not False,
+        "notes": body.get("notes") or "",
+        "created_by": me["id"],
+        "created_at": now_utc().isoformat(),
+        "updated_at": now_utc().isoformat(),
+    }
+    await db.f1_staff_assignments.insert_one(doc)
+    doc.pop("_id", None)
+    return (await _enrich_f1_staff_assignments([doc]))[0]
+
+
+@router.patch("/challenges/{cid}/staff/{assignment_id}")
+async def update_challenge_staff(cid: str, assignment_id: str, body: dict, me: dict = Depends(require_admin())):
+    db = get_db()
+    cid = await _resolve_cid(cid)
+    current = await db.f1_staff_assignments.find_one({"id": assignment_id, "challenge_id": cid}, {"_id": 0})
+    if not current:
+        raise HTTPException(status_code=404, detail="Zuweisung nicht gefunden")
+    updates = {}
+    if "is_active" in body:
+        updates["is_active"] = body.get("is_active") is not False
+    if "notes" in body:
+        updates["notes"] = body.get("notes") or ""
+    if "role" in body:
+        role = body.get("role")
+        if role not in F1_RESULT_STAFF_ROLES:
+            raise HTTPException(status_code=400, detail="Ungueltige Fast-Lap-Rolle")
+        updates["role"] = role
+    if not updates:
+        return current
+    updates["updated_at"] = now_utc().isoformat()
+    await db.f1_staff_assignments.update_one({"id": assignment_id}, {"$set": updates})
+    updated = await db.f1_staff_assignments.find_one({"id": assignment_id}, {"_id": 0})
+    return (await _enrich_f1_staff_assignments([updated]))[0]
+
+
+@router.delete("/challenges/{cid}/staff/{assignment_id}")
+async def delete_challenge_staff(cid: str, assignment_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    cid = await _resolve_cid(cid)
+    result = await db.f1_staff_assignments.delete_one({"id": assignment_id, "challenge_id": cid})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Zuweisung nicht gefunden")
+    return {"ok": True}
 
 
 @router.post("/challenges")
@@ -329,6 +469,10 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
             await _award_f1_season_points(c)
         except Exception:
             pass
+        try:
+            await _notify_f1_prize_winners(c)
+        except Exception:
+            pass
     return c
 
 
@@ -364,6 +508,51 @@ async def _award_f1_season_points(challenge: dict):
             )
 
 
+async def _notify_f1_prize_winners(challenge: dict) -> int:
+    db = get_db()
+    prize_places = challenge.get("prize_places") or []
+    if not prize_places:
+        return 0
+    tracks = await db.f1_tracks.find({"challenge_id": challenge["id"]}, {"_id": 0}).sort("order_index", 1).to_list(100)
+    if not tracks:
+        return 0
+    prize_ranks = []
+    for prize in prize_places:
+        try:
+            prize_ranks.append((int(prize.get("place")), prize))
+        except Exception:
+            continue
+    if not prize_ranks:
+        return 0
+    max_rank = max(rank for rank, _ in prize_ranks)
+    notified = 0
+    for track in tracks:
+        times = await db.f1_lap_times.find(
+            _official_time_query({"challenge_id": challenge["id"], "track_id": track["id"]}),
+            {"_id": 0},
+        ).to_list(5000)
+        user_ids = list({row.get("user_id") for row in times if row.get("user_id")})
+        users = {u["id"]: u for u in await db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}).to_list(500)} if user_ids else {}
+        entries = _best_lap_entries(times, users)[:max_rank]
+        by_rank = {entry["rank"]: entry for entry in entries}
+        for rank, prize in prize_ranks:
+            entry = by_rank.get(rank)
+            if not entry:
+                continue
+            from services.user_notifications import create_user_notification
+            prize_text = prize.get("value") or prize.get("label") or "ein Preis"
+            await create_user_notification(
+                entry["user_id"],
+                "Fast-Lap Gewinn",
+                f"{challenge.get('title') or 'Fast Lap'} - {track.get('name') or 'Strecke'}: Platz {rank}, {prize_text}. Bitte beim Team vor Ort melden.",
+                url=f"/fastlap/{challenge.get('slug') or challenge['id']}",
+                kind="f1_prize",
+                meta={"challenge_id": challenge["id"], "track_id": track["id"], "rank": rank},
+            )
+            notified += 1
+    return notified
+
+
 @router.delete("/challenges/{cid}")
 async def delete_challenge(cid: str, me: dict = Depends(require_admin())):
     db = get_db()
@@ -371,6 +560,7 @@ async def delete_challenge(cid: str, me: dict = Depends(require_admin())):
     await db.f1_challenges.delete_one({"id": cid})
     await db.f1_tracks.delete_many({"challenge_id": cid})
     await db.f1_lap_times.delete_many({"challenge_id": cid})
+    await db.f1_staff_assignments.delete_many({"challenge_id": cid})
     return {"ok": True}
 
 
@@ -502,13 +692,14 @@ async def championship_standings(cid: str, user=Depends(get_optional_user)):
 
 
 @router.post("/challenges/{cid}/times")
-async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_role("moderator"))):
+async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(get_current_user)):
     db = get_db()
     cid = await _resolve_cid(cid)
     # Verify
     c = await db.f1_challenges.find_one({"id": cid})
     if not c:
         raise HTTPException(status_code=404)
+    await _require_f1_result_permission(me, cid)
     if not await db.f1_tracks.find_one({"id": body.track_id, "challenge_id": cid}):
         raise HTTPException(status_code=400, detail="Strecke gehört nicht zur Challenge")
     if not await db.users.find_one({"id": body.user_id}):
@@ -606,8 +797,10 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(require_r
 
 
 @router.get("/challenges/{cid}/times")
-async def list_times(cid: str, track_id: str | None = None, user_id: str | None = None, me: dict = Depends(require_role("moderator"))):
+async def list_times(cid: str, track_id: str | None = None, user_id: str | None = None, me: dict = Depends(get_current_user)):
     db = get_db()
+    cid = await _resolve_cid(cid)
+    await _require_f1_result_permission(me, cid)
     q = {"challenge_id": cid}
     if track_id:
         q["track_id"] = track_id
@@ -632,11 +825,12 @@ async def list_times(cid: str, track_id: str | None = None, user_id: str | None 
 
 @router.put("/times/{time_id}")
 @router.patch("/times/{time_id}")
-async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(require_role("moderator"))):
+async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(get_current_user)):
     db = get_db()
     existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Lap-Time nicht gefunden")
+    await _require_f1_result_permission(me, existing.get("challenge_id"))
     nullable_fields = {"proof_url", "admin_note"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
@@ -667,8 +861,12 @@ async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(re
 
 
 @router.delete("/times/{time_id}")
-async def delete_time(time_id: str, me: dict = Depends(require_role("moderator"))):
+async def delete_time(time_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
+    existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0, "challenge_id": 1})
+    if not existing:
+        raise HTTPException(404, "Lap-Time nicht gefunden")
+    await _require_f1_result_permission(me, existing.get("challenge_id"))
     await db.f1_lap_times.delete_one({"id": time_id})
     return {"ok": True}
 

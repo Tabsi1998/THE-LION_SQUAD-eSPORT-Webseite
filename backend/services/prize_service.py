@@ -107,6 +107,20 @@ async def auto_create_for_tournament(tid: str) -> int:
         }
         await db.prize_pickups.insert_one(doc)
         created += 1
+        if uid:
+            try:
+                from services.user_notifications import create_user_notification
+                prize_text = doc.get("prize_value") or doc.get("prize_label") or "ein Preis"
+                await create_user_notification(
+                    uid,
+                    "Gewinn vorgemerkt",
+                    f"{doc.get('place_label') or _ordinal(place)} Platz bei {t.get('title') or 'dem Turnier'}: {prize_text}. Sobald der Gewinn abholbereit ist, bekommst du die naechste Meldung.",
+                    url="/me/prizes",
+                    kind="prize_pending",
+                    meta={"tournament_id": tid, "pickup_id": doc["id"], "place": place},
+                )
+            except Exception as exc:
+                logger.warning(f"[prizes] notification failed for pickup {doc['id']}: {exc}")
         logger.info(f"[prizes] created pickup {doc['id']} place {place} tournament {tid}")
     return created
 

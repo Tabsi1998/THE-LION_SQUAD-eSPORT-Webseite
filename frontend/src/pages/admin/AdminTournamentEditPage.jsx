@@ -414,8 +414,36 @@ export default function AdminTournamentEditPage() {
       toast.error(formatRequestError(err, "Teilnehmer konnte nicht hinzugefügt werden."));
     }
   };
+  const runPlanningCheck = async ({ silent = false } = {}) => {
+    const { data } = await api.get(`/tournaments/${id}/planning-check`);
+    const lines = [...(data.errors || []), ...(data.warnings || [])]
+      .slice(0, 8)
+      .map((item) => item.message)
+      .join("\n");
+    if (!silent) {
+      if (data.ok && !data.warning_count) toast.success(`Planung OK: ${data.checked_matches} Matches geprueft.`);
+      else toast[data.ok ? "warning" : "error"](`${data.error_count} Konflikte, ${data.warning_count} Hinweise${lines ? `\n${lines}` : ""}`);
+    }
+    return data;
+  };
   const setTournStatus = async (status) => {
     try {
+      if (status === "live") {
+        const report = await runPlanningCheck({ silent: true });
+        if (!report.ok || report.warning_count > 0) {
+          const lines = [...(report.errors || []), ...(report.warnings || [])]
+            .slice(0, 10)
+            .map((item) => item.message)
+            .join("\n");
+          const ok = await confirm({
+            title: report.ok ? "Mit Hinweisen live schalten?" : "Mit Planungskonflikten live schalten?",
+            description: `${report.error_count} Konflikte, ${report.warning_count} Hinweise.${lines ? `\n\n${lines}` : ""}`,
+            confirmLabel: "Trotzdem live",
+            tone: report.ok ? "info" : "danger",
+          });
+          if (!ok) return;
+        }
+      }
       const { data } = await api.post(`/tournaments/${id}/status`, { status });
       if (status === "check_in" && data?.auto_generated_bracket && data.auto_generated_bracket.ok !== false) {
         await autoAssignStations({ silent: true, reload: false });
@@ -579,6 +607,9 @@ export default function AdminTournamentEditPage() {
           {isModerator && stations.length > 0 && <button onClick={() => autoAssignStations()} data-testid="admin-tr-auto-stations" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
             <Zap className="w-3.5 h-3.5" /> Stationen automatisch
           </button>}
+          {isModerator && <button onClick={() => runPlanningCheck()} data-testid="admin-tr-planning-check" className="px-4 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#FFD700]/10 inline-flex items-center gap-2">
+            <Eye className="w-3.5 h-3.5" /> Planung pruefen
+          </button>}
           {isModerator && <button onClick={reset} data-testid="admin-tr-reset" className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-sm hover:border-[#FF3B30]/60 hover:text-[#FF3B30] inline-flex items-center gap-2">
             <RefreshCw className="w-3.5 h-3.5" /> Zurücksetzen
           </button>}
@@ -592,6 +623,7 @@ export default function AdminTournamentEditPage() {
             <a href={`${API}/exports/tournaments/${t.id}/participants.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF Teilnehmer</a>
             <a href={`${API}/exports/tournaments/${t.id}/checkin.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF Check-in</a>
             <a href={`${API}/exports/tournaments/${t.id}/matches.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF Spiele</a>
+            {isModerator && <a href={`${API}/tournaments/${t.id}/match-plan.csv`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">CSV Matchplan</a>}
           </div>
         </div>
       </div>

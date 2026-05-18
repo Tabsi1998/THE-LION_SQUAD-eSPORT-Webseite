@@ -1,9 +1,11 @@
 """Tournament + bracket routes."""
+import csv
+import io
 import re
 from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import math
 from pydantic import BaseModel, Field
 from database import get_db
@@ -15,6 +17,7 @@ from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     PARTICIPANT_STAFF_ROLES,
     READ_STAFF_ROLES,
+    RESULT_STAFF_ROLES,
     STRUCTURE_STAFF_ROLES,
     assigned_tournament_ids,
     has_tournament_staff_permission,
@@ -45,6 +48,8 @@ BRACKET_REFRESH_LOCKED_STATUSES = {"check_in", "live", "paused", "completed", "r
 TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
 LOCKABLE_TOURNAMENT_STATUSES = {"completed", "results_published", "archived", "cancelled"}
 MATCH_PLAN_FIELDS = ("scheduled_at", "duration_minutes", "station_id", "admin_note", "map", "best_of")
+MATCH_PLAN_ACTIVE_STATUSES = {"preview", "pending", "ready", "scheduled", "in_progress", "waiting_result"}
+MATCH_PLAN_DONE_STATUSES = {"completed", "forfeit", "cancelled", "archived", "bye"}
 
 
 class TournamentChatCreate(BaseModel):
@@ -168,6 +173,124 @@ def _apply_match_plan(matches: list[dict], plan: dict[tuple, dict], key_fn) -> l
         if fields.get("scheduled_at") and match.get("status") in {"preview", "pending", "ready", "scheduled"}:
             match["status"] = "scheduled"
     return matches
+
+
+def _parse_plan_dt(value) -> datetime | None:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
+def _plan_duration(match: dict, tournament: dict | None = None) -> int:
+    tournament = tournament or {}
+    raw = match.get("duration_minutes") or (match.get("settings") or {}).get("duration_minutes") or tournament.get("match_duration_minutes") or 30
+    try:
+        return max(1, int(raw))
+    except Exception:
+        return 30
+
+
+def _plan_match_label(match: dict) -> str:
+    return (
+        match.get("match_key")
+        or match.get("round_name")
+        or (f"Spiel #{int(match.get('match_index') or 0) + 1}" if match.get("match_index") is not None else None)
+        or match.get("id")
+        or "Match"
+    )
+
+
+def _plan_match_sort(match: dict) -> tuple:
+    scheduled = _parse_plan_dt(match.get("scheduled_at")) or datetime.max.replace(tzinfo=timezone.utc)
+    return (
+        scheduled,
+        int(match.get("stage_number") or 0),
+        str(match.get("section") or match.get("bracket") or ""),
+        int(match.get("round") or 0),
+        int(match.get("order") or match.get("position") or match.get("match_index") or 0),
+        str(match.get("match_key") or match.get("id") or ""),
+    )
+
+
+def _plan_station_label(match: dict) -> str:
+    return match.get("station_label") or match.get("station_name") or (match.get("station") or {}).get("name") or match.get("station_id") or ""
+
+
+def _has_playable_participants(match: dict) -> bool:
+    if match.get("slots"):
+        return len([slot for slot in match.get("slots") or [] if slot.get("registration_id")]) >= 1
+    return bool(match.get("participant_a_id") or match.get("participant_b_id"))
+
+
+async def _collect_plan_matches(db, tid: str) -> tuple[list[dict], dict]:
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
+    legacy = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    v2 = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    for match in legacy:
+        match["_collection"] = "matches"
+    for match in v2:
+        match["_collection"] = "matches_v2"
+    matches = legacy + v2
+    await attach_station_info(db, matches)
+    return sorted(matches, key=_plan_match_sort), tournament
+
+
+def _planning_report(matches: list[dict], tournament: dict | None = None) -> dict:
+    tournament = tournament or {}
+    warnings: list[dict] = []
+    errors: list[dict] = []
+    planned_by_station: dict[str, list[dict]] = {}
+    active_matches = [
+        match for match in matches
+        if match.get("status") not in MATCH_PLAN_DONE_STATUSES
+    ]
+    for match in active_matches:
+        label = _plan_match_label(match)
+        if not match.get("scheduled_at"):
+            warnings.append({"type": "missing_time", "severity": "warning", "match_id": match.get("id"), "label": label, "message": f"{label}: keine Startzeit geplant."})
+        if not match.get("station_id"):
+            warnings.append({"type": "missing_station", "severity": "warning", "match_id": match.get("id"), "label": label, "message": f"{label}: keine Station geplant."})
+        scheduled = _parse_plan_dt(match.get("scheduled_at"))
+        if scheduled and match.get("station_id"):
+            planned_by_station.setdefault(match["station_id"], []).append({
+                "match": match,
+                "start": scheduled,
+            })
+    for station_id, rows in planned_by_station.items():
+        enriched = []
+        for row in rows:
+            duration = _plan_duration(row["match"], tournament)
+            enriched.append({**row, "end": row["start"] + timedelta(minutes=duration), "duration": duration})
+        enriched.sort(key=lambda row: row["start"])
+        for index, current in enumerate(enriched):
+            for other in enriched[index + 1:]:
+                if other["start"] >= current["end"]:
+                    break
+                station = _plan_station_label(current["match"]) or station_id
+                msg = f"{station}: {_plan_match_label(current['match'])} überschneidet sich mit {_plan_match_label(other['match'])}."
+                errors.append({
+                    "type": "station_overlap",
+                    "severity": "error",
+                    "station_id": station_id,
+                    "station": station,
+                    "match_id": current["match"].get("id"),
+                    "other_match_id": other["match"].get("id"),
+                    "message": msg,
+                })
+    return {
+        "ok": not errors,
+        "error_count": len(errors),
+        "warning_count": len(warnings),
+        "checked_matches": len(active_matches),
+        "errors": errors,
+        "warnings": warnings,
+    }
 
 
 def _stage_defaults_for_tournament_format(tournament: dict, body: TournamentBracketStructurePayload | None = None) -> dict | None:
@@ -1153,6 +1276,10 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, user=Depe
     if was_old_slug and t.get("slug"):
         return RedirectResponse(url=f"/api/tournaments/{t['slug']}", status_code=301)
     await _enrich_tournament(t, user)
+    t["can_manage_results"] = bool(
+        is_admin
+        or await has_tournament_staff_permission(user, t["id"], RESULT_STAFF_ROLES)
+    )
     if t.get("event_id"):
         related_f1_query = {"event_id": t["event_id"]}
         if not is_admin:
@@ -2307,7 +2434,11 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
             logging.getLogger("tls.tournament").warning(f"results_published hook: {exc}")
 
     # Discord trigger
-    if prev != status and status in ("registration_open", "live", "completed", "results_published"):
+    is_public_discord_status = (
+        t.get("is_public") is not False
+        and (t.get("visibility") or "public") == "public"
+    )
+    if is_public_discord_status and prev != status and status in ("registration_open", "live", "completed", "results_published"):
         try:
             from discord_service import send_public_discord
             colors = {"registration_open": 0x00FF88, "live": 0x29B6E8,
@@ -2331,6 +2462,66 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
         except Exception:
             pass
     return {"ok": True, "auto_generated_bracket": auto_generated_bracket}
+
+
+@router.get("/{tid}/planning-check")
+async def planning_check(tid: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES)
+    matches, tournament = await _collect_plan_matches(db, tid)
+    return _planning_report(matches, tournament)
+
+
+@router.get("/{tid}/match-plan.csv")
+async def export_match_plan_csv(tid: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES)
+    matches, tournament = await _collect_plan_matches(db, tid)
+    reg_ids = set()
+    for match in matches:
+        if match.get("slots"):
+            reg_ids.update(slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id"))
+        else:
+            reg_ids.update([match.get("participant_a_id"), match.get("participant_b_id")])
+    regs = await db.tournament_registrations.find({"id": {"$in": list(reg_ids)}}, {"_id": 0}).to_list(1000) if reg_ids else []
+    reg_map = {reg["id"]: reg for reg in regs}
+
+    def _participants(match: dict) -> str:
+        if match.get("slots"):
+            labels = []
+            for slot in match.get("slots") or []:
+                reg = reg_map.get(slot.get("registration_id"))
+                labels.append(reg.get("display_name") or reg.get("ingame_name") if reg else (slot.get("source") or {}).get("raw") or f"Slot {slot.get('slot')}")
+            return " vs ".join([label for label in labels if label])
+        labels = []
+        for reg_id in [match.get("participant_a_id"), match.get("participant_b_id")]:
+            reg = reg_map.get(reg_id)
+            labels.append(reg.get("display_name") or reg.get("ingame_name") if reg else (reg_id or "Offen"))
+        return " vs ".join(labels)
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow(["Turnier", "Match", "Bereich", "Runde", "Start", "Dauer", "Station", "Status", "Teilnehmer"])
+    for match in matches:
+        writer.writerow([
+            tournament.get("title") or tid,
+            _plan_match_label(match),
+            match.get("section") or match.get("bracket") or "",
+            match.get("round_name") or match.get("round") or "",
+            match.get("scheduled_at") or "",
+            _plan_duration(match, tournament),
+            _plan_station_label(match),
+            match.get("status") or "",
+            _participants(match),
+        ])
+    filename = f"matchplan_{tournament.get('slug') or tid}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @router.get("/{tid}/bracket")
