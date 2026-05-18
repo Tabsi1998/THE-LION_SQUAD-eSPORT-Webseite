@@ -40,6 +40,7 @@ REGISTRATION_CHECKIN_STATUSES = {"approved", "checked_in", "no_show"}
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 LEGACY_AUTO_PREVIEW_FORMATS = {"single_elim", "double_elim", "round_robin", "league"}
 MAX_INITIAL_PREVIEW_MATCHES = 512
+BRACKET_REFRESH_LOCKED_STATUSES = {"check_in", "live", "paused", "completed", "results_published", "archived", "cancelled"}
 
 
 class TournamentChatCreate(BaseModel):
@@ -596,6 +597,8 @@ async def _refresh_stage_previews_after_registration(db, tournament: dict, actor
 
 async def _refresh_tournament_previews_after_registration(db, tournament: dict, actor_id: str | None) -> dict | None:
     """Refresh all draft bracket surfaces after participant changes."""
+    if tournament.get("status") in BRACKET_REFRESH_LOCKED_STATUSES:
+        return None
     tid = tournament["id"]
     stage_count = await db.tournament_stages.count_documents({"tournament_id": tid})
     if stage_count:
@@ -610,6 +613,105 @@ async def _refresh_tournament_previews_after_registration(db, tournament: dict, 
     if legacy_update:
         return {**legacy_update, "engine": legacy_update.get("engine") or "legacy"}
     return None
+
+
+async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: str | None) -> dict | None:
+    """Convert stage previews into fixed matches when check-in starts."""
+    tid = tournament["id"]
+    stages = await db.tournament_stages.find({"tournament_id": tid}, {"_id": 0}).sort("number", 1).to_list(200)
+    if not stages:
+        return None
+    registrations = await db.tournament_registrations.find(
+        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+        {"_id": 0},
+    ).to_list(5000)
+    if len(registrations) < 2:
+        return None
+
+    changed_stages: list[dict] = []
+    total_matches = 0
+    for stage in stages:
+        existing_matches = await db.matches_v2.find({"stage_id": stage["id"]}, {"_id": 0}).to_list(3000)
+        if existing_matches and not all(match.get("is_preview") for match in existing_matches):
+            continue
+        try:
+            matches = build_matches_v2_from_schema(tournament, stage, registrations, preview=False)
+        except BracketSchemaError:
+            continue
+        if not matches:
+            continue
+        if existing_matches:
+            match_ids = await db.matches_v2.distinct("id", {"stage_id": stage["id"]})
+            if match_ids:
+                await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
+            await db.matches_v2.delete_many({"stage_id": stage["id"]})
+        await db.matches_v2.insert_many(matches)
+        await db.tournament_stages.update_one(
+            {"id": stage["id"]},
+            {"$set": {"status": "ready", "updated_at": now_utc().isoformat()}},
+        )
+        changed_stages.append({
+            "stage_id": stage["id"],
+            "stage_number": stage.get("number"),
+            "stage_type": stage.get("stage_type"),
+            "match_count": len(matches),
+        })
+        total_matches += len(matches)
+
+    if not changed_stages:
+        return None
+    await _audit_tournament_action(
+        db,
+        "tournament.stage.finalize_checkin",
+        actor_id,
+        tid,
+        {
+            "stage_count": len(changed_stages),
+            "match_count": total_matches,
+            "participant_count": len(registrations),
+        },
+    )
+    return {
+        "ok": True,
+        "engine": "stages",
+        "match_count": total_matches,
+        "participant_count": len(registrations),
+        "stages": changed_stages,
+        "preview": False,
+    }
+
+
+async def _finalize_bracket_for_checkin(db, tournament: dict, actor_id: str | None) -> dict | None:
+    """Run the final bracket mix once when tournament check-in opens."""
+    tid = tournament["id"]
+    stage_count = await db.tournament_stages.count_documents({"tournament_id": tid})
+    if stage_count:
+        finalized = await _finalize_stage_previews_for_checkin(db, tournament, actor_id)
+        if finalized:
+            legacy_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+            if legacy_matches and all(match.get("is_preview") for match in legacy_matches):
+                await db.matches.delete_many({"tournament_id": tid})
+        return finalized
+
+    existing_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    can_replace_preview = bool(existing_matches) and all(match.get("is_preview") for match in existing_matches)
+    if existing_matches and not can_replace_preview:
+        return None
+    try:
+        result = await _generate_legacy_bracket_docs(
+            db,
+            tournament,
+            actor_id,
+            preview=False,
+            force=can_replace_preview,
+            set_live=False,
+        )
+    except HTTPException:
+        return None
+    return {**result, "engine": "legacy", "participant_count": await db.tournament_registrations.count_documents({
+        "tournament_id": tid,
+        "status": {"$in": ["approved", "checked_in"]},
+    })}
 
 
 async def _replace_registration_in_open_matches(db, tid: str, old_reg_id: str, new_reg: dict,
@@ -1267,9 +1369,6 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
         {"registration_id": reg_id, "from_status": reg.get("status"), "to_status": status},
     )
     updated = await db.tournament_registrations.find_one({"id": reg_id}, {"_id": 0})
-    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
-    if tournament:
-        updated["auto_bracket_update"] = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
     return updated
 
 
@@ -1662,11 +1761,7 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
         tid,
         {"registration_id": reg["id"], "from_status": reg.get("status"), "to_status": "checked_in"},
     )
-    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
-    auto_bracket_update = None
-    if tournament:
-        auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
-    return {"ok": True, "auto_bracket_update": auto_bracket_update}
+    return {"ok": True}
 
 
 # --- Bracket generation ---
@@ -1724,6 +1819,9 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
     prev = t.get("status")
     await db.tournaments.update_one({"id": tid}, {"$set": {"status": status, "updated_at": now_utc().isoformat()}})
     auto_generated_bracket = None
+    if prev != status and status == "check_in":
+        fresh_t = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or t
+        auto_generated_bracket = await _finalize_bracket_for_checkin(db, fresh_t, me.get("id"))
     if status == "live":
         try:
             stage_count = await db.tournament_stages.count_documents({"tournament_id": tid})

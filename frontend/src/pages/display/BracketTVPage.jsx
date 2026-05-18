@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { MascotBadge } from "@/components/tls/Logo";
 import { StatusBadge } from "@/components/tls/StatusBadge";
@@ -187,18 +187,18 @@ function TvMatchCard({ match, regMap }) {
         {isV2 ? (
           (match.slots || []).map((slot) => {
             const result = (match.results || []).find((row) => row.registration_id === slot.registration_id);
-            return <ParticipantRow key={slot.slot} label={participantLabel(slot, regMap)} result={result} position={slot.slot} />;
+            return <ParticipantRow key={slot.slot} participant={participantInfo(slot, regMap)} result={result} position={slot.slot} />;
           })
         ) : (
           <>
             <ParticipantRow
-              label={legacyParticipantLabel(match.participant_a_id, regMap)}
+              participant={legacyParticipantInfo(match.participant_a_id, regMap)}
               score={match.score_a}
               isWinner={match.winner_id && match.winner_id === match.participant_a_id}
               side="A"
             />
             <ParticipantRow
-              label={legacyParticipantLabel(match.participant_b_id, regMap)}
+              participant={legacyParticipantInfo(match.participant_b_id, regMap)}
               score={match.score_b}
               isWinner={match.winner_id && match.winner_id === match.participant_b_id}
               side="B"
@@ -217,16 +217,32 @@ function TvMatchCard({ match, regMap }) {
   );
 }
 
-function ParticipantRow({ label, result, score, isWinner, position, side }) {
+function ParticipantRow({ participant, result, score, isWinner, position, side }) {
   const rowScore = result?.score ?? result?.points ?? score;
   const rank = result?.rank ? `#${result.rank}` : null;
+  const avatar = participant?.avatar ? resolveMediaUrl(participant.avatar) : null;
+  const label = participant?.label || "Offen";
+  const subtitle = participant?.subtitle;
+  const initial = label.trim().charAt(0).toUpperCase() || side || position || "?";
   return (
     <div className={`flex items-center justify-between gap-2 px-2.5 py-1.5 border-b border-white/5 last:border-b-0 ${isWinner || result?.qualified ? "bg-[#29B6E8]/10" : ""}`}>
       <div className="flex items-center gap-2 min-w-0">
-        <span className="w-5 h-5 shrink-0 border border-white/10 bg-white/5 flex items-center justify-center text-[10px] font-bold text-white/55">
-          {side || position}
-        </span>
-        <span className={`truncate text-sm ${isWinner || result?.qualified ? "text-[#29B6E8] font-semibold" : "text-white/82"}`}>{label}</span>
+        <div className="relative shrink-0">
+          {avatar ? (
+            <img src={avatar} alt="" className="w-8 h-8 rounded-sm object-cover border border-white/10 bg-white/5" />
+          ) : (
+            <div className="w-8 h-8 rounded-sm border border-white/10 bg-white/5 flex items-center justify-center text-[11px] font-bold text-white/60">
+              {initial}
+            </div>
+          )}
+          <span className="absolute -bottom-1 -right-1 w-4 h-4 border border-black/70 bg-[#121212] flex items-center justify-center text-[9px] font-bold text-white/65">
+            {side || position}
+          </span>
+        </div>
+        <div className="min-w-0">
+          <div className={`truncate text-sm leading-tight ${isWinner || result?.qualified ? "text-[#29B6E8] font-semibold" : "text-white/84"}`}>{label}</div>
+          {subtitle && <div className="truncate text-[10px] uppercase tracking-wider text-white/35">{subtitle}</div>}
+        </div>
       </div>
       <div className="shrink-0 text-right font-display font-bold text-white/75">
         {rank || (rowScore != null ? rowScore : "—")}
@@ -374,6 +390,26 @@ function isMatchDone(match) {
   if (match.winner_id) return true;
   if ((match.results || []).length > 0 && ["completed", "archived"].includes(match.status)) return true;
   return false;
+}
+
+function participantInfo(slot, regMap) {
+  const reg = regMap.get(slot.registration_id);
+  const user = reg?.user || {};
+  return {
+    label: reg?.display_name || user.display_name || reg?.ingame_name || slot.source?.raw || "Offen",
+    avatar: user.avatar_url || reg?.avatar_url,
+    subtitle: user.username ? `@${user.username}` : (slot.registration_id ? null : "Freier Slot"),
+  };
+}
+
+function legacyParticipantInfo(registrationId, regMap) {
+  const reg = regMap.get(registrationId);
+  const user = reg?.user || {};
+  return {
+    label: reg?.display_name || user.display_name || reg?.ingame_name || (registrationId ? "-" : "Offen"),
+    avatar: user.avatar_url || reg?.avatar_url,
+    subtitle: user.username ? `@${user.username}` : (registrationId ? null : "Freier Slot"),
+  };
 }
 
 function participantLabel(slot, regMap) {
