@@ -53,7 +53,7 @@ def _effective_favicon_url(branding: dict) -> str:
     custom = branding.get("favicon_url")
     if custom and not _same_media_url(custom, branding.get("mascot_url")):
         return custom
-    return "/assets/brand/tls-favicon.png?v=20260517"
+    return "/assets/brand/tls-favicon.png?v=20260518"
 
 
 def _truthy_mail_config(mail: dict, legacy_email: dict) -> bool:

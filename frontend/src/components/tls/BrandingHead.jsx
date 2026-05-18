@@ -6,7 +6,7 @@ import { onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 const DEFAULT_TITLE = "THE LION SQUAD - eSPORTS";
 const DEFAULT_FAVICON = "/assets/brand/tls-favicon.png";
 const DEFAULT_SHARE_IMAGE = "/assets/brand/tls-wordmark.png";
-const FAVICON_VERSION = "20260517";
+const FAVICON_VERSION = "20260518";
 
 function upsertMeta(selector, attrs) {
   let el = document.head.querySelector(selector);

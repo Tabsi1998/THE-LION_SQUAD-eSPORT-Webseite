@@ -21,7 +21,7 @@ STAFF_HIDDEN_STATUSES = {"draft", "archived", "cancelled"}
 MARKDOWN_RE = re.compile(r"(!?\[[^\]]*\]\([^)]+\)|[`*_>#~-]+|\r?\n+)")
 HTML_RE = re.compile(r"<[^>]+>")
 DEFAULT_SHARE_IMAGE = "/assets/brand/tls-wordmark.png"
-DEFAULT_FAVICON = "/assets/brand/tls-favicon.png?v=20260517"
+DEFAULT_FAVICON = "/assets/brand/tls-favicon.png?v=20260518"
 
 
 def same_media_url(a: str | None, b: str | None) -> bool:
