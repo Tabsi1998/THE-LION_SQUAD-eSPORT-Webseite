@@ -1680,7 +1680,11 @@ async def pdf_tournament_matches(slug_or_id: str, me: dict = Depends(require_adm
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/stations.pdf")
-async def pdf_tournament_station_signs(slug_or_id: str, me: dict = Depends(require_admin())):
+async def pdf_tournament_station_signs(
+    slug_or_id: str,
+    orientation: Literal["portrait", "landscape"] = "portrait",
+    me: dict = Depends(require_admin()),
+):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
@@ -1689,8 +1693,8 @@ async def pdf_tournament_station_signs(slug_or_id: str, me: dict = Depends(requi
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
     return _pdf_response(
-        pdf_station_signs(t, stations, pdf_sponsors=sponsors, pdf_branding=branding),
-        f"stationen_{t['slug']}.pdf",
+        pdf_station_signs(t, stations, pdf_sponsors=sponsors, pdf_branding=branding, orientation=orientation),
+        f"stationen_{orientation}_{t['slug']}.pdf",
     )
 
 

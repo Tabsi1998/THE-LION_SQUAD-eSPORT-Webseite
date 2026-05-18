@@ -306,14 +306,21 @@ def _fit_font_size(text: str, max_width: float, font_name: str = "Helvetica-Bold
     return size
 
 
-def pdf_station_signs(tournament: dict, stations: list, pdf_sponsors: list | None = None, pdf_branding: dict | None = None) -> bytes:
-    """One print-friendly A4 page per station for event signage."""
+def pdf_station_signs(
+    tournament: dict,
+    stations: list,
+    pdf_sponsors: list | None = None,
+    pdf_branding: dict | None = None,
+    orientation: str = "portrait",
+) -> bytes:
+    """One print-friendly page per station for event signage."""
     buf = io.BytesIO()
-    c = pdf_canvas.Canvas(buf, pagesize=A4, pageCompression=1)
-    page_w, page_h = A4
+    page_size = landscape(A4) if orientation == "landscape" else A4
+    c = pdf_canvas.Canvas(buf, pagesize=page_size, pageCompression=1)
+    page_w, page_h = page_size
 
     class _Doc:
-        pagesize = A4
+        pagesize = page_size
         page = 1
 
     doc = _Doc()
@@ -329,9 +336,14 @@ def pdf_station_signs(tournament: dict, stations: list, pdf_sponsors: list | Non
         c.rect(0, page_h - 4, page_w, 4, fill=1, stroke=0)
         _draw_brand_header(c, doc, branding)
 
+        content_top = page_h - 2.65 * cm
+        content_bottom = 3.25 * cm
+        content_h = content_top - content_bottom
+        center_y = content_bottom + content_h * (0.53 if orientation == "landscape" else 0.50)
+
         c.setStrokeColor(colors.HexColor("#1F2937"))
-        c.setLineWidth(1)
-        c.roundRect(2 * cm, 3.65 * cm, page_w - 4 * cm, page_h - 6.25 * cm, 8, stroke=1, fill=0)
+        c.setLineWidth(1.2)
+        c.roundRect(1.55 * cm, content_bottom, page_w - 3.1 * cm, content_h, 8, stroke=1, fill=0)
 
         station_name = str(station.get("name") or station.get("label") or station.get("id") or "Station").strip()
         device = str(station.get("device_type") or "").strip()
@@ -339,35 +351,40 @@ def pdf_station_signs(tournament: dict, stations: list, pdf_sponsors: list | Non
         tournament_title = str(tournament.get("title") or "THE LION SQUAD Event").strip()
 
         c.setFillColor(CYAN)
-        c.setFont("Helvetica-Bold", 11)
-        c.drawCentredString(page_w / 2, page_h - 4.05 * cm, "SPIELSTATION")
+        c.setFont("Helvetica-Bold", 13 if orientation == "landscape" else 11)
+        c.drawCentredString(page_w / 2, content_top - 1.0 * cm, "SPIELSTATION")
 
         c.setFillColor(WHITE)
-        name_font_size = _fit_font_size(station_name.upper(), page_w - 5 * cm, start=74, minimum=36)
+        name_font_size = _fit_font_size(
+            station_name.upper(),
+            page_w - 3.6 * cm,
+            start=112 if orientation == "landscape" else 88,
+            minimum=42 if orientation == "landscape" else 34,
+        )
         c.setFont("Helvetica-Bold", name_font_size)
-        c.drawCentredString(page_w / 2, page_h / 2 + 2.0 * cm, station_name.upper())
+        c.drawCentredString(page_w / 2, center_y + (0.55 * cm if orientation == "landscape" else 1.65 * cm), station_name.upper())
 
         if device:
             c.setFillColor(CYAN)
-            c.setFont("Helvetica-Bold", 22)
-            c.drawCentredString(page_w / 2, page_h / 2 + 0.45 * cm, device.upper())
+            c.setFont("Helvetica-Bold", 30 if orientation == "landscape" else 24)
+            c.drawCentredString(page_w / 2, center_y - (1.05 * cm if orientation == "landscape" else 0.25 * cm), device.upper())
 
         c.setFillColor(colors.HexColor("#E5E7EB"))
-        c.setFont("Helvetica-Bold", 16)
-        c.drawCentredString(page_w / 2, page_h / 2 - 1.1 * cm, tournament_title[:72])
+        c.setFont("Helvetica-Bold", 16 if orientation == "landscape" else 15)
+        c.drawCentredString(page_w / 2, center_y - (2.25 * cm if orientation == "landscape" else 1.55 * cm), tournament_title[:86])
 
         if notes:
             c.setFillColor(MUTED)
             c.setFont("Helvetica", 12)
-            c.drawCentredString(page_w / 2, page_h / 2 - 2.15 * cm, notes[:96])
+            c.drawCentredString(page_w / 2, center_y - (3.1 * cm if orientation == "landscape" else 2.45 * cm), notes[:96])
 
         c.setStrokeColor(CYAN)
         c.setLineWidth(1.5)
-        c.line(4.2 * cm, page_h / 2 - 3.1 * cm, page_w - 4.2 * cm, page_h / 2 - 3.1 * cm)
+        c.line(3.4 * cm, content_bottom + 1.55 * cm, page_w - 3.4 * cm, content_bottom + 1.55 * cm)
 
         c.setFillColor(colors.HexColor("#64748B"))
         c.setFont("Helvetica-Bold", 8)
-        c.drawCentredString(page_w / 2, 3.18 * cm, "THE LION SQUAD eSPORTS")
+        c.drawCentredString(page_w / 2, 3.04 * cm, "THE LION SQUAD eSPORTS")
 
         _draw_sponsor_footer(c, doc, sponsors)
         c.setFillColor(MUTED)

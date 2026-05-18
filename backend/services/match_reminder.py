@@ -5,11 +5,12 @@ Idempotent via dedupe_key on the mail_jobs collection.
 """
 import logging
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from database import get_db
 from match_rules import participant_source_ids
 from models import now_utc
-from services.user_notifications import create_user_notification
+from services.user_notifications import build_public_url, create_user_notification
 
 logger = logging.getLogger("tls.match_reminders")
 
@@ -116,8 +117,9 @@ async def schedule_match_reminders() -> dict:
             diff_min = (scheduled - now).total_seconds() / 60
             # Tournament + opponent context
             t = await db.tournaments.find_one({"id": m.get("tournament_id")}, {"title": 1, "slug": 1}) or {}
-            url = f"/matches/{m.get('id')}" if collection_name == "matches" else f"/tournaments/{t.get('slug') or m.get('tournament_id')}/bracket"
-            when_str = scheduled.astimezone(timezone.utc).strftime("%d.%m. %H:%M UTC")
+            url = f"/matches/{m.get('id')}"
+            mail_url = await build_public_url(url)
+            when_str = scheduled.astimezone(ZoneInfo("Europe/Vienna")).strftime("%d.%m. %H:%M Uhr")
             station = await _station_label(m)
 
             participants = await _participants_for_match(m)
@@ -165,7 +167,7 @@ async def schedule_match_reminders() -> dict:
                         tournament_title=t.get("title", "Turnier"),
                         opponent=opp_name,
                         when=when_str,
-                        url=url,
+                        url=mail_url,
                         station=station,
                         dedupe_key=dedupe,
                     )

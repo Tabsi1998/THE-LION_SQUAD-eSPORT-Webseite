@@ -155,6 +155,10 @@ class TestPDFExports:
         r = admin_client.get(f"{BASE_URL}/api/exports/tournaments/mario-kart-winter-cup/stations.pdf")
         self._assert_pdf(r)
 
+    def test_station_signs_pdf_landscape(self, admin_client):
+        r = admin_client.get(f"{BASE_URL}/api/exports/tournaments/mario-kart-winter-cup/stations.pdf?orientation=landscape")
+        self._assert_pdf(r)
+
     def test_standings_pdf(self, admin_client):
         # public endpoint (no admin required)
         r = admin_client.get(f"{BASE_URL}/api/exports/tournaments/mario-kart-winter-cup/standings.pdf")

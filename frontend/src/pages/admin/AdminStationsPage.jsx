@@ -230,15 +230,26 @@ export default function AdminStationsPage() {
             {tournaments.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
           </select>
         </label>
-        <a
-          href={activeTid ? `${API}/exports/tournaments/${activeTid}/stations.pdf` : "#"}
-          target="_blank"
-          rel="noreferrer"
-          aria-disabled={!activeTid || !list.length}
-          className={`px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 ${!activeTid || !list.length ? "pointer-events-none opacity-40" : "hover:border-[#29B6E8]/50 hover:text-[#29B6E8]"}`}
-        >
-          PDF Stationsschilder
-        </a>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <a
+            href={activeTid ? `${API}/exports/tournaments/${activeTid}/stations.pdf?orientation=portrait` : "#"}
+            target="_blank"
+            rel="noreferrer"
+            aria-disabled={!activeTid || !list.length}
+            className={`px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 text-xs ${!activeTid || !list.length ? "pointer-events-none opacity-40" : "hover:border-[#29B6E8]/50 hover:text-[#29B6E8]"}`}
+          >
+            PDF Hochformat
+          </a>
+          <a
+            href={activeTid ? `${API}/exports/tournaments/${activeTid}/stations.pdf?orientation=landscape` : "#"}
+            target="_blank"
+            rel="noreferrer"
+            aria-disabled={!activeTid || !list.length}
+            className={`px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 text-xs ${!activeTid || !list.length ? "pointer-events-none opacity-40" : "hover:bg-[#29B6E8]/10"}`}
+          >
+            PDF Querformat
+          </a>
+        </div>
         <button type="button" onClick={autoAssign} disabled={!list.length || !unassignedMatches.length} className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
           <Wand2 className="w-4 h-4" /> Nächste Spiele verteilen
         </button>

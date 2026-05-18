@@ -21,6 +21,10 @@ function notificationDate(value) {
   }
 }
 
+function isExternalUrl(url) {
+  return /^https?:\/\//i.test(String(url || ""));
+}
+
 export function NotificationBell() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -30,6 +34,15 @@ export function NotificationBell() {
   const boxRef = useRef(null);
   const knownIdsRef = useRef(new Set());
   const didPrimeRef = useRef(false);
+
+  const openUrl = useCallback((url) => {
+    if (!url) return;
+    if (isExternalUrl(url)) {
+      window.location.href = url;
+      return;
+    }
+    navigate(url);
+  }, [navigate]);
 
   const load = useCallback(async () => {
     if (!user) {
@@ -44,17 +57,17 @@ export function NotificationBell() {
       setItems(rows);
       if (didPrimeRef.current) {
         rows
-          .filter((item) => item.kind === "match_reminder" && !item.read && item.id && !knownIdsRef.current.has(item.id))
-          .slice(0, 3)
+          .filter((item) => !item.read && item.id && !knownIdsRef.current.has(item.id))
+          .slice(0, 4)
           .forEach((item) => {
-            toast.info(item.title || "Match-Erinnerung", {
-              description: item.body || "Dein Match startet bald.",
+            toast.info(item.title || "Benachrichtigung", {
+              description: item.body || "Neue Benachrichtigung.",
               duration: 15000,
               action: item.url ? {
                 label: "Oeffnen",
                 onClick: async () => {
                   try { await api.post(`/admin/notifications/${item.id}/read`); } catch {}
-                  navigate(item.url);
+                  openUrl(item.url);
                 },
               } : undefined,
             });
@@ -65,7 +78,7 @@ export function NotificationBell() {
     } catch {
       setItems([]);
     }
-  }, [navigate, user]);
+  }, [openUrl, user]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -219,10 +232,18 @@ function NotificationRow({ item, onRead, onDelete, onClose }) {
     </div>
   );
   const className = `block flex-1 min-w-0 px-4 py-3 text-left transition ${item.read ? "hover:bg-white/[0.03]" : "bg-[#29B6E8]/5 hover:bg-[#29B6E8]/10"}`;
+  const handleOpen = () => {
+    onRead(item);
+    onClose();
+  };
   return (
     <div className="group border-b border-white/5 flex items-stretch">
-      {item.url ? (
-        <Link to={item.url} onClick={() => { onRead(item); onClose(); }} className={className}>
+      {item.url && isExternalUrl(item.url) ? (
+        <a href={item.url} onClick={handleOpen} className={className}>
+          {content}
+        </a>
+      ) : item.url ? (
+        <Link to={item.url} onClick={handleOpen} className={className}>
           {content}
         </Link>
       ) : (

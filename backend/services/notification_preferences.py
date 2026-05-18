@@ -82,6 +82,27 @@ TEMPLATE_CATEGORY = {
     "newsletter_event": "news_events",
 }
 
+NOTIFICATION_KIND_CATEGORY = {
+    "match_reminder": "match_reminders",
+    "match_station": "match_reminders",
+    "match_result": "match_reminders",
+    "tournament_checkin": "tournament_updates",
+    "tournament_chat_mention": "community_messages",
+    "team_chat_mention": "community_messages",
+    "direct_message": "community_messages",
+    "friend_request": "community_messages",
+    "friend_accept": "community_messages",
+    "team_invite": "community_messages",
+    "team_invite_accepted": "community_messages",
+    "team_role_changed": "community_messages",
+    "team_leader_transferred": "community_messages",
+    "f1_prize": "prize_updates",
+    "f1_prize_reminder": "prize_updates",
+    "prize_pending": "prize_updates",
+    "news_mention": "news_events",
+    "membership_update": "membership_updates",
+}
+
 
 REQUIRED_EMAIL_TEMPLATES = {
     "registration",
@@ -110,6 +131,14 @@ def email_allowed(user: dict | None, template_key: str, category: str | None = N
     if template_key in REQUIRED_EMAIL_TEMPLATES:
         return True
     category = category or TEMPLATE_CATEGORY.get(template_key)
+    if not category:
+        return True
+    prefs = normalized_preferences(user)
+    return bool(prefs.get(category, True))
+
+
+def notification_allowed(user: dict | None, kind: str, category: str | None = None) -> bool:
+    category = category or NOTIFICATION_KIND_CATEGORY.get(kind)
     if not category:
         return True
     prefs = normalized_preferences(user)

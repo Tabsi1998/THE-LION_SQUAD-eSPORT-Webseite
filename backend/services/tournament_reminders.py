@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 from database import get_db
 from services.notification_preferences import _site_base_url, send_user_template
+from services.user_notifications import create_user_notification
 
 logger = logging.getLogger("tls.tournament_reminders")
 
@@ -81,7 +82,7 @@ async def _unchecked_registration_users(tournament_id: str) -> list[dict]:
     if not user_ids:
         return []
     return await db.users.find(
-        {"id": {"$in": user_ids}, "email": {"$nin": [None, ""]}, "is_banned": {"$ne": True}},
+        {"id": {"$in": user_ids}, "is_banned": {"$ne": True}},
         {"_id": 0, "id": 1, "email": 1, "username": 1, "display_name": 1, "notification_preferences": 1, "newsletter_consent": 1},
     ).to_list(5000)
 
@@ -92,6 +93,7 @@ async def schedule_checkin_reminders(now: datetime | None = None) -> dict:
     checked = 0
     due_count = 0
     queued = 0
+    notifications = 0
     base_url = await _site_base_url()
     cursor = db.tournaments.find(
         {
@@ -109,15 +111,17 @@ async def schedule_checkin_reminders(now: datetime | None = None) -> dict:
         if not users:
             continue
         slug_or_id = tournament.get("slug") or tournament["id"]
-        url = f"{base_url}/tournaments/{slug_or_id}"
+        public_path = f"/tournaments/{slug_or_id}"
+        url = f"{base_url}{public_path}"
         for spec, target in due:
             due_count += 1
             target_iso = target.isoformat()
             for user in users:
+                dedupe_key = f"tournament_checkin:{tournament['id']}:{spec.label}:{target_iso}:{user['id']}"
                 kwargs = {
                     "tournament_title": tournament.get("title") or "Turnier",
                     "url": url,
-                    "dedupe_key": f"tournament_checkin:{tournament['id']}:{spec.label}:{target_iso}:{user['id']}",
+                    "dedupe_key": dedupe_key,
                     "mail_meta": {
                         "kind": "tournament_checkin",
                         "tournament_id": tournament["id"],
@@ -132,6 +136,43 @@ async def schedule_checkin_reminders(now: datetime | None = None) -> dict:
                 result = await send_user_template(user, spec.template_key, **kwargs)
                 if result.get("ok") and not result.get("skipped") and not result.get("deduped"):
                     queued += 1
+                existing_notification = await db.notifications.find_one(
+                    {
+                        "user_id": user["id"],
+                        "kind": "tournament_checkin",
+                        "meta.dedupe_key": dedupe_key,
+                    },
+                    {"_id": 1},
+                )
+                if not existing_notification:
+                    tournament_title = tournament.get("title") or "Turnier"
+                    if spec.label == "opens_10m":
+                        title = "Check-in startet gleich"
+                        body = f"{tournament_title}: Check-in startet um {_format_de_time(target)}."
+                    elif spec.label == "open_now":
+                        title = "Check-in ist offen"
+                        until = _format_de_time(tournament.get("check_in_until"))
+                        body = f"{tournament_title}: Check-in ist jetzt offen."
+                        if until:
+                            body += f" Bitte bis {until} einchecken."
+                    else:
+                        title = "Check-in endet bald"
+                        body = f"{tournament_title}: Check-in endet um {_format_de_time(target)}."
+                    created = await create_user_notification(
+                        user["id"],
+                        title=title,
+                        body=body,
+                        url=public_path,
+                        kind="tournament_checkin",
+                        meta={
+                            "dedupe_key": dedupe_key,
+                            "category": "tournament_updates",
+                            "tournament_id": tournament["id"],
+                            "reminder": spec.label,
+                        },
+                    )
+                    if created:
+                        notifications += 1
     if queued:
-        logger.info("[tournament-reminders] queued=%s checked=%s due=%s", queued, checked, due_count)
-    return {"checked": checked, "due": due_count, "queued": queued}
+        logger.info("[tournament-reminders] queued=%s notifications=%s checked=%s due=%s", queued, notifications, checked, due_count)
+    return {"checked": checked, "due": due_count, "queued": queued, "notifications": notifications}

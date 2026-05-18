@@ -4,6 +4,7 @@ from typing import Any
 
 from database import get_db
 from models import new_id, now_utc
+from services.notification_preferences import notification_allowed
 
 
 async def build_public_url(path: str = "") -> str:
@@ -30,6 +31,13 @@ async def create_user_notification(
 ) -> dict | None:
     if not user_id:
         return None
+    db = get_db()
+    user = await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0, "id": 1, "newsletter_consent": 1, "notification_preferences": 1},
+    )
+    if user and not notification_allowed(user, kind, (meta or {}).get("category")):
+        return None
     doc = {
         "id": new_id(),
         "user_id": user_id,
@@ -41,6 +49,6 @@ async def create_user_notification(
         "meta": meta or {},
         "created_at": now_utc().isoformat(),
     }
-    await get_db().notifications.insert_one(doc)
+    await db.notifications.insert_one(doc)
     doc.pop("_id", None)
     return doc
