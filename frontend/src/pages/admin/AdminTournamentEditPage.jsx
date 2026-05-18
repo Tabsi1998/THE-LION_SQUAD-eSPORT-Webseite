@@ -635,11 +635,11 @@ export default function AdminTournamentEditPage() {
           {isAdmin && t.format === "groups" && (
             <button onClick={generateGroups} data-testid="admin-tr-groups" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Gruppen generieren</button>
           )}
-          <div className="flex gap-1">
-            <a href={`${API}/exports/tournaments/${t.id}/participants.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF Teilnehmer</a>
-            <a href={`${API}/exports/tournaments/${t.id}/checkin.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF Check-in</a>
-            <a href={`${API}/exports/tournaments/${t.id}/matches.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF Spiele</a>
-            {isModerator && <a href={`${API}/tournaments/${t.id}/match-plan.csv`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">CSV Matchplan</a>}
+          <div className="grid grid-cols-2 sm:flex gap-1 w-full sm:w-auto">
+            <a href={`${API}/exports/tournaments/${t.id}/participants.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">PDF Teilnehmer</a>
+            <a href={`${API}/exports/tournaments/${t.id}/checkin.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">PDF Check-in</a>
+            <a href={`${API}/exports/tournaments/${t.id}/matches.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">PDF Spiele</a>
+            {isModerator && <a href={`${API}/tournaments/${t.id}/match-plan.csv`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">CSV Matchplan</a>}
           </div>
         </div>
       </div>
@@ -671,7 +671,41 @@ export default function AdminTournamentEditPage() {
           />
         )}
         <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="md:hidden divide-y divide-white/5">
+            {regs.map((r, i) => (
+              <div key={r.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[10px] uppercase tracking-widest text-white/35">#{i + 1}</div>
+                    <div className="mt-1 font-heading font-bold uppercase break-words">{r.display_name || r.user?.display_name || r.ingame_name}</div>
+                    <div className="mt-1 text-xs text-white/45 break-all">{r.discord || "Kein Discord"}</div>
+                  </div>
+                  <StatusBadge status={r.status} />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {isAdmin && (
+                    <select value={r.status} onChange={(e) => setRegStatus(r.id, e.target.value)} data-testid={`admin-reg-status-mobile-${r.id}`} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 text-xs rounded-sm">
+                      {["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"].map((s) => <option key={s} value={s}>{formatRegistrationStatus(s)}</option>)}
+                    </select>
+                  )}
+                  {isModerator && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
+                    <button type="button" onClick={() => setRegCheckinStatus(r.id, "checked_in")} className="px-2 py-2 border border-[#00FF88]/40 text-[#00FF88] rounded-sm text-[10px] font-bold uppercase">Check-in</button>
+                  )}
+                  {isModerator && r.status === "checked_in" && (
+                    <button type="button" onClick={() => setRegCheckinStatus(r.id, "approved")} className="px-2 py-2 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Auschecken</button>
+                  )}
+                  {isModerator && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
+                    <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
+                  )}
+                  {isModerator && (
+                    <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {regs.length === 0 && <div className="text-center py-10 text-white/40">Keine Anmeldungen</div>}
+          </div>
+          <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
               <tr>
@@ -732,7 +766,40 @@ export default function AdminTournamentEditPage() {
 
       {tab === "stages" && !hasFlexibleStructure && bracket?.matches && (
         <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="lg:hidden divide-y divide-white/5">
+            {bracket.matches.map((m) => {
+              const a = bracket.registrations.find((r) => r.id === m.participant_a_id);
+              const b = bracket.registrations.find((r) => r.id === m.participant_b_id);
+              return (
+                <div key={m.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[10px] uppercase tracking-widest text-white/35">{m.round_name || m.round}</div>
+                      <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-sm">
+                        <span className="truncate">{a?.display_name || "Offen"}</span>
+                        <span className="font-display font-bold tabular-nums">{m.score_a}</span>
+                        <span className="truncate">{b?.display_name || "Offen"}</span>
+                        <span className="font-display font-bold tabular-nums">{m.score_b}</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-[10px] uppercase tracking-wider text-white/45">
+                        <span>{stationDisplay(m, stations) ? `Station ${stationDisplay(m, stations)}` : "Station offen"}</span>
+                        {m.scheduled_at && <span>{formatDateTime(m.scheduled_at)}</span>}
+                      </div>
+                    </div>
+                    <StatusBadge status={m.status} />
+                  </div>
+                  <div className="space-y-2">
+                    {isModerator && canRecordResults && a && b && (
+                      <MatchResultControls match={m} a={a} b={b} onSave={updateMatchResult} />
+                    )}
+                    {isModerator && <MatchScheduleControls match={m} stations={stations} defaultScheduledAt={t.start_date} onSave={updateMatchSchedule} />}
+                    <Link to={`/matches/${m.id}`} className="inline-flex text-[#29B6E8] text-xs font-bold uppercase hover:text-white">Oeffnen</Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="hidden lg:block overflow-x-auto">
           <table className="w-full text-sm min-w-[720px]">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
               <tr>
