@@ -547,6 +547,7 @@ async def _refresh_preview_bracket_after_registration(db, tournament: dict, acto
         return None
     tid = tournament["id"]
     existing_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
     if existing_matches and not all(m.get("is_preview") for m in existing_matches):
         return None
     registrations = await db.tournament_registrations.find(
@@ -650,6 +651,8 @@ async def _refresh_stage_previews_after_registration(db, tournament: dict, actor
 
 async def _refresh_tournament_previews_after_registration(db, tournament: dict, actor_id: str | None) -> dict | None:
     """Refresh all draft bracket surfaces after participant changes."""
+    if tournament.get("status") == "check_in":
+        return await _rebuild_checkin_bracket_after_staff_change(db, tournament, actor_id)
     if tournament.get("status") in BRACKET_REFRESH_LOCKED_STATUSES:
         return None
     tid = tournament["id"]
@@ -750,6 +753,14 @@ async def _finalize_bracket_for_checkin(db, tournament: dict, actor_id: str | No
     can_replace_preview = bool(existing_matches) and all(match.get("is_preview") for match in existing_matches)
     if existing_matches and not can_replace_preview:
         return None
+    if v2_matches and not all(_v2_match_can_be_rebuilt(match) for match in v2_matches):
+        return None
+    if v2_matches:
+        match_ids = [match["id"] for match in v2_matches if match.get("id")]
+        if match_ids:
+            await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
+        await db.matches_v2.delete_many({"tournament_id": tid})
+
     try:
         result = await _generate_legacy_bracket_docs(
             db,
@@ -765,6 +776,140 @@ async def _finalize_bracket_for_checkin(db, tournament: dict, actor_id: str | No
         "tournament_id": tid,
         "status": {"$in": ["approved", "checked_in"]},
     })}
+
+
+def _legacy_match_can_be_rebuilt(match: dict) -> bool:
+    status = match.get("status") or "pending"
+    if match.get("is_preview") or status in {"pending", "ready", "scheduled", "cancelled"}:
+        return True
+    if status == "completed":
+        a_id = match.get("participant_a_id")
+        b_id = match.get("participant_b_id")
+        winner_id = match.get("winner_id")
+        if bool(a_id) != bool(b_id) and winner_id in {a_id, b_id}:
+            return True
+    return False
+
+
+def _v2_match_can_be_rebuilt(match: dict) -> bool:
+    status = match.get("status") or "pending"
+    if match.get("is_preview") or status in {"pending", "ready", "scheduled", "cancelled"}:
+        return True
+    if status == "completed" and (match.get("result_meta") or {}).get("source") == "auto_bye":
+        return True
+    return False
+
+
+async def _rebuild_checkin_bracket_after_staff_change(db, tournament: dict, actor_id: str | None) -> dict | None:
+    """Rebuild the fixed check-in bracket after staff changes, until real play starts."""
+    tid = tournament["id"]
+    registrations = await db.tournament_registrations.find(
+        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+        {"_id": 0},
+    ).to_list(5000)
+    if len(registrations) < 2:
+        return None
+
+    legacy_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    locked_legacy = [m.get("id") for m in legacy_matches if not _legacy_match_can_be_rebuilt(m)]
+    locked_v2 = [m.get("id") for m in v2_matches if not _v2_match_can_be_rebuilt(m)]
+    if locked_legacy or locked_v2:
+        return {
+            "ok": False,
+            "reason": "matches_started",
+            "preview": False,
+            "participant_count": len(registrations),
+            "locked_match_count": len(locked_legacy) + len(locked_v2),
+        }
+
+    stages = await db.tournament_stages.find(
+        {"tournament_id": tid},
+        {"_id": 0},
+    ).sort("number", 1).to_list(200)
+    if stages:
+        if legacy_matches:
+            await db.matches.delete_many({"tournament_id": tid})
+        if v2_matches:
+            match_ids = [match["id"] for match in v2_matches if match.get("id")]
+            if match_ids:
+                await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
+            await db.matches_v2.delete_many({"tournament_id": tid})
+
+        changed_stages: list[dict] = []
+        total_matches = 0
+        for stage in stages:
+            try:
+                matches = build_matches_v2_from_schema(tournament, stage, registrations, preview=False)
+            except BracketSchemaError as exc:
+                return {
+                    "ok": False,
+                    "reason": "schema_error",
+                    "detail": str(exc),
+                    "preview": False,
+                    "participant_count": len(registrations),
+                }
+            if not matches:
+                continue
+            await db.matches_v2.insert_many(matches)
+            await db.tournament_stages.update_one(
+                {"id": stage["id"]},
+                {"$set": {"status": "ready", "updated_at": now_utc().isoformat()}},
+            )
+            changed_stages.append({
+                "stage_id": stage["id"],
+                "stage_number": stage.get("number"),
+                "stage_type": stage.get("stage_type"),
+                "match_count": len(matches),
+            })
+            total_matches += len(matches)
+
+        if not changed_stages:
+            return None
+        await _audit_tournament_action(
+            db,
+            "tournament.stage.checkin_rebuild_after_registration",
+            actor_id,
+            tid,
+            {
+                "stage_count": len(changed_stages),
+                "match_count": total_matches,
+                "participant_count": len(registrations),
+            },
+        )
+        return {
+            "ok": True,
+            "engine": "stages",
+            "match_count": total_matches,
+            "participant_count": len(registrations),
+            "stages": changed_stages,
+            "preview": False,
+            "reason": "checkin_rebuild",
+        }
+
+    try:
+        result = await _generate_legacy_bracket_docs(
+            db,
+            tournament,
+            actor_id,
+            preview=False,
+            force=bool(legacy_matches),
+            set_live=False,
+        )
+    except HTTPException as exc:
+        return {
+            "ok": False,
+            "reason": "generator_error",
+            "detail": exc.detail,
+            "preview": False,
+            "participant_count": len(registrations),
+        }
+    return {
+        **result,
+        "engine": "legacy",
+        "participant_count": len(registrations),
+        "reason": "checkin_rebuild",
+    }
 
 
 async def _replace_registration_in_open_matches(db, tid: str, old_reg_id: str, new_reg: dict,

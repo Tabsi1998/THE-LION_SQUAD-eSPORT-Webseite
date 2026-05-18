@@ -243,8 +243,12 @@ export default function AdminTournamentEditPage() {
   const autoAssignStations = async ({ silent = false, reload = true } = {}) => {
     if (!stations.length) return null;
     try {
-      const { data } = await api.post(`/stations/auto-assign?tournament_id=${encodeURIComponent(id)}`);
-      if (!silent) toast.success(`${data.assigned || 0} Match${Number(data.assigned) === 1 ? "" : "es"} automatisch Stationen zugewiesen.`);
+      const { data } = await api.post(`/stations/auto-assign?tournament_id=${encodeURIComponent(id)}&plan=true`);
+      if (!silent) {
+        toast.success(data.planned
+          ? `${data.assigned || 0} Match${Number(data.assigned) === 1 ? "" : "es"} mit Station und Startzeit geplant.`
+          : `${data.assigned || 0} Match${Number(data.assigned) === 1 ? "" : "es"} automatisch Stationen zugewiesen.`);
+      }
       if (reload) load();
       return data;
     } catch (e) {
@@ -310,7 +314,10 @@ export default function AdminTournamentEditPage() {
   };
   const setRegStatus = async (rid, status) => {
     try {
-      await api.patch(`/tournaments/${id}/registrations/${rid}`, { status });
+      const { data } = await api.patch(`/tournaments/${id}/registrations/${rid}`, { status });
+      if (data?.auto_bracket_update?.preview === false && data.auto_bracket_update?.ok !== false) {
+        await autoAssignStations({ silent: true, reload: false });
+      }
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Teilnehmerstatus konnte nicht gespeichert werden."));
@@ -356,8 +363,13 @@ export default function AdminTournamentEditPage() {
       tone: "danger",
     })) return;
     try {
-      await api.delete(`/tournaments/${id}/registrations/${registration.id}`);
-      toast.success("Teilnehmer entfernt.");
+      const { data } = await api.delete(`/tournaments/${id}/registrations/${registration.id}`);
+      if (data?.auto_bracket_update?.preview === false && data.auto_bracket_update?.ok !== false) {
+        await autoAssignStations({ silent: true, reload: false });
+      }
+      toast.success(data?.auto_bracket_update?.match_count
+        ? `Teilnehmer entfernt. ${data.auto_bracket_update.preview === false ? "Turnierbaum" : "Vorschau"} neu gemischt.`
+        : "Teilnehmer entfernt.");
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Teilnehmer konnte nicht entfernt werden."));
@@ -380,11 +392,22 @@ export default function AdminTournamentEditPage() {
       const { data } = await api.post(`/tournaments/${id}/registrations`, payload);
       const replacement = data.replacement;
       const autoBracketUpdate = data.auto_bracket_update;
-      toast.success(replacement
+      if (autoBracketUpdate?.preview === false && autoBracketUpdate?.ok !== false) {
+        await autoAssignStations({ silent: true, reload: false });
+      }
+      if (!replacement && autoBracketUpdate?.ok === false) {
+        toast.success(autoBracketUpdate.reason === "matches_started"
+          ? "Teilnehmer hinzugefügt. Turnierbaum bleibt fix, weil bereits Spiele aktiv oder gewertet sind."
+          : `Teilnehmer hinzugefügt. Turnierbaum konnte nicht automatisch neu gebaut werden${autoBracketUpdate.detail ? `: ${autoBracketUpdate.detail}` : "."}`);
+      } else if (!replacement && autoBracketUpdate?.match_count) {
+        toast.success(`Teilnehmer hinzugefügt. ${autoBracketUpdate.preview === false ? "Turnierbaum" : "Vorschau"} mit ${autoBracketUpdate.participant_count} Teilnehmern neu gemischt.`);
+      } else {
+        toast.success(replacement
         ? `Teilnehmer hinzugefügt und ${replacement.legacy_matches + replacement.v2_matches} Spielplätze ersetzt.`
         : autoBracketUpdate?.match_count
           ? `Teilnehmer hinzugefügt. Vorschau mit ${autoBracketUpdate.participant_count} Teilnehmern neu gemischt.`
           : "Teilnehmer hinzugefügt.");
+      }
       setParticipantForm({ user_id: "", team_id: "", display_name: "", ingame_name: "", discord: "", status: "approved", seed: "", replace_registration_id: "" });
       load();
     } catch (err) {
@@ -393,7 +416,10 @@ export default function AdminTournamentEditPage() {
   };
   const setTournStatus = async (status) => {
     try {
-      await api.post(`/tournaments/${id}/status`, { status });
+      const { data } = await api.post(`/tournaments/${id}/status`, { status });
+      if (status === "check_in" && data?.auto_generated_bracket && data.auto_generated_bracket.ok !== false) {
+        await autoAssignStations({ silent: true, reload: false });
+      }
       toast.success(`Status: ${TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status}`);
       load();
     } catch (e) {

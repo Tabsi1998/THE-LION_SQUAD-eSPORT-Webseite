@@ -1,5 +1,5 @@
 """Station routes."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
@@ -62,10 +62,30 @@ def _match_sort_key(match: dict) -> tuple:
     return (
         scheduled_dt,
         int(match.get("stage_number") or 0),
+        match.get("section") or match.get("bracket") or "",
         int(match.get("round") or 0),
         int(match.get("order") or match.get("position") or 0),
+        int(match.get("match_index") or 0),
         match.get("match_key") or match.get("id") or "",
     )
+
+
+def _parse_dt(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
+def _duration_for_match(match: dict, tournament: dict) -> int:
+    duration = match.get("duration_minutes") or (match.get("settings") or {}).get("duration_minutes") or tournament.get("match_duration_minutes") or 30
+    try:
+        return max(1, int(duration))
+    except Exception:
+        return 30
 
 
 async def _station_label(station: dict) -> str:
@@ -237,34 +257,67 @@ async def bulk_create_stations(body: dict, me: dict = Depends(require_admin())):
 
 @router.post("/auto-assign")
 async def auto_assign_stations(tournament_id: str, start_now: bool = False,
+                               plan: bool = True,
                                me: dict = Depends(get_current_user)):
     db = get_db()
-    if not await db.tournaments.find_one({"id": tournament_id}, {"id": 1}):
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+    if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     await _ensure_tournament_unlocked(db, tournament_id)
     await require_tournament_staff_permission(me, tournament_id, STATION_ASSIGN_ROLES, "tournament")
-    stations = await db.stations.find({
-        "tournament_id": tournament_id,
-        "status": {"$in": ["free", "reserved"]},
-        "$or": [{"current_match_id": None}, {"current_match_id": {"$exists": False}}],
-    }, {"_id": 0}).sort("name", 1).to_list(200)
+    station_query = {"tournament_id": tournament_id, "status": {"$ne": "broken"}}
+    if start_now or not plan:
+        station_query = {
+            **station_query,
+            "status": {"$in": ["free", "reserved"]},
+            "$or": [{"current_match_id": None}, {"current_match_id": {"$exists": False}}],
+        }
+    stations = await db.stations.find(station_query, {"_id": 0}).sort("name", 1).to_list(200)
+    if not stations:
+        return {"assigned": 0, "items": [], "planned": bool(plan and not start_now)}
     matches = await db.matches.find({
         "tournament_id": tournament_id,
         "station_id": {"$in": [None, ""]},
-        "status": {"$in": ["ready", "scheduled"]},
+        "status": {"$in": ["pending", "ready", "scheduled"]},
     }, {"_id": 0}).to_list(1000)
     matches_v2 = await db.matches_v2.find({
         "tournament_id": tournament_id,
         "station_id": {"$in": [None, ""]},
-        "status": {"$in": ["ready", "scheduled"]},
+        "status": {"$in": ["pending", "ready", "scheduled"]},
     }, {"_id": 0}).to_list(3000)
     candidates = [("matches", m) for m in matches] + [("matches_v2", m) for m in matches_v2]
     candidates.sort(key=lambda item: _match_sort_key(item[1]))
+
+    if plan and not start_now:
+        start_at = _parse_dt(tournament.get("start_date")) or now_utc()
+        station_available_at = {station["id"]: start_at for station in stations}
+        assigned = []
+        for collection_name, match in candidates:
+            station = min(stations, key=lambda item: (station_available_at[item["id"]], item.get("name") or item["id"]))
+            scheduled_at = station_available_at[station["id"]]
+            duration_minutes = _duration_for_match(match, tournament)
+            await db[collection_name].update_one({"id": match["id"]}, {"$set": {
+                "station_id": station["id"],
+                "scheduled_at": scheduled_at.isoformat(),
+                "duration_minutes": duration_minutes,
+                "status": "scheduled" if match.get("status") in {"pending", "ready", "scheduled"} else match.get("status"),
+                "updated_at": now_utc().isoformat(),
+            }})
+            station_available_at[station["id"]] = scheduled_at + timedelta(minutes=duration_minutes)
+            assigned.append({
+                "station_id": station["id"],
+                "match_id": match["id"],
+                "match_type": collection_name,
+                "scheduled_at": scheduled_at.isoformat(),
+                "duration_minutes": duration_minutes,
+            })
+        return {"assigned": len(assigned), "items": assigned, "planned": True}
+
     assigned = []
     for station, (collection_name, match) in zip(stations, candidates):
         await _assign_match_to_station(db, station, match, collection_name, start_now=start_now)
         assigned.append({"station_id": station["id"], "match_id": match["id"], "match_type": collection_name})
-    return {"assigned": len(assigned), "items": assigned}
+    return {"assigned": len(assigned), "items": assigned, "planned": False}
 
 
 @router.post("/{sid}/assign/{match_id}")
