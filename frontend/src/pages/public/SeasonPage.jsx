@@ -15,6 +15,12 @@ function rankColor(rank) {
   return "text-[#29B6E8]";
 }
 
+function formatPoints(value) {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return 0;
+  return Number.isInteger(number) ? number : number.toFixed(1);
+}
+
 const POINT_SOURCES = [
   {
     icon: Trophy,
@@ -36,15 +42,15 @@ const POINT_SOURCES = [
   },
   {
     icon: Star,
-    title: "Achievements",
+    title: "Profilpunkte",
     tone: "violet",
-    text: "Achievements geben Profilpunkte und schalten weitere Ranglisten-Erfolge frei. Saisonpunkte erzeugen wiederum eigene Achievements.",
+    text: "Achievements sind eigene Profilpunkte. Sie erklären dein Account-Level, werden aber nicht still in die Season-Wertung gemischt.",
   },
   {
     icon: MessageCircle,
     title: "Community",
     tone: "white",
-    text: "Discord-, Stream-, Team- und Community-Aktivität kann über Achievements oder manuelle Admin-Wertungen Punkte bringen.",
+    text: "Community-Aktivität zählt für die Season nur dann, wenn sie als Event, Challenge oder manuelle Admin-Wertung eingetragen ist.",
   },
 ];
 
@@ -76,6 +82,7 @@ export default function SeasonPage() {
   const standings = data.standings || [];
   const topThree = standings.slice(0, 3);
   const totalPoints = standings.reduce((sum, row) => sum + Number(row.points || 0), 0);
+  const totalProfilePoints = standings.reduce((sum, row) => sum + Number(row.profile_points || row.achievement_points || 0), 0);
   const totalRatings = standings.reduce((sum, row) => sum + Number(row.events_count || 0), 0);
   const tournamentCount = s.tournament_ids?.length || 0;
   const fastLapCount = s.f1_challenge_ids?.length || 0;
@@ -104,9 +111,9 @@ export default function SeasonPage() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <StatCard icon={Users} label="Teilnehmer" value={standings.length} />
-              <StatCard icon={BarChart3} label="Punkte" value={totalPoints} />
-              <StatCard icon={Trophy} label="Turniere" value={tournamentCount} />
-              <StatCard icon={Flag} label="Challenges" value={fastLapCount} />
+              <StatCard icon={BarChart3} label="Season-Punkte" value={formatPoints(totalPoints)} />
+              <StatCard icon={Star} label="Profilpunkte" value={formatPoints(totalProfilePoints)} />
+              <StatCard icon={Flag} label="Wertungen" value={totalRatings} />
             </div>
           </div>
         </div>
@@ -148,9 +155,9 @@ export default function SeasonPage() {
             <Trophy className="w-4 h-4 text-[#FFD700]"/><h2 className="font-heading font-bold uppercase">Gesamtwertung</h2>
           </div>
           <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm min-w-[720px]">
+            <table className="w-full text-sm min-w-[900px]">
               <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
-                <tr><th className="text-left px-4 py-3 w-14">#</th><th className="text-left px-4 py-3">Teilnehmer</th><th className="text-right px-4 py-3">Wertungen</th><th className="text-right px-4 py-3">Erfolge</th><th className="text-right px-4 py-3 font-display">Punkte</th></tr>
+                <tr><th className="text-left px-4 py-3 w-14">#</th><th className="text-left px-4 py-3">Teilnehmer</th><th className="text-left px-4 py-3">Quellen</th><th className="text-right px-4 py-3">Wertungen</th><th className="text-right px-4 py-3">Achievements</th><th className="text-right px-4 py-3">Siege</th><th className="text-right px-4 py-3 font-display">Season-Punkte</th></tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {standings.map((r)=>(
@@ -159,12 +166,19 @@ export default function SeasonPage() {
                     <td className="px-4 py-3">
                       <PlayerIdentity row={r} />
                     </td>
+                    <td className="px-4 py-3">
+                      <SourceBreakdown row={r} />
+                    </td>
                     <td className="px-4 py-3 text-right text-white/70">{r.events_count}</td>
+                    <td className="px-4 py-3 text-right text-white/70">
+                      <div className="font-bold text-white/80">{r.achievement_count || 0}</div>
+                      <div className="text-[10px] uppercase tracking-widest text-white/35">{formatPoints(r.profile_points || r.achievement_points || 0)} Profil</div>
+                    </td>
                     <td className="px-4 py-3 text-right text-white/70">{r.wins}</td>
-                    <td className="px-4 py-3 text-right font-display font-bold text-[#29B6E8] text-lg">{r.points}</td>
+                    <td className="px-4 py-3 text-right font-display font-bold text-[#29B6E8] text-lg">{formatPoints(r.points)}</td>
                   </tr>
                 ))}
-                {standings.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-white/40">Noch keine Ergebnisse</td></tr>}
+                {standings.length === 0 && <tr><td colSpan="7" className="text-center py-10 text-white/40">Noch keine Ergebnisse</td></tr>}
               </tbody>
             </table>
           </div>
@@ -174,8 +188,9 @@ export default function SeasonPage() {
                 <div className={`font-display text-2xl font-black w-10 ${rankColor(r.rank)}`}>#{r.rank}</div>
                 <PlayerIdentity row={r} />
                 <div className="ml-auto text-right">
-                  <div className="font-display text-2xl font-black text-[#29B6E8]">{r.points}</div>
-                  <div className="text-[10px] uppercase tracking-widest text-white/40">{r.events_count} Wertungen · {r.wins} Erfolge</div>
+                  <div className="font-display text-2xl font-black text-[#29B6E8]">{formatPoints(r.points)}</div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/40">{r.events_count} Wertungen · {r.wins} Siege</div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/30">{r.achievement_count || 0} Achievements</div>
                 </div>
               </div>
             ))}
@@ -188,7 +203,7 @@ export default function SeasonPage() {
               <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#29B6E8]">Punkte</div>
               <h2 className="mt-1 font-heading text-2xl md:text-3xl font-black uppercase">Wie du Punkte sammelst</h2>
             </div>
-            <div className="text-xs text-white/45">Alles zählt, sobald es bestätigt oder veröffentlicht ist.</div>
+            <div className="text-xs text-white/45">Season-Punkte und Profilpunkte bleiben getrennt nachvollziehbar.</div>
           </div>
           <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-3">
             {POINT_SOURCES.map((item) => <PointSourceCard key={item.title} {...item} />)}
@@ -196,7 +211,7 @@ export default function SeasonPage() {
         </section>
 
         <section className="mt-8 grid lg:grid-cols-[1.15fr_0.85fr] gap-4">
-          <InfoPanel icon={Award} title="Punktewertung" text="Season-Punkte werden aus echten Wertungseinträgen berechnet: Turnier- und Fast-Lap-Ergebnisse, bestätigte Event-Teilnahme sowie manuelle Admin-Wertungen. Platz, Gewichtung, Teilnehmerfeld und Boni fließen in die Summe ein." />
+          <InfoPanel icon={Award} title="Punktewertung" text="Season-Punkte werden aus echten Wertungseinträgen berechnet: Turnier- und Fast-Lap-Ergebnisse, bestätigte Event-Teilnahme sowie manuelle Admin-Wertungen. Achievements bleiben als Profilpunkte sichtbar, damit die Rangliste nicht heimlich zwei Systeme vermischt." />
           <InfoPanel icon={Medal} title="Streichresultate" text={s.drop_worst ? `${s.drop_worst} schlechteste Resultat(e) werden nicht in die Gesamtpunkte gerechnet.` : "Alle gewerteten Resultate zählen in die Gesamtwertung."} />
         </section>
       </div>
@@ -245,6 +260,26 @@ function PlayerIdentity({ row }) {
   );
 }
 
+function SourceBreakdown({ row }) {
+  const items = (row.source_breakdown || []).filter((item) => Number(item.total_points || 0) > 0).slice(0, 3);
+  if (!items.length) return <span className="text-xs text-white/35">Keine Detaildaten</span>;
+  return (
+    <div className="flex flex-wrap gap-1.5 max-w-xs">
+      {items.map((item) => (
+        <span key={item.source_type} className="inline-flex items-center gap-1 rounded-sm border border-white/10 bg-black/25 px-2 py-1 text-[10px] uppercase tracking-wider text-white/60">
+          <span className="text-white/80">{item.label}</span>
+          <span className="font-display text-[#29B6E8]">{formatPoints(item.total_points)}</span>
+        </span>
+      ))}
+      {row.dropped_events > 0 && (
+        <span className="inline-flex items-center rounded-sm border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-1 text-[10px] uppercase tracking-wider text-[#FFD700]">
+          {row.dropped_events} gestrichen
+        </span>
+      )}
+    </div>
+  );
+}
+
 function PodiumCard({ row }) {
   const content = (
     <>
@@ -256,9 +291,9 @@ function PodiumCard({ row }) {
         <PlayerIdentity row={row} />
       </div>
       <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-        <MiniStat label="Punkte" value={row.points} />
+        <MiniStat label="Season" value={formatPoints(row.points)} />
         <MiniStat label="Wertungen" value={row.events_count} />
-        <MiniStat label="Erfolge" value={row.wins} />
+        <MiniStat label="Profil" value={formatPoints(row.profile_points || row.achievement_points || 0)} />
       </div>
     </>
   );

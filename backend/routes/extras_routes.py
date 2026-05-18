@@ -1231,7 +1231,18 @@ async def my_season_points(me: dict = Depends(get_current_user)):
         {"season_id": season["id"], "user_id": me["id"]}, {"_id": 0},
     ).sort("created_at", -1).to_list(500)
     total = round(sum(e.get("total_points", 0) for e in entries), 1)
-    return {"season": season, "total": total, "entries": entries}
+    from services.season_service import _achievement_summaries, _summarise_point_entries
+    achievements = (await _achievement_summaries(db, [me["id"]])).get(me["id"], {})
+    return {
+        "season": season,
+        "total": total,
+        "season_points": total,
+        "entries": entries,
+        "source_breakdown": _summarise_point_entries(entries, max(int(season.get("drop_worst") or 0), 0)).get("source_breakdown", []),
+        "achievement_count": achievements.get("achievement_count", 0),
+        "achievement_points": achievements.get("achievement_points", 0),
+        "profile_points": achievements.get("achievement_points", 0),
+    }
 
 
 @season_router.post("/v2/award")

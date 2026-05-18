@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, ArrowRight, CheckCircle2, Star, Timer } from "lucide-react";
+import { Trophy, ArrowRight, CheckCircle2, BarChart3, Timer } from "lucide-react";
 
 /**
  * SeasonPassWidget — Animierter Champion-Ticker.
@@ -40,7 +40,7 @@ export function SeasonPassWidget() {
     { icon: Trophy, label: "Turniere" },
     { icon: Timer, label: "Fast Lap" },
     { icon: CheckCircle2, label: "Event-Check-in" },
-    { icon: Star, label: "Achievements" },
+    { icon: BarChart3, label: "Profilpunkte separat" },
   ];
 
   return (
@@ -63,7 +63,7 @@ export function SeasonPassWidget() {
               <span className="text-white">{s.name}</span>
             </h2>
             <p className="mt-4 text-white/70 text-base max-w-md">
-              {s.description || "Die Vereinswertung bündelt Punkte aus Turnieren, Challenges, Achievements und Community-Aktivität."}
+              {s.description || "Die Vereinswertung bündelt bestätigte Season-Punkte aus Turnieren, Challenges, Events und Admin-Wertungen."}
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2 max-w-md">
               {pointHints.map(({ icon: Icon, label }) => (

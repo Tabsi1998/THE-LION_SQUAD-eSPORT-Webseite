@@ -164,6 +164,16 @@ Live angebundene Quellen:
 - Twitch Live-Sessions und Stream-Minuten
 - Discord-Nachrichten-Counter
 
+## Season Pass und Profilpunkte
+
+Season-Punkte und Achievement-/Profilpunkte sind absichtlich getrennte Wertungen:
+
+- Season-Punkte kommen aus gewerteten Quellen wie Turnieren, Fast-Lap-Challenges, Events und manuellen Admin-Wertungen.
+- Die Season-Rangliste sortiert nach Season-Punkten, nicht nach der Anzahl der Achievements.
+- Achievements erzeugen Profilpunkte und Account-Level. Diese werden in der Season-Tabelle separat angezeigt, damit Unterschiede nachvollziehbar bleiben.
+- Pro Teilnehmer zeigt die Season-Tabelle eine Quellen-Aufschluesselung, z.B. Turniere, Fast Lap, Events oder Admin-Wertungen.
+- Streichresultate werden in der Gesamtwertung abgezogen und als gestrichene Wertungen sichtbar gemacht.
+
 Manuelle Quellen:
 
 - Community-Hilfe, Mentor, Creator, besondere Events
