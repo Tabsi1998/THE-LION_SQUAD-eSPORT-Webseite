@@ -18,6 +18,17 @@ updates:
       time: "04:15"
       timezone: Europe/Vienna
     open-pull-requests-limit: 5
+    groups:
+      backend-python:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
     commit-message:
       prefix: chore
 
@@ -29,6 +40,17 @@ updates:
       time: "04:30"
       timezone: Europe/Vienna
     open-pull-requests-limit: 5
+    groups:
+      frontend-npm:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
     commit-message:
       prefix: chore
 
@@ -40,5 +62,26 @@ updates:
       time: "04:45"
       timezone: Europe/Vienna
     open-pull-requests-limit: 5
+    groups:
+      mobile-expo:
+        patterns:
+          - "expo"
+          - "expo-*"
+          - "@expo/*"
+          - "react"
+          - "react-native"
+        update-types:
+          - minor
+          - patch
+      mobile-npm:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
     commit-message:
       prefix: chore

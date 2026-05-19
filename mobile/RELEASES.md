@@ -41,8 +41,8 @@ THE-LION-SQUAD-android-alpha-v0.1.0-alpha.1-<commit>.apk
 Fuer einen echten GitHub-Release einen Tag pushen:
 
 ```bash
-git tag mobile-v0.1.0-alpha.1
-git push origin mobile-v0.1.0-alpha.1
+git tag mobile-v0.1.0-alpha.2
+git push origin mobile-v0.1.0-alpha.2
 ```
 
 Der Workflow haengt die APK automatisch an den Release. Alpha- und Beta-Releases werden als `prerelease` markiert.
