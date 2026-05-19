@@ -63,6 +63,8 @@ export function TournamentsScreen({ navigation }: Props) {
 
   useEffect(() => {
     load();
+    const timer = setInterval(load, 30000);
+    return () => clearInterval(timer);
   }, [load]);
 
   const items = useMemo(() => {
@@ -104,6 +106,11 @@ export function TournamentsScreen({ navigation }: Props) {
     const visible = mapped.filter((item) => matchesFilter(item, filter));
     return visible.sort((a, b) => dateSort(a.date) - dateSort(b.date));
   }, [events, fastlaps, filter, tournaments]);
+  const groupedItems = useMemo(() => ({
+    events: items.filter((item) => item.kind === "event"),
+    tournaments: items.filter((item) => item.kind === "tournament"),
+    fastlaps: items.filter((item) => item.kind === "fastlap"),
+  }), [items]);
 
   const open = useCallback((item: HubItem) => {
     if (item.kind === "event") navigation.navigate("EventDetail", { id: item.id });
@@ -144,13 +151,29 @@ export function TournamentsScreen({ navigation }: Props) {
           <Stat label="Fast Laps" value={String(fastlaps.length)} />
         </View>
 
-        {items.length ? (
+        {items.length && filter === "all" ? (
+          <>
+            <HubSection title="Events" items={groupedItems.events} onOpen={open} />
+            <HubSection title="Turniere" items={groupedItems.tournaments} onOpen={open} />
+            <HubSection title="Fast Laps" items={groupedItems.fastlaps} onOpen={open} />
+          </>
+        ) : items.length ? (
           items.map((item) => <HubCard key={`${item.kind}-${item.id}`} item={item} onPress={() => open(item)} />)
         ) : (
           <EmptyState title="Keine Eintraege" detail="Fuer diese Auswahl sind aktuell keine sichtbaren Inhalte vorhanden." />
         )}
       </ScrollView>
     </Screen>
+  );
+}
+
+function HubSection({ title, items, onOpen }: { title: string; items: HubItem[]; onOpen: (item: HubItem) => void }) {
+  if (!items.length) return null;
+  return (
+    <View style={styles.section}>
+      <Heading>{title}</Heading>
+      {items.map((item) => <HubCard key={`${item.kind}-${item.id}`} item={item} onPress={() => onOpen(item)} />)}
+    </View>
   );
 }
 
@@ -268,6 +291,9 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     gap: 12,
+  },
+  section: {
+    gap: 10,
   },
   image: {
     borderRadius: 8,

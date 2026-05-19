@@ -5,6 +5,7 @@ import { formatDate } from "../lib/format";
 import { colors } from "../theme";
 import type { ChatMessage } from "../types";
 import { EmptyState, LoadingState } from "./ListState";
+import { RichText } from "./RichText";
 import { Body, Muted } from "./Text";
 
 type Props = {
@@ -51,6 +52,8 @@ export function ChatThreadView({
 
   useEffect(() => {
     load();
+    const timer = setInterval(load, 7000);
+    return () => clearInterval(timer);
   }, [load]);
 
   const send = useCallback(async () => {
@@ -106,7 +109,9 @@ function MessageBubble({ message, own }: { message: ChatMessage; own: boolean })
         <Body style={[styles.author, own && styles.ownText]}>{name}</Body>
         {message.created_at ? <Muted style={own && styles.ownMuted}>{formatDate(message.created_at)}</Muted> : null}
       </View>
-      <Body style={own && styles.ownText}>{message.message}</Body>
+      <View style={own && styles.ownRichText}>
+        <RichText text={message.message} compact />
+      </View>
     </View>
   );
 }
@@ -146,6 +151,9 @@ const styles = StyleSheet.create({
   },
   ownText: {
     color: colors.white,
+  },
+  ownRichText: {
+    opacity: 0.98,
   },
   ownMuted: {
     color: "rgba(255,255,255,0.68)",

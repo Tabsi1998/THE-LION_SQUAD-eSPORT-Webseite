@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { EmptyState, LoadingState } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
+import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
@@ -36,7 +37,6 @@ export function NewsDetailScreen({ navigation, route }: Props) {
     load();
   }, [load]);
 
-  const paragraphs = useMemo(() => splitContent(post), [post]);
   const contentImages = useMemo(() => extractImages(post), [post]);
 
   if (loading) {
@@ -67,8 +67,8 @@ export function NewsDetailScreen({ navigation, route }: Props) {
           <Muted>{formatDate(post.published_at || post.created_at)}{post.category ? ` · ${post.category}` : ""}</Muted>
           <Title>{post.title}</Title>
           {post.excerpt || post.summary ? <Body style={styles.lead}>{post.excerpt || post.summary}</Body> : null}
-          {paragraphs.length ? (
-            paragraphs.map((paragraph, index) => <Body key={`${index}-${paragraph.slice(0, 12)}`}>{paragraph}</Body>)
+          {post.content || post.body ? (
+            <RichText text={post.content || post.body} />
           ) : (
             <Muted>Kein weiterer Inhalt hinterlegt.</Muted>
           )}
@@ -85,6 +85,27 @@ export function NewsDetailScreen({ navigation, route }: Props) {
             </View>
           ) : null}
         </View>
+
+        {(post as any).mentioned_users?.length ? (
+          <Card style={styles.card}>
+            <Heading>Markierte Personen</Heading>
+            <View style={styles.mentionGrid}>
+              {(post as any).mentioned_users.map((user: any) => (
+                <View key={user.id || user.username} style={styles.mentionCard}>
+                  <MediaImage
+                    uri={user.avatar_url}
+                    style={styles.mentionAvatar}
+                    fallback={<Body style={styles.mentionInitial}>{(user.display_name || user.username || "?").slice(0, 1).toUpperCase()}</Body>}
+                  />
+                  <View style={styles.flex}>
+                    <Body style={styles.strong}>{user.display_name || user.username}</Body>
+                    {user.username ? <Muted>@{user.username}</Muted> : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </Card>
+        ) : null}
 
         {post.linked_tournaments?.length ? (
           <Card style={styles.card}>
@@ -114,22 +135,24 @@ export function NewsDetailScreen({ navigation, route }: Props) {
             ))}
           </Card>
         ) : null}
+
+        {(post as any).linked_f1_challenges?.length ? (
+          <Card style={styles.card}>
+            <Heading>Verknuepfte Fast Laps</Heading>
+            {(post as any).linked_f1_challenges.map((challenge: any) => (
+              <Pressable key={challenge.id} onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "FastLapDetail", params: { id: challenge.slug || challenge.id } })} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
+                <View style={styles.flex}>
+                  <Body style={styles.strong}>{challenge.title}</Body>
+                  <Muted>{formatDate(challenge.start_date)} · {formatStatus(challenge.status)}</Muted>
+                </View>
+                <Ionicons name="chevron-forward" color={colors.muted} size={18} />
+              </Pressable>
+            ))}
+          </Card>
+        ) : null}
       </ScrollView>
     </Screen>
   );
-}
-
-function splitContent(post: NewsPost | null) {
-  const raw = post?.content || post?.body || "";
-  return String(raw)
-    .replace(/!\[[^\]]*]\([^)]+\)/g, "\n")
-    .replace(/<img[^>]+>/gi, "\n")
-    .replace(/https?:\/\/\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?/gi, "\n")
-    .replace(/<[^>]+>/g, "\n")
-    .split(/\n{2,}|\r\n{2,}/)
-    .map((item) => item.replace(/\s+/g, " ").trim())
-    .filter(Boolean)
-    .slice(0, 24);
 }
 
 function extractImages(post: NewsPost | null) {
@@ -187,6 +210,28 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
     gap: 2,
+  },
+  mentionGrid: {
+    gap: 10,
+  },
+  mentionCard: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 10,
+  },
+  mentionAvatar: {
+    borderRadius: 8,
+    height: 42,
+    width: 42,
+  },
+  mentionInitial: {
+    color: colors.cyan,
+    fontWeight: "900",
   },
   strong: {
     fontWeight: "900",

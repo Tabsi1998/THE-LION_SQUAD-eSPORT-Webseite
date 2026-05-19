@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { EmptyState, LoadingState } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
@@ -80,6 +79,8 @@ export function DashboardScreen({ navigation }: Props) {
 
   useEffect(() => {
     load();
+    const timer = setInterval(load, 30000);
+    return () => clearInterval(timer);
   }, [load]);
 
   const timeline = useMemo(() => {
@@ -182,7 +183,7 @@ export function DashboardScreen({ navigation }: Props) {
           </Section>
         ) : null}
 
-        <Section title="News" actionLabel="Aktualisieren" onAction={load}>
+        <Section title="News">
           {data.news.length ? (
             data.news.slice(0, 4).map((post) => (
               <NewsCard
@@ -196,7 +197,6 @@ export function DashboardScreen({ navigation }: Props) {
           )}
         </Section>
 
-        <Button label="Aktualisieren" variant="secondary" onPress={load} />
       </ScrollView>
     </Screen>
   );

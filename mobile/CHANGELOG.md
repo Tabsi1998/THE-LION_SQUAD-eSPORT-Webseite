@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.0-alpha.14 - 2026-05-19
+
+- Added a native rich-text renderer for mobile Markdown, simple HTML formatting, links, lists, quotes, code, mentions, and hashtags.
+- Applied rich-text rendering to news, event content, and chat messages so website formatting no longer appears as raw text.
+- Added a global in-app notification provider with foreground polling, notification popups, and a floating bell with unread count.
+- Made the notification inbox refresh automatically and keep the global unread badge in sync.
+- Grouped the Events hub into Events, Turniere, and Fast Laps when showing all content.
+- Removed visible manual refresh actions from Home and added background polling for Home and the Events hub.
+- Added a mobile roadmap documenting remaining website-parity gaps and rollout phases.
+
 ## 0.1.0-alpha.13 - 2026-05-19
 
 - Reworked the bottom "Turniere" area into an "Events" hub for all visible events, tournaments, and Fast-Lap challenges.

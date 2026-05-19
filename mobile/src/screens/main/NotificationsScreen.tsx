@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Button } from "../../components/Button";
@@ -7,7 +7,8 @@ import { EmptyState, LoadingState } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
-import { formatDate } from "../../lib/format";
+import { formatDateTime } from "../../lib/format";
+import { useNotifications } from "../../notifications/NotificationContext";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { UserNotification } from "../../types";
@@ -16,6 +17,7 @@ type Props = NativeStackScreenProps<MoreStackParamList, "Notifications">;
 
 export function NotificationsScreen({ navigation }: Props) {
   const [items, setItems] = useState<UserNotification[]>([]);
+  const { load: loadLiveNotifications, markAllRead: markAllLiveRead, markRead: markLiveRead } = useNotifications();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -24,32 +26,39 @@ export function NotificationsScreen({ navigation }: Props) {
     try {
       const { data } = await api.get<UserNotification[]>("/admin/notifications");
       setItems(Array.isArray(data) ? data : []);
+      await loadLiveNotifications();
     } catch (err) {
       setError(errorMessage(err, "Benachrichtigungen konnten nicht geladen werden."));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadLiveNotifications]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", load);
     load();
-    return unsubscribe;
+    const timer = setInterval(load, 15000);
+    return () => {
+      clearInterval(timer);
+      unsubscribe();
+    };
   }, [load, navigation]);
 
   const markAllRead = useCallback(async () => {
     await api.post("/admin/notifications/read-all");
+    await markAllLiveRead();
     await load();
-  }, [load]);
+  }, [load, markAllLiveRead]);
 
   const markRead = useCallback(async (item: UserNotification) => {
     if (!item.read) {
       await api.post(`/admin/notifications/${item.id}/read`);
+      await markLiveRead(item);
       setItems((rows) => rows.map((row) => row.id === item.id ? { ...row, read: true } : row));
     }
-  }, []);
+  }, [markLiveRead]);
 
-  const unread = items.filter((item) => !item.read).length;
+  const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
 
   return (
     <Screen padded={false}>
@@ -73,7 +82,7 @@ export function NotificationsScreen({ navigation }: Props) {
               {item.body ? <Body>{item.body}</Body> : null}
               <View style={styles.meta}>
                 {item.kind ? <Muted style={styles.kind}>{item.kind}</Muted> : null}
-                {item.created_at ? <Muted>{formatDate(item.created_at)}</Muted> : null}
+                {item.created_at ? <Muted>{formatDateTime(item.created_at)}</Muted> : null}
               </View>
             </Card>
           </Pressable>

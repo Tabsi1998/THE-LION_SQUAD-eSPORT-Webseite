@@ -6,6 +6,7 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { EmptyState, LoadingState } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
+import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
@@ -62,7 +63,6 @@ export function EventDetailScreen({ navigation, route }: Props) {
     load();
   }, [load]);
 
-  const paragraphs = useMemo(() => splitText(event?.program || event?.description || ""), [event]);
   const registrationOpen = event?.has_registration && event.public_phase?.state === "registration_open";
   const registered = event?.own_registration && !["cancelled", "no_show"].includes(String(event.own_registration.status || ""));
 
@@ -166,7 +166,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
 
         <Card style={styles.card}>
           <Heading>Infos</Heading>
-          {paragraphs.length ? paragraphs.map((paragraph, index) => <Body key={`${index}-${paragraph.slice(0, 10)}`}>{paragraph}</Body>) : <Muted>Keine weiteren Event-Infos hinterlegt.</Muted>}
+          {event.program || event.description ? <RichText text={event.program || event.description} /> : <Muted>Keine weiteren Event-Infos hinterlegt.</Muted>}
         </Card>
 
         {event.tournaments?.length ? (
@@ -229,17 +229,6 @@ export function EventDetailScreen({ navigation, route }: Props) {
       </ScrollView>
     </Screen>
   );
-}
-
-function splitText(value: string) {
-  return String(value || "")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n\n")
-    .replace(/<[^>]+>/g, " ")
-    .split(/\n{2,}|\r\n{2,}/)
-    .map((item) => item.replace(/\s+/g, " ").trim())
-    .filter(Boolean)
-    .slice(0, 24);
 }
 
 function Pill({ label, tone = "cyan" }: { label: string; tone?: "cyan" | "gold" }) {

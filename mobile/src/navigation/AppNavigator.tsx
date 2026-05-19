@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
+import { NavigationContainer, DefaultTheme, createNavigationContainerRef } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import React from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { BootScreen } from "../screens/BootScreen";
 import { LoginScreen } from "../screens/auth/LoginScreen";
 import { RegisterScreen } from "../screens/auth/RegisterScreen";
@@ -26,6 +27,8 @@ import { TournamentChatScreen } from "../screens/main/TournamentChatScreen";
 import { TournamentDetailScreen } from "../screens/main/TournamentDetailScreen";
 import { TournamentsScreen } from "../screens/main/TournamentsScreen";
 import { useAuth } from "../auth/AuthContext";
+import { isGuestUser } from "../live";
+import { useNotifications } from "../notifications/NotificationContext";
 import { colors } from "../theme";
 import type {
   AuthStackParamList,
@@ -40,6 +43,7 @@ const Tabs = createBottomTabNavigator<MainTabParamList>();
 const TournamentStack = createNativeStackNavigator<TournamentStackParamList>();
 const TeamStack = createNativeStackNavigator<TeamStackParamList>();
 const MoreStack = createNativeStackNavigator<MoreStackParamList>();
+const navigationRef = createNavigationContainerRef<MainTabParamList>();
 
 const theme = {
   ...DefaultTheme,
@@ -55,12 +59,14 @@ const theme = {
 
 export function AppNavigator() {
   const { user, loading } = useAuth();
+  const signedIn = Boolean(user && !isGuestUser(user));
 
   if (loading) return <BootScreen />;
 
   return (
-    <NavigationContainer theme={theme}>
+    <NavigationContainer ref={navigationRef} theme={theme}>
       {user ? <MainTabs /> : <AuthScreens />}
+      {signedIn ? <NotificationBellOverlay /> : null}
     </NavigationContainer>
   );
 }
@@ -161,7 +167,7 @@ function iconFor(route: keyof MainTabParamList) {
     case "Dashboard":
       return "home-outline";
     case "Tournaments":
-      return "trophy-outline";
+      return "calendar-outline";
     case "Teams":
       return "people-outline";
     case "Profile":
@@ -170,3 +176,62 @@ function iconFor(route: keyof MainTabParamList) {
       return "grid-outline";
   }
 }
+
+function NotificationBellOverlay() {
+  const insets = useSafeAreaInsets();
+  const { unread, load } = useNotifications();
+  return (
+    <Pressable
+      onPress={() => {
+        load();
+        navigationRef.navigate("More", { screen: "Notifications" });
+      }}
+      style={({ pressed }) => [styles.bell, { top: Math.max(insets.top + 6, 12) }, pressed && styles.pressed]}
+      hitSlop={8}
+    >
+      <Ionicons name="notifications-outline" color={unread ? colors.cyan : colors.white} size={21} />
+      {unread ? (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{unread > 99 ? "99+" : unread}</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  bell: {
+    alignItems: "center",
+    backgroundColor: "rgba(18,18,18,0.92)",
+    borderColor: colors.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: "center",
+    position: "absolute",
+    right: 14,
+    width: 40,
+    zIndex: 40,
+  },
+  badge: {
+    alignItems: "center",
+    backgroundColor: colors.live,
+    borderColor: colors.black,
+    borderRadius: 9,
+    borderWidth: 1,
+    minWidth: 18,
+    paddingHorizontal: 4,
+    position: "absolute",
+    right: -2,
+    top: -3,
+  },
+  badgeText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: "900",
+    lineHeight: 15,
+  },
+  pressed: {
+    opacity: 0.72,
+  },
+});
