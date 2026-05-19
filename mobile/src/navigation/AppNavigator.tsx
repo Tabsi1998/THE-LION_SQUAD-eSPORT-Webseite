@@ -9,6 +9,8 @@ import { LoginScreen } from "../screens/auth/LoginScreen";
 import { RegisterScreen } from "../screens/auth/RegisterScreen";
 import { DashboardScreen } from "../screens/main/DashboardScreen";
 import { MoreScreen } from "../screens/main/MoreScreen";
+import { NewsDetailScreen } from "../screens/main/NewsDetailScreen";
+import { NewsScreen } from "../screens/main/NewsScreen";
 import { ProfileScreen } from "../screens/main/ProfileScreen";
 import { InfoCenterScreen } from "../screens/main/InfoCenterScreen";
 import { TeamDetailScreen } from "../screens/main/TeamDetailScreen";
@@ -131,6 +133,8 @@ function MoreStackScreen() {
     <MoreStack.Navigator screenOptions={stackOptions}>
       <MoreStack.Screen name="MoreHub" component={MoreScreen} options={{ headerShown: false }} />
       <MoreStack.Screen name="InfoCenter" component={InfoCenterScreen} options={{ title: "Info Center" }} />
+      <MoreStack.Screen name="NewsList" component={NewsScreen} options={{ title: "News" }} />
+      <MoreStack.Screen name="NewsDetail" component={NewsDetailScreen} options={{ title: "News" }} />
     </MoreStack.Navigator>
   );
 }

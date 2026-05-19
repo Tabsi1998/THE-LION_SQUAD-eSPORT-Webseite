@@ -2,7 +2,7 @@
   "expo": {
     "name": "THE LION SQUAD",
     "slug": "the-lion-squad",
-    "version": "0.1.0-alpha.6",
+    "version": "0.1.0-alpha.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -17,7 +17,7 @@
     },
     "android": {
       "package": "at.lionsquad.app",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0A0A"

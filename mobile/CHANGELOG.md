@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-alpha.7 - 2026-05-19
+
+- Added a native News area with list and detail screens, including linked tournaments and events.
+- Made Home news cards open the matching native news detail view.
+- Added `/api/mobile/profile/references` for personal tournament and Fast-Lap references from the logged-in user's live account data.
+- Added a "Referenzen" profile tab for personal placements, Fast-Lap ranks, podiums, wins, and season points.
+- Moved public club CMS references out of the main app module list so "Referenzen" now means user profile history.
+
 ## 0.1.0-alpha.6 - 2026-05-19
 
 - Added `/api/mobile/dashboard` as a native app dashboard feed for user-specific tournaments, events, open matches, actions, public upcoming items, and latest news.

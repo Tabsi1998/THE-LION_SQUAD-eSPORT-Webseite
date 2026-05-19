@@ -6,11 +6,12 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
-import { displayName } from "../../lib/format";
+import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import { colors } from "../../theme";
+import type { PersonalReferenceData, PersonalReferenceItem } from "../../types";
 
-type TabKey = "overview" | "edit" | "achievements" | "privacy" | "notifications";
+type TabKey = "overview" | "references" | "edit" | "achievements" | "privacy" | "notifications";
 type AchievementData = { groups?: AchievementGroup[]; awards?: any[] };
 type AchievementGroup = {
   code: string;
@@ -40,6 +41,7 @@ type AchievementTier = {
 
 const tabs: Array<{ key: TabKey; label: string }> = [
   { key: "overview", label: "Übersicht" },
+  { key: "references", label: "Referenzen" },
   { key: "edit", label: "Bearbeiten" },
   { key: "achievements", label: "Erfolge" },
   { key: "privacy", label: "Privat" },
@@ -77,6 +79,7 @@ export function ProfileScreen() {
   const { user, logout, refreshMe } = useAuth();
   const [tab, setTab] = useState<TabKey>("overview");
   const [achievements, setAchievements] = useState<AchievementData>({ groups: [], awards: [] });
+  const [references, setReferences] = useState<PersonalReferenceData>({ items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } });
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [completeness, setCompleteness] = useState<{ score?: number; missing?: string[] }>({});
   const [form, setForm] = useState<Record<string, any>>({});
@@ -128,12 +131,14 @@ export function ProfileScreen() {
 
   const loadProfileData = useCallback(async () => {
     if (guest) return;
-    const [achievementResult, completenessResult, preferenceResult] = await Promise.all([
+    const [achievementResult, completenessResult, preferenceResult, referenceResult] = await Promise.all([
       api.get<AchievementData>("/achievements/me").catch(() => ({ data: { groups: [], awards: [] } })),
       api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness").catch(() => ({ data: {} })),
       api.get<Record<string, boolean>>("/users/me/notification-preferences").catch(() => ({ data: {} })),
+      api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } } })),
     ]);
     setAchievements(achievementResult.data || { groups: [], awards: [] });
+    setReferences(referenceResult.data || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } });
     setCompleteness(completenessResult.data || {});
     setForm((current) => ({
       ...current,
@@ -270,6 +275,32 @@ export function ProfileScreen() {
                 <Muted>Keine offenen automatischen Fortschritte gefunden.</Muted>
               )}
             </Card>
+          </>
+        ) : null}
+
+        {tab === "references" ? (
+          <>
+            <Card style={styles.card}>
+              <Heading>Meine Referenzen</Heading>
+              <Muted>Persoenliche Turnier- und Fast-Lap-Historie aus deinem Konto.</Muted>
+              <View style={styles.statGrid}>
+                <Stat label="Gesamt" value={String(references.stats.total)} />
+                <Stat label="Podien" value={String(references.stats.podiums)} tone="gold" />
+                <Stat label="Punkte" value={String(references.stats.season_points || 0)} />
+              </View>
+              <View style={styles.statGrid}>
+                <Stat label="Turniere" value={String(references.stats.tournaments)} />
+                <Stat label="Fast Laps" value={String(references.stats.fastlaps)} tone="gold" />
+                <Stat label="Siege" value={String(references.stats.wins)} />
+              </View>
+            </Card>
+            {references.items.length ? (
+              references.items.map((item) => <ReferenceCard key={item.id} item={item} />)
+            ) : (
+              <Card style={styles.card}>
+                <Muted>Noch keine persoenlichen Referenzen gefunden. Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier.</Muted>
+              </Card>
+            )}
           </>
         ) : null}
 
@@ -448,6 +479,35 @@ function TierRow({ tier, accent }: { tier: AchievementTier; accent: string }) {
       </View>
       <Muted style={styles.points}>+{tier.points || 0}</Muted>
     </View>
+  );
+}
+
+function ReferenceCard({ item }: { item: PersonalReferenceItem }) {
+  const isFastlap = item.kind === "fastlap";
+  return (
+    <Card style={styles.referenceCard}>
+      <View style={styles.referenceTop}>
+        <View style={[styles.referenceIcon, isFastlap ? styles.referenceIconFastlap : styles.referenceIconTournament]}>
+          <Body style={styles.referenceIconText}>{isFastlap ? "FL" : "T"}</Body>
+        </View>
+        <View style={styles.referenceText}>
+          <Body style={styles.strong}>{item.title}</Body>
+          <Muted>{item.subtitle || (isFastlap ? "Fast Lap" : "Turnier")}</Muted>
+          <Muted>{formatDate(item.date)} · {formatStatus(item.status)}</Muted>
+        </View>
+        <View style={styles.referenceRank}>
+          <Body style={[styles.referenceRankText, Number(item.rank || 0) <= 3 && item.rank ? styles.gold : null]}>
+            {item.rank ? `#${item.rank}` : "-"}
+          </Body>
+          <Muted>{item.participant_count ? `von ${item.participant_count}` : "Rang"}</Muted>
+        </View>
+      </View>
+      <View style={styles.referenceMeta}>
+        {item.time_str ? <Pill label={item.time_str} tone="cyan" /> : null}
+        {item.points != null ? <Pill label={`${item.points} Punkte`} tone="gold" /> : null}
+        <Pill label={isFastlap ? "Fast Lap" : "Turnier"} />
+      </View>
+    </Card>
   );
 }
 
@@ -754,6 +814,53 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900",
     textTransform: "uppercase",
+  },
+  referenceCard: {
+    gap: 10,
+  },
+  referenceTop: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  referenceIcon: {
+    alignItems: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
+  },
+  referenceIconTournament: {
+    backgroundColor: "rgba(41, 182, 232, 0.14)",
+    borderColor: "rgba(41, 182, 232, 0.38)",
+  },
+  referenceIconFastlap: {
+    backgroundColor: "rgba(240, 180, 41, 0.14)",
+    borderColor: "rgba(240, 180, 41, 0.38)",
+  },
+  referenceIconText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  referenceText: {
+    flex: 1,
+    gap: 2,
+  },
+  referenceRank: {
+    alignItems: "flex-end",
+    minWidth: 58,
+  },
+  referenceRankText: {
+    color: colors.cyan,
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  referenceMeta: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
   points: {
     color: colors.gold,

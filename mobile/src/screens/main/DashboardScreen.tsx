@@ -174,7 +174,13 @@ export function DashboardScreen({ navigation }: Props) {
 
         <Section title="News" actionLabel="Aktualisieren" onAction={load}>
           {data.news.length ? (
-            data.news.slice(0, 4).map((post) => <NewsCard key={post.id} post={post} />)
+            data.news.slice(0, 4).map((post) => (
+              <NewsCard
+                key={post.id}
+                post={post}
+                onPress={() => navigation.navigate("More", { screen: "NewsDetail", params: { id: post.slug || post.id } })}
+              />
+            ))
           ) : (
             <EmptyState title="Keine News" detail="Aktuelle Website-News werden hier eingeblendet, sobald sie veroeffentlicht sind." />
           )}
@@ -261,23 +267,25 @@ function TimelineCard({ item, onPress }: { item: TimelineItem; onPress: () => vo
   );
 }
 
-function NewsCard({ post }: { post: NewsPost }) {
+function NewsCard({ post, onPress }: { post: NewsPost; onPress: () => void }) {
   return (
-    <Card style={styles.newsCard}>
-      <MediaImage
-        uri={post.banner_url}
-        style={styles.newsImage}
-        fallback={<Ionicons name="newspaper-outline" color={colors.gold} size={24} />}
-      />
-      <View style={styles.flex}>
-        <View style={styles.rowTop}>
-          <Body style={styles.rowTitle}>{post.title}</Body>
-          {post.pinned ? <Badge label="Top" tone="gold" /> : null}
+    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
+      <Card style={styles.newsCard}>
+        <MediaImage
+          uri={post.banner_url}
+          style={styles.newsImage}
+          fallback={<Ionicons name="newspaper-outline" color={colors.gold} size={24} />}
+        />
+        <View style={styles.flex}>
+          <View style={styles.rowTop}>
+            <Body style={styles.rowTitle}>{post.title}</Body>
+            {post.pinned ? <Badge label="Top" tone="gold" /> : null}
+          </View>
+          <Muted>{formatDate(post.published_at || post.created_at)}{post.category ? ` · ${post.category}` : ""}</Muted>
+          {post.excerpt || post.summary ? <Muted numberOfLines={2}>{post.excerpt || post.summary}</Muted> : null}
         </View>
-        <Muted>{formatDate(post.published_at || post.created_at)}{post.category ? ` · ${post.category}` : ""}</Muted>
-        {post.excerpt || post.summary ? <Muted numberOfLines={2}>{post.excerpt || post.summary}</Muted> : null}
-      </View>
-    </Card>
+      </Card>
+    </Pressable>
   );
 }
 

@@ -7,15 +7,14 @@ import { Body, Heading, Muted } from "../../components/Text";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 
-type SectionKey = NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>;
 type Props = NativeStackScreenProps<MoreStackParamList, "MoreHub">;
 
-const modules: Array<{ title: string; detail: string; section: SectionKey; badge: string }> = [
+const modules: Array<{ title: string; detail: string; badge: string; section?: NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>; screen?: "NewsList" }> = [
+  { title: "News", detail: "Aktuelle Ankuendigungen, Updates, Events und verknuepfte Turniere.", screen: "NewsList", badge: "Live" },
   { title: "Sponsoren", detail: "Hinterlegte Unterstützer mit Kurzinfo und Link-Logik.", section: "sponsors", badge: "Club" },
   { title: "Partner", detail: "Kooperationen, Ligen, Community-Partner und Event-Bezug.", section: "partners", badge: "Netzwerk" },
   { title: "Events", detail: "Community-Abende, LAN, Festival-Auftritte und Anmeldestatus.", section: "events", badge: "Kalender" },
   { title: "Mitgliedervorteile", detail: "Dynamische Vorteile für aktive Vereinsmitglieder.", section: "benefits", badge: "Member" },
-  { title: "Referenzen", detail: "Turnierresultate und Wettbewerbs-Historie aus dem Verein.", section: "references", badge: "Erfolge" },
   { title: "Spielerprofile", detail: "Profile finden, Rollen sehen und Achievements vergleichen.", section: "profiles", badge: "Social" },
 ];
 
@@ -28,7 +27,7 @@ export function MoreScreen({ navigation }: Props) {
           <Muted>Info, Verein, Community und Profil-Funktionen sind hier als native App-Bereiche gebündelt.</Muted>
         </View>
         {modules.map((item) => (
-          <Pressable key={item.title} onPress={() => navigation.navigate("InfoCenter", { section: item.section })} style={({ pressed }) => [pressed && styles.pressed]}>
+          <Pressable key={item.title} onPress={() => item.screen ? navigation.navigate(item.screen) : navigation.navigate("InfoCenter", { section: item.section })} style={({ pressed }) => [pressed && styles.pressed]}>
             <Card style={styles.card}>
               <View style={styles.cardTop}>
                 <Body style={styles.title}>{item.title}</Body>

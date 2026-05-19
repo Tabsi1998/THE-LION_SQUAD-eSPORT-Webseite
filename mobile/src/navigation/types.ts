@@ -26,4 +26,6 @@ export type TeamStackParamList = {
 export type MoreStackParamList = {
   MoreHub: undefined;
   InfoCenter: { section?: "sponsors" | "partners" | "events" | "benefits" | "references" | "profiles" } | undefined;
+  NewsList: undefined;
+  NewsDetail: { id: string };
 };

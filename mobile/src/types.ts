@@ -136,11 +136,15 @@ export type NewsPost = {
   slug?: string;
   excerpt?: string;
   summary?: string;
+  content?: string;
+  body?: string;
   category?: string;
   banner_url?: string | null;
   published_at?: string | null;
   created_at?: string | null;
   pinned?: boolean;
+  linked_events?: ClubEvent[];
+  linked_tournaments?: Tournament[];
 };
 
 export type DashboardAction = {
@@ -173,6 +177,34 @@ export type MobileDashboardData = {
     news: number;
     public_tournaments: number;
     public_events: number;
+  };
+};
+
+export type PersonalReferenceItem = {
+  id: string;
+  kind: "tournament" | "fastlap" | string;
+  title: string;
+  subtitle?: string | null;
+  rank?: number | null;
+  points?: number | null;
+  status?: string | null;
+  date?: string | null;
+  target_id?: string | null;
+  banner_url?: string | null;
+  participant_count?: number | null;
+  time_ms?: number | null;
+  time_str?: string | null;
+};
+
+export type PersonalReferenceData = {
+  items: PersonalReferenceItem[];
+  stats: {
+    total: number;
+    tournaments: number;
+    fastlaps: number;
+    wins: number;
+    podiums: number;
+    season_points: number;
   };
 };
 
