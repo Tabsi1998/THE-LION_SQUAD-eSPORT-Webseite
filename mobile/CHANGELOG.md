@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-alpha.10 - 2026-05-19
+
+- Fixed the mobile Profile screen TypeScript failure caused by the removed `StyleSheet.absoluteFillObject` API.
+- Delayed native push-notification module loading so notification setup cannot crash the app during initial startup.
+- Verified the Android JavaScript bundle export after the startup hardening.
+
 ## 0.1.0-alpha.9 - 2026-05-19
 
 - Added native direct messages with conversation list and thread view.
