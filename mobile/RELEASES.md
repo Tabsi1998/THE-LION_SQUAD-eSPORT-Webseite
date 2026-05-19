@@ -22,6 +22,7 @@ Schema fuer Vorabversionen:
 ```text
 0.1.0-alpha.1
 0.1.0-alpha.2
+0.1.0-alpha.3
 0.1.0-beta.1
 1.0.0
 ```
@@ -41,8 +42,8 @@ THE-LION-SQUAD-android-alpha-v0.1.0-alpha.1-<commit>.apk
 Fuer einen echten GitHub-Release einen Tag pushen:
 
 ```bash
-git tag mobile-v0.1.0-alpha.2
-git push origin mobile-v0.1.0-alpha.2
+git tag mobile-v0.1.0-alpha.3
+git push origin mobile-v0.1.0-alpha.3
 ```
 
 Der Workflow haengt die APK automatisch an den Release. Alpha- und Beta-Releases werden als `prerelease` markiert.
