@@ -152,8 +152,10 @@ jobs:
           VERSION="${{ steps.meta.outputs.version }}"
           APK_NAME="${{ steps.meta.outputs.apk_name }}"
           SHA256="$(cut -d ' ' -f 1 "builds/${APK_NAME}.sha256")"
-          SIGNER="$(grep -m 1 "Signer #1 certificate DN" "builds/${APK_NAME}.signature.txt" | sed 's/^Signer #1 certificate DN: //')"
-          SIGNER_SHA="$(grep -m 1 "Signer #1 certificate SHA-256 digest" "builds/${APK_NAME}.signature.txt" | sed 's/^Signer #1 certificate SHA-256 digest: //')"
+          SIGNER="$(grep -m 1 -E "Signer #1 certificate DN|V[0-9]+ Signer: certificate DN" "builds/${APK_NAME}.signature.txt" | sed -E 's/^Signer #1 certificate DN: //; s/^V[0-9]+ Signer: certificate DN: //' || true)"
+          SIGNER_SHA="$(grep -m 1 -E "Signer #1 certificate SHA-256 digest|V[0-9]+ Signer: certificate SHA-256 digest" "builds/${APK_NAME}.signature.txt" | sed -E 's/^Signer #1 certificate SHA-256 digest: //; s/^V[0-9]+ Signer: certificate SHA-256 digest: //' || true)"
+          SIGNER="${SIGNER:-unknown}"
+          SIGNER_SHA="${SIGNER_SHA:-unknown}"
           {
             echo "# LionsAPP v${VERSION}"
             echo ""
