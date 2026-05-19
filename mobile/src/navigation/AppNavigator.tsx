@@ -8,6 +8,8 @@ import { BootScreen } from "../screens/BootScreen";
 import { LoginScreen } from "../screens/auth/LoginScreen";
 import { RegisterScreen } from "../screens/auth/RegisterScreen";
 import { DashboardScreen } from "../screens/main/DashboardScreen";
+import { FastLapDetailScreen } from "../screens/main/FastLapDetailScreen";
+import { FastLapScreen } from "../screens/main/FastLapScreen";
 import { MoreScreen } from "../screens/main/MoreScreen";
 import { NewsDetailScreen } from "../screens/main/NewsDetailScreen";
 import { NewsScreen } from "../screens/main/NewsScreen";
@@ -135,6 +137,8 @@ function MoreStackScreen() {
       <MoreStack.Screen name="InfoCenter" component={InfoCenterScreen} options={{ title: "Info Center" }} />
       <MoreStack.Screen name="NewsList" component={NewsScreen} options={{ title: "News" }} />
       <MoreStack.Screen name="NewsDetail" component={NewsDetailScreen} options={{ title: "News" }} />
+      <MoreStack.Screen name="FastLapList" component={FastLapScreen} options={{ title: "Fast Laps" }} />
+      <MoreStack.Screen name="FastLapDetail" component={FastLapDetailScreen} options={{ title: "Fast Lap" }} />
     </MoreStack.Navigator>
   );
 }

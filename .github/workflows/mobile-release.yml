@@ -75,7 +75,7 @@ jobs:
             CHANNEL="${{ inputs.channel }}"
           fi
           SHORT_SHA="${GITHUB_SHA::7}"
-          APK_NAME="THE-LION-SQUAD-android-${CHANNEL}-v${VERSION}-${SHORT_SHA}.apk"
+          APK_NAME="LionsAPP-android-${CHANNEL}-v${VERSION}-${SHORT_SHA}.apk"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
           echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
@@ -102,7 +102,9 @@ jobs:
           [ -n "$ANDROID_KEY_PASSWORD" ] || missing+=("ANDROID_KEY_PASSWORD")
           if [ "${#missing[@]}" -gt 0 ]; then
             echo "::error::Missing Android release signing secrets: ${missing[*]}"
-            echo "GitHub releases must be signed with the stable THE LION SQUAD upload key."
+            echo "GitHub releases must be signed with the stable LionsAPP upload key."
+            echo "Set these as Repository secrets in Settings -> Secrets and variables -> Actions."
+            echo "Do not store them as Variables and do not store them only in an Environment unless this workflow is configured to use that Environment."
             exit 1
           fi
 
@@ -153,7 +155,7 @@ jobs:
           SIGNER="$(grep -m 1 "Signer #1 certificate DN" "builds/${APK_NAME}.signature.txt" | sed 's/^Signer #1 certificate DN: //')"
           SIGNER_SHA="$(grep -m 1 "Signer #1 certificate SHA-256 digest" "builds/${APK_NAME}.signature.txt" | sed 's/^Signer #1 certificate SHA-256 digest: //')"
           {
-            echo "# THE LION SQUAD App v${VERSION}"
+            echo "# LionsAPP v${VERSION}"
             echo ""
             echo "**Channel:** \`${{ steps.meta.outputs.channel }}\`"
             echo ""
@@ -197,7 +199,7 @@ jobs:
         if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
-          name: THE LION SQUAD App v${{ steps.meta.outputs.version }} (${{ steps.meta.outputs.channel }})
+          name: LionsAPP v${{ steps.meta.outputs.version }} (${{ steps.meta.outputs.channel }})
           prerelease: ${{ steps.meta.outputs.channel != 'stable' }}
           body_path: ${{ steps.notes.outputs.notes_file }}
           files: |

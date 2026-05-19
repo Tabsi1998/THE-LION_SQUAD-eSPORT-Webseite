@@ -208,6 +208,55 @@ export type PersonalReferenceData = {
   };
 };
 
+export type F1Track = {
+  id: string;
+  name?: string;
+  country?: string | null;
+  image_url?: string | null;
+  order_index?: number;
+};
+
+export type F1Challenge = {
+  id: string;
+  slug?: string;
+  title: string;
+  description?: string | null;
+  status?: string;
+  public_phase?: { label?: string; state?: string; target_at?: string | null };
+  start_date?: string | null;
+  end_date?: string | null;
+  banner_url?: string | null;
+  vehicle?: string | null;
+  weather?: string | null;
+  platform?: string | null;
+  participant_count?: number;
+  track_count?: number;
+  tracks?: F1Track[];
+};
+
+export type F1LeaderboardEntry = {
+  user_id: string;
+  username?: string;
+  display_name?: string;
+  avatar_url?: string | null;
+  time_ms?: number;
+  time_str?: string;
+  raw_time_ms?: number;
+  penalty_seconds?: number;
+  attempts?: number;
+  rank?: number;
+  gap_str?: string;
+  points?: number;
+};
+
+export type F1LeaderboardPayload = {
+  challenge: F1Challenge;
+  track?: F1Track | null;
+  entries: F1LeaderboardEntry[];
+  club_reference_entries?: F1LeaderboardEntry[];
+  club_reference_public?: boolean;
+};
+
 export type MemberBenefit = {
   id: string;
   title: string;

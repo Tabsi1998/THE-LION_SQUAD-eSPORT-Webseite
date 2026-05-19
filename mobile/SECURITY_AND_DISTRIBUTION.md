@@ -14,12 +14,14 @@ Google Play distribution removes the manual sideload flow because users install 
 
 ## Release Signing
 
-Public APKs must never be signed with the Android debug certificate. The release workflow requires these GitHub Actions secrets:
+Public APKs must never be signed with the Android debug certificate. The release workflow requires these GitHub Actions repository secrets:
 
 - `ANDROID_KEYSTORE_BASE64`
 - `ANDROID_KEYSTORE_PASSWORD`
 - `ANDROID_KEY_ALIAS`
 - `ANDROID_KEY_PASSWORD`
+
+These values must be stored under `Settings -> Secrets and variables -> Actions -> Repository secrets`. GitHub Actions Variables with the same names are not enough, and Environment secrets are not read unless the workflow explicitly uses that environment.
 
 The keystore itself must stay private and outside Git. If it is lost, existing sideloaded APK installations can no longer be updated with the same package name and certificate.
 
@@ -33,7 +35,7 @@ Convert the local Java keystore to a GitHub secret value with PowerShell:
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("mobile\local-signing\the-lion-squad-upload.jks"))
 ```
 
-Store the output as `ANDROID_KEYSTORE_BASE64` in GitHub repository secrets. Store the matching passwords and alias in the other three secrets.
+Store the output as `ANDROID_KEYSTORE_BASE64` in GitHub repository secrets. Store the matching passwords and alias in the other three repository secrets.
 
 ## Release Integrity
 

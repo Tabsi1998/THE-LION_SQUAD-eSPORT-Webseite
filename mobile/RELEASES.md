@@ -25,6 +25,7 @@ Schema fuer Vorabversionen:
 0.1.0-alpha.5
 0.1.0-alpha.6
 0.1.0-alpha.7
+0.1.0-alpha.8
 0.1.0-beta.1
 1.0.0
 ```
@@ -36,7 +37,7 @@ Bei jedem Android-Release muss `expo.android.versionCode` in `mobile/app.json` u
 In GitHub unter `Actions` den Workflow `Mobile APK Release` starten. Der Workflow erzeugt ein Artefakt mit diesem Namensschema:
 
 ```text
-THE-LION-SQUAD-android-alpha-v0.1.0-alpha.1-<commit>.apk
+LionsAPP-android-alpha-v0.1.0-alpha.8-<commit>.apk
 ```
 
 ## Release-Signatur
@@ -48,15 +49,15 @@ GitHub-Releases muessen mit dem stabilen Upload-Key signiert werden. Dafuer brau
 - `ANDROID_KEY_ALIAS`
 - `ANDROID_KEY_PASSWORD`
 
-Ohne diese Secrets bricht der Release-Workflow ab, damit keine oeffentliche Debug-signierte APK entsteht.
+Ohne diese Repository-Secrets bricht der Release-Workflow ab, damit keine oeffentliche Debug-signierte APK entsteht. GitHub Actions Variables reichen dafuer nicht.
 
 ## GitHub Release erstellen
 
 Fuer einen echten GitHub-Release einen Tag pushen:
 
 ```bash
-git tag mobile-v0.1.0-alpha.7
-git push origin mobile-v0.1.0-alpha.7
+git tag mobile-v0.1.0-alpha.8
+git push origin mobile-v0.1.0-alpha.8
 ```
 
 Der Workflow haengt die APK automatisch an den Release. Alpha- und Beta-Releases werden als `prerelease` markiert.

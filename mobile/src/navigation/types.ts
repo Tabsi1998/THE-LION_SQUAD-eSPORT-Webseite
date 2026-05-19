@@ -28,4 +28,6 @@ export type MoreStackParamList = {
   InfoCenter: { section?: "sponsors" | "partners" | "events" | "benefits" | "references" | "profiles" } | undefined;
   NewsList: undefined;
   NewsDetail: { id: string };
+  FastLapList: undefined;
+  FastLapDetail: { id: string };
 };

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-alpha.8 - 2026-05-19
+
+- Renamed the installed app display name to `LionsAPP`.
+- Added a native Fast-Lap area with challenge list, challenge details, track selector, per-track leaderboard, best time, and club reference times.
+- Added the Fast-Lap module to the native More screen.
+- Renamed APK release artifacts and GitHub release titles to `LionsAPP`.
+- Clarified Android release signing errors so missing repository secrets are easier to diagnose.
+
 ## 0.1.0-alpha.7 - 2026-05-19
 
 - Added a native News area with list and detail screens, including linked tournaments and events.
