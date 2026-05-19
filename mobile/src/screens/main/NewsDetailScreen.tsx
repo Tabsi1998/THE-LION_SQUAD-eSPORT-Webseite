@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { EmptyState, LoadingState } from "../../components/ListState";
@@ -9,6 +9,7 @@ import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
+import type { ContentTarget } from "../../lib/contentLinks";
 import { formatDate, formatStatus } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -37,7 +38,29 @@ export function NewsDetailScreen({ navigation, route }: Props) {
     load();
   }, [load]);
 
-  const contentImages = useMemo(() => extractImages(post), [post]);
+  const openContentTarget = useCallback((target: ContentTarget) => {
+    if (target.type === "news") {
+      navigation.navigate("NewsDetail", { id: target.id });
+      return;
+    }
+    if (target.type === "event") {
+      navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: target.id } });
+      return;
+    }
+    if (target.type === "tournament") {
+      navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: target.id } });
+      return;
+    }
+    if (target.type === "fastlap") {
+      navigation.getParent()?.navigate("Tournaments", { screen: "FastLapDetail", params: { id: target.id } });
+      return;
+    }
+    if (target.type === "team") {
+      navigation.getParent()?.navigate("Teams", { screen: "TeamDetail", params: { id: target.id } });
+      return;
+    }
+    navigation.navigate("InfoCenter", { section: "profiles" });
+  }, [navigation]);
 
   if (loading) {
     return (
@@ -68,29 +91,17 @@ export function NewsDetailScreen({ navigation, route }: Props) {
           <Title>{post.title}</Title>
           {post.excerpt || post.summary ? <Body style={styles.lead}>{post.excerpt || post.summary}</Body> : null}
           {post.content || post.body ? (
-            <RichText text={post.content || post.body} />
+            <RichText text={post.content || post.body} onOpenContent={openContentTarget} />
           ) : (
             <Muted>Kein weiterer Inhalt hinterlegt.</Muted>
           )}
-          {contentImages.length ? (
-            <View style={styles.imageStack}>
-              {contentImages.map((url) => (
-                <MediaImage
-                  key={url}
-                  uri={url}
-                  style={styles.contentImage}
-                  fallback={<Ionicons name="image-outline" color={colors.cyan} size={28} />}
-                />
-              ))}
-            </View>
-          ) : null}
         </View>
 
-        {(post as any).mentioned_users?.length ? (
+        {post.mentioned_users?.length ? (
           <Card style={styles.card}>
             <Heading>Markierte Personen</Heading>
             <View style={styles.mentionGrid}>
-              {(post as any).mentioned_users.map((user: any) => (
+              {post.mentioned_users.map((user) => (
                 <View key={user.id || user.username} style={styles.mentionCard}>
                   <MediaImage
                     uri={user.avatar_url}
@@ -126,20 +137,21 @@ export function NewsDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>Verknuepfte Events</Heading>
             {post.linked_events.map((event) => (
-              <View key={event.id} style={styles.linkRow}>
+              <Pressable key={event.id} onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id } })} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
                 <View style={styles.flex}>
                   <Body style={styles.strong}>{event.title || event.name}</Body>
                   <Muted>{formatDate(event.start_date || event.date)} · {event.public_phase?.label || formatStatus(event.status)}</Muted>
                 </View>
-              </View>
+                <Ionicons name="chevron-forward" color={colors.muted} size={18} />
+              </Pressable>
             ))}
           </Card>
         ) : null}
 
-        {(post as any).linked_f1_challenges?.length ? (
+        {post.linked_f1_challenges?.length ? (
           <Card style={styles.card}>
             <Heading>Verknuepfte Fast Laps</Heading>
-            {(post as any).linked_f1_challenges.map((challenge: any) => (
+            {post.linked_f1_challenges.map((challenge) => (
               <Pressable key={challenge.id} onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "FastLapDetail", params: { id: challenge.slug || challenge.id } })} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
                 <View style={styles.flex}>
                   <Body style={styles.strong}>{challenge.title}</Body>
@@ -153,20 +165,6 @@ export function NewsDetailScreen({ navigation, route }: Props) {
       </ScrollView>
     </Screen>
   );
-}
-
-function extractImages(post: NewsPost | null) {
-  const urls = new Set<string>();
-  const raw = String(post?.content || post?.body || "");
-  const banner = post?.banner_url;
-  const add = (url?: string | null) => {
-    const value = String(url || "").trim().replace(/^["']|["']$/g, "");
-    if (value && value !== banner) urls.add(value);
-  };
-  [...raw.matchAll(/!\[[^\]]*]\(([^)]+)\)/g)].forEach((match) => add(match[1]));
-  [...raw.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)].forEach((match) => add(match[1]));
-  [...raw.matchAll(/https?:\/\/\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?/gi)].forEach((match) => add(match[0]));
-  return Array.from(urls).slice(0, 8);
 }
 
 const styles = StyleSheet.create({
@@ -186,14 +184,6 @@ const styles = StyleSheet.create({
   lead: {
     color: colors.cyan,
     fontWeight: "800",
-  },
-  imageStack: {
-    gap: 10,
-  },
-  contentImage: {
-    borderRadius: 8,
-    height: 190,
-    width: "100%",
   },
   card: {
     gap: 10,

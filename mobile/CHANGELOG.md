@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0-alpha.1 - 2026-05-19
+
+- Improved the native rich-text renderer with internal content links, native content embeds, ordered lists, decoded HTML entities, auto-linked URLs, and inline image rendering for Markdown, HTML, and standalone image URLs.
+- Made `[[event:id]]`, `[[tournament:id]]`, `[[fastlap:id]]`, `[[news:id]]`, and team/profile links route inside the app instead of opening as raw text or external web links.
+- Updated News details so linked Events and Fast-Lap challenges open their native app views and embedded images are rendered in the article body.
+- Updated Event details so program text can open native linked content, Event news opens News detail, galleries are displayed, and sponsor logos can open their configured links.
+- Added shared mobile content-link parsing for Events, Turniere, Fast Laps, News, Teams, and Profiles.
+
 ## 0.2.0-alpha.1 - 2026-05-19
 
 - Added a native Match detail screen with participants, schedule status, station, linked tournament, schedule proposals, pending proposal decisions, match chat, result reporting, disputes, and staff forfeit actions.

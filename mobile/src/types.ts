@@ -173,7 +173,9 @@ export type NewsPost = {
   created_at?: string | null;
   pinned?: boolean;
   linked_events?: ClubEvent[];
+  linked_f1_challenges?: F1Challenge[];
   linked_tournaments?: Tournament[];
+  mentioned_users?: PublicUser[];
 };
 
 export type DashboardAction = {

@@ -12,6 +12,7 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
+import type { ContentTarget } from "../../lib/contentLinks";
 import { formatDateTime, formatStatus } from "../../lib/format";
 import { getRegistrationState } from "../../lib/registration";
 import { isGuestUser } from "../../live";
@@ -79,6 +80,30 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const registered = event?.own_registration && !["cancelled", "no_show"].includes(String(event.own_registration.status || ""));
   const maxCompanions = event?.allow_companions ? Number(event.max_companions_per_registration || 0) : 0;
   const companionNumber = clampNumber(companionCount, 0, maxCompanions);
+
+  const openContentTarget = useCallback((target: ContentTarget) => {
+    if (target.type === "event") {
+      navigation.navigate("EventDetail", { id: target.id });
+      return;
+    }
+    if (target.type === "tournament") {
+      navigation.navigate("TournamentDetail", { id: target.id });
+      return;
+    }
+    if (target.type === "fastlap") {
+      navigation.navigate("FastLapDetail", { id: target.id });
+      return;
+    }
+    if (target.type === "news") {
+      navigation.getParent()?.navigate("More", { screen: "NewsDetail", params: { id: target.id } });
+      return;
+    }
+    if (target.type === "team") {
+      navigation.getParent()?.navigate("Teams", { screen: "TeamDetail", params: { id: target.id } });
+      return;
+    }
+    navigation.getParent()?.navigate("More", { screen: "InfoCenter", params: { section: "profiles" } });
+  }, [navigation]);
 
   const register = useCallback(async () => {
     if (!event || busy) return;
@@ -230,7 +255,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
 
         <Card style={styles.card}>
           <Heading>Infos</Heading>
-          {event.program || event.description ? <RichText text={event.program || event.description} /> : <Muted>Keine weiteren Event-Infos hinterlegt.</Muted>}
+          {event.program || event.description ? <RichText text={event.program || event.description} onOpenContent={openContentTarget} /> : <Muted>Keine weiteren Event-Infos hinterlegt.</Muted>}
         </Card>
 
         {event.tournaments?.length ? (
@@ -267,13 +292,28 @@ export function EventDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>News zum Event</Heading>
             {event.news.map((post) => (
-              <View key={post.id} style={styles.linkRow}>
+              <Pressable key={post.id} onPress={() => navigation.getParent()?.navigate("More", { screen: "NewsDetail", params: { id: post.slug || post.id } })} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
                 <View style={styles.flex}>
                   <Body style={styles.strong}>{post.title}</Body>
                   <Muted>{formatDateTime(post.published_at || post.created_at)}</Muted>
                 </View>
-              </View>
+                <Ionicons name="chevron-forward" color={colors.muted} size={18} />
+              </Pressable>
             ))}
+          </Card>
+        ) : null}
+
+        {event.albums?.length ? (
+          <Card style={styles.card}>
+            <Heading>Galerie</Heading>
+            <View style={styles.albumGrid}>
+              {event.albums.map((album) => (
+                <View key={album.id} style={styles.albumItem}>
+                  <MediaImage uri={album.cover_url || album.image_url} style={styles.albumImage} fallback={<Ionicons name="images-outline" color={colors.cyan} size={24} />} />
+                  <Muted numberOfLines={2}>{album.title || "Album"}</Muted>
+                </View>
+              ))}
+            </View>
           </Card>
         ) : null}
 
@@ -282,10 +322,10 @@ export function EventDetailScreen({ navigation, route }: Props) {
             <Heading>Sponsoren</Heading>
             <View style={styles.logoGrid}>
               {event.sponsors.map((sponsor) => (
-                <View key={sponsor.id} style={styles.logoItem}>
+                <Pressable key={sponsor.id} onPress={() => openSponsor(sponsor)} style={({ pressed }) => [styles.logoItem, pressed && styles.pressed]}>
                   <MediaImage uri={sponsor.logo_url} resizeMode="contain" style={styles.logo} fallback={<Body style={styles.logoText}>{sponsor.name.slice(0, 2).toUpperCase()}</Body>} />
                   <Muted numberOfLines={2}>{sponsor.name}</Muted>
-                </View>
+                </Pressable>
               ))}
             </View>
           </Card>
@@ -307,6 +347,13 @@ function clampNumber(value: string, min: number, max: number) {
   const parsed = Number.parseInt(value || "0", 10);
   if (Number.isNaN(parsed)) return min;
   return Math.min(max, Math.max(min, parsed));
+}
+
+function openSponsor(sponsor: { url?: string | null; link?: string | null }) {
+  const raw = String(sponsor.url || sponsor.link || "").trim();
+  if (!raw) return;
+  const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  Linking.openURL(url).catch(() => {});
 }
 
 const styles = StyleSheet.create({
@@ -397,6 +444,20 @@ const styles = StyleSheet.create({
   logoText: {
     color: colors.cyan,
     fontWeight: "900",
+  },
+  albumGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  albumItem: {
+    gap: 6,
+    width: 132,
+  },
+  albumImage: {
+    borderRadius: 8,
+    height: 84,
+    width: 132,
   },
   noteInput: {
     minHeight: 92,

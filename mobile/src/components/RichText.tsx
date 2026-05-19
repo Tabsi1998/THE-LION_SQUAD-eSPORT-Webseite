@@ -1,12 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Linking, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { isImageUrl, parseContentTarget, type ContentTarget } from "../lib/contentLinks";
 import { colors } from "../theme";
+import { MediaImage } from "./MediaImage";
 import { Body, Heading, Muted } from "./Text";
 
 type RichTextProps = {
   text?: string | null;
   compact?: boolean;
+  onOpenContent?: (target: ContentTarget) => void;
 };
 
 type InlineToken =
@@ -17,22 +20,47 @@ type InlineToken =
   | { type: "link"; label: string; url: string }
   | { type: "mention"; value: string };
 
-export function RichText({ text, compact = false }: RichTextProps) {
+export function RichText({ text, compact = false, onOpenContent }: RichTextProps) {
   const blocks = normalizeBlocks(text);
   if (!blocks.length) return null;
   return (
     <View style={[styles.wrap, compact && styles.compactWrap]}>
-      {blocks.map((block, index) => renderBlock(block, index, compact))}
+      {blocks.map((block, index) => renderBlock(block, index, compact, onOpenContent))}
     </View>
   );
 }
 
-function renderBlock(block: string, index: number, compact: boolean) {
-  if (/^\[\[\s*(event|events|turnier|turniere|tournament|tournaments|fastlap|fast-lap|f1)\s*:/i.test(block)) {
+function renderBlock(block: string, index: number, compact: boolean, onOpenContent?: (target: ContentTarget) => void) {
+  const image = parseImageBlock(block);
+  if (image) {
+    return (
+      <MediaImage
+        key={`${index}-${image.url}`}
+        uri={image.url}
+        style={[styles.image, compact && styles.compactImage]}
+        fallback={<Ionicons name="image-outline" color={colors.cyan} size={28} />}
+      />
+    );
+  }
+
+  const target = parseContentTarget(block);
+  if (target) {
+    const content = (
+      <>
+        <Ionicons name={iconForTarget(target.type)} color={colors.cyan} size={14} />
+        <Muted style={styles.embedText}>{target.label || labelForTarget(target)}</Muted>
+      </>
+    );
+    if (onOpenContent) {
+      return (
+        <Pressable key={`${index}-${block}`} onPress={() => onOpenContent(target)} style={({ pressed }) => [styles.embedHint, pressed && styles.pressed]}>
+          {content}
+        </Pressable>
+      );
+    }
     return (
       <View key={`${index}-${block}`} style={styles.embedHint}>
-        <Ionicons name="link-outline" color={colors.cyan} size={14} />
-        <Muted style={styles.embedText}>{block.replace(/\[\[|\]\]/g, "")}</Muted>
+        {content}
       </View>
     );
   }
@@ -45,24 +73,26 @@ function renderBlock(block: string, index: number, compact: boolean) {
   if (/^>\s+/.test(block)) {
     return (
       <View key={`${index}-${block}`} style={styles.quote}>
-        <Body style={styles.quoteText}>{renderInline(block.replace(/^>\s+/, ""), index)}</Body>
+        <Body style={styles.quoteText}>{renderInline(block.replace(/^>\s+/, ""), index, onOpenContent)}</Body>
       </View>
     );
   }
 
-  if (/^[-*]\s+/.test(block)) {
+  if (/^[-*]\s+/.test(block) || /^\d+[.)]\s+/.test(block)) {
     return (
       <View key={`${index}-${block}`} style={styles.bullet}>
         <View style={styles.dot} />
-        <Body style={styles.bulletText}>{renderInline(block.replace(/^[-*]\s+/, ""), index)}</Body>
+        <Body style={styles.bulletText}>
+          {renderInline(block.replace(/^[-*]\s+/, "").replace(/^\d+[.)]\s+/, ""), index, onOpenContent)}
+        </Body>
       </View>
     );
   }
 
-  return <Body key={`${index}-${block}`} style={compact ? styles.compactBody : undefined}>{renderInline(block, index)}</Body>;
+  return <Body key={`${index}-${block}`} style={compact ? styles.compactBody : undefined}>{renderInline(block, index, onOpenContent)}</Body>;
 }
 
-function renderInline(value: string, blockIndex: number) {
+function renderInline(value: string, blockIndex: number, onOpenContent?: (target: ContentTarget) => void) {
   return tokenizeInline(value).map((token, index) => {
     const key = `${blockIndex}-${index}-${token.type}`;
     if (token.type === "bold") return <Text key={key} style={styles.bold}>{token.value}</Text>;
@@ -75,6 +105,11 @@ function renderInline(value: string, blockIndex: number) {
           key={key}
           style={styles.link}
           onPress={() => {
+            const target = parseContentTarget(token.url);
+            if (target && onOpenContent) {
+              onOpenContent(target);
+              return;
+            }
             const url = /^https?:\/\//i.test(token.url) ? token.url : `https://${token.url}`;
             Linking.openURL(url).catch(() => {});
           }}
@@ -89,7 +124,7 @@ function renderInline(value: string, blockIndex: number) {
 
 function tokenizeInline(value: string): InlineToken[] {
   const tokens: InlineToken[] = [];
-  const pattern = /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\[[^\]]+\]\([^)]+\)|(^|\s)@[a-zA-Z0-9_.-]{2,32}|(^|\s)#[\p{L}\p{N}_-]{2,40}|\*[^*\n]+\*)/gu;
+  const pattern = /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\[[^\]]+\]\([^)]+\)|https?:\/\/[^\s<>()]+|www\.[^\s<>()]+|(^|\s)@[a-zA-Z0-9_.-]{2,32}|(^|\s)#[\p{L}\p{N}_-]{2,40}|\*[^*\n]+\*)/gu;
   let last = 0;
   for (const match of value.matchAll(pattern)) {
     const raw = match[0];
@@ -108,6 +143,8 @@ function tokenizeInline(value: string): InlineToken[] {
       const link = trimmed.match(/^\[([^\]]+)]\(([^)]+)\)$/);
       if (link) tokens.push({ type: "link", label: link[1], url: link[2] });
       else tokens.push({ type: "text", value: trimmed });
+    } else if (/^(https?:\/\/|www\.)/i.test(trimmed)) {
+      tokens.push({ type: "link", label: trimmed.replace(/^https?:\/\//i, ""), url: trimmed });
     } else if (trimmed.startsWith("@") || trimmed.startsWith("#")) {
       tokens.push({ type: "mention", value: trimmed });
     } else {
@@ -120,7 +157,11 @@ function tokenizeInline(value: string): InlineToken[] {
 }
 
 function normalizeBlocks(text?: string | null) {
-  return String(text || "")
+  return decodeEntities(String(text || ""))
+    .replace(/!\[([^\]]*)]\(([^)]+)\)/g, "\n{{image:$2|$1}}\n")
+    .replace(/<img[^>]+src=["']([^"']+)["'][^>]*alt=["']([^"']*)["'][^>]*>/gi, "\n{{image:$1|$2}}\n")
+    .replace(/<img[^>]+alt=["']([^"']*)["'][^>]*src=["']([^"']+)["'][^>]*>/gi, "\n{{image:$2|$1}}\n")
+    .replace(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi, "\n{{image:$1}}\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n\n")
     .replace(/<li>/gi, "\n- ")
@@ -137,8 +178,45 @@ function normalizeBlocks(text?: string | null) {
     .filter(Boolean);
 }
 
+function parseImageBlock(block: string) {
+  const image = block.match(/^\{\{image:([^|}]+)(?:\|([^}]+))?}}$/i);
+  if (image) return { url: image[1].trim(), alt: image[2]?.trim() };
+  return isImageUrl(block) ? { url: block } : null;
+}
+
 function stripMarkdown(value: string) {
   return value.replace(/[*_`]/g, "");
+}
+
+function decodeEntities(value: string) {
+  return value
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'");
+}
+
+function labelForTarget(target: ContentTarget) {
+  const prefix: Record<ContentTarget["type"], string> = {
+    event: "Event",
+    fastlap: "Fast Lap",
+    news: "News",
+    profile: "Profil",
+    team: "Team",
+    tournament: "Turnier",
+  };
+  return `${prefix[target.type]}: ${target.id}`;
+}
+
+function iconForTarget(type: ContentTarget["type"]) {
+  if (type === "event") return "calendar-outline";
+  if (type === "fastlap") return "speedometer-outline";
+  if (type === "news") return "newspaper-outline";
+  if (type === "profile") return "person-circle-outline";
+  if (type === "team") return "people-outline";
+  return "trophy-outline";
 }
 
 const styles = StyleSheet.create({
@@ -175,6 +253,14 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textDecorationLine: "underline",
   },
+  image: {
+    borderRadius: 8,
+    height: 190,
+    width: "100%",
+  },
+  compactImage: {
+    height: 130,
+  },
   quote: {
     borderLeftColor: colors.cyan,
     borderLeftWidth: 3,
@@ -209,6 +295,9 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 9,
     paddingVertical: 6,
+  },
+  pressed: {
+    opacity: 0.72,
   },
   embedText: {
     color: colors.cyan,
