@@ -4,6 +4,8 @@ export type User = {
   username: string;
   display_name?: string | null;
   avatar_url?: string | null;
+  discord_name?: string | null;
+  game_ids?: Record<string, Record<string, string>>;
   role?: string;
   user_type?: string;
   is_club_member?: boolean;
@@ -24,7 +26,17 @@ export type Tournament = {
   slug: string;
   status?: string;
   game_name?: string;
-  game?: { name?: string; display_name?: string; logo_url?: string | null; cover_url?: string | null };
+  game?: {
+    name?: string;
+    display_name?: string;
+    logo_url?: string | null;
+    cover_url?: string | null;
+    slug?: string;
+    identity_game_name?: string;
+    identity_game_slug?: string;
+    effective_player_id_fields?: Array<{ key: string; label?: string; required?: boolean; help_text?: string }>;
+    player_id_fields?: Array<{ key: string; label?: string; required?: boolean; help_text?: string }>;
+  };
   event?: { name?: string; location?: string; start_date?: string | null } | null;
   description?: string | null;
   platform?: string | null;
@@ -33,7 +45,16 @@ export type Tournament = {
   format_label?: string;
   public_phase?: { label?: string; state?: string; target_at?: string | null };
   start_date?: string | null;
+  end_date?: string | null;
   registration_enabled?: boolean;
+  registration_open_from?: string | null;
+  registration_open_until?: string | null;
+  check_in_from?: string | null;
+  check_in_until?: string | null;
+  is_invite_only?: boolean;
+  block_club_member_registration?: boolean;
+  team_mode?: string;
+  team_size?: number;
   show_chat?: boolean;
   banner_url?: string | null;
   format?: string;
@@ -44,7 +65,7 @@ export type Tournament = {
   prize_pool?: string | null;
   prize_places?: Array<{ place?: number; label?: string; value?: string }> | null;
   prizes?: string[];
-  my_registration?: { id?: string; status?: string; display_name?: string | null; ingame_name?: string | null; team_id?: string | null } | null;
+  my_registration?: { id?: string; status?: string; display_name?: string | null; ingame_name?: string | null; team_id?: string | null; user_id?: string | null } | null;
 };
 
 export type Team = {
@@ -58,6 +79,8 @@ export type Team = {
   member_count?: number;
   squad_count?: number;
   leader?: { id: string; username?: string; display_name?: string; avatar_url?: string | null };
+  can_manage?: boolean;
+  my_role?: string;
   members?: Array<{ id: string; name?: string; username?: string; display_name?: string; role?: string; avatar_url?: string | null; achievements?: string[] }>;
   squads?: Array<{ name: string; game: string; record: string }>;
   chat_preview?: Array<{ author: string; message: string; time: string }>;
@@ -128,7 +151,12 @@ export type ClubEvent = {
   banner_url?: string | null;
   public_phase?: { label?: string; state?: string; target_at?: string | null };
   has_registration?: boolean;
-  own_registration?: { id?: string; status?: string; display_name?: string | null; companion_count?: number } | null;
+  registration_url?: string | null;
+  registration_opens_at?: string | null;
+  registration_closes_at?: string | null;
+  allow_companions?: boolean;
+  max_companions_per_registration?: number | null;
+  own_registration?: { id?: string; status?: string; display_name?: string | null; companion_count?: number; seat_count?: number } | null;
 };
 
 export type NewsPost = {
@@ -224,6 +252,13 @@ export type F1Challenge = {
   description?: string | null;
   status?: string;
   public_phase?: { label?: string; state?: string; target_at?: string | null };
+  online_registration_enabled?: boolean;
+  registration_enabled?: boolean;
+  registration_open_from?: string | null;
+  registration_open_until?: string | null;
+  block_club_member_results?: boolean;
+  allow_club_reference_times?: boolean;
+  show_club_reference_times?: boolean;
   start_date?: string | null;
   end_date?: string | null;
   banner_url?: string | null;

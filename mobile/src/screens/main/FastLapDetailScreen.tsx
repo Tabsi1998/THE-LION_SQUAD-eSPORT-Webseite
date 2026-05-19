@@ -6,14 +6,17 @@ import { EmptyState, LoadingState } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
+import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
-import { formatDate, formatStatus } from "../../lib/format";
+import { formatDate, formatDateTime, formatStatus } from "../../lib/format";
+import { getRegistrationState, hasOnlineRegistration } from "../../lib/registration";
 import { colors } from "../../theme";
 import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload, F1Track } from "../../types";
 
 type Props = { route: { params: { id: string } } };
 
 export function FastLapDetailScreen({ route }: Props) {
+  const { user } = useAuth();
   const [challenge, setChallenge] = useState<F1Challenge | null>(null);
   const [leaderboard, setLeaderboard] = useState<F1LeaderboardPayload | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
@@ -49,6 +52,8 @@ export function FastLapDetailScreen({ route }: Props) {
   }, [load]);
 
   const best = useMemo(() => leaderboard?.entries?.[0], [leaderboard]);
+  const registration = useMemo(() => getRegistrationState(challenge, "Einreichung"), [challenge]);
+  const showRegistrationInfo = hasOnlineRegistration(challenge) || challenge?.block_club_member_results || challenge?.allow_club_reference_times !== false;
 
   if (loading) {
     return (
@@ -88,6 +93,36 @@ export function FastLapDetailScreen({ route }: Props) {
             <Pill label={`${challenge.participant_count || leaderboard?.entries.length || 0} Fahrer`} tone="gold" />
           </View>
         </View>
+
+        {showRegistrationInfo ? (
+          <Card style={styles.infoCard}>
+            <Heading>Einreichung</Heading>
+            {hasOnlineRegistration(challenge) ? (
+              <>
+                <Muted>{registration.label}</Muted>
+                {challenge.registration_open_from || challenge.registration_open_until ? (
+                  <Muted>
+                    {challenge.registration_open_from ? `Oeffnet: ${formatDateTime(challenge.registration_open_from)}` : ""}
+                    {challenge.registration_open_from && challenge.registration_open_until ? " · " : ""}
+                    {challenge.registration_open_until ? `Endet: ${formatDateTime(challenge.registration_open_until)}` : ""}
+                  </Muted>
+                ) : null}
+              </>
+            ) : (
+              <Muted>Zeiten werden aktuell durch Admins oder Moderatoren eingetragen.</Muted>
+            )}
+            {challenge.block_club_member_results ? (
+              <Muted style={styles.warning}>
+                {user?.is_club_member
+                  ? "Als Vereinsmitglied wirst du in dieser Challenge als Referenzzeit ausser Wertung gefuehrt."
+                  : "Diese Challenge ist fuer externe Fahrer gewertet. Vereinsmitglieder erscheinen als Referenzzeiten ausser Wertung."}
+              </Muted>
+            ) : challenge.allow_club_reference_times !== false ? (
+              <Muted>Vereins-Referenzzeiten sind separat moeglich und zaehlen nicht zur offiziellen Rangliste.</Muted>
+            ) : null}
+            {challenge.show_club_reference_times === false ? <Muted>Referenzzeiten sind aktuell nur intern sichtbar.</Muted> : null}
+          </Card>
+        ) : null}
 
         <View style={styles.section}>
           <Heading>Strecken</Heading>
@@ -212,6 +247,14 @@ const styles = StyleSheet.create({
   bestCard: {
     gap: 4,
     marginHorizontal: 18,
+  },
+  infoCard: {
+    gap: 8,
+    marginHorizontal: 18,
+  },
+  warning: {
+    color: colors.gold,
+    fontWeight: "800",
   },
   bestTime: {
     color: colors.gold,

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1-alpha.1 - 2026-05-19
+
+- Aligned native tournament registration with website eligibility rules for team mode, manageable teams, required game IDs, club-member blocks, and check-in.
+- Added a tournament registration modal for team selection and game/player ID fields using live profile data.
+- Loaded native tournament registrations directly so participant state, team registrations, and self-registration detection are more reliable.
+- Aligned native event registration with website behavior for external registration links, companion counts, optional notes, registration windows, and reserved seats.
+- Added Fast-Lap submission/reference policy information so users can see online submission windows and club-reference scoring rules in the app.
+
 ## 0.1.0-alpha.14 - 2026-05-19
 
 - Added a native rich-text renderer for mobile Markdown, simple HTML formatting, links, lists, quotes, code, mentions, and hashtags.

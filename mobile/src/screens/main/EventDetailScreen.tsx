@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { FormInput } from "../../components/FormInput";
 import { EmptyState, LoadingState } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { RichText } from "../../components/RichText";
@@ -12,6 +13,7 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { formatDateTime, formatStatus } from "../../lib/format";
+import { getRegistrationState } from "../../lib/registration";
 import { isGuestUser } from "../../live";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -26,10 +28,12 @@ type EventDetail = ClubEvent & {
     registered_count?: number;
     waitlist_count?: number;
     checked_in_count?: number;
+    companion_count?: number;
+    reserved_seats?: number;
     spots_left?: number | null;
     max_participants?: number | null;
   };
-  registrations?: Array<{ id: string; display_name?: string; status?: string; companion_count?: number }>;
+  registrations?: Array<{ id: string; display_name?: string; status?: string; companion_count?: number; seat_count?: number }>;
   tournaments?: Tournament[];
   f1_challenges?: F1Challenge[];
   news?: NewsPost[];
@@ -44,6 +48,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [companionCount, setCompanionCount] = useState("0");
+  const [note, setNote] = useState("");
   const guest = isGuestUser(user);
 
   const load = useCallback(async () => {
@@ -63,22 +69,39 @@ export function EventDetailScreen({ navigation, route }: Props) {
     load();
   }, [load]);
 
-  const registrationOpen = event?.has_registration && event.public_phase?.state === "registration_open";
+  useEffect(() => {
+    setCompanionCount("0");
+    setNote("");
+  }, [event?.id]);
+
+  const hasRegistration = Boolean(event?.has_registration || event?.registration_url);
+  const registration = useMemo(() => getRegistrationState(event, "Anmeldung"), [event]);
   const registered = event?.own_registration && !["cancelled", "no_show"].includes(String(event.own_registration.status || ""));
+  const maxCompanions = event?.allow_companions ? Number(event.max_companions_per_registration || 0) : 0;
+  const companionNumber = clampNumber(companionCount, 0, maxCompanions);
 
   const register = useCallback(async () => {
     if (!event || busy) return;
     setBusy(true);
     setError("");
     try {
-      await api.post(`/events/${event.slug || event.id}/registrations`, { companion_count: 0 });
+      await api.post(`/events/${event.id}/registrations`, { companion_count: companionNumber, note: note.trim() || null });
       await load();
     } catch (err) {
       setError(errorMessage(err, "Event-Anmeldung konnte nicht gespeichert werden."));
     } finally {
       setBusy(false);
     }
-  }, [busy, event, load]);
+  }, [busy, companionNumber, event, load, note]);
+
+  const openExternalRegistration = useCallback(async () => {
+    if (!event?.registration_url) return;
+    try {
+      await Linking.openURL(event.registration_url);
+    } catch {
+      setError("Externer Anmeldelink konnte nicht geoeffnet werden.");
+    }
+  }, [event?.registration_url]);
 
   const unregister = useCallback(async () => {
     if (!event || busy) return;
@@ -143,21 +166,62 @@ export function EventDetailScreen({ navigation, route }: Props) {
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
-        {event.has_registration ? (
+        {hasRegistration ? (
           <Card style={styles.card}>
-            <Heading>Anmeldung</Heading>
+            <Heading>{event.registration_url ? "Registrierung" : "Anmeldung"}</Heading>
             <Muted>
-              {event.registration_summary?.registered_count || 0} angemeldet
+              {event.registration_summary?.reserved_seats || event.registration_summary?.registered_count || 0} reserviert
+              {event.registration_summary?.registered_count != null ? ` · ${event.registration_summary.registered_count} Anmeldungen` : ""}
+              {event.registration_summary?.companion_count ? ` · ${event.registration_summary.companion_count} Begleitp.` : ""}
               {event.registration_summary?.max_participants ? ` · ${event.registration_summary.max_participants} Plaetze` : ""}
               {event.registration_summary?.spots_left != null ? ` · ${event.registration_summary.spots_left} frei` : ""}
             </Muted>
-            {registered ? <Muted style={styles.success}>Status: {formatStatus(event.own_registration?.status)}</Muted> : null}
-            {guest ? (
-              <Muted>Zum Anmelden bitte mit deinem Account einloggen.</Muted>
+            <Muted>{registration.label}</Muted>
+            {event.registration_opens_at || event.registration_closes_at ? (
+              <Muted>
+                {event.registration_opens_at ? `Oeffnet: ${formatDateTime(event.registration_opens_at)}` : ""}
+                {event.registration_opens_at && event.registration_closes_at ? " · " : ""}
+                {event.registration_closes_at ? `Schliesst: ${formatDateTime(event.registration_closes_at)}` : ""}
+              </Muted>
+            ) : null}
+            {event.registration_url ? (
+              <Button label="Extern anmelden" onPress={openExternalRegistration} />
             ) : registered ? (
-              <Button label={busy ? "Wird abgemeldet ..." : "Vom Event abmelden"} variant="secondary" onPress={unregister} disabled={busy} />
-            ) : registrationOpen ? (
-              <Button label={busy ? "Wird angemeldet ..." : "Zum Event anmelden"} onPress={register} disabled={busy} />
+              <>
+                <Muted style={styles.success}>
+                  {formatStatus(event.own_registration?.status)}
+                  {event.own_registration?.seat_count ? ` · ${event.own_registration.seat_count} Platz/Plaetze` : ""}
+                  {event.own_registration?.companion_count ? ` · ${event.own_registration.companion_count} Begleitp.` : ""}
+                </Muted>
+                <Button label={busy ? "Wird abgemeldet ..." : "Vom Event abmelden"} variant="secondary" onPress={unregister} disabled={busy} />
+              </>
+            ) : guest ? (
+              <Muted>Zum Anmelden bitte mit deinem Account einloggen.</Muted>
+            ) : registration.canRegister && event.has_registration ? (
+              <>
+                {event.allow_companions ? (
+                  <>
+                    <FormInput
+                      label="Begleitpersonen"
+                      value={companionCount}
+                      keyboardType="number-pad"
+                      onChangeText={(value) => setCompanionCount(String(clampNumber(value, 0, maxCompanions)))}
+                    />
+                    <Muted>Maximal {maxCompanions} Begleitperson(en) pro Anmeldung.</Muted>
+                  </>
+                ) : null}
+                <FormInput
+                  label="Hinweis optional"
+                  value={note}
+                  multiline
+                  numberOfLines={3}
+                  maxLength={500}
+                  style={styles.noteInput}
+                  onChangeText={setNote}
+                  placeholder="z.B. komme etwas spaeter"
+                />
+                <Button label={busy ? "Wird angemeldet ..." : "Zum Event anmelden"} onPress={register} disabled={busy} />
+              </>
             ) : (
               <Muted>Anmeldung ist aktuell nicht offen.</Muted>
             )}
@@ -237,6 +301,12 @@ function Pill({ label, tone = "cyan" }: { label: string; tone?: "cyan" | "gold" 
       <Muted style={[styles.pillText, tone === "gold" && styles.pillGoldText]}>{label}</Muted>
     </View>
   );
+}
+
+function clampNumber(value: string, min: number, max: number) {
+  const parsed = Number.parseInt(value || "0", 10);
+  if (Number.isNaN(parsed)) return min;
+  return Math.min(max, Math.max(min, parsed));
 }
 
 const styles = StyleSheet.create({
@@ -327,5 +397,9 @@ const styles = StyleSheet.create({
   logoText: {
     color: colors.cyan,
     fontWeight: "900",
+  },
+  noteInput: {
+    minHeight: 92,
+    textAlignVertical: "top",
   },
 });

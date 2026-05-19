@@ -1,18 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { FormInput } from "../../components/FormInput";
 import { EmptyState, LoadingState } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime, formatStatus } from "../../lib/format";
+import { getRegistrationState } from "../../lib/registration";
 import { isGuestUser } from "../../live";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
-import type { Tournament } from "../../types";
+import type { Team, Tournament, User } from "../../types";
 
 type Props = NativeStackScreenProps<TournamentStackParamList, "TournamentDetail">;
 type TabKey = "overview" | "bracket" | "matches" | "standings" | "participants" | "rules";
@@ -23,6 +25,10 @@ type BracketPayload = {
   stages?: any[];
   registrations?: any[];
   engine?: string;
+};
+type RegistrationPayload = {
+  player_ids?: Record<string, string>;
+  team_id?: string | null;
 };
 
 const tabs: Array<{ key: TabKey; label: string }> = [
@@ -39,6 +45,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const [tournament, setTournament] = useState<Tournament | undefined>();
   const [bracket, setBracket] = useState<BracketPayload>({});
   const [standings, setStandings] = useState<any[]>([]);
+  const [myTeams, setMyTeams] = useState<Team[]>([]);
+  const [registerModal, setRegisterModal] = useState(false);
   const [tab, setTab] = useState<TabKey>("overview");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -48,32 +56,56 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const load = useCallback(async () => {
     setError("");
     try {
-      const [detailResult, bracketResult, standingsResult] = await Promise.all([
+      const [detailResult, bracketResult, standingsResult, registrationsResult, teamsResult] = await Promise.all([
         api.get<Tournament>(`/tournaments/${route.params.id}`),
-        api.get<BracketPayload>(`/tournaments/${route.params.id}/bracket`).catch(() => ({ data: {} })),
+        api.get<BracketPayload>(`/tournaments/${route.params.id}/bracket`).catch(() => ({ data: {} as BracketPayload })),
         api.get<any[]>(`/tournaments/${route.params.id}/standings`).catch(() => ({ data: [] })),
+        api.get<any[]>(`/tournaments/${route.params.id}/registrations`).catch(() => ({ data: [] })),
+        user && !isGuestUser(user) ? api.get<Team[]>("/teams/my").catch(() => ({ data: [] })) : Promise.resolve({ data: [] as Team[] }),
       ]);
       setTournament(detailResult.data);
-      setBracket(bracketResult.data || {});
+      setBracket({ ...(bracketResult.data || {}), registrations: Array.isArray(registrationsResult.data) ? registrationsResult.data : bracketResult.data?.registrations || [] });
       setStandings(Array.isArray(standingsResult.data) ? standingsResult.data : []);
+      setMyTeams(Array.isArray(teamsResult.data) ? teamsResult.data : []);
     } catch (err) {
       setError(errorMessage(err, "Turnierdetail konnte nicht geladen werden."));
     } finally {
       setLoading(false);
     }
-  }, [route.params.id]);
+  }, [route.params.id, user]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const registrations = bracket.registrations || [];
+  const myTeamIds = useMemo(() => new Set(myTeams.map((team) => team.id).filter(Boolean)), [myTeams]);
   const ownRegistration = useMemo(() => {
     if (tournament?.my_registration?.id) return tournament.my_registration;
-    return registrations.find((registration) => registration.is_mine || registration.user_id === user?.id);
-  }, [registrations, tournament?.my_registration, user?.id]);
+    return registrations.find((registration) => registration.is_mine || registration.user_id === user?.id || (registration.team_id && myTeamIds.has(registration.team_id)));
+  }, [myTeamIds, registrations, tournament?.my_registration, user?.id]);
   const registered = Boolean(ownRegistration?.id && !["cancelled", "rejected", "no_show"].includes(String(ownRegistration.status || "")));
-  const registrationOpen = Boolean(tournament?.registration_enabled && tournament.status === "registration_open");
+  const registration = useMemo(() => getRegistrationState(tournament, "Anmeldung"), [tournament]);
+  const isTeamTournament = Boolean(tournament && (tournament.team_mode || "solo") !== "solo");
+  const gameFields = useMemo(() => tournament?.game?.effective_player_id_fields || tournament?.game?.player_id_fields || [], [tournament?.game]);
+  const manageableTeams = useMemo(() => myTeams.filter((team) => team.can_manage || ["leader", "co_leader"].includes(String(team.my_role || ""))), [myTeams]);
+  const myRegTeam = ownRegistration?.team_id ? myTeams.find((team) => team.id === ownRegistration.team_id) : null;
+  const canManageOwnRegistration = Boolean(
+    ownRegistration &&
+      (!ownRegistration.team_id ||
+        ownRegistration.user_id === user?.id ||
+        myRegTeam?.can_manage ||
+        ["leader", "co_leader"].includes(String(myRegTeam?.my_role || ""))),
+  );
+  const clubMemberBlocked = Boolean(user?.is_club_member && tournament?.block_club_member_registration);
+  const canSelfRegister = Boolean(!guest && !registered && registration.canRegister && !clubMemberBlocked);
+  const canCheckIn = Boolean(canManageOwnRegistration && ownRegistration?.status === "approved" && tournament?.status === "check_in");
+  const canSelfUnregister = Boolean(
+    registered &&
+      canManageOwnRegistration &&
+      !["checked_in", "no_show", "rejected"].includes(String(ownRegistration?.status || "")) &&
+      !["live", "paused", "completed", "results_published", "archived"].includes(String(tournament?.status || "")),
+  );
   const regMap = useMemo(() => {
     const map = new Map<string, any>();
     registrations.forEach((registration) => map.set(registration.id, registration));
@@ -83,23 +115,50 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const v2Matches = bracket.matches_v2 || [];
   const allMatches = v2Matches.length ? v2Matches : legacyMatches;
 
-  const register = useCallback(async () => {
+  const register = useCallback(async (payload: RegistrationPayload = {}) => {
     if (!tournament || busy) return;
     setBusy(true);
     setError("");
     try {
-      await api.post(`/tournaments/${tournament.slug || tournament.id}/register`, {
+      await api.post(`/tournaments/${tournament.id}/register`, {
+        team_id: payload.team_id || null,
         ingame_name: user?.display_name || user?.username,
+        discord: user?.discord_name,
+        player_ids: payload.player_ids || {},
         accept_rules: true,
         accept_privacy: true,
       });
+      setRegisterModal(false);
       await load();
     } catch (err) {
       setError(errorMessage(err, "Turnier-Anmeldung konnte nicht gespeichert werden."));
     } finally {
       setBusy(false);
     }
-  }, [busy, load, tournament, user?.display_name, user?.username]);
+  }, [busy, load, tournament, user?.discord_name, user?.display_name, user?.username]);
+
+  const startRegistration = useCallback(() => {
+    if (!tournament || busy) return;
+    if (isTeamTournament || gameFields.length) {
+      setRegisterModal(true);
+      return;
+    }
+    register();
+  }, [busy, gameFields.length, isTeamTournament, register, tournament]);
+
+  const checkIn = useCallback(async () => {
+    if (!tournament || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.post(`/tournaments/${tournament.id}/checkin`);
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, "Check-in konnte nicht gespeichert werden."));
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, load, tournament]);
 
   const unregister = useCallback(async () => {
     if (!tournament || !ownRegistration?.id || busy) return;
@@ -112,7 +171,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
           setBusy(true);
           setError("");
           try {
-            await api.delete(`/tournaments/${tournament.slug || tournament.id}/registrations/${ownRegistration.id}`);
+            await api.delete(`/tournaments/${tournament.id}/registrations/${ownRegistration.id}`);
             await load();
           } catch (err) {
             setError(errorMessage(err, "Turnier-Abmeldung konnte nicht gespeichert werden."));
@@ -181,20 +240,43 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
             <Card style={styles.card}>
               <Heading>Turnierstatus</Heading>
               <View style={styles.registrationBox}>
+                <Muted>{registration.label}</Muted>
+                {tournament.registration_open_from || tournament.registration_open_until ? (
+                  <Muted>
+                    {tournament.registration_open_from ? `Oeffnet: ${formatDateTime(tournament.registration_open_from)}` : ""}
+                    {tournament.registration_open_from && tournament.registration_open_until ? " · " : ""}
+                    {tournament.registration_open_until ? `Endet: ${formatDateTime(tournament.registration_open_until)}` : ""}
+                  </Muted>
+                ) : null}
+                {clubMemberBlocked && !registered ? (
+                  <Muted style={styles.warning}>Dieses Turnier ist fuer externe Teilnehmer vorgesehen. Vereinsmitglieder koennen sich hier nicht selbst anmelden.</Muted>
+                ) : null}
+                {isTeamTournament && canSelfRegister && !manageableTeams.length ? (
+                  <Muted style={styles.errorText}>Fuer dieses Team-Turnier brauchst du ein Team, das du als Leader oder Co-Leader verwalten darfst.</Muted>
+                ) : null}
                 {guest ? (
                   <Muted>Zum Anmelden bitte mit deinem Account einloggen.</Muted>
                 ) : registered ? (
                   <>
                     <Muted style={styles.success}>Du bist angemeldet: {formatStatus(ownRegistration?.status)}</Muted>
-                    <Button label={busy ? "Wird abgemeldet ..." : "Vom Turnier abmelden"} variant="secondary" onPress={unregister} disabled={busy} />
+                    {canCheckIn ? <Button label={busy ? "Check-in laeuft ..." : "Jetzt einchecken"} onPress={checkIn} disabled={busy} /> : null}
+                    {canSelfUnregister ? (
+                      <Button label={busy ? "Wird abgemeldet ..." : "Vom Turnier abmelden"} variant="secondary" onPress={unregister} disabled={busy} />
+                    ) : (
+                      <Muted>Abmeldung ist fuer diese Anmeldung aktuell nicht moeglich.</Muted>
+                    )}
                   </>
-                ) : registrationOpen ? (
+                ) : canSelfRegister ? (
                   <>
                     <Muted>Mit der Anmeldung akzeptierst du Regeln und Datenschutz fuer dieses Turnier.</Muted>
-                    <Button label={busy ? "Wird angemeldet ..." : "Zum Turnier anmelden"} onPress={register} disabled={busy} />
+                    <Button
+                      label={busy ? "Wird angemeldet ..." : isTeamTournament ? "Team anmelden" : "Zum Turnier anmelden"}
+                      onPress={startRegistration}
+                      disabled={busy || (isTeamTournament && !manageableTeams.length)}
+                    />
                   </>
                 ) : (
-                  <Muted>Anmeldung ist aktuell nicht offen.</Muted>
+                  <Muted>Anmeldung ist aktuell nicht moeglich.</Muted>
                 )}
               </View>
               <View style={styles.statGrid}>
@@ -204,7 +286,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
               </View>
               <Info label="Event" value={tournament.event?.name || "-"} />
               <Info label="Ort" value={tournament.event?.location || "-"} />
-              <Info label="Anmeldung" value={tournament.registration_enabled ? "Offen" : "Geschlossen"} />
+              <Info label="Anmeldung" value={registration.label} />
+              <Info label="Modus" value={formatTeamMode(tournament.team_mode)} />
               {tournament.show_chat ? (
                 <Button
                   label="Turnier-Chat öffnen"
@@ -281,7 +364,116 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
           </Card>
         ) : null}
       </ScrollView>
+      <RegistrationModal
+        busy={busy}
+        fields={gameFields}
+        teams={manageableTeams}
+        tournament={tournament}
+        user={user}
+        visible={registerModal}
+        onClose={() => setRegisterModal(false)}
+        onSubmit={register}
+      />
     </Screen>
+  );
+}
+
+function RegistrationModal({
+  busy,
+  fields,
+  teams,
+  tournament,
+  user,
+  visible,
+  onClose,
+  onSubmit,
+}: {
+  busy: boolean;
+  fields: NonNullable<NonNullable<Tournament["game"]>["effective_player_id_fields"]>;
+  teams: Team[];
+  tournament: Tournament;
+  user?: User | null;
+  visible: boolean;
+  onClose: () => void;
+  onSubmit: (payload: RegistrationPayload) => void;
+}) {
+  const isTeamTournament = (tournament.team_mode || "solo") !== "solo";
+  const sourceSlug = tournament.game?.identity_game_slug || tournament.game?.slug || "";
+  const gameSlug = tournament.game?.slug || "";
+  const initialIds = useMemo(() => ({
+    ...((sourceSlug && user?.game_ids?.[sourceSlug]) || {}),
+    ...((gameSlug && user?.game_ids?.[gameSlug]) || {}),
+  }), [gameSlug, sourceSlug, user?.game_ids]);
+  const [playerIds, setPlayerIds] = useState<Record<string, string>>(initialIds);
+  const [teamId, setTeamId] = useState(teams[0]?.id || "");
+
+  useEffect(() => {
+    if (!visible) return;
+    setPlayerIds(initialIds);
+    setTeamId(teams[0]?.id || "");
+  }, [initialIds, teams, visible]);
+
+  const missingRequired = fields.some((field) => field.required !== false && !String(playerIds[field.key] || "").trim());
+  const canSubmit = !busy && (!isTeamTournament || Boolean(teamId)) && !missingRequired;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalCard}>
+          <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+            <View style={styles.modalHead}>
+              <View style={styles.flex}>
+                <Heading>Turnier-Anmeldung</Heading>
+                <Muted>{isTeamTournament ? "Waehle dein verwaltbares Team aus." : `${tournament.game?.display_name || tournament.game?.name || "Dieses Spiel"} benoetigt diese Angaben.`}</Muted>
+              </View>
+              <Pressable onPress={onClose} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
+                <Body style={styles.closeText}>x</Body>
+              </Pressable>
+            </View>
+
+            {isTeamTournament ? (
+              <View style={styles.formGroup}>
+                <Muted style={styles.formLabel}>Team</Muted>
+                {teams.length ? teams.map((team) => (
+                  <Pressable key={team.id} onPress={() => setTeamId(team.id)} style={[styles.teamChoice, teamId === team.id && styles.teamChoiceActive]}>
+                    <View style={styles.flex}>
+                      <Body style={styles.strong}>{team.tag ? `[${team.tag}] ${team.name}` : team.name}</Body>
+                      <Muted>{team.my_role === "co_leader" ? "Co-Leader" : team.my_role === "leader" ? "Leader" : team.can_manage ? "Verwaltbar" : "Team"}</Muted>
+                    </View>
+                    <View style={[styles.radio, teamId === team.id && styles.radioActive]} />
+                  </Pressable>
+                )) : (
+                  <Muted style={styles.errorText}>Du hast aktuell kein Team, das du fuer dieses Turnier anmelden darfst.</Muted>
+                )}
+              </View>
+            ) : null}
+
+            {fields.length ? (
+              <View style={styles.formGroup}>
+                <Muted style={styles.formLabel}>Spieler-IDs</Muted>
+                {fields.map((field) => (
+                  <FormInput
+                    key={field.key}
+                    label={`${field.label || field.key}${field.required === false ? "" : " *"}`}
+                    value={playerIds[field.key] || ""}
+                    placeholder={field.help_text || field.label || field.key}
+                    onChangeText={(value) => setPlayerIds((current) => ({ ...current, [field.key]: value }))}
+                  />
+                ))}
+              </View>
+            ) : null}
+
+            <Muted>Mit der Anmeldung akzeptierst du die Turnierregeln und die Datenschutzhinweise.</Muted>
+            {missingRequired ? <Muted style={styles.errorText}>Bitte alle Pflicht-IDs ausfuellen.</Muted> : null}
+
+            <View style={styles.formActions}>
+              <Button label="Abbrechen" variant="secondary" onPress={onClose} disabled={busy} />
+              <Button label={busy ? "Sendet ..." : "Anmelden"} onPress={() => onSubmit({ team_id: isTeamTournament ? teamId : null, player_ids: playerIds })} disabled={!canSubmit} />
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -368,6 +560,14 @@ function formatSection(value: string) {
   return value || "Main";
 }
 
+function formatTeamMode(value?: string | null) {
+  if (!value || value === "solo") return "Solo";
+  if (value === "team") return "Team";
+  if (value === "duo") return "Duo";
+  if (value === "squad") return "Squad";
+  return value.replace(/_/g, " ");
+}
+
 function Stat({ label, value, tone = "cyan" }: { label: string; value: string; tone?: "cyan" | "gold" }) {
   return (
     <View style={styles.stat}>
@@ -444,6 +644,16 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
+  flex: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pressed: {
+    opacity: 0.72,
+  },
+  strong: {
+    fontWeight: "900",
+  },
   pill: {
     backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderColor: colors.border,
@@ -481,6 +691,14 @@ const styles = StyleSheet.create({
   success: {
     color: colors.success,
     fontWeight: "900",
+  },
+  warning: {
+    color: colors.gold,
+    fontWeight: "800",
+  },
+  errorText: {
+    color: colors.live,
+    fontWeight: "800",
   },
   stat: {
     backgroundColor: "rgba(255,255,255,0.04)",
@@ -652,5 +870,79 @@ const styles = StyleSheet.create({
   },
   error: {
     color: colors.live,
+  },
+  closeButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: colors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  closeText: {
+    fontSize: 22,
+    fontWeight: "900",
+    lineHeight: 24,
+  },
+  formActions: {
+    gap: 10,
+  },
+  formGroup: {
+    gap: 10,
+  },
+  formLabel: {
+    color: colors.cyan,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  modalBackdrop: {
+    backgroundColor: "rgba(0,0,0,0.78)",
+    flex: 1,
+    justifyContent: "center",
+    padding: 18,
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    maxHeight: "88%",
+    overflow: "hidden",
+  },
+  modalContent: {
+    gap: 14,
+    padding: 16,
+  },
+  modalHead: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 12,
+  },
+  radio: {
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 2,
+    height: 16,
+    width: 16,
+  },
+  radioActive: {
+    backgroundColor: colors.cyan,
+    borderColor: colors.cyan,
+  },
+  teamChoice: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: colors.border,
+    borderRadius: 7,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 11,
+  },
+  teamChoiceActive: {
+    backgroundColor: "rgba(41,182,232,0.13)",
+    borderColor: "rgba(41,182,232,0.5)",
   },
 });
