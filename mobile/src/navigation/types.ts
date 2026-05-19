@@ -16,11 +16,13 @@ export type MainTabParamList = {
 export type TournamentStackParamList = {
   TournamentList: undefined;
   TournamentDetail: { id: string };
+  TournamentChat: { id: string; title?: string };
 };
 
 export type TeamStackParamList = {
   TeamList: undefined;
   TeamDetail: { id: string };
+  TeamChat: { id: string; title?: string };
 };
 
 export type MoreStackParamList = {
@@ -30,4 +32,7 @@ export type MoreStackParamList = {
   NewsDetail: { id: string };
   FastLapList: undefined;
   FastLapDetail: { id: string };
+  DirectMessages: undefined;
+  DirectThread: { userId: string; title?: string };
+  Notifications: undefined;
 };

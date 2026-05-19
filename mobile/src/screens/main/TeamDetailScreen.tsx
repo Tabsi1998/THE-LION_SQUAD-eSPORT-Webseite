@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { EmptyState, LoadingState } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
@@ -13,7 +14,7 @@ import type { Team } from "../../types";
 
 type Props = NativeStackScreenProps<TeamStackParamList, "TeamDetail">;
 
-export function TeamDetailScreen({ route }: Props) {
+export function TeamDetailScreen({ navigation, route }: Props) {
   const [team, setTeam] = useState<Team | undefined>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -109,7 +110,8 @@ export function TeamDetailScreen({ route }: Props) {
 
         <Card style={styles.card}>
           <Heading>Team-Chat</Heading>
-          <Muted>Vorschau für den späteren nativen Chat mit Team-Abstimmung.</Muted>
+          <Muted>Direkter Teamchat mit Mentions und Plattform-Benachrichtigungen.</Muted>
+          <Button label="Team-Chat öffnen" onPress={() => navigation.navigate("TeamChat", { id: team.id, title: `${team.tag || team.name} Chat` })} />
           {team.chat_preview?.map((message) => (
             <View key={`${message.author}-${message.time}`} style={styles.chatRow}>
               <View style={styles.rowMain}>

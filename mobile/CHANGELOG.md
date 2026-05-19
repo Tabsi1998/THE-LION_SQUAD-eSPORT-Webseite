@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-alpha.9 - 2026-05-19
+
+- Added native direct messages with conversation list and thread view.
+- Added native Team-Chat and Turnier-Chat screens using the existing website chat APIs.
+- Added a native notification inbox with read state and "mark all read".
+- Added Expo push-token registration in the app and backend delivery hooks for platform notifications.
+- Stored mobile push tokens per user and prepared notification pushes for reminders, mentions, messages, match updates, and Fast-Lap notices.
+
 ## 0.1.0-alpha.8 - 2026-05-19
 
 - Renamed the installed app display name to `LionsAPP`.

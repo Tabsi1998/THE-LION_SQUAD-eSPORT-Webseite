@@ -96,6 +96,8 @@ async def init_indexes():
     await db.notifications.create_index("id", unique=True)
     await db.notifications.create_index("user_id")
     await db.notifications.create_index([("user_id", 1), ("read", 1), ("created_at", -1)])
+    await db.mobile_push_tokens.create_index("token", unique=True)
+    await db.mobile_push_tokens.create_index([("user_id", 1), ("enabled", 1), ("updated_at", -1)])
     await db.direct_messages.create_index("id", unique=True)
     await db.direct_messages.create_index([("sender_id", 1), ("recipient_id", 1), ("created_at", -1)])
     await db.direct_messages.create_index([("recipient_id", 1), ("read_at", 1), ("created_at", -1)])

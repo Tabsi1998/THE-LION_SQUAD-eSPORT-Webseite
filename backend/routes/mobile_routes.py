@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from auth import get_current_user, get_optional_user
 from database import get_db
@@ -19,6 +20,12 @@ ACTIVE_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in", "waitlist"}
 OPEN_MATCH_STATUSES = {"ready", "scheduled", "in_progress", "waiting_result"}
 HIDDEN_PUBLIC_STATUSES = {"draft", "completed", "results_published", "archived", "cancelled"}
 RESULT_TOURNAMENT_STATUSES = {"completed", "results_published", "archived"}
+
+
+class MobilePushTokenCreate(BaseModel):
+    token: str = Field(min_length=20, max_length=300)
+    platform: str | None = Field(default=None, max_length=40)
+    device_name: str | None = Field(default=None, max_length=120)
 
 
 def _parse_dt(value):
@@ -671,3 +678,38 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
 @router.get("/profile/references")
 async def mobile_profile_references(user: dict = Depends(get_current_user)):
     return await _personal_references(user)
+
+
+@router.post("/push-token")
+async def register_mobile_push_token(body: MobilePushTokenCreate, user: dict = Depends(get_current_user)):
+    token = body.token.strip()
+    if not (token.startswith("ExponentPushToken[") or token.startswith("ExpoPushToken[")):
+        raise HTTPException(status_code=400, detail="Ungültiger Expo Push Token")
+    db = get_db()
+    now = now_utc().isoformat()
+    await db.mobile_push_tokens.update_one(
+        {"token": token},
+        {
+            "$set": {
+                "token": token,
+                "user_id": user["id"],
+                "platform": body.platform,
+                "device_name": body.device_name,
+                "enabled": True,
+                "updated_at": now,
+            },
+            "$setOnInsert": {"created_at": now},
+        },
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+@router.delete("/push-token")
+async def unregister_mobile_push_token(body: MobilePushTokenCreate, user: dict = Depends(get_current_user)):
+    db = get_db()
+    result = await db.mobile_push_tokens.update_one(
+        {"token": body.token.strip(), "user_id": user["id"]},
+        {"$set": {"enabled": False, "updated_at": now_utc().isoformat()}},
+    )
+    return {"ok": True, "updated": result.modified_count}

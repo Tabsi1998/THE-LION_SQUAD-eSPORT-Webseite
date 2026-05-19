@@ -8,15 +8,20 @@ import { BootScreen } from "../screens/BootScreen";
 import { LoginScreen } from "../screens/auth/LoginScreen";
 import { RegisterScreen } from "../screens/auth/RegisterScreen";
 import { DashboardScreen } from "../screens/main/DashboardScreen";
+import { DirectMessagesScreen } from "../screens/main/DirectMessagesScreen";
+import { DirectThreadScreen } from "../screens/main/DirectThreadScreen";
 import { FastLapDetailScreen } from "../screens/main/FastLapDetailScreen";
 import { FastLapScreen } from "../screens/main/FastLapScreen";
 import { MoreScreen } from "../screens/main/MoreScreen";
 import { NewsDetailScreen } from "../screens/main/NewsDetailScreen";
 import { NewsScreen } from "../screens/main/NewsScreen";
+import { NotificationsScreen } from "../screens/main/NotificationsScreen";
 import { ProfileScreen } from "../screens/main/ProfileScreen";
 import { InfoCenterScreen } from "../screens/main/InfoCenterScreen";
+import { TeamChatScreen } from "../screens/main/TeamChatScreen";
 import { TeamDetailScreen } from "../screens/main/TeamDetailScreen";
 import { TeamsScreen } from "../screens/main/TeamsScreen";
+import { TournamentChatScreen } from "../screens/main/TournamentChatScreen";
 import { TournamentDetailScreen } from "../screens/main/TournamentDetailScreen";
 import { TournamentsScreen } from "../screens/main/TournamentsScreen";
 import { useAuth } from "../auth/AuthContext";
@@ -117,6 +122,7 @@ function TournamentStackScreen() {
     <TournamentStack.Navigator screenOptions={stackOptions}>
       <TournamentStack.Screen name="TournamentList" component={TournamentsScreen} options={{ headerShown: false }} />
       <TournamentStack.Screen name="TournamentDetail" component={TournamentDetailScreen} options={{ title: "Turnier" }} />
+      <TournamentStack.Screen name="TournamentChat" component={TournamentChatScreen} options={({ route }) => ({ title: route.params.title || "Turnier-Chat" })} />
     </TournamentStack.Navigator>
   );
 }
@@ -126,6 +132,7 @@ function TeamStackScreen() {
     <TeamStack.Navigator screenOptions={stackOptions}>
       <TeamStack.Screen name="TeamList" component={TeamsScreen} options={{ headerShown: false }} />
       <TeamStack.Screen name="TeamDetail" component={TeamDetailScreen} options={{ title: "Team" }} />
+      <TeamStack.Screen name="TeamChat" component={TeamChatScreen} options={({ route }) => ({ title: route.params.title || "Team-Chat" })} />
     </TeamStack.Navigator>
   );
 }
@@ -139,6 +146,9 @@ function MoreStackScreen() {
       <MoreStack.Screen name="NewsDetail" component={NewsDetailScreen} options={{ title: "News" }} />
       <MoreStack.Screen name="FastLapList" component={FastLapScreen} options={{ title: "Fast Laps" }} />
       <MoreStack.Screen name="FastLapDetail" component={FastLapDetailScreen} options={{ title: "Fast Lap" }} />
+      <MoreStack.Screen name="DirectMessages" component={DirectMessagesScreen} options={{ title: "Nachrichten" }} />
+      <MoreStack.Screen name="DirectThread" component={DirectThreadScreen} options={({ route }) => ({ title: route.params.title || "Chat" })} />
+      <MoreStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: "Benachrichtigungen" }} />
     </MoreStack.Navigator>
   );
 }

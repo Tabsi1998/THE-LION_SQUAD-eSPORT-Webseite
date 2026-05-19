@@ -9,7 +9,9 @@ import { colors } from "../../theme";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "MoreHub">;
 
-const modules: Array<{ title: string; detail: string; badge: string; section?: NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>; screen?: "NewsList" | "FastLapList" }> = [
+const modules: Array<{ title: string; detail: string; badge: string; section?: NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>; screen?: "NewsList" | "FastLapList" | "DirectMessages" | "Notifications" }> = [
+  { title: "Benachrichtigungen", detail: "Erinnerungen, Mentions, Nachrichten und Match-Updates aus der Plattform.", screen: "Notifications", badge: "Push" },
+  { title: "Nachrichten", detail: "Direktnachrichten mit Spielern und Community-Kontakten.", screen: "DirectMessages", badge: "Chat" },
   { title: "News", detail: "Aktuelle Ankuendigungen, Updates, Events und verknuepfte Turniere.", screen: "NewsList", badge: "Live" },
   { title: "Fast Laps", detail: "Challenges, Strecken und Bestzeiten direkt in LionsAPP ansehen.", screen: "FastLapList", badge: "Racing" },
   { title: "Sponsoren", detail: "Hinterlegte Unterstützer mit Kurzinfo und Link-Logik.", section: "sponsors", badge: "Club" },

@@ -1,6 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api, configureAuthBridge } from "../lib/api";
+import { registerDevicePushToken } from "../lib/push";
 import { isGuestUser, liveGuestUser } from "../live";
 import type { AuthResponse, User } from "../types";
 
@@ -76,6 +77,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearSession,
     });
   }, [accessToken, clearSession, persistSession, refreshToken]);
+
+  useEffect(() => {
+    if (user && accessToken && !isGuestUser(user)) {
+      registerDevicePushToken();
+    }
+  }, [accessToken, user]);
 
   const refreshMe = useCallback(async () => {
     const { data } = await api.get<User>("/auth/me");

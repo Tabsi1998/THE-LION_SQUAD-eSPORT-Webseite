@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { EmptyState, LoadingState } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
@@ -31,7 +32,7 @@ const tabs: Array<{ key: TabKey; label: string }> = [
   { key: "rules", label: "Regeln" },
 ];
 
-export function TournamentDetailScreen({ route }: Props) {
+export function TournamentDetailScreen({ navigation, route }: Props) {
   const [tournament, setTournament] = useState<Tournament | undefined>();
   const [bracket, setBracket] = useState<BracketPayload>({});
   const [standings, setStandings] = useState<any[]>([]);
@@ -135,6 +136,13 @@ export function TournamentDetailScreen({ route }: Props) {
               <Info label="Event" value={tournament.event?.name || "-"} />
               <Info label="Ort" value={tournament.event?.location || "-"} />
               <Info label="Anmeldung" value={tournament.registration_enabled ? "Offen" : "Geschlossen"} />
+              {tournament.show_chat ? (
+                <Button
+                  label="Turnier-Chat öffnen"
+                  onPress={() => navigation.navigate("TournamentChat", { id: tournament.id, title: `${tournament.title} Chat` })}
+                  variant="secondary"
+                />
+              ) : null}
             </Card>
             <Card style={styles.card}>
               <Heading>Nächste Matches</Heading>

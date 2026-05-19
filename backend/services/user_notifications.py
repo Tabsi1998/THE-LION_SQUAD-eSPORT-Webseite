@@ -51,4 +51,9 @@ async def create_user_notification(
     }
     await db.notifications.insert_one(doc)
     doc.pop("_id", None)
+    try:
+        from services.push_notifications import send_mobile_push_for_notification
+        await send_mobile_push_for_notification(doc)
+    except Exception:
+        pass
     return doc

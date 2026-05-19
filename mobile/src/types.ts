@@ -34,6 +34,7 @@ export type Tournament = {
   public_phase?: { label?: string; state?: string; target_at?: string | null };
   start_date?: string | null;
   registration_enabled?: boolean;
+  show_chat?: boolean;
   banner_url?: string | null;
   format?: string;
   participants?: string[];
@@ -272,4 +273,54 @@ export type PublicProfile = {
   role: string;
   games: string[];
   achievements: Achievement[];
+};
+
+export type PublicUser = {
+  id: string;
+  username?: string;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  role?: string;
+  is_club_member?: boolean;
+  can_message?: boolean;
+  message_hint?: string;
+};
+
+export type ChatMessage = {
+  id: string;
+  message: string;
+  created_at?: string;
+  user_id?: string;
+  sender_id?: string;
+  recipient_id?: string;
+  author?: PublicUser | null;
+  sender?: PublicUser | null;
+  recipient?: PublicUser | null;
+  read_at?: string | null;
+};
+
+export type DirectConversation = {
+  user: PublicUser;
+  latest_message?: ChatMessage;
+  unread_count?: number;
+  can_send?: boolean;
+  message_hint?: string;
+};
+
+export type DirectThread = {
+  user: PublicUser;
+  can_send?: boolean;
+  message_hint?: string;
+  messages: ChatMessage[];
+};
+
+export type UserNotification = {
+  id: string;
+  kind?: string;
+  title: string;
+  body?: string;
+  url?: string;
+  read?: boolean;
+  created_at?: string;
+  meta?: Record<string, unknown>;
 };
