@@ -515,8 +515,8 @@ class RegistrationCreate(BaseModel):
     platform_id: Optional[str] = None
     player_ids: Optional[Dict[str, str]] = None
     notes: Optional[str] = None
-    accept_rules: bool = True
-    accept_privacy: bool = True
+    accept_rules: bool = Field(..., description="Must be explicitly true")
+    accept_privacy: bool = Field(..., description="Must be explicitly true")
 
 
 class RegistrationUpdate(BaseModel):

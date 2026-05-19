@@ -3,6 +3,7 @@ import os
 import secrets
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Response, Request, HTTPException, Depends
+from pydantic import BaseModel
 from database import get_db
 from auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
@@ -20,6 +21,14 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 BRUTE_FORCE_MAX = 7
 BRUTE_FORCE_WINDOW_MIN = 15
+
+
+class MobileRefreshBody(BaseModel):
+    refresh_token: str
+
+
+class MobileLogoutBody(BaseModel):
+    refresh_token: str | None = None
 
 
 async def _check_brute_force(db, identifier: str):
@@ -67,6 +76,75 @@ async def _issue_session(db, response: Response, user: dict, request: Request):
         "ip": get_client_ip(request),
     })
     set_auth_cookies(response, access, refresh)
+    return access, refresh
+
+
+def _public_user(user: dict) -> dict:
+    doc = dict(user)
+    doc.pop("_id", None)
+    doc.pop("password_hash", None)
+    return doc
+
+
+async def _attach_membership(user: dict) -> dict:
+    db = get_db()
+    membership = await db.memberships.find_one({"user_id": user["id"]}, {"_id": 0})
+    user["membership"] = membership
+    user["is_club_member"] = bool(membership and membership.get("member_status") in ("active", "honorary"))
+    if user["is_club_member"]:
+        user["user_type"] = "club_member"
+    elif not user.get("user_type"):
+        user["user_type"] = "community_user"
+    return user
+
+
+async def _issue_mobile_session(db, user: dict, request: Request) -> tuple[str, str]:
+    access = create_access_token(user["id"], user["email"], user.get("role", "player"))
+    token_id = secrets.token_urlsafe(24)
+    refresh = create_refresh_token(user["id"], token_id)
+    await db.refresh_tokens.insert_one({
+        "id": new_id(),
+        "jti": token_id,
+        "user_id": user["id"],
+        "token_hash": hash_token(refresh),
+        "revoked": False,
+        "created_at": now_utc(),
+        "expires_at": refresh_expires_at(),
+        "user_agent": request.headers.get("user-agent"),
+        "ip": request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+              or (request.client.host if request.client else None),
+        "client": "mobile",
+    })
+    return access, refresh
+
+
+async def _refresh_mobile_session(db, token: str, request: Request) -> tuple[dict, str, str]:
+    payload = _decode(token)
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    token_id = payload.get("jti")
+    if not token_id:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    stored = await db.refresh_tokens.find_one({
+        "jti": token_id,
+        "token_hash": hash_token(token),
+        "revoked": {"$ne": True},
+    })
+    if not stored:
+        await db.refresh_tokens.update_many(
+            {"user_id": payload["sub"]},
+            {"$set": {"revoked": True, "revoked_at": now_utc(), "revocation_reason": "refresh_reuse"}},
+        )
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    user = await db.users.find_one({"id": payload["sub"]})
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    await db.refresh_tokens.update_one(
+        {"id": stored["id"]},
+        {"$set": {"revoked": True, "rotated_at": now_utc()}},
+    )
+    access, refresh = await _issue_mobile_session(db, user, request)
+    return user, access, refresh
 
 
 async def _revoke_refresh(db, token: str):
@@ -134,9 +212,7 @@ async def register(body: UserRegister, request: Request, response: Response):
     await _issue_session(db, response, user_doc, request)
     # Send welcome email (silent fail if not configured)
     await send_template("registration", email, display_name=user_doc["display_name"])
-    user_doc.pop("_id", None)
-    user_doc.pop("password_hash", None)
-    return user_doc
+    return _public_user(user_doc)
 
 
 @router.post("/login")
@@ -158,17 +234,106 @@ async def login(body: UserLogin, request: Request, response: Response):
 
     await _clear_failed(db, identifier)
     await _issue_session(db, response, user, request)
-    user.pop("_id", None)
-    user.pop("password_hash", None)
+    user = _public_user(user)
     # Attach membership for instant UI gating
-    membership = await db.memberships.find_one({"user_id": user["id"]}, {"_id": 0})
-    user["membership"] = membership
-    user["is_club_member"] = bool(membership and membership.get("member_status") in ("active", "honorary"))
-    if user["is_club_member"]:
-        user["user_type"] = "club_member"
-    elif not user.get("user_type"):
-        user["user_type"] = "community_user"
+    await _attach_membership(user)
     return user
+
+
+@router.post("/mobile/register")
+async def mobile_register(body: UserRegister, request: Request):
+    db = get_db()
+    if not body.accept_privacy or not body.accept_terms:
+        raise HTTPException(status_code=400, detail="Datenschutz und Nutzungsbedingungen müssen akzeptiert werden.")
+    email = body.email.lower().strip()
+    username = body.username.strip()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=409, detail="E-Mail bereits registriert")
+    if await db.users.find_one({"username": username}):
+        raise HTTPException(status_code=409, detail="Benutzername bereits vergeben")
+    user_doc = {
+        "id": new_id(),
+        "email": email,
+        "username": username,
+        "password_hash": hash_password(body.password),
+        "display_name": username,
+        "avatar_url": None, "banner_url": None,
+        "role": "player",
+        "roles": ["player"],
+        "user_type": "community_user",
+        "is_club_member": False,
+        "discord_name": body.discord_name, "discord_id": None,
+        "switch_code": None, "steam_id": None, "epic_id": None,
+        "psn_id": None, "xbox_id": None, "riot_id": None,
+        "twitch_handle": None, "youtube_handle": None, "tiktok_handle": None,
+        "instagram_handle": None, "x_handle": None,
+        "nintendo_fc": None,
+        "ea_id": None, "battlenet_id": None,
+        "website": None,
+        "country": None, "state": None, "city": None,
+        "first_name": None, "last_name": None, "nickname": None,
+        "birth_date": body.birth_date,
+        "gender": body.gender,
+        "favorite_games": [],
+        "main_platform": None, "preferred_role": None, "input_device": None,
+        "privacy_public_profile": True,
+        "profile_visibility": {},
+        "dm_privacy": "everyone",
+        "bio": None,
+        "is_active": True, "is_banned": False, "email_verified": False,
+        "accepted_privacy": body.accept_privacy,
+        "accepted_terms": body.accept_terms,
+        "newsletter_consent": body.newsletter_consent,
+        "created_at": now_utc().isoformat(),
+        "updated_at": now_utc().isoformat(),
+    }
+    await db.users.insert_one(user_doc)
+    access, refresh = await _issue_mobile_session(db, user_doc, request)
+    await send_template("registration", email, display_name=user_doc["display_name"])
+    user = _public_user(user_doc)
+    await _attach_membership(user)
+    return {"user": user, "access_token": access, "refresh_token": refresh, "token_type": "bearer"}
+
+
+@router.post("/mobile/login")
+async def mobile_login(body: UserLogin, request: Request):
+    db = get_db()
+    email = body.email.lower().strip()
+    identifier = _client_identifier(request, email)
+    await _check_brute_force(db, identifier)
+
+    user = await db.users.find_one({"email": email})
+    if user and user.get("password_setup_required"):
+        await _record_failed(db, identifier)
+        raise HTTPException(status_code=403, detail="Bitte zuerst den Einladungslink verwenden und ein Passwort erstellen.")
+    if not user or not verify_password(body.password, user["password_hash"]):
+        await _record_failed(db, identifier)
+        raise HTTPException(status_code=401, detail="Ungültige Zugangsdaten")
+    if user.get("is_banned"):
+        raise HTTPException(status_code=403, detail="Account gesperrt")
+
+    await _clear_failed(db, identifier)
+    access, refresh = await _issue_mobile_session(db, user, request)
+    user = _public_user(user)
+    await _attach_membership(user)
+    return {"user": user, "access_token": access, "refresh_token": refresh, "token_type": "bearer"}
+
+
+@router.post("/mobile/refresh")
+async def mobile_refresh(body: MobileRefreshBody, request: Request):
+    db = get_db()
+    user, access, refresh = await _refresh_mobile_session(db, body.refresh_token, request)
+    user = _public_user(user)
+    await _attach_membership(user)
+    return {"user": user, "access_token": access, "refresh_token": refresh, "token_type": "bearer"}
+
+
+@router.post("/mobile/logout")
+async def mobile_logout(body: MobileLogoutBody):
+    if body.refresh_token:
+        db = get_db()
+        await _revoke_refresh(db, body.refresh_token)
+    return {"ok": True}
 
 
 @router.post("/logout")

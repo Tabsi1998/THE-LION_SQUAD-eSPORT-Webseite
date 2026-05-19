@@ -60,17 +60,26 @@ logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("tls-arena")
 
+app_env = os.environ.get("APP_ENV", os.environ.get("ENVIRONMENT", "development")).lower()
+is_production = app_env in {"prod", "production"}
+PLACEHOLDER_SECRET_MARKERS = {"change-me", "changeme", "generate-with", "example", "replace-me"}
+
 
 def validate_runtime_env():
     if not is_production:
         return
     jwt_secret = os.environ.get("JWT_SECRET", "")
-    if len(jwt_secret) < 32:
-        raise RuntimeError("JWT_SECRET must be set to at least 32 characters in production.")
-    if not os.environ.get("ADMIN_PASSWORD"):
-        raise RuntimeError("ADMIN_PASSWORD must be set in production.")
+    jwt_secret_l = jwt_secret.lower()
+    if len(jwt_secret) < 32 or any(marker in jwt_secret_l for marker in PLACEHOLDER_SECRET_MARKERS):
+        raise RuntimeError("JWT_SECRET must be a real secret with at least 32 characters in production.")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "")
+    admin_password_l = admin_password.lower()
+    if len(admin_password) < 12 or any(marker in admin_password_l for marker in PLACEHOLDER_SECRET_MARKERS):
+        raise RuntimeError("ADMIN_PASSWORD must be a real password with at least 12 characters in production.")
     if not os.environ.get("FRONTEND_URL"):
         raise RuntimeError("FRONTEND_URL must be set in production.")
+    if os.environ.get("TLS_RESET", "").lower() == "true":
+        raise RuntimeError("TLS_RESET=true is blocked in production.")
 
 
 @asynccontextmanager
@@ -132,12 +141,17 @@ async def lifespan(app: FastAPI):
     await close_client()
 
 
-app = FastAPI(title="THE LION SQUAD eSports", version="1.0.0", lifespan=lifespan)
+app = FastAPI(
+    title="THE LION SQUAD eSports",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url=None if is_production else "/docs",
+    redoc_url=None if is_production else "/redoc",
+    openapi_url=None if is_production else "/openapi.json",
+)
 
 # CORS: credentials require explicit trusted origins. Open wildcard CORS can be
 # enabled only for short-lived local debugging via ALLOW_INSECURE_CORS=true.
-app_env = os.environ.get("APP_ENV", os.environ.get("ENVIRONMENT", "development")).lower()
-is_production = app_env in {"prod", "production"}
 cors_origins_env = os.environ.get("CORS_ORIGINS", "").strip()
 allow_insecure_cors = os.environ.get("ALLOW_INSECURE_CORS", "").lower() == "true"
 if cors_origins_env == "*" and not allow_insecure_cors:
@@ -310,6 +324,9 @@ async def security_headers(request, call_next):
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    forwarded_proto = request.headers.get("x-forwarded-proto", "")
+    if request.url.scheme == "https" or forwarded_proto == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Pragma"] = "no-cache"

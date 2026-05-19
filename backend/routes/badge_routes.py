@@ -19,6 +19,8 @@ Admin endpoints (prefix /api/admin/achievements):
   DELETE /award                           — revoke {user_id, tier_code}
   GET    /negative/awards                 — admin-only list of negative awards
 """
+import re
+
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
@@ -307,7 +309,7 @@ async def admin_search_users(q: str = "", me: dict = Depends(require_admin())):
     db = get_db()
     query: dict = {}
     if q:
-        rx = {"$regex": q.strip(), "$options": "i"}
+        rx = {"$regex": re.escape(q.strip()[:80]), "$options": "i"}
         query = {"$or": [{"username": rx}, {"display_name": rx}, {"email": rx}]}
     users = await db.users.find(
         query,

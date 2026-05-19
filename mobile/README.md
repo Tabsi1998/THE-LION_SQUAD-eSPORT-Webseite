@@ -1,0 +1,50 @@
+# THE LION SQUAD Mobile
+
+Native mobile app built with Expo / React Native. The web app stays unchanged; this app talks to the same backend API through mobile bearer-token auth.
+
+## Development
+
+```powershell
+cd C:\Privat\Programmierung\bracket-system\mobile
+npm install
+npm run android
+```
+
+In development, the default API target is `http://10.0.2.2:8000`, the Android emulator alias for the host machine. For a custom backend:
+
+```powershell
+$env:EXPO_PUBLIC_API_BASE_URL="http://10.0.2.2:8000"
+npm run android
+```
+
+Release builds default to `https://lionsquad.at`. The login uses the deployed mobile bearer-token endpoints under `/api/auth/mobile/*`; public areas can also be opened without login through the live data mode.
+
+## Checks
+
+```powershell
+npm run typecheck
+npx expo install --check
+npx expo export --platform android
+npm audit --audit-level=moderate
+```
+
+## Implemented Foundation
+
+- Native Expo app shell
+- Website-aligned THE LION SQUAD colors and brand assets
+- Secure mobile token storage with `expo-secure-store`
+- Mobile login/register/refresh/logout API flow
+- Authenticated API client with bearer token refresh
+- Bottom tabs: Dashboard, Turniere, Teams, Profil, Mehr
+- API-backed user areas: dashboard summary, tournaments, teams, profile, info center, events, sponsors, public profiles
+
+## Next User Modules
+
+- Match-Hub: report result, disputes, schedule proposals, chat
+- Tournament detail: registration, check-in, bracket, standings
+- Team detail: chat, invites, squads, member actions
+- Events: event registration and participant state
+- Fastlap: challenge detail, tracks, leaderboard, own times
+- Member area: benefits, documents, member news, membership status
+- Social: public profiles, friends, direct messages
+- Media/content: news, gallery, servers

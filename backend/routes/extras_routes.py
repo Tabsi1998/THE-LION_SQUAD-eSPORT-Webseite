@@ -1,4 +1,5 @@
 """Admin settings (email config, branding), Seasons/Circuits, Widgets, DSGVO, Audit Logs, PDF exports."""
+import re
 import secrets as secrets_lib
 from fastapi import APIRouter, HTTPException, Depends, Response
 from fastapi.responses import RedirectResponse, StreamingResponse
@@ -40,6 +41,10 @@ SOCIAL_LEGACY_FIELDS = {
     "tiktok": "tiktok_url",
     "youtube": "youtube_url",
 }
+
+
+def _safe_regex(value: str | None, max_len: int = 80) -> str:
+    return re.escape((value or "").strip()[:max_len])
 
 
 class EmailSettings(BaseModel):
@@ -1750,8 +1755,9 @@ async def list_audit(action: Optional[str] = None, limit: int = 200, me: dict = 
     db = get_db()
     q = {}
     if action:
-        q["action"] = {"$regex": action}
-    logs = await db.audit_logs.find(q, {"_id": 0}).sort("created_at", -1).to_list(limit)
+        q["action"] = {"$regex": _safe_regex(action)}
+    safe_limit = max(1, min(int(limit or 200), 500))
+    logs = await db.audit_logs.find(q, {"_id": 0}).sort("created_at", -1).to_list(safe_limit)
     # Enrich actor
     ids = list({l.get("actor_id") for l in logs if l.get("actor_id")})
     users = {u["id"]: u for u in await db.users.find({"id": {"$in": ids}},

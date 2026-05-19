@@ -22,6 +22,10 @@ from models import (
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 
+def _safe_regex(value: str | None, max_len: int = 80) -> str:
+    return re.escape((value or "").strip()[:max_len])
+
+
 def _clean(u: dict) -> dict:
     u.pop("_id", None)
     u.pop("password_hash", None)
@@ -242,10 +246,11 @@ async def list_users(q: str | None = None, role: str | None = None,
     db = get_db()
     query = {}
     if q:
+        pattern = _safe_regex(q)
         query["$or"] = [
-            {"username": {"$regex": q, "$options": "i"}},
-            {"email": {"$regex": q, "$options": "i"}},
-            {"display_name": {"$regex": q, "$options": "i"}},
+            {"username": {"$regex": pattern, "$options": "i"}},
+            {"email": {"$regex": pattern, "$options": "i"}},
+            {"display_name": {"$regex": pattern, "$options": "i"}},
         ]
     if role:
         query["role"] = role

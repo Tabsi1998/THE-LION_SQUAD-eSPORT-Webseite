@@ -47,7 +47,11 @@ class ContactSubmit(BaseModel):
     subject: str = Field(min_length=2, max_length=200)
     message: str = Field(min_length=5, max_length=4000)
     related_id: Optional[str] = None  # tournament_id / event_id / etc.
-    accept_privacy: bool = True
+    accept_privacy: bool = Field(..., description="Must be explicitly true")
+
+
+def _html(value: object) -> str:
+    return escape(str(value or ""), quote=True)
 
 
 @contact_router.post("/submit")

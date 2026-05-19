@@ -52,6 +52,10 @@ MATCH_PLAN_ACTIVE_STATUSES = {"preview", "pending", "ready", "scheduled", "in_pr
 MATCH_PLAN_DONE_STATUSES = {"completed", "forfeit", "cancelled", "archived", "bye"}
 
 
+def _safe_regex(value: str | None, max_len: int = 80) -> str:
+    return re.escape((value or "").strip()[:max_len])
+
+
 class TournamentChatCreate(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
 
@@ -1240,7 +1244,8 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
         q["game_id"] = game_id
     if event_id:
         q["event_id"] = event_id
-    tournaments = await db.tournaments.find(q, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    safe_limit = max(1, min(int(limit or 100), 500))
+    tournaments = await db.tournaments.find(q, {"_id": 0}).sort("created_at", -1).to_list(safe_limit)
     if not is_admin:
         visible = []
         for t in tournaments:
@@ -1539,10 +1544,11 @@ async def list_assignable_tournament_users(tid: str, q: str | None = None, limit
     await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
     query = {"is_banned": {"$ne": True}}
     if q:
+        pattern = _safe_regex(q)
         query["$or"] = [
-            {"username": {"$regex": q, "$options": "i"}},
-            {"display_name": {"$regex": q, "$options": "i"}},
-            {"email": {"$regex": q, "$options": "i"}},
+            {"username": {"$regex": pattern, "$options": "i"}},
+            {"display_name": {"$regex": pattern, "$options": "i"}},
+            {"email": {"$regex": pattern, "$options": "i"}},
         ]
     users = await db.users.find(
         query,
@@ -1559,6 +1565,8 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
     t = await _get_visible_tournament(tid, me)
     if _is_tournament_locked(t):
         raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
+    if not body.accept_rules or not body.accept_privacy:
+        raise HTTPException(status_code=400, detail="Regeln und Datenschutz müssen akzeptiert werden.")
     registration_error = _registration_error(t)
     if registration_error:
         raise HTTPException(status_code=400, detail=registration_error)

@@ -6,6 +6,8 @@ Endpoints:
   GET  /api/membership/applications              — admin queue
   PATCH /api/membership/applications/{id}        — admin approve/reject
 """
+import html
+
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
@@ -16,6 +18,10 @@ from models import now_utc, new_id
 from badges import compute_profile_completeness, PROFILE_FIELDS, evaluate_user_progress
 
 router = APIRouter(prefix="/api", tags=["phase-c"])
+
+
+def _html(value: object) -> str:
+    return html.escape(str(value or ""), quote=True)
 
 
 # -------------- Profile Completeness --------------
@@ -93,7 +99,7 @@ async def membership_apply(body: ApplyBody, me: dict = Depends(get_current_user)
             "membership_application_admin",
             {"applicant": applicant_name},
             fallback_subject="Neue Mitgliedsbewerbung",
-            fallback_html=f"<p>{applicant_name} hat eine Mitgliedsbewerbung eingereicht.</p>",
+            fallback_html=f"<p>{_html(applicant_name)} hat eine Mitgliedsbewerbung eingereicht.</p>",
         )
         for a in admins:
             if a.get("email"):
@@ -193,9 +199,9 @@ async def admin_decide_application(app_id: str, body: DecisionBody,
                 tpl_key,
                 {"display_name": display, "note": body.note or ""},
                 fallback_subject=("Mitgliedsbewerbung angenommen 🦁" if body.decision == "approve" else "Mitgliedsbewerbung abgelehnt"),
-                fallback_html=(f"<p>Hallo {display},</p><p>Deine Bewerbung wurde "
+                fallback_html=(f"<p>Hallo {_html(display)},</p><p>Deine Bewerbung wurde "
                                f"{'angenommen' if body.decision == 'approve' else 'abgelehnt'}.</p>"
-                               f"<p>{body.note or ''}</p>"),
+                               f"<p>{_html(body.note or '')}</p>"),
             )
             from services.notification_preferences import email_allowed
             if email_allowed(u, tpl_key, "membership_updates"):

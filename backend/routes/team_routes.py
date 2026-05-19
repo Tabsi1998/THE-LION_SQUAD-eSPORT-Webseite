@@ -13,6 +13,10 @@ from services.user_notifications import build_public_url, create_user_notificati
 router = APIRouter(prefix="/api/teams", tags=["teams"])
 
 
+def _safe_regex(value: str | None, max_len: int = 80) -> str:
+    return re.escape((value or "").strip()[:max_len])
+
+
 class TeamSquadCreate(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     description: Optional[str] = None
@@ -250,9 +254,10 @@ async def list_teams(q: str | None = None):
     db = get_db()
     query = {}
     if q:
+        pattern = _safe_regex(q)
         query["$or"] = [
-            {"name": {"$regex": q, "$options": "i"}},
-            {"tag": {"$regex": q, "$options": "i"}},
+            {"name": {"$regex": pattern, "$options": "i"}},
+            {"tag": {"$regex": pattern, "$options": "i"}},
         ]
     query["is_public"] = {"$ne": False}
     teams = await db.teams.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
@@ -356,9 +361,10 @@ async def invite_candidates(team_id: str, q: str | None = None, me: dict = Depen
         "id": {"$nin": team.get("member_ids") or []},
     }
     if q:
+        pattern = _safe_regex(q)
         query["$or"] = [
-            {"username": {"$regex": q, "$options": "i"}},
-            {"display_name": {"$regex": q, "$options": "i"}},
+            {"username": {"$regex": pattern, "$options": "i"}},
+            {"display_name": {"$regex": pattern, "$options": "i"}},
         ]
     users = await db.users.find(
         query,

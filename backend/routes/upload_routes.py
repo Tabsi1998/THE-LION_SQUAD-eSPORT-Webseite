@@ -75,15 +75,22 @@ ALLOWED_DOC = {
     "text/markdown",
     "image/png", "image/jpeg",
 }
-MAX_IMAGE_UPLOAD_MB = _upload_mb_from_env("MAX_IMAGE_UPLOAD_MB", 120)
+MAX_IMAGE_UPLOAD_MB = _upload_mb_from_env("MAX_IMAGE_UPLOAD_MB", 50)
 MAX_DOCUMENT_UPLOAD_MB = _upload_mb_from_env("MAX_DOCUMENT_UPLOAD_MB", 50)
 MAX_BYTES = MAX_IMAGE_UPLOAD_MB * 1024 * 1024  # images before re-encoding
 MAX_DOC_BYTES = MAX_DOCUMENT_UPLOAD_MB * 1024 * 1024  # docs
 MAX_IMAGE_DIMENSION = _int_from_env("MAX_IMAGE_DIMENSION", 4096)
-MAX_IMAGE_PIXELS = _int_from_env("MAX_IMAGE_PIXELS", 200_000_000)
-Image.MAX_IMAGE_PIXELS = max(Image.MAX_IMAGE_PIXELS or 0, MAX_IMAGE_PIXELS)
+MAX_IMAGE_PIXELS = _int_from_env("MAX_IMAGE_PIXELS", 50_000_000)
+Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
+
+
+async def _read_upload_limited(file: UploadFile, max_bytes: int, max_mb: int) -> bytes:
+    data = await file.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"Datei zu groß (max {max_mb} MB)")
+    return data
 
 
 def _clean_media_scope(value: str | None, me: dict) -> str:
@@ -160,10 +167,8 @@ async def _upload_image_impl(
             detail=f"Nur PNG, JPG oder WebP erlaubt. Erkannt: {declared_content_type or 'unbekannt'}",
         )
     # Read & size check
-    data = await file.read()
+    data = await _read_upload_limited(file, MAX_BYTES, MAX_IMAGE_UPLOAD_MB)
     original_size = len(data)
-    if len(data) > MAX_BYTES:
-        raise HTTPException(status_code=413, detail=f"Datei zu groß (max {MAX_IMAGE_UPLOAD_MB} MB)")
     try:
         with Image.open(BytesIO(data)) as img:
             img.verify()
@@ -174,6 +179,8 @@ async def _upload_image_impl(
                     status_code=400,
                     detail=f"Nur PNG, JPG oder WebP erlaubt. Erkannt: {detected_format or declared_content_type or 'unbekannt'}",
                 )
+            if img.width * img.height > MAX_IMAGE_PIXELS:
+                raise HTTPException(status_code=413, detail="Bildauflösung ist zu groß")
             content_type, ext = PIL_IMAGE_FORMATS[detected_format]
             img = ImageOps.exif_transpose(img)
             if declared_content_type and declared_content_type not in ALLOWED_IMAGE:
@@ -339,9 +346,7 @@ async def upload_document(request: Request, file: UploadFile = File(...), me: di
     await enforce_rate_limit(request, "uploads:document:user", limit=20, window_seconds=3600, subject=me["id"])
     if file.content_type not in ALLOWED_DOC:
         raise HTTPException(status_code=400, detail=f"Dateityp nicht erlaubt: {file.content_type}")
-    data = await file.read()
-    if len(data) > MAX_DOC_BYTES:
-        raise HTTPException(status_code=413, detail=f"Datei zu groß (max {MAX_DOCUMENT_UPLOAD_MB} MB)")
+    data = await _read_upload_limited(file, MAX_DOC_BYTES, MAX_DOCUMENT_UPLOAD_MB)
     if file.content_type == "application/pdf" and not data.startswith(b"%PDF-"):
         raise HTTPException(status_code=400, detail="Dateiinhalt ist kein gültiges PDF")
     if file.content_type in {

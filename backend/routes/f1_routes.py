@@ -259,7 +259,8 @@ async def list_challenges(status: str | None = None, limit: int = 100, include_d
         q["status"] = status
     elif not (include_drafts and is_staff):
         q["status"] = {"$ne": "draft"}
-    challenges = await db.f1_challenges.find(q, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    safe_limit = max(1, min(int(limit or 100), 500))
+    challenges = await db.f1_challenges.find(q, {"_id": 0}).sort("created_at", -1).to_list(safe_limit)
     visible = []
     for c in challenges:
         if not await user_can_see(user, c.get("visibility") or "public"):

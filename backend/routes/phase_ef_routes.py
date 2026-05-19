@@ -16,6 +16,8 @@ Endpoints:
   POST /api/admin/discord/counter/{user_id}         — bump discord_messages_count (+N)
   GET  /api/admin/discord/counters                  — list users with counter
 """
+import html as html_lib
+import re
 from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
@@ -304,8 +306,10 @@ async def render_template(key: str, vars_: dict, fallback_subject: str = "", fal
     html = (t and t.get("html")) or fallback_html
     for k, v in (vars_ or {}).items():
         v_str = "" if v is None else str(v)
-        subj = subj.replace("{{" + k + "}}", v_str)
-        html = html.replace("{{" + k + "}}", v_str)
+        subject_v = v_str.replace("\r", " ").replace("\n", " ")
+        safe_v = html_lib.escape(v_str, quote=True)
+        subj = subj.replace("{{" + k + "}}", subject_v)
+        html = html.replace("{{" + k + "}}", safe_v)
     return subj, html
 
 
@@ -396,7 +400,7 @@ async def admin_list_counters(q: str = "", limit: int = 100, me: dict = Depends(
     safe_limit = max(1, min(limit, 500))
     query: dict = {"discord_messages_count": {"$gt": 0}}
     if q.strip():
-        rx = {"$regex": q.strip(), "$options": "i"}
+        rx = {"$regex": re.escape(q.strip()[:80]), "$options": "i"}
         query = {"$or": [{"username": rx}, {"display_name": rx}, {"email": rx}, {"discord_name": rx}]}
     users = await db.users.find(
         query,
