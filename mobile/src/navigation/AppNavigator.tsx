@@ -12,6 +12,7 @@ import { DirectMessagesScreen } from "../screens/main/DirectMessagesScreen";
 import { DirectThreadScreen } from "../screens/main/DirectThreadScreen";
 import { FastLapDetailScreen } from "../screens/main/FastLapDetailScreen";
 import { FastLapScreen } from "../screens/main/FastLapScreen";
+import { EventDetailScreen } from "../screens/main/EventDetailScreen";
 import { MoreScreen } from "../screens/main/MoreScreen";
 import { NewsDetailScreen } from "../screens/main/NewsDetailScreen";
 import { NewsScreen } from "../screens/main/NewsScreen";
@@ -102,7 +103,7 @@ function MainTabs() {
       })}
     >
       <Tabs.Screen name="Dashboard" component={DashboardScreen} options={{ title: "Home" }} />
-      <Tabs.Screen name="Tournaments" component={TournamentStackScreen} options={{ title: "Turniere" }} />
+      <Tabs.Screen name="Tournaments" component={TournamentStackScreen} options={{ title: "Events" }} />
       <Tabs.Screen name="Teams" component={TeamStackScreen} options={{ title: "Teams" }} />
       <Tabs.Screen name="Profile" component={ProfileScreen} options={{ title: "Profil" }} />
       <Tabs.Screen name="More" component={MoreStackScreen} options={{ title: "Mehr" }} />
@@ -122,6 +123,8 @@ function TournamentStackScreen() {
     <TournamentStack.Navigator screenOptions={stackOptions}>
       <TournamentStack.Screen name="TournamentList" component={TournamentsScreen} options={{ headerShown: false }} />
       <TournamentStack.Screen name="TournamentDetail" component={TournamentDetailScreen} options={{ title: "Turnier" }} />
+      <TournamentStack.Screen name="EventDetail" component={EventDetailScreen} options={{ title: "Event" }} />
+      <TournamentStack.Screen name="FastLapDetail" component={FastLapDetailScreen} options={{ title: "Fast Lap" }} />
       <TournamentStack.Screen name="TournamentChat" component={TournamentChatScreen} options={({ route }) => ({ title: route.params.title || "Turnier-Chat" })} />
     </TournamentStack.Navigator>
   );

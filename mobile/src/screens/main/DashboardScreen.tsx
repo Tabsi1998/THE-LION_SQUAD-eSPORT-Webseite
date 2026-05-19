@@ -105,8 +105,8 @@ export function DashboardScreen({ navigation }: Props) {
       openTournament(action.target_id);
       return;
     }
-    if (action.target_type === "event") {
-      navigation.navigate("More", { screen: "InfoCenter", params: { section: "events" } });
+    if (action.target_type === "event" && action.target_id) {
+      navigation.navigate("Tournaments", { screen: "EventDetail", params: { id: action.target_id } });
     }
   }, [navigation, openTournament]);
 
@@ -141,7 +141,7 @@ export function DashboardScreen({ navigation }: Props) {
         <Section title={isGuest ? "Aktuell geplant" : "Meine naechsten Termine"} actionLabel="Alle Turniere" onAction={() => navigation.navigate("Tournaments")}>
           {timeline.length ? (
             timeline.slice(0, 6).map((item) => (
-              <TimelineCard key={`${item.kind}-${item.id}`} item={item} onPress={() => item.kind === "tournament" ? openTournament(item.targetId) : navigation.navigate("More", { screen: "InfoCenter", params: { section: "events" } })} />
+              <TimelineCard key={`${item.kind}-${item.id}`} item={item} onPress={() => item.kind === "tournament" ? openTournament(item.targetId) : navigation.navigate("Tournaments", { screen: "EventDetail", params: { id: item.targetId || item.id } })} />
             ))
           ) : (
             <EmptyState title={isGuest ? "Noch keine Termine" : "Keine eigenen Termine"} detail={isGuest ? "Sobald Website-Termine veroeffentlicht sind, stehen sie hier." : "Deine Turnier- und Event-Anmeldungen erscheinen hier automatisch."} />

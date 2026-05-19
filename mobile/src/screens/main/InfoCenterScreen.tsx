@@ -22,7 +22,7 @@ const sections: Array<{ key: SectionKey; label: string }> = [
   { key: "profiles", label: "Profile" },
 ];
 
-export function InfoCenterScreen({ route }: Props) {
+export function InfoCenterScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const [section, setSection] = useState<SectionKey>(route.params?.section || "sponsors");
   const [sponsors, setSponsors] = useState<any[]>([]);
@@ -73,7 +73,7 @@ export function InfoCenterScreen({ route }: Props) {
 
         {section === "sponsors" ? <Sponsors items={sponsors} /> : null}
         {section === "partners" ? <Partners items={partners} /> : null}
-        {section === "events" ? <Events items={events} /> : null}
+        {section === "events" ? <Events items={events} onOpen={(event) => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id } })} /> : null}
         {section === "benefits" ? <Benefits isMember={Boolean(user?.is_club_member)} items={benefits} /> : null}
         {section === "references" ? <References items={references} /> : null}
         {section === "profiles" ? <Profiles items={profiles} /> : null}
@@ -140,18 +140,21 @@ function Partners({ items }: { items: any[] }) {
   );
 }
 
-function Events({ items }: { items: any[] }) {
+function Events({ items, onOpen }: { items: any[]; onOpen: (event: any) => void }) {
   return (
     <>
       {items.map((event) => (
-        <Card key={event.id} style={styles.card}>
-          <View style={styles.cardTop}>
-            <Heading>{event.title || event.name}</Heading>
-            <Badge label={event.public_phase?.label || event.status} />
-          </View>
-          <Muted>{event.type || event.event_type || "Event"} · {event.date || event.start_date}</Muted>
-          <Body style={styles.strong}>{[event.location, event.city, event.country].filter(Boolean).join(", ") || "Ort offen"}</Body>
-        </Card>
+        <Pressable key={event.id} onPress={() => onOpen(event)} style={({ pressed }) => [pressed && styles.pressed]}>
+          <Card style={styles.card}>
+            <View style={styles.cardTop}>
+              <Heading>{event.title || event.name}</Heading>
+              <Badge label={event.public_phase?.label || event.status} />
+            </View>
+            <Muted>{event.type || event.event_type || "Event"} · {event.date || event.start_date}</Muted>
+            <Body style={styles.strong}>{[event.location, event.city, event.country].filter(Boolean).join(", ") || "Ort offen"}</Body>
+            <Muted style={styles.link}>Details öffnen</Muted>
+          </Card>
+        </Pressable>
       ))}
     </>
   );

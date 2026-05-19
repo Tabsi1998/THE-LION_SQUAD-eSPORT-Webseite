@@ -16,6 +16,8 @@ export type MainTabParamList = {
 export type TournamentStackParamList = {
   TournamentList: undefined;
   TournamentDetail: { id: string };
+  EventDetail: { id: string };
+  FastLapDetail: { id: string };
   TournamentChat: { id: string; title?: string };
 };
 

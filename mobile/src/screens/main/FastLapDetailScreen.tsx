@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
@@ -9,11 +8,10 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatStatus } from "../../lib/format";
-import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload, F1Track } from "../../types";
 
-type Props = NativeStackScreenProps<MoreStackParamList, "FastLapDetail">;
+type Props = { route: { params: { id: string } } };
 
 export function FastLapDetailScreen({ route }: Props) {
   const [challenge, setChallenge] = useState<F1Challenge | null>(null);

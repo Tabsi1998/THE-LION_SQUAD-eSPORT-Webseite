@@ -1,20 +1,37 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
 import { EmptyState, LoadingState } from "../../components/ListState";
+import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
-import { formatDate, formatStatus } from "../../lib/format";
+import { formatDateTime, formatStatus } from "../../lib/format";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
-import type { Tournament } from "../../types";
+import type { ClubEvent, F1Challenge, Tournament } from "../../types";
 
 type Props = NativeStackScreenProps<TournamentStackParamList, "TournamentList">;
+type Filter = "all" | "events" | "tournaments" | "fastlaps";
+type HubItem =
+  | { kind: "event"; id: string; title: string; date?: string | null; status?: string; phase?: string; image?: string | null; detail?: string; raw: ClubEvent }
+  | { kind: "tournament"; id: string; title: string; date?: string | null; status?: string; phase?: string; image?: string | null; detail?: string; raw: Tournament }
+  | { kind: "fastlap"; id: string; title: string; date?: string | null; status?: string; phase?: string; image?: string | null; detail?: string; raw: F1Challenge };
+
+const filters: Array<{ key: Filter; label: string }> = [
+  { key: "all", label: "Alle" },
+  { key: "events", label: "Events" },
+  { key: "tournaments", label: "Turniere" },
+  { key: "fastlaps", label: "Fast Laps" },
+];
 
 export function TournamentsScreen({ navigation }: Props) {
-  const [items, setItems] = useState<Tournament[]>([]);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [events, setEvents] = useState<ClubEvent[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [fastlaps, setFastlaps] = useState<F1Challenge[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -22,10 +39,22 @@ export function TournamentsScreen({ navigation }: Props) {
   const load = useCallback(async () => {
     setError("");
     try {
-      const { data } = await api.get<Tournament[]>("/tournaments");
-      setItems(Array.isArray(data) ? data : []);
+      const [eventResult, tournamentResult, fastLapResult] = await Promise.all([
+        api.get<ClubEvent[]>("/events", { params: { upcoming: false } }).catch((err) => {
+          throw new Error(errorMessage(err, "Events konnten nicht geladen werden."));
+        }),
+        api.get<Tournament[]>("/tournaments").catch((err) => {
+          throw new Error(errorMessage(err, "Turniere konnten nicht geladen werden."));
+        }),
+        api.get<F1Challenge[]>("/f1/challenges", { params: { limit: 100 } }).catch((err) => {
+          throw new Error(errorMessage(err, "Fast-Lap Challenges konnten nicht geladen werden."));
+        }),
+      ]);
+      setEvents(Array.isArray(eventResult.data) ? eventResult.data : []);
+      setTournaments(Array.isArray(tournamentResult.data) ? tournamentResult.data : []);
+      setFastlaps(Array.isArray(fastLapResult.data) ? fastLapResult.data : []);
     } catch (err) {
-      setError(errorMessage(err, "Turniere konnten nicht geladen werden."));
+      setError(errorMessage(err, "Events konnten nicht geladen werden."));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -36,103 +65,248 @@ export function TournamentsScreen({ navigation }: Props) {
     load();
   }, [load]);
 
+  const items = useMemo(() => {
+    const mapped: HubItem[] = [
+      ...events.map((event) => ({
+        kind: "event" as const,
+        id: event.slug || event.id,
+        title: event.title || event.name || "Event",
+        date: event.start_date || event.date,
+        status: event.status,
+        phase: event.public_phase?.label,
+        image: event.banner_url,
+        detail: [event.event_type || event.type, event.location, event.city].filter(Boolean).join(" · "),
+        raw: event,
+      })),
+      ...tournaments.map((tournament) => ({
+        kind: "tournament" as const,
+        id: tournament.slug || tournament.id,
+        title: tournament.title,
+        date: tournament.start_date,
+        status: tournament.status,
+        phase: tournament.public_phase?.label,
+        image: tournament.banner_url || tournament.game?.cover_url || tournament.game?.logo_url,
+        detail: [tournament.game?.display_name || tournament.game?.name || tournament.game_name, tournament.format_label || tournament.format].filter(Boolean).join(" · "),
+        raw: tournament,
+      })),
+      ...fastlaps.map((challenge) => ({
+        kind: "fastlap" as const,
+        id: challenge.slug || challenge.id,
+        title: challenge.title,
+        date: challenge.start_date,
+        status: challenge.status,
+        phase: challenge.public_phase?.label,
+        image: challenge.banner_url,
+        detail: [`${challenge.track_count || 0} Strecken`, `${challenge.participant_count || 0} Fahrer`, challenge.vehicle].filter(Boolean).join(" · "),
+        raw: challenge,
+      })),
+    ];
+    const visible = mapped.filter((item) => matchesFilter(item, filter));
+    return visible.sort((a, b) => dateSort(a.date) - dateSort(b.date));
+  }, [events, fastlaps, filter, tournaments]);
+
+  const open = useCallback((item: HubItem) => {
+    if (item.kind === "event") navigation.navigate("EventDetail", { id: item.id });
+    if (item.kind === "tournament") navigation.navigate("TournamentDetail", { id: item.id });
+    if (item.kind === "fastlap") navigation.navigate("FastLapDetail", { id: item.id });
+  }, [navigation]);
+
   if (loading) {
     return (
       <Screen>
-        <LoadingState label="Turniere werden geladen ..." />
+        <LoadingState label="Events werden geladen ..." />
       </Screen>
     );
   }
 
   return (
-    <Screen>
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={
-          <View style={styles.header}>
-            <Heading>Turniere</Heading>
-            {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Anmelden, Status verfolgen und später Match-Hub öffnen.</Muted>}
-          </View>
-        }
-        ListEmptyComponent={<EmptyState title="Keine Turniere" detail="Aktuell sind keine Turniere veröffentlicht." />}
+    <Screen padded={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
-        contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <Pressable onPress={() => navigation.navigate("TournamentDetail", { id: item.slug || item.id })} style={({ pressed }) => [pressed && styles.pressed]}>
-            <Card style={styles.card}>
-              <View style={styles.cardTop}>
-                <Body style={styles.title}>{item.title}</Body>
-                <Muted style={styles.openHint}>öffnen</Muted>
-              </View>
-              <Muted>{item.public_phase?.label || formatStatus(item.status)} · {formatDate(item.start_date)}</Muted>
-              <Muted>{item.game?.display_name || item.game?.name || item.game_name || item.platform || "Turnier"}</Muted>
-              <View style={styles.metaRow}>
-                <Pill label={item.format_label || item.format || "Turnier"} />
-                <Pill label={`${item.participant_count ?? item.participants?.length ?? 0}${item.max_participants ? `/${item.max_participants}` : ""} Teilnehmer`} />
-                <Pill label={item.event?.name || `${item.standings?.length || 0} Ergebnisse`} />
-              </View>
-            </Card>
-          </Pressable>
+      >
+        <View style={styles.header}>
+          <Heading>Events</Heading>
+          {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Alle sichtbaren Events, Turniere und Fast-Lap Challenges an einem Ort.</Muted>}
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+          {filters.map((item) => (
+            <Pressable key={item.key} onPress={() => setFilter(item.key)} style={[styles.tab, filter === item.key && styles.tabActive]}>
+              <Muted style={[styles.tabText, filter === item.key && styles.tabTextActive]}>{item.label}</Muted>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        <View style={styles.stats}>
+          <Stat label="Events" value={String(events.length)} />
+          <Stat label="Turniere" value={String(tournaments.length)} tone="gold" />
+          <Stat label="Fast Laps" value={String(fastlaps.length)} />
+        </View>
+
+        {items.length ? (
+          items.map((item) => <HubCard key={`${item.kind}-${item.id}`} item={item} onPress={() => open(item)} />)
+        ) : (
+          <EmptyState title="Keine Eintraege" detail="Fuer diese Auswahl sind aktuell keine sichtbaren Inhalte vorhanden." />
         )}
-      />
+      </ScrollView>
     </Screen>
   );
 }
 
-function Pill({ label }: { label: string }) {
+function HubCard({ item, onPress }: { item: HubItem; onPress: () => void }) {
   return (
-    <View style={styles.pill}>
-      <Muted style={styles.pillText}>{label}</Muted>
+    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
+      <Card style={styles.card}>
+        <MediaImage
+          uri={item.image}
+          style={styles.image}
+          fallback={<Ionicons name={iconFor(item.kind)} color={item.kind === "fastlap" ? colors.gold : colors.cyan} size={28} />}
+        />
+        <View style={styles.text}>
+          <View style={styles.top}>
+            <Body style={styles.title}>{item.title}</Body>
+            <Pill label={labelFor(item.kind)} tone={item.kind === "fastlap" ? "gold" : "cyan"} />
+          </View>
+          <Muted>{formatDateTime(item.date)} · {item.phase || formatStatus(item.status)}</Muted>
+          {item.detail ? <Muted numberOfLines={2}>{item.detail}</Muted> : null}
+        </View>
+      </Card>
+    </Pressable>
+  );
+}
+
+function Stat({ label, value, tone = "cyan" }: { label: string; value: string; tone?: "cyan" | "gold" }) {
+  return (
+    <Card style={styles.stat}>
+      <Body style={[styles.statValue, tone === "gold" && styles.gold]}>{value}</Body>
+      <Muted>{label}</Muted>
+    </Card>
+  );
+}
+
+function Pill({ label, tone = "cyan" }: { label: string; tone?: "cyan" | "gold" }) {
+  return (
+    <View style={[styles.pill, tone === "gold" && styles.pillGold]}>
+      <Muted style={[styles.pillText, tone === "gold" && styles.pillGoldText]}>{label}</Muted>
     </View>
   );
 }
 
+function dateSort(value?: string | null) {
+  if (!value) return Number.MAX_SAFE_INTEGER;
+  const date = new Date(value).getTime();
+  return Number.isNaN(date) ? Number.MAX_SAFE_INTEGER : date;
+}
+
+function matchesFilter(item: HubItem, filter: Filter) {
+  if (filter === "all") return true;
+  if (filter === "events") return item.kind === "event";
+  if (filter === "tournaments") return item.kind === "tournament";
+  return item.kind === "fastlap";
+}
+
+function iconFor(kind: HubItem["kind"]) {
+  if (kind === "event") return "calendar-outline";
+  if (kind === "fastlap") return "speedometer-outline";
+  return "trophy-outline";
+}
+
+function labelFor(kind: HubItem["kind"]) {
+  if (kind === "event") return "Event";
+  if (kind === "fastlap") return "Fast Lap";
+  return "Turnier";
+}
+
 const styles = StyleSheet.create({
-  list: {
-    gap: 12,
-    paddingBottom: 24,
+  content: {
+    gap: 14,
+    padding: 18,
+    paddingBottom: 28,
   },
   header: {
     gap: 6,
-    marginBottom: 4,
   },
-  card: {
+  tabs: {
     gap: 8,
+    paddingRight: 18,
   },
-  cardTop: {
-    alignItems: "flex-start",
+  tab: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderColor: colors.border,
+    borderRadius: 7,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  tabActive: {
+    backgroundColor: "rgba(41,182,232,0.16)",
+    borderColor: "rgba(41,182,232,0.42)",
+  },
+  tabText: {
+    fontWeight: "900",
+  },
+  tabTextActive: {
+    color: colors.cyan,
+  },
+  stats: {
     flexDirection: "row",
     gap: 10,
-    justifyContent: "space-between",
+  },
+  stat: {
+    flex: 1,
+    minHeight: 76,
+  },
+  statValue: {
+    color: colors.cyan,
+    fontSize: 23,
+    fontWeight: "900",
+  },
+  gold: {
+    color: colors.gold,
+  },
+  card: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  image: {
+    borderRadius: 8,
+    height: 82,
+    width: 92,
+  },
+  text: {
+    flex: 1,
+    gap: 5,
+    minWidth: 0,
+  },
+  top: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 8,
   },
   title: {
     flex: 1,
     fontWeight: "900",
   },
-  openHint: {
-    color: colors.cyan,
-    fontWeight: "800",
-    textTransform: "uppercase",
-  },
-  metaRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 2,
-  },
   pill: {
-    backgroundColor: "rgba(41, 182, 232, 0.12)",
-    borderColor: "rgba(41, 182, 232, 0.28)",
+    backgroundColor: "rgba(41,182,232,0.12)",
+    borderColor: "rgba(41,182,232,0.28)",
     borderRadius: 6,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
+  pillGold: {
+    backgroundColor: "rgba(240,180,41,0.12)",
+    borderColor: "rgba(240,180,41,0.32)",
+  },
   pillText: {
     color: colors.cyan,
-    fontSize: 12,
-    fontWeight: "800",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  pillGoldText: {
+    color: colors.gold,
   },
   pressed: {
     opacity: 0.72,

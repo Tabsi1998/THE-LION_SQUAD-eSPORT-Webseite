@@ -37,6 +37,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
   }, [load]);
 
   const paragraphs = useMemo(() => splitContent(post), [post]);
+  const contentImages = useMemo(() => extractImages(post), [post]);
 
   if (loading) {
     return (
@@ -71,6 +72,18 @@ export function NewsDetailScreen({ navigation, route }: Props) {
           ) : (
             <Muted>Kein weiterer Inhalt hinterlegt.</Muted>
           )}
+          {contentImages.length ? (
+            <View style={styles.imageStack}>
+              {contentImages.map((url) => (
+                <MediaImage
+                  key={url}
+                  uri={url}
+                  style={styles.contentImage}
+                  fallback={<Ionicons name="image-outline" color={colors.cyan} size={28} />}
+                />
+              ))}
+            </View>
+          ) : null}
         </View>
 
         {post.linked_tournaments?.length ? (
@@ -109,11 +122,28 @@ export function NewsDetailScreen({ navigation, route }: Props) {
 function splitContent(post: NewsPost | null) {
   const raw = post?.content || post?.body || "";
   return String(raw)
+    .replace(/!\[[^\]]*]\([^)]+\)/g, "\n")
+    .replace(/<img[^>]+>/gi, "\n")
+    .replace(/https?:\/\/\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?/gi, "\n")
     .replace(/<[^>]+>/g, "\n")
     .split(/\n{2,}|\r\n{2,}/)
     .map((item) => item.replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .slice(0, 24);
+}
+
+function extractImages(post: NewsPost | null) {
+  const urls = new Set<string>();
+  const raw = String(post?.content || post?.body || "");
+  const banner = post?.banner_url;
+  const add = (url?: string | null) => {
+    const value = String(url || "").trim().replace(/^["']|["']$/g, "");
+    if (value && value !== banner) urls.add(value);
+  };
+  [...raw.matchAll(/!\[[^\]]*]\(([^)]+)\)/g)].forEach((match) => add(match[1]));
+  [...raw.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)].forEach((match) => add(match[1]));
+  [...raw.matchAll(/https?:\/\/\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?/gi)].forEach((match) => add(match[0]));
+  return Array.from(urls).slice(0, 8);
 }
 
 const styles = StyleSheet.create({
@@ -133,6 +163,14 @@ const styles = StyleSheet.create({
   lead: {
     color: colors.cyan,
     fontWeight: "800",
+  },
+  imageStack: {
+    gap: 10,
+  },
+  contentImage: {
+    borderRadius: 8,
+    height: 190,
+    width: "100%",
   },
   card: {
     gap: 10,

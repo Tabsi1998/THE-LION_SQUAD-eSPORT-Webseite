@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.0-alpha.13 - 2026-05-19
+
+- Reworked the bottom "Turniere" area into an "Events" hub for all visible events, tournaments, and Fast-Lap challenges.
+- Added native event details with program text, registration state, linked tournaments, linked Fast-Lap challenges, linked news, and sponsors.
+- Added event registration and cancellation actions for logged-in users.
+- Added tournament registration and cancellation actions in tournament details.
+- Made Home event cards and Info Center event cards open the native event detail instead of jumping into a generic info list.
+- Displayed match times with date and clock time, including a clear fallback when no time is scheduled.
+- Rendered image URLs embedded in news content as images instead of raw URL text.
+
 ## 0.1.0-alpha.12 - 2026-05-19
 
 - Added the missing root `SafeAreaProvider` so the authenticated tab navigator can safely read device insets after login.

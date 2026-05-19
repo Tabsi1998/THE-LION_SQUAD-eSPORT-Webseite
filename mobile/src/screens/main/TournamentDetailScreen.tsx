@@ -1,13 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { EmptyState, LoadingState } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
+import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
-import { formatDate, formatStatus } from "../../lib/format";
+import { formatDate, formatDateTime, formatStatus } from "../../lib/format";
+import { isGuestUser } from "../../live";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { Tournament } from "../../types";
@@ -33,12 +35,15 @@ const tabs: Array<{ key: TabKey; label: string }> = [
 ];
 
 export function TournamentDetailScreen({ navigation, route }: Props) {
+  const { user } = useAuth();
   const [tournament, setTournament] = useState<Tournament | undefined>();
   const [bracket, setBracket] = useState<BracketPayload>({});
   const [standings, setStandings] = useState<any[]>([]);
   const [tab, setTab] = useState<TabKey>("overview");
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const guest = isGuestUser(user);
 
   const load = useCallback(async () => {
     setError("");
@@ -63,6 +68,12 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   }, [load]);
 
   const registrations = bracket.registrations || [];
+  const ownRegistration = useMemo(() => {
+    if (tournament?.my_registration?.id) return tournament.my_registration;
+    return registrations.find((registration) => registration.is_mine || registration.user_id === user?.id);
+  }, [registrations, tournament?.my_registration, user?.id]);
+  const registered = Boolean(ownRegistration?.id && !["cancelled", "rejected", "no_show"].includes(String(ownRegistration.status || "")));
+  const registrationOpen = Boolean(tournament?.registration_enabled && tournament.status === "registration_open");
   const regMap = useMemo(() => {
     const map = new Map<string, any>();
     registrations.forEach((registration) => map.set(registration.id, registration));
@@ -71,6 +82,47 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const legacyMatches = bracket.matches || tournament?.matches || [];
   const v2Matches = bracket.matches_v2 || [];
   const allMatches = v2Matches.length ? v2Matches : legacyMatches;
+
+  const register = useCallback(async () => {
+    if (!tournament || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.post(`/tournaments/${tournament.slug || tournament.id}/register`, {
+        ingame_name: user?.display_name || user?.username,
+        accept_rules: true,
+        accept_privacy: true,
+      });
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, "Turnier-Anmeldung konnte nicht gespeichert werden."));
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, load, tournament, user?.display_name, user?.username]);
+
+  const unregister = useCallback(async () => {
+    if (!tournament || !ownRegistration?.id || busy) return;
+    Alert.alert("Vom Turnier abmelden?", "Deine Turnier-Anmeldung wird entfernt.", [
+      { text: "Abbrechen", style: "cancel" },
+      {
+        text: "Abmelden",
+        style: "destructive",
+        onPress: async () => {
+          setBusy(true);
+          setError("");
+          try {
+            await api.delete(`/tournaments/${tournament.slug || tournament.id}/registrations/${ownRegistration.id}`);
+            await load();
+          } catch (err) {
+            setError(errorMessage(err, "Turnier-Abmeldung konnte nicht gespeichert werden."));
+          } finally {
+            setBusy(false);
+          }
+        },
+      },
+    ]);
+  }, [busy, load, ownRegistration?.id, tournament]);
 
   if (loading) {
     return (
@@ -128,6 +180,23 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
           <>
             <Card style={styles.card}>
               <Heading>Turnierstatus</Heading>
+              <View style={styles.registrationBox}>
+                {guest ? (
+                  <Muted>Zum Anmelden bitte mit deinem Account einloggen.</Muted>
+                ) : registered ? (
+                  <>
+                    <Muted style={styles.success}>Du bist angemeldet: {formatStatus(ownRegistration?.status)}</Muted>
+                    <Button label={busy ? "Wird abgemeldet ..." : "Vom Turnier abmelden"} variant="secondary" onPress={unregister} disabled={busy} />
+                  </>
+                ) : registrationOpen ? (
+                  <>
+                    <Muted>Mit der Anmeldung akzeptierst du Regeln und Datenschutz fuer dieses Turnier.</Muted>
+                    <Button label={busy ? "Wird angemeldet ..." : "Zum Turnier anmelden"} onPress={register} disabled={busy} />
+                  </>
+                ) : (
+                  <Muted>Anmeldung ist aktuell nicht offen.</Muted>
+                )}
+              </View>
               <View style={styles.statGrid}>
                 <Stat label="Matches" value={String(allMatches.length)} />
                 <Stat label="Spieler" value={String(registrations.length || tournament.participant_count || 0)} tone="gold" />
@@ -278,7 +347,7 @@ function MatchCard({ match, regMap, compact = false }: { match: any; regMap: Map
         </View>
       ))}
       <View style={styles.matchMeta}>
-        {match.scheduled_at ? <Muted>{formatDate(match.scheduled_at)}</Muted> : null}
+        {match.scheduled_at ? <Muted>{formatDateTime(match.scheduled_at)}</Muted> : <Muted>Zeit noch offen</Muted>}
         {match.station_label || match.station_name ? <Muted style={styles.textCyan}>{match.station_label || match.station_name}</Muted> : null}
       </View>
     </View>
@@ -400,6 +469,18 @@ const styles = StyleSheet.create({
   statGrid: {
     flexDirection: "row",
     gap: 10,
+  },
+  registrationBox: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: colors.border,
+    borderRadius: 7,
+    borderWidth: 1,
+    gap: 8,
+    padding: 10,
+  },
+  success: {
+    color: colors.success,
+    fontWeight: "900",
   },
   stat: {
     backgroundColor: "rgba(255,255,255,0.04)",
