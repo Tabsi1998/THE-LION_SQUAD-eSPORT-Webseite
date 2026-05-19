@@ -197,7 +197,7 @@ jobs:
 
       - name: Publish GitHub release
         if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: LionsAPP v${{ steps.meta.outputs.version }} (${{ steps.meta.outputs.channel }})
           prerelease: ${{ steps.meta.outputs.channel != 'stable' }}
