@@ -37,6 +37,23 @@ const emptyDashboard: MobileDashboardData = {
   stats: { my_tournaments: 0, my_events: 0, open_matches: 0, open_actions: 0, news: 0, public_tournaments: 0, public_events: 0 },
 };
 
+function normalizeDashboard(payload?: Partial<MobileDashboardData> | null): MobileDashboardData {
+  return {
+    me: {
+      tournaments: Array.isArray(payload?.me?.tournaments) ? payload.me.tournaments : [],
+      events: Array.isArray(payload?.me?.events) ? payload.me.events : [],
+      matches: Array.isArray(payload?.me?.matches) ? payload.me.matches : [],
+      actions: Array.isArray(payload?.me?.actions) ? payload.me.actions : [],
+    },
+    public: {
+      tournaments: Array.isArray(payload?.public?.tournaments) ? payload.public.tournaments : [],
+      events: Array.isArray(payload?.public?.events) ? payload.public.events : [],
+    },
+    news: Array.isArray(payload?.news) ? payload.news : [],
+    stats: { ...emptyDashboard.stats, ...(payload?.stats || {}) },
+  };
+}
+
 export function DashboardScreen({ navigation }: Props) {
   const { user, refreshMe } = useAuth();
   const [data, setData] = useState<MobileDashboardData>(emptyDashboard);
@@ -49,14 +66,7 @@ export function DashboardScreen({ navigation }: Props) {
     setError("");
     try {
       const response = await api.get<MobileDashboardData>("/mobile/dashboard");
-      setData({
-        ...emptyDashboard,
-        ...response.data,
-        me: { ...emptyDashboard.me, ...(response.data?.me || {}) },
-        public: { ...emptyDashboard.public, ...(response.data?.public || {}) },
-        stats: { ...emptyDashboard.stats, ...(response.data?.stats || {}) },
-        news: Array.isArray(response.data?.news) ? response.data.news : [],
-      });
+      setData(normalizeDashboard(response.data));
       if (!isGuest) {
         await refreshMe().catch(() => {});
       }

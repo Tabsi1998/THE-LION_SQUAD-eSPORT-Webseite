@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-alpha.12 - 2026-05-19
+
+- Added the missing root `SafeAreaProvider` so the authenticated tab navigator can safely read device insets after login.
+- Fixed the post-login Android crash that happened when switching from the auth screens into the main app.
+
 ## 0.1.0-alpha.11 - 2026-05-19
 
 - Removed the native Expo notifications module from the Android build to stabilize app startup on installed APKs.
