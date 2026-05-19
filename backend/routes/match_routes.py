@@ -143,6 +143,31 @@ async def _can_act_for_match(match: dict, user: dict | None) -> bool:
     )
 
 
+async def _can_submit_result_for_match(match: dict, user: dict | None, collection: str) -> bool:
+    if not user:
+        return False
+    if collection == "matches":
+        return bool(
+            await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "tournament")
+            or await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "match", match.get("id"))
+            or (match.get("station_id") and await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "station", match.get("station_id")))
+        )
+    return bool(
+        await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES)
+        or await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "match", match.get("id"))
+        or await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "stage", match.get("stage_id"))
+        or (match.get("station_id") and await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "station", match.get("station_id")))
+    )
+
+
+async def _can_forfeit_match(match: dict, user: dict | None, collection: str) -> bool:
+    return bool(
+        user
+        and collection == "matches"
+        and await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES)
+    )
+
+
 async def _can_read_match(match: dict, user: dict | None) -> bool:
     return (
         _is_staff(user)
@@ -285,6 +310,8 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         proposal["actor"] = actors.get(proposal.get("actor_user_id"))
         proposal.pop("match_collection", None)
     acting_reg = await _acting_registration_for_match(match, user)
+    direct_reg = await _user_registration_for_match(match, user)
+    can_submit_result = await _can_submit_result_for_match(match, user, collection)
     round_number = match.get("matchday_number") or match.get("round")
     league_like = (tournament or {}).get("format") in {"league", "round_robin"} or (stage or {}).get("stage_type") in {"league", "round_robin_groups", "ffa_league"}
     matchday_label = match.get("matchday_label") or match.get("round_name")
@@ -298,6 +325,11 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "participants": await _match_participants(match, user),
         "schedule_proposals": proposals,
         "can_act": bool(user and await _can_act_for_match(match, user)),
+        "can_report_score": bool(collection == "matches" and direct_reg),
+        "can_submit_result": can_submit_result,
+        "can_dispute": bool(collection == "matches" and user and (_is_staff(user) or direct_reg)),
+        "can_forfeit": await _can_forfeit_match(match, user, collection),
+        "collection": collection,
         "acting_registration_id": acting_reg.get("id") if acting_reg else None,
         "matchday": round_number,
         "matchday_label": matchday_label,

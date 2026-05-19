@@ -15,6 +15,7 @@ import { FastLapDetailScreen } from "../screens/main/FastLapDetailScreen";
 import { FastLapScreen } from "../screens/main/FastLapScreen";
 import { EventDetailScreen } from "../screens/main/EventDetailScreen";
 import { MoreScreen } from "../screens/main/MoreScreen";
+import { MatchDetailScreen } from "../screens/main/MatchDetailScreen";
 import { NewsDetailScreen } from "../screens/main/NewsDetailScreen";
 import { NewsScreen } from "../screens/main/NewsScreen";
 import { NotificationsScreen } from "../screens/main/NotificationsScreen";
@@ -131,6 +132,7 @@ function TournamentStackScreen() {
       <TournamentStack.Screen name="TournamentDetail" component={TournamentDetailScreen} options={{ title: "Turnier" }} />
       <TournamentStack.Screen name="EventDetail" component={EventDetailScreen} options={{ title: "Event" }} />
       <TournamentStack.Screen name="FastLapDetail" component={FastLapDetailScreen} options={{ title: "Fast Lap" }} />
+      <TournamentStack.Screen name="MatchDetail" component={MatchDetailScreen} options={{ title: "Match" }} />
       <TournamentStack.Screen name="TournamentChat" component={TournamentChatScreen} options={({ route }) => ({ title: route.params.title || "Turnier-Chat" })} />
     </TournamentStack.Navigator>
   );

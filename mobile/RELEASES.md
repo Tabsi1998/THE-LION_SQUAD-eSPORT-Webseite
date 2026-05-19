@@ -67,6 +67,7 @@ Historische Einordnung, neueste Version oben:
 ```text
 1.0.0
 0.1.0-beta.1
+0.2.0-alpha.1
 0.1.1-alpha.1
 0.1.0-alpha.14
 0.1.0-alpha.13

@@ -106,6 +106,10 @@ export function DashboardScreen({ navigation }: Props) {
       openTournament(action.target_id);
       return;
     }
+    if (action.target_type === "match" && action.target_id) {
+      navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: action.target_id } });
+      return;
+    }
     if (action.target_type === "event" && action.target_id) {
       navigation.navigate("Tournaments", { screen: "EventDetail", params: { id: action.target_id } });
     }
@@ -162,7 +166,7 @@ export function DashboardScreen({ navigation }: Props) {
                       <Body style={styles.rowTitle}>{action.label}</Body>
                       {action.detail ? <Muted>{action.detail}</Muted> : null}
                     </View>
-                    {action.target_type === "tournament" || action.target_type === "event" ? <Ionicons name="chevron-forward" color={colors.muted} size={18} /> : null}
+                    {action.target_id ? <Ionicons name="chevron-forward" color={colors.muted} size={18} /> : null}
                   </Card>
                 </Pressable>
               ))
@@ -175,10 +179,12 @@ export function DashboardScreen({ navigation }: Props) {
         {!isGuest && data.me.matches.length ? (
           <Section title="Naechste Matches">
             {data.me.matches.slice(0, 4).map((match) => (
-              <Card key={match.id} style={styles.compactCard}>
-                <Body style={styles.rowTitle}>{match.tournament_title || match.opponent_name || "Match"}</Body>
-                <Muted>{formatDate(match.scheduled_at)} · {match.round_name || formatStatus(match.status)}</Muted>
-              </Card>
+              <Pressable key={match.id} onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id } })} style={({ pressed }) => [pressed && styles.pressed]}>
+                <Card style={styles.compactCard}>
+                  <Body style={styles.rowTitle}>{match.tournament_title || match.opponent_name || "Match"}</Body>
+                  <Muted>{formatDate(match.scheduled_at)} · {match.round_name || formatStatus(match.status)}</Muted>
+                </Card>
+              </Pressable>
             ))}
           </Section>
         ) : null}

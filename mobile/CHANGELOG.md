@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0-alpha.1 - 2026-05-19
+
+- Added a native Match detail screen with participants, schedule status, station, linked tournament, schedule proposals, pending proposal decisions, match chat, result reporting, disputes, and staff forfeit actions.
+- Linked tournament overview, bracket, match plan, Home open actions, and upcoming Home matches directly into native Match details.
+- Added backend permission flags to the match page API so the app only shows result, dispute, and forfeit actions when the current user is allowed to use them.
+- Added native result entry for legacy duel matches and staff Heat result entry for multi-slot matches.
+- Kept Match detail live through periodic refresh and pull-to-refresh while preserving active form input.
+
 ## 0.1.1-alpha.1 - 2026-05-19
 
 - Aligned native tournament registration with website eligibility rules for team mode, manageable teams, required game IDs, club-member blocks, and check-in.

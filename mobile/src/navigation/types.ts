@@ -18,6 +18,7 @@ export type TournamentStackParamList = {
   TournamentDetail: { id: string };
   EventDetail: { id: string };
   FastLapDetail: { id: string };
+  MatchDetail: { id: string };
   TournamentChat: { id: string; title?: string };
 };
 

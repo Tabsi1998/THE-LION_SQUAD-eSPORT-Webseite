@@ -299,7 +299,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
             <Card style={styles.card}>
               <Heading>Nächste Matches</Heading>
               {allMatches.length ? allMatches.slice(0, 5).map((match) => (
-                <MatchCard key={match.id} match={match} regMap={regMap} compact />
+                <MatchCard key={match.id} match={match} regMap={regMap} compact onPress={() => navigation.navigate("MatchDetail", { id: match.id })} />
               )) : <Muted>Noch keine Matches generiert.</Muted>}
             </Card>
           </>
@@ -308,14 +308,14 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
         {tab === "bracket" ? (
           <Card style={styles.card}>
             <Heading>Turnierbaum</Heading>
-            {allMatches.length ? <BracketView payload={bracket} regMap={regMap} /> : <Muted>Noch kein Turnierbaum veröffentlicht.</Muted>}
+            {allMatches.length ? <BracketView payload={bracket} regMap={regMap} onOpenMatch={(id) => navigation.navigate("MatchDetail", { id })} /> : <Muted>Noch kein Turnierbaum veröffentlicht.</Muted>}
           </Card>
         ) : null}
 
         {tab === "matches" ? (
           <Card style={styles.card}>
             <Heading>Matchplan</Heading>
-            {allMatches.length ? allMatches.map((match) => <MatchCard key={match.id} match={match} regMap={regMap} />) : <Muted>Noch keine Matches veröffentlicht.</Muted>}
+            {allMatches.length ? allMatches.map((match) => <MatchCard key={match.id} match={match} regMap={regMap} onPress={() => navigation.navigate("MatchDetail", { id: match.id })} />) : <Muted>Noch keine Matches veröffentlicht.</Muted>}
           </Card>
         ) : null}
 
@@ -477,7 +477,7 @@ function RegistrationModal({
   );
 }
 
-function BracketView({ payload, regMap }: { payload: BracketPayload; regMap: Map<string, any> }) {
+function BracketView({ payload, regMap, onOpenMatch }: { payload: BracketPayload; regMap: Map<string, any>; onOpenMatch?: (id: string) => void }) {
   const matchesV2 = payload.matches_v2 || [];
   const legacy = payload.matches || [];
   const sections = useMemo(() => {
@@ -505,7 +505,7 @@ function BracketView({ payload, regMap }: { payload: BracketPayload; regMap: Map
             {section.rounds.map(([round, matches]) => (
               <View key={`${section.section}-${round}`} style={styles.roundCol}>
                 <Muted style={styles.roundTitle}>{matches[0]?.round_name || `Runde ${round}`}</Muted>
-                {matches.map((match) => <MatchCard key={match.id} match={match} regMap={regMap} compact />)}
+                {matches.map((match) => <MatchCard key={match.id} match={match} regMap={regMap} compact onPress={match.id ? () => onOpenMatch?.(match.id) : undefined} />)}
               </View>
             ))}
           </ScrollView>
@@ -515,7 +515,7 @@ function BracketView({ payload, regMap }: { payload: BracketPayload; regMap: Map
   );
 }
 
-function MatchCard({ match, regMap, compact = false }: { match: any; regMap: Map<string, any>; compact?: boolean }) {
+function MatchCard({ match, regMap, compact = false, onPress }: { match: any; regMap: Map<string, any>; compact?: boolean; onPress?: () => void }) {
   const rows = match.slots?.length
     ? match.slots.map((slot: any) => {
         const reg = regMap.get(slot.registration_id);
@@ -526,7 +526,7 @@ function MatchCard({ match, regMap, compact = false }: { match: any; regMap: Map
         { id: "a", label: participantLabel(regMap.get(match.participant_a_id)) || "Offen", score: match.score_a, winner: match.winner_id && match.winner_id === match.participant_a_id },
         { id: "b", label: participantLabel(regMap.get(match.participant_b_id)) || "Offen", score: match.score_b, winner: match.winner_id && match.winner_id === match.participant_b_id },
       ];
-  return (
+  const content = (
     <View style={[styles.matchCard, compact && styles.matchCardCompact]}>
       <View style={styles.matchHead}>
         <Muted style={styles.matchKey}>{match.match_key || match.round_name || "Match"}</Muted>
@@ -543,6 +543,12 @@ function MatchCard({ match, regMap, compact = false }: { match: any; regMap: Map
         {match.station_label || match.station_name ? <Muted style={styles.textCyan}>{match.station_label || match.station_name}</Muted> : null}
       </View>
     </View>
+  );
+  if (!onPress) return content;
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
+      {content}
+    </Pressable>
   );
 }
 
