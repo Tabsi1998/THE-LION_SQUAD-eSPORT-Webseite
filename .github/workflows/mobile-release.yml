@@ -39,15 +39,6 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
-          cache: gradle
-
-      - name: Install Android SDK
-        uses: android-actions/setup-android@v4
-
       - name: Install mobile dependencies
         working-directory: mobile
         run: npm ci
@@ -89,6 +80,15 @@ jobs:
         env:
           CI: "1"
         run: npx expo prebuild --platform android --clean
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v4
 
       - name: Configure Android release signing
         working-directory: mobile
