@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useState } from "react";
-import { Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
@@ -14,9 +14,10 @@ import { colors } from "../../theme";
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
 export function LoginScreen({ navigation }: Props) {
-  const { login, continueAsGuest } = useAuth();
+  const { login, continueAsGuest, rememberSession } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(rememberSession);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -24,7 +25,7 @@ export function LoginScreen({ navigation }: Props) {
     setSubmitting(true);
     setError("");
     try {
-      await login(email.trim(), password);
+      await login(email.trim(), password, remember);
     } catch (err) {
       setError(errorMessage(err, "Login fehlgeschlagen."));
     } finally {
@@ -69,6 +70,18 @@ export function LoginScreen({ navigation }: Props) {
             textContentType="password"
             autoComplete="password"
           />
+          <View style={styles.rememberRow}>
+            <Switch
+              value={remember}
+              onValueChange={setRemember}
+              trackColor={{ false: "rgba(255,255,255,0.16)", true: "rgba(41,182,232,0.45)" }}
+              thumbColor={remember ? colors.cyan : colors.muted}
+            />
+            <Pressable onPress={() => setRemember((value) => !value)} style={styles.rememberText}>
+              <Body style={styles.rememberTitle}>Angemeldet bleiben</Body>
+              <Muted>Die App meldet dich beim nächsten Öffnen automatisch wieder an.</Muted>
+            </Pressable>
+          </View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Button label={submitting ? "Anmelden ..." : "Anmelden"} onPress={submit} disabled={submitting} />
           <Button
@@ -108,6 +121,18 @@ const styles = StyleSheet.create({
   error: {
     color: colors.live,
     fontWeight: "700",
+  },
+  rememberRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  rememberText: {
+    flex: 1,
+    gap: 2,
+  },
+  rememberTitle: {
+    fontWeight: "900",
   },
   linkWrap: {
     alignItems: "center",

@@ -3,6 +3,7 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-nat
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
 import { EmptyState, LoadingState } from "../../components/ListState";
+import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
@@ -69,7 +70,11 @@ export function TeamsScreen({ navigation }: Props) {
             <Card style={styles.card}>
               <View style={styles.teamTop}>
                 <View style={styles.logo}>
-                  <Body style={styles.logoText}>{(item.tag || item.name).slice(0, 2).toUpperCase()}</Body>
+                  <MediaImage
+                    uri={item.logo_url}
+                    style={styles.logoImage}
+                    fallback={<Body style={styles.logoText}>{(item.tag || item.name).slice(0, 2).toUpperCase()}</Body>}
+                  />
                 </View>
                 <View style={styles.teamText}>
                   <Body style={styles.title}>{item.name}</Body>
@@ -125,6 +130,11 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: "center",
     width: 44,
+  },
+  logoImage: {
+    borderRadius: 8,
+    height: "100%",
+    width: "100%",
   },
   logoText: {
     color: colors.cyan,

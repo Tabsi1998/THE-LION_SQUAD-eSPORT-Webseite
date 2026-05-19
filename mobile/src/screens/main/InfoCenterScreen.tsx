@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
+import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
@@ -25,39 +26,28 @@ export function InfoCenterScreen({ route }: Props) {
   const { user } = useAuth();
   const [section, setSection] = useState<SectionKey>(route.params?.section || "sponsors");
   const [sponsors, setSponsors] = useState<any[]>([]);
+  const [partners, setPartners] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
-  const [members, setMembers] = useState<any[]>([]);
   const [benefits, setBenefits] = useState<any[]>([]);
   const [references, setReferences] = useState<any[]>([]);
   const active = useMemo(() => sections.find((item) => item.key === section) || sections[0], [section]);
 
   const loadLive = useCallback(async () => {
-    const [liveSponsors, liveEvents, liveProfiles, liveMembers, liveBenefits, liveAchievements] = await Promise.all([
+    const [liveSponsors, livePartners, liveEvents, liveProfiles, liveBenefits, liveReferences] = await Promise.all([
       api.get<any[]>("/sponsors").catch(() => ({ data: [] })),
+      api.get<any[]>("/partners").catch(() => ({ data: [] })),
       api.get<any[]>("/events").catch(() => ({ data: [] })),
       api.get<any[]>("/users/public-list").catch(() => ({ data: [] })),
-      api.get<any[]>("/membership/public").catch(() => ({ data: [] })),
       api.get<any[]>("/membership/benefits").catch(() => ({ data: [] })),
-      api.get<any[]>("/achievements/groups").catch(() => ({ data: [] })),
+      api.get<any[]>("/references").catch(() => ({ data: [] })),
     ]);
     setSponsors(Array.isArray(liveSponsors.data) ? liveSponsors.data : []);
+    setPartners(Array.isArray(livePartners.data) ? livePartners.data : []);
     setEvents(Array.isArray(liveEvents.data) ? liveEvents.data : []);
     setProfiles(Array.isArray(liveProfiles.data) ? liveProfiles.data : []);
-    setMembers(Array.isArray(liveMembers.data) ? liveMembers.data : []);
     setBenefits(Array.isArray(liveBenefits.data) ? liveBenefits.data : []);
-    setReferences(
-      Array.isArray(liveAchievements.data) && liveAchievements.data.length
-        ? liveAchievements.data.slice(0, 8).map((group) => ({
-            id: group.id || group.code,
-            placement: group.name,
-            game: group.category || "Achievement",
-            title: group.description || `${group.tier_count || group.tiers?.length || 0} Stufen hinterlegt`,
-            mode: "Live-Katalog",
-            date: "Live",
-          }))
-        : []
-    );
+    setReferences(Array.isArray(liveReferences.data) ? liveReferences.data : []);
   }, [user]);
 
   useEffect(() => {
@@ -82,7 +72,7 @@ export function InfoCenterScreen({ route }: Props) {
         </ScrollView>
 
         {section === "sponsors" ? <Sponsors items={sponsors} /> : null}
-        {section === "partners" ? <Partners items={members} /> : null}
+        {section === "partners" ? <Partners items={partners} /> : null}
         {section === "events" ? <Events items={events} /> : null}
         {section === "benefits" ? <Benefits isMember={Boolean(user?.is_club_member)} items={benefits} /> : null}
         {section === "references" ? <References items={references} /> : null}
@@ -96,14 +86,26 @@ function Sponsors({ items }: { items: any[] }) {
   return (
     <>
       {items.map((sponsor) => (
-        <Card key={sponsor.id} style={styles.card}>
-          <View style={styles.cardTop}>
-            <Heading>{sponsor.name}</Heading>
-            <Badge label={sponsor.tier} />
-          </View>
-          <Muted>{sponsor.description || sponsor.effective_status || "Aktiver Unterstützer"}</Muted>
-          {sponsor.url || sponsor.link ? <Muted style={styles.link}>{sponsor.url || sponsor.link}</Muted> : null}
-        </Card>
+        <LinkedCard key={sponsor.id} url={sponsor.url || sponsor.link}>
+          <Card style={styles.card}>
+            <View style={styles.logoRow}>
+              <MediaImage
+                uri={sponsor.logo_url}
+                resizeMode="contain"
+                style={styles.logoBox}
+                fallback={<Body style={styles.logoFallback}>{(sponsor.name || "?").slice(0, 2).toUpperCase()}</Body>}
+              />
+              <View style={styles.logoTextWrap}>
+                <View style={styles.cardTop}>
+                  <Heading>{sponsor.name}</Heading>
+                  <Badge label={sponsor.tier || "Sponsor"} />
+                </View>
+                <Muted>{sponsor.description || sponsor.effective_status || "Aktiver Unterstützer"}</Muted>
+                {sponsor.url || sponsor.link ? <Muted style={styles.link}>Website öffnen</Muted> : null}
+              </View>
+            </View>
+          </Card>
+        </LinkedCard>
       ))}
     </>
   );
@@ -113,13 +115,26 @@ function Partners({ items }: { items: any[] }) {
   return (
     <>
       {items.map((partner, index) => (
-        <Card key={partner.id || partner.username || index} style={styles.card}>
-          <View style={styles.cardTop}>
-            <Heading>{partner.name || partner.display_name || partner.username}</Heading>
-            <Badge label={partner.kind || partner.internal_role || "Mitglied"} />
-          </View>
-          <Muted>{partner.description || `${partner.country || "Community"} · ${(partner.favorite_games || []).join(", ") || "THE LION SQUAD"}`}</Muted>
-        </Card>
+        <LinkedCard key={partner.id || partner.username || index} url={partner.url || partner.link}>
+          <Card style={styles.card}>
+            <View style={styles.logoRow}>
+              <MediaImage
+                uri={partner.logo_url || partner.avatar_url}
+                resizeMode="contain"
+                style={styles.logoBox}
+                fallback={<Body style={styles.logoFallback}>{(partner.name || partner.display_name || partner.username || "?").slice(0, 2).toUpperCase()}</Body>}
+              />
+              <View style={styles.logoTextWrap}>
+                <View style={styles.cardTop}>
+                  <Heading>{partner.name || partner.display_name || partner.username}</Heading>
+                  <Badge label={partner.kind || partner.internal_role || "Partner"} />
+                </View>
+                <Muted>{partner.description || `${partner.country || "Community"} · ${(partner.favorite_games || []).join(", ") || "THE LION SQUAD"}`}</Muted>
+                {partner.url || partner.link ? <Muted style={styles.link}>Website öffnen</Muted> : null}
+              </View>
+            </View>
+          </Card>
+        </LinkedCard>
       ))}
     </>
   );
@@ -171,11 +186,11 @@ function References({ items }: { items: any[] }) {
       {items.map((reference) => (
         <Card key={reference.id} style={styles.card}>
           <View style={styles.cardTop}>
-            <Heading>{reference.placement}</Heading>
-            <Badge label={reference.game} />
+            <Heading>{reference.placement || reference.result || reference.title}</Heading>
+            <Badge label={reference.game || reference.category || "Referenz"} />
           </View>
-          <Body style={styles.strong}>{reference.title}</Body>
-          <Muted>{reference.mode} · {reference.date}</Muted>
+          <Body style={styles.strong}>{reference.title || reference.event_name || reference.tournament_title}</Body>
+          <Muted>{reference.mode || reference.kind || "Live"} · {reference.date || reference.published_at || reference.created_at || ""}</Muted>
         </Card>
       ))}
     </>
@@ -187,10 +202,12 @@ function Profiles({ items }: { items: any[] }) {
     <>
       {items.map((profile) => (
         <Card key={profile.id} style={styles.card}>
-          <View style={styles.profileRow}>
-            <View style={styles.avatar}>
-              <Body style={styles.avatarText}>{(profile.name || profile.display_name || profile.username || "?").slice(0, 1).toUpperCase()}</Body>
-            </View>
+            <View style={styles.profileRow}>
+            <MediaImage
+              uri={profile.avatar_url}
+              style={styles.avatar}
+              fallback={<Body style={styles.avatarText}>{(profile.name || profile.display_name || profile.username || "?").slice(0, 1).toUpperCase()}</Body>}
+            />
             <View style={styles.profileText}>
               <Heading>{profile.name || profile.display_name || profile.username}</Heading>
               <Muted>@{profile.username} · {profile.role || profile.user_type || profile.achievement_level?.title || "Community"}</Muted>
@@ -204,6 +221,22 @@ function Profiles({ items }: { items: any[] }) {
       ))}
     </>
   );
+}
+
+function LinkedCard({ url, children }: { url?: string | null; children: React.ReactNode }) {
+  const href = normalizeLink(url);
+  if (!href) return <>{children}</>;
+  return (
+    <Pressable onPress={() => Linking.openURL(href)} style={({ pressed }) => [pressed && styles.pressed]}>
+      {children}
+    </Pressable>
+  );
+}
+
+function normalizeLink(url?: string | null) {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
 }
 
 function Badge({ label }: { label: string }) {
@@ -271,6 +304,24 @@ const styles = StyleSheet.create({
     color: colors.cyan,
     fontWeight: "800",
   },
+  logoRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  logoBox: {
+    borderRadius: 8,
+    height: 58,
+    width: 76,
+  },
+  logoFallback: {
+    color: colors.cyan,
+    fontWeight: "900",
+  },
+  logoTextWrap: {
+    flex: 1,
+    gap: 8,
+  },
   strong: {
     fontWeight: "900",
   },
@@ -299,6 +350,9 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: "center",
     width: 44,
+  },
+  pressed: {
+    opacity: 0.72,
   },
   avatarText: {
     fontWeight: "900",

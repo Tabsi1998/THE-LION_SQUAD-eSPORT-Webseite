@@ -7,13 +7,15 @@ export function Screen({
   children,
   padded = true,
   style,
+  bottomSafe = false,
 }: {
   children: React.ReactNode;
   padded?: boolean;
   style?: ViewStyle;
+  bottomSafe?: boolean;
 }) {
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
+    <SafeAreaView style={styles.safe} edges={bottomSafe ? ["top", "left", "right", "bottom"] : ["top", "left", "right"]}>
       <View style={[styles.container, padded && styles.padded, style]}>{children}</View>
     </SafeAreaView>
   );

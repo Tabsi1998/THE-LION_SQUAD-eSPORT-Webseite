@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import React from "react";
 import { BootScreen } from "../screens/BootScreen";
 import { LoginScreen } from "../screens/auth/LoginScreen";
@@ -69,6 +70,8 @@ function AuthScreens() {
 }
 
 function MainTabs() {
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 8);
   return (
     <Tabs.Navigator
       screenOptions={({ route }) => ({
@@ -78,8 +81,9 @@ function MainTabs() {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          minHeight: 62,
+          height: 56 + bottomInset,
           paddingTop: 7,
+          paddingBottom: bottomInset,
         },
         tabBarLabelStyle: {
           fontSize: 11,

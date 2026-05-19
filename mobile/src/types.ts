@@ -91,6 +91,8 @@ export type Sponsor = {
   name: string;
   tier: string;
   url?: string;
+  link?: string;
+  logo_url?: string | null;
   description: string;
 };
 
@@ -98,6 +100,9 @@ export type Partner = {
   id: string;
   name: string;
   kind: string;
+  url?: string;
+  link?: string;
+  logo_url?: string | null;
   description: string;
 };
 

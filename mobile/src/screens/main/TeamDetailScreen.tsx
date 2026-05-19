@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
 import { EmptyState, LoadingState } from "../../components/ListState";
+import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
@@ -55,7 +56,11 @@ export function TeamDetailScreen({ route }: Props) {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
           <View style={styles.logo}>
-            <Body style={styles.logoText}>{(team.tag || team.name).slice(0, 2).toUpperCase()}</Body>
+            <MediaImage
+              uri={team.logo_url}
+              style={styles.logoImage}
+              fallback={<Body style={styles.logoText}>{(team.tag || team.name).slice(0, 2).toUpperCase()}</Body>}
+            />
           </View>
           <View style={styles.heroText}>
             <Muted>{team.tag ? `#${team.tag}` : "Team"}</Muted>
@@ -72,7 +77,11 @@ export function TeamDetailScreen({ route }: Props) {
             return (
             <View key={member.id} style={styles.row}>
               <View style={styles.avatar}>
-                <Body style={styles.avatarText}>{memberName.slice(0, 1).toUpperCase()}</Body>
+                <MediaImage
+                  uri={member.avatar_url}
+                  style={styles.avatarImage}
+                  fallback={<Body style={styles.avatarText}>{memberName.slice(0, 1).toUpperCase()}</Body>}
+                />
               </View>
               <View style={styles.rowMain}>
                 <Body style={styles.rowTitle}>{memberName}</Body>
@@ -155,6 +164,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "900",
   },
+  logoImage: {
+    borderRadius: 10,
+    height: "100%",
+    width: "100%",
+  },
   heroText: {
     flex: 1,
     gap: 4,
@@ -189,6 +203,11 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontWeight: "900",
+  },
+  avatarImage: {
+    borderRadius: 8,
+    height: "100%",
+    width: "100%",
   },
   wrap: {
     flexDirection: "row",

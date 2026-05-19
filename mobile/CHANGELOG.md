@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-alpha.5 - 2026-05-19
+
+- Added explicit "Angemeldet bleiben" handling for mobile login and restored sessions via refresh token on app start.
+- Improved logout and guest-mode token handling so persisted sessions are not left behind accidentally.
+- Fixed Android bottom tab safe-area spacing so the menu stays above system navigation.
+- Added a shared mobile media image component for local, API-relative, and external image URLs.
+- Started rendering team logos, member avatars, sponsor logos, partner logos, and public profile avatars in native views.
+- Switched partner and reference info tabs to the real website API sources instead of placeholder/member-derived data.
+
 ## 0.1.0-alpha.4 - 2026-05-19
 
 - Release builds now require a stable Android upload key instead of the Android debug certificate.
