@@ -1,6 +1,6 @@
 # Mobile Releases
 
-Die Android-App wird als APK ueber GitHub Actions gebaut.
+Die Android-App wird als APK ueber GitHub Actions gebaut. GitHub Releases enthalten die APK, eine SHA-256-Pruefsumme, die Signatur-Metadaten und die passenden Changelog-Details direkt im Release-Text.
 
 ## Kanaele
 
@@ -37,13 +37,24 @@ In GitHub unter `Actions` den Workflow `Mobile APK Release` starten. Der Workflo
 THE-LION-SQUAD-android-alpha-v0.1.0-alpha.1-<commit>.apk
 ```
 
+## Release-Signatur
+
+GitHub-Releases muessen mit dem stabilen Upload-Key signiert werden. Dafuer braucht der Workflow diese Repository-Secrets:
+
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+
+Ohne diese Secrets bricht der Release-Workflow ab, damit keine oeffentliche Debug-signierte APK entsteht.
+
 ## GitHub Release erstellen
 
 Fuer einen echten GitHub-Release einen Tag pushen:
 
 ```bash
-git tag mobile-v0.1.0-alpha.3
-git push origin mobile-v0.1.0-alpha.3
+git tag mobile-v0.1.0-alpha.4
+git push origin mobile-v0.1.0-alpha.4
 ```
 
 Der Workflow haengt die APK automatisch an den Release. Alpha- und Beta-Releases werden als `prerelease` markiert.
