@@ -69,11 +69,24 @@ jobs:
           else
             CHANNEL="${{ inputs.channel }}"
           fi
+          VERSION_CODE="$(node -p "require('./app.json').expo.android.versionCode")"
+          DISPLAY_VERSION="${VERSION%%-*}"
+          CHANNEL_LABEL="${CHANNEL^^}"
           SHORT_SHA="${GITHUB_SHA::7}"
-          APK_NAME="LionsAPP-android-${CHANNEL}-v${VERSION}-${SHORT_SHA}.apk"
+          if [ "$CHANNEL" = "stable" ]; then
+            APK_NAME="LionsAPP-v${DISPLAY_VERSION}-build${VERSION_CODE}-${SHORT_SHA}.apk"
+            RELEASE_NAME="LionsAPP v${DISPLAY_VERSION} (Build ${VERSION_CODE})"
+          else
+            APK_NAME="LionsAPP-${CHANNEL_LABEL}-v${DISPLAY_VERSION}-build${VERSION_CODE}-${SHORT_SHA}.apk"
+            RELEASE_NAME="LionsAPP ${CHANNEL_LABEL} v${DISPLAY_VERSION} (Build ${VERSION_CODE})"
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "display_version=$DISPLAY_VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "channel_label=$CHANNEL_LABEL" >> "$GITHUB_OUTPUT"
           echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
+          echo "release_name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Generate Android project
         working-directory: mobile
@@ -163,7 +176,13 @@ jobs:
           {
             echo "# LionsAPP v${VERSION}"
             echo ""
+            echo "**Release:** ${{ steps.meta.outputs.release_name }}"
+            echo ""
             echo "**Channel:** \`${{ steps.meta.outputs.channel }}\`"
+            echo ""
+            echo "**Internal version:** \`${VERSION}\`"
+            echo ""
+            echo "**Android build:** \`${{ steps.meta.outputs.version_code }}\`"
             echo ""
             echo "**APK:** \`${APK_NAME}\`"
             echo ""
@@ -205,7 +224,7 @@ jobs:
         if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v3
         with:
-          name: LionsAPP v${{ steps.meta.outputs.version }} (${{ steps.meta.outputs.channel }})
+          name: ${{ steps.meta.outputs.release_name }}
           prerelease: ${{ steps.meta.outputs.channel != 'stable' }}
           body_path: ${{ steps.notes.outputs.notes_file }}
           files: |
