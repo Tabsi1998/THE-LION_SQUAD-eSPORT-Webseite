@@ -77,14 +77,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, [accessToken, clearSession, persistSession, refreshToken]);
 
-  useEffect(() => {
-    if (user && accessToken && !isGuestUser(user)) {
-      import("../lib/push")
-        .then(({ registerDevicePushToken }) => registerDevicePushToken())
-        .catch(() => {});
-    }
-  }, [accessToken, user]);
-
   const refreshMe = useCallback(async () => {
     const { data } = await api.get<User>("/auth/me");
     setUser(data);

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-alpha.11 - 2026-05-19
+
+- Removed the native Expo notifications module from the Android build to stabilize app startup on installed APKs.
+- Kept the in-app notification inbox, direct messages, team chat, and tournament chat available through the live API.
+- Left backend push-token support in place so phone push notifications can be re-enabled later with a dedicated Firebase/Expo push configuration.
+- Prepared the release workflow for faster repeat Android builds through Gradle caching.
+
 ## 0.1.0-alpha.10 - 2026-05-19
 
 - Fixed the mobile Profile screen TypeScript failure caused by the removed `StyleSheet.absoluteFillObject` API.
