@@ -1,15 +1,16 @@
 const { spawnSync } = require("child_process");
 
 const yarn = process.env.npm_execpath || "yarn";
-const command = yarn.endsWith(".js") ? process.execPath : yarn;
-const args = yarn.endsWith(".js")
+const usesNodeShim = yarn.endsWith(".js");
+const command = usesNodeShim ? process.execPath : yarn;
+const args = usesNodeShim
   ? [yarn, "audit", "--groups", "dependencies", "--level", "high", "--json"]
   : ["audit", "--groups", "dependencies", "--level", "high", "--json"];
 
 const result = spawnSync(command, args, {
   cwd: process.cwd(),
   encoding: "utf8",
-  shell: process.platform === "win32",
+  shell: process.platform === "win32" && !usesNodeShim,
 });
 
 const lines = String(result.stdout || "").split(/\r?\n/).filter(Boolean);
