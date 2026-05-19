@@ -43,6 +43,7 @@ export type Tournament = {
   prize_pool?: string | null;
   prize_places?: Array<{ place?: number; label?: string; value?: string }> | null;
   prizes?: string[];
+  my_registration?: { id?: string; status?: string; display_name?: string | null; ingame_name?: string | null; team_id?: string | null } | null;
 };
 
 export type Team = {
@@ -65,8 +66,11 @@ export type Match = {
   id: string;
   status?: string;
   scheduled_at?: string | null;
+  tournament_id?: string | null;
   tournament_title?: string | null;
   opponent_name?: string | null;
+  round?: number | string | null;
+  round_name?: string | null;
 };
 
 export type Achievement = {
@@ -109,10 +113,67 @@ export type Partner = {
 export type ClubEvent = {
   id: string;
   title: string;
+  name?: string;
+  slug?: string;
+  type?: string;
+  event_type?: string;
+  date?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  location?: string | null;
+  city?: string | null;
+  country?: string | null;
+  status?: string;
+  banner_url?: string | null;
+  public_phase?: { label?: string; state?: string; target_at?: string | null };
+  has_registration?: boolean;
+  own_registration?: { id?: string; status?: string; display_name?: string | null; companion_count?: number } | null;
+};
+
+export type NewsPost = {
+  id: string;
+  title: string;
+  slug?: string;
+  excerpt?: string;
+  summary?: string;
+  category?: string;
+  banner_url?: string | null;
+  published_at?: string | null;
+  created_at?: string | null;
+  pinned?: boolean;
+};
+
+export type DashboardAction = {
+  id: string;
   type: string;
-  date: string;
-  location: string;
-  status: string;
+  label: string;
+  detail?: string | null;
+  target_type?: "tournament" | "event" | "match" | string;
+  target_id?: string | null;
+  priority?: number;
+};
+
+export type MobileDashboardData = {
+  me: {
+    tournaments: Tournament[];
+    events: ClubEvent[];
+    matches: Match[];
+    actions: DashboardAction[];
+  };
+  public: {
+    tournaments: Tournament[];
+    events: ClubEvent[];
+  };
+  news: NewsPost[];
+  stats: {
+    my_tournaments: number;
+    my_events: number;
+    open_matches: number;
+    open_actions: number;
+    news: number;
+    public_tournaments: number;
+    public_events: number;
+  };
 };
 
 export type MemberBenefit = {

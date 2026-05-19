@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-alpha.6 - 2026-05-19
+
+- Added `/api/mobile/dashboard` as a native app dashboard feed for user-specific tournaments, events, open matches, actions, public upcoming items, and latest news.
+- Rebuilt the app Home screen around live dashboard data with "Meine naechsten Termine", "Offene Aktionen", upcoming matches, and News sections.
+- Added direct navigation from Home tournament cards and tournament actions into the native tournament detail screen.
+- Added event and news visibility on Home so the first screen reflects current website content more closely.
+
 ## 0.1.0-alpha.5 - 2026-05-19
 
 - Added explicit "Angemeldet bleiben" handling for mobile login and restored sessions via refresh token on app start.

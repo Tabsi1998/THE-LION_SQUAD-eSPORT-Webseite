@@ -29,6 +29,7 @@ from routes.match_v2_routes import router as match_v2_router
 from routes.f1_routes import router as f1_router
 from routes.station_routes import router as station_router
 from routes.news_routes import router as news_router
+from routes.mobile_routes import router as mobile_router
 from routes.admin_routes import router as admin_router
 from routes.upload_routes import router as upload_router
 from routes.badge_routes import router as badge_router, admin_router as achievement_admin_router
@@ -215,6 +216,7 @@ app.include_router(match_v2_router)
 app.include_router(f1_router)
 app.include_router(station_router)
 app.include_router(news_router)
+app.include_router(mobile_router)
 app.include_router(admin_router)
 app.include_router(settings_router)
 app.include_router(season_router)

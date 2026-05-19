@@ -23,6 +23,7 @@ Schema fuer Vorabversionen:
 0.1.0-alpha.1
 0.1.0-alpha.2
 0.1.0-alpha.5
+0.1.0-alpha.6
 0.1.0-beta.1
 1.0.0
 ```
@@ -53,8 +54,8 @@ Ohne diese Secrets bricht der Release-Workflow ab, damit keine oeffentliche Debu
 Fuer einen echten GitHub-Release einen Tag pushen:
 
 ```bash
-git tag mobile-v0.1.0-alpha.5
-git push origin mobile-v0.1.0-alpha.5
+git tag mobile-v0.1.0-alpha.6
+git push origin mobile-v0.1.0-alpha.6
 ```
 
 Der Workflow haengt die APK automatisch an den Release. Alpha- und Beta-Releases werden als `prerelease` markiert.

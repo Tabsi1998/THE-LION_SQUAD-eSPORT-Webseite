@@ -1,3 +1,5 @@
+import type { NavigatorScreenParams } from "@react-navigation/native";
+
 export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
@@ -5,10 +7,10 @@ export type AuthStackParamList = {
 
 export type MainTabParamList = {
   Dashboard: undefined;
-  Tournaments: undefined;
-  Teams: undefined;
+  Tournaments: NavigatorScreenParams<TournamentStackParamList> | undefined;
+  Teams: NavigatorScreenParams<TeamStackParamList> | undefined;
   Profile: undefined;
-  More: undefined;
+  More: NavigatorScreenParams<MoreStackParamList> | undefined;
 };
 
 export type TournamentStackParamList = {
