@@ -183,7 +183,7 @@ jobs:
           echo "notes_file=mobile/${NOTES_FILE}" >> "$GITHUB_OUTPUT"
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.meta.outputs.apk_name }}
           path: |
