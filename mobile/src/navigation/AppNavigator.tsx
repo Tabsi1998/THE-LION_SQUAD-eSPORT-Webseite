@@ -186,11 +186,14 @@ function NotificationBellOverlay() {
   const { unread, load } = useNotifications();
   return (
     <Pressable
+      accessibilityHint="Oeffnet die Benachrichtigungen"
+      accessibilityLabel={unread ? `${unread} ungelesene Benachrichtigungen` : "Benachrichtigungen"}
+      accessibilityRole="button"
       onPress={() => {
         load();
         navigationRef.navigate("More", { screen: "Notifications" });
       }}
-      style={({ pressed }) => [styles.bell, { top: Math.max(insets.top + 6, 12) }, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.bell, { right: Math.max(insets.right + 14, 14), top: Math.max(insets.top + 6, 12) }, pressed && styles.pressed]}
       hitSlop={8}
     >
       <Ionicons name="notifications-outline" color={unread ? colors.cyan : colors.white} size={21} />
@@ -216,6 +219,7 @@ const styles = StyleSheet.create({
     right: 14,
     width: 40,
     zIndex: 40,
+    elevation: 6,
   },
   badge: {
     alignItems: "center",

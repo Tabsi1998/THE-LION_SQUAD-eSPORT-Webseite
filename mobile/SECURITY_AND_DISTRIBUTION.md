@@ -60,3 +60,30 @@ What reduces warnings and risk:
 - Distribute through Google Play testing when possible.
 - Keep checksums and release notes visible.
 - Avoid repackaged APKs or third-party mirrors.
+
+## Google Play Internal Testing Readiness
+
+Internal testing should be the first Play Console track. It keeps the app away from public listing traffic while removing the sideload flow for selected testers.
+
+Before uploading the first internal testing build:
+
+- Confirm the package name stays `at.lionsquad.app`.
+- Use the same upload key as the GitHub release workflow.
+- Upload an AAB build for Play Console, while APK releases can continue on GitHub for manual testers.
+- Add a small tester list first, then expand after login, Home, Events, Teams, Chat, Profile, Notifications and logout have been smoke-tested.
+- Keep the release name aligned with the mobile changelog, e.g. `LionsAPP ALPHA v0.7.0 (Build 21)`.
+
+Manual smoke-test checklist for every alpha candidate:
+
+- Fresh install opens Login/Register without crash.
+- Existing account login restores the session after app restart.
+- Home loads live dashboard data.
+- Events, Turniere, Fast Laps, Teams, Profile and More open without layout overlap.
+- Notification bell and popup do not overlap the status bar or bottom navigation.
+- A notification tap opens the expected native target.
+- Team chat and direct messages can send and receive messages.
+- Logout clears the session and returns to Login.
+
+## Runtime Crash Handling
+
+The app includes a native render error boundary. If a screen-level render error occurs, testers see a controlled fallback with an option to reload the view instead of a blank screen. This is not a replacement for production crash reporting; before beta or Play Store rollout, add a dedicated crash-reporting backend such as Sentry, Firebase Crashlytics or an equivalent service approved for the project.

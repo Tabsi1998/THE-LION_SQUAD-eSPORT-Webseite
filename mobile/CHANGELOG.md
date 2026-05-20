@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0-alpha.1 - 2026-05-20
+
+- Added a global native error boundary so render-time screen crashes show a controlled LionsAPP fallback instead of leaving testers on a blank or closed app view.
+- Improved notification popup Safe-Area positioning so popups sit below the device status bar and notification bell on cutout/notch Android devices.
+- Improved the floating notification bell with safe right inset handling, accessibility labels, and Android elevation.
+- Documented the Google Play internal testing readiness path, alpha entry criteria, and manual smoke-test checklist for APK and Play testing.
+- Kept the current APK flow unchanged while preparing the app shell for broader tester distribution.
+
 ## 0.6.0-alpha.1 - 2026-05-20
 
 - Added central native notification routing so in-app notifications can open the matching Event, Tournament, Match, Team, Team-Chat, Tournament-Chat, Fast-Lap, News, Direct Message, Profile, or Home/Profile fallback.

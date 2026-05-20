@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../auth/AuthContext";
 import { Body, Muted } from "../components/Text";
 import { api } from "../lib/api";
@@ -22,6 +23,7 @@ const NotificationContext = createContext<NotificationContextValue | null>(null)
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [items, setItems] = useState<UserNotification[]>([]);
   const [popups, setPopups] = useState<UserNotification[]>([]);
   const knownIds = useRef(new Set<string>());
@@ -97,7 +99,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   return (
     <NotificationContext.Provider value={value}>
       {children}
-      <View pointerEvents="box-none" style={styles.popupLayer}>
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.popupLayer,
+          {
+            left: Math.max(insets.left + 14, 14),
+            right: Math.max(insets.right + 14, 14),
+            top: Math.max(insets.top + 58, 66),
+          },
+        ]}
+      >
         {popups.map((item) => (
           <Pressable key={item.id} onPress={() => { openNotification(item); }} style={styles.popup}>
             <Ionicons name="notifications" color={colors.cyan} size={18} />
@@ -120,11 +132,8 @@ export function useNotifications() {
 
 const styles = StyleSheet.create({
   popupLayer: {
-    left: 14,
     pointerEvents: "box-none",
     position: "absolute",
-    right: 14,
-    top: 54,
     zIndex: 50,
     gap: 8,
   },
@@ -137,6 +146,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     padding: 12,
+    elevation: 8,
     shadowColor: "#000",
     shadowOpacity: 0.35,
     shadowRadius: 14,
