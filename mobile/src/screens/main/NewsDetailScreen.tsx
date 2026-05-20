@@ -59,7 +59,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
       navigation.getParent()?.navigate("Teams", { screen: "TeamDetail", params: { id: target.id } });
       return;
     }
-    navigation.navigate("InfoCenter", { section: "profiles" });
+    navigation.navigate("PublicProfile", { username: target.id });
   }, [navigation]);
 
   if (loading) {
@@ -102,7 +102,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
             <Heading>Markierte Personen</Heading>
             <View style={styles.mentionGrid}>
               {post.mentioned_users.map((user) => (
-                <View key={user.id || user.username} style={styles.mentionCard}>
+                <Pressable key={user.id || user.username} onPress={() => user.username ? navigation.navigate("PublicProfile", { username: user.username }) : undefined} style={({ pressed }) => [styles.mentionCard, pressed && styles.pressed]}>
                   <MediaImage
                     uri={user.avatar_url}
                     style={styles.mentionAvatar}
@@ -112,7 +112,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
                     <Body style={styles.strong}>{user.display_name || user.username}</Body>
                     {user.username ? <Muted>@{user.username}</Muted> : null}
                   </View>
-                </View>
+                </Pressable>
               ))}
             </View>
           </Card>

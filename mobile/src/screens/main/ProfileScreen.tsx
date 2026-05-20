@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
 import { Image, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -76,6 +77,7 @@ const levelColors: Record<number, string> = {
 };
 
 export function ProfileScreen() {
+  const navigation = useNavigation<any>();
   const { user, logout, refreshMe } = useAuth();
   const [tab, setTab] = useState<TabKey>("overview");
   const [achievements, setAchievements] = useState<AchievementData>({ groups: [], awards: [] });
@@ -204,6 +206,17 @@ export function ProfileScreen() {
     }
   }, [guest, loadProfileData]);
 
+  const openReference = useCallback((item: PersonalReferenceItem) => {
+    if (!item.target_id) return;
+    if (item.kind === "fastlap") {
+      navigation.navigate("Tournaments", { screen: "FastLapDetail", params: { id: item.target_id } });
+      return;
+    }
+    if (item.kind === "tournament") {
+      navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id: item.target_id } });
+    }
+  }, [navigation]);
+
   const avatar = resolveMediaUrl(form.avatar_url || user?.avatar_url);
   const banner = resolveMediaUrl(form.banner_url || (user as any)?.banner_url);
 
@@ -295,7 +308,7 @@ export function ProfileScreen() {
               </View>
             </Card>
             {references.items.length ? (
-              references.items.map((item) => <ReferenceCard key={item.id} item={item} />)
+              references.items.map((item) => <ReferenceCard key={item.id} item={item} onOpen={openReference} />)
             ) : (
               <Card style={styles.card}>
                 <Muted>Noch keine persoenlichen Referenzen gefunden. Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier.</Muted>
@@ -482,9 +495,9 @@ function TierRow({ tier, accent }: { tier: AchievementTier; accent: string }) {
   );
 }
 
-function ReferenceCard({ item }: { item: PersonalReferenceItem }) {
+function ReferenceCard({ item, onOpen }: { item: PersonalReferenceItem; onOpen?: (item: PersonalReferenceItem) => void }) {
   const isFastlap = item.kind === "fastlap";
-  return (
+  const content = (
     <Card style={styles.referenceCard}>
       <View style={styles.referenceTop}>
         <View style={[styles.referenceIcon, isFastlap ? styles.referenceIconFastlap : styles.referenceIconTournament]}>
@@ -508,6 +521,12 @@ function ReferenceCard({ item }: { item: PersonalReferenceItem }) {
         <Pill label={isFastlap ? "Fast Lap" : "Turnier"} />
       </View>
     </Card>
+  );
+  if (!item.target_id || !onOpen) return content;
+  return (
+    <Pressable onPress={() => onOpen(item)} style={({ pressed }) => [pressed && styles.pressed]}>
+      {content}
+    </Pressable>
   );
 }
 
@@ -865,6 +884,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+  },
+  pressed: {
+    opacity: 0.72,
   },
   points: {
     color: colors.gold,

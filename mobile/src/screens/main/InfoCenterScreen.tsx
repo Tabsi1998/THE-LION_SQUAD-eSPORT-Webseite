@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -74,9 +75,9 @@ export function InfoCenterScreen({ navigation, route }: Props) {
         {section === "sponsors" ? <Sponsors items={sponsors} /> : null}
         {section === "partners" ? <Partners items={partners} /> : null}
         {section === "events" ? <Events items={events} onOpen={(event) => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id } })} /> : null}
-        {section === "benefits" ? <Benefits isMember={Boolean(user?.is_club_member)} items={benefits} /> : null}
+        {section === "benefits" ? <Benefits isMember={Boolean(user?.is_club_member)} membership={user?.membership || null} items={benefits} /> : null}
         {section === "references" ? <References items={references} /> : null}
-        {section === "profiles" ? <Profiles items={profiles} /> : null}
+        {section === "profiles" ? <Profiles items={profiles} onOpen={(profile) => profile.username ? navigation.navigate("PublicProfile", { username: profile.username }) : undefined} /> : null}
       </ScrollView>
     </Screen>
   );
@@ -160,15 +161,18 @@ function Events({ items, onOpen }: { items: any[]; onOpen: (event: any) => void 
   );
 }
 
-function Benefits({ isMember, items }: { isMember: boolean; items: any[] }) {
+function Benefits({ isMember, membership, items }: { isMember: boolean; membership?: Record<string, unknown> | null; items: any[] }) {
+  const status = String(membership?.member_status || membership?.status || (isMember ? "active" : "inactive"));
+  const type = String(membership?.membership_type || membership?.type || "");
   return (
     <>
-      {!isMember ? (
-        <Card style={styles.card}>
-          <Heading>Mitgliedschaft erforderlich</Heading>
-          <Muted>Diese Vorteile werden freigeschaltet, wenn der Account als Vereinsmitglied markiert ist.</Muted>
-        </Card>
-      ) : null}
+      <Card style={[styles.card, isMember ? styles.memberCard : styles.locked]}>
+        <View style={styles.cardTop}>
+          <Heading>{isMember ? "Mitgliedschaft aktiv" : "Mitgliedschaft erforderlich"}</Heading>
+          <Badge label={isMember ? status : "Gesperrt"} />
+        </View>
+        <Muted>{isMember ? `Vorteile sind fuer deinen Account freigeschaltet${type ? ` (${type.replace(/_/g, " ")})` : ""}.` : "Diese Vorteile werden freigeschaltet, wenn der Account als Vereinsmitglied markiert ist."}</Muted>
+      </Card>
       {items.map((benefit) => (
         <Card key={benefit.id || benefit.title} style={[styles.card, !isMember && (benefit.memberOnly || benefit.member_only) && styles.locked]}>
           <View style={styles.cardTop}>
@@ -200,11 +204,12 @@ function References({ items }: { items: any[] }) {
   );
 }
 
-function Profiles({ items }: { items: any[] }) {
+function Profiles({ items, onOpen }: { items: any[]; onOpen: (profile: any) => void }) {
   return (
     <>
       {items.map((profile) => (
-        <Card key={profile.id} style={styles.card}>
+        <Pressable key={profile.id} onPress={() => onOpen(profile)} style={({ pressed }) => [pressed && styles.pressed]}>
+          <Card style={styles.card}>
             <View style={styles.profileRow}>
             <MediaImage
               uri={profile.avatar_url}
@@ -215,12 +220,15 @@ function Profiles({ items }: { items: any[] }) {
               <Heading>{profile.name || profile.display_name || profile.username}</Heading>
               <Muted>@{profile.username} · {profile.role || profile.user_type || profile.achievement_level?.title || "Community"}</Muted>
             </View>
+            <Ionicons name="chevron-forward" color={colors.muted} size={18} />
           </View>
           <View style={styles.wrap}>
             {(profile.games || profile.favorite_games || []).map((game: string) => <Badge key={game} label={game} />)}
           </View>
           <Muted>{profile.achievements_count ?? profile.achievements?.length ?? 0} Achievements hinterlegt</Muted>
-        </Card>
+          <Muted style={styles.link}>Profil oeffnen</Muted>
+          </Card>
+        </Pressable>
       ))}
     </>
   );
@@ -330,6 +338,9 @@ const styles = StyleSheet.create({
   },
   locked: {
     opacity: 0.56,
+  },
+  memberCard: {
+    borderColor: "rgba(0, 255, 136, 0.32)",
   },
   memberOk: {
     color: colors.success,

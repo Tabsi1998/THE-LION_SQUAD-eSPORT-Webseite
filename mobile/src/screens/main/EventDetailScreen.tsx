@@ -102,7 +102,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
       navigation.getParent()?.navigate("Teams", { screen: "TeamDetail", params: { id: target.id } });
       return;
     }
-    navigation.getParent()?.navigate("More", { screen: "InfoCenter", params: { section: "profiles" } });
+    navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username: target.id } });
   }, [navigation]);
 
   const register = useCallback(async () => {

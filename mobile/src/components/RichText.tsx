@@ -98,7 +98,20 @@ function renderInline(value: string, blockIndex: number, onOpenContent?: (target
     if (token.type === "bold") return <Text key={key} style={styles.bold}>{token.value}</Text>;
     if (token.type === "italic") return <Text key={key} style={styles.italic}>{token.value}</Text>;
     if (token.type === "code") return <Text key={key} style={styles.code}>{token.value}</Text>;
-    if (token.type === "mention") return <Text key={key} style={styles.mention}>{token.value}</Text>;
+    if (token.type === "mention") {
+      const username = token.value.startsWith("@") ? token.value.slice(1) : "";
+      return (
+        <Text
+          key={key}
+          style={styles.mention}
+          onPress={() => {
+            if (username && onOpenContent) onOpenContent({ type: "profile", id: username, label: token.value });
+          }}
+        >
+          {token.value}
+        </Text>
+      );
+    }
     if (token.type === "link") {
       return (
         <Text

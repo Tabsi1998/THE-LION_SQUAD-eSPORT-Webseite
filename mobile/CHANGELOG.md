@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0-alpha.1 - 2026-05-20
+
+- Added a native public profile detail screen backed by the live website profile API, including banner, avatar, membership state, profile stats, public info, gaming setup, socials, game IDs, achievements, tournament history, Fast-Lap bests, and teams.
+- Made Info Center player cards open the native profile detail instead of staying as static cards.
+- Made `@username` mentions in rich text route to native player profiles when the surrounding screen provides app navigation.
+- Updated News and Event content links so profile targets open native public profiles.
+- Made mentioned users in News tappable and linked personal profile references to the matching native tournament or Fast-Lap detail.
+- Added a clearer membership status card to the mobile benefits area so locked and active member benefits are easier to understand.
+
 ## 0.3.0-alpha.1 - 2026-05-19
 
 - Improved the native rich-text renderer with internal content links, native content embeds, ordered lists, decoded HTML entities, auto-linked URLs, and inline image rendering for Markdown, HTML, and standalone image URLs.

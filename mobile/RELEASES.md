@@ -65,6 +65,7 @@ Der Build-Zusatz kommt aus `expo.android.versionCode`. Dadurch ist fuer Tester k
 Historische Einordnung, neueste Version oben:
 
 ```text
+0.4.0-alpha.1
 0.3.0-alpha.1
 0.2.0-alpha.1
 0.1.1-alpha.1
@@ -89,7 +90,7 @@ Historische Einordnung, neueste Version oben:
 In GitHub unter `Actions` den Workflow `Mobile APK Release` starten. Der Workflow erzeugt ein Artefakt mit diesem Namensschema:
 
 ```text
-LionsAPP-ALPHA-v0.3.0-build17-<commit>.apk
+LionsAPP-ALPHA-v0.4.0-build18-<commit>.apk
 ```
 
 ## Release-Signatur

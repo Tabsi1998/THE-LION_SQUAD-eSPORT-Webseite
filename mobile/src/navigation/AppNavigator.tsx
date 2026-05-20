@@ -20,6 +20,7 @@ import { NewsDetailScreen } from "../screens/main/NewsDetailScreen";
 import { NewsScreen } from "../screens/main/NewsScreen";
 import { NotificationsScreen } from "../screens/main/NotificationsScreen";
 import { ProfileScreen } from "../screens/main/ProfileScreen";
+import { PublicProfileScreen } from "../screens/main/PublicProfileScreen";
 import { InfoCenterScreen } from "../screens/main/InfoCenterScreen";
 import { TeamChatScreen } from "../screens/main/TeamChatScreen";
 import { TeamDetailScreen } from "../screens/main/TeamDetailScreen";
@@ -153,6 +154,7 @@ function MoreStackScreen() {
     <MoreStack.Navigator screenOptions={stackOptions}>
       <MoreStack.Screen name="MoreHub" component={MoreScreen} options={{ headerShown: false }} />
       <MoreStack.Screen name="InfoCenter" component={InfoCenterScreen} options={{ title: "Info Center" }} />
+      <MoreStack.Screen name="PublicProfile" component={PublicProfileScreen} options={{ title: "Profil" }} />
       <MoreStack.Screen name="NewsList" component={NewsScreen} options={{ title: "News" }} />
       <MoreStack.Screen name="NewsDetail" component={NewsDetailScreen} options={{ title: "News" }} />
       <MoreStack.Screen name="FastLapList" component={FastLapScreen} options={{ title: "Fast Laps" }} />
