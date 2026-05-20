@@ -1,13 +1,14 @@
 {
   "name": "mobile",
-  "version": "0.7.0-alpha.1",
+  "version": "0.8.0-alpha.1",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "release:preflight": "node scripts/release-preflight.cjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.0-alpha.1 - 2026-05-20
+
+- Added a reusable mobile release preflight script that validates package/app version parity, package-lock version parity, Android package identity, Android versionCode, changelog coverage, release history coverage, and tag/version consistency.
+- Added `npm run release:preflight` to the mobile app package.
+- Wired the mobile release preflight into the main CI Mobile App job before Expo config validation.
+- Wired the same preflight into the Mobile APK Release workflow before TypeScript and Android build steps.
+- Hardened release automation so version, changelog, release docs, package name, slug, app name, and Git tag mismatches fail before building or publishing an APK.
+
 ## 0.7.0-alpha.1 - 2026-05-20
 
 - Added a global native error boundary so render-time screen crashes show a controlled LionsAPP fallback instead of leaving testers on a blank or closed app view.

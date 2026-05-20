@@ -85,10 +85,10 @@ Die App soll fuer normale Nutzer die wichtigen Webseitenfunktionen nativ abbilde
 
 ## Phase 8 - Tests, CI und Qualitaetssicherung
 
-- Mobile Typecheck, Expo Config Check und Dependency Audit bleiben Pflicht.
+- Mobile Typecheck, Expo Config Check, Dependency Audit und Mobile Release Preflight bleiben Pflicht.
 - Backend-Tests fuer Rechte, Sichtbarkeit, Anmeldung, Check-in, Fast-Lap-Reference-Regeln und Notifications.
 - Frontend-/Mobile-E2E-Pfade fuer Login, Home, Eventdetail, Turnieranmeldung, Check-in, Chat, News und Profil.
-- Release-Workflow darf nur bauen, wenn Version, Changelog, Signatur und APK-Name konsistent sind.
+- Release-Workflow darf nur bauen, wenn Version, Changelog, Release-Historie, Tag, Android-Package, Signatur und APK-Name konsistent sind.
 - Build-Zeit weiter ueber Gradle/NPM-Cache optimieren, aber Android-Release-Builds bleiben grundsaetzlich mehrere Minuten lang.
 - Akzeptanz: Updates laufen reproduzierbar und Fehler fallen vor Release auf.
 

@@ -97,6 +97,9 @@ jobs:
       - name: Typecheck mobile app
         working-directory: mobile
         run: npm run typecheck
+      - name: Mobile release preflight
+        working-directory: mobile
+        run: npm run release:preflight
       - name: Validate Expo config
         working-directory: mobile
         run: npx expo config --type public
