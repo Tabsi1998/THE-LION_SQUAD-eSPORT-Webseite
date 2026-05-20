@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { Body, Muted } from "../components/Text";
 import { api } from "../lib/api";
 import { isGuestUser } from "../live";
+import { navigateToNotification } from "../navigation/rootNavigation";
 import { colors } from "../theme";
 import type { UserNotification } from "../types";
 
@@ -14,6 +15,7 @@ type NotificationContextValue = {
   load: () => Promise<void>;
   markRead: (item: UserNotification) => Promise<void>;
   markAllRead: () => Promise<void>;
+  openNotification: (item: UserNotification) => Promise<void>;
 };
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
@@ -77,20 +79,27 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     await api.post("/admin/notifications/read-all").catch(() => {});
   }, []);
 
+  const openNotification = useCallback(async (item: UserNotification) => {
+    await markRead(item);
+    setPopups((rows) => rows.filter((row) => row.id !== item.id));
+    navigateToNotification(item);
+  }, [markRead]);
+
   const value = useMemo(() => ({
     items,
     unread: items.filter((item) => !item.read).length,
     load,
     markRead,
     markAllRead,
-  }), [items, load, markAllRead, markRead]);
+    openNotification,
+  }), [items, load, markAllRead, markRead, openNotification]);
 
   return (
     <NotificationContext.Provider value={value}>
       {children}
       <View pointerEvents="box-none" style={styles.popupLayer}>
         {popups.map((item) => (
-          <Pressable key={item.id} onPress={() => { markRead(item); setPopups((rows) => rows.filter((row) => row.id !== item.id)); }} style={styles.popup}>
+          <Pressable key={item.id} onPress={() => { openNotification(item); }} style={styles.popup}>
             <Ionicons name="notifications" color={colors.cyan} size={18} />
             <View style={styles.popupText}>
               <Body style={styles.popupTitle} numberOfLines={1}>{item.title || "Benachrichtigung"}</Body>

@@ -6,57 +6,28 @@ import { Card } from "../../components/Card";
 import { EmptyState, LoadingState } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
-import { api, errorMessage } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
 import { useNotifications } from "../../notifications/NotificationContext";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
-import type { UserNotification } from "../../types";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "Notifications">;
 
 export function NotificationsScreen({ navigation }: Props) {
-  const [items, setItems] = useState<UserNotification[]>([]);
-  const { load: loadLiveNotifications, markAllRead: markAllLiveRead, markRead: markLiveRead } = useNotifications();
+  const { items, load, markAllRead, openNotification } = useNotifications();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    setError("");
-    try {
-      const { data } = await api.get<UserNotification[]>("/admin/notifications");
-      setItems(Array.isArray(data) ? data : []);
-      await loadLiveNotifications();
-    } catch (err) {
-      setError(errorMessage(err, "Benachrichtigungen konnten nicht geladen werden."));
-    } finally {
-      setLoading(false);
-    }
-  }, [loadLiveNotifications]);
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    await load();
+    setLoading(false);
+  }, [load]);
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", load);
-    load();
-    const timer = setInterval(load, 15000);
-    return () => {
-      clearInterval(timer);
-      unsubscribe();
-    };
-  }, [load, navigation]);
-
-  const markAllRead = useCallback(async () => {
-    await api.post("/admin/notifications/read-all");
-    await markAllLiveRead();
-    await load();
-  }, [load, markAllLiveRead]);
-
-  const markRead = useCallback(async (item: UserNotification) => {
-    if (!item.read) {
-      await api.post(`/admin/notifications/${item.id}/read`);
-      await markLiveRead(item);
-      setItems((rows) => rows.map((row) => row.id === item.id ? { ...row, read: true } : row));
-    }
-  }, [markLiveRead]);
+    const unsubscribe = navigation.addListener("focus", refresh);
+    refresh();
+    return unsubscribe;
+  }, [navigation, refresh]);
 
   const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
 
@@ -70,10 +41,9 @@ export function NotificationsScreen({ navigation }: Props) {
         </View>
         {items.length ? <Button label="Alle als gelesen markieren" onPress={markAllRead} variant="secondary" /> : null}
         {loading ? <LoadingState /> : null}
-        {error ? <Muted style={styles.error}>{error}</Muted> : null}
         {!loading && !items.length ? <EmptyState title="Keine Benachrichtigungen" detail="Erinnerungen, Mentions, Nachrichten und Match-Updates erscheinen hier." /> : null}
         {items.map((item) => (
-          <Pressable key={item.id} onPress={() => markRead(item)}>
+          <Pressable key={item.id} onPress={() => openNotification(item)} style={({ pressed }) => [pressed && styles.pressed]}>
             <Card style={[styles.note, !item.read && styles.unread]}>
               <View style={styles.noteHead}>
                 <Heading style={styles.noteTitle}>{item.title}</Heading>
@@ -83,6 +53,7 @@ export function NotificationsScreen({ navigation }: Props) {
               <View style={styles.meta}>
                 {item.kind ? <Muted style={styles.kind}>{item.kind}</Muted> : null}
                 {item.created_at ? <Muted>{formatDateTime(item.created_at)}</Muted> : null}
+                <Muted style={styles.openHint}>Oeffnen</Muted>
               </View>
             </Card>
           </Pressable>
@@ -132,7 +103,12 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textTransform: "uppercase",
   },
-  error: {
-    color: colors.live,
+  openHint: {
+    color: colors.gold,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  pressed: {
+    opacity: 0.72,
   },
 });

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0-alpha.1 - 2026-05-20
+
+- Added central native notification routing so in-app notifications can open the matching Event, Tournament, Match, Team, Team-Chat, Tournament-Chat, Fast-Lap, News, Direct Message, Profile, or Home/Profile fallback.
+- Made notification popups mark the item as read and jump directly to the best native target instead of only dismissing the popup.
+- Reworked the Notification inbox to use the global notification context instead of polling independently, reducing duplicate notification requests while the inbox is open.
+- Added visible "Oeffnen" affordance to notification cards so users know tapping a notification navigates to the relevant app area.
+- Moved the root navigation ref into a shared navigation helper so notification routing can be reused consistently from overlays and screens.
+
 ## 0.5.0-alpha.1 - 2026-05-20
 
 - Expanded the native Team detail screen with live banner/logo display, membership role state, richer members, Squads, Join-Code handling, Discord links, and pull-to-refresh.

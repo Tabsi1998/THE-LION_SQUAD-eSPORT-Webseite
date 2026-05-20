@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { NavigationContainer, DefaultTheme, createNavigationContainerRef } from "@react-navigation/native";
+import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -32,6 +32,7 @@ import { useAuth } from "../auth/AuthContext";
 import { isGuestUser } from "../live";
 import { useNotifications } from "../notifications/NotificationContext";
 import { colors } from "../theme";
+import { navigationRef } from "./rootNavigation";
 import type {
   AuthStackParamList,
   MainTabParamList,
@@ -45,7 +46,6 @@ const Tabs = createBottomTabNavigator<MainTabParamList>();
 const TournamentStack = createNativeStackNavigator<TournamentStackParamList>();
 const TeamStack = createNativeStackNavigator<TeamStackParamList>();
 const MoreStack = createNativeStackNavigator<MoreStackParamList>();
-const navigationRef = createNavigationContainerRef<MainTabParamList>();
 
 const theme = {
   ...DefaultTheme,
