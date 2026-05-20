@@ -7,7 +7,7 @@ import type { TeamStackParamList } from "../../navigation/types";
 
 type Props = NativeStackScreenProps<TeamStackParamList, "TeamChat">;
 
-export function TeamChatScreen({ route }: Props) {
+export function TeamChatScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   return (
     <Screen padded={false} bottomSafe>
@@ -16,6 +16,8 @@ export function TeamChatScreen({ route }: Props) {
         emptyTitle="Noch keine Teamnachrichten"
         lockedDetail="Team-Chat ist nur für Teammitglieder sichtbar."
         listUrl={`/teams/${route.params.id}/chat`}
+        mentionSearchUrl={`/teams/${route.params.id}/mention-candidates`}
+        onOpenProfile={(username) => navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username } })}
         postUrl={`/teams/${route.params.id}/chat`}
       />
     </Screen>

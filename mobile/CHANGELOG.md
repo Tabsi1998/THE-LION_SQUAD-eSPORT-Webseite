@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0-alpha.1 - 2026-05-20
+
+- Expanded the native Team detail screen with live banner/logo display, membership role state, richer members, Squads, Join-Code handling, Discord links, and pull-to-refresh.
+- Added native Team management actions for permitted users: edit basic team data, invite users, promote/demote Co-Leaders, transfer leadership, remove members, leave teams, and join by Join-Code.
+- Added native Squad management for Team-Leads and Co-Leads, including create, edit, archive/activate, delete, and member assignment.
+- Added mobile handling for pending team invitations directly on the Teams screen.
+- Added team-scoped mention suggestions for Team-Chat and made chat authors and `@username` mentions open native public profiles.
+- Added direct profile-to-message navigation where public profile permissions allow messaging.
+
 ## 0.4.0-alpha.1 - 2026-05-20
 
 - Added a native public profile detail screen backed by the live website profile API, including banner, avatar, membership state, profile stats, public info, gaming setup, socials, game IDs, achievements, tournament history, Fast-Lap bests, and teams.

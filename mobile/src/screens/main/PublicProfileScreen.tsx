@@ -50,6 +50,7 @@ type PublicProfilePayload = {
   user_type?: string;
   membership?: Record<string, unknown> | null;
   socials?: Array<{ platform?: string; value?: string; url?: string }>;
+  can_message?: boolean;
   stats?: Record<string, number | string | undefined>;
   achievement_level?: { level?: number; title?: string; points?: number; progress?: number };
   badges?: any[];
@@ -147,6 +148,12 @@ export function PublicProfileScreen({ navigation, route }: Props) {
                 <Pill label={profile.achievement_level?.title || `Level ${profile.achievement_level?.level || stats.level || 1}`} tone="gold" />
                 {profile.role && profile.role !== "player" ? <Pill label={formatStatus(profile.role)} /> : null}
               </View>
+              {profile.can_message ? (
+                <Pressable onPress={() => navigation.navigate("DirectThread", { userId: profile.id, title: display })} style={({ pressed }) => [styles.messageButton, pressed && styles.pressed]}>
+                  <Ionicons name="chatbubble-ellipses-outline" color={colors.black} size={16} />
+                  <Body style={styles.messageButtonText}>Nachricht</Body>
+                </Pressable>
+              ) : null}
             </View>
           </View>
         </View>
@@ -579,6 +586,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     paddingVertical: 5,
+  },
+  messageButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: colors.cyan,
+    borderRadius: 7,
+    flexDirection: "row",
+    gap: 7,
+    marginTop: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  messageButtonText: {
+    color: colors.black,
+    fontWeight: "900",
   },
   linkIcon: {
     alignItems: "center",

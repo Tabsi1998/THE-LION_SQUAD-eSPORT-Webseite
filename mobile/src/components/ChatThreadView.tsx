@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { api, errorMessage } from "../lib/api";
 import { formatDate } from "../lib/format";
+import type { ContentTarget } from "../lib/contentLinks";
 import { colors } from "../theme";
 import type { ChatMessage } from "../types";
 import { EmptyState, LoadingState } from "./ListState";
@@ -16,6 +17,8 @@ type Props = {
   lockedDetail?: string;
   extractMessages?: (data: unknown) => ChatMessage[];
   canSend?: (data: unknown) => boolean;
+  mentionSearchUrl?: string;
+  onOpenProfile?: (username: string) => void;
 };
 
 export function ChatThreadView({
@@ -26,9 +29,12 @@ export function ChatThreadView({
   lockedDetail,
   extractMessages = (data) => (Array.isArray(data) ? data as ChatMessage[] : []),
   canSend = () => true,
+  mentionSearchUrl,
+  onOpenProfile,
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
+  const [mentionCandidates, setMentionCandidates] = useState<Array<{ id: string; username?: string; display_name?: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -56,6 +62,28 @@ export function ChatThreadView({
     return () => clearInterval(timer);
   }, [load]);
 
+  useEffect(() => {
+    if (!mentionSearchUrl) {
+      setMentionCandidates([]);
+      return undefined;
+    }
+    const query = mentionQuery(text);
+    if (!query || query.length < 2) {
+      setMentionCandidates([]);
+      return undefined;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const separator = mentionSearchUrl.includes("?") ? "&" : "?";
+        const { data } = await api.get(`${mentionSearchUrl}${separator}q=${encodeURIComponent(query)}`);
+        setMentionCandidates(Array.isArray(data) ? data : []);
+      } catch {
+        setMentionCandidates([]);
+      }
+    }, 180);
+    return () => clearTimeout(timer);
+  }, [mentionSearchUrl, text]);
+
   const send = useCallback(async () => {
     const message = text.trim();
     if (!message || sending || !allowed) return;
@@ -79,9 +107,28 @@ export function ChatThreadView({
       <ScrollView ref={scrollRef} contentContainerStyle={styles.messages}>
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
         {messages.length ? messages.map((message) => (
-          <MessageBubble key={message.id} message={message} own={message.user_id === currentUserId || message.sender_id === currentUserId} />
+          <MessageBubble
+            key={message.id}
+            message={message}
+            onOpenProfile={onOpenProfile}
+            own={message.user_id === currentUserId || message.sender_id === currentUserId}
+          />
         )) : <EmptyState title={emptyTitle} detail={allowed ? "Schreibe die erste Nachricht." : lockedDetail || error} />}
       </ScrollView>
+      {mentionCandidates.length ? (
+        <View style={styles.suggestions}>
+          {mentionCandidates.map((candidate) => (
+            <Pressable key={candidate.id} onPress={() => {
+              if (!candidate.username) return;
+              setText((current) => current.replace(/(^|\s)@([A-Za-z0-9_.-]{1,32})$/, `$1@${candidate.username} `));
+              setMentionCandidates([]);
+            }} style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]}>
+              <Body style={styles.author}>{candidate.display_name || candidate.username}</Body>
+              {candidate.username ? <Muted>@{candidate.username}</Muted> : null}
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       <View style={styles.composer}>
         <TextInput
           editable={allowed && !sending}
@@ -100,20 +147,35 @@ export function ChatThreadView({
   );
 }
 
-function MessageBubble({ message, own }: { message: ChatMessage; own: boolean }) {
+function MessageBubble({ message, own, onOpenProfile }: { message: ChatMessage; own: boolean; onOpenProfile?: (username: string) => void }) {
   const author = message.author || message.sender;
   const name = own ? "Du" : author?.display_name || author?.username || "Spieler";
+  const openContent = useCallback((target: ContentTarget) => {
+    if (target.type === "profile" && onOpenProfile) onOpenProfile(target.id);
+  }, [onOpenProfile]);
   return (
     <View style={[styles.bubble, own && styles.bubbleOwn]}>
       <View style={styles.bubbleHead}>
-        <Body style={[styles.author, own && styles.ownText]}>{name}</Body>
+        <Body
+          onPress={() => {
+            if (author?.username && onOpenProfile) onOpenProfile(author.username);
+          }}
+          style={[styles.author, own && styles.ownText]}
+        >
+          {name}
+        </Body>
         {message.created_at ? <Muted style={own && styles.ownMuted}>{formatDate(message.created_at)}</Muted> : null}
       </View>
       <View style={own && styles.ownRichText}>
-        <RichText text={message.message} compact />
+        <RichText text={message.message} compact onOpenContent={openContent} />
       </View>
     </View>
   );
+}
+
+function mentionQuery(value: string) {
+  const match = value.match(/(^|\s)@([A-Za-z0-9_.-]{1,32})$/);
+  return match?.[2] || "";
 }
 
 const styles = StyleSheet.create({
@@ -166,6 +228,24 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 12,
   },
+  suggestions: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderTopWidth: 1,
+    gap: 6,
+    padding: 10,
+  },
+  suggestion: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
   input: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -192,6 +272,9 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.45,
+  },
+  pressed: {
+    opacity: 0.72,
   },
   error: {
     color: colors.live,

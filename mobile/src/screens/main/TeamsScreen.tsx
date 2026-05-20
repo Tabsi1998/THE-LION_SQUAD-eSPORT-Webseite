@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -9,13 +10,14 @@ import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import type { TeamStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
-import type { Team } from "../../types";
+import type { Team, TeamInvite } from "../../types";
 
 type Props = NativeStackScreenProps<TeamStackParamList, "TeamList">;
 
 export function TeamsScreen({ navigation }: Props) {
   const [myTeams, setMyTeams] = useState<Team[]>([]);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
+  const [invites, setInvites] = useState<TeamInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -27,8 +29,10 @@ export function TeamsScreen({ navigation }: Props) {
         api.get<Team[]>("/teams/my").catch(() => ({ data: [] })),
         api.get<Team[]>("/teams").catch(() => ({ data: [] })),
       ]);
+      const inviteResult = await api.get<TeamInvite[]>("/teams/invites/my").catch(() => ({ data: [] }));
       setMyTeams(Array.isArray(mine.data) ? mine.data : []);
       setAllTeams(Array.isArray(all.data) ? all.data : []);
+      setInvites(Array.isArray(inviteResult.data) ? inviteResult.data : []);
     } catch (err) {
       setError(errorMessage(err, "Teams konnten nicht geladen werden."));
     } finally {
@@ -50,6 +54,16 @@ export function TeamsScreen({ navigation }: Props) {
   }
 
   const list = myTeams.length ? myTeams : allTeams;
+  const actOnInvite = useCallback(async (invite: TeamInvite, action: "accept" | "decline") => {
+    setError("");
+    try {
+      await api.post(`/teams/invites/${invite.id}/${action}`);
+      setInvites((items) => items.filter((item) => item.id !== invite.id));
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, "Einladung konnte nicht verarbeitet werden."));
+    }
+  }, [load]);
 
   return (
     <Screen>
@@ -59,7 +73,38 @@ export function TeamsScreen({ navigation }: Props) {
         ListHeaderComponent={
           <View style={styles.header}>
             <Heading>{myTeams.length ? "Meine Teams" : "Teams"}</Heading>
-            {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Team-Übersicht als native Grundlage. Chat, Invites und Squads folgen hier im selben Modul.</Muted>}
+            {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Teams, Einladungen, Squads und Community-Chat aus der Live-Plattform.</Muted>}
+            {invites.length ? (
+              <View style={styles.invites}>
+                <View style={styles.inviteHead}>
+                  <Ionicons name="mail-unread-outline" color={colors.cyan} size={18} />
+                  <Heading>Offene Einladungen</Heading>
+                </View>
+                {invites.map((invite) => (
+                  <Card key={invite.id} style={styles.inviteCard}>
+                    <View style={styles.teamTop}>
+                      <MediaImage
+                        uri={invite.team?.logo_url}
+                        style={styles.inviteLogo}
+                        fallback={<Body style={styles.logoText}>{(invite.team?.tag || invite.team?.name || "?").slice(0, 2).toUpperCase()}</Body>}
+                      />
+                      <View style={styles.teamText}>
+                        <Body style={styles.title}>{invite.team?.name || "Team"}</Body>
+                        <Muted>{invite.team?.tag ? `[${invite.team.tag}]` : "Team"} · von {invite.inviter?.display_name || invite.inviter?.username || "Teamleitung"}</Muted>
+                      </View>
+                    </View>
+                    <View style={styles.inviteActions}>
+                      <Pressable onPress={() => actOnInvite(invite, "accept")} style={({ pressed }) => [styles.acceptButton, pressed && styles.pressed]}>
+                        <Body style={styles.acceptText}>Annehmen</Body>
+                      </Pressable>
+                      <Pressable onPress={() => actOnInvite(invite, "decline")} style={({ pressed }) => [styles.declineButton, pressed && styles.pressed]}>
+                        <Muted style={styles.declineText}>Ablehnen</Muted>
+                      </Pressable>
+                    </View>
+                  </Card>
+                ))}
+              </View>
+            ) : null}
           </View>
         }
         ListEmptyComponent={<EmptyState title="Keine Teams" detail="Du bist noch in keinem Team oder es gibt keine öffentlichen Teams." />}
@@ -112,6 +157,51 @@ const styles = StyleSheet.create({
   header: {
     gap: 6,
     marginBottom: 4,
+  },
+  invites: {
+    gap: 10,
+    marginTop: 10,
+  },
+  inviteHead: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  inviteCard: {
+    gap: 10,
+  },
+  inviteLogo: {
+    borderRadius: 8,
+    height: 44,
+    width: 44,
+  },
+  inviteActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  acceptButton: {
+    alignItems: "center",
+    backgroundColor: colors.cyan,
+    borderRadius: 7,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 42,
+  },
+  acceptText: {
+    color: colors.black,
+    fontWeight: "900",
+  },
+  declineButton: {
+    alignItems: "center",
+    borderColor: colors.border,
+    borderRadius: 7,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 42,
+  },
+  declineText: {
+    fontWeight: "900",
   },
   card: {
     gap: 10,

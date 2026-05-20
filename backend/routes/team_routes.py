@@ -380,6 +380,32 @@ async def invite_candidates(team_id: str, q: str | None = None, me: dict = Depen
     return users
 
 
+@router.get("/{team_id}/mention-candidates")
+async def mention_candidates(team_id: str, q: str | None = None, me: dict = Depends(get_current_user)):
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _chat_allowed(team, me):
+        raise HTTPException(status_code=403, detail="Team-Chat ist nur für Teammitglieder sichtbar")
+    query = {
+        "id": {"$in": team.get("member_ids") or []},
+        "is_active": True,
+        "is_banned": {"$ne": True},
+    }
+    if q:
+        pattern = _safe_regex(q, 40)
+        query["$or"] = [
+            {"username": {"$regex": pattern, "$options": "i"}},
+            {"display_name": {"$regex": pattern, "$options": "i"}},
+        ]
+    users = await db.users.find(
+        query,
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
+    ).sort("display_name", 1).to_list(12)
+    return users
+
+
 @router.post("/{team_id}/invites")
 async def invite_team_member(team_id: str, body: TeamInviteCreate, me: dict = Depends(get_current_user)):
     db = get_db()

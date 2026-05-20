@@ -76,14 +76,45 @@ export type Team = {
   logo_url?: string | null;
   banner_url?: string | null;
   discord_link?: string | null;
+  join_code?: string | null;
+  is_public?: boolean;
+  is_member?: boolean;
   member_count?: number;
   squad_count?: number;
   leader?: { id: string; username?: string; display_name?: string; avatar_url?: string | null };
+  leader_id?: string | null;
+  co_leader_ids?: string[];
+  member_ids?: string[];
   can_manage?: boolean;
   my_role?: string;
   members?: Array<{ id: string; name?: string; username?: string; display_name?: string; role?: string; avatar_url?: string | null; achievements?: string[] }>;
-  squads?: Array<{ name: string; game: string; record: string }>;
+  squads?: TeamSquad[];
   chat_preview?: Array<{ author: string; message: string; time: string }>;
+};
+
+export type TeamSquad = {
+  id?: string;
+  team_id?: string;
+  name: string;
+  description?: string | null;
+  tournament_id?: string | null;
+  season_id?: string | null;
+  game_id?: string | null;
+  game?: string | null;
+  record?: string | null;
+  member_ids?: string[];
+  members?: Array<{ id: string; username?: string; display_name?: string; avatar_url?: string | null }>;
+  status?: "active" | "archived" | string;
+};
+
+export type TeamInvite = {
+  id: string;
+  team_id: string;
+  user_id: string;
+  status?: string;
+  created_at?: string;
+  team?: Pick<Team, "id" | "name" | "tag" | "logo_url"> | null;
+  inviter?: { id?: string; username?: string; display_name?: string; avatar_url?: string | null } | null;
 };
 
 export type Match = {

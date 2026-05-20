@@ -8,7 +8,7 @@ import type { ChatMessage, DirectThread } from "../../types";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "DirectThread">;
 
-export function DirectThreadScreen({ route }: Props) {
+export function DirectThreadScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const extractMessages = useCallback((data: unknown): ChatMessage[] => {
     return Array.isArray((data as DirectThread)?.messages) ? (data as DirectThread).messages : [];
@@ -23,6 +23,7 @@ export function DirectThreadScreen({ route }: Props) {
         extractMessages={extractMessages}
         canSend={canSend}
         listUrl={`/messages/direct/${route.params.userId}`}
+        onOpenProfile={(username) => navigation.navigate("PublicProfile", { username })}
         postUrl={`/messages/direct/${route.params.userId}`}
       />
     </Screen>
