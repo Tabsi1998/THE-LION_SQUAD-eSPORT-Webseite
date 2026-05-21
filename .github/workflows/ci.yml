@@ -41,17 +41,8 @@ jobs:
         # No fixed version exists; 2.12.1 is already the latest release.
         # We use HS256 with a strong secret (>=256 bit) so the risk is mitigated.
         run: pip-audit -r backend/requirements.txt --ignore-vuln PYSEC-2025-183
-      - name: Run backend smoke tests
-        run: >
-          python -m pytest
-          backend/tests/test_public_phase.py
-          backend/tests/test_match_v2_results_unit.py
-          backend/tests/test_bracket_engine_unit.py
-          backend/tests/test_custom_bracket_unit.py
-          backend/tests/test_tournament_permissions_unit.py
-          backend/tests/test_achievement_catalog_audit.py
-          backend/tests/test_birthday_mailer_unit.py
-          backend/tests/test_notification_preferences.py
+      - name: Run backend unit tests
+        run: python -m pytest -m "not live"
 
   frontend:
     name: Frontend

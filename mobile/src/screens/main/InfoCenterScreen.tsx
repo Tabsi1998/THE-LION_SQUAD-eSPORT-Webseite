@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
+import { EmptyState, LoadingState } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -32,32 +33,46 @@ export function InfoCenterScreen({ navigation, route }: Props) {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [benefits, setBenefits] = useState<any[]>([]);
   const [references, setReferences] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const active = useMemo(() => sections.find((item) => item.key === section) || sections[0], [section]);
 
   const loadLive = useCallback(async () => {
-    const [liveSponsors, livePartners, liveEvents, liveProfiles, liveBenefits, liveReferences] = await Promise.all([
-      api.get<any[]>("/sponsors").catch(() => ({ data: [] })),
-      api.get<any[]>("/partners").catch(() => ({ data: [] })),
-      api.get<any[]>("/events").catch(() => ({ data: [] })),
-      api.get<any[]>("/users/public-list").catch(() => ({ data: [] })),
-      api.get<any[]>("/membership/benefits").catch(() => ({ data: [] })),
-      api.get<any[]>("/references").catch(() => ({ data: [] })),
-    ]);
-    setSponsors(Array.isArray(liveSponsors.data) ? liveSponsors.data : []);
-    setPartners(Array.isArray(livePartners.data) ? livePartners.data : []);
-    setEvents(Array.isArray(liveEvents.data) ? liveEvents.data : []);
-    setProfiles(Array.isArray(liveProfiles.data) ? liveProfiles.data : []);
-    setBenefits(Array.isArray(liveBenefits.data) ? liveBenefits.data : []);
-    setReferences(Array.isArray(liveReferences.data) ? liveReferences.data : []);
-  }, [user]);
+    try {
+      const [liveSponsors, livePartners, liveEvents, liveProfiles, liveBenefits, liveReferences] = await Promise.all([
+        api.get<any[]>("/sponsors").catch(() => ({ data: [] })),
+        api.get<any[]>("/partners").catch(() => ({ data: [] })),
+        api.get<any[]>("/events").catch(() => ({ data: [] })),
+        api.get<any[]>("/users/public-list").catch(() => ({ data: [] })),
+        api.get<any[]>("/membership/benefits").catch(() => ({ data: [] })),
+        api.get<any[]>("/references").catch(() => ({ data: [] })),
+      ]);
+      setSponsors(Array.isArray(liveSponsors.data) ? liveSponsors.data : []);
+      setPartners(Array.isArray(livePartners.data) ? livePartners.data : []);
+      setEvents(Array.isArray(liveEvents.data) ? liveEvents.data : []);
+      setProfiles(Array.isArray(liveProfiles.data) ? liveProfiles.data : []);
+      setBenefits(Array.isArray(liveBenefits.data) ? liveBenefits.data : []);
+      setReferences(Array.isArray(liveReferences.data) ? liveReferences.data : []);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     loadLive();
   }, [loadLive]);
 
+  useEffect(() => {
+    if (route.params?.section) setSection(route.params.section);
+  }, [route.params?.section]);
+
   return (
     <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadLive(); }} tintColor={colors.cyan} />}
+      >
         <View style={styles.header}>
           <Muted>Info Center</Muted>
           <Title>{active.label}</Title>
@@ -72,19 +87,25 @@ export function InfoCenterScreen({ navigation, route }: Props) {
           ))}
         </ScrollView>
 
-        {section === "sponsors" ? <Sponsors items={sponsors} /> : null}
-        {section === "partners" ? <Partners items={partners} /> : null}
-        {section === "events" ? <Events items={events} onOpen={(event) => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id } })} /> : null}
-        {section === "benefits" ? <Benefits isMember={Boolean(user?.is_club_member)} membership={user?.membership || null} items={benefits} /> : null}
-        {section === "references" ? <References items={references} /> : null}
-        {section === "profiles" ? <Profiles items={profiles} onOpen={(profile) => profile.username ? navigation.navigate("PublicProfile", { username: profile.username }) : undefined} /> : null}
+        {loading ? (
+          <LoadingState label="Info Center wird geladen ..." />
+        ) : (
+          <>
+            {section === "sponsors" ? <Sponsors items={sponsors} /> : null}
+            {section === "partners" ? <Partners items={partners} /> : null}
+            {section === "events" ? <Events items={events} onOpen={(event) => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id } })} /> : null}
+            {section === "benefits" ? <Benefits isMember={Boolean(user?.is_club_member)} membership={user?.membership || null} items={benefits} /> : null}
+            {section === "references" ? <References items={references} /> : null}
+            {section === "profiles" ? <Profiles items={profiles} onOpen={(profile) => profile.username ? navigation.navigate("PublicProfile", { username: profile.username }) : undefined} /> : null}
+          </>
+        )}
       </ScrollView>
     </Screen>
   );
 }
 
 function Sponsors({ items }: { items: any[] }) {
-  if (!items.length) return null;
+  if (!items.length) return <EmptyState title="Keine Sponsoren" detail="Sobald Sponsoren auf der Website gepflegt sind, erscheinen ihre Logos hier." />;
   return (
     <View style={styles.sponsorGrid}>
       {items.map((sponsor) => {
@@ -115,6 +136,7 @@ function Sponsors({ items }: { items: any[] }) {
 }
 
 function Partners({ items }: { items: any[] }) {
+  if (!items.length) return <EmptyState title="Keine Partner" detail="Kooperationen und Community-Partner werden hier gesammelt." />;
   return (
     <>
       {items.map((partner, index) => (
@@ -144,6 +166,7 @@ function Partners({ items }: { items: any[] }) {
 }
 
 function Events({ items, onOpen }: { items: any[]; onOpen: (event: any) => void }) {
+  if (!items.length) return <EmptyState title="Keine Events" detail="Veröffentlichte Vereins- und Community-Events landen hier." />;
   return (
     <>
       {items.map((event) => (
@@ -185,11 +208,13 @@ function Benefits({ isMember, membership, items }: { isMember: boolean; membersh
           <Muted style={isMember ? styles.memberOk : styles.memberLocked}>{isMember ? "Freigeschaltet" : "Gesperrt"}</Muted>
         </Card>
       ))}
+      {!items.length ? <EmptyState title="Keine Vorteile gepflegt" detail="Mitgliedervorteile können im Adminbereich ergänzt werden." /> : null}
     </>
   );
 }
 
 function References({ items }: { items: any[] }) {
+  if (!items.length) return <EmptyState title="Keine Referenzen" detail="Erfolge, Platzierungen und Highlights erscheinen hier." />;
   return (
     <>
       {items.map((reference) => (
@@ -207,6 +232,7 @@ function References({ items }: { items: any[] }) {
 }
 
 function Profiles({ items, onOpen }: { items: any[]; onOpen: (profile: any) => void }) {
+  if (!items.length) return <EmptyState title="Keine Profile" detail="Öffentliche Profile werden hier angezeigt, sobald sie sichtbar freigegeben sind." />;
   return (
     <>
       {items.map((profile) => (

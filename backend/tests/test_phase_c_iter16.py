@@ -17,7 +17,9 @@ import uuid
 import requests
 import pytest
 
-BASE = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
+BASE = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
+if not BASE:
+    pytest.skip("REACT_APP_BACKEND_URL not configured; skipping live backend tests", allow_module_level=True)
 API = f"{BASE}/api"
 ADMIN_EMAIL = "admin@lionsquad.at"
 ADMIN_PW = "TLSAdmin2026!"

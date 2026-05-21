@@ -1,15 +1,7 @@
 import pathlib
 import sys
-import types
-from datetime import datetime, timezone
-from uuid import uuid4
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-
-models_stub = types.ModuleType("models")
-models_stub.new_id = lambda: str(uuid4())
-models_stub.now_utc = lambda: datetime.now(timezone.utc)
-sys.modules.setdefault("models", models_stub)
 
 from bracket_engine import generate_bracket, generate_single_elimination
 

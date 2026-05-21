@@ -993,7 +993,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
     <div className="space-y-5">
       {mode === "settings" && (
         <div className="text-xs text-white/50 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-          Erweiterte Bracket-Phasen sind nur fÃ¼r eigene Schemas oder Spezial-Brackets nÃ¶tig. Der Matchplan-Tab bleibt fÃ¼r Zeiten, Ergebnisse und operative Matcharbeit.
+          Erweiterte Bracket-Phasen sind nur für eigene Schemas oder Spezial-Brackets nötig. Der Matchplan-Tab bleibt für Zeiten, Ergebnisse und operative Matcharbeit.
         </div>
       )}
       {showSettings && (

@@ -236,7 +236,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
     address: event.address || "",
     postal_code: event.postal_code || "",
     city: event.city || "",
-    country: event.country || "Ã–sterreich",
+    country: event.country || "Österreich",
     show_map: event.show_map ?? true,
     organizer_name: event.organizer_name || "",
     organizer_url: event.organizer_url || "",

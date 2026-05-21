@@ -16,7 +16,8 @@ if not _BU:
     except Exception:
         pass
 BASE_URL = (_BU or "").rstrip("/")
-assert BASE_URL, "REACT_APP_BACKEND_URL not configured"
+if not BASE_URL:
+    pytest.skip("REACT_APP_BACKEND_URL not configured; skipping live backend tests", allow_module_level=True)
 ADMIN_EMAIL = "admin@lionsquad.at"
 ADMIN_PASSWORD = "TLSAdmin2026!"
 

@@ -2,6 +2,7 @@ import * as SecureStore from "expo-secure-store";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api, configureAuthBridge } from "../lib/api";
 import { isGuestUser, liveGuestUser } from "../live";
+import { unregisterPushToken } from "../notifications/PushService";
 import type { AuthResponse, User } from "../types";
 
 const ACCESS_KEY = "tls.mobile.accessToken";
@@ -164,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     try {
       if (!isGuestUser(user) && refreshToken) {
+        await unregisterPushToken().catch(() => {});
         await api.post("/auth/mobile/logout", { refresh_token: refreshToken });
       }
     } finally {

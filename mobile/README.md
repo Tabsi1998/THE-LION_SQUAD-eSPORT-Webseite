@@ -10,10 +10,10 @@ npm install
 npm run android
 ```
 
-In development, the default API target is `http://10.0.2.2:8000`, the Android emulator alias for the host machine. For a custom backend:
+In development, the default API target is `http://10.0.2.2:8001`, the Android emulator alias for the host machine. For a custom backend:
 
 ```powershell
-$env:EXPO_PUBLIC_API_BASE_URL="http://10.0.2.2:8000"
+$env:EXPO_PUBLIC_API_BASE_URL="http://10.0.2.2:8001"
 npm run android
 ```
 

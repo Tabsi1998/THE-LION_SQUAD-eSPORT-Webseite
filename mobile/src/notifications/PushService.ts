@@ -15,6 +15,7 @@
  */
 
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 import { api } from "../lib/api";
 
 // Graceful import – falls expo-notifications nicht installiert ist
@@ -23,6 +24,15 @@ import { api } from "../lib/api";
 let Notifications: any = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let Device: any = null;
+
+function getExpoProjectId() {
+  return (
+    Constants.expoConfig?.extra?.eas?.projectId ||
+    // easConfig is present in EAS builds, but older expo-constants typings do not expose it everywhere.
+    (Constants as { easConfig?: { projectId?: string } }).easConfig?.projectId ||
+    "3eaaebbc-883e-469c-a135-09f3459e2c46"
+  );
+}
 
 try {
   // @ts-ignore – optionales Package
@@ -91,7 +101,7 @@ export async function registerPushToken(): Promise<string | null> {
 
     // Expo Push Token holen
     const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: "lionsapp", // Muss mit app.json extra.eas.projectId übereinstimmen
+      projectId: getExpoProjectId(),
     });
 
     const token = tokenData.data;
@@ -119,7 +129,7 @@ export async function unregisterPushToken(): Promise<void> {
 
   try {
     const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: "lionsapp",
+      projectId: getExpoProjectId(),
     }).catch(() => null);
 
     if (tokenData?.data) {

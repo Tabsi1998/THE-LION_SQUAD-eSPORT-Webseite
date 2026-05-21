@@ -1,26 +1,42 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { EmptyState, LoadingState } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { formatDateTime } from "../../lib/format";
-import { useNotifications } from "../../notifications/NotificationContext";
 import type { MoreStackParamList } from "../../navigation/types";
+import { useNotifications } from "../../notifications/NotificationContext";
 import { colors } from "../../theme";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "Notifications">;
+type NotificationFilter = "all" | "unread";
 
 export function NotificationsScreen({ navigation }: Props) {
   const { items, load, markAllRead, openNotification } = useNotifications();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<NotificationFilter>("all");
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    await load();
-    setLoading(false);
+    try {
+      await load();
+    } finally {
+      setLoading(false);
+    }
+  }, [load]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
   }, [load]);
 
   useEffect(() => {
@@ -30,19 +46,46 @@ export function NotificationsScreen({ navigation }: Props) {
   }, [navigation, refresh]);
 
   const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
+  const visibleItems = useMemo(
+    () => (filter === "unread" ? items.filter((item) => !item.read) : items),
+    [filter, items]
+  );
+  const latestLabel = items[0]?.created_at ? formatDateTime(items[0].created_at) : "Keine Einträge";
 
   return (
     <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl tintColor={colors.cyan} refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         <View style={styles.header}>
           <Muted>LionsAPP</Muted>
           <Title>Benachrichtigungen</Title>
-          <Muted>{unread ? `${unread} ungelesen` : "Alles gelesen"}</Muted>
+          <Muted>{unread ? `${unread} ungelesen` : "Alles gelesen"} · {items.length} gesamt</Muted>
         </View>
+
+        <View style={styles.stats}>
+          <StatCard icon="notifications" label="Ungelesen" value={String(unread)} accent={colors.cyan} />
+          <StatCard icon="time" label="Letzte Meldung" value={latestLabel} accent={colors.gold} compact />
+        </View>
+
+        <View style={styles.filterRow}>
+          <FilterButton active={filter === "all"} label="Alle" onPress={() => setFilter("all")} />
+          <FilterButton active={filter === "unread"} label="Ungelesen" onPress={() => setFilter("unread")} />
+        </View>
+
         {items.length ? <Button label="Alle als gelesen markieren" onPress={markAllRead} variant="secondary" /> : null}
-        {loading ? <LoadingState /> : null}
-        {!loading && !items.length ? <EmptyState title="Keine Benachrichtigungen" detail="Erinnerungen, Mentions, Nachrichten und Match-Updates erscheinen hier." /> : null}
-        {items.map((item) => (
+        {loading ? <SkeletonList count={4} hasImage={false} /> : null}
+        {!loading && !items.length ? (
+          <EmptyState
+            title="Keine Benachrichtigungen"
+            detail="Erinnerungen, Mentions, Nachrichten und Match-Updates erscheinen hier."
+          />
+        ) : null}
+        {!loading && items.length > 0 && !visibleItems.length ? (
+          <EmptyState title="Alles gelesen" detail="Neue ungelesene Meldungen landen automatisch wieder hier." />
+        ) : null}
+        {visibleItems.map((item) => (
           <Pressable key={item.id} onPress={() => openNotification(item)} style={({ pressed }) => [pressed && styles.pressed]}>
             <Card style={[styles.note, !item.read && styles.unread]}>
               <View style={styles.noteHead}>
@@ -63,6 +106,45 @@ export function NotificationsScreen({ navigation }: Props) {
   );
 }
 
+function StatCard({
+  icon,
+  label,
+  value,
+  accent,
+  compact = false,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  accent: string;
+  compact?: boolean;
+}) {
+  return (
+    <Card style={styles.statCard}>
+      <View style={[styles.statIcon, { borderColor: accent }]}>
+        <Ionicons name={icon} color={accent} size={18} />
+      </View>
+      <Muted>{label}</Muted>
+      <Heading numberOfLines={compact ? 2 : 1} style={[styles.statValue, compact && styles.statValueCompact]}>
+        {value}
+      </Heading>
+    </Card>
+  );
+}
+
+function FilterButton({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.filterButton, active && styles.filterButtonActive, pressed && styles.pressed]}
+    >
+      <Body style={[styles.filterLabel, active && styles.filterLabelActive]}>{label}</Body>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   content: {
     gap: 12,
@@ -71,6 +153,57 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 4,
+  },
+  stats: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    gap: 6,
+    minHeight: 116,
+  },
+  statIcon: {
+    alignItems: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+  statValue: {
+    fontSize: 20,
+  },
+  statValueCompact: {
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  filterRow: {
+    backgroundColor: colors.cardAlt,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    padding: 4,
+  },
+  filterButton: {
+    alignItems: "center",
+    borderRadius: 6,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 38,
+  },
+  filterButtonActive: {
+    backgroundColor: colors.cyan,
+  },
+  filterLabel: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  filterLabelActive: {
+    color: colors.black,
   },
   note: {
     gap: 8,

@@ -149,6 +149,26 @@ Fuer reine Backend-Aenderungen kann der Frontend-Build uebersprungen werden:
 powershell -ExecutionPolicy Bypass -File .\scripts\quick-check.ps1 -SkipFrontendBuild
 ```
 
+Backend-Unit- und Smoke-Tests ohne laufendes Live-Backend:
+
+```powershell
+python -m pytest -m "not live"
+```
+
+Die komplette Backend-Sammlung ist lokal ebenfalls stabil; Live-Tests werden ohne
+`REACT_APP_BACKEND_URL` automatisch uebersprungen:
+
+```powershell
+python -m pytest backend\tests
+```
+
+Live-Tests gegen eine laufende Instanz:
+
+```powershell
+$env:REACT_APP_BACKEND_URL="https://lionsquad.at"
+python -m pytest -m live
+```
+
 Weitere Details:
 
 - [UPDATE.md](UPDATE.md) fuer den normalen Update-Ablauf.

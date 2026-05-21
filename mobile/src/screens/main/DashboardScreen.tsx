@@ -3,7 +3,7 @@ import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
-import { EmptyState, LoadingState } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -92,9 +92,10 @@ export function DashboardScreen({ navigation }: Props) {
       : [
           ...data.me.tournaments.map(tournamentToTimeline),
           ...data.me.events.map(eventToTimeline),
-        ];
+      ];
     return source.sort((a, b) => dateSort(a.date) - dateSort(b.date));
   }, [data, isGuest]);
+  const liveItems = useMemo(() => timeline.filter(isLiveTimelineItem).slice(0, 3), [timeline]);
 
   const openTournament = useCallback((id?: string | null) => {
     if (!id) return;
@@ -115,10 +116,25 @@ export function DashboardScreen({ navigation }: Props) {
     }
   }, [navigation, openTournament]);
 
+  const openTimelineItem = useCallback((item: TimelineItem) => {
+    if (item.kind === "tournament") {
+      openTournament(item.targetId);
+      return;
+    }
+    navigation.navigate("Tournaments", { screen: "EventDetail", params: { id: item.targetId || item.id } });
+  }, [navigation, openTournament]);
+
   if (loading) {
     return (
-      <Screen>
-        <LoadingState label="Dashboard wird geladen ..." />
+      <Screen padded={false}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.header}>
+            <Muted>THE LION SQUAD</Muted>
+            <Title>LionsAPP</Title>
+            <Muted>Dein Vereins- und eSports-Hub wird vorbereitet.</Muted>
+          </View>
+          <SkeletonList count={4} />
+        </ScrollView>
       </Screen>
     );
   }
@@ -129,11 +145,22 @@ export function DashboardScreen({ navigation }: Props) {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
       >
-        <View style={styles.header}>
-          <Muted>{isGuest ? "THE LION SQUAD" : "Willkommen zurück"}</Muted>
-          <Title>{isGuest ? "Live Home" : displayName(user)}</Title>
-          <Body>{isGuest ? "Aktuelle Turniere, Events und News aus der Website." : "Deine nächsten Termine, offenen Aktionen und Vereins-News."}</Body>
-        </View>
+        <Card style={styles.heroCard}>
+          <View style={styles.heroTop}>
+            <View style={styles.heroMark}>
+              <Ionicons name={isGuest ? "radio-outline" : "shield-checkmark-outline"} color={colors.black} size={22} />
+            </View>
+            <View style={styles.flex}>
+              <Muted style={styles.heroEyebrow}>{isGuest ? "THE LION SQUAD" : "Willkommen zurück"}</Muted>
+              <Title>{isGuest ? "Live Home" : displayName(user)}</Title>
+            </View>
+          </View>
+          <Body style={styles.heroBody}>{isGuest ? "Aktuelle Turniere, Events und News aus der Website." : "Deine nächsten Termine, offenen Aktionen und Vereins-News."}</Body>
+          <View style={styles.heroBadges}>
+            <Badge label={isGuest ? "Gastmodus" : user?.is_club_member ? "Vereinsmitglied" : "Community"} tone={isGuest || !user?.is_club_member ? "cyan" : "gold"} />
+            {!isGuest && user?.is_tournament_staff ? <Badge label="Staff" /> : null}
+          </View>
+        </Card>
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
@@ -143,10 +170,27 @@ export function DashboardScreen({ navigation }: Props) {
           <Stat label="News" value={String(data.stats.news)} />
         </View>
 
+        <Section title="Schnellzugriff">
+          <View style={styles.quickGrid}>
+            <QuickAction icon="chatbubbles-outline" label="Nachrichten" onPress={() => navigation.navigate("More", { screen: "DirectMessages" })} />
+            <QuickAction icon="notifications-outline" label="Alerts" onPress={() => navigation.navigate("More", { screen: "Notifications" })} />
+            <QuickAction icon="flash-outline" label="Fast Laps" onPress={() => navigation.navigate("More", { screen: "FastLapList" })} />
+            <QuickAction icon="information-circle-outline" label="Verein" onPress={() => navigation.navigate("More", { screen: "InfoCenter", params: { section: "benefits" } })} />
+          </View>
+        </Section>
+
+        {liveItems.length ? (
+          <Section title="Heute und Live">
+            {liveItems.map((item) => (
+              <TimelineCard key={`live-${item.kind}-${item.id}`} item={item} onPress={() => openTimelineItem(item)} />
+            ))}
+          </Section>
+        ) : null}
+
         <Section title={isGuest ? "Aktuell geplant" : "Meine nächsten Termine"} actionLabel="Alle Turniere" onAction={() => navigation.navigate("Tournaments")}>
           {timeline.length ? (
             timeline.slice(0, 6).map((item) => (
-              <TimelineCard key={`${item.kind}-${item.id}`} item={item} onPress={() => item.kind === "tournament" ? openTournament(item.targetId) : navigation.navigate("Tournaments", { screen: "EventDetail", params: { id: item.targetId || item.id } })} />
+              <TimelineCard key={`${item.kind}-${item.id}`} item={item} onPress={() => openTimelineItem(item)} />
             ))
           ) : (
             <EmptyState title={isGuest ? "Noch keine Termine" : "Keine eigenen Termine"} detail={isGuest ? "Sobald Website-Termine veröffentlicht sind, stehen sie hier." : "Deine Turnier- und Event-Anmeldungen erscheinen hier automatisch."} />
@@ -204,8 +248,8 @@ export function DashboardScreen({ navigation }: Props) {
               </View>
               <View style={styles.flex}>
                 <Body style={styles.rowTitle}>Season {new Date().getFullYear()}</Body>
-                <Muted>Sammle Punkte durch Turniere, Events & Achievements.</Muted>
-                <Muted style={styles.seasonHint}>Rangliste ansehen →</Muted>
+                <Muted>Sammle Punkte durch Turniere, Events und Achievements.</Muted>
+                <Muted style={styles.seasonHint}>Rangliste ansehen</Muted>
               </View>
             </Card>
           </Pressable>
@@ -264,6 +308,25 @@ function dateSort(value?: string | null) {
   if (!value) return Number.MAX_SAFE_INTEGER;
   const date = new Date(value).getTime();
   return Number.isNaN(date) ? Number.MAX_SAFE_INTEGER : date;
+}
+
+function isLiveTimelineItem(item: TimelineItem) {
+  const status = `${item.status || ""} ${item.phaseLabel || ""}`.toLowerCase();
+  if (status.includes("live") || status.includes("check") || status.includes("running") || status.includes("progress")) {
+    return true;
+  }
+  if (status.includes("registration") || status.includes("anmeldung")) {
+    return true;
+  }
+  return isToday(item.date);
+}
+
+function isToday(value?: string | null) {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const today = new Date();
+  return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
 }
 
 function Section({ title, actionLabel, onAction, children }: { title: string; actionLabel?: string; onAction?: () => void; children: React.ReactNode }) {
@@ -336,6 +399,15 @@ function Stat({ label, value, tone = "cyan" }: { label: string; value: string; t
   );
 }
 
+function QuickAction({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}>
+      <Ionicons name={icon} color={colors.cyan} size={20} />
+      <Muted style={styles.quickLabel}>{label}</Muted>
+    </Pressable>
+  );
+}
+
 function Badge({ label, tone = "cyan" }: { label: string; tone?: "cyan" | "gold" }) {
   return (
     <View style={[styles.badge, tone === "gold" && styles.badgeGold]}>
@@ -360,12 +432,66 @@ const styles = StyleSheet.create({
   header: {
     gap: 7,
   },
+  heroCard: {
+    backgroundColor: colors.card,
+    borderColor: "rgba(41, 182, 232, 0.32)",
+    gap: 12,
+    padding: 16,
+  },
+  heroTop: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  heroMark: {
+    alignItems: "center",
+    backgroundColor: colors.cyan,
+    borderRadius: 10,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
+  },
+  heroEyebrow: {
+    color: colors.cyan,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  heroBody: {
+    color: "rgba(255,255,255,0.86)",
+  },
+  heroBadges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   error: {
     color: colors.live,
   },
   grid: {
     flexDirection: "row",
     gap: 10,
+  },
+  quickGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  quickAction: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: "47%",
+    flexGrow: 1,
+    gap: 6,
+    justifyContent: "center",
+    minHeight: 74,
+    padding: 10,
+  },
+  quickLabel: {
+    color: colors.white,
+    fontWeight: "900",
   },
   stat: {
     flex: 1,

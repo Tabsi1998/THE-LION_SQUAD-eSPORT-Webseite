@@ -2223,7 +2223,7 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
     tournament = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     if not _can_create_initial_legacy_preview(tournament):
-        raise HTTPException(status_code=400, detail="FÃ¼r dieses Format gibt es keinen automatischen Format-Bracket-Generator.")
+        raise HTTPException(status_code=400, detail="Für dieses Format gibt es keinen automatischen Format-Bracket-Generator.")
     if tournament.get("status") in ("live", "paused", "completed", "results_published", "archived") and not force:
         raise HTTPException(status_code=409, detail="Laufende oder beendete Turniere brauchen force=true.")
 

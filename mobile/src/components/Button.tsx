@@ -33,7 +33,7 @@ export function Button({
 const styles = StyleSheet.create({
   button: {
     minHeight: 48,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,

@@ -25,9 +25,9 @@ type ModuleItem = {
 const modules: ModuleItem[] = [
   {
     title: "Season-Pass",
-    detail: "Sammle das ganze Jahr Punkte durch Turniere, Events & Achievements. Der Beste gewinnt!",
+    detail: "Sammle das ganze Jahr Punkte durch Turniere, Events und Achievements.",
     screen: "SeasonPass",
-    badge: "🏆 Neu",
+    badge: "Neu",
     icon: "trophy-outline",
     badgeTone: "gold",
   },
@@ -93,6 +93,14 @@ const modules: ModuleItem[] = [
     section: "profiles",
     badge: "Social",
     icon: "people-outline",
+  },
+  {
+    title: "Referenzen",
+    detail: "Erfolge, Highlights und Vereinsmomente gesammelt ansehen.",
+    section: "references",
+    badge: "Archiv",
+    icon: "medal-outline",
+    badgeTone: "gold",
   },
 ];
 

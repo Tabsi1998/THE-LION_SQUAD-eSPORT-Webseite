@@ -3,11 +3,44 @@ import os
 import pytest
 import requests
 
+LIVE_TEST_FILES = {
+    "test_iter20_bug_hunt.py",
+    "test_iter20_bugfixes.py",
+    "test_iter20_edge_cases.py",
+    "test_phase2_3.py",
+    "test_phase3.py",
+    "test_phase3_news_events_gallery.py",
+    "test_phase4_documents.py",
+    "test_phase4_features.py",
+    "test_phase5_badges.py",
+    "test_phase567.py",
+    "test_phase_8_9_10.py",
+    "test_phase_a_quickwins.py",
+    "test_phase_b_v4_achievements.py",
+    "test_phase_c_iter16.py",
+    "test_phase_d_v3.py",
+    "test_phase_ef_iter17.py",
+    "test_phase_fg_iter18.py",
+    "test_phase_membership.py",
+    "test_phase_penalty_iter19.py",
+    "test_tls_arena_api.py",
+}
+
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
 ADMIN_EMAIL = "admin@lionsquad.at"
 ADMIN_PASSWORD = "TLSAdmin2026!"
 DEMO_EMAIL = "leon_king@demo.lionsquad.at"
 DEMO_PASSWORD = "demo123"
+
+
+def pytest_collection_modifyitems(config, items):
+    live_enabled = bool(os.environ.get("REACT_APP_BACKEND_URL"))
+    skip_live = pytest.mark.skip(reason="live backend test; set REACT_APP_BACKEND_URL to run")
+    for item in items:
+        if item.path.name in LIVE_TEST_FILES:
+            item.add_marker(pytest.mark.live)
+            if not live_enabled:
+                item.add_marker(skip_live)
 
 
 @pytest.fixture(scope="session")

@@ -1,16 +1,11 @@
 import asyncio
 import sys
-import types
 from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-database_stub = types.ModuleType("database")
-database_stub.get_db = lambda: None
-sys.modules.setdefault("database", database_stub)
 
 import services.tournament_permissions as perms
 
