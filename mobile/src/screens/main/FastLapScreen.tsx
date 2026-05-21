@@ -3,6 +3,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
+import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
@@ -136,23 +137,16 @@ function FeaturedChallengeCard({ item, onPress }: { item: F1Challenge; onPress: 
 
 function ChallengeCard({ item, onPress }: { item: F1Challenge; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
-      <Card style={styles.card}>
-        <MediaImage
-          uri={item.banner_url}
-          style={styles.image}
-          fallback={<Ionicons name="speedometer-outline" color={colors.gold} size={24} />}
-        />
-        <View style={styles.text}>
-          <View style={styles.top}>
-            <Body style={styles.title}>{item.title}</Body>
-            <StatusBadge phase={item.public_phase} status={item.status} />
-          </View>
-          <Muted>{formatDate(item.start_date)} · {item.track_count || 0} Strecken · {item.participant_count || 0} Fahrer</Muted>
-          <MetaPills item={item} />
-        </View>
-      </Card>
-    </Pressable>
+    <ContentCard
+      kind="fastlap"
+      title={item.title}
+      image={item.banner_url}
+      date={item.start_date}
+      phase={item.public_phase}
+      status={item.status}
+      detail={challengeDetail(item)}
+      onPress={onPress}
+    />
   );
 }
 
@@ -164,6 +158,16 @@ function MetaPills({ item }: { item: F1Challenge }) {
       {values.map((value) => <Pill key={value} label={value} />)}
     </View>
   );
+}
+
+function challengeDetail(item: F1Challenge) {
+  return [
+    `${item.track_count || 0} Strecken`,
+    `${item.participant_count || 0} Fahrer`,
+    item.vehicle,
+    item.platform,
+    item.weather,
+  ].filter(Boolean).join(" · ");
 }
 
 function Stat({ label, value, tone = "cyan" }: { label: string; value: number; tone?: "cyan" | "gold" }) {
@@ -255,29 +259,10 @@ const styles = StyleSheet.create({
   featuredTitle: {
     flex: 1,
   },
-  card: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-  },
-  image: {
-    borderRadius: 8,
-    height: 88,
-    width: 92,
-  },
-  text: {
-    flex: 1,
-    gap: 6,
-    minWidth: 0,
-  },
   top: {
     alignItems: "flex-start",
     flexDirection: "row",
     gap: 8,
-  },
-  title: {
-    flex: 1,
-    fontWeight: "900",
   },
   metaRow: {
     flexDirection: "row",
