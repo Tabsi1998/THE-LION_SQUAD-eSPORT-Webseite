@@ -1,6 +1,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { logMobileError } from "../lib/mobileLog";
 import { colors } from "../theme";
 
 type State = {
@@ -16,6 +17,7 @@ export class AppErrorBoundary extends React.Component<{ children: React.ReactNod
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error("LionsAPP render crash", error, info.componentStack);
+    logMobileError(error, "AppErrorBoundary", { componentStack: info.componentStack });
   }
 
   render() {

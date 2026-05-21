@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0-beta.8 - 2026-05-21
+
+- Mobile: Chat-Composer auf `KeyboardStickyView` umgestellt, damit das Eingabefeld an der echten Tastaturkante bleibt statt unter der Tastatur zu verschwinden.
+- Mobile/Backend/Admin: App-Fehler, Console-Warnungen und Render-Crashes werden ans Backend gesendet und im Adminbereich unter App-Logs mit Status und Admin-Notiz sichtbar.
+
 ## 1.0.0-beta.7 - 2026-05-21
 
 - Mobile/CI: Android-Release-Builds bereiten `google-services.json` aus GitHub Secrets vor und brechen ohne Firebase-Konfiguration klar ab, damit keine APK ohne funktionierenden FCM/Expo-Push veroeffentlicht wird.

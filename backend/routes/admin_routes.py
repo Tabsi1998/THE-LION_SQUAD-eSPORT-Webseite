@@ -1,11 +1,18 @@
 """Admin-only routes: dashboard KPIs, audit logs, notifications."""
 import os
 import pathlib
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from database import get_db
 from auth import require_admin, get_current_user
+from models import now_utc
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+class MobileLogPatch(BaseModel):
+    status: str | None = Field(default=None, max_length=20)
+    admin_note: str | None = Field(default=None, max_length=2000)
 
 
 @router.get("/dashboard")
@@ -32,6 +39,55 @@ async def audit_logs(limit: int = 100, me: dict = Depends(require_admin())):
     safe_limit = max(1, min(int(limit or 100), 500))
     logs = await db.audit_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(safe_limit)
     return logs
+
+
+@router.get("/mobile-logs")
+async def mobile_client_logs(
+    limit: int = Query(default=100, ge=1, le=500),
+    level: str = "",
+    status: str = "",
+    user_id: str = "",
+    q: str = "",
+    me: dict = Depends(require_admin()),
+):
+    db = get_db()
+    query = {}
+    if level:
+        query["level"] = level.strip().lower()
+    if status:
+        query["status"] = status.strip().lower()
+    if user_id:
+        query["user_id"] = user_id.strip()
+    search = q.strip()
+    if search:
+        query["$or"] = [
+            {"message": {"$regex": search, "$options": "i"}},
+            {"source": {"$regex": search, "$options": "i"}},
+            {"screen": {"$regex": search, "$options": "i"}},
+            {"username": {"$regex": search, "$options": "i"}},
+            {"display_name": {"$regex": search, "$options": "i"}},
+        ]
+    return await db.mobile_client_logs.find(query, {"_id": 0}).sort("received_at", -1).to_list(limit)
+
+
+@router.patch("/mobile-logs/{log_id}")
+async def update_mobile_client_log(log_id: str, body: MobileLogPatch, me: dict = Depends(require_admin())):
+    db = get_db()
+    update = {"updated_at": now_utc().isoformat()}
+    if body.status is not None:
+        status = body.status.strip().lower()
+        if status not in {"open", "info", "resolved", "ignored"}:
+            raise HTTPException(status_code=400, detail="Ungueltiger Status")
+        update["status"] = status
+        if status == "resolved":
+            update["resolved_at"] = now_utc().isoformat()
+            update["resolved_by"] = me["id"]
+    if body.admin_note is not None:
+        update["admin_note"] = body.admin_note.strip()[:2000]
+    result = await db.mobile_client_logs.update_one({"id": log_id}, {"$set": update})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Log nicht gefunden")
+    return await db.mobile_client_logs.find_one({"id": log_id}, {"_id": 0})
 
 
 def _upload_status() -> dict:

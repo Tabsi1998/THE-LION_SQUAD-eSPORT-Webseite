@@ -74,6 +74,7 @@ const AdminNewsPage = lazy(() => import("@/pages/admin/AdminNewsPage"));
 const AdminSettingsPage = lazy(() => import("@/pages/admin/AdminSettingsPage"));
 const AdminSeasonsPage = lazy(() => import("@/pages/admin/AdminSeasonsPage"));
 const AdminAuditPage = lazy(() => import("@/pages/admin/AdminAuditPage"));
+const AdminMobileLogsPage = lazy(() => import("@/pages/admin/AdminMobileLogsPage"));
 const AdminWidgetsPage = lazy(() => import("@/pages/admin/AdminWidgetsPage"));
 const AdminMembersPage = lazy(() => import("@/pages/admin/AdminMembersPage"));
 const AdminClubMemberProfilesPage = lazy(() => import("@/pages/admin/AdminClubMemberProfilesPage"));
@@ -215,6 +216,7 @@ function App() {
           <Route path="/admin/settings" element={<ProtectedRoute requireAdmin><AdminSettingsPage /></ProtectedRoute>} />
           <Route path="/admin/seasons" element={<ProtectedRoute requireAdmin><AdminSeasonsPage /></ProtectedRoute>} />
           <Route path="/admin/audit" element={<ProtectedRoute requireAdmin><AdminAuditPage /></ProtectedRoute>} />
+          <Route path="/admin/mobile-logs" element={<ProtectedRoute requireAdmin><AdminMobileLogsPage /></ProtectedRoute>} />
           <Route path="/admin/widgets" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
 
           <Route path="/seasons/current" element={<CurrentSeasonRedirect />} />

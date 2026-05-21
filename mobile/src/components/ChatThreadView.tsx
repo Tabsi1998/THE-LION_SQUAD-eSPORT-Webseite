@@ -10,7 +10,8 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { KeyboardStickyView } from "react-native-keyboard-controller";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, errorMessage } from "../lib/api";
 import { formatDate } from "../lib/format";
 import type { ContentTarget } from "../lib/contentLinks";
@@ -50,9 +51,12 @@ export function ChatThreadView({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [allowed, setAllowed] = useState(true);
+  const [composerHeight, setComposerHeight] = useState(88);
+  const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
   const didInitialScroll = useRef(false);
+  const composerBottomInset = Math.max(insets.bottom, Platform.OS === "android" ? 8 : 10);
 
   const scrollToLatest = useCallback((animated = false) => {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated }));
@@ -83,15 +87,21 @@ export function ChatThreadView({
   }, [load]);
 
   useEffect(() => {
-    if (Platform.OS !== "android") return undefined;
-    const showSub = Keyboard.addListener("keyboardDidShow", () => {
+    const onShow = () => {
       if (nearBottomRef.current) scrollToLatest(true);
-    });
-    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+      setTimeout(() => {
+        if (nearBottomRef.current) scrollToLatest(true);
+      }, 120);
+    };
+    const onHide = () => {
       if (nearBottomRef.current) scrollToLatest(false);
-    });
+    };
+    const showSub = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", onShow);
+    const changeSub = Platform.OS === "ios" ? Keyboard.addListener("keyboardWillChangeFrame", onShow) : undefined;
+    const hideSub = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide", onHide);
     return () => {
       showSub.remove();
+      changeSub?.remove();
       hideSub.remove();
     };
   }, [scrollToLatest]);
@@ -144,14 +154,11 @@ export function ChatThreadView({
   if (loading) return <SkeletonList count={5} hasImage={false} />;
 
   return (
-    <KeyboardAvoidingView
-      behavior="padding"
-      style={styles.wrap}
-    >
+    <View style={styles.wrap}>
       <ScrollView
         ref={scrollRef}
         style={styles.scroller}
-        contentContainerStyle={styles.messages}
+        contentContainerStyle={[styles.messages, { paddingBottom: composerHeight + 18 }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
         onContentSizeChange={() => {
@@ -170,42 +177,49 @@ export function ChatThreadView({
           />
         )) : <EmptyState title={emptyTitle} detail={allowed ? "Schreibe die erste Nachricht." : lockedDetail || error} />}
       </ScrollView>
-      {mentionCandidates.length ? (
-        <View style={styles.suggestions}>
-          {mentionCandidates.map((candidate) => (
-            <Pressable key={candidate.id} onPress={() => {
-              if (!candidate.username) return;
-              setText((current) => current.replace(/(^|\s)@([A-Za-z0-9_.-]{1,32})$/, `$1@${candidate.username} `));
-              setMentionCandidates([]);
-            }} style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]}>
-              <Body style={styles.author}>{candidate.display_name || candidate.username}</Body>
-              {candidate.username ? <Muted>@{candidate.username}</Muted> : null}
-            </Pressable>
-          ))}
+      <KeyboardStickyView
+        offset={{ closed: 0, opened: 0 }}
+        onLayout={(event) => setComposerHeight(Math.ceil(event.nativeEvent.layout.height))}
+        style={styles.composerDock}
+      >
+        {mentionCandidates.length ? (
+          <View style={styles.suggestions}>
+            {mentionCandidates.map((candidate) => (
+              <Pressable key={candidate.id} onPress={() => {
+                if (!candidate.username) return;
+                setText((current) => current.replace(/(^|\s)@([A-Za-z0-9_.-]{1,32})$/, `$1@${candidate.username} `));
+                setMentionCandidates([]);
+              }} style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]}>
+                <Body style={styles.author}>{candidate.display_name || candidate.username}</Body>
+                {candidate.username ? <Muted>@{candidate.username}</Muted> : null}
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        <View style={[styles.composer, { paddingBottom: composerBottomInset }]}>
+          <TextInput
+            editable={allowed && !sending}
+            multiline
+            onChangeText={setText}
+            placeholder={allowed ? "Nachricht schreiben ..." : "Chat nicht verfügbar"}
+            placeholderTextColor={colors.muted}
+            style={styles.input}
+            onFocus={() => {
+              nearBottomRef.current = true;
+              setTimeout(() => scrollToLatest(true), 80);
+              setTimeout(() => scrollToLatest(true), 260);
+            }}
+            onSubmitEditing={() => {
+              if (!text.includes("\n")) Keyboard.dismiss();
+            }}
+            value={text}
+          />
+          <Pressable disabled={!text.trim() || sending || !allowed} onPress={send} style={[styles.send, (!text.trim() || sending || !allowed) && styles.disabled]}>
+            <Body style={styles.sendText}>Senden</Body>
+          </Pressable>
         </View>
-      ) : null}
-      <View style={styles.composer}>
-        <TextInput
-          editable={allowed && !sending}
-          multiline
-          onChangeText={setText}
-          placeholder={allowed ? "Nachricht schreiben ..." : "Chat nicht verfügbar"}
-          placeholderTextColor={colors.muted}
-          style={styles.input}
-          onFocus={() => {
-            nearBottomRef.current = true;
-            setTimeout(() => scrollToLatest(true), 80);
-          }}
-          onSubmitEditing={() => {
-            if (!text.includes("\n")) Keyboard.dismiss();
-          }}
-          value={text}
-        />
-        <Pressable disabled={!text.trim() || sending || !allowed} onPress={send} style={[styles.send, (!text.trim() || sending || !allowed) && styles.disabled]}>
-          <Body style={styles.sendText}>Senden</Body>
-        </Pressable>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardStickyView>
+    </View>
   );
 }
 
@@ -252,6 +266,9 @@ const styles = StyleSheet.create({
     padding: 18,
     paddingBottom: 14,
   },
+  composerDock: {
+    backgroundColor: colors.black,
+  },
   bubble: {
     alignSelf: "flex-start",
     backgroundColor: colors.surface,
@@ -292,7 +309,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     padding: 12,
-    paddingBottom: Platform.OS === "android" ? 18 : 12,
   },
   suggestions: {
     backgroundColor: colors.surface,

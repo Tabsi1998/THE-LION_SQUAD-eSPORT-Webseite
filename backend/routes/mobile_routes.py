@@ -1,14 +1,16 @@
 """Mobile app aggregation routes."""
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from auth import get_current_user, get_optional_user
 from database import get_db
-from models import now_utc
+from models import new_id, now_utc
 from services.public_phase import derive_public_phase
 from services.user_notifications import create_user_notification
 from services.visibility import user_can_see
@@ -27,6 +29,45 @@ class MobilePushTokenCreate(BaseModel):
     token: str = Field(min_length=20, max_length=300)
     platform: str | None = Field(default=None, max_length=40)
     device_name: str | None = Field(default=None, max_length=120)
+
+
+class MobileClientLogCreate(BaseModel):
+    level: str = Field(default="info", max_length=20)
+    message: str = Field(min_length=1, max_length=2000)
+    source: str | None = Field(default=None, max_length=120)
+    screen: str | None = Field(default=None, max_length=120)
+    error_name: str | None = Field(default=None, max_length=160)
+    stack: str | None = Field(default=None, max_length=8000)
+    context: dict[str, Any] | None = None
+    platform: str | None = Field(default=None, max_length=40)
+    device_name: str | None = Field(default=None, max_length=160)
+    os_version: str | None = Field(default=None, max_length=80)
+    app_version: str | None = Field(default=None, max_length=80)
+    build_version: str | None = Field(default=None, max_length=80)
+    session_id: str | None = Field(default=None, max_length=120)
+    created_at: datetime | None = None
+
+
+LOG_LEVELS = {"debug", "info", "warn", "warning", "error", "fatal"}
+
+
+def _clip_text(value: str | None, limit: int) -> str | None:
+    if value is None:
+        return None
+    text = str(value)
+    return text if len(text) <= limit else text[:limit]
+
+
+def _safe_log_context(value: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not value:
+        return None
+    try:
+        encoded = json.dumps(value, default=str, ensure_ascii=False)
+    except TypeError:
+        return {"raw": _clip_text(str(value), 8000)}
+    if len(encoded) <= 8000:
+        return value
+    return {"truncated": True, "raw": encoded[:8000]}
 
 
 def _parse_dt(value):
@@ -725,6 +766,40 @@ async def send_mobile_test_notification(user: dict = Depends(get_current_user)):
         meta={"test": True},
     )
     return {"ok": bool(notification), "notification": notification}
+
+
+@router.post("/client-logs")
+async def create_mobile_client_log(body: MobileClientLogCreate, user: dict = Depends(get_current_user)):
+    db = get_db()
+    level = (body.level or "info").strip().lower()
+    if level == "warning":
+        level = "warn"
+    if level not in LOG_LEVELS:
+        level = "info"
+    row = {
+        "id": new_id(),
+        "level": level,
+        "status": "open" if level in {"warn", "error", "fatal"} else "info",
+        "message": _clip_text(body.message, 2000),
+        "source": _clip_text(body.source, 120),
+        "screen": _clip_text(body.screen, 120),
+        "error_name": _clip_text(body.error_name, 160),
+        "stack": _clip_text(body.stack, 8000),
+        "context": _safe_log_context(body.context),
+        "platform": _clip_text(body.platform, 40),
+        "device_name": _clip_text(body.device_name, 160),
+        "os_version": _clip_text(body.os_version, 80),
+        "app_version": _clip_text(body.app_version, 80),
+        "build_version": _clip_text(body.build_version, 80),
+        "session_id": _clip_text(body.session_id, 120),
+        "created_at": (_parse_dt(body.created_at) or now_utc()).isoformat(),
+        "received_at": now_utc().isoformat(),
+        "user_id": user["id"],
+        "username": user.get("username"),
+        "display_name": user.get("display_name"),
+    }
+    await db.mobile_client_logs.insert_one(row)
+    return {"ok": True, "id": row["id"]}
 
 
 @router.get("/push-status")
