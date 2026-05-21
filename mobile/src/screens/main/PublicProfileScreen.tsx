@@ -12,6 +12,7 @@ import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatStatus } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
+import type { LiveStream } from "../../types";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "PublicProfile">;
 type TabKey = "overview" | "achievements" | "tournaments" | "fastlaps" | "teams";
@@ -30,6 +31,7 @@ type PublicProfilePayload = {
   city?: string | null;
   discord_name?: string | null;
   twitch_handle?: string | null;
+  show_twitch_embed?: boolean;
   youtube_handle?: string | null;
   instagram_handle?: string | null;
   x_handle?: string | null;
@@ -73,6 +75,7 @@ const tabs: Array<{ key: TabKey; label: string }> = [
 export function PublicProfileScreen({ navigation, route }: Props) {
   const [profile, setProfile] = useState<PublicProfilePayload | null>(null);
   const [achievements, setAchievements] = useState<AchievementPayload>({ awards: [], groups: [] });
+  const [liveStreams, setLiveStreams] = useState<LiveStream[]>([]);
   const [tab, setTab] = useState<TabKey>("overview");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,6 +86,7 @@ export function PublicProfileScreen({ navigation, route }: Props) {
     try {
       const { data } = await api.get<PublicProfilePayload>(`/users/public/${route.params.username}`);
       setProfile(data || null);
+      api.get<LiveStream[]>("/streams/live").then(({ data: streams }) => setLiveStreams(Array.isArray(streams) ? streams : [])).catch(() => setLiveStreams([]));
       if (data?.id) {
         const achievementResult = await api.get<AchievementPayload>(`/achievements/user/${data.id}`).catch(() => ({ data: { awards: [], groups: [] } }));
         setAchievements(achievementResult.data || { awards: [], groups: [] });
@@ -104,6 +108,15 @@ export function PublicProfileScreen({ navigation, route }: Props) {
 
   const socialLinks = useMemo(() => publicSocialLinks(profile), [profile]);
   const gamingIds = useMemo(() => publicGamingIds(profile), [profile]);
+  const liveStream = useMemo(() => {
+    const twitch = cleanHandle(profile?.twitch_handle).toLowerCase();
+    if (!profile || !twitch) return null;
+    return liveStreams.find((stream) => (
+      cleanHandle(stream.twitch_login).toLowerCase() === twitch ||
+      stream.user_id === profile.id ||
+      stream.username === profile.username
+    )) || null;
+  }, [liveStreams, profile]);
   const stats = profile?.stats || {};
   const display = profile?.display_name || profile?.username || "Spieler";
 
@@ -197,6 +210,10 @@ export function PublicProfileScreen({ navigation, route }: Props) {
               ]}
             />
 
+            {profile.show_twitch_embed && profile.twitch_handle ? (
+              <ProfileStreamCard profile={profile} stream={liveStream} />
+            ) : null}
+
             {socialLinks.length || gamingIds.length ? (
               <Card style={styles.card}>
                 <Heading>Socials & IDs</Heading>
@@ -234,6 +251,32 @@ export function PublicProfileScreen({ navigation, route }: Props) {
         {tab === "teams" ? <TeamTab items={profile.teams || []} onOpen={(item) => navigation.getParent()?.navigate("Teams", { screen: "TeamDetail", params: { id: item.id } })} /> : null}
       </ScrollView>
     </Screen>
+  );
+}
+
+function ProfileStreamCard({ profile, stream }: { profile: PublicProfilePayload; stream: LiveStream | null }) {
+  const channel = cleanHandle(profile.twitch_handle);
+  const url = stream?.stream_url || (channel ? `https://www.twitch.tv/${channel}` : "");
+  if (!channel) return null;
+  return (
+    <Pressable onPress={() => url ? Linking.openURL(url).catch(() => {}) : undefined} style={({ pressed }) => [pressed && styles.pressed]}>
+      <Card style={[styles.card, styles.streamProfileCard]}>
+        <View style={styles.cardTop}>
+          <View style={styles.streamIcon}>
+            <Ionicons name="radio-outline" color={stream ? colors.live : colors.cyan} size={20} />
+          </View>
+          <View style={styles.flex}>
+            <Muted style={stream ? styles.liveText : styles.textCyan}>{stream ? "JETZT LIVE" : "TWITCH"}</Muted>
+            <Heading>{channel}</Heading>
+            <Muted numberOfLines={2}>{stream?.title || "Stream auf Twitch öffnen"}</Muted>
+            {stream?.game_name || stream?.viewer_count ? (
+              <Muted>{[stream.game_name, stream.viewer_count ? `${stream.viewer_count} Zuschauer` : ""].filter(Boolean).join(" · ")}</Muted>
+            ) : null}
+          </View>
+          <Ionicons name="open-outline" color={colors.muted} size={18} />
+        </View>
+      </Card>
+    </Pressable>
   );
 }
 
@@ -676,6 +719,23 @@ const styles = StyleSheet.create({
   },
   textSuccess: {
     color: colors.success,
+  },
+  streamProfileCard: {
+    borderColor: "rgba(145,70,255,0.35)",
+  },
+  streamIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(145,70,255,0.14)",
+    borderColor: "rgba(145,70,255,0.38)",
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  liveText: {
+    color: colors.live,
+    fontWeight: "900",
   },
   pressed: {
     opacity: 0.72,

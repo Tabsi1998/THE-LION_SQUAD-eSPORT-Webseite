@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-beta.7 - 2026-05-21
+
+- Mobile/CI: Android-Release-Builds bereiten `google-services.json` aus GitHub Secrets vor und brechen ohne Firebase-Konfiguration klar ab, damit keine APK ohne funktionierenden FCM/Expo-Push veroeffentlicht wird.
+- Mobile/Backend: Push-Diagnose in der Benachrichtigungsseite ergaenzt und Expo-Tickets/Receipts im Backend gespeichert, damit Permission-, Token-, Backend- und FCM-Fehler sichtbar werden.
+- Mobile: Live-Streams von Vereinsmitgliedern erscheinen jetzt im Dashboard und auf oeffentlichen Profilen als Twitch-Karte, wenn ein Profil die Twitch-Einbettung erlaubt.
+
 ## 1.0.0-beta.6 - 2026-05-21
 
 - Mobile: Chat-Tastaturanpassung auf `react-native-keyboard-controller` umgestellt, damit der Composer dynamisch an der echten Android-/iOS-Tastaturhoehe bleibt statt mit geratenen Offsets zu arbeiten.

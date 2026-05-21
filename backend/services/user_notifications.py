@@ -53,7 +53,13 @@ async def create_user_notification(
     doc.pop("_id", None)
     try:
         from services.push_notifications import send_mobile_push_for_notification
-        await send_mobile_push_for_notification(doc)
+        push_sent_count = await send_mobile_push_for_notification(doc)
+        doc["push_sent_count"] = push_sent_count
+        doc["push_sent_at"] = now_utc().isoformat()
+        await db.notifications.update_one(
+            {"id": doc["id"]},
+            {"$set": {"push_sent_count": push_sent_count, "push_sent_at": doc["push_sent_at"]}},
+        )
     except Exception:
         pass
     return doc

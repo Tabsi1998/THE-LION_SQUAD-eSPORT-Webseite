@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
@@ -14,7 +14,7 @@ import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import type { MainTabParamList } from "../../navigation/types";
 import { colors } from "../../theme";
-import type { ClubEvent, DashboardAction, MobileDashboardData, NewsPost, Tournament } from "../../types";
+import type { ClubEvent, DashboardAction, LiveStream, MobileDashboardData, NewsPost, Tournament } from "../../types";
 
 type Props = BottomTabScreenProps<MainTabParamList, "Dashboard">;
 type TimelineItem = {
@@ -39,7 +39,8 @@ const emptyDashboard: MobileDashboardData = {
   me: { tournaments: [], events: [], matches: [], actions: [] },
   public: { tournaments: [], events: [] },
   news: [],
-  stats: { my_tournaments: 0, my_events: 0, open_matches: 0, open_actions: 0, news: 0, public_tournaments: 0, public_events: 0 },
+  streams: [],
+  stats: { my_tournaments: 0, my_events: 0, open_matches: 0, open_actions: 0, news: 0, public_tournaments: 0, public_events: 0, live_streams: 0 },
 };
 
 function normalizeDashboard(payload?: Partial<MobileDashboardData> | null): MobileDashboardData {
@@ -55,6 +56,7 @@ function normalizeDashboard(payload?: Partial<MobileDashboardData> | null): Mobi
       events: Array.isArray(payload?.public?.events) ? payload.public.events : [],
     },
     news: Array.isArray(payload?.news) ? payload.news : [],
+    streams: Array.isArray(payload?.streams) ? payload.streams : [],
     stats: { ...emptyDashboard.stats, ...(payload?.stats || {}) },
   };
 }
@@ -208,6 +210,14 @@ export function DashboardScreen({ navigation }: Props) {
           </Section>
         ) : null}
 
+        {data.streams.length ? (
+          <Section title="Vereinsmitglieder live">
+            {data.streams.slice(0, 3).map((stream) => (
+              <StreamCard key={`${stream.user_id || stream.username}-${stream.twitch_login}`} stream={stream} />
+            ))}
+          </Section>
+        ) : null}
+
         <Section title={isGuest ? "Aktuell geplant" : "Meine nächsten Termine"} actionLabel="Alle Turniere" onAction={() => navigation.navigate("Tournaments")}>
           {timeline.length ? (
             timeline.slice(0, 6).map((item) => (
@@ -292,6 +302,27 @@ export function DashboardScreen({ navigation }: Props) {
 
       </ScrollView>
     </Screen>
+  );
+}
+
+function StreamCard({ stream }: { stream: LiveStream }) {
+  const name = stream.member_profile?.gamertag || stream.member_profile?.display_name || stream.display_name || stream.username || stream.twitch_login || "Stream";
+  const url = stream.stream_url || (stream.twitch_login ? `https://www.twitch.tv/${stream.twitch_login}` : "");
+  return (
+    <Pressable onPress={() => url ? Linking.openURL(url).catch(() => {}) : undefined} style={({ pressed }) => [pressed && styles.pressed]}>
+      <Card style={styles.streamCard}>
+        <View style={styles.streamIcon}>
+          <Ionicons name="radio-outline" color={colors.live} size={20} />
+        </View>
+        <View style={styles.flex}>
+          <Muted style={styles.liveLabel}>LIVE</Muted>
+          <Body style={styles.rowTitle}>{name}</Body>
+          <Muted numberOfLines={2}>{stream.title || "Live auf Twitch"}</Muted>
+          <Muted>{[stream.game_name, stream.viewer_count ? `${stream.viewer_count} Zuschauer` : ""].filter(Boolean).join(" · ")}</Muted>
+        </View>
+        <Ionicons name="open-outline" color={colors.muted} size={18} />
+      </Card>
+    </Pressable>
   );
 }
 
@@ -597,6 +628,27 @@ const styles = StyleSheet.create({
   },
   seasonHint: {
     color: colors.gold,
+    fontWeight: "900",
+  },
+  streamCard: {
+    alignItems: "center",
+    borderColor: "rgba(255,59,48,0.34)",
+    flexDirection: "row",
+    gap: 12,
+  },
+  streamIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,59,48,0.12)",
+    borderColor: "rgba(255,59,48,0.32)",
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  liveLabel: {
+    color: colors.live,
+    fontSize: 11,
     fontWeight: "900",
   },
 });

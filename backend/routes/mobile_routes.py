@@ -618,6 +618,11 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
     db = get_db()
     news = await _latest_news(user)
     public = await _public_upcoming(user)
+    try:
+        from routes.phase_ef_routes import list_live_streams
+        live_streams = await list_live_streams()
+    except Exception:
+        live_streams = []
 
     my_tournaments: list[dict] = []
     my_events: list[dict] = []
@@ -664,6 +669,7 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
         },
         "public": public,
         "news": news,
+        "streams": live_streams[:6] if isinstance(live_streams, list) else [],
         "stats": {
             "my_tournaments": len(my_tournaments),
             "my_events": len(my_events),
@@ -672,6 +678,7 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
             "news": len(news),
             "public_tournaments": len(public["tournaments"]),
             "public_events": len(public["events"]),
+            "live_streams": len(live_streams) if isinstance(live_streams, list) else 0,
         },
     }
 
@@ -718,6 +725,48 @@ async def send_mobile_test_notification(user: dict = Depends(get_current_user)):
         meta={"test": True},
     )
     return {"ok": bool(notification), "notification": notification}
+
+
+@router.get("/push-status")
+async def mobile_push_status(user: dict = Depends(get_current_user)):
+    db = get_db()
+    tokens = await db.mobile_push_tokens.find(
+        {"user_id": user["id"]},
+        {
+            "_id": 0,
+            "token": 1,
+            "platform": 1,
+            "enabled": 1,
+            "created_at": 1,
+            "updated_at": 1,
+            "last_sent_at": 1,
+            "last_ticket_id": 1,
+            "last_ticket_status": 1,
+            "last_ticket_message": 1,
+            "last_ticket_error": 1,
+            "last_ticket_at": 1,
+            "last_receipt_status": 1,
+            "last_receipt_message": 1,
+            "last_receipt_error": 1,
+            "last_receipt_checked_at": 1,
+            "disabled_at": 1,
+        },
+    ).sort("updated_at", -1).to_list(10)
+    for row in tokens:
+        token = str(row.get("token") or "")
+        row["token_preview"] = f"{token[:24]}..." if len(token) > 24 else token
+        row.pop("token", None)
+    return {
+        "tokens": tokens,
+        "enabled_count": len([row for row in tokens if row.get("enabled") is not False]),
+        "has_enabled_token": any(row.get("enabled") is not False for row in tokens),
+    }
+
+
+@router.post("/push-receipts/check")
+async def mobile_push_receipts_check(user: dict = Depends(get_current_user)):
+    from services.push_notifications import check_mobile_push_receipts_for_user
+    return await check_mobile_push_receipts_for_user(user["id"])
 
 
 @router.post("/push-token")

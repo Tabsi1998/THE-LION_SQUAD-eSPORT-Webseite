@@ -253,6 +253,7 @@ export type MobileDashboardData = {
     events: ClubEvent[];
   };
   news: NewsPost[];
+  streams: LiveStream[];
   stats: {
     my_tournaments: number;
     my_events: number;
@@ -261,7 +262,29 @@ export type MobileDashboardData = {
     news: number;
     public_tournaments: number;
     public_events: number;
+    live_streams: number;
   };
+};
+
+export type LiveStream = {
+  user_id?: string;
+  username?: string;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  twitch_login?: string | null;
+  title?: string | null;
+  game_name?: string | null;
+  viewer_count?: number;
+  thumbnail_url?: string | null;
+  stream_url?: string | null;
+  public_profile_url?: string | null;
+  member_profile?: {
+    id?: string;
+    slug?: string;
+    display_name?: string | null;
+    gamertag?: string | null;
+    photo_url?: string | null;
+  } | null;
 };
 
 export type PersonalReferenceItem = {
