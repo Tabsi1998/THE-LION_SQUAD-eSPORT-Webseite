@@ -17,6 +17,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Season-Punkte existieren bereits beim Status `results_published`. Teilnahme, Platzierung, Gewichtung und Jahreswertung sind also kein kompletter Neubau, brauchen aber bessere Benennung, Transparenz und App-Darstellung.
 - Die mobile Website hat bereits eine app-artige Bottom-Navigation mit dunkler Transparenz, `backdrop-blur-xl`, Safe-Area-Padding, Icon-Fokus und aktivem Top-Indikator. Die native App-Tabbar ist dagegen noch einfacher und kann diese Designsprache aufnehmen.
 - Web und App nutzen aehnliche Inhalte, aber noch nicht immer dieselben UX-Muster: Statusbadges, Embed-Karten, Listen, Tabs, Actions und leere Zustaende sollten staerker vereinheitlicht werden.
+- Die Website selbst ist bereits breit aufgestellt: Public Pages, CMS, SEO/OG, Sitemap, Admin, Media, Galerie, Display-Seiten, Mitgliedsbereich, Turniere, Events und Fast-Lap sind vorhanden. Der naechste Hebel ist weniger "noch mehr Seiten", sondern bessere Informationsarchitektur, Performance, Redaktionskomfort, Admin-Effizienz und Live-Erlebnis.
 
 ## Zielbild
 
@@ -136,7 +137,69 @@ Design-Checks:
 - Farben bleiben TLS-typisch, aber nicht nur Cyan/Gold: Danger, Success, Neutral und Statusfarben klar getrennt.
 - Motion sparsam: kurze Press-States, keine dauerhaften Effekte, die Akku oder Lesbarkeit stoeren.
 
-## Phase 7 - Jahreswertung statt unklarer Season-Pass
+## Phase 7 - Website-Modernisierung und Public Experience
+
+Ziel:
+
+- Die Website soll fuer Besucher, Mitglieder, Spieler, Sponsoren und Turnierleitung schneller zum richtigen Ziel fuehren.
+- Oeffentliche Seiten sollen weniger wie einzelne Inseln wirken und mehr wie ein zusammenhaengendes Vereinsportal.
+- SEO, Sharing, Performance und Barrierefreiheit sollen nicht nur technisch vorhanden sein, sondern regelmaessig pruefbar sein.
+
+Public Website:
+
+- Startseite staerker nach aktuellen Prioritaeten steuern: naechstes Event, laufende Turniere, aktuelle News, Jahreswertung, Mitglied werden.
+- Turnier-, Event- und Fast-Lap-Seiten angleichen: konsistente Hero-Infos, Status, Anmeldung, Zeitplan, Regeln, Preise, Galerie/Rueckblick.
+- News-Seiten mit besseren Inhaltsbausteinen: Embed-Karten, Autoren-/Kategoriezeile, "Weiterlesen", verwandte Turniere/Events, Rueckblick-Galerien.
+- Community-Bereich klarer strukturieren: Spieler, Teams, Server, Mitglieder, Achievements und Referenzen als zusammenhaengende Community-Welt.
+- Sponsoren/Partner sichtbarer machen: Partnerkarten, Sponsoren-Tiers, Verknuepfung mit Events, Footer/SEO-Daten sauber halten.
+
+Navigation und Informationsarchitektur:
+
+- Hauptnavigation pruefen: Besucher brauchen andere Wege als eingeloggte Spieler oder Admins.
+- "Mein Bereich" klarer als Spieler-Dashboard positionieren, getrennt von oeffentlichem Profil.
+- Mobile BottomNav und Desktop-Nav inhaltlich aufeinander abstimmen.
+- Breadcrumbs/Zurueck-Links auf tiefen Seiten wie Match, Bracket, Standings und Galerie konsequent einsetzen.
+- Interne Suche oder Quick-Jump fuer Turniere, Events, News, Spieler und Teams pruefen.
+
+Performance und technische Qualitaet:
+
+- Bildstrategie haerten: responsive Bildgroessen, Lazy Loading, feste Aspect Ratios, saubere Fallbacks, WebP/AVIF wo sinnvoll.
+- Bundle pruefen: Admin-Schwergewichte lazy laden, Display-Seiten separat halten, Editor/Charts nur bei Bedarf laden.
+- Core-Web-Vitals-Ziele definieren: schnelle Startseite, stabile Layouts ohne Spruenge, schnelle Detailseiten.
+- API-Responses fuer Listen vereinheitlichen: kompakte Karten-Daten statt komplette Detailobjekte, Pagination/Filter sauber.
+- Fehlerseiten und Ladezustand modernisieren: 404/403/500 mit klarer Rueckfuehrung statt nur "nicht gefunden".
+
+SEO, Sharing und Content-Betrieb:
+
+- SEO-Vorschau im Admin: Titel, Beschreibung, Canonical, OG-Bild und Social Preview vor Veroeffentlichung ansehen.
+- Sitemap und SEO-Preview regelmaessig gegen echte Routen pruefen, inklusive Turnier-Bracket, Standings, Fast-Lap, Galerie und Profilen.
+- Redaktions-Checkliste fuer News/CMS: Titel, Teaser, Banner, Embeds, Sichtbarkeit, SEO, Newsletter, Discord.
+- Strukturierte Daten erweitern: Event, SportsEvent/Competition, Organization, Breadcrumb, Article, ImageObject.
+- IndexNow/Search-Console-Submit nach wichtigen Veroeffentlichungen automatisieren oder im Admin klarer anzeigen.
+
+Admin und Redaktion:
+
+- Admin-Dashboard als echte Tageszentrale: offene Aufgaben, kaputte Medien, ausstehende Anmeldungen, Ergebnis-Konflikte, Newsletter-Queue, Systemstatus.
+- Admin-Listen vereinheitlichen: Filter, Suche, gespeicherte Ansichten, Bulk-Actions und Export pro Bereich.
+- Turnier-Editor entlasten: Setup-Assistent fuer lokales/online/hybrid Turnier, Regeln, Stationen, Ergebnisfluss und Kommunikation.
+- Medienbibliothek erweitern: fehlende Alt-Texte, doppelte Dateien, ungenutzte Dateien, kaputte Referenzen, Bildzuschnitt.
+- Audit- und Rollenansicht besser erreichbar machen: wer darf was, wer hat was geaendert, welche Staff-Zuweisung gilt wo.
+
+Live- und Event-Erlebnis:
+
+- Display-Seiten als eigener Modus ausbauen: Bracket-TV, Fast-Lap-TV, Event-Ticker, Station-Status, Sponsorrotation.
+- Oeffentliche Live-Seiten fuer lokale Events: Zeitplan, laufende Matches, naechste Station, Ergebnis-Ticker.
+- Nach dem Event automatisch Rueckblick vorbereiten: Gewinner, Podium, Galerie, News-Entwurf, Social-Share.
+- QR-Codes fuer Vor-Ort-Wege: Check-in, Match, Station, Galerie-Upload, Feedback.
+
+Barrierefreiheit und Vertrauen:
+
+- Tastaturbedienung und Fokus-Stile fuer Navigation, Modals, Editor, Tabellen und Formulare pruefen.
+- Kontraste fuer Cyan/Gold auf dunklem Hintergrund systematisch testen.
+- Formulare mit klaren Fehlermeldungen, Pflichtfeldhinweisen und sinnvoller Tab-Reihenfolge.
+- Datenschutz/Cookie/Analytics sichtbar nachvollziehbar halten, besonders bei Embeds, Twitch und externen Medien.
+
+## Phase 8 - Jahreswertung statt unklarer Season-Pass
 
 Namensoptionen:
 
@@ -160,7 +223,7 @@ Umsetzung:
 - UI-Begriffe vereinheitlichen, damit "Season-Punkte", "Profilpunkte" und "Achievements" nicht vermischt werden.
 - Mobile `SeasonPassScreen` in Richtung "Jahreswertung" umbauen.
 
-## Phase 8 - Weitere sinnvolle Erweiterungen
+## Phase 9 - Weitere sinnvolle Erweiterungen
 
 Turnierbetrieb:
 
@@ -188,7 +251,7 @@ Qualitaet und Betrieb:
 - Monitoring fuer Push-Token, API-Fehler und langsame mobile Endpunkte.
 - Beta-Feedback-Kanal in App/Web: kurzer Report mit Screen, Version, User-Agent und Route.
 
-## Phase 9 - Beta 0.12.0-beta.2
+## Phase 10 - Beta 0.12.0-beta.2
 
 Fuer den naechsten APK-Build:
 
@@ -204,7 +267,8 @@ Fuer den naechsten APK-Build:
 3. Statuslabels zentral sauber machen.
 4. Embed-Karten und Fast-Lap-Streckenbilder.
 5. Mobile Design-System mit Bottom-Bar/Blur, gemeinsamen Cards und Tabs modernisieren.
-6. Profil und Mehr-Navigation modernisieren.
-7. Jahreswertung benennen und in App/Web klar darstellen.
-8. Staff-Dashboard, QR-Flows und Beta-Feedback als naechste Erweiterungen vorbereiten.
-9. Beta.2 bauen und testen.
+6. Website-Modernisierung: Public Experience, SEO, Performance, Admin-Workflows und Live-Seiten.
+7. Profil und Mehr-Navigation modernisieren.
+8. Jahreswertung benennen und in App/Web klar darstellen.
+9. Staff-Dashboard, QR-Flows und Beta-Feedback als naechste Erweiterungen vorbereiten.
+10. Beta.2 bauen und testen.
