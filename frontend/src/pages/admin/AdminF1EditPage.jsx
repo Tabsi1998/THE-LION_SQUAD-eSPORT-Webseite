@@ -25,6 +25,14 @@ const F1_STATUS_OPTIONS = [
   ["archived", "Archiviert"],
   ["cancelled", "Abgesagt"],
 ];
+const F1_SEASON_WEIGHT_OPTIONS = [
+  ["1", "Fast Lap Standard (x1.00)"],
+  ["0.75", "Fun-Challenge (x0.75)"],
+  ["0.5", "Event/Check-in Wertung (x0.50)"],
+  ["1.25", "Mini-Wertung (x1.25)"],
+  ["2", "Normal-Turnier nah (x2.00)"],
+  ["0", "Keine Jahreswertung (x0.00)"],
+];
 
 export default function AdminF1EditPage() {
   const { isAdmin } = useAuth();
@@ -558,6 +566,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
     unlimited_attempts: source.unlimited_attempts !== false,
     max_attempts: source.max_attempts || 0,
     site_banner_enabled: !!source.site_banner_enabled,
+    season_weight: source.season_weight ?? 1,
   });
   const [form, setForm] = useState(formFromChallenge());
   const [events, setEvents] = useState([]);
@@ -578,6 +587,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
           payload.registration_open_from = null;
           payload.registration_open_until = null;
         }
+        payload.season_weight = Number(payload.season_weight || 0);
         normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
         return payload;
       };
@@ -631,6 +641,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
         <SmallField label="Fahrhilfen" value={form.assists_allowed} onChange={(v)=>set("assists_allowed", v)} />
         <SmallField label="Controller-Typ" value={form.controller_type} onChange={(v)=>set("controller_type", v)} />
       </div>
+      <FastLapSeasonWeightField value={form.season_weight} onChange={(v)=>set("season_weight", v)} />
       <MarkdownEditor value={form.description} onChange={(v)=>set("description", v)} rows={5} testId="f1-edit-description" placeholder="Beschreibung" />
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.registration_enabled} onChange={(e)=>set("registration_enabled", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Online-Einreichung öffentlich anzeigen</span></label>
@@ -697,6 +708,26 @@ function SmallSelect({ label, value, onChange, options }) {
       <select value={value ?? ""} onChange={(e)=>onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
+    </label>
+  );
+}
+
+function FastLapSeasonWeightField({ value, onChange }) {
+  const normalized = String(value ?? "1");
+  const isPreset = F1_SEASON_WEIGHT_OPTIONS.some(([optionValue]) => optionValue === normalized);
+  return (
+    <label className="block border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] mb-1.5">Jahreswertung</div>
+      <div className="grid sm:grid-cols-[1fr_120px] gap-2">
+        <select value={isPreset ? normalized : "__custom"} onChange={(e)=>onChange(e.target.value === "__custom" ? value : e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+          {F1_SEASON_WEIGHT_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          <option value="__custom">Eigener Faktor</option>
+        </select>
+        <input type="number" step="0.05" min="0" value={value ?? ""} onChange={(e)=>onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" aria-label="Jahreswertungs-Faktor" />
+      </div>
+      <div className="text-[11px] text-white/45 mt-1.5">
+        Bestimmt, wie stark diese Fast-Lap Challenge in die Jahreswertung eingeht. 0 bedeutet: keine Jahrespunkte.
+      </div>
     </label>
   );
 }

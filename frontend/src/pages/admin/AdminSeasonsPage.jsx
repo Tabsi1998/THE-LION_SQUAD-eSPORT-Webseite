@@ -474,6 +474,9 @@ function RuleSummary({ form, fallbackPoints, selectedTournaments, selectedChalle
         <p className="text-xs text-white/55 mt-2">
           Neue Wertungen entstehen mit: Basispunkte x Quellen-Gewicht x Teilnehmerfaktor + Bonuspunkte.
         </p>
+        <p className="text-xs text-white/45 mt-2">
+          Major, Normal, Mini usw. stellst du direkt beim jeweiligen Turnier oder bei der Fast-Lap Challenge ein. Diese Jahreswertung waehlt nur aus, welche Quellen zaehlen.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-2">

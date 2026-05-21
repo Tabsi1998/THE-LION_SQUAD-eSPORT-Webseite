@@ -63,6 +63,15 @@ const STREAM_PLATFORM_OPTIONS = [["", "—"], ["twitch", "Twitch"], ["youtube", 
 const EVENT_MODE_OPTIONS = [["online", "Online"], ["local", "Vor Ort"], ["hybrid", "Hybrid"]];
 const RESULT_ENTRY_MODE_OPTIONS = [["", "Automatisch passend"], ["staff_only", "Nur Turnierleitung"], ["player_confirmed", "Beide Parteien melden"], ["hybrid", "Hybrid"]];
 const SCHEDULE_MODE_OPTIONS = [["", "Automatisch passend"], ["fixed_by_staff", "Fix durch Turnierleitung"], ["player_proposal", "Teilnehmer schlagen vor"], ["hybrid", "Hybrid"]];
+const TOURNAMENT_SEASON_WEIGHT_OPTIONS = [
+  ["3", "Major - grosses Turnier (x3.00)"],
+  ["2", "Normal - regulaeres Turnier (x2.00)"],
+  ["1.25", "Mini - kleines Turnier (x1.25)"],
+  ["1", "Kleine Challenge / Fast-Lap nah (x1.00)"],
+  ["0.75", "Fun-Wertung (x0.75)"],
+  ["0.5", "Event/Check-in Wertung (x0.50)"],
+  ["0", "Keine Jahreswertung (x0.00)"],
+];
 
 const STAGE_TYPES = [
   ["single_elimination", "Einzelausscheidung"],
@@ -1765,7 +1774,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
             <SelectField label="Seeding" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} />
             <Fld label="Best of" type="number" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"/>
             <Fld label="Matchdauer Min." type="number" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"/>
-            <Fld label="Jahreswertungs-Gewicht" type="number" value={f.season_weight} onChange={(v)=>set("season_weight",v)} testId="tr-edit-season-weight"/>
+            <SeasonWeightField value={f.season_weight} onChange={(v)=>set("season_weight",v)} />
           </div>
           <div className="mt-4 flex flex-wrap gap-4">
             {BRONZE_FORMATS.has(f.format) && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.bronze_match} onChange={(e)=>set("bronze_match",e.target.checked)} className="accent-[#29B6E8]"/><span>Spiel um Platz 3</span></label>}
@@ -1839,6 +1848,26 @@ function SelectField({ label, value, onChange, options }) {
       <select value={value || ""} onChange={(e) => onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white">
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
+    </label>
+  );
+}
+
+function SeasonWeightField({ value, onChange }) {
+  const normalized = String(value ?? "2");
+  const isPreset = TOURNAMENT_SEASON_WEIGHT_OPTIONS.some(([optionValue]) => optionValue === normalized);
+  return (
+    <label className="block md:col-span-3">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Jahreswertung</div>
+      <div className="grid sm:grid-cols-[1fr_120px] gap-2">
+        <select value={isPreset ? normalized : "__custom"} onChange={(e) => onChange(e.target.value === "__custom" ? value : e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white">
+          {TOURNAMENT_SEASON_WEIGHT_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          <option value="__custom">Eigener Faktor</option>
+        </select>
+        <input type="number" step="0.05" min="0" value={value ?? ""} onChange={(e)=>onChange(e.target.value)} data-testid="tr-edit-season-weight" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" aria-label="Jahreswertungs-Faktor" />
+      </div>
+      <div className="text-[11px] text-white/40 mt-1.5">
+        Das hier bestimmt Major/Normal/Mini: Die Jahreswertung nimmt Platzierungs- oder Teilnahmepunkte und multipliziert sie mit diesem Faktor. 0 bedeutet: Dieses Turnier gibt keine Jahrespunkte.
+      </div>
     </label>
   );
 }

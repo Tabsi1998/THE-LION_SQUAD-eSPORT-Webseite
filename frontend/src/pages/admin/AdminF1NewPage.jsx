@@ -12,6 +12,15 @@ const CREATE_STATUS_OPTIONS = [
   ["scheduled", "Angekündigt"],
 ];
 
+const F1_SEASON_WEIGHT_OPTIONS = [
+  ["1", "Fast Lap Standard (x1.00)"],
+  ["0.75", "Fun-Challenge (x0.75)"],
+  ["0.5", "Event/Check-in Wertung (x0.50)"],
+  ["1.25", "Mini-Wertung (x1.25)"],
+  ["2", "Normal-Turnier nah (x2.00)"],
+  ["0", "Keine Jahreswertung (x0.00)"],
+];
+
 export default function AdminF1NewPage() {
   const nav = useNavigate();
   const [form, setForm] = useState({
@@ -26,6 +35,7 @@ export default function AdminF1NewPage() {
     start_date: "", end_date: "", status: "draft",
     site_banner_enabled: false,
     is_championship: false,
+    season_weight: 1,
     twitch_channel: "", twitch_enabled: false,
     prize_places: [],
   });
@@ -45,6 +55,7 @@ export default function AdminF1NewPage() {
       if (payload.block_club_member_results) payload.allow_club_reference_times = true;
       if (!payload.event_id) payload.event_id = null;
       if (payload.unlimited_attempts) payload.max_attempts = null;
+      payload.season_weight = Number(payload.season_weight || 0);
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
       payload.prize_places = (payload.prize_places || [])
         .filter((p) => p.value && p.value.trim())
@@ -163,6 +174,7 @@ export default function AdminF1NewPage() {
           <input type="checkbox" data-testid="f1-new-championship" checked={form.is_championship} onChange={(e) => set("is_championship", e.target.checked)} className="accent-[#29B6E8]" />
           <span>Championship (mehrere Strecken + Punkte pro Platz)</span>
         </label>
+        <FastLapSeasonWeightField value={form.season_weight} onChange={(v) => set("season_weight", v)} />
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" data-testid="f1-new-unlimited" checked={form.unlimited_attempts} onChange={(e) => set("unlimited_attempts", e.target.checked)} className="accent-[#29B6E8]" />
           <span>Unbegrenzte Versuche</span>
@@ -219,6 +231,25 @@ function Select({ label, value, onChange, options, required, testId }) {
       <select value={value} onChange={(e) => onChange(e.target.value)} required={required} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white focus:outline-none">
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
+    </label>
+  );
+}
+function FastLapSeasonWeightField({ value, onChange }) {
+  const normalized = String(value ?? "1");
+  const isPreset = F1_SEASON_WEIGHT_OPTIONS.some(([optionValue]) => optionValue === normalized);
+  return (
+    <label className="block border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] mb-1.5">Jahreswertung</div>
+      <div className="grid sm:grid-cols-[1fr_120px] gap-2">
+        <select value={isPreset ? normalized : "__custom"} onChange={(e) => onChange(e.target.value === "__custom" ? value : e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white focus:outline-none">
+          {F1_SEASON_WEIGHT_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          <option value="__custom">Eigener Faktor</option>
+        </select>
+        <input type="number" step="0.05" min="0" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white focus:outline-none" aria-label="Jahreswertungs-Faktor" />
+      </div>
+      <div className="text-[11px] text-white/45 mt-1.5">
+        Bestimmt, wie stark diese Fast-Lap Challenge in die Jahreswertung eingeht. 0 bedeutet: keine Jahrespunkte.
+      </div>
     </label>
   );
 }
