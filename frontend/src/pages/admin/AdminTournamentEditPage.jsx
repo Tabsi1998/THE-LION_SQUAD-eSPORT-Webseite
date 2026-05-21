@@ -60,6 +60,10 @@ const TEAM_MODE_OPTIONS = [["solo", "Einzelspieler"], ["team", "Team"]];
 const SEEDING_OPTIONS = [["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]];
 const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
 const STREAM_PLATFORM_OPTIONS = [["", "—"], ["twitch", "Twitch"], ["youtube", "YouTube"], ["kick", "Kick"], ["custom", "Eigene Plattform"]];
+const EVENT_MODE_OPTIONS = [["online", "Online"], ["local", "Vor Ort"], ["hybrid", "Hybrid"]];
+const RESULT_ENTRY_MODE_OPTIONS = [["", "Automatisch passend"], ["staff_only", "Nur Turnierleitung"], ["player_confirmed", "Beide Parteien melden"], ["hybrid", "Hybrid"]];
+const SCHEDULE_MODE_OPTIONS = [["", "Automatisch passend"], ["fixed_by_staff", "Fix durch Turnierleitung"], ["player_proposal", "Teilnehmer schlagen vor"], ["hybrid", "Hybrid"]];
+
 const STAGE_TYPES = [
   ["single_elimination", "Einzelausscheidung"],
   ["double_elimination", "Doppelausscheidung"],
@@ -1519,6 +1523,9 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     is_public: source.is_public !== false,
     visibility: source.visibility || "public",
     site_banner_enabled: !!source.site_banner_enabled,
+    event_mode: source.event_mode || "online",
+    result_entry_mode: source.result_entry_mode || "",
+    schedule_mode: source.schedule_mode || "",
     twitch_channel: source.twitch_channel || "",
     twitch_enabled: !!source.twitch_enabled,
     has_live_stream: !!source.has_live_stream,
@@ -1566,6 +1573,9 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     is_public: tournament.is_public !== false,
     visibility: tournament.visibility || "public",
     site_banner_enabled: !!tournament.site_banner_enabled,
+    event_mode: tournament.event_mode || "online",
+    result_entry_mode: tournament.result_entry_mode || "",
+    schedule_mode: tournament.schedule_mode || "",
     twitch_channel: tournament.twitch_channel || "",
     twitch_enabled: !!tournament.twitch_enabled,
     has_live_stream: !!tournament.has_live_stream,
@@ -1626,6 +1636,8 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
         const payload = { ...source };
         if (!payload.event_id) payload.event_id = null;
         if (!payload.stream_platform) payload.stream_platform = null;
+        if (!payload.result_entry_mode) payload.result_entry_mode = null;
+        if (!payload.schedule_mode) payload.schedule_mode = null;
         payload.format_label = (payload.format_label || "").trim() || null;
         if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
         normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
@@ -1692,6 +1704,14 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
           <Fld label="Anmeldung endet" type="datetime-local" value={f.registration_open_until} onChange={(v)=>set("registration_open_until",v)} testId="tr-edit-reg-until"/>
           <Fld label="Check-in öffnet" type="datetime-local" value={f.check_in_from} onChange={(v)=>set("check_in_from",v)} testId="tr-edit-checkin-from"/>
           <Fld label="Check-in endet" type="datetime-local" value={f.check_in_until} onChange={(v)=>set("check_in_until",v)} testId="tr-edit-checkin-until"/>
+        </div>
+        <div className="grid md:grid-cols-3 gap-3">
+          <SelectField label="Austragung" value={f.event_mode} onChange={(v)=>set("event_mode",v)} options={EVENT_MODE_OPTIONS} />
+          <SelectField label="Ergebniserfassung" value={f.result_entry_mode || ""} onChange={(v)=>set("result_entry_mode",v || "")} options={RESULT_ENTRY_MODE_OPTIONS} />
+          <SelectField label="Terminplanung" value={f.schedule_mode || ""} onChange={(v)=>set("schedule_mode",v || "")} options={SCHEDULE_MODE_OPTIONS} />
+        </div>
+        <div className="border border-white/10 bg-black/20 rounded-sm p-3 text-xs text-white/55">
+          Vor-Ort-Turniere werden standardmaessig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmaessig Ergebnisberichte beider Parteien und Terminvorschlaege.
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.registration_enabled} onChange={(e)=>set("registration_enabled",e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Öffentliche Anmeldung erlauben</span></label>

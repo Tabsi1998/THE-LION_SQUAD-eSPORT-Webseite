@@ -1423,6 +1423,7 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         "start_date", "end_date", "rules", "prize_pool", "prize_places",
         "stream_link", "twitch_channel", "discord_link", "location",
         "banner_url", "stream_platform", "stream_url", "stream_title", "format_label",
+        "result_entry_mode", "schedule_mode",
     }
     updates = {k: v for k, v in raw_updates.items() if v is not None or k in nullable_fields}
     slug_source = slug_source_for_update(raw_updates, existing, "title", fallback="turnier")

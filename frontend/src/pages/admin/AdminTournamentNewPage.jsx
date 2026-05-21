@@ -15,6 +15,10 @@ const CREATE_STATUS_OPTIONS = [
   ["scheduled", "Angekündigt"],
 ];
 
+const EVENT_MODE_OPTIONS = [["online", "Online"], ["local", "Vor Ort"], ["hybrid", "Hybrid"]];
+const RESULT_ENTRY_MODE_OPTIONS = [["", "Automatisch passend"], ["staff_only", "Nur Turnierleitung"], ["player_confirmed", "Beide Parteien melden"], ["hybrid", "Hybrid"]];
+const SCHEDULE_MODE_OPTIONS = [["", "Automatisch passend"], ["fixed_by_staff", "Fix durch Turnierleitung"], ["player_proposal", "Teilnehmer schlagen vor"], ["hybrid", "Hybrid"]];
+
 const PRIZE_GROUP_OPTIONS = [
   ["overall", "Gesamtwertung"],
   ["winner", "Gewinner-Bracket"],
@@ -38,6 +42,7 @@ export default function AdminTournamentNewPage() {
     start_date: "", end_date: "",
     status: "draft",
     site_banner_enabled: false,
+    event_mode: "online", result_entry_mode: "", schedule_mode: "",
     best_of: 1, bronze_match: false, seeding_mode: "random",
     is_public: true, rules: "", prize_pool: "",
     banner_url: "",
@@ -75,6 +80,8 @@ export default function AdminTournamentNewPage() {
       payload.team_mode = payload.team_mode === "solo" ? "solo" : "team";
       payload.team_size = payload.team_mode === "solo" ? 1 : Number(payload.team_size || 2);
       payload.format_label = (payload.format_label || "").trim() || null;
+      if (!payload.result_entry_mode) payload.result_entry_mode = null;
+      if (!payload.schedule_mode) payload.schedule_mode = null;
       if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
       if (!payload.event_id) delete payload.event_id;
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
@@ -137,6 +144,14 @@ export default function AdminTournamentNewPage() {
           </Row>
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
             Anmeldung, Check-in, Live und Beendet werden anhand dieser Zeiten automatisch geschaltet. Manuelle Sonderstatus setzt du später in der Bearbeitung.
+          </div>
+          <Row>
+            <Select label="Austragung" value={form.event_mode} onChange={(v) => set("event_mode", v)} options={EVENT_MODE_OPTIONS} testId="new-tr-event-mode" />
+            <Select label="Ergebniserfassung" value={form.result_entry_mode || ""} onChange={(v) => set("result_entry_mode", v || null)} options={RESULT_ENTRY_MODE_OPTIONS} testId="new-tr-result-entry-mode" />
+            <Select label="Terminplanung" value={form.schedule_mode || ""} onChange={(v) => set("schedule_mode", v || null)} options={SCHEDULE_MODE_OPTIONS} testId="new-tr-schedule-mode" />
+          </Row>
+          <div className="border border-white/10 bg-black/20 rounded-sm p-3 text-xs text-white/55">
+            Vor-Ort-Turniere werden standardmaessig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmaessig Ergebnisberichte beider Parteien und Terminvorschlaege.
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="flex items-start gap-2 text-sm text-white/75">

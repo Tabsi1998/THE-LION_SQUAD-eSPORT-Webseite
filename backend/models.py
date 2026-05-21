@@ -397,6 +397,9 @@ TournamentStatus = Literal[
 ]
 TeamMode = Literal["solo", "team"]
 StreamPlatform = Literal["twitch", "youtube", "kick", "custom"]
+TournamentEventMode = Literal["local", "online", "hybrid"]
+TournamentResultEntryMode = Literal["staff_only", "player_confirmed", "hybrid"]
+TournamentScheduleMode = Literal["fixed_by_staff", "player_proposal", "hybrid"]
 
 
 def _empty_stream_platform_to_none(value):
@@ -448,6 +451,9 @@ class TournamentCreate(BaseModel):
     stream_url: Optional[str] = None
     stream_title: Optional[str] = None
     show_chat: bool = False
+    event_mode: TournamentEventMode = "online"
+    result_entry_mode: Optional[TournamentResultEntryMode] = None
+    schedule_mode: Optional[TournamentScheduleMode] = None
     # Phase 7
     season_weight: float = 2.0
     visibility: Literal["public", "community", "members", "internal"] = "public"
@@ -501,6 +507,9 @@ class TournamentUpdate(BaseModel):
     stream_url: Optional[str] = None
     stream_title: Optional[str] = None
     show_chat: Optional[bool] = None
+    event_mode: Optional[TournamentEventMode] = None
+    result_entry_mode: Optional[TournamentResultEntryMode] = None
+    schedule_mode: Optional[TournamentScheduleMode] = None
     season_weight: Optional[float] = None
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None
     site_banner_enabled: Optional[bool] = None

@@ -39,13 +39,20 @@ type MatchPage = {
   can_act?: boolean;
   can_dispute?: boolean;
   can_forfeit?: boolean;
+  can_manage_schedule?: boolean;
+  can_player_report_result?: boolean;
+  can_propose_schedule?: boolean;
   can_report_score?: boolean;
+  can_staff_submit_result?: boolean;
   can_submit_result?: boolean;
   collection?: "matches" | "matches_v2" | string;
+  event_mode?: "local" | "online" | "hybrid" | string;
   match?: any;
   matchday_label?: string;
   participants?: MatchParticipant[];
+  result_entry_mode?: "staff_only" | "player_confirmed" | "hybrid" | string;
   schedule_proposals?: ScheduleProposal[];
+  schedule_mode?: "fixed_by_staff" | "player_proposal" | "hybrid" | string;
   stage?: { name?: string; title?: string; stage_type?: string; match_type?: string; settings?: Record<string, unknown> } | null;
   tournament?: Tournament | null;
 };
@@ -140,8 +147,14 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const isV2 = page?.collection === "matches_v2" || Boolean(match.slots?.length);
   const duelParticipants = participants.slice(0, 2);
   const canUseChat = Boolean(page?.can_act);
-  const canSubmitLegacyResult = Boolean(!isV2 && duelParticipants.length >= 2 && (page?.can_report_score || page?.can_submit_result));
-  const canSubmitV2Result = Boolean(isV2 && page?.can_submit_result && v2Rows.length);
+  const canPlayerReportResult = Boolean(page?.can_player_report_result ?? page?.can_report_score);
+  const canStaffSubmitResult = Boolean(page?.can_staff_submit_result ?? page?.can_submit_result);
+  const canSubmitLegacyResult = Boolean(!isV2 && duelParticipants.length >= 2 && (canPlayerReportResult || canStaffSubmitResult));
+  const canSubmitV2Result = Boolean(isV2 && canStaffSubmitResult && v2Rows.length);
+  const canProposeSchedule = Boolean(page?.can_propose_schedule);
+  const canManageSchedule = Boolean(page?.can_manage_schedule);
+  const hasScheduleProposals = pendingProposals.length > 0;
+  const showScheduleCard = Boolean(canProposeSchedule || hasScheduleProposals || match.scheduled_at || stationLabel(match) || page?.schedule_mode === "fixed_by_staff");
   const scheduleStatus = match.schedule_status || match.status;
 
   const propose = useCallback(async () => {
@@ -212,7 +225,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     setBusy(true);
     setError("");
     try {
-      if (page?.can_submit_result && !page.can_report_score) {
+      if (canStaffSubmitResult) {
         await api.patch(`/matches/${route.params.id}`, {
           score_a: a,
           score_b: b,
@@ -233,7 +246,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     } finally {
       setBusy(false);
     }
-  }, [busy, canSubmitLegacyResult, duelParticipants, load, page?.can_report_score, page?.can_submit_result, proofUrl, resultNote, route.params.id, scoreA, scoreB]);
+  }, [busy, canStaffSubmitResult, canSubmitLegacyResult, duelParticipants, load, proofUrl, resultNote, route.params.id, scoreA, scoreB]);
 
   const submitV2Result = useCallback(async () => {
     if (!canSubmitV2Result || busy) return;
@@ -355,15 +368,18 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           )) : <Muted>Noch keine Teilnehmer zugewiesen.</Muted>}
         </Card>
 
+        {showScheduleCard ? (
         <Card style={styles.card}>
-          <Heading>Terminabstimmung</Heading>
+          <Heading>{canProposeSchedule || hasScheduleProposals ? "Terminabstimmung" : "Termin"}</Heading>
           <Muted>{formatDateTime(match.scheduled_at)}{stationLabel(match) ? ` · Station ${stationLabel(match)}` : ""}</Muted>
-          {page.can_act ? (
+          {canProposeSchedule ? (
             <>
               <FormInput label="Vorschlag" value={proposalAt} onChangeText={setProposalAt} placeholder="2026-05-19 20:00" />
               <FormInput label="Notiz optional" value={proposalNote} onChangeText={setProposalNote} placeholder="z.B. nach 20:00 Uhr möglich" />
               <Button label={busy ? "Sendet ..." : "Termin vorschlagen"} onPress={propose} disabled={busy} />
             </>
+          ) : page?.schedule_mode === "fixed_by_staff" ? (
+            <Muted>Termin und Station werden durch die Turnierleitung festgelegt.</Muted>
           ) : (
             <Muted>Termine können Teilnehmer, Team-Captains oder Turnierleitung vorschlagen.</Muted>
           )}
@@ -373,7 +389,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                 <View key={proposal.id} style={styles.proposal}>
                   <Body style={styles.strong}>{formatDateTime(proposal.scheduled_at)}</Body>
                   <Muted>{proposal.actor?.display_name || proposal.actor?.username || "Teilnehmer"}{proposal.note ? ` · ${proposal.note}` : ""}</Muted>
-                  {page.can_act ? (
+                  {canManageSchedule ? (
                     <>
                       <View style={styles.buttonRow}>
                         <Button label="Annehmen" onPress={() => decide(proposal, "accept")} disabled={busy} />
@@ -388,9 +404,10 @@ export function MatchDetailScreen({ navigation, route }: Props) {
               ))}
             </View>
           ) : (
-            <Muted>Kein offener Terminvorschlag.</Muted>
+            canProposeSchedule ? <Muted>Kein offener Terminvorschlag.</Muted> : null
           )}
         </Card>
+        ) : null}
 
         {(canSubmitLegacyResult || canSubmitV2Result || page.can_dispute || page.can_forfeit) ? (
           <Card style={styles.card}>
@@ -403,7 +420,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                 </View>
                 <FormInput label="Nachweis-Link optional" value={proofUrl} onChangeText={setProofUrl} placeholder="https://..." />
                 <FormInput label="Notiz optional" value={resultNote} onChangeText={setResultNote} placeholder="Kommentar zum Ergebnis" />
-                <Button label={busy ? "Speichert ..." : page.can_submit_result && !page.can_report_score ? "Ergebnis speichern" : "Ergebnis melden"} onPress={submitLegacyResult} disabled={busy} />
+                <Button label={busy ? "Speichert ..." : canStaffSubmitResult ? "Ergebnis speichern" : "Ergebnis melden"} onPress={submitLegacyResult} disabled={busy} />
               </>
             ) : null}
             {canSubmitV2Result ? (
