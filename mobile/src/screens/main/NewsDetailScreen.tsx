@@ -16,6 +16,7 @@ import { colors } from "../../theme";
 import type { NewsPost } from "../../types";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "NewsDetail">;
+type LinkedContentKind = "event" | "fastlap" | "tournament";
 
 export function NewsDetailScreen({ navigation, route }: Props) {
   const [post, setPost] = useState<NewsPost | null>(null);
@@ -122,13 +123,12 @@ export function NewsDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>Verknüpfte Turniere</Heading>
             {post.linked_tournaments.map((tournament) => (
-              <Pressable key={tournament.id} onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: tournament.slug || tournament.id } })} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
-                <View style={styles.flex}>
-                  <Body style={styles.strong}>{tournament.title}</Body>
-                  <Muted>{formatDate(tournament.start_date)} · {tournament.public_phase?.label || formatStatus(tournament.status)}</Muted>
-                </View>
-                <Ionicons name="chevron-forward" color={colors.muted} size={18} />
-              </Pressable>
+              <LinkedContentCard
+                key={tournament.id}
+                kind="tournament"
+                item={tournament}
+                onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: tournament.slug || tournament.id } })}
+              />
             ))}
           </Card>
         ) : null}
@@ -137,13 +137,12 @@ export function NewsDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>Verknüpfte Events</Heading>
             {post.linked_events.map((event) => (
-              <Pressable key={event.id} onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id } })} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
-                <View style={styles.flex}>
-                  <Body style={styles.strong}>{event.title || event.name}</Body>
-                  <Muted>{formatDate(event.start_date || event.date)} · {event.public_phase?.label || formatStatus(event.status)}</Muted>
-                </View>
-                <Ionicons name="chevron-forward" color={colors.muted} size={18} />
-              </Pressable>
+              <LinkedContentCard
+                key={event.id}
+                kind="event"
+                item={event}
+                onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id } })}
+              />
             ))}
           </Card>
         ) : null}
@@ -152,19 +151,57 @@ export function NewsDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>Verknüpfte Fast Laps</Heading>
             {post.linked_f1_challenges.map((challenge) => (
-              <Pressable key={challenge.id} onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "FastLapDetail", params: { id: challenge.slug || challenge.id } })} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
-                <View style={styles.flex}>
-                  <Body style={styles.strong}>{challenge.title}</Body>
-                  <Muted>{formatDate(challenge.start_date)} · {formatStatus(challenge.status)}</Muted>
-                </View>
-                <Ionicons name="chevron-forward" color={colors.muted} size={18} />
-              </Pressable>
+              <LinkedContentCard
+                key={challenge.id}
+                kind="fastlap"
+                item={challenge}
+                onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "FastLapDetail", params: { id: challenge.slug || challenge.id } })}
+              />
             ))}
           </Card>
         ) : null}
       </ScrollView>
     </Screen>
   );
+}
+
+function LinkedContentCard({ kind, item, onPress }: { kind: LinkedContentKind; item: any; onPress: () => void }) {
+  const title = item.title || item.name || labelForKind(kind);
+  const date = item.start_date || item.date;
+  const status = item.public_phase?.label || (item.status ? formatStatus(item.status) : "");
+  const description = String(item.description || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const accent = kind === "event" ? "#9F7AEA" : kind === "tournament" ? colors.gold : colors.cyan;
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.linkedCard, pressed && styles.pressed]}>
+      <MediaImage
+        uri={item.banner_url}
+        style={styles.linkedImage}
+        fallback={<Ionicons name={iconForKind(kind)} color={accent} size={24} />}
+      />
+      <View style={styles.linkedBody}>
+        <View style={styles.linkedMetaRow}>
+          <Ionicons name={iconForKind(kind)} color={accent} size={13} />
+          <Muted style={[styles.linkedKind, { color: accent }]}>{labelForKind(kind)}</Muted>
+        </View>
+        <Body style={styles.strong}>{title}</Body>
+        <Muted>{[date ? formatDate(date) : "", status].filter(Boolean).join(" · ")}</Muted>
+        {description ? <Muted numberOfLines={2}>{description}</Muted> : null}
+      </View>
+      <Ionicons name="chevron-forward" color={colors.muted} size={18} />
+    </Pressable>
+  );
+}
+
+function labelForKind(kind: LinkedContentKind) {
+  if (kind === "event") return "Event";
+  if (kind === "tournament") return "Turnier";
+  return "Fast Lap";
+}
+
+function iconForKind(kind: LinkedContentKind) {
+  if (kind === "event") return "calendar-outline";
+  if (kind === "tournament") return "trophy-outline";
+  return "speedometer-outline";
 }
 
 const styles = StyleSheet.create({
@@ -196,6 +233,39 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     paddingTop: 10,
+  },
+  linkedCard: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    overflow: "hidden",
+    paddingRight: 10,
+  },
+  linkedImage: {
+    borderRadius: 0,
+    borderWidth: 0,
+    height: 104,
+    width: 104,
+  },
+  linkedBody: {
+    flex: 1,
+    gap: 3,
+    minWidth: 0,
+    paddingVertical: 10,
+  },
+  linkedMetaRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 5,
+  },
+  linkedKind: {
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
   },
   flex: {
     flex: 1,
