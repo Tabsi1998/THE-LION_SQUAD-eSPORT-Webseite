@@ -164,8 +164,10 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const showScheduleCard = Boolean(canProposeSchedule || hasScheduleProposals || match.scheduled_at || stationLabel(match) || page?.schedule_mode === "fixed_by_staff");
   const scheduleStatus = match.schedule_status || match.status;
   const eventModeLabel = formatEventMode(page?.event_mode);
-  const resultModeLabel = ["staff_only", "hybrid"].includes(String(page?.result_entry_mode || "")) ? formatResultEntryMode(page?.result_entry_mode) : "";
-  const scheduleModeLabel = ["fixed_by_staff", "hybrid"].includes(String(page?.schedule_mode || "")) ? formatScheduleMode(page?.schedule_mode) : "";
+  const resultModeLabel = formatResultEntryMode(page?.result_entry_mode);
+  const scheduleModeLabel = formatScheduleMode(page?.schedule_mode);
+  const hasResultActions = Boolean(canSubmitLegacyResult || canSubmitV2Result || page?.can_dispute || page?.can_forfeit);
+  const showFlowNotice = Boolean(!hasResultActions && (page?.result_entry_mode || page?.schedule_mode));
 
   const propose = useCallback(async () => {
     const scheduledAt = parseDateInput(proposalAt);
@@ -422,7 +424,14 @@ export function MatchDetailScreen({ navigation, route }: Props) {
         </Card>
         ) : null}
 
-        {(canSubmitLegacyResult || canSubmitV2Result || page.can_dispute || page.can_forfeit) ? (
+        {showFlowNotice ? (
+          <Card style={styles.card}>
+            <Heading>Ablauf</Heading>
+            <FlowNotice page={page} canUseChat={canUseChat} />
+          </Card>
+        ) : null}
+
+        {hasResultActions ? (
           <Card style={styles.card}>
             <Heading>Match-Aktionen</Heading>
             {canSubmitLegacyResult ? (
@@ -514,6 +523,42 @@ function Pill({ label, accent }: { label: string; accent?: "cyan" | "gold" }) {
   return (
     <View style={[styles.pill, accent === "cyan" && styles.pillCyan, accent === "gold" && styles.pillGold]}>
       <Muted style={[styles.pillText, accent === "cyan" && styles.textCyan, accent === "gold" && styles.textGold]}>{label}</Muted>
+    </View>
+  );
+}
+
+function FlowNotice({ page, canUseChat }: { page: MatchPage; canUseChat: boolean }) {
+  const resultMode = String(page.result_entry_mode || "");
+  const scheduleMode = String(page.schedule_mode || "");
+  const eventMode = String(page.event_mode || "");
+  const resultText = resultMode === "staff_only"
+    ? "Ergebnisse werden durch Turnierleitung, Station-Crew oder Ergebnis-Erfasser eingetragen."
+    : resultMode === "player_confirmed"
+      ? "Bei Online-Matches melden beide Seiten ihr Ergebnis. Gleiche Meldungen werden automatisch bestätigt."
+      : resultMode === "hybrid"
+        ? "Teilnehmer können Ergebnisse melden, Staff kann jederzeit prüfen und korrigieren."
+        : "Der Ergebnisablauf wird durch die Turnierleitung gesteuert.";
+  const scheduleText = scheduleMode === "fixed_by_staff"
+    ? "Termin und Station werden durch die Turnierleitung festgelegt."
+    : scheduleMode === "player_proposal"
+      ? "Terminvorschläge sind für Teilnehmer oder Team-Captains vorgesehen."
+      : scheduleMode === "hybrid"
+        ? "Termine können vorgeschlagen oder durch Staff festgelegt werden."
+        : "";
+  const eventText = eventMode === "local"
+    ? "Vor-Ort-Match: bitte Infos, Station und Staff-Hinweise beachten."
+    : eventMode === "online"
+      ? "Online-Match: Absprachen laufen über Matchchat und Terminabstimmung, sofern freigeschaltet."
+      : eventMode === "hybrid"
+        ? "Hybrid-Match: Online- und Vor-Ort-Regeln können je Stage abweichen."
+        : "";
+
+  return (
+    <View style={styles.flowNotice}>
+      {eventText ? <Muted>{eventText}</Muted> : null}
+      <Muted>{resultText}</Muted>
+      {scheduleText ? <Muted>{scheduleText}</Muted> : null}
+      {canUseChat ? <Muted style={styles.textCyan}>Du kannst den Matchchat für Rückfragen nutzen.</Muted> : null}
     </View>
   );
 }
@@ -653,6 +698,9 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
     minWidth: 0,
+  },
+  flowNotice: {
+    gap: 8,
   },
   header: {
     gap: 9,
