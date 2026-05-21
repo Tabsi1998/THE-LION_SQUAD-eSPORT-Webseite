@@ -151,7 +151,10 @@ export function NotificationBell() {
       >
         <Bell className="w-4 h-4" />
         {unread > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-sm bg-[#FF3B30] text-white text-[10px] font-black inline-flex items-center justify-center">
+          <span
+            className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-sm bg-[#FF3B30] text-white text-[10px] font-black inline-flex items-center justify-center"
+            aria-label={`${unread > 99 ? "99+" : unread} ungelesene Benachrichtigungen`}
+          >
             {unread > 99 ? "99+" : unread}
           </span>
         )}
@@ -196,7 +199,7 @@ export function NotificationBell() {
             ))}
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain" aria-live="polite" aria-label="Benachrichtigungsliste">
             {visibleItems.length === 0 ? (
               <div className="px-4 py-10 text-center text-white/40">
                 <Inbox className="w-8 h-8 mx-auto mb-2 opacity-50" />

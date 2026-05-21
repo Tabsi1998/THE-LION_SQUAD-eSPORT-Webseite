@@ -56,7 +56,7 @@ function AlbumCard({ a }) {
     >
       <div className="aspect-video bg-[#0A0A0A] overflow-hidden relative">
         {a.cover_url ? (
-          <img src={resolveMediaUrl(a.cover_url)} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+          <img src={resolveMediaUrl(a.cover_url)} alt={a.title} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
         ) : (
           <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-10 h-10 text-white/15" /></div>
         )}

@@ -63,7 +63,7 @@ export default function NewsDetailPage() {
         {post.author_name && <div className="mt-3 text-xs text-white/50">Von <strong className="text-white/80">{post.author_name}</strong></div>}
         {post.banner_url && (
           <div className="mt-8 rounded-sm overflow-hidden border border-white/10">
-            <img src={resolveMediaUrl(post.banner_url)} alt="" className="w-full h-auto" />
+            <img src={resolveMediaUrl(post.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-auto" />
           </div>
         )}
         <RichContent text={post.content} embeds={post.content_embeds || []} className="mt-8 prose prose-invert max-w-none text-white/85" />

@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
-import { EmptyState, LoadingState } from "../../components/ListState";
+import { EmptyState, LoadingState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
@@ -121,7 +121,7 @@ export function TournamentsScreen({ navigation }: Props) {
   if (loading) {
     return (
       <Screen>
-        <LoadingState label="Events werden geladen ..." />
+        <SkeletonList count={5} hasImage />
       </Screen>
     );
   }

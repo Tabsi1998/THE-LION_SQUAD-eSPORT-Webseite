@@ -116,7 +116,7 @@ function NewsCard({ n, featured = false }) {
     >
       {n.banner_url && (
         <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
-          <img src={resolveMediaUrl(n.banner_url)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+          <img src={resolveMediaUrl(n.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
         </div>
       )}
       <div className="p-5 flex-1 flex flex-col">

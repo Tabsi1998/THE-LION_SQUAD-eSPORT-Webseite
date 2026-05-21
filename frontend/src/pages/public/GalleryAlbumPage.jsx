@@ -96,7 +96,7 @@ function Lightbox({ photo, onClose, onPrev, onNext }) {
     <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center" onClick={onClose}>
       <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="absolute top-4 right-4 p-2 text-white/70 hover:text-white" aria-label="Schließen"><X className="w-6 h-6" /></button>
       <button onClick={(e) => { e.stopPropagation(); onPrev(); }} className="absolute left-4 p-3 text-white/70 hover:text-white" aria-label="Vorheriges"><ChevronLeft className="w-6 h-6" /></button>
-      <img src={resolveMediaUrl(photo.image_url)} alt={photo.caption || ""} className="max-w-[90vw] max-h-[85vh] object-contain" onClick={(e) => e.stopPropagation()} />
+      <img src={resolveMediaUrl(photo.image_url)} alt={photo.caption || ""} loading="lazy" decoding="async" className="max-w-[90vw] max-h-[85vh] object-contain" onClick={(e) => e.stopPropagation()} />
       <button onClick={(e) => { e.stopPropagation(); onNext(); }} className="absolute right-4 p-3 text-white/70 hover:text-white" aria-label="Nächstes"><ChevronRight className="w-6 h-6" /></button>
       {photo.caption && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 max-w-[80vw] text-center text-sm text-white/85 bg-black/60 px-4 py-2 rounded-sm">

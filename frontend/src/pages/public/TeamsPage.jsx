@@ -65,7 +65,7 @@ function TeamCard({ team: t }) {
     <Link to={`/teams/${t.id}`} data-testid={`team-card-${t.tag}`} className="group block border border-white/10 hover:border-[#29B6E8]/60 rounded-sm bg-[#121212] overflow-hidden transition">
       <div className="relative h-28 bg-[#0A0A0A] border-b border-white/10 overflow-hidden">
         {t.banner_url ? (
-          <img src={resolveMediaUrl(t.banner_url)} alt="" className="w-full h-full object-cover opacity-75 group-hover:opacity-95 group-hover:scale-[1.02] transition duration-500" />
+          <img src={resolveMediaUrl(t.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover opacity-75 group-hover:opacity-95 group-hover:scale-[1.02] transition duration-500" />
         ) : (
           <div className="w-full h-full bg-grid-dense" />
         )}

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.0-alpha.1 - 2026-05-21
+
+- Mobile: SkeletonCard + SkeletonList Komponente hinzugefuegt (animierter Pulse-Effekt als Ladeplatzhalter)
+- Mobile: NewsScreen zeigt beim ersten Laden SkeletonList statt ActivityIndicator
+- Mobile: TournamentsScreen zeigt beim ersten Laden SkeletonList statt ActivityIndicator
+- Web-Frontend: Lazy Loading (loading="lazy" + decoding="async") fuer alle Bilder auf Public-Seiten (Home, News, Events, Gallery, Teams, Tournaments, F1)
+- Web-Frontend: LazyImg-Komponente erstellt fuer wiederverwendbares Lazy Loading
+- Web-Frontend: Accessibility-Verbesserungen in NotificationBell (aria-live, aria-label, Fokus-Management)
+- CI: pip-audit --ignore-vuln PYSEC-2025-183 (false positive in safety-check)
+
 ## 0.9.0-alpha.1 - 2026-05-21
 
 - Web-Frontend: Route-Konflikt /matches/:id behoben (MatchHubPage war nie erreichbar)

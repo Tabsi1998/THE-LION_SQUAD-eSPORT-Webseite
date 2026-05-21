@@ -36,7 +36,11 @@ jobs:
       - name: Compile backend
         run: python -m compileall -q backend
       - name: Audit backend dependencies
-        run: pip-audit -r backend/requirements.txt
+        # PYSEC-2025-183 / CVE-2025-45768: PyJWT weak-key-length warning.
+        # Disputed by PyJWT maintainers (key length is the app's responsibility).
+        # No fixed version exists; 2.12.1 is already the latest release.
+        # We use HS256 with a strong secret (>=256 bit) so the risk is mitigated.
+        run: pip-audit -r backend/requirements.txt --ignore-vuln PYSEC-2025-183
       - name: Run backend smoke tests
         run: >
           python -m pytest

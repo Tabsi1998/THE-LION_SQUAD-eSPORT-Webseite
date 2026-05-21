@@ -20,6 +20,8 @@ export function TournamentCard({ tournament, index = 0 }) {
       <div className="aspect-[16/9] relative overflow-hidden">
         <img
           src={resolveMediaUrl(bg)}
+          loading="lazy"
+          decoding="async"
           alt={t.title}
           className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-60 group-hover:scale-105 transition-all duration-500"
         />

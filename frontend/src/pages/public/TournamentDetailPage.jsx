@@ -148,7 +148,7 @@ export default function TournamentDetailPage() {
       <div className="relative border-b border-white/10 bg-grid-dense">
         {t.banner_url && (
           <div className="absolute inset-0">
-            <img src={resolveMediaUrl(t.banner_url)} alt="" className="w-full h-full object-cover opacity-20" />
+            <img src={resolveMediaUrl(t.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover opacity-20" />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#0A0A0A]" />
           </div>
         )}
