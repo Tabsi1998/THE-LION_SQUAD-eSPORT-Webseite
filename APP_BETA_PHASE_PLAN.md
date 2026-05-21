@@ -11,11 +11,12 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: Fast-Lap-Details nutzen vorhandene Streckenbilder (`track.image_url`) mit Challenge-Banner als Fallback.
 - Seit der Planerstellung umgesetzt: Profil-Actions wurden kompakter gemacht, Logout ist eine separate Konto-Aktion, Tabs sind sichtbarer und die Mehr-Navigation resetet beim Tabwechsel.
 - Seit der Planerstellung umgesetzt: Match-V2-Routen liefern Policy-Flags und blockieren Termin-Vorschlaege, wenn `schedule_mode=fixed_by_staff` gilt.
+- Seit der Planerstellung umgesetzt: Admin kann Turnier-Regeln auf Turnier- und Stage-Ebene konfigurieren; die Turnierliste zeigt Regelmodi kompakt an.
 - Seit der Planerstellung umgesetzt: `0.12.0-beta.2` ist vorbereitet, inklusive Android `versionCode` 28, Changelog und Release-Historie.
 - Ergebnislogik ist teilweise vorhanden: Bei klassischen Online-Matches koennen Teilnehmer Ergebnisse melden. Stimmen die letzten zwei Reports ueberein, wird das Match automatisch abgeschlossen. Weichen sie ab, geht das Match auf Klaerung.
 - Staff-Erfassung ist vorhanden: Turnierleitung kann klassische Matches direkt aktualisieren und V2-Heats ueber `/api/matches/{id}/result` werten.
-- Das Regelmodell fuer Vor-Ort-Staff-only, Online-Doppelmeldung und Hybrid ist im Backend begonnen, muss aber noch in Admin-UI, Turnier-Setup und Legacy/V1-Flows vollstaendig durchgezogen werden.
-- Terminabstimmung wird im Match-Hub ueber Backend-Flags gesteuert. Offen bleibt die vollstaendige Admin-Konfiguration pro Turnier/Stage.
+- Das Regelmodell fuer Vor-Ort-Staff-only, Online-Doppelmeldung und Hybrid ist im Backend und Admin begonnen. Offen bleibt die vollstaendige Durchsetzung/Pruefung in Legacy/V1-Flows und die bessere Erklaerung im Setup-Assistenten.
+- Terminabstimmung wird im Match-Hub ueber Backend-Flags gesteuert. Admin-Konfiguration ist auf Turnier- und Stage-Ebene moeglich, braucht aber noch Validierungs- und Preset-Komfort.
 - Mobile Embeds sind teilweise als Karten modernisiert. Offen bleibt, dass RichText/News/Info-Center konsequent echte Embed-Daten erhalten statt nur Fallbacks.
 - Das Profil ist deutlich kompakter, braucht aber noch Feinschliff bei Tab-Inhalten, Einstellungsgruppen und ggf. einem echten `ActionRow`/`SegmentedTabs`-Baustein.
 - Season-Punkte existieren bereits beim Status `results_published`. Teilnahme, Platzierung, Gewichtung und Jahreswertung sind also kein kompletter Neubau, brauchen aber bessere Benennung, Transparenz und App-Darstellung.
@@ -270,7 +271,7 @@ Fuer den naechsten APK-Build:
 
 1. Backend-Regelmodell fuer Ergebnis- und Terminrechte.
 2. Mobile Match-Hub passend zu lokalen und Online-Turnieren.
-3. Admin-UI/Turnier-Setup fuer `event_mode`, `result_entry_mode` und `schedule_mode` vollstaendig nachziehen.
+3. Legacy/V1-Flow und Admin-Validierung fuer `event_mode`, `result_entry_mode` und `schedule_mode` vollstaendig nachziehen.
 4. Embed-Daten in RichText/News/Info-Center vollstaendig anliefern und Fallback-Balken weiter reduzieren.
 5. Mobile Design-System mit Bottom-Bar/Blur, gemeinsamen Cards und Tabs modernisieren.
 6. Website-Modernisierung: Public Experience, SEO, Performance, Admin-Workflows und Live-Seiten.
