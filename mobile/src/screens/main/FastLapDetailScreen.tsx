@@ -11,7 +11,7 @@ import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime, formatStatus } from "../../lib/format";
 import { getRegistrationState, hasOnlineRegistration } from "../../lib/registration";
 import { colors } from "../../theme";
-import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload, F1Track } from "../../types";
+import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload } from "../../types";
 
 type Props = { route: { params: { id: string } } };
 
@@ -35,6 +35,7 @@ export function FastLapDetailScreen({ route }: Props) {
       const nextTrackId = trackId || nextChallenge.tracks?.[0]?.id || null;
       setChallenge(nextChallenge);
       setSelectedTrackId(nextTrackId);
+
       const leaderboardResult = await api.get<F1LeaderboardPayload>(`/f1/challenges/${nextChallenge.slug || nextChallenge.id}/leaderboard`, {
         params: nextTrackId ? { track_id: nextTrackId } : undefined,
       });
@@ -54,6 +55,7 @@ export function FastLapDetailScreen({ route }: Props) {
   const best = useMemo(() => leaderboard?.entries?.[0], [leaderboard]);
   const registration = useMemo(() => getRegistrationState(challenge, "Einreichung"), [challenge]);
   const showRegistrationInfo = hasOnlineRegistration(challenge) || challenge?.block_club_member_results || challenge?.allow_club_reference_times !== false;
+  const participantCount = challenge?.participant_count || leaderboard?.entries.length || 0;
 
   if (loading) {
     return (
@@ -77,20 +79,37 @@ export function FastLapDetailScreen({ route }: Props) {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(activeTrackId); }} tintColor={colors.cyan} />}
       >
-        <MediaImage
-          uri={challenge.banner_url}
-          style={styles.hero}
-          fallback={<Ionicons name="speedometer-outline" color={colors.gold} size={42} />}
-        />
+        <View style={styles.heroWrap}>
+          <MediaImage
+            uri={challenge.banner_url}
+            style={styles.hero}
+            fallback={<Ionicons name="speedometer-outline" color={colors.gold} size={42} />}
+          />
+          <View style={styles.heroShade} />
+          <View style={styles.heroContent}>
+            <View style={styles.heroMark}>
+              <Ionicons name="speedometer-outline" color={colors.black} size={22} />
+            </View>
+            <View style={styles.heroText}>
+              <Muted style={styles.heroEyebrow}>{challenge.public_phase?.label || formatStatus(challenge.status)}</Muted>
+              <Title>{challenge.title}</Title>
+              <Muted>{formatDate(challenge.start_date)}</Muted>
+            </View>
+          </View>
+        </View>
+
         <View style={styles.header}>
-          <Muted>{challenge.public_phase?.label || formatStatus(challenge.status)} · {formatDate(challenge.start_date)}</Muted>
-          <Title>{challenge.title}</Title>
-          {challenge.description ? <Body>{stripText(challenge.description)}</Body> : null}
+          {challenge.description ? <Body>{stripText(challenge.description)}</Body> : <Muted>Keine Beschreibung hinterlegt.</Muted>}
           <View style={styles.metaRow}>
             {challenge.vehicle ? <Pill label={challenge.vehicle} /> : null}
             {challenge.platform ? <Pill label={challenge.platform} /> : null}
             {challenge.weather ? <Pill label={challenge.weather} /> : null}
-            <Pill label={`${challenge.participant_count || leaderboard?.entries.length || 0} Fahrer`} tone="gold" />
+            <Pill label={`${participantCount} Fahrer`} tone="gold" />
+          </View>
+          <View style={styles.statGrid}>
+            <Stat icon="map-outline" label="Strecken" value={tracks.length || challenge.track_count || 0} />
+            <Stat icon="people-outline" label="Fahrer" value={participantCount} tone="gold" />
+            <Stat icon="timer-outline" label="Zeiten" value={leaderboard?.entries.length || 0} />
           </View>
         </View>
 
@@ -129,7 +148,11 @@ export function FastLapDetailScreen({ route }: Props) {
           {tracks.length ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
               {tracks.map((track) => (
-                <Pressable key={track.id} onPress={() => load(track.id)} style={[styles.tab, activeTrackId === track.id && styles.tabActive]}>
+                <Pressable
+                  key={track.id}
+                  onPress={() => load(track.id)}
+                  style={({ pressed }) => [styles.tab, activeTrackId === track.id && styles.tabActive, pressed && styles.pressed]}
+                >
                   <Muted style={[styles.tabText, activeTrackId === track.id && styles.tabTextActive]}>{track.name || "Strecke"}</Muted>
                 </Pressable>
               ))}
@@ -141,10 +164,15 @@ export function FastLapDetailScreen({ route }: Props) {
 
         {best ? (
           <Card style={styles.bestCard}>
-            <Muted>Bestzeit</Muted>
-            <Body style={styles.bestTime}>{best.time_str || "-"}</Body>
-            <Body style={styles.strong}>{best.display_name || best.username || "Fahrer"}</Body>
-            <Muted>{best.attempts || 0} Versuche · {best.gap_str || "Führung"}</Muted>
+            <View style={styles.bestIcon}>
+              <Ionicons name="trophy-outline" color={colors.gold} size={22} />
+            </View>
+            <View style={styles.bestText}>
+              <Muted>Bestzeit</Muted>
+              <Body style={styles.bestTime}>{best.time_str || "-"}</Body>
+              <Body style={styles.strong}>{best.display_name || best.username || "Fahrer"}</Body>
+              <Muted>{best.attempts || 0} Versuche · {best.gap_str || "Führung"}</Muted>
+            </View>
           </Card>
         ) : null}
 
@@ -173,6 +201,9 @@ function EntryRow({ entry, reference = false }: { entry: F1LeaderboardEntry; ref
   return (
     <Card style={[styles.entry, reference && styles.referenceEntry]}>
       <View style={styles.rankBox}>
+        {Number(entry.rank || 0) <= 3 && entry.rank ? (
+          <Ionicons name="medal-outline" color={colors.gold} size={20} />
+        ) : null}
         <Body style={[styles.rank, Number(entry.rank || 0) <= 3 && entry.rank ? styles.gold : null]}>{entry.rank ? `#${entry.rank}` : "-"}</Body>
       </View>
       <View style={styles.entryText}>
@@ -195,6 +226,16 @@ function Pill({ label, tone = "cyan" }: { label: string; tone?: "cyan" | "gold" 
   );
 }
 
+function Stat({ icon, label, value, tone = "cyan" }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: number; tone?: "cyan" | "gold" }) {
+  return (
+    <Card style={styles.stat}>
+      <Ionicons name={icon} color={tone === "gold" ? colors.gold : colors.cyan} size={18} />
+      <Body style={[styles.statValue, tone === "gold" && styles.gold]}>{value}</Body>
+      <Muted>{label}</Muted>
+    </Card>
+  );
+}
+
 function stripText(value: string) {
   return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -204,10 +245,47 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingBottom: 28,
   },
+  heroWrap: {
+    minHeight: 250,
+  },
   hero: {
     borderWidth: 0,
-    height: 220,
+    height: 250,
     width: "100%",
+  },
+  heroShade: {
+    backgroundColor: "rgba(0,0,0,0.45)",
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  heroContent: {
+    alignItems: "flex-end",
+    bottom: 18,
+    flexDirection: "row",
+    gap: 12,
+    left: 18,
+    position: "absolute",
+    right: 18,
+  },
+  heroMark: {
+    alignItems: "center",
+    backgroundColor: colors.gold,
+    borderRadius: 10,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
+  },
+  heroText: {
+    flex: 1,
+    gap: 3,
+  },
+  heroEyebrow: {
+    color: colors.gold,
+    fontWeight: "900",
+    textTransform: "uppercase",
   },
   header: {
     gap: 10,
@@ -217,6 +295,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+  },
+  statGrid: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  stat: {
+    flex: 1,
+    gap: 3,
+    minHeight: 88,
+  },
+  statValue: {
+    color: colors.cyan,
+    fontSize: 20,
+    fontWeight: "900",
   },
   section: {
     gap: 10,
@@ -245,8 +337,25 @@ const styles = StyleSheet.create({
     color: colors.gold,
   },
   bestCard: {
-    gap: 4,
+    alignItems: "center",
+    borderColor: "rgba(255,215,0,0.35)",
+    flexDirection: "row",
+    gap: 12,
     marginHorizontal: 18,
+  },
+  bestIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,215,0,0.12)",
+    borderColor: "rgba(255,215,0,0.32)",
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: "center",
+    width: 48,
+  },
+  bestText: {
+    flex: 1,
+    gap: 3,
   },
   infoCard: {
     gap: 8,
@@ -270,11 +379,14 @@ const styles = StyleSheet.create({
     borderColor: "rgba(240, 180, 41, 0.34)",
   },
   rankBox: {
-    width: 42,
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4,
+    width: 52,
   },
   rank: {
     color: colors.cyan,
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: "900",
   },
   entryText: {
@@ -317,5 +429,8 @@ const styles = StyleSheet.create({
   },
   error: {
     color: colors.live,
+  },
+  pressed: {
+    opacity: 0.72,
   },
 });
