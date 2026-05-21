@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-beta.9 - 2026-05-21
+
+- Mobile/CI: Android-Release blockiert den APK-Build nicht mehr, wenn noch kein `google-services.json` Secret fuer Firebase/FCM gesetzt ist.
+
 ## 1.0.0-beta.8 - 2026-05-21
 
 - Mobile: Chat-Composer auf `KeyboardStickyView` umgestellt, damit das Eingabefeld an der echten Tastaturkante bleibt statt unter der Tastatur zu verschwinden.
