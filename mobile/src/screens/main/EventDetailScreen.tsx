@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { ContentCard } from "../../components/ContentCard";
 import { FormInput } from "../../components/FormInput";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
@@ -266,13 +267,17 @@ export function EventDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>Verknüpfte Turniere</Heading>
             {event.tournaments.map((tournament) => (
-              <Pressable key={tournament.id} onPress={() => navigation.navigate("TournamentDetail", { id: tournament.slug || tournament.id })} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
-                <View style={styles.flex}>
-                  <Body style={styles.strong}>{tournament.title}</Body>
-                  <Muted>{formatDateTime(tournament.start_date)} · {tournament.public_phase?.label || formatStatus(tournament.status)}</Muted>
-                </View>
-                <Ionicons name="chevron-forward" color={colors.muted} size={18} />
-              </Pressable>
+              <ContentCard
+                key={tournament.id}
+                kind="tournament"
+                title={tournament.title}
+                image={tournament.banner_url || tournament.game?.cover_url || tournament.game?.logo_url}
+                date={tournament.start_date}
+                phase={tournament.public_phase}
+                status={tournament.status}
+                description={tournament.description}
+                onPress={() => navigation.navigate("TournamentDetail", { id: tournament.slug || tournament.id })}
+              />
             ))}
           </Card>
         ) : null}
@@ -281,13 +286,17 @@ export function EventDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>Fast-Lap Challenges</Heading>
             {event.f1_challenges.map((challenge) => (
-              <Pressable key={challenge.id} onPress={() => navigation.navigate("FastLapDetail", { id: challenge.slug || challenge.id })} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
-                <View style={styles.flex}>
-                  <Body style={styles.strong}>{challenge.title}</Body>
-                  <Muted>{formatDateTime(challenge.start_date)} · {challenge.public_phase?.label || formatStatus(challenge.status)}</Muted>
-                </View>
-                <Ionicons name="chevron-forward" color={colors.muted} size={18} />
-              </Pressable>
+              <ContentCard
+                key={challenge.id}
+                kind="fastlap"
+                title={challenge.title}
+                image={challenge.banner_url}
+                date={challenge.start_date}
+                phase={challenge.public_phase}
+                status={challenge.status}
+                description={challenge.description}
+                onPress={() => navigation.navigate("FastLapDetail", { id: challenge.slug || challenge.id })}
+              />
             ))}
           </Card>
         ) : null}
@@ -296,13 +305,15 @@ export function EventDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>News zum Event</Heading>
             {event.news.map((post) => (
-              <Pressable key={post.id} onPress={() => navigation.getParent()?.navigate("More", { screen: "NewsDetail", params: { id: post.slug || post.id } })} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
-                <View style={styles.flex}>
-                  <Body style={styles.strong}>{post.title}</Body>
-                  <Muted>{formatDateTime(post.published_at || post.created_at)}</Muted>
-                </View>
-                <Ionicons name="chevron-forward" color={colors.muted} size={18} />
-              </Pressable>
+              <ContentCard
+                key={post.id}
+                kind="news"
+                title={post.title}
+                image={post.banner_url}
+                date={post.published_at || post.created_at}
+                description={post.excerpt || post.summary}
+                onPress={() => navigation.getParent()?.navigate("More", { screen: "NewsDetail", params: { id: post.slug || post.id } })}
+              />
             ))}
           </Card>
         ) : null}

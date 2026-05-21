@@ -3,6 +3,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
+import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { RichText } from "../../components/RichText";
@@ -123,10 +124,15 @@ export function NewsDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>Verknüpfte Turniere</Heading>
             {post.linked_tournaments.map((tournament) => (
-              <LinkedContentCard
+              <ContentCard
                 key={tournament.id}
                 kind="tournament"
-                item={tournament}
+                title={tournament.title}
+                image={tournament.banner_url || tournament.game?.cover_url || tournament.game?.logo_url}
+                date={tournament.start_date}
+                phase={tournament.public_phase}
+                status={tournament.status}
+                description={tournament.description}
                 onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: tournament.slug || tournament.id } })}
               />
             ))}
@@ -137,10 +143,15 @@ export function NewsDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>Verknüpfte Events</Heading>
             {post.linked_events.map((event) => (
-              <LinkedContentCard
+              <ContentCard
                 key={event.id}
                 kind="event"
-                item={event}
+                title={event.title || event.name}
+                image={event.banner_url}
+                date={event.start_date || event.date}
+                phase={event.public_phase}
+                status={event.status}
+                description={[event.location, event.city].filter(Boolean).join(", ")}
                 onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id } })}
               />
             ))}
@@ -151,10 +162,15 @@ export function NewsDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>Verknüpfte Fast Laps</Heading>
             {post.linked_f1_challenges.map((challenge) => (
-              <LinkedContentCard
+              <ContentCard
                 key={challenge.id}
                 kind="fastlap"
-                item={challenge}
+                title={challenge.title}
+                image={challenge.banner_url}
+                date={challenge.start_date}
+                phase={challenge.public_phase}
+                status={challenge.status}
+                description={challenge.description}
                 onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "FastLapDetail", params: { id: challenge.slug || challenge.id } })}
               />
             ))}
