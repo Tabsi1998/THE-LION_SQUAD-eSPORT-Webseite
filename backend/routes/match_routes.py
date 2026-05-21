@@ -188,6 +188,22 @@ def _score_report_resolution(match: dict, reports: list[dict]) -> dict | None:
     }
 
 
+async def _audit_match_action(db, action: str, match: dict, actor_id: str | None, data: dict | None = None) -> None:
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": action,
+        "target_id": match.get("tournament_id") or match.get("id"),
+        "actor_id": actor_id,
+        "data": {
+            "match_id": match.get("id"),
+            "stage_id": match.get("stage_id"),
+            "match_key": match.get("match_key"),
+            **(data or {}),
+        },
+        "created_at": now_utc().isoformat(),
+    })
+
+
 async def _find_match_any(match_id: str) -> tuple[dict, str]:
     db = get_db()
     match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
@@ -995,6 +1011,22 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         m.get("score_a"),
         m.get("score_b"),
     )
+    if current_result_signature != previous_result_signature:
+        await _audit_match_action(db, "match.result.update", m, me.get("id"), {
+            "changed_fields": sorted(updates.keys()),
+            "previous": {
+                "status": previous_result_signature[0],
+                "winner_id": previous_result_signature[1],
+                "score_a": previous_result_signature[2],
+                "score_b": previous_result_signature[3],
+            },
+            "current": {
+                "status": current_result_signature[0],
+                "winner_id": current_result_signature[1],
+                "score_a": current_result_signature[2],
+                "score_b": current_result_signature[3],
+            },
+        })
     # If completed, advance bracket
     if m.get("status") == "completed" and m.get("winner_id"):
         all_matches = await db.matches.find({"tournament_id": m["tournament_id"]}).to_list(2000)
@@ -1077,12 +1109,25 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
         "$push": {"reports": report},
         "$set": {"status": "waiting_result", "updated_at": now_utc().isoformat()},
     })
+    await _audit_match_action(db, "match.result.report", m, me.get("id"), {
+        "report_id": report["id"],
+        "registration_id": my_reg["id"],
+        "score_a": body.score_a,
+        "score_b": body.score_b,
+    })
     # Check consensus - if 2 reports match, auto-complete
     m = await db.matches.find_one({"id": match_id})
     reports = m.get("reports", [])
     resolution = _score_report_resolution(m, reports)
     if resolution:
         await db.matches.update_one({"id": match_id}, {"$set": resolution})
+        await _audit_match_action(db, "match.result.auto_resolution", m, me.get("id"), {
+            "status": resolution.get("status"),
+            "score_a": resolution.get("score_a"),
+            "score_b": resolution.get("score_b"),
+            "winner_id": resolution.get("winner_id"),
+            "report_count": len(reports),
+        })
         if resolution.get("status") == "completed":
             # Advance bracket
             m = await db.matches.find_one({"id": match_id})
@@ -1110,6 +1155,9 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
         "$push": {"disputes": {"user_id": me["id"], "reason": body.reason,
                                  "at": now_utc().isoformat()}},
         "$set": {"status": "disputed", "updated_at": now_utc().isoformat()},
+    })
+    await _audit_match_action(db, "match.dispute.open", m, me.get("id"), {
+        "reason_length": len((body.reason or "").strip()),
     })
     m = await db.matches.find_one({"id": match_id}, {"_id": 0})
     # Phase B v4.1: trigger negative achievement for the user who disputed
@@ -1152,6 +1200,11 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(get_current_user
         "admin_decision_at": now_utc().isoformat(),
         "updated_at": now_utc().isoformat(),
     }})
+    await _audit_match_action(db, "match.forfeit", m, me.get("id"), {
+        "winner_id": winner_id,
+        "loser_id": loser_id,
+        "note_length": len(note),
+    })
     m = await db.matches.find_one({"id": match_id})
     all_matches = await db.matches.find({"tournament_id": m["tournament_id"]}).to_list(2000)
     for um in advance_match_winner(m, all_matches):

@@ -1,9 +1,10 @@
 import pathlib
 import sys
+import asyncio
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from routes.match_routes import _score_report_resolution
+from routes.match_routes import _audit_match_action, _score_report_resolution
 
 
 def _match(**overrides):
@@ -101,3 +102,38 @@ def test_score_report_resolution_allows_draws_in_group_matches():
     assert result["score_b"] == 1
     assert result["winner_id"] is None
     assert result["loser_id"] is None
+
+
+def test_audit_match_action_records_context():
+    db = _FakeDb()
+
+    asyncio.run(_audit_match_action(
+        db,
+        "match.result.report",
+        _match(tournament_id="t1", stage_id="s1", match_key="A1"),
+        "user-1",
+        {"score_a": 2, "score_b": 0},
+    ))
+
+    doc = db.audit_logs.docs[0]
+    assert doc["action"] == "match.result.report"
+    assert doc["target_id"] == "t1"
+    assert doc["actor_id"] == "user-1"
+    assert doc["data"]["match_id"] == "match-1"
+    assert doc["data"]["stage_id"] == "s1"
+    assert doc["data"]["match_key"] == "A1"
+    assert doc["data"]["score_a"] == 2
+    assert doc["data"]["score_b"] == 0
+
+
+class _FakeAuditLogs:
+    def __init__(self):
+        self.docs = []
+
+    async def insert_one(self, doc):
+        self.docs.append(doc)
+
+
+class _FakeDb:
+    def __init__(self):
+        self.audit_logs = _FakeAuditLogs()
