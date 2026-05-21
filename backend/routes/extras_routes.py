@@ -13,6 +13,7 @@ from database import get_db
 from auth import require_admin, require_super, get_current_user, get_optional_user
 from services.visibility import user_can_see
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
+from services.access_links import validate_access_link
 from models import now_utc, new_id
 from email_service import send_template, _get_email_config
 from pdf_service import (
@@ -1434,10 +1435,13 @@ async def season_standings(slug_or_id: str):
 widget_router = APIRouter(prefix="/api/widgets", tags=["widgets"])
 
 
-async def _public_f1_challenge_or_404(slug_or_id: str) -> dict:
+async def _public_f1_challenge_or_404(slug_or_id: str, access: str | None = None) -> dict:
     db = get_db()
     c, _ = await find_by_slug_or_history(db.f1_challenges, slug_or_id, {"_id": 0})
-    if not c or c.get("status") == "draft" or (c.get("visibility") or "public") != "public":
+    if not c:
+        raise HTTPException(status_code=404)
+    access_link = await validate_access_link(db, access, "fastlap", c["id"], None, "view")
+    if not access_link and (c.get("status") == "draft" or (c.get("visibility") or "public") != "public"):
         raise HTTPException(status_code=404)
     return c
 
@@ -1718,11 +1722,11 @@ async def pdf_tournament_standings(slug_or_id: str):
 
 
 @pdf_router.get("/f1/{slug_or_id}/leaderboard.pdf")
-async def pdf_f1_lb(slug_or_id: str, track_id: Optional[str] = None):
+async def pdf_f1_lb(slug_or_id: str, track_id: Optional[str] = None, access: Optional[str] = None):
     db = get_db()
-    c = await _public_f1_challenge_or_404(slug_or_id)
+    c = await _public_f1_challenge_or_404(slug_or_id, access)
     from routes.f1_routes import leaderboard as f1_lb
-    lb = await f1_lb(c["id"], track_id)
+    lb = await f1_lb(c["id"], track_id, access)
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
     return _pdf_response(pdf_f1_leaderboard(c, lb.get("track"), lb.get("entries", []), pdf_sponsors=sponsors, pdf_branding=branding),
@@ -1730,11 +1734,11 @@ async def pdf_f1_lb(slug_or_id: str, track_id: Optional[str] = None):
 
 
 @pdf_router.get("/f1/{slug_or_id}/championship.pdf")
-async def pdf_f1_championship(slug_or_id: str):
+async def pdf_f1_championship(slug_or_id: str, access: Optional[str] = None):
     db = get_db()
-    c = await _public_f1_challenge_or_404(slug_or_id)
+    c = await _public_f1_challenge_or_404(slug_or_id, access)
     from routes.f1_routes import championship_standings as f1_champ
-    cs = await f1_champ(c["id"])
+    cs = await f1_champ(c["id"], access)
     # Reuse standings PDF shape
     rows = [{"rank": r["rank"], "display_name": r["display_name"],
              "won": r.get("wins", 0), "lost": (r.get("races", 0) - r.get("wins", 0)),

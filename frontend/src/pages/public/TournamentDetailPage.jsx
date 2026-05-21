@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -23,6 +23,8 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 
 export default function TournamentDetailPage() {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
+  const accessToken = searchParams.get("access") || "";
   const nav = useNavigate();
   const { user } = useAuth();
   const [t, setT] = useState(null);
@@ -40,10 +42,11 @@ export default function TournamentDetailPage() {
   useCanonicalSlugRedirect(slug, t?.slug, "/tournaments");
 
   const load = useCallback(async () => {
-    const { data } = await api.get(`/tournaments/${slug}`);
+    const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
+    const { data } = await api.get(`/tournaments/${slug}`, accessConfig);
     setT(data);
     const [{ data: r }, teamsResponse] = await Promise.all([
-      api.get(`/tournaments/${data.id}/registrations`),
+      api.get(`/tournaments/${data.id}/registrations`, accessConfig),
       user ? api.get("/teams/my").catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
     ]);
     const teams = teamsResponse.data || [];
@@ -51,7 +54,7 @@ export default function TournamentDetailPage() {
     setMyTeams(teams);
     if (["completed", "results_published", "archived"].includes(data.status)) {
       try {
-        const { data: rows } = await api.get(`/tournaments/${data.id}/standings`);
+        const { data: rows } = await api.get(`/tournaments/${data.id}/standings`, accessConfig);
         setStandings(rows || []);
       } catch {
         setStandings([]);
@@ -61,7 +64,7 @@ export default function TournamentDetailPage() {
     }
     const teamIds = new Set(teams.map((team) => team.id));
     setMyReg(user ? r.find((x) => x.user_id === user.id || x.is_mine || (x.team_id && teamIds.has(x.team_id))) || null : null);
-  }, [slug, user]);
+  }, [slug, user, accessToken]);
 
   useEffect(() => {
     load();
@@ -72,7 +75,7 @@ export default function TournamentDetailPage() {
   useApiInvalidation(load, ["tournaments"]);
 
   const submitRegistration = async ({ playerIds = {}, teamId = null } = {}) => {
-    if (!user) { nav(`/login?next=/tournaments/${slug}`); return; }
+    if (!user) { nav(`/login?next=${encodeURIComponent(`/tournaments/${slug}${accessToken ? `?access=${accessToken}` : ""}`)}`); return; }
     setLoading(true);
     try {
       await api.post(`/tournaments/${t.id}/register`, {
@@ -81,7 +84,7 @@ export default function TournamentDetailPage() {
         discord: user.discord_name,
         player_ids: playerIds,
         accept_rules: true, accept_privacy: true,
-      });
+      }, { params: accessToken ? { access: accessToken } : undefined });
       toast.success("Erfolgreich angemeldet!");
       setRegisterModal(false);
       load();
@@ -91,7 +94,7 @@ export default function TournamentDetailPage() {
   };
 
   const handleRegister = async () => {
-    if (!user) { nav(`/login?next=/tournaments/${slug}`); return; }
+    if (!user) { nav(`/login?next=${encodeURIComponent(`/tournaments/${slug}${accessToken ? `?access=${accessToken}` : ""}`)}`); return; }
     const needsTeam = (t.team_mode || "solo") !== "solo";
     if (needsTeam || (t.game?.effective_player_id_fields || t.game?.player_id_fields || []).length) {
       setRegisterModal(true);
@@ -136,7 +139,8 @@ export default function TournamentDetailPage() {
   const myRegTeam = myReg?.team_id ? myTeams.find((team) => team.id === myReg.team_id) : null;
   const canCheckIn = !!myReg && (!myReg.team_id || myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role));
   const clubMemberBlocked = !!user?.is_club_member && !!t.block_club_member_registration;
-  const canSelfRegister = registration.canRegister && !clubMemberBlocked;
+  const hasRegisterAccess = t.access_link?.grants?.includes("register");
+  const canSelfRegister = (registration.canRegister || hasRegisterAccess) && !clubMemberBlocked;
   const canSelfUnregister = !!myReg && (myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role)) && !["checked_in", "no_show", "rejected"].includes(myReg.status) && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
   const podiumRows = standings
     .filter((row) => Number(row.rank) >= 1 && Number(row.rank) <= 3)
@@ -232,10 +236,10 @@ export default function TournamentDetailPage() {
               </button>
             )}
             {myReg && <StatusBadge status={myReg.status} size="lg" />}
-            <Link to={`/tournaments/${t.slug || t.id}/bracket`} data-testid="tournament-bracket-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
+            <Link to={`/tournaments/${t.slug || t.id}/bracket${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} data-testid="tournament-bracket-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
               Turnierbaum ansehen
             </Link>
-            <Link to={`/tournaments/${t.slug || t.id}/matches`} data-testid="tournament-schedule-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
+            <Link to={`/tournaments/${t.slug || t.id}/matches${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} data-testid="tournament-schedule-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
               Spielplan
             </Link>
             {t.can_manage_results && (
@@ -243,7 +247,7 @@ export default function TournamentDetailPage() {
                 Ergebnisse eintragen
               </Link>
             )}
-            <Link to={`/tournaments/${t.slug || t.id}/standings`} data-testid="tournament-standings-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
+            <Link to={`/tournaments/${t.slug || t.id}/standings${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} data-testid="tournament-standings-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
               Rangliste
             </Link>
             {t.stream_link && (

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { API, api, formatRequestError, parseTimeStr, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -16,8 +16,19 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 
+function f1Query(values = {}) {
+  const params = new URLSearchParams();
+  Object.entries(values).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
 export default function F1DetailPage() {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
+  const accessToken = searchParams.get("access") || "";
   const { user } = useAuth();
   const [challenge, setChallenge] = useState(null);
   const [activeTrack, setActiveTrack] = useState(null);
@@ -31,19 +42,20 @@ export default function F1DetailPage() {
   useCanonicalSlugRedirect(slug, challenge?.slug, "/fastlap");
 
   const loadChallenge = useCallback(async () => {
-    const { data } = await api.get(`/f1/challenges/${slug}`);
+    const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
+    const { data } = await api.get(`/f1/challenges/${slug}`, accessConfig);
     setChallenge(data);
     setActiveTrack((current) => {
       if (current && data.tracks?.some((tr) => tr.id === current)) return current;
       return data.tracks?.[0]?.id || null;
     });
     if (data.is_championship) {
-      const { data: cs } = await api.get(`/f1/challenges/${data.id}/championship`);
+      const { data: cs } = await api.get(`/f1/challenges/${data.id}/championship`, accessConfig);
       setChampionship(cs);
     } else {
       setChampionship(null);
     }
-  }, [slug]);
+  }, [slug, accessToken]);
 
   useEffect(() => {
     loadChallenge();
@@ -53,9 +65,11 @@ export default function F1DetailPage() {
 
   const loadBoard = useCallback(async () => {
     if (!challenge?.id || !activeTrack) return;
-    const { data } = await api.get(`/f1/challenges/${challenge.id}/leaderboard?track_id=${activeTrack}`);
+    const { data } = await api.get(`/f1/challenges/${challenge.id}/leaderboard`, {
+      params: { track_id: activeTrack, ...(accessToken ? { access: accessToken } : {}) },
+    });
     setBoard(data);
-  }, [challenge?.id, activeTrack]);
+  }, [challenge?.id, activeTrack, accessToken]);
 
   useEffect(() => {
     loadBoard();
@@ -122,7 +136,7 @@ export default function F1DetailPage() {
               <Tv className="w-4 h-4" /> TV / Beamer Modus
             </Link>
             <a
-              href={`${API}/exports/f1/${challenge.slug || challenge.id}/leaderboard.pdf${activeTrack ? `?track_id=${activeTrack}` : ""}`}
+              href={`${API}/exports/f1/${challenge.slug || challenge.id}/leaderboard.pdf${f1Query({ track_id: activeTrack, access: accessToken })}`}
               target="_blank" rel="noreferrer"
               data-testid="f1-export-pdf-track"
               className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition"
@@ -131,7 +145,7 @@ export default function F1DetailPage() {
             </a>
             {challenge.is_championship && (
               <a
-                href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship.pdf`}
+                href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship.pdf${f1Query({ access: accessToken })}`}
                 target="_blank" rel="noreferrer"
                 data-testid="f1-export-pdf-championship"
                 className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition"
@@ -140,7 +154,7 @@ export default function F1DetailPage() {
               </a>
             )}
             <a
-              href={`${API}/f1/challenges/${challenge.id}/export.csv`}
+              href={`${API}/f1/challenges/${challenge.id}/export.csv${f1Query({ access: accessToken })}`}
               data-testid="f1-export-csv"
               className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/10 text-white/60 font-bold uppercase tracking-wider rounded-sm hover:border-white/20 hover:text-white transition text-sm"
             >

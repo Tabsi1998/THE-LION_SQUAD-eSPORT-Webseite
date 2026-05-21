@@ -5,6 +5,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
+import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
@@ -222,6 +223,7 @@ export default function AdminF1EditPage() {
         </div>
       </div>
 
+      {isAdmin && <div className="mb-5"><AccessLinksPanel targetType="fastlap" targetId={challenge.id} /></div>}
       {isAdmin && <ChallengeSettingsForm key={challenge.updated_at || challenge.id} challenge={challenge} onSaved={load} />}
       {isAdmin && <F1StaffPanel challengeId={challenge.id} staff={staff} users={users} onChanged={load} />}
 

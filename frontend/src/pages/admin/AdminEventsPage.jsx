@@ -3,6 +3,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
+import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { appendEmbedToken } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -345,6 +346,9 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
             Für neue Inhalte reicht normalerweise <span className="text-white font-semibold">Entwurf</span> oder <span className="text-white font-semibold">Angekündigt</span>. Anmeldung, Live und Beendet werden über die Datumsfelder automatisch berechnet.
           </div>
+          {!isNew && (
+            <AccessLinksPanel targetType="event" targetId={event.id} allowRegister={form.has_registration} />
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Start"><input type="datetime-local" value={form.start_date} onChange={(e) => set("start_date", e.target.value)} data-testid="event-start" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
             <Field label="Ende"><input type="datetime-local" value={form.end_date} onChange={(e) => set("end_date", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { CalendarClock } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { api } from "@/lib/api";
@@ -33,13 +33,16 @@ function duelLabels(match, registrations) {
 
 export default function TournamentSchedulePage() {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
+  const accessToken = searchParams.get("access") || "";
   const [data, setData] = useState(null);
 
   const load = useCallback(async () => {
-    const { data: tournament } = await api.get(`/tournaments/${slug}`);
-    const { data: bracket } = await api.get(`/tournaments/${tournament.id}/bracket`);
+    const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
+    const { data: tournament } = await api.get(`/tournaments/${slug}`, accessConfig);
+    const { data: bracket } = await api.get(`/tournaments/${tournament.id}/bracket`, accessConfig);
     setData(bracket);
-  }, [slug]);
+  }, [slug, accessToken]);
 
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["tournaments", "matches", "matches_v2"]);
@@ -81,7 +84,7 @@ export default function TournamentSchedulePage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link to={`/tournaments/${tournament.slug || tournament.id}`} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
+        <Link to={`/tournaments/${tournament.slug || tournament.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
         <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase">Spielplan</h1>
         <p className="mt-3 text-white/60 max-w-2xl">Alle Runden, Heats, Zeiten und öffentlichen Matchseiten für Terminabstimmung, Chat und Ergebnisstatus.</p>
 

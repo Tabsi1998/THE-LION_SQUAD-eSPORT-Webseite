@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { BracketTree } from "@/components/tls/BracketTree";
@@ -12,6 +12,8 @@ import { Tv } from "lucide-react";
 
 export default function TournamentBracketPage() {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
+  const accessToken = searchParams.get("access") || "";
   const [data, setData] = useState(null);
   const tournament = data?.tournament;
   useDocumentTitle(`${tournament?.title || "Turnier"} Turnierbaum`, tournament?.description || "Live-Turnierbaum von THE LION SQUAD eSports.", {
@@ -21,10 +23,11 @@ export default function TournamentBracketPage() {
   useCanonicalSlugRedirect(slug, tournament?.slug, "/tournaments", "/bracket");
 
   const load = useCallback(async () => {
-    const { data: t } = await api.get(`/tournaments/${slug}`);
-    const { data: br } = await api.get(`/tournaments/${t.id}/bracket`);
+    const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
+    const { data: t } = await api.get(`/tournaments/${slug}`, accessConfig);
+    const { data: br } = await api.get(`/tournaments/${t.id}/bracket`, accessConfig);
     setData(br);
-  }, [slug]);
+  }, [slug, accessToken]);
 
   useEffect(() => {
     load();
@@ -42,7 +45,7 @@ export default function TournamentBracketPage() {
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div>
-            <Link to={`/tournaments/${t.slug}`} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
+            <Link to={`/tournaments/${t.slug}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
             <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">{t.title}</h1>
             <div className="mt-2 flex gap-2 items-center">
               <PhaseBadge phase={t.public_phase} status={t.status} />

@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_current_user, require_admin, get_optional_user
 from services.visibility import user_can_see
+from services.access_links import public_access_link_payload, record_access_link_use, validate_access_link
 from services.public_phase import derive_public_phase
 from services.station_labels import attach_station_info
 from services.tournament_permissions import (
@@ -1286,7 +1287,7 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
 
 
 @router.get("/{slug_or_id}")
-async def get_tournament(slug_or_id: str, include_draft: bool = False, user=Depends(get_optional_user)):
+async def get_tournament(slug_or_id: str, include_draft: bool = False, access: str | None = None, user=Depends(get_optional_user)):
     db = get_db()
     t, was_old_slug = await find_by_slug_or_history(db.tournaments, slug_or_id, {"_id": 0})
     if not t:
@@ -1294,19 +1295,24 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, user=Depe
     is_admin = user and user.get("role") in STAFF_ROLES
     is_assigned = await _is_tournament_staff(t["id"], user)
     is_participant = await _user_participates_in_tournament(db, t["id"], user)
-    if t.get("status") == "draft" and not (is_admin or is_assigned):
+    access_link = await validate_access_link(db, access, "tournament", t["id"], user, "view")
+    has_access = bool(access_link)
+    if t.get("status") == "draft" and not (is_admin or is_assigned or has_access):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if not (is_admin or is_assigned or is_participant) and t.get("is_public") is False:
+    if not (is_admin or is_assigned or is_participant or has_access) and t.get("is_public") is False:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if not (is_admin or is_assigned or is_participant) and not await user_can_see(user, t.get("visibility") or "public"):
+    if not (is_admin or is_assigned or is_participant or has_access) and not await user_can_see(user, t.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Turnier ist nicht sichtbar")
     if was_old_slug and t.get("slug"):
-        return RedirectResponse(url=f"/api/tournaments/{t['slug']}", status_code=301)
+        suffix = f"?access={access}" if access else ""
+        return RedirectResponse(url=f"/api/tournaments/{t['slug']}{suffix}", status_code=301)
     await _enrich_tournament(t, user)
     t["can_manage_results"] = bool(
         is_admin
         or await has_tournament_staff_permission(user, t["id"], RESULT_STAFF_ROLES)
     )
+    if access_link:
+        t["access_link"] = public_access_link_payload(access_link)
     if t.get("event_id"):
         related_f1_query = {"event_id": t["event_id"]}
         if not is_admin:
@@ -1520,10 +1526,16 @@ async def delete_tournament(tid: str, me: dict = Depends(require_admin())):
 
 # --- Registrations ---
 @router.get("/{tid}/registrations")
-async def list_registrations(tid: str, user=Depends(get_optional_user)):
+async def list_registrations(tid: str, access: str | None = None, user=Depends(get_optional_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    t_doc = await _get_visible_tournament(tid, user)
+    access_link = await validate_access_link(db, access, "tournament", tid, user, "view")
+    if access_link:
+        t_doc = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+        if not t_doc:
+            raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    else:
+        t_doc = await _get_visible_tournament(tid, user)
     is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
     user_team_ids = set()
@@ -1583,16 +1595,26 @@ async def list_assignable_tournament_users(tid: str, q: str | None = None, limit
 
 @router.post("/{tid}/register")
 async def register_for_tournament(tid: str, body: RegistrationCreate,
+                                   access: str | None = None,
                                    me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    t = await _get_visible_tournament(tid, me)
+    t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not t:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    view_access = await validate_access_link(db, access, "tournament", tid, me, "view")
+    register_access = await validate_access_link(db, access, "tournament", tid, me, "register")
+    has_access = bool(view_access or register_access)
+    if not has_access:
+        t = await _get_visible_tournament(tid, me)
+    elif t.get("status") == "draft" and not register_access:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if _is_tournament_locked(t):
         raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
     if not body.accept_rules or not body.accept_privacy:
         raise HTTPException(status_code=400, detail="Regeln und Datenschutz müssen akzeptiert werden.")
     registration_error = _registration_error(t)
-    if registration_error:
+    if registration_error and not register_access:
         raise HTTPException(status_code=400, detail=registration_error)
     if t.get("block_club_member_registration") and await _is_active_club_member(db, me):
         raise HTTPException(status_code=403, detail="Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.")
@@ -1655,6 +1677,8 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
         await on_tournament_registered(me["id"], tid)
     except Exception:
         pass
+    if register_access:
+        await record_access_link_use(db, register_access, me)
     return reg
 
 
@@ -2595,10 +2619,16 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
 
 
 @router.get("/{tid}/bracket")
-async def get_bracket(tid: str, user=Depends(get_optional_user)):
+async def get_bracket(tid: str, access: str | None = None, user=Depends(get_optional_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    t = await _get_visible_tournament(tid, user)
+    access_link = await validate_access_link(db, access, "tournament", tid, user, "view")
+    if access_link:
+        t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+        if not t:
+            raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    else:
+        t = await _get_visible_tournament(tid, user)
     is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
     return await _build_bracket_payload(db, t, user, is_staff)
 
@@ -2670,10 +2700,16 @@ def _v2_standings(matches_v2: list[dict], regs: list[dict]) -> list[dict]:
 
 
 @router.get("/{tid}/standings")
-async def standings(tid: str, user=Depends(get_optional_user)):
+async def standings(tid: str, access: str | None = None, user=Depends(get_optional_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    t = await _get_visible_tournament(tid, user)
+    access_link = await validate_access_link(db, access, "tournament", tid, user, "view")
+    if access_link:
+        t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+        if not t:
+            raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    else:
+        t = await _get_visible_tournament(tid, user)
     is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
     matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(1000)
     matches_v2 = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)

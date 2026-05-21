@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -8,6 +8,8 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function TournamentStandingsPage() {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
+  const accessToken = searchParams.get("access") || "";
   const [t, setT] = useState(null);
   const [rows, setRows] = useState([]);
   useDocumentTitle(`${t?.title || "Turnier"} Rangliste`, "Rangliste und Ergebnisse des Turniers.", {
@@ -17,11 +19,12 @@ export default function TournamentStandingsPage() {
   useCanonicalSlugRedirect(slug, t?.slug, "/tournaments", "/standings");
 
   const load = useCallback(async () => {
-    const { data: tr } = await api.get(`/tournaments/${slug}`);
+    const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
+    const { data: tr } = await api.get(`/tournaments/${slug}`, accessConfig);
     setT(tr);
-    const { data } = await api.get(`/tournaments/${tr.id}/standings`);
+    const { data } = await api.get(`/tournaments/${tr.id}/standings`, accessConfig);
     setRows(data);
-  }, [slug]);
+  }, [slug, accessToken]);
 
   useEffect(() => {
     load();
@@ -36,7 +39,7 @@ export default function TournamentStandingsPage() {
   return (
     <PublicLayout>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link to={`/tournaments/${t.slug}`} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← {t.title}</Link>
+        <Link to={`/tournaments/${t.slug}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← {t.title}</Link>
         <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Rangliste</h1>
         <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <table className="w-full text-sm">

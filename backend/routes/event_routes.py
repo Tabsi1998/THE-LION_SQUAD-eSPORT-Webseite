@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from database import get_db
 from auth import require_admin, get_optional_user, get_current_user
 from services.visibility import user_can_see
+from services.access_links import public_access_link_payload, record_access_link_use, validate_access_link
 from services.content_embed_service import resolve_content_embeds
 from services.public_phase import derive_public_phase
 from services.sponsor_utils import dedupe_public_sponsors
@@ -25,17 +26,23 @@ async def _user_can_see(user: dict | None, visibility: str) -> bool:
     return await user_can_see(user, visibility)
 
 
-async def _filter_related(items: list[dict], user: dict | None, kind: str) -> list[dict]:
+async def _filter_related(items: list[dict], user: dict | None, kind: str, access: str | None = None) -> list[dict]:
     out: list[dict] = []
     is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    db = get_db()
+    target_type = "fastlap" if kind == "fastlap" else kind
     for item in items:
-        if item.get("status") == "draft" and not is_staff:
+        access_link = await validate_access_link(db, access, target_type, item.get("id"), user, "view")
+        has_access = bool(access_link)
+        if item.get("status") == "draft" and not (is_staff or has_access):
             continue
-        if kind == "tournament" and item.get("is_public") is False and not is_staff:
+        if kind == "tournament" and item.get("is_public") is False and not (is_staff or has_access):
             continue
-        if await _user_can_see(user, item.get("visibility") or "public"):
+        if has_access or await _user_can_see(user, item.get("visibility") or "public"):
             phase_kind = "f1" if kind == "fastlap" else kind
             item["public_phase"] = derive_public_phase(item, phase_kind)
+            if access_link:
+                item["access_link"] = public_access_link_payload(access_link)
             out.append(item)
     return out
 
@@ -335,28 +342,33 @@ async def event_meta():
 
 
 @router.get("/{slug_or_id}")
-async def get_event(slug_or_id: str, include_draft: bool = False, user: dict | None = Depends(get_optional_user)):
+async def get_event(slug_or_id: str, include_draft: bool = False, access: str | None = None, user: dict | None = Depends(get_optional_user)):
     db = get_db()
     event, was_old_slug = await _find_event(slug_or_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
     is_admin = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
-    if event.get("status") == "draft" and not is_admin:
+    access_link = await validate_access_link(db, access, "event", event["id"], user, "view")
+    has_access = bool(access_link)
+    if event.get("status") == "draft" and not (is_admin or has_access):
         raise HTTPException(404, "Event nicht gefunden.")
-    if not await _user_can_see(user, event.get("visibility") or "public"):
+    if not has_access and not await _user_can_see(user, event.get("visibility") or "public"):
         raise HTTPException(403, "Event ist nicht sichtbar.")
     if was_old_slug and event.get("slug"):
-        return RedirectResponse(url=f"/api/events/{event['slug']}", status_code=301)
+        suffix = f"?access={access}" if access else ""
+        return RedirectResponse(url=f"/api/events/{event['slug']}{suffix}", status_code=301)
     # Attach tournaments and f1 challenges
     event["tournaments"] = await _filter_related(
         await db.tournaments.find({"event_id": event["id"]}, {"_id": 0}).to_list(200),
         user,
         "tournament",
+        access,
     )
     event["f1_challenges"] = await _filter_related(
         await db.f1_challenges.find({"event_id": event["id"]}, {"_id": 0}).to_list(200),
         user,
         "fastlap",
+        access,
     )
     # Albums linked to this event
     albums = await db.gallery_albums.find(
@@ -378,6 +390,8 @@ async def get_event(slug_or_id: str, include_draft: bool = False, user: dict | N
     event["content_embeds"] = await resolve_content_embeds(db, event.get("program"), user)
     await _decorate_event(event, include_sponsors=True)
     await _attach_event_registration_view(event, user)
+    if access_link:
+        event["access_link"] = public_access_link_payload(access_link)
     return event
 
 
@@ -400,17 +414,23 @@ async def list_event_registrations(event_id: str, me: dict = Depends(require_adm
 
 @router.post("/{event_id}/registrations")
 async def register_for_event(event_id: str, body: EventRegistrationCreate,
+                             access: str | None = None,
                              me: dict = Depends(get_current_user)):
     db = get_db()
     event, _ = await _find_event(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
-    if event.get("status") == "draft" and me.get("role") not in STAFF_ROLES:
+    view_access = await validate_access_link(db, access, "event", event["id"], me, "view")
+    register_access = await validate_access_link(db, access, "event", event["id"], me, "register")
+    has_access = bool(view_access or register_access)
+    if event.get("status") == "draft" and me.get("role") not in STAFF_ROLES and not has_access:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
-    if not await _user_can_see(me, event.get("visibility") or "public"):
+    if not has_access and not await _user_can_see(me, event.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Event ist nicht sichtbar")
-    if not _event_registration_open(event):
+    if not _event_registration_open(event) and not register_access:
         raise HTTPException(status_code=400, detail="Die Anmeldung ist aktuell nicht offen")
+    if not event.get("has_registration"):
+        raise HTTPException(status_code=400, detail="Dieses Event hat keine Anmeldung")
 
     companion_count = _validated_companion_count(event, body.companion_count)
     requested_seats = 1 + companion_count
@@ -458,6 +478,8 @@ async def register_for_event(event_id: str, body: EventRegistrationCreate,
         "data": {"registration_id": doc["id"], "status": status, "companion_count": companion_count},
         "created_at": now,
     })
+    if register_access:
+        await record_access_link_use(db, register_access, me)
     return _public_event_registration(doc, is_staff=True)
 
 

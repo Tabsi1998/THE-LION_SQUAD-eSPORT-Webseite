@@ -1,0 +1,170 @@
+import { useCallback, useEffect, useState } from "react";
+import { api, formatRequestError } from "@/lib/api";
+import { Copy, Link2, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+
+const TARGET_LABELS = {
+  event: "Event",
+  tournament: "Turnier",
+  fastlap: "Fast-Lap",
+};
+
+function absoluteUrl(path) {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${window.location.origin}${path}`;
+}
+
+async function copyText(value) {
+  if (!value) return;
+  await navigator.clipboard?.writeText(value).catch(() => null);
+}
+
+export function AccessLinksPanel({ targetType, targetId, allowRegister = false }) {
+  const [links, setLinks] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [includeRegister, setIncludeRegister] = useState(allowRegister);
+  const [note, setNote] = useState("");
+  const [expiresInDays, setExpiresInDays] = useState("");
+
+  const load = useCallback(async () => {
+    if (!targetType || !targetId) return;
+    const { data } = await api.get("/access-links", {
+      params: { target_type: targetType, target_id: targetId },
+    });
+    setLinks(data || []);
+  }, [targetType, targetId]);
+
+  useEffect(() => {
+    load().catch(() => setLinks([]));
+  }, [load]);
+
+  const create = async () => {
+    setBusy(true);
+    try {
+      const days = Number(expiresInDays || 0);
+      const expiresAt = days > 0 ? new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString() : null;
+      const grants = ["view", ...(includeRegister && allowRegister ? ["register"] : [])];
+      const { data } = await api.post("/access-links", {
+        target_type: targetType,
+        target_id: targetId,
+        grants,
+        expires_at: expiresAt,
+        note: note.trim() || null,
+      });
+      const url = absoluteUrl(data.url);
+      await copyText(url);
+      toast.success("Speziallink erstellt und kopiert.");
+      setNote("");
+      setExpiresInDays("");
+      await load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Speziallink konnte nicht erstellt werden."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revoke = async (link) => {
+    setBusy(true);
+    try {
+      await api.delete(`/access-links/${link.id}`);
+      toast.success("Speziallink deaktiviert.");
+      await load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Speziallink konnte nicht deaktiviert werden."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest font-bold text-[#FFD700]">
+            <Link2 className="w-3.5 h-3.5" /> Speziallinks
+          </div>
+          <p className="mt-1 text-xs text-white/50">
+            Gezielt Zugriff auf gesperrte oder interne {TARGET_LABELS[targetType] || "Inhalte"} geben.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={create}
+          disabled={busy}
+          className="inline-flex items-center gap-2 px-3 py-2 bg-[#FFD700] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50"
+        >
+          <Plus className="w-3.5 h-3.5" /> Erstellen
+        </button>
+      </div>
+
+      <div className="grid md:grid-cols-[1fr_8rem_auto] gap-2 items-end">
+        <label className="block">
+          <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">Notiz</span>
+          <input
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            maxLength={500}
+            placeholder="z.B. Gastteam, Presse, externer Fahrer"
+            className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="block">
+          <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">Tage</span>
+          <input
+            type="number"
+            min="1"
+            max="365"
+            value={expiresInDays}
+            onChange={(event) => setExpiresInDays(event.target.value)}
+            placeholder="offen"
+            className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm"
+          />
+        </label>
+        {allowRegister && (
+          <label className="inline-flex items-center gap-2 text-xs text-white/70 pb-2">
+            <input type="checkbox" checked={includeRegister} onChange={(event) => setIncludeRegister(event.target.checked)} className="accent-[#FFD700]" />
+            Anmeldung freigeben
+          </label>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        {links.map((link) => (
+          <div key={link.id} className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-[#0A0A0A]/70 rounded-sm px-3 py-2">
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-white/80">
+                {(link.grants || []).join(", ")} {link.note ? <span className="text-white/40 font-normal">- {link.note}</span> : null}
+              </div>
+              <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/35">
+                {link.use_count || 0}{link.max_uses ? `/${link.max_uses}` : ""} Nutzungen
+                {link.expires_at ? ` · bis ${new Date(link.expires_at).toLocaleDateString("de-DE")}` : " · ohne Ablauf"}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => toast.info("Der vollständige Link ist nur direkt beim Erstellen sichtbar.")}
+                className="p-2 border border-white/10 text-white/45 rounded-sm"
+                title="Link-Hinweis"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => revoke(link)}
+                disabled={busy}
+                className="p-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm hover:bg-[#FF3B30]/10 disabled:opacity-50"
+                title="Deaktivieren"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        ))}
+        {links.length === 0 && <div className="text-xs text-white/40 border border-dashed border-white/10 rounded-sm p-3">Noch keine aktiven Speziallinks.</div>}
+      </div>
+    </section>
+  );
+}

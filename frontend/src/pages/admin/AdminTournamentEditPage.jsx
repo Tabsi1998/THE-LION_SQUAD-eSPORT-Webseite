@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
+import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { formatDateTime, fromDateTimeLocal, normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
@@ -656,6 +657,8 @@ export default function AdminTournamentEditPage() {
           </div>
         </div>
       </div>
+
+      {isAdmin && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister /></div>}
 
       <div className="flex gap-2 mb-5 border-b border-white/10 overflow-x-auto">
         {["participants", "bracket", "stages", ...(t.format === "groups" ? ["groups"] : []), ...(isAdmin ? ["staff"] : []), "edit"].map((s) => (

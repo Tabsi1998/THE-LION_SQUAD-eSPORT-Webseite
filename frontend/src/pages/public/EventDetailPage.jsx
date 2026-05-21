@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -55,6 +55,8 @@ function uniqueLogoSponsors(sponsors = []) {
 
 export default function EventDetailPage() {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
+  const accessToken = searchParams.get("access") || "";
   const { user } = useAuth();
   const [e, setE] = useState(null);
   const [error, setError] = useState(null);
@@ -67,13 +69,13 @@ export default function EventDetailPage() {
   useCanonicalSlugRedirect(slug, e?.slug, "/events");
 
   const load = useCallback(() => {
-    return api.get(`/events/${slug}`).then(({ data }) => {
+    return api.get(`/events/${slug}`, { params: accessToken ? { access: accessToken } : undefined }).then(({ data }) => {
       setE(data);
       setError(null);
     }).catch((err) => {
       setError(err.response?.status === 403 ? "Dieses Event ist nicht öffentlich zugänglich." : "Event nicht gefunden.");
     });
-  }, [slug]);
+  }, [slug, accessToken]);
 
   useEffect(() => {
     load();
@@ -130,7 +132,7 @@ export default function EventDetailPage() {
         {(e.has_registration || (e.show_map && mapEmbedUrl(e))) && (
           <div className="grid lg:grid-cols-2 gap-5 min-w-0">
             {e.has_registration && (
-              <EventRegistrationPanel event={e} user={user} onChanged={load} />
+              <EventRegistrationPanel event={e} user={user} accessToken={accessToken} onChanged={load} />
             )}
             {e.show_map && mapEmbedUrl(e) && hasConsent("external_media") && (
               <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
@@ -158,7 +160,7 @@ export default function EventDetailPage() {
           <div>
             <h2 className="font-heading text-2xl font-black uppercase mb-5">Turniere</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 min-w-0">
-              {e.tournaments.map((t) => <EventTournamentEmbed key={t.id} tournament={t} />)}
+              {e.tournaments.map((t) => <EventTournamentEmbed key={t.id} tournament={t} accessToken={accessToken} />)}
             </div>
           </div>
         )}
@@ -167,7 +169,7 @@ export default function EventDetailPage() {
           <div>
             <h2 className="font-heading text-2xl font-black uppercase mb-5">Fast-Lap Challenges</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 min-w-0">
-              {e.f1_challenges.map((c) => <EventFastLapEmbed key={c.id} challenge={c} />)}
+              {e.f1_challenges.map((c) => <EventFastLapEmbed key={c.id} challenge={c} accessToken={accessToken} />)}
             </div>
           </div>
         )}
@@ -228,7 +230,7 @@ const EVENT_REGISTRATION_LABELS = {
   no_show: "Nicht erschienen",
 };
 
-function EventRegistrationPanel({ event, user, onChanged }) {
+function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
   const [companionCount, setCompanionCount] = useState(0);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -238,7 +240,8 @@ function EventRegistrationPanel({ event, user, onChanged }) {
   const phaseState = event.public_phase?.state || event.event_phase?.state || event.status;
   const registrationOpen = phaseState === "registration_open";
   const maxCompanions = event.allow_companions ? Number(event.max_companions_per_registration || 0) : 0;
-  const loginTarget = typeof window !== "undefined" ? `/login?next=${encodeURIComponent(window.location.pathname)}` : "/login";
+  const loginTarget = typeof window !== "undefined" ? `/login?next=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}` : "/login";
+  const hasRegisterAccess = event.access_link?.grants?.includes("register");
 
   useEffect(() => {
     setCompanionCount(0);
@@ -252,7 +255,7 @@ function EventRegistrationPanel({ event, user, onChanged }) {
       await api.post(`/events/${event.id}/registrations`, {
         companion_count: Number(companionCount || 0),
         note: note || null,
-      });
+      }, { params: accessToken ? { access: accessToken } : undefined });
       toast.success("Anmeldung gespeichert.");
       await onChanged();
     } catch (err) {
@@ -310,7 +313,7 @@ function EventRegistrationPanel({ event, user, onChanged }) {
             <XCircle className="w-3.5 h-3.5" /> Stornieren
           </button>
         </div>
-      ) : !registrationOpen ? (
+      ) : !registrationOpen && !hasRegisterAccess ? (
         <div className="mt-5 border border-white/10 rounded-sm p-4 text-sm text-white/55">Die Anmeldung ist aktuell nicht offen.</div>
       ) : !user ? (
         <Link to={loginTarget} className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-[#9F7AEA] text-black text-xs uppercase tracking-wider font-bold rounded-sm">
@@ -360,25 +363,29 @@ function MiniStat({ label, value }) {
   );
 }
 
-function EventTournamentEmbed({ tournament }) {
+function accessSuffix(accessToken) {
+  return accessToken ? `?access=${encodeURIComponent(accessToken)}` : "";
+}
+
+function EventTournamentEmbed({ tournament, accessToken = "" }) {
   const [bracket, setBracket] = useState(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
-    api.get(`/tournaments/${tournament.id}/bracket`)
+    api.get(`/tournaments/${tournament.id}/bracket`, { params: tournament.access_link && accessToken ? { access: accessToken } : undefined })
       .then(({ data }) => { if (active) setBracket(data); })
       .catch(() => { if (active) setBracket(null); })
       .finally(() => { if (active) setLoaded(true); });
     return () => { active = false; };
-  }, [tournament.id]);
+  }, [tournament.id, tournament.access_link, accessToken]);
 
   const matches = (bracket?.matches || []).slice(0, 4);
   const regMap = new Map((bracket?.registrations || []).map((r) => [r.id, r]));
 
   return (
     <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden min-w-0">
-      <Link to={`/tournaments/${tournament.slug || tournament.id}`} className="block p-5 hover:bg-white/[0.03] transition">
+      <Link to={`/tournaments/${tournament.slug || tournament.id}${tournament.access_link ? accessSuffix(accessToken) : ""}`} className="block p-5 hover:bg-white/[0.03] transition">
         <div className="flex flex-wrap items-center gap-2">
           <Trophy className="w-4 h-4 text-[#FFD700]" />
           <PhaseBadge phase={tournament.public_phase} status={tournament.status} />
@@ -419,24 +426,24 @@ function EventTournamentEmbed({ tournament }) {
   );
 }
 
-function EventFastLapEmbed({ challenge }) {
+function EventFastLapEmbed({ challenge, accessToken = "" }) {
   const [board, setBoard] = useState(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
-    api.get(`/f1/challenges/${challenge.id}/leaderboard`)
+    api.get(`/f1/challenges/${challenge.id}/leaderboard`, { params: challenge.access_link && accessToken ? { access: accessToken } : undefined })
       .then(({ data }) => { if (active) setBoard(data); })
       .catch(() => { if (active) setBoard(null); })
       .finally(() => { if (active) setLoaded(true); });
     return () => { active = false; };
-  }, [challenge.id]);
+  }, [challenge.id, challenge.access_link, accessToken]);
 
   const entries = (board?.entries || []).slice(0, 3);
 
   return (
     <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden min-w-0">
-      <Link to={`/fastlap/${challenge.slug || challenge.id}`} className="block p-5 hover:bg-white/[0.03] transition">
+      <Link to={`/fastlap/${challenge.slug || challenge.id}${challenge.access_link ? accessSuffix(accessToken) : ""}`} className="block p-5 hover:bg-white/[0.03] transition">
         <div className="flex flex-wrap items-center gap-2">
           <Flag className="w-4 h-4 text-[#29B6E8]" />
           <PhaseBadge phase={challenge.public_phase} status={challenge.status} />
@@ -448,7 +455,7 @@ function EventFastLapEmbed({ challenge }) {
       <div className="border-t border-white/10 p-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3 min-w-0">
           <div className="text-[10px] uppercase tracking-widest font-bold text-white/45 break-words">Top 3{board?.track?.name ? ` · ${board.track.name}` : ""}</div>
-          <Link to={`/fastlap/${challenge.slug || challenge.id}`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">Rangliste</Link>
+          <Link to={`/fastlap/${challenge.slug || challenge.id}${challenge.access_link ? accessSuffix(accessToken) : ""}`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">Rangliste</Link>
         </div>
         {!loaded ? (
           <div className="text-sm text-white/40 py-4">Lade Zeiten…</div>

@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse, StreamingResponse
 from database import get_db
 from auth import get_current_user, require_admin, get_optional_user
 from services.visibility import user_can_see
+from services.access_links import public_access_link_payload, validate_access_link
 from services.public_phase import derive_public_phase
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import (
@@ -219,23 +220,27 @@ async def _visible_event_summary(event_id: str, user: dict | None, include_draft
     return event
 
 
-async def _get_visible_challenge_record(slug_or_id: str, user: dict | None = None, include_draft: bool = False) -> tuple[dict, bool]:
+async def _get_visible_challenge_record(slug_or_id: str, user: dict | None = None, include_draft: bool = False, access: str | None = None) -> tuple[dict, bool]:
     db = get_db()
     user = _auth_user(user)
     c, was_old_slug = await find_by_slug_or_history(db.f1_challenges, slug_or_id, {"_id": 0})
     if not c:
         raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
     is_assigned = await _has_f1_staff_permission(user, c["id"], F1_RESULT_STAFF_ROLES)
-    if c.get("status") == "draft" and not (_is_staff(user) or is_assigned):
+    access_link = await validate_access_link(db, access, "fastlap", c["id"], user, "view")
+    has_access = bool(access_link)
+    if c.get("status") == "draft" and not (_is_staff(user) or is_assigned or has_access):
         raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
-    if not (_is_staff(user) or is_assigned) and not await user_can_see(user, c.get("visibility") or "public"):
+    if not (_is_staff(user) or is_assigned or has_access) and not await user_can_see(user, c.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Challenge ist nicht sichtbar")
     c["public_phase"] = derive_public_phase(c, "f1")
+    if access_link:
+        c["access_link"] = public_access_link_payload(access_link)
     return c, was_old_slug
 
 
-async def _get_visible_challenge(slug_or_id: str, user: dict | None = None, include_draft: bool = False) -> dict:
-    c, _ = await _get_visible_challenge_record(slug_or_id, user, include_draft=include_draft)
+async def _get_visible_challenge(slug_or_id: str, user: dict | None = None, include_draft: bool = False, access: str | None = None) -> dict:
+    c, _ = await _get_visible_challenge_record(slug_or_id, user, include_draft=include_draft, access=access)
     return c
 
 
@@ -274,11 +279,12 @@ async def list_challenges(status: str | None = None, limit: int = 100, include_d
 
 
 @router.get("/challenges/{slug_or_id}")
-async def get_challenge(slug_or_id: str, include_draft: bool = False, user=Depends(get_optional_user)):
+async def get_challenge(slug_or_id: str, include_draft: bool = False, access: str | None = None, user=Depends(get_optional_user)):
     db = get_db()
-    c, was_old_slug = await _get_visible_challenge_record(slug_or_id, user, include_draft=include_draft)
+    c, was_old_slug = await _get_visible_challenge_record(slug_or_id, user, include_draft=include_draft, access=access)
     if was_old_slug and c.get("slug"):
-        return RedirectResponse(url=f"/api/f1/challenges/{c['slug']}", status_code=301)
+        suffix = f"?access={access}" if access else ""
+        return RedirectResponse(url=f"/api/f1/challenges/{c['slug']}{suffix}", status_code=301)
     await _annotate_reference_policy(c, include_counts=True)
     c["can_manage_times"] = await _has_f1_staff_permission(user, c["id"], F1_RESULT_STAFF_ROLES)
     tracks = await db.f1_tracks.find({"challenge_id": c["id"]}, {"_id": 0}).sort("order_index", 1).to_list(100)
@@ -611,10 +617,10 @@ async def delete_track(tid: str, me: dict = Depends(require_admin())):
 
 # --- Lap times ---
 @router.get("/challenges/{cid}/leaderboard")
-async def leaderboard(cid: str, track_id: str | None = None, user=Depends(get_optional_user)):
+async def leaderboard(cid: str, track_id: str | None = None, access: str | None = None, user=Depends(get_optional_user)):
     """Per-track leaderboard. If no track_id, use first track."""
     db = get_db()
-    c = await _get_visible_challenge(cid, user)
+    c = await _get_visible_challenge(cid, user, access=access)
     cid = c["id"]
     if not track_id:
         first_track = await db.f1_tracks.find_one({"challenge_id": cid}, {"_id": 0},
@@ -651,10 +657,10 @@ async def leaderboard(cid: str, track_id: str | None = None, user=Depends(get_op
 
 
 @router.get("/challenges/{cid}/championship")
-async def championship_standings(cid: str, user=Depends(get_optional_user)):
+async def championship_standings(cid: str, access: str | None = None, user=Depends(get_optional_user)):
     """Championship standings across all tracks using points_per_position."""
     db = get_db()
-    c = await _get_visible_challenge(cid, user)
+    c = await _get_visible_challenge(cid, user, access=access)
     cid = c["id"]
     tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).sort("order_index", 1).to_list(100)
     points_system = c.get("points_per_position", [25, 18, 15, 12, 10, 8, 6, 4, 2, 1])
@@ -880,9 +886,9 @@ async def delete_time(time_id: str, me: dict = Depends(get_current_user)):
 
 
 @router.get("/challenges/{cid}/export.csv")
-async def export_csv(cid: str, track_id: str | None = None, user=Depends(get_optional_user)):
+async def export_csv(cid: str, track_id: str | None = None, access: str | None = None, user=Depends(get_optional_user)):
     db = get_db()
-    c = await _get_visible_challenge(cid, user)
+    c = await _get_visible_challenge(cid, user, access=access)
     cid = c["id"]
     output = io.StringIO()
     w = csv.writer(output, delimiter=";")
@@ -891,7 +897,7 @@ async def export_csv(cid: str, track_id: str | None = None, user=Depends(get_opt
     if track_id:
         tracks = [t for t in tracks if t["id"] == track_id]
     for tr in tracks:
-        lb = await leaderboard(cid, tr["id"], user)
+        lb = await leaderboard(cid, tr["id"], access, user)
         for entry in lb["entries"]:
             w.writerow([
                 entry["rank"], entry["display_name"], "",
