@@ -35,7 +35,7 @@ export default function CurrentSeasonRedirect() {
   if (loading) {
     return (
       <PublicLayout>
-        <div className="p-20 text-center text-white/40 font-display tracking-widest">LADE AKTUELLE SEASON …</div>
+        <div className="p-20 text-center text-white/40 font-display tracking-widest">LADE AKTUELLE JAHRESWERTUNG …</div>
       </PublicLayout>
     );
   }
@@ -44,10 +44,10 @@ export default function CurrentSeasonRedirect() {
     <PublicLayout>
       <section className="border-b border-white/10 bg-grid-dense">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Season Pass</span>
-          <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase leading-tight">Season Pass</h1>
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">TLS Jahreswertung</span>
+          <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase leading-tight">Jahreswertung</h1>
           <p className="mt-4 text-white/65 max-w-2xl">
-            Hier landen die saisonübergreifenden Ranglisten aus Turnieren und Fast-Lap-Challenges. Sobald eine Season aktiv ist, öffnet dieser Bereich automatisch die aktuelle Wertung.
+            Hier landen die jahresübergreifenden Ranglisten aus Turnieren, Fast-Lap-Challenges, Events und gepflegten Admin-Wertungen. Sobald eine Wertung aktiv ist, öffnet dieser Bereich automatisch die aktuelle Tabelle.
           </p>
         </div>
       </section>
@@ -85,9 +85,9 @@ export default function CurrentSeasonRedirect() {
         ) : (
           <div className="border border-dashed border-white/15 bg-[#121212] rounded-sm p-12 text-center">
             <Trophy className="w-10 h-10 mx-auto text-white/20 mb-4" />
-            <h2 className="font-heading text-2xl font-black uppercase">Noch keine Season aktiv</h2>
+            <h2 className="font-heading text-2xl font-black uppercase">Noch keine Jahreswertung aktiv</h2>
             <p className="mt-3 text-white/55 max-w-xl mx-auto">
-              Lege im Admin-Bereich eine Saison an und setze sie auf aktiv. Danach zeigt der Saisonpass automatisch Rangliste, Punkte und Top-Spieler.
+              Lege im Admin-Bereich eine Saison an und setze sie auf aktiv. Danach zeigt die Jahreswertung automatisch Rangliste, Punkte und Top-Spieler.
             </p>
           </div>
         )}

@@ -652,7 +652,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
             }}
             className="accent-[#29B6E8] mt-1"
           />
-          <span><strong className="text-white">Vereinsmitglieder aus offizieller Wertung ausschließen</strong><br /><span className="text-xs text-white/50">Sie erscheinen nicht in Rangliste, Season-Punkten oder Achievements dieser Challenge.</span></span>
+          <span><strong className="text-white">Vereinsmitglieder aus offizieller Wertung ausschließen</strong><br /><span className="text-xs text-white/50">Sie erscheinen nicht in Rangliste, Jahrespunkten oder Achievements dieser Challenge.</span></span>
         </label>
         <label className="flex items-start gap-2 text-sm text-white/75">
           <input

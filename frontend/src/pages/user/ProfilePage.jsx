@@ -1399,9 +1399,9 @@ function TeamsPanel() {
                     {tournaments.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
                   </select>
                 </Field>
-                <Field label="Season/Circuit">
+                <Field label="Jahreswertung / Circuit">
                   <select value={editing.season_id || ""} onChange={(e) => setEditing({ ...editing, season_id: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-                    <option value="">Keine Season</option>
+                    <option value="">Keine Jahreswertung</option>
                     {seasons.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </Field>

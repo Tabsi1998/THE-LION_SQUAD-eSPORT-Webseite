@@ -110,7 +110,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* Season Pass widget */}
+      {/* Jahreswertung widget */}
       <SeasonPassWidget />
 
       {newsItems.length > 0 && (

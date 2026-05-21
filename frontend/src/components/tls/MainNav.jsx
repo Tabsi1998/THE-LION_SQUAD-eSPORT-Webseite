@@ -36,7 +36,7 @@ export const NAV_STRUCTURE = [
     children: [
       { to: "/tournaments", label: "Turniere" },
       { to: "/fastlap", label: "Fast Lap" },
-      { to: "/seasons/current", label: "Season Pass" },
+      { to: "/seasons/current", label: "Jahreswertung" },
     ],
   },
   {

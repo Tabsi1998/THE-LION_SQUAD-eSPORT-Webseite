@@ -38,19 +38,19 @@ const POINT_SOURCES = [
     icon: CheckCircle2,
     title: "Events",
     tone: "green",
-    text: "Wenn Admins oder Moderatoren deine Teilnahme per Check-in bestätigen, wird daraus ein Season-Eintrag.",
+    text: "Wenn Admins oder Moderatoren deine Teilnahme per Check-in bestätigen, wird daraus ein Jahreswertungs-Eintrag.",
   },
   {
     icon: Star,
     title: "Profilpunkte",
     tone: "violet",
-    text: "Achievements sind eigene Profilpunkte. Sie erklären dein Account-Level, werden aber nicht still in die Season-Wertung gemischt.",
+    text: "Achievements sind eigene Profilpunkte. Sie erklären dein Account-Level, werden aber nicht still in die Jahreswertung gemischt.",
   },
   {
     icon: MessageCircle,
     title: "Community",
     tone: "white",
-    text: "Community-Aktivität zählt für die Season nur dann, wenn sie als Event, Challenge oder manuelle Admin-Wertung eingetragen ist.",
+    text: "Community-Aktivität zählt für die Jahreswertung nur dann, wenn sie als Event, Challenge oder manuelle Admin-Wertung eingetragen ist.",
   },
 ];
 
@@ -66,7 +66,7 @@ export default function SeasonPage() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
   const season = data?.season;
-  useDocumentTitle(season?.name || "Saison", season?.description || "Season Pass von THE LION SQUAD eSports.", {
+  useDocumentTitle(season?.name || "Jahreswertung", season?.description || "Jahreswertung von THE LION SQUAD eSports.", {
     image: season?.banner_url,
     canonical: season?.slug ? `${window.location.origin}/seasons/${season.slug}` : undefined,
   });
@@ -101,7 +101,7 @@ export default function SeasonPage() {
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
           <div className="grid lg:grid-cols-[minmax(0,1fr)_22rem] gap-8 items-end">
             <div>
-              <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{s.kind === "circuit" ? "Circuit" : "Season Pass"}</span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{s.kind === "circuit" ? "Lions Circuit" : "TLS Jahreswertung"}</span>
               <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{s.name}</h1>
               {s.description && <p className="mt-3 text-white/70 max-w-2xl">{s.description}</p>}
               <div className="mt-6 flex flex-wrap gap-2">
@@ -111,7 +111,7 @@ export default function SeasonPage() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <StatCard icon={Users} label="Teilnehmer" value={standings.length} />
-              <StatCard icon={BarChart3} label="Season-Punkte" value={formatPoints(totalPoints)} />
+              <StatCard icon={BarChart3} label="Jahrespunkte" value={formatPoints(totalPoints)} />
               <StatCard icon={Star} label="Profilpunkte" value={formatPoints(totalProfilePoints)} />
               <StatCard icon={Flag} label="Wertungen" value={totalRatings} />
             </div>
@@ -123,7 +123,7 @@ export default function SeasonPage() {
           <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
             <div>
               <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#29B6E8]">Übersicht</div>
-              <h2 className="mt-1 font-heading text-2xl md:text-3xl font-black uppercase">So funktioniert diese Season</h2>
+              <h2 className="mt-1 font-heading text-2xl md:text-3xl font-black uppercase">So funktioniert diese Jahreswertung</h2>
             </div>
             <div className="inline-flex items-center gap-2 text-xs text-white/50 border border-white/10 bg-[#101010] rounded-sm px-3 py-2">
               <CircleGauge className="w-4 h-4 text-[#29B6E8]" />
@@ -157,7 +157,7 @@ export default function SeasonPage() {
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm min-w-[900px]">
               <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
-                <tr><th className="text-left px-4 py-3 w-14">#</th><th className="text-left px-4 py-3">Teilnehmer</th><th className="text-left px-4 py-3">Quellen</th><th className="text-right px-4 py-3">Wertungen</th><th className="text-right px-4 py-3">Achievements</th><th className="text-right px-4 py-3">Siege</th><th className="text-right px-4 py-3 font-display">Season-Punkte</th></tr>
+                <tr><th className="text-left px-4 py-3 w-14">#</th><th className="text-left px-4 py-3">Teilnehmer</th><th className="text-left px-4 py-3">Quellen</th><th className="text-right px-4 py-3">Wertungen</th><th className="text-right px-4 py-3">Achievements</th><th className="text-right px-4 py-3">Siege</th><th className="text-right px-4 py-3 font-display">Jahrespunkte</th></tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {standings.map((r)=>(
@@ -203,7 +203,7 @@ export default function SeasonPage() {
               <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#29B6E8]">Punkte</div>
               <h2 className="mt-1 font-heading text-2xl md:text-3xl font-black uppercase">Wie du Punkte sammelst</h2>
             </div>
-            <div className="text-xs text-white/45">Season-Punkte und Profilpunkte bleiben getrennt nachvollziehbar.</div>
+            <div className="text-xs text-white/45">Jahreswertungspunkte und Profilpunkte bleiben getrennt nachvollziehbar.</div>
           </div>
           <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-3">
             {POINT_SOURCES.map((item) => <PointSourceCard key={item.title} {...item} />)}
@@ -211,7 +211,7 @@ export default function SeasonPage() {
         </section>
 
         <section className="mt-8 grid lg:grid-cols-[1.15fr_0.85fr] gap-4">
-          <InfoPanel icon={Award} title="Punktewertung" text="Season-Punkte werden aus echten Wertungseinträgen berechnet: Turnier- und Fast-Lap-Ergebnisse, bestätigte Event-Teilnahme sowie manuelle Admin-Wertungen. Achievements bleiben als Profilpunkte sichtbar, damit die Rangliste nicht heimlich zwei Systeme vermischt." />
+          <InfoPanel icon={Award} title="Punktewertung" text="Jahreswertungspunkte werden aus echten Wertungseinträgen berechnet: Turnier- und Fast-Lap-Ergebnisse, bestätigte Event-Teilnahme sowie manuelle Admin-Wertungen. Achievements bleiben als Profilpunkte sichtbar, damit die Rangliste nicht heimlich zwei Systeme vermischt." />
           <InfoPanel icon={Medal} title="Streichresultate" text={s.drop_worst ? `${s.drop_worst} schlechteste Resultat(e) werden nicht in die Gesamtpunkte gerechnet.` : "Alle gewerteten Resultate zählen in die Gesamtwertung."} />
         </section>
       </div>
@@ -291,7 +291,7 @@ function PodiumCard({ row }) {
         <PlayerIdentity row={row} />
       </div>
       <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-        <MiniStat label="Season" value={formatPoints(row.points)} />
+        <MiniStat label="Jahr" value={formatPoints(row.points)} />
         <MiniStat label="Wertungen" value={row.events_count} />
         <MiniStat label="Profil" value={formatPoints(row.profile_points || row.achievement_points || 0)} />
       </div>

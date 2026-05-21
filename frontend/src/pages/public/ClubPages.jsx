@@ -225,7 +225,7 @@ export function ValuesPage() {
           <ul className="space-y-3 text-white/80 max-w-2xl">
             <li>🦁 <strong>Eine Heimat schaffen</strong> für eSports-Begeisterte aller Plattformen, Spiele und Skill-Level.</li>
             <li>🏁 <strong>Reguläre Vereinsevents</strong> (online &amp; offline) mit Pokal, Preisen und gutem Essen.</li>
-            <li>🏆 <strong>Eigene Turnierserie</strong> mit Season Pass, Achievements und Hall of Fame.</li>
+            <li>🏆 <strong>Eigene Turnierserie</strong> mit Jahreswertung, Achievements und Hall of Fame.</li>
             <li>🎮 <strong>Förderung des Nachwuchses</strong> — auch für Kinder &amp; Jugendliche, mit klaren Regeln und sicheren Strukturen.</li>
             <li>🤝 <strong>Kooperationen mit anderen Vereinen</strong>, Streamern, Spielentwicklern und Sponsoren.</li>
           </ul>

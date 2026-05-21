@@ -1,7 +1,7 @@
 /**
  * BottomNav — Mobile Bottom Navigation Bar (App-Style)
  * Zeigt sich nur auf kleinen Screens (< lg).
- * Gäste sehen: Home, Turniere, Events, News, Season
+ * Gäste sehen: Home, Turniere, Events, News, Wertung
  * Eingeloggte User sehen: Home, Turniere, Events, Dashboard, Profil
  */
 import { Link, useLocation } from "react-router-dom";
@@ -13,7 +13,7 @@ const GUEST_ITEMS = [
   { to: "/tournaments", label: "Turniere", icon: Trophy },
   { to: "/events", label: "Events", icon: Calendar },
   { to: "/news", label: "News", icon: Newspaper },
-  { to: "/seasons/current", label: "Season", icon: Medal },
+  { to: "/seasons/current", label: "Wertung", icon: Medal },
 ];
 
 const AUTH_ITEMS = [

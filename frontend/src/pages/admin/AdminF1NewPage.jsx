@@ -137,7 +137,7 @@ export default function AdminF1NewPage() {
                 data-testid="f1-new-allow-club-reference"
                 className="accent-[#29B6E8] mt-1 disabled:opacity-50"
               />
-              <span><strong className="text-white">Vereins-Referenzzeiten erlauben</strong><br /><span className="text-xs text-white/50">Separater Bereich ohne Punkte, ohne Season-Wertung und ohne Achievements.</span></span>
+              <span><strong className="text-white">Vereins-Referenzzeiten erlauben</strong><br /><span className="text-xs text-white/50">Separater Bereich ohne Punkte, ohne Jahreswertung und ohne Achievements.</span></span>
             </label>
             <label className="flex items-start gap-2 text-sm text-white/75">
               <input
