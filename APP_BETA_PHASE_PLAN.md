@@ -6,14 +6,18 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 
 ## Aktuelle Befunde
 
+- Seit der Planerstellung umgesetzt: mobile Content-Karten wurden fuer Dashboard, Turnier-Hub, Fast-Lap-Liste, News- und Event-Kontext vereinheitlicht.
+- Seit der Planerstellung umgesetzt: mobile Statuslabels wurden erweitert, damit `approved`, `waiting_result`, Staff-only, Ergebnis-Konflikte und Rollen nicht mehr roh angezeigt werden.
+- Seit der Planerstellung umgesetzt: Fast-Lap-Details nutzen vorhandene Streckenbilder (`track.image_url`) mit Challenge-Banner als Fallback.
+- Seit der Planerstellung umgesetzt: Profil-Actions wurden kompakter gemacht, Logout ist eine separate Konto-Aktion, Tabs sind sichtbarer und die Mehr-Navigation resetet beim Tabwechsel.
+- Seit der Planerstellung umgesetzt: Match-V2-Routen liefern Policy-Flags und blockieren Termin-Vorschlaege, wenn `schedule_mode=fixed_by_staff` gilt.
+- Seit der Planerstellung umgesetzt: `0.12.0-beta.2` ist vorbereitet, inklusive Android `versionCode` 28, Changelog und Release-Historie.
 - Ergebnislogik ist teilweise vorhanden: Bei klassischen Online-Matches koennen Teilnehmer Ergebnisse melden. Stimmen die letzten zwei Reports ueberein, wird das Match automatisch abgeschlossen. Weichen sie ab, geht das Match auf Klaerung.
 - Staff-Erfassung ist vorhanden: Turnierleitung kann klassische Matches direkt aktualisieren und V2-Heats ueber `/api/matches/{id}/result` werten.
-- Es fehlt eine explizite Turnier-Regel, die unterscheidet zwischen Vor-Ort-Staff-only, Online-Doppelmeldung und Hybrid. Aktuell ergibt sich viel aus Berechtigungen, aber nicht aus einer klaren Event-/Turnierart.
-- Terminabstimmung ist in der App fuer Teilnehmer sichtbar, sobald `can_act` gilt. Fuer lokale, vorgeplante Events wirkt "Termin vorschlagen" deshalb unpassend.
-- Mobile Embeds sind nur kompakte blaue Hinweis-Balken. Website-Embeds rendern bereits als Bildkarte mit Status, Datum und Beschreibung.
-- Fast-Lap-Strecken haben im mobilen Typ bereits `image_url`, werden im Detailscreen aber nicht sichtbar als Streckenbild verwendet.
-- Mobile Statuslabels sind zu technisch. `formatStatus()` ersetzt aktuell nur Unterstriche, wodurch Werte wie `approved` oder `waiting_result` roh wirken.
-- Das Profil ist funktional, aber schwerer zu bedienen als noetig: Tabs sind horizontal versteckt, Bearbeiten und Abmelden wirken zu gross, Gruppen bleiben offen, und die Mehr-Navigation merkt sich Unterseiten.
+- Das Regelmodell fuer Vor-Ort-Staff-only, Online-Doppelmeldung und Hybrid ist im Backend begonnen, muss aber noch in Admin-UI, Turnier-Setup und Legacy/V1-Flows vollstaendig durchgezogen werden.
+- Terminabstimmung wird im Match-Hub ueber Backend-Flags gesteuert. Offen bleibt die vollstaendige Admin-Konfiguration pro Turnier/Stage.
+- Mobile Embeds sind teilweise als Karten modernisiert. Offen bleibt, dass RichText/News/Info-Center konsequent echte Embed-Daten erhalten statt nur Fallbacks.
+- Das Profil ist deutlich kompakter, braucht aber noch Feinschliff bei Tab-Inhalten, Einstellungsgruppen und ggf. einem echten `ActionRow`/`SegmentedTabs`-Baustein.
 - Season-Punkte existieren bereits beim Status `results_published`. Teilnahme, Platzierung, Gewichtung und Jahreswertung sind also kein kompletter Neubau, brauchen aber bessere Benennung, Transparenz und App-Darstellung.
 - Die mobile Website hat bereits eine app-artige Bottom-Navigation mit dunkler Transparenz, `backdrop-blur-xl`, Safe-Area-Padding, Icon-Fokus und aktivem Top-Indikator. Die native App-Tabbar ist dagegen noch einfacher und kann diese Designsprache aufnehmen.
 - Web und App nutzen aehnliche Inhalte, aber noch nicht immer dieselben UX-Muster: Statusbadges, Embed-Karten, Listen, Tabs, Actions und leere Zustaende sollten staerker vereinheitlicht werden.
@@ -255,17 +259,19 @@ Qualitaet und Betrieb:
 
 Fuer den naechsten APK-Build:
 
-- Version auf `0.12.0-beta.2` setzen.
-- Android `versionCode` auf `28` erhoehen.
-- Changelog mit Match-Regeln, Embed-Karten, Profilnavigation, App-Design-Rework und Jahreswertung aktualisieren.
-- Vor Release pruefen: `npm run typecheck`, `npm audit --audit-level=moderate`, mobile Preflight, Backend-Tests fuer Match-Regeln.
+- [x] Version auf `0.12.0-beta.2` setzen.
+- [x] Android `versionCode` auf `28` erhoehen.
+- [x] Changelog mit Match-Regeln, Embed-Karten, Profilnavigation und App-Design-Rework aktualisieren.
+- [x] Vor Release pruefen: `npm run typecheck`, `npm audit --audit-level=moderate`, mobile Preflight, Backend-Tests fuer Match-Regeln.
+- [ ] APK-Build ueber GitHub Actions starten und Smoke-Test auf echtem Android-Geraet durchfuehren.
+- [ ] Optional danach Release-Tag `mobile-v0.12.0-beta.2` setzen, wenn der APK-Smoke-Test passt.
 
 ## Prioritaet
 
 1. Backend-Regelmodell fuer Ergebnis- und Terminrechte.
 2. Mobile Match-Hub passend zu lokalen und Online-Turnieren.
-3. Statuslabels zentral sauber machen.
-4. Embed-Karten und Fast-Lap-Streckenbilder.
+3. Admin-UI/Turnier-Setup fuer `event_mode`, `result_entry_mode` und `schedule_mode` vollstaendig nachziehen.
+4. Embed-Daten in RichText/News/Info-Center vollstaendig anliefern und Fallback-Balken weiter reduzieren.
 5. Mobile Design-System mit Bottom-Bar/Blur, gemeinsamen Cards und Tabs modernisieren.
 6. Website-Modernisierung: Public Experience, SEO, Performance, Admin-Workflows und Live-Seiten.
 7. Profil und Mehr-Navigation modernisieren.
