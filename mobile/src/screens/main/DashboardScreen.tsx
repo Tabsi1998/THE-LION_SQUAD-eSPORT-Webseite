@@ -177,7 +177,9 @@ export function DashboardScreen({ navigation }: Props) {
           <View style={styles.quickGrid}>
             <QuickAction icon="chatbubbles-outline" label="Nachrichten" onPress={() => navigation.navigate("More", { screen: "DirectMessages" })} />
             <QuickAction icon="notifications-outline" label="Alerts" onPress={() => navigation.navigate("More", { screen: "Notifications" })} />
+            <QuickAction icon="trophy-outline" label="Jahreswertung" onPress={() => navigation.navigate("More", { screen: "SeasonPass" })} />
             <QuickAction icon="flash-outline" label="Fast Laps" onPress={() => navigation.navigate("More", { screen: "FastLapList" })} />
+            <QuickAction icon="newspaper-outline" label="News" onPress={() => navigation.navigate("More", { screen: "NewsList" })} />
             <QuickAction icon="information-circle-outline" label="Verein" onPress={() => navigation.navigate("More", { screen: "InfoCenter", params: { section: "benefits" } })} />
           </View>
         </Section>

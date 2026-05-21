@@ -129,7 +129,7 @@ function MainTabs() {
       })}
     >
       <Tabs.Screen name="Dashboard" component={DashboardScreen} options={{ title: "Home" }} />
-      <Tabs.Screen name="Tournaments" component={TournamentStackScreen} options={{ title: "Turniere" }} />
+      <Tabs.Screen name="Tournaments" component={TournamentStackScreen} options={{ title: "Events" }} />
       <Tabs.Screen name="Teams" component={TeamStackScreen} options={{ title: "Teams" }} />
       <Tabs.Screen name="Profile" component={ProfileScreen} options={{ title: "Profil" }} />
       <Tabs.Screen

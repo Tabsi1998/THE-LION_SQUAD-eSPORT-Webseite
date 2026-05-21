@@ -19,6 +19,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: mobile `SkeletonList` nutzt dieselben Surface-/Border-Tokens wie Karten und wirkt beim Laden ruhiger.
 - Seit der Planerstellung umgesetzt: mobile `ErrorState` trennt Fehler-/Nicht-gefunden-Zustaende optisch von leeren Listen.
 - Seit der Planerstellung umgesetzt: Offline-Fallbacks markieren Cache-Daten sichtbar und persistieren wichtige Listen wie News, Events, Turniere und Fast-Laps.
+- Seit der Planerstellung umgesetzt: App-Hauptnavigation benennt den Turnier-Tab als Event-Hub und Dashboard-Schnellzugriff priorisiert Jahreswertung und News.
 - Seit der Planerstellung umgesetzt: mobile Bottom-Tabbar nutzt einen Website-nahen Glas-Surface-Layer, versteckt sich bei Tastatur und die Glocke wurde visuell angeglichen.
 - Seit der Planerstellung umgesetzt: Web-Navigation, Jahreswertungsseite, Widget und Admin-Hinweise nutzen sichtbare Begriffe wie Jahreswertung/Jahrespunkte statt unklarem Season-Pass.
 - Seit der Planerstellung umgesetzt: Backend-Defaulttexte, Achievements, Seed-Daten und SEO-Breadcrumbs verwenden ebenfalls Jahreswertung/Jahrespunkte.
@@ -129,7 +130,7 @@ App-Navigation:
 - Blur/Transparenz in React Native pruefen: Expo `BlurView` nur falls performant und stabil, sonst Fallback mit `rgba(10,10,10,0.94)`.
 - [x] Aktiver Tab bekommt klaren oberen Strich oder kleine Glow-Linie, nicht nur andere Textfarbe.
 - [x] Benachrichtigungsglocke integrieren oder an die Tabbar anpassen, damit sie nicht wie ein Fremdkoerper ueber dem UI schwebt.
-- Tab-Reihenfolge pruefen: Home, Turniere, Teams/Events, Jahreswertung/News, Profil/Mehr. Ziel ist weniger Springen zwischen "Mehr" und Haupttabs.
+- [x] Tab-Reihenfolge pruefen: Event-Hub bleibt Haupttab, Jahreswertung/News werden im Dashboard-Schnellzugriff priorisiert, ohne Teams oder Profil aus der Tabbar zu verdraengen.
 
 Gemeinsame UI-Muster:
 
