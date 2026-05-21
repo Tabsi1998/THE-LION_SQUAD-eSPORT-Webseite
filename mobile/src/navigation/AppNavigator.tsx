@@ -115,7 +115,17 @@ function MainTabs() {
       <Tabs.Screen name="Tournaments" component={TournamentStackScreen} options={{ title: "Turniere" }} />
       <Tabs.Screen name="Teams" component={TeamStackScreen} options={{ title: "Teams" }} />
       <Tabs.Screen name="Profile" component={ProfileScreen} options={{ title: "Profil" }} />
-      <Tabs.Screen name="More" component={MoreStackScreen} options={{ title: "Mehr" }} />
+      <Tabs.Screen
+        name="More"
+        component={MoreStackScreen}
+        options={{ title: "Mehr" }}
+        listeners={({ navigation }) => ({
+          tabPress: (event) => {
+            event.preventDefault();
+            navigation.navigate("More", { screen: "MoreHub" });
+          },
+        })}
+      />
     </Tabs.Navigator>
   );
 }
