@@ -6,10 +6,10 @@ import { Card } from "../../components/Card";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
+import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../lib/api";
-import { formatStatus } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 
@@ -175,7 +175,7 @@ function Events({ items, onOpen }: { items: any[]; onOpen: (event: any) => void 
           <Card style={styles.card}>
             <View style={styles.cardTop}>
               <Heading>{event.title || event.name}</Heading>
-              <Badge label={event.public_phase?.label || formatStatus(event.status)} />
+              <StatusBadge phase={event.public_phase} status={event.status} />
             </View>
             <Muted>{event.type || event.event_type || "Event"} · {event.date || event.start_date}</Muted>
             <Body style={styles.strong}>{[event.location, event.city, event.country].filter(Boolean).join(", ") || "Ort offen"}</Body>

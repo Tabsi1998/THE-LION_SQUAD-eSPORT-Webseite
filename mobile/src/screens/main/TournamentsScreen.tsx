@@ -6,9 +6,10 @@ import { Card } from "../../components/Card";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
+import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
-import { formatDateTime, formatStatus } from "../../lib/format";
+import { formatDateTime } from "../../lib/format";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ClubEvent, F1Challenge, Tournament } from "../../types";
@@ -189,9 +190,12 @@ function HubCard({ item, onPress }: { item: HubItem; onPress: () => void }) {
         <View style={styles.text}>
           <View style={styles.top}>
             <Body style={styles.title}>{item.title}</Body>
-            <Pill label={labelFor(item.kind)} tone={item.kind === "fastlap" ? "gold" : "cyan"} />
+            <View style={styles.badgeRow}>
+              <Pill label={labelFor(item.kind)} tone={item.kind === "fastlap" ? "gold" : "cyan"} />
+              <StatusBadge label={item.phase} status={item.status} />
+            </View>
           </View>
-          <Muted>{formatDateTime(item.date)} · {item.phase || formatStatus(item.status)}</Muted>
+          <Muted>{formatDateTime(item.date)}</Muted>
           {item.detail ? <Muted numberOfLines={2}>{item.detail}</Muted> : null}
         </View>
       </Card>
@@ -309,6 +313,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     flexDirection: "row",
     gap: 8,
+  },
+  badgeRow: {
+    alignItems: "flex-end",
+    gap: 6,
   },
   title: {
     flex: 1,

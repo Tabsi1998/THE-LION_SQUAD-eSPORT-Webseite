@@ -6,9 +6,10 @@ import { Card } from "../../components/Card";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
+import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
-import { formatDate, formatStatus } from "../../lib/format";
+import { formatDate } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { F1Challenge } from "../../types";
@@ -119,7 +120,7 @@ function FeaturedChallengeCard({ item, onPress }: { item: F1Challenge; onPress: 
         <View style={styles.featuredBody}>
           <View style={styles.top}>
             <Heading style={styles.featuredTitle}>{item.title}</Heading>
-            <StatusBadge item={item} />
+            <StatusBadge phase={item.public_phase} status={item.status} />
           </View>
           <Muted>{formatDate(item.start_date)} · {item.track_count || 0} Strecken · {item.participant_count || 0} Fahrer</Muted>
           <MetaPills item={item} />
@@ -145,7 +146,7 @@ function ChallengeCard({ item, onPress }: { item: F1Challenge; onPress: () => vo
         <View style={styles.text}>
           <View style={styles.top}>
             <Body style={styles.title}>{item.title}</Body>
-            <StatusBadge item={item} />
+            <StatusBadge phase={item.public_phase} status={item.status} />
           </View>
           <Muted>{formatDate(item.start_date)} · {item.track_count || 0} Strecken · {item.participant_count || 0} Fahrer</Muted>
           <MetaPills item={item} />
@@ -161,17 +162,6 @@ function MetaPills({ item }: { item: F1Challenge }) {
   return (
     <View style={styles.metaRow}>
       {values.map((value) => <Pill key={value} label={value} />)}
-    </View>
-  );
-}
-
-function StatusBadge({ item }: { item: F1Challenge }) {
-  const active = isActiveChallenge(item);
-  return (
-    <View style={[styles.badge, active && styles.badgeActive]}>
-      <Muted style={[styles.badgeText, active && styles.badgeTextActive]}>
-        {item.public_phase?.label || formatStatus(item.status)}
-      </Muted>
     </View>
   );
 }
@@ -288,27 +278,6 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     fontWeight: "900",
-  },
-  badge: {
-    backgroundColor: "rgba(41, 182, 232, 0.1)",
-    borderColor: "rgba(41, 182, 232, 0.28)",
-    borderRadius: 6,
-    borderWidth: 1,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-  },
-  badgeActive: {
-    backgroundColor: "rgba(255, 215, 0, 0.12)",
-    borderColor: "rgba(255, 215, 0, 0.32)",
-  },
-  badgeText: {
-    color: colors.cyan,
-    fontSize: 11,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
-  badgeTextActive: {
-    color: colors.gold,
   },
   metaRow: {
     flexDirection: "row",
