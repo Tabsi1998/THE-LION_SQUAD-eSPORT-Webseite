@@ -5,6 +5,7 @@ import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 
 const EMBED_RE = /\[\[\s*(event|events|turnier|turniere|tournament|tournaments|fastlap|fast-lap|f1)\s*:\s*([^\]\s]+)\s*\]\]/gi;
+const EMBED_PARSE_RE = /^\[\[\s*(event|events|turnier|turniere|tournament|tournaments|fastlap|fast-lap|f1)\s*:\s*([^\]\s]+)\s*\]\]$/i;
 
 function normalizeKind(kind) {
   const k = String(kind || "").toLowerCase();
@@ -12,6 +13,28 @@ function normalizeKind(kind) {
   if (["turnier", "turniere", "tournament", "tournaments"].includes(k)) return "tournament";
   if (["fastlap", "fast-lap", "f1"].includes(k)) return "fastlap";
   return k;
+}
+
+function embedKey(kind, ref) {
+  return `${normalizeKind(kind)}:${String(ref || "").trim().toLowerCase()}`;
+}
+
+function normalizeToken(token) {
+  const match = String(token || "").match(EMBED_PARSE_RE);
+  if (!match) return String(token || "").trim().toLowerCase();
+  return embedKey(match[1], match[2]);
+}
+
+function buildEmbedIndex(embeds = []) {
+  const byToken = new Map();
+  for (const embed of embeds || []) {
+    if (!embed) continue;
+    if (embed.token) byToken.set(normalizeToken(embed.token), embed);
+    if (embed.kind && embed.ref) byToken.set(embedKey(embed.kind, embed.ref), embed);
+    const itemId = embed.item?.slug || embed.item?.id;
+    if (embed.kind && itemId) byToken.set(embedKey(embed.kind, itemId), embed);
+  }
+  return byToken;
 }
 
 function embedMeta(kind, item) {
@@ -61,14 +84,14 @@ function EmbedCard({ embed }) {
 }
 
 export function RichContent({ text = "", embeds = [], className = "" }) {
-  const byToken = new Map((embeds || []).map((embed) => [embed.token, embed]));
+  const byToken = buildEmbedIndex(embeds);
   const parts = [];
   let lastIndex = 0;
   for (const match of String(text || "").matchAll(EMBED_RE)) {
     const token = match[0];
     const index = match.index || 0;
     if (index > lastIndex) parts.push({ type: "text", value: text.slice(lastIndex, index) });
-    const embed = byToken.get(token);
+    const embed = byToken.get(normalizeToken(token));
     parts.push(embed ? { type: "embed", value: embed } : { type: "text", value: token });
     lastIndex = index + token.length;
   }

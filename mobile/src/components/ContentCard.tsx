@@ -10,6 +10,7 @@ import { StatusBadge } from "./StatusBadge";
 export type ContentCardKind = "event" | "fastlap" | "news" | "team" | "tournament";
 
 export function ContentCard({
+  compact = false,
   date,
   description,
   detail,
@@ -21,6 +22,7 @@ export function ContentCard({
   status,
   title,
 }: {
+  compact?: boolean;
   date?: string | null;
   description?: string | null;
   detail?: string | null;
@@ -38,10 +40,10 @@ export function ContentCard({
     <>
       <MediaImage
         uri={image}
-        style={styles.image}
+        style={[styles.image, compact && styles.compactImage]}
         fallback={<Ionicons name={iconForKind(kind)} color={accent} size={24} />}
       />
-      <View style={styles.body}>
+      <View style={[styles.body, compact && styles.compactBody]}>
         <View style={styles.kindRow}>
           <Ionicons name={iconForKind(kind)} color={accent} size={13} />
           <Muted style={[styles.kind, { color: accent }]}>{labelForKind(kind)}</Muted>
@@ -111,11 +113,18 @@ const styles = StyleSheet.create({
     height: 104,
     width: 104,
   },
+  compactImage: {
+    height: 78,
+    width: 78,
+  },
   body: {
     flex: 1,
     gap: 3,
     minWidth: 0,
     paddingVertical: 10,
+  },
+  compactBody: {
+    paddingVertical: 8,
   },
   kindRow: {
     alignItems: "center",

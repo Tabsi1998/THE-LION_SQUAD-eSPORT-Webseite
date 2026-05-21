@@ -17,7 +17,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Staff-Erfassung ist vorhanden: Turnierleitung kann klassische Matches direkt aktualisieren und V2-Heats ueber `/api/matches/{id}/result` werten.
 - Das Regelmodell fuer Vor-Ort-Staff-only, Online-Doppelmeldung und Hybrid ist im Backend und Admin begonnen. Offen bleibt die vollstaendige Durchsetzung/Pruefung in Legacy/V1-Flows und die bessere Erklaerung im Setup-Assistenten.
 - Terminabstimmung wird im Match-Hub ueber Backend-Flags gesteuert. Admin-Konfiguration ist auf Turnier- und Stage-Ebene moeglich, braucht aber noch Validierungs- und Preset-Komfort.
-- Mobile Embeds sind teilweise als Karten modernisiert. Offen bleibt, dass RichText/News/Info-Center konsequent echte Embed-Daten erhalten statt nur Fallbacks.
+- Mobile und Web-RichText nutzen robuste Embed-Aufloesung und gemeinsame Kartenlogik; offen bleibt nur noch, neue Embed-Typen und Track-spezifische Fast-Lap-Bilder backendseitig auszubauen.
 - Das Profil ist deutlich kompakter, braucht aber noch Feinschliff bei Tab-Inhalten, Einstellungsgruppen und ggf. einem echten `ActionRow`/`SegmentedTabs`-Baustein.
 - Season-Punkte existieren bereits beim Status `results_published`. Teilnahme, Platzierung, Gewichtung und Jahreswertung sind also kein kompletter Neubau, brauchen aber bessere Benennung, Transparenz und App-Darstellung.
 - Die mobile Website hat bereits eine app-artige Bottom-Navigation mit dunkler Transparenz, `backdrop-blur-xl`, Safe-Area-Padding, Icon-Fokus und aktivem Top-Indikator. Die native App-Tabbar ist dagegen noch einfacher und kann diese Designsprache aufnehmen.
@@ -73,9 +73,10 @@ Ziel:
 
 Umsetzung:
 
-- Mobile API fuer News/Content muss die bereits vorhandenen `embeds` aus `content_embed_service.py` anliefern oder nachladen.
-- Mobile `RichText` bekommt einen `embeds`-Prop und rendert `ContentEmbedCard`.
-- Fast-Lap, Turnier und Event Karten nutzen `banner_url`; Fast-Lap-Strecken nutzen zusaetzlich `track.image_url`.
+- [x] Mobile API fuer News/Events liefert die bereits vorhandenen `content_embeds` aus `content_embed_service.py`.
+- [x] Mobile `RichText` nutzt `embeds` und rendert verlinkte Inhalte ueber die gemeinsame `ContentCard`.
+- [x] Web `RichContent` und mobile `RichText` finden Embeds robust ueber Token, Ref, Slug und Alias-Schreibweisen.
+- [ ] Fast-Lap, Turnier und Event Karten nutzen `banner_url`; Fast-Lap-Strecken nutzen zusaetzlich `track.image_url`.
 
 ## Phase 4 - Fast-Lap-Streckenbilder
 

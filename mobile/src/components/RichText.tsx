@@ -2,9 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { isImageUrl, parseContentTarget, type ContentTarget } from "../lib/contentLinks";
-import { formatDate, formatStatus } from "../lib/format";
 import { colors } from "../theme";
 import type { ContentEmbed } from "../types";
+import { ContentCard, type ContentCardKind } from "./ContentCard";
 import { MediaImage } from "./MediaImage";
 import { Body, Heading, Muted } from "./Text";
 
@@ -28,6 +28,7 @@ type InlineToken =
   | { type: "mention"; value: string };
 
 const EMBED_TOKEN_RE = /\[\[\s*(event|events|turnier|turniere|tournament|tournaments|fastlap|fast-lap|f1)\s*:\s*([^\]\s]+)\s*\]\]/gi;
+const EMBED_TOKEN_PARSE_RE = /^\[\[\s*(event|events|turnier|turniere|tournament|tournaments|fastlap|fast-lap|f1)\s*:\s*([^\]\s]+)\s*\]\]$/i;
 
 export function RichText({ text, compact = false, embeds = [], onOpenContent }: RichTextProps) {
   const blocks = buildRichBlocks(text, embeds);
@@ -46,7 +47,7 @@ export function RichText({ text, compact = false, embeds = [], onOpenContent }: 
 function buildRichBlocks(text?: string | null, embeds: ContentEmbed[] = []) {
   const source = String(text || "");
   if (!source.trim()) return [];
-  const byToken = new Map((embeds || []).map((embed) => [embed.token, embed]));
+  const byToken = buildEmbedIndex(embeds);
   const blocks: RichBlock[] = [];
   let lastIndex = 0;
 
@@ -54,7 +55,7 @@ function buildRichBlocks(text?: string | null, embeds: ContentEmbed[] = []) {
     const token = match[0];
     const index = match.index || 0;
     if (index > lastIndex) appendTextBlocks(blocks, source.slice(lastIndex, index));
-    const embed = byToken.get(token);
+    const embed = findEmbedForToken(token, byToken);
     if (embed) blocks.push({ type: "embed", value: embed });
     else appendTextBlocks(blocks, token);
     lastIndex = index + token.length;
@@ -75,43 +76,20 @@ function renderEmbedCard(embed: ContentEmbed, index: number, compact: boolean, o
   const title = item.title || item.name || labelForEmbedKind(kind);
   const id = item.slug || item.id || embed.ref;
   const target: ContentTarget | null = id ? { type: kind, id, label: title } : null;
-  const meta = [
-    item.public_phase?.label || (item.status ? formatStatus(item.status) : ""),
-    item.start_date ? formatDate(item.start_date) : "",
-    item.location || "",
-  ].filter(Boolean).join(" · ");
-  const accent = accentForEmbedKind(kind);
-  const content = (
-    <>
-      <MediaImage
-        uri={item.banner_url}
-        style={[styles.embedImageCard, compact && styles.compactEmbedImageCard]}
-        fallback={<Ionicons name={iconForTarget(kind)} color={accent} size={26} />}
-      />
-      <View style={styles.embedCardBody}>
-        <View style={styles.embedCardMeta}>
-          <Ionicons name={iconForTarget(kind)} color={accent} size={13} />
-          <Muted style={[styles.embedCardKind, { color: accent }]}>{labelForEmbedKind(kind)}</Muted>
-        </View>
-        <Body style={styles.embedCardTitle}>{title}</Body>
-        {meta ? <Muted>{meta}</Muted> : null}
-        {item.description ? <Muted numberOfLines={2}>{stripText(item.description)}</Muted> : null}
-      </View>
-      {target && onOpenContent ? <Ionicons name="chevron-forward" color={colors.muted} size={18} /> : null}
-    </>
-  );
-
-  if (target && onOpenContent) {
-    return (
-      <Pressable key={`${index}-${embed.token}`} onPress={() => onOpenContent(target)} style={({ pressed }) => [styles.embedCard, pressed && styles.pressed]}>
-        {content}
-      </Pressable>
-    );
-  }
   return (
-    <View key={`${index}-${embed.token}`} style={styles.embedCard}>
-      {content}
-    </View>
+    <ContentCard
+      key={`${index}-${embed.token || `${kind}:${id || "embed"}`}`}
+      compact={compact}
+      date={item.start_date}
+      description={item.description}
+      detail={item.location}
+      image={item.banner_url}
+      kind={kind}
+      onPress={target && onOpenContent ? () => onOpenContent(target) : undefined}
+      phase={item.public_phase}
+      status={item.status}
+      title={title}
+    />
   );
 }
 
@@ -286,10 +264,6 @@ function stripMarkdown(value: string) {
   return value.replace(/[*_`]/g, "");
 }
 
-function stripText(value: string) {
-  return stripMarkdown(value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
-}
-
 function decodeEntities(value: string) {
   return value
     .replace(/&nbsp;/g, " ")
@@ -312,23 +286,47 @@ function labelForTarget(target: ContentTarget) {
   return `${prefix[target.type]}: ${target.id}`;
 }
 
-function normalizeEmbedKind(kind?: string | null): ContentTarget["type"] {
+function buildEmbedIndex(embeds: ContentEmbed[] = []) {
+  const byToken = new Map<string, ContentEmbed>();
+  embeds.forEach((embed) => {
+    if (!embed) return;
+    if (embed.token) byToken.set(normalizeEmbedToken(embed.token), embed);
+    if (embed.kind && embed.ref) byToken.set(embedKey(embed.kind, embed.ref), embed);
+    const itemId = embed.item?.slug || embed.item?.id;
+    if (embed.kind && itemId) byToken.set(embedKey(embed.kind, itemId), embed);
+  });
+  return byToken;
+}
+
+function findEmbedForToken(token: string, byToken: Map<string, ContentEmbed>) {
+  return byToken.get(normalizeEmbedToken(token));
+}
+
+function normalizeEmbedToken(token: string) {
+  const match = String(token || "").match(EMBED_TOKEN_PARSE_RE);
+  if (!match) return String(token || "").trim().toLowerCase();
+  return embedKey(match[1], match[2]);
+}
+
+function embedKey(kind?: string | null, ref?: string | number | null) {
+  return `${normalizeEmbedKind(kind)}:${String(ref || "").trim().toLowerCase()}`;
+}
+
+function normalizeEmbedKind(kind?: string | null): ContentCardKind {
   const value = String(kind || "").toLowerCase();
   if (value === "event" || value === "events") return "event";
   if (["turnier", "turniere", "tournament", "tournaments"].includes(value)) return "tournament";
+  if (value === "news") return "news";
+  if (value === "team" || value === "teams") return "team";
   return "fastlap";
 }
 
-function labelForEmbedKind(kind: ContentTarget["type"]) {
+function labelForEmbedKind(kind: ContentCardKind) {
   if (kind === "event") return "Event";
   if (kind === "tournament") return "Turnier";
+  if (kind === "news") return "News";
+  if (kind === "team") return "Team";
   return "Fast Lap";
-}
-
-function accentForEmbedKind(kind: ContentTarget["type"]) {
-  if (kind === "event") return "#9F7AEA";
-  if (kind === "tournament") return colors.gold;
-  return colors.cyan;
 }
 
 function iconForTarget(type: ContentTarget["type"]) {
@@ -381,46 +379,6 @@ const styles = StyleSheet.create({
   },
   compactImage: {
     height: 130,
-  },
-  embedCard: {
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderColor: colors.border,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    overflow: "hidden",
-    paddingRight: 10,
-  },
-  embedImageCard: {
-    borderRadius: 0,
-    borderWidth: 0,
-    height: 104,
-    width: 104,
-  },
-  compactEmbedImageCard: {
-    height: 78,
-    width: 78,
-  },
-  embedCardBody: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-    paddingVertical: 10,
-  },
-  embedCardMeta: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 5,
-  },
-  embedCardKind: {
-    fontSize: 11,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
-  embedCardTitle: {
-    fontWeight: "900",
   },
   quote: {
     borderLeftColor: colors.cyan,
