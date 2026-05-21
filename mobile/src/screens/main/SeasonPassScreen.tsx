@@ -1,44 +1,66 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
+import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "SeasonPass">;
 
-type SeasonPassEntry = {
-  rank: number;
-  user_id: string;
-  display_name: string;
-  username?: string;
-  avatar_url?: string | null;
-  points: number;
-  tournaments_played?: number;
-  events_attended?: number;
-  achievements_earned?: number;
-  is_own?: boolean;
+type SourceBreakdown = {
+  entries?: number;
+  label?: string;
+  source_type?: string;
+  total_points?: number;
+  wins?: number;
 };
 
-type SeasonPassData = {
-  season_name?: string;
-  season_year?: number;
-  season_start?: string;
-  season_end?: string;
+type JahreswertungEntry = {
+  achievement_count?: number;
+  achievement_points?: number;
+  avatar_url?: string | null;
+  display_name?: string;
+  events?: number;
+  events_count?: number;
+  id?: string;
+  profile_points?: number;
+  points?: number;
+  rank: number;
+  season_points?: number;
+  source_breakdown?: SourceBreakdown[];
+  total_points?: number;
+  user_id?: string;
+  username?: string;
+  wins?: number;
+};
+
+type JahreswertungSeason = {
+  banner_url?: string | null;
   description?: string;
-  prize_description?: string;
-  leaderboard: SeasonPassEntry[];
-  own_entry?: SeasonPassEntry | null;
-  total_participants?: number;
+  drop_worst?: number;
+  end_date?: string;
+  id?: string;
+  kind?: string;
+  name?: string;
+  slug?: string;
+  start_date?: string;
+  status?: string;
+};
+
+type JahreswertungData = {
+  season?: JahreswertungSeason | null;
+  standings: JahreswertungEntry[];
 };
 
 export function SeasonPassScreen({ navigation }: Props) {
-  const [data, setData] = useState<SeasonPassData | null>(null);
+  const { user } = useAuth();
+  const [data, setData] = useState<JahreswertungData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -46,8 +68,20 @@ export function SeasonPassScreen({ navigation }: Props) {
   const load = useCallback(async () => {
     setError("");
     try {
-      const { data: res } = await api.get<SeasonPassData>("/season-pass");
-      setData(res || null);
+      const { data: featured } = await api.get<JahreswertungData>("/seasons/active/featured");
+      const season = featured?.season || null;
+      if (!season) {
+        setData({ season: null, standings: [] });
+        return;
+      }
+      const seasonRef = season.slug || season.id;
+      const { data: standingsData } = seasonRef
+        ? await api.get<JahreswertungData>(`/seasons/${seasonRef}/standings`)
+        : { data: featured };
+      setData({
+        season: standingsData?.season || season,
+        standings: standingsData?.standings || featured?.standings || [],
+      });
     } catch (err) {
       setError(errorMessage(err, "Jahreswertung konnte nicht geladen werden."));
     } finally {
@@ -76,9 +110,18 @@ export function SeasonPassScreen({ navigation }: Props) {
     );
   }
 
-  const leaderboard = data?.leaderboard ?? [];
+  const leaderboard = data?.standings ?? [];
   const top3 = leaderboard.slice(0, 3);
   const rest = leaderboard.slice(3);
+  const ownEntry = useMemo(() => {
+    const userId = user?.id;
+    const username = user?.username;
+    return leaderboard.find((entry) => (userId && (entry.user_id === userId || entry.id === userId)) || (username && entry.username === username)) || null;
+  }, [leaderboard, user?.id, user?.username]);
+  const totalPoints = leaderboard.reduce((sum, row) => sum + entryPoints(row), 0);
+  const totalProfilePoints = leaderboard.reduce((sum, row) => sum + Number(row.profile_points || row.achievement_points || 0), 0);
+  const totalRatings = leaderboard.reduce((sum, row) => sum + entryEvents(row), 0);
+  const season = data?.season;
 
   return (
     <Screen padded={false}>
@@ -101,29 +144,32 @@ export function SeasonPassScreen({ navigation }: Props) {
             <Ionicons name="trophy-outline" color={colors.gold} size={38} />
           </View>
           <Title style={styles.heroTitle}>
-            {data?.season_name ?? `Jahreswertung ${data?.season_year ?? new Date().getFullYear()}`}
+            {season?.name ?? `TLS Jahreswertung ${new Date().getFullYear()}`}
           </Title>
           <Muted style={styles.heroSub}>
-            {data?.description ?? "Sammle das ganze Jahr über Punkte durch Turniere, Events, Fast Laps und Erfolge. Am Jahresende wird der Jahres-Champion gekürt."}
+            {season?.description ?? "Turniere, Fast-Lap-Challenges, bestätigte Events und manuelle Admin-Wertungen ergeben die Jahreswertung. Profilpunkte bleiben sichtbar getrennt."}
           </Muted>
-          {data?.prize_description ? (
-            <View style={styles.prizeBanner}>
-              <Ionicons name="gift-outline" color={colors.gold} size={16} />
-              <Body style={styles.prizeText}>{data.prize_description}</Body>
-            </View>
-          ) : null}
-          {data?.season_start && data?.season_end ? (
+          {season?.start_date || season?.end_date ? (
             <Muted style={styles.dateRange}>
-              {formatDate(data.season_start)} - {formatDate(data.season_end)}
+              {season.start_date ? formatDate(season.start_date) : "Start offen"}
+              {season.end_date ? ` - ${formatDate(season.end_date)}` : ""}
             </Muted>
           ) : null}
         </View>
 
+        <View style={styles.statGrid}>
+          <StatCard icon="people-outline" label="Teilnehmer" value={String(leaderboard.length)} />
+          <StatCard icon="bar-chart-outline" label="Jahrespunkte" value={formatPoints(totalPoints)} tone="gold" />
+          <StatCard icon="flag-outline" label="Wertungen" value={String(totalRatings)} />
+          <StatCard icon="star-outline" label="Profilpunkte" value={formatPoints(totalProfilePoints)} />
+        </View>
+
         {/* Eigener Rang */}
-        {data?.own_entry ? (
+        {ownEntry ? (
           <Card style={styles.card}>
             <Heading>Dein Rang</Heading>
-            <RankRow entry={data.own_entry} highlight />
+            <RankRow entry={ownEntry} highlight />
+            <SourceBreakdownList entry={ownEntry} />
           </Card>
         ) : null}
 
@@ -167,12 +213,11 @@ export function SeasonPassScreen({ navigation }: Props) {
         {/* Punkte-Erklärung */}
         <Card style={styles.card}>
           <Heading>Wie zählt die Jahreswertung?</Heading>
-          <PointRow icon="trophy-outline" label="Turnier gewinnen" points="+50 Pkt." />
-          <PointRow icon="medal-outline" label="Turnier Top 3" points="+25 Pkt." />
-          <PointRow icon="people-outline" label="Turnier teilnehmen" points="+10 Pkt." />
-          <PointRow icon="calendar-outline" label="Event besuchen" points="+15 Pkt." />
-          <PointRow icon="star-outline" label="Achievement freischalten" points="+5 Pkt." />
-          <PointRow icon="flash-outline" label="Fast Lap Bestzeit" points="+20 Pkt." />
+          <PointRow icon="trophy-outline" label="Turniere" detail="Teilnahme zählt, Platzierungen und größere Teilnehmerfelder zählen mehr." />
+          <PointRow icon="timer-outline" label="Fast Lap" detail="Gültige Zeiten, starke Ränge und veröffentlichte Challenges fließen ein." />
+          <PointRow icon="calendar-outline" label="Events" detail="Check-ins zählen nur, wenn sie ausdrücklich als Jahreswertung gepflegt sind." />
+          <PointRow icon="shield-checkmark-outline" label="Fair und nachvollziehbar" detail={season?.drop_worst ? `${season.drop_worst} schwächste Wertung(en) werden gestrichen.` : "Aktuell zählen alle gepflegten Wertungen."} />
+          <PointRow icon="star-outline" label="Profilpunkte" detail="Achievements erklären dein Profil-Level, werden aber nicht heimlich in die Jahreswertung gemischt." />
         </Card>
       </ScrollView>
     </Screen>
@@ -184,7 +229,7 @@ function RankRow({
   highlight = false,
   onPress,
 }: {
-  entry: SeasonPassEntry;
+  entry: JahreswertungEntry;
   highlight?: boolean;
   onPress?: () => void;
 }) {
@@ -205,10 +250,11 @@ function RankRow({
           {entry.display_name || entry.username || "Unbekannt"}
         </Body>
         {entry.username ? <Muted>@{entry.username}</Muted> : null}
+        <Muted>{entryEvents(entry)} Wertungen · {entry.wins || 0} Siege · {entry.achievement_count || 0} Profil-Erfolge</Muted>
       </View>
       <View style={styles.rankPoints}>
         <Body style={[styles.pointsValue, { color: highlight ? colors.cyan : colors.white }]}>
-          {entry.points.toLocaleString("de-AT")}
+          {formatPoints(entryPoints(entry))}
         </Body>
         <Muted style={styles.pointsLabel}>Pkt.</Muted>
       </View>
@@ -223,14 +269,55 @@ function RankRow({
   );
 }
 
-function PointRow({ icon, label, points }: { icon: string; label: string; points: string }) {
+function SourceBreakdownList({ entry }: { entry: JahreswertungEntry }) {
+  const items = (entry.source_breakdown || []).slice(0, 4);
+  if (!items.length) return null;
+  return (
+    <View style={styles.breakdown}>
+      {items.map((item) => (
+        <View key={`${item.source_type || item.label}-${item.total_points}`} style={styles.breakdownItem}>
+          <Muted style={styles.breakdownLabel}>{item.label || item.source_type || "Wertung"}</Muted>
+          <Body style={styles.breakdownPoints}>{formatPoints(item.total_points || 0)} Pkt.</Body>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function StatCard({ icon, label, value, tone = "cyan" }: { icon: string; label: string; value: string; tone?: "cyan" | "gold" }) {
+  const color = tone === "gold" ? colors.gold : colors.cyan;
+  return (
+    <Card style={styles.statCard}>
+      <Ionicons name={icon as any} color={color} size={18} />
+      <Body style={[styles.statValue, { color }]}>{value}</Body>
+      <Muted style={styles.statLabel}>{label}</Muted>
+    </Card>
+  );
+}
+
+function PointRow({ icon, label, detail }: { icon: string; label: string; detail: string }) {
   return (
     <View style={styles.pointRow}>
       <Ionicons name={icon as any} color={colors.cyan} size={16} />
-      <Muted style={styles.pointLabel}>{label}</Muted>
-      <Body style={styles.pointValue}>{points}</Body>
+      <View style={styles.pointText}>
+        <Body style={styles.pointTitle}>{label}</Body>
+        <Muted>{detail}</Muted>
+      </View>
     </View>
   );
+}
+
+function entryPoints(entry: JahreswertungEntry) {
+  return Number(entry.points ?? entry.total_points ?? entry.season_points ?? 0);
+}
+
+function entryEvents(entry: JahreswertungEntry) {
+  return Number(entry.events_count ?? entry.events ?? 0);
+}
+
+function formatPoints(value: number) {
+  if (!Number.isFinite(value)) return "0";
+  return (Number.isInteger(value) ? value : Number(value.toFixed(1))).toLocaleString("de-AT");
 }
 
 function formatDate(iso: string) {
@@ -271,24 +358,29 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
-  prizeBanner: {
-    alignItems: "center",
-    backgroundColor: "rgba(240,180,41,0.1)",
-    borderColor: "rgba(240,180,41,0.3)",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  prizeText: {
-    color: colors.gold,
-    fontWeight: "900",
-    flex: 1,
-  },
   dateRange: {
     color: colors.muted,
+  },
+  statGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    paddingHorizontal: 18,
+  },
+  statCard: {
+    flexBasis: "47%",
+    flexGrow: 1,
+    gap: 4,
+    minHeight: 92,
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
   },
   card: {
     gap: 10,
@@ -339,6 +431,26 @@ const styles = StyleSheet.create({
   pointsLabel: {
     fontSize: 11,
   },
+  breakdown: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    gap: 7,
+    paddingTop: 10,
+  },
+  breakdownItem: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+  },
+  breakdownLabel: {
+    flex: 1,
+  },
+  breakdownPoints: {
+    color: colors.cyan,
+    fontSize: 13,
+    fontWeight: "900",
+  },
   emptyBox: {
     alignItems: "center",
     gap: 10,
@@ -355,13 +467,12 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingTop: 8,
   },
-  pointLabel: {
+  pointText: {
     flex: 1,
+    gap: 2,
   },
-  pointValue: {
-    color: colors.cyan,
+  pointTitle: {
     fontWeight: "900",
-    fontSize: 13,
   },
   pressed: {
     opacity: 0.72,
