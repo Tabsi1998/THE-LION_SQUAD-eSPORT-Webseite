@@ -19,6 +19,7 @@ import { MatchDetailScreen } from "../screens/main/MatchDetailScreen";
 import { NewsDetailScreen } from "../screens/main/NewsDetailScreen";
 import { NewsScreen } from "../screens/main/NewsScreen";
 import { NotificationsScreen } from "../screens/main/NotificationsScreen";
+import { SeasonPassScreen } from "../screens/main/SeasonPassScreen";
 import { ProfileScreen } from "../screens/main/ProfileScreen";
 import { PublicProfileScreen } from "../screens/main/PublicProfileScreen";
 import { InfoCenterScreen } from "../screens/main/InfoCenterScreen";
@@ -162,6 +163,7 @@ function MoreStackScreen() {
       <MoreStack.Screen name="DirectMessages" component={DirectMessagesScreen} options={{ title: "Nachrichten" }} />
       <MoreStack.Screen name="DirectThread" component={DirectThreadScreen} options={({ route }) => ({ title: route.params.title || "Chat" })} />
       <MoreStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: "Benachrichtigungen" }} />
+      <MoreStack.Screen name="SeasonPass" component={SeasonPassScreen} options={{ title: "Season-Pass" }} />
     </MoreStack.Navigator>
   );
 }
@@ -186,7 +188,7 @@ function NotificationBellOverlay() {
   const { unread, load } = useNotifications();
   return (
     <Pressable
-      accessibilityHint="Oeffnet die Benachrichtigungen"
+      accessibilityHint="Öffnet die Benachrichtigungen"
       accessibilityLabel={unread ? `${unread} ungelesene Benachrichtigungen` : "Benachrichtigungen"}
       accessibilityRole="button"
       onPress={() => {

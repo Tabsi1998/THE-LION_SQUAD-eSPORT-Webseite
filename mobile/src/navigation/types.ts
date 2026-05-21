@@ -39,4 +39,5 @@ export type MoreStackParamList = {
   DirectMessages: undefined;
   DirectThread: { userId: string; title?: string };
   Notifications: undefined;
+  SeasonPass: undefined;
 };

@@ -130,9 +130,9 @@ export function DashboardScreen({ navigation }: Props) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
       >
         <View style={styles.header}>
-          <Muted>{isGuest ? "THE LION SQUAD" : "Willkommen zurueck"}</Muted>
+          <Muted>{isGuest ? "THE LION SQUAD" : "Willkommen zurück"}</Muted>
           <Title>{isGuest ? "Live Home" : displayName(user)}</Title>
-          <Body>{isGuest ? "Aktuelle Turniere, Events und News aus der Website." : "Deine naechsten Termine, offenen Aktionen und Vereins-News."}</Body>
+          <Body>{isGuest ? "Aktuelle Turniere, Events und News aus der Website." : "Deine nächsten Termine, offenen Aktionen und Vereins-News."}</Body>
         </View>
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
@@ -143,13 +143,13 @@ export function DashboardScreen({ navigation }: Props) {
           <Stat label="News" value={String(data.stats.news)} />
         </View>
 
-        <Section title={isGuest ? "Aktuell geplant" : "Meine naechsten Termine"} actionLabel="Alle Turniere" onAction={() => navigation.navigate("Tournaments")}>
+        <Section title={isGuest ? "Aktuell geplant" : "Meine nächsten Termine"} actionLabel="Alle Turniere" onAction={() => navigation.navigate("Tournaments")}>
           {timeline.length ? (
             timeline.slice(0, 6).map((item) => (
               <TimelineCard key={`${item.kind}-${item.id}`} item={item} onPress={() => item.kind === "tournament" ? openTournament(item.targetId) : navigation.navigate("Tournaments", { screen: "EventDetail", params: { id: item.targetId || item.id } })} />
             ))
           ) : (
-            <EmptyState title={isGuest ? "Noch keine Termine" : "Keine eigenen Termine"} detail={isGuest ? "Sobald Website-Termine veroeffentlicht sind, stehen sie hier." : "Deine Turnier- und Event-Anmeldungen erscheinen hier automatisch."} />
+            <EmptyState title={isGuest ? "Noch keine Termine" : "Keine eigenen Termine"} detail={isGuest ? "Sobald Website-Termine veröffentlicht sind, stehen sie hier." : "Deine Turnier- und Event-Anmeldungen erscheinen hier automatisch."} />
           )}
         </Section>
 
@@ -177,7 +177,7 @@ export function DashboardScreen({ navigation }: Props) {
         ) : null}
 
         {!isGuest && data.me.matches.length ? (
-          <Section title="Naechste Matches">
+          <Section title="Nächste Matches">
             {data.me.matches.slice(0, 4).map((match) => (
               <Pressable key={match.id} onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id } })} style={({ pressed }) => [pressed && styles.pressed]}>
                 <Card style={styles.compactCard}>
@@ -189,6 +189,28 @@ export function DashboardScreen({ navigation }: Props) {
           </Section>
         ) : null}
 
+        <Section
+          title="Season-Pass"
+          actionLabel="Rangliste"
+          onAction={() => navigation.navigate("More", { screen: "SeasonPass" })}
+        >
+          <Pressable
+            onPress={() => navigation.navigate("More", { screen: "SeasonPass" })}
+            style={({ pressed }) => [pressed && styles.pressed]}
+          >
+            <Card style={styles.seasonCard}>
+              <View style={styles.seasonIcon}>
+                <Ionicons name="trophy-outline" color={colors.gold} size={26} />
+              </View>
+              <View style={styles.flex}>
+                <Body style={styles.rowTitle}>Season {new Date().getFullYear()}</Body>
+                <Muted>Sammle Punkte durch Turniere, Events & Achievements.</Muted>
+                <Muted style={styles.seasonHint}>Rangliste ansehen →</Muted>
+              </View>
+            </Card>
+          </Pressable>
+        </Section>
+
         <Section title="News">
           {data.news.length ? (
             data.news.slice(0, 4).map((post) => (
@@ -199,7 +221,7 @@ export function DashboardScreen({ navigation }: Props) {
               />
             ))
           ) : (
-            <EmptyState title="Keine News" detail="Aktuelle Website-News werden hier eingeblendet, sobald sie veroeffentlicht sind." />
+            <EmptyState title="Keine News" detail="Aktuelle Website-News werden hier eingeblendet, sobald sie veröffentlicht sind." />
           )}
         </Section>
 
@@ -448,5 +470,25 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.72,
+  },
+  seasonCard: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    borderColor: "rgba(240,180,41,0.3)",
+  },
+  seasonIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(240,180,41,0.12)",
+    borderColor: "rgba(240,180,41,0.28)",
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: "center",
+    width: 48,
+  },
+  seasonHint: {
+    color: colors.gold,
+    fontWeight: "900",
   },
 });
