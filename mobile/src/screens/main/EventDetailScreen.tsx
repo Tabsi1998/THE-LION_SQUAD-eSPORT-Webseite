@@ -5,7 +5,7 @@ import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
-import { EmptyState, LoadingState } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
@@ -154,7 +154,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <Screen>
-        <LoadingState label="Event wird geladen ..." />
+        <SkeletonList count={4} />
       </Screen>
     );
   }

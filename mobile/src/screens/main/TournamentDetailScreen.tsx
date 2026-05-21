@@ -4,7 +4,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
-import { EmptyState, LoadingState } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
@@ -186,7 +186,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <Screen>
-        <LoadingState label="Turnier wird geladen ..." />
+        <SkeletonList count={4} hasImage={false} />
       </Screen>
     );
   }

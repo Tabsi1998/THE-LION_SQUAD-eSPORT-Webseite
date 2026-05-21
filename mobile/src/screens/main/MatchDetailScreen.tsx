@@ -4,7 +4,7 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
-import { EmptyState, LoadingState } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -302,7 +302,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <Screen>
-        <LoadingState label="Match wird geladen ..." />
+        <SkeletonList count={4} hasImage={false} />
       </Screen>
     );
   }

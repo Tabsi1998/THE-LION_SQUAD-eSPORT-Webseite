@@ -6,7 +6,7 @@ import { formatDate } from "../lib/format";
 import type { ContentTarget } from "../lib/contentLinks";
 import { colors } from "../theme";
 import type { ChatMessage } from "../types";
-import { EmptyState, LoadingState } from "./ListState";
+import { EmptyState, SkeletonList } from "./ListState";
 import { RichText } from "./RichText";
 import { Body, Muted } from "./Text";
 
@@ -104,7 +104,7 @@ export function ChatThreadView({
     }
   }, [allowed, postUrl, sending, text]);
 
-  if (loading) return <LoadingState label="Chat wird geladen ..." />;
+  if (loading) return <SkeletonList count={5} hasImage={false} />;
 
   return (
     <KeyboardAvoidingView

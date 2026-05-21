@@ -3,7 +3,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
-import { EmptyState, LoadingState } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
@@ -65,7 +65,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <Screen>
-        <LoadingState label="Beitrag wird geladen ..." />
+        <SkeletonList count={4} />
       </Screen>
     );
   }
