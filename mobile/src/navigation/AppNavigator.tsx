@@ -98,17 +98,32 @@ function MainTabs() {
         tabBarActiveTintColor: colors.cyan,
         tabBarInactiveTintColor: colors.muted,
         tabBarStyle: {
-          backgroundColor: colors.surface,
+          backgroundColor: "rgba(10,10,10,0.96)",
           borderTopColor: colors.border,
-          height: 56 + bottomInset,
-          paddingTop: 7,
+          borderTopWidth: 1,
+          elevation: 14,
+          height: 62 + bottomInset,
+          paddingTop: 8,
           paddingBottom: bottomInset,
+          shadowColor: colors.black,
+          shadowOffset: { width: 0, height: -8 },
+          shadowOpacity: 0.32,
+          shadowRadius: 16,
+        },
+        tabBarItemStyle: {
+          minHeight: 50,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "700",
+          fontSize: 10,
+          fontWeight: "900",
+          textTransform: "uppercase",
         },
-        tabBarIcon: ({ color, size }) => <Ionicons name={iconFor(route.name)} color={color} size={size} />,
+        tabBarIcon: ({ color, focused, size }) => (
+          <View style={styles.tabIconWrap}>
+            <View style={[styles.tabActiveLine, focused && styles.tabActiveLineVisible]} />
+            <Ionicons name={iconFor(route.name)} color={color} size={focused ? size + 1 : size} />
+          </View>
+        ),
       })}
     >
       <Tabs.Screen name="Dashboard" component={DashboardScreen} options={{ title: "Home" }} />
@@ -219,6 +234,24 @@ function NotificationBellOverlay() {
 }
 
 const styles = StyleSheet.create({
+  tabIconWrap: {
+    alignItems: "center",
+    height: 28,
+    justifyContent: "flex-end",
+    minWidth: 38,
+  },
+  tabActiveLine: {
+    backgroundColor: "transparent",
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
+    height: 2,
+    position: "absolute",
+    top: -6,
+    width: 32,
+  },
+  tabActiveLineVisible: {
+    backgroundColor: colors.cyan,
+  },
   bell: {
     alignItems: "center",
     backgroundColor: "rgba(18,18,18,0.92)",
