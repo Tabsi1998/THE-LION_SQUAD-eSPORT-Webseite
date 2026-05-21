@@ -62,6 +62,8 @@ def _safe_link_payload(link: dict, target: dict | None = None) -> dict:
     payload["email"] = link.get("email")
     payload["last_used_at"] = link.get("last_used_at")
     payload["last_used_by"] = link.get("last_used_by")
+    payload["revoked_at"] = link.get("revoked_at")
+    payload["revoked_by"] = link.get("revoked_by")
     expires_at = parse_dt(link.get("expires_at"))
     max_uses = link.get("max_uses")
     use_count = int(link.get("use_count") or 0)
@@ -70,6 +72,14 @@ def _safe_link_payload(link: dict, target: dict | None = None) -> dict:
     if target:
         payload["target"] = target
     return payload
+
+
+def _link_is_stale(link: dict) -> bool:
+    expires_at = parse_dt(link.get("expires_at"))
+    if expires_at and now_utc() > expires_at:
+        return True
+    max_uses = link.get("max_uses")
+    return bool(max_uses is not None and int(link.get("use_count") or 0) >= int(max_uses))
 
 
 @router.get("")
@@ -91,6 +101,48 @@ async def list_access_links(
         query["is_active"] = {"$ne": False}
     rows = await db.access_links.find(query, {"_id": 0, "token_hash": 0}).sort("created_at", -1).to_list(500)
     return [_safe_link_payload(row) for row in rows]
+
+
+@router.post("/cleanup")
+async def cleanup_access_links(
+    target_type: str | None = None,
+    target_id: str | None = None,
+    me: dict = Depends(require_admin()),
+):
+    db = get_db()
+    query: dict = {"is_active": {"$ne": False}}
+    if target_type:
+        if target_type not in TARGET_TYPES:
+            raise HTTPException(status_code=400, detail="Ungueltiger Zieltyp")
+        query["target_type"] = target_type
+    if target_id:
+        query["target_id"] = target_id
+    rows = await db.access_links.find(query, {"_id": 0}).to_list(1000)
+    stale_ids = [row["id"] for row in rows if _link_is_stale(row)]
+    if not stale_ids:
+        return {"ok": True, "deactivated": 0}
+    now = now_utc().isoformat()
+    await db.access_links.update_many(
+        {"id": {"$in": stale_ids}},
+        {
+            "$set": {
+                "is_active": False,
+                "revoked_at": now,
+                "revoked_by": me.get("id"),
+                "cleanup_reason": "expired_or_exhausted",
+                "updated_at": now,
+            },
+        },
+    )
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "access_link.cleanup",
+        "target_id": target_id,
+        "actor_id": me.get("id"),
+        "data": {"target_type": target_type, "target_id": target_id, "deactivated": len(stale_ids)},
+        "created_at": now,
+    })
+    return {"ok": True, "deactivated": len(stale_ids)}
 
 
 @router.post("")

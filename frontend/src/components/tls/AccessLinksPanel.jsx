@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
-import { Copy, Link2, Plus, Trash2 } from "lucide-react";
+import { Copy, Link2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const TARGET_LABELS = {
@@ -10,9 +10,16 @@ const TARGET_LABELS = {
 };
 
 function linkStateLabel(link) {
+  if (link.is_active === false) return "Deaktiviert";
   if (link.is_expired) return "Abgelaufen";
   if (link.is_exhausted) return "Limit erreicht";
   return "Aktiv";
+}
+
+function linkStateClass(link) {
+  if (link.is_active === false) return "text-white/40";
+  if (link.is_expired || link.is_exhausted) return "text-[#FF3B30]";
+  return "text-[#00FF88]";
 }
 
 function absoluteUrl(path) {
@@ -38,14 +45,15 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false }
   const [email, setEmail] = useState("");
   const [notifyUser, setNotifyUser] = useState(false);
   const [createdUrl, setCreatedUrl] = useState("");
+  const [includeInactive, setIncludeInactive] = useState(false);
 
   const load = useCallback(async () => {
     if (!targetType || !targetId) return;
     const { data } = await api.get("/access-links", {
-      params: { target_type: targetType, target_id: targetId },
+      params: { target_type: targetType, target_id: targetId, include_inactive: includeInactive },
     });
     setLinks(data || []);
-  }, [targetType, targetId]);
+  }, [targetType, targetId, includeInactive]);
 
   useEffect(() => {
     load().catch(() => setLinks([]));
@@ -103,6 +111,21 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false }
     }
   };
 
+  const cleanup = async () => {
+    setBusy(true);
+    try {
+      const { data } = await api.post("/access-links/cleanup", null, {
+        params: { target_type: targetType, target_id: targetId },
+      });
+      toast.success(data.deactivated ? `${data.deactivated} Speziallink(s) deaktiviert.` : "Keine alten Speziallinks gefunden.");
+      await load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Speziallinks konnten nicht aufgeräumt werden."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -121,6 +144,21 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false }
           className="inline-flex items-center gap-2 px-3 py-2 bg-[#FFD700] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50"
         >
           <Plus className="w-3.5 h-3.5" /> Erstellen
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border border-white/10 bg-[#0A0A0A]/50 rounded-sm px-3 py-2">
+        <label className="inline-flex items-center gap-2 text-xs text-white/65">
+          <input type="checkbox" checked={includeInactive} onChange={(event) => setIncludeInactive(event.target.checked)} className="accent-[#FFD700]" />
+          Deaktivierte anzeigen
+        </label>
+        <button
+          type="button"
+          onClick={cleanup}
+          disabled={busy}
+          className="inline-flex items-center gap-2 px-3 py-2 border border-white/10 text-white/65 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white disabled:opacity-50"
+        >
+          <RefreshCw className="w-3.5 h-3.5" /> Alte deaktivieren
         </button>
       </div>
 
@@ -227,7 +265,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false }
           <div key={link.id} className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-[#0A0A0A]/70 rounded-sm px-3 py-2">
             <div className="min-w-0">
               <div className="text-xs font-bold text-white/80">
-                <span className={link.is_expired || link.is_exhausted ? "text-[#FF3B30]" : "text-[#00FF88]"}>{linkStateLabel(link)}</span>
+                <span className={linkStateClass(link)}>{linkStateLabel(link)}</span>
                 <span className="text-white/30"> · </span>
                 {(link.grants || []).join(", ")} {link.note ? <span className="text-white/40 font-normal">- {link.note}</span> : null}
               </div>
@@ -251,7 +289,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false }
               <button
                 type="button"
                 onClick={() => revoke(link)}
-                disabled={busy}
+                disabled={busy || link.is_active === false}
                 className="p-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm hover:bg-[#FF3B30]/10 disabled:opacity-50"
                 title="Deaktivieren"
               >

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from services.access_links import access_path, hash_access_token, new_access_token, touch_access_link, validate_access_link
+from routes.access_link_routes import _link_is_stale
 
 
 class FakeCollection:
@@ -101,3 +102,13 @@ def test_touch_access_link_updates_last_seen_without_incrementing_use_count():
     assert db.access_links.row["last_used_by"] == "user_1"
     assert db.access_links.row["last_used_at"]
     assert db.access_links.row["use_count"] == 0
+
+
+def test_stale_access_link_detection_catches_expired_or_exhausted():
+    expired = {"expires_at": (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()}
+    exhausted = {"max_uses": 1, "use_count": 1}
+    active = {"max_uses": 3, "use_count": 1}
+
+    assert _link_is_stale(expired) is True
+    assert _link_is_stale(exhausted) is True
+    assert _link_is_stale(active) is False
