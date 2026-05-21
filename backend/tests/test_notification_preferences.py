@@ -48,6 +48,12 @@ def test_in_app_notifications_use_the_same_profile_preferences():
     assert notification_allowed(user, "direct_message") is True
 
 
+def test_direct_message_notifications_are_required():
+    user = {"notification_preferences": {"community_messages": False}}
+    assert notification_allowed(user, "direct_message") is True
+    assert notification_allowed(user, "team_chat_message") is False
+
+
 def test_public_preferences_payload_contains_channels():
     payload = public_preferences_payload({"newsletter_consent": True})
     assert payload["preferences"]["news_events"] is True

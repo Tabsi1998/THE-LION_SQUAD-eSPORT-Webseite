@@ -10,6 +10,7 @@ from auth import get_current_user, get_optional_user
 from database import get_db
 from models import now_utc
 from services.public_phase import derive_public_phase
+from services.user_notifications import create_user_notification
 from services.visibility import user_can_see
 
 router = APIRouter(prefix="/api/mobile", tags=["mobile"])
@@ -704,6 +705,19 @@ async def mark_all_mobile_notifications_read(user: dict = Depends(get_current_us
         {"$set": {"read": True, "read_at": now_utc().isoformat()}},
     )
     return {"ok": True}
+
+
+@router.post("/notifications/test")
+async def send_mobile_test_notification(user: dict = Depends(get_current_user)):
+    notification = await create_user_notification(
+        user["id"],
+        title="LionsAPP Test",
+        body="Diese Test-Benachrichtigung prueft In-App und Handy-Push.",
+        url="/profile?tab=inbox",
+        kind="direct_message",
+        meta={"test": True},
+    )
+    return {"ok": bool(notification), "notification": notification}
 
 
 @router.post("/push-token")

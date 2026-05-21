@@ -107,6 +107,11 @@ NOTIFICATION_KIND_CATEGORY = {
 }
 
 
+REQUIRED_NOTIFICATION_KINDS = {
+    "direct_message",
+}
+
+
 REQUIRED_EMAIL_TEMPLATES = {
     "registration",
     "password_reset",
@@ -141,6 +146,8 @@ def email_allowed(user: dict | None, template_key: str, category: str | None = N
 
 
 def notification_allowed(user: dict | None, kind: str, category: str | None = None) -> bool:
+    if kind in REQUIRED_NOTIFICATION_KINDS:
+        return True
     category = category or NOTIFICATION_KIND_CATEGORY.get(kind)
     if not category:
         return True

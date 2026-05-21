@@ -7,6 +7,7 @@ import { Card } from "../../components/Card";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
+import { api, errorMessage } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
 import { useNotifications } from "../../notifications/NotificationContext";
@@ -19,6 +20,8 @@ export function NotificationsScreen({ navigation }: Props) {
   const { items, load, markAllRead, openNotification } = useNotifications();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testMessage, setTestMessage] = useState("");
   const [filter, setFilter] = useState<NotificationFilter>("all");
 
   const refresh = useCallback(async () => {
@@ -44,6 +47,21 @@ export function NotificationsScreen({ navigation }: Props) {
     refresh();
     return unsubscribe;
   }, [navigation, refresh]);
+
+  const sendTestNotification = useCallback(async () => {
+    if (testing) return;
+    setTesting(true);
+    setTestMessage("");
+    try {
+      await api.post("/mobile/notifications/test");
+      setTestMessage("Test gesendet. Wenn Push erlaubt ist, sollte jetzt eine Handy-Benachrichtigung erscheinen.");
+      await load();
+    } catch (err) {
+      setTestMessage(errorMessage(err, "Test-Benachrichtigung konnte nicht gesendet werden."));
+    } finally {
+      setTesting(false);
+    }
+  }, [load, testing]);
 
   const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
   const visibleItems = useMemo(
@@ -75,6 +93,8 @@ export function NotificationsScreen({ navigation }: Props) {
         </View>
 
         {items.length ? <Button label="Alle als gelesen markieren" onPress={markAllRead} variant="secondary" /> : null}
+        <Button label={testing ? "Test wird gesendet ..." : "Test-Benachrichtigung senden"} onPress={sendTestNotification} disabled={testing} variant="secondary" />
+        {testMessage ? <Muted style={styles.testMessage}>{testMessage}</Muted> : null}
         {loading ? <SkeletonList count={4} hasImage={false} /> : null}
         {!loading && !items.length ? (
           <EmptyState
@@ -241,6 +261,9 @@ const styles = StyleSheet.create({
     color: colors.gold,
     fontWeight: "900",
     textTransform: "uppercase",
+  },
+  testMessage: {
+    color: colors.cyan,
   },
   pressed: {
     opacity: 0.72,

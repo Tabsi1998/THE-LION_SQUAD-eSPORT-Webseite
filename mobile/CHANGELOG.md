@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0-beta.5 - 2026-05-21
+
+- Backend: Direktnachrichten erzeugen jetzt immer eine In-App-/Push-Benachrichtigung, auch wenn optionale Community-Benachrichtigungen deaktiviert sind.
+- Mobile: Benachrichtigungsseite kann eine echte Test-Benachrichtigung an den eigenen Account ausloesen, um Geraeteberechtigung, Token und Push-Zustellung direkt zu pruefen.
+
 ## 1.0.0-beta.4 - 2026-05-21
 
 - Mobile: Push-Token-Registrierung wird wiederholt, bis der Token wirklich beim Backend gespeichert wurde, statt nach einem fehlgeschlagenen Versuch stumm aufzugeben.
