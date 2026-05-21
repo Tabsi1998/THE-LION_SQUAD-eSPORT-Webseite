@@ -173,7 +173,7 @@ export function PublicLayout({ children }) {
       <main className="flex-1 min-w-0 max-w-full overflow-x-clip">{children}</main>
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="above_footer" />
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="bottom_fixed" />
-      <footer className="border-t border-white/10 bg-[#0A0A0A] mt-24 min-w-0 max-w-full overflow-x-clip">
+      <footer className="border-t border-white/10 bg-[#0A0A0A] mt-24 min-w-0 max-w-full overflow-x-clip pb-16 lg:pb-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <Logo size="lg" asLink={false} />
@@ -204,7 +204,7 @@ export function PublicLayout({ children }) {
         <button
           type="button"
           onClick={scrollToTop}
-          className="fixed bottom-5 right-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-sm border border-[#29B6E8]/45 bg-[#0A0A0A]/90 text-[#29B6E8] shadow-[0_0_18px_rgba(41,182,232,0.22)] backdrop-blur transition hover:bg-[#29B6E8] hover:text-black"
+          className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px)+8px)] lg:bottom-5 right-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-sm border border-[#29B6E8]/45 bg-[#0A0A0A]/90 text-[#29B6E8] shadow-[0_0_18px_rgba(41,182,232,0.22)] backdrop-blur transition hover:bg-[#29B6E8] hover:text-black"
           aria-label="Nach oben"
           title="Nach oben"
           data-testid="scroll-top-btn"
