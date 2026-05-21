@@ -222,9 +222,9 @@ export function ProfileScreen() {
     try {
       const { data } = await api.post<{ newly_awarded?: number }>("/achievements/evaluate");
       await loadProfileData();
-      setMessage(data.newly_awarded ? `${data.newly_awarded} neue Achievements freigeschaltet.` : "Achievements sind aktuell.");
+      setMessage(data.newly_awarded ? `${data.newly_awarded} neue Erfolge freigeschaltet.` : "Erfolge sind aktuell.");
     } catch (err) {
-      setMessage(errorMessage(err, "Achievements konnten nicht aktualisiert werden."));
+      setMessage(errorMessage(err, "Erfolge konnten nicht aktualisiert werden."));
     }
   }, [guest, loadProfileData]);
 
@@ -304,7 +304,7 @@ export function ProfileScreen() {
               <View style={styles.statGrid}>
                 <Stat label="Punkte" value={String(insights.points)} />
                 <Stat label="Erfolge" value={`${insights.earned.length}/${insights.tiers.length || 0}`} tone="gold" />
-                <Stat label="Rolle" value={user?.role || "player"} />
+                <Stat label="Rolle" value={formatStatus(user?.role || "player")} />
               </View>
               {completeness.missing?.length ? (
                 <Muted>Offen: {completeness.missing.slice(0, 8).join(", ")}</Muted>
@@ -390,21 +390,27 @@ export function ProfileScreen() {
           <>
             <Card style={styles.card}>
               <View style={styles.cardTop}>
-                <Heading>Achievements</Heading>
+                <Heading>Erfolge</Heading>
                 <Pressable onPress={evaluateAchievements} disabled={guest} style={styles.smallAction}>
                   <Muted style={styles.smallActionText}>Prüfen</Muted>
                 </Pressable>
               </View>
               <Muted>{insights.points} Punkte · {insights.earned.length} freigeschaltet · {insights.tiers.length} Gesamtstufen</Muted>
             </Card>
-            {(achievements.groups || []).map((group) => (
-              <AchievementGroupCard
-                key={group.code}
-                group={group}
-                open={Boolean(openGroups[group.code])}
-                onToggle={() => setOpenGroups((current) => ({ ...current, [group.code]: !current[group.code] }))}
-              />
-            ))}
+            {(achievements.groups || []).length ? (
+              (achievements.groups || []).map((group) => (
+                <AchievementGroupCard
+                  key={group.code}
+                  group={group}
+                  open={Boolean(openGroups[group.code])}
+                  onToggle={() => setOpenGroups((current) => ({ ...current, [group.code]: !current[group.code] }))}
+                />
+              ))
+            ) : (
+              <Card style={styles.card}>
+                <EmptyState icon="trophy-outline" title="Noch keine Erfolge" detail="Sobald automatische oder manuelle Erfolge freigeschaltet sind, erscheinen sie hier." tone="gold" />
+              </Card>
+            )}
           </>
         ) : null}
 

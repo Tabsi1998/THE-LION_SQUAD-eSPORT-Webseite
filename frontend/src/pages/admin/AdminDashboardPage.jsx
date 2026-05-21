@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles } from "lucide-react";
+import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity } from "lucide-react";
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
@@ -24,6 +24,38 @@ export default function AdminDashboardPage() {
     { label: "Offene Disputes", value: data?.open_disputes, icon: AlertTriangle, color: "#FF3B30" },
     { label: "Fast Lap Live", value: data?.active_f1, icon: Flag, color: "#29B6E8" },
     { label: "Events Gesamt", value: data?.total_events, icon: CalendarDays, color: "#29B6E8" },
+  ];
+  const taskItems = [
+    {
+      label: "Setup pruefen",
+      detail: setupStatus && (!setupStatus.completed || (setupStatus.health_score || 0) < 100)
+        ? `${setupStatus.health_score ?? 0}% abgeschlossen`
+        : "Grundkonfiguration sieht sauber aus",
+      to: "/setup",
+      icon: Sparkles,
+      tone: setupStatus && (!setupStatus.completed || (setupStatus.health_score || 0) < 100) ? "#FFD700" : "#00FF88",
+    },
+    {
+      label: "Ergebnis-Konflikte",
+      detail: `${data?.open_disputes ?? 0} offene Disputes`,
+      to: "/admin/tournaments",
+      icon: AlertTriangle,
+      tone: (data?.open_disputes || 0) > 0 ? "#FF3B30" : "#00FF88",
+    },
+    {
+      label: "Medien-Check",
+      detail: "Banner, Track-Bilder und ungenutzte Dateien pruefen",
+      to: "/admin/media",
+      icon: ImageIcon,
+      tone: "#29B6E8",
+    },
+    {
+      label: "Systemstatus",
+      detail: "Mail-Queue, Uploads, Scheduler und Integrationen",
+      to: "/admin/settings",
+      icon: Activity,
+      tone: "#29B6E8",
+    },
   ];
 
   return (
@@ -64,6 +96,28 @@ export default function AdminDashboardPage() {
             <div className="mt-3 font-display font-bold text-4xl text-white">{k.value ?? "—"}</div>
           </div>
         ))}
+      </div>
+
+      <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.28em] text-[#29B6E8] font-bold">Tageszentrale</div>
+            <h2 className="font-heading font-bold uppercase text-lg mt-1">Offene Aufgaben</h2>
+          </div>
+          <span className="text-xs text-white/40">{new Date().toLocaleDateString("de-DE")}</span>
+        </div>
+        <div className="grid md:grid-cols-4 gap-3">
+          {taskItems.map((item) => (
+            <Link key={item.label} to={item.to} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 hover:border-[#29B6E8]/50 transition group">
+              <div className="flex items-center justify-between gap-3">
+                <item.icon className="w-4 h-4" style={{ color: item.tone }} />
+                <span className="text-[#29B6E8] group-hover:translate-x-0.5 transition-transform">→</span>
+              </div>
+              <div className="mt-3 text-xs font-bold uppercase tracking-wider text-white">{item.label}</div>
+              <div className="mt-1 text-xs text-white/45 leading-relaxed">{item.detail}</div>
+            </Link>
+          ))}
+        </div>
       </div>
 
       <div className="mt-10 grid md:grid-cols-2 gap-6">

@@ -10,6 +10,8 @@
 - Mobile: Detail-Fehler wie nicht gefundene Turniere, Events oder Matches nutzen einen eigenen Error-State statt neutraler Leerzustaende.
 - Mobile: Offline-/Cache-Fallbacks sind sichtbarer und wichtige Listen werden fuer den Offline-Fall persistiert.
 - Mobile: Dashboard-Schnellzugriff priorisiert Jahreswertung und News; der Turnier-Tab ist als Event-Hub klarer benannt.
+- Mobile: Profil- und Public-Profile-Erfolge wurden sprachlich geglaettet, Rollen lesbar gemacht und leere Bereiche mit passenden Icon-States versehen.
+- Mobile: Beta-Smoke-Test fuer APK-Build und echten Android-Test in `RELEASE_SMOKE_TEST.md` dokumentiert.
 - Mobile: Bottom-Tabbar naeher an die mobile Website angeglichen, inklusive Glas-Surface, aktivem Indikator, Keyboard-Verhalten und angepasster Glocke.
 - Mobile: Statuslabels und Badge-Farbwahl fuer Ergebnisberichte, Klaerung, Staff-only, Rollen und Veroeffentlichungen erweitert.
 - Mobile: Jahreswertung nutzt jetzt die echten Season-Standings, trennt Jahrespunkte von Profilpunkten und zeigt Quellen/Statistiken nachvollziehbarer an.

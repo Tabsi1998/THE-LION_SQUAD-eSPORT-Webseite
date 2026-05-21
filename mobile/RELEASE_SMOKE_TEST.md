@@ -1,0 +1,54 @@
+# LionsAPP Beta Smoke-Test
+
+Version: `0.12.0-beta.2`
+Android build: `28`
+Channel: `beta`
+
+## GitHub Actions Build
+
+1. GitHub Repository oeffnen.
+2. `Actions` -> `Mobile APK Release` oeffnen.
+3. `Run workflow` starten.
+4. `channel` auf `beta` setzen.
+5. Nach erfolgreichem Lauf das APK-Artefakt herunterladen.
+
+Erwarteter APK-Name:
+
+```text
+LionsAPP-BETA-v0.12.0-build28-<commit>.apk
+```
+
+## Installationscheck
+
+- APK auf echtem Android-Geraet installieren.
+- App startet ohne Crash.
+- Login mit Testkonto funktioniert.
+- Gastmodus funktioniert, falls kein Login genutzt wird.
+- Keine unerwartete Play-Protect- oder Debug-Signatur-Warnung ausser normale Sideload-Hinweise.
+
+## Pflicht-Screens
+
+- Home/Dashboard: Termine, Quick-Actions, Jahreswertung und News sichtbar.
+- Events-Tab: Events, Turniere und Fast-Laps laden.
+- Match-Hub: lokales Staff-only Match zeigt keine Spieler-Ergebnis-/Terminbuttons.
+- Match-Hub: Online-Match zeigt Spieler-Report und Konflikthinweise korrekt.
+- Fast-Lap Detail: Streckenbild oder sauberer Fallback sichtbar.
+- News Detail: eingebettete Turniere/Events/Fast-Laps erscheinen als Karten.
+- Jahreswertung: echte Rangliste, Quellen und Profilpunkt-Trennung sichtbar.
+- Profil: kompakte Actions, Tabs, Referenzen und Logout wirken sauber.
+- Offline-Test: App kurz offline nehmen; Dashboard/Event-Hub/News zeigen gespeicherte Daten mit Offline-Hinweis.
+
+## Release-Entscheidung
+
+Tag erst setzen, wenn:
+
+- GitHub Actions Build erfolgreich ist.
+- APK installiert und Smoke-Test bestanden ist.
+- Signatur- und SHA-256-Dateien im Artefakt vorhanden sind.
+
+Danach optional:
+
+```text
+git tag mobile-v0.12.0-beta.2
+git push origin mobile-v0.12.0-beta.2
+```

@@ -22,6 +22,9 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: App-Hauptnavigation benennt den Turnier-Tab als Event-Hub und Dashboard-Schnellzugriff priorisiert Jahreswertung und News.
 - Seit der Planerstellung umgesetzt: mobile Bottom-Tabbar nutzt einen Website-nahen Glas-Surface-Layer, versteckt sich bei Tastatur und die Glocke wurde visuell angeglichen.
 - Seit der Planerstellung umgesetzt: Website-Fehlerseiten fuehren mit Quick-Links zu Start, Events, Turnieren, News und Jahreswertung zurueck.
+- Seit der Planerstellung umgesetzt: Profil-/Erfolge-Texte sind geglaettet, Rollen werden lesbar angezeigt und leere Profilbereiche nutzen passende Icon-States.
+- Seit der Planerstellung umgesetzt: `mobile/RELEASE_SMOKE_TEST.md` beschreibt den Beta-APK-Build und den Android-Smoke-Test.
+- Seit der Planerstellung umgesetzt: Admin-Dashboard hat eine Tageszentrale fuer Setup, Ergebnis-Konflikte, Medien-Check und Systemstatus.
 - Seit der Planerstellung umgesetzt: Web-Navigation, Jahreswertungsseite, Widget und Admin-Hinweise nutzen sichtbare Begriffe wie Jahreswertung/Jahrespunkte statt unklarem Season-Pass.
 - Seit der Planerstellung umgesetzt: Backend-Defaulttexte, Achievements, Seed-Daten und SEO-Breadcrumbs verwenden ebenfalls Jahreswertung/Jahrespunkte.
 - Seit der Planerstellung umgesetzt: `0.12.0-beta.2` ist vorbereitet, inklusive Android `versionCode` 28, Changelog und Release-Historie.
@@ -30,7 +33,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Das Regelmodell fuer Vor-Ort-Staff-only, Online-Doppelmeldung und Hybrid ist im Backend und Admin begonnen. Offen bleibt die vollstaendige Durchsetzung/Pruefung in Legacy/V1-Flows und die bessere Erklaerung im Setup-Assistenten.
 - Terminabstimmung wird im Match-Hub ueber Backend-Flags gesteuert. Admin-Konfiguration ist auf Turnier- und Stage-Ebene moeglich, braucht aber noch Validierungs- und Preset-Komfort.
 - Mobile und Web-RichText nutzen robuste Embed-Aufloesung und gemeinsame Kartenlogik; offen bleibt nur noch, neue Embed-Typen und Track-spezifische Fast-Lap-Bilder backendseitig auszubauen.
-- Das Profil ist deutlich kompakter, braucht aber noch Feinschliff bei Tab-Inhalten, Einstellungsgruppen und ggf. einem echten `ActionRow`/`SegmentedTabs`-Baustein.
+- Das Profil ist deutlich kompakter: Actions, Logout, Tabs, leere Zustaende, Rollenlabels und Erfolgstexte sind fuer die Beta geglaettet.
 - Season-Punkte existieren bereits beim Status `results_published`. Teilnahme, Platzierung, Gewichtung und Jahreswertung sind also kein kompletter Neubau, brauchen aber bessere Benennung, Transparenz und App-Darstellung.
 - Die mobile Website hat bereits eine app-artige Bottom-Navigation mit dunkler Transparenz, `backdrop-blur-xl`, Safe-Area-Padding, Icon-Fokus und aktivem Top-Indikator. Die native App-Tabbar ist dagegen noch einfacher und kann diese Designsprache aufnehmen.
 - Web und App nutzen aehnliche Inhalte, aber noch nicht immer dieselben UX-Muster: Statusbadges, Embed-Karten, Listen, Tabs, Actions und leere Zustaende sollten staerker vereinheitlicht werden.
@@ -108,10 +111,11 @@ Umsetzung:
 
 Profil:
 
-- Bearbeiten, Datenschutz und Benachrichtigungen als kleinere Icon-Actions statt riesiger Primaerflaechen.
-- Abmelden als kompakter Danger-Action im Profil-Menue oder am Ende eines Einstellungsbereichs.
-- Tabs mit sichtbarem Hinweis: aktive Seite, kurze Tab-Leiste, ggf. "Mehr"-Sheet statt verstecktem horizontalem Scroll.
-- Offene Achievement-Gruppen beim Tabwechsel oder Refresh optional schliessen.
+- [x] Bearbeiten, Datenschutz und Benachrichtigungen als kleinere Icon-Actions statt riesiger Primaerflaechen.
+- [x] Abmelden als kompakter Danger-Action im Profil-Menue oder am Ende eines Einstellungsbereichs.
+- [x] Tabs mit sichtbarem Hinweis: aktive Seite, kurze Tab-Leiste, ggf. "Mehr"-Sheet statt verstecktem horizontalem Scroll.
+- [x] Offene Achievement-Gruppen beim Tabwechsel oder Refresh optional schliessen.
+- [x] Profil-/Erfolge-Texte, Rollenlabels und leere Profilbereiche fuer Beta glaetten.
 
 Mehr-Navigation:
 
@@ -201,7 +205,7 @@ SEO, Sharing und Content-Betrieb:
 
 Admin und Redaktion:
 
-- Admin-Dashboard als echte Tageszentrale: offene Aufgaben, kaputte Medien, ausstehende Anmeldungen, Ergebnis-Konflikte, Newsletter-Queue, Systemstatus.
+- [x] Admin-Dashboard als Beta-Tageszentrale: Setup, Ergebnis-Konflikte, Medien-Check und Systemstatus direkt erreichbar.
 - Admin-Listen vereinheitlichen: Filter, Suche, gespeicherte Ansichten, Bulk-Actions und Export pro Bereich.
 - Turnier-Editor entlasten: Setup-Assistent fuer lokales/online/hybrid Turnier, Regeln, Stationen, Ergebnisfluss und Kommunikation.
 - Medienbibliothek erweitern: fehlende Alt-Texte, doppelte Dateien, ungenutzte Dateien, kaputte Referenzen, Bildzuschnitt.
@@ -282,6 +286,7 @@ Fuer den naechsten APK-Build:
 - [x] Android `versionCode` auf `28` erhoehen.
 - [x] Changelog mit Match-Regeln, Embed-Karten, Profilnavigation und App-Design-Rework aktualisieren.
 - [x] Vor Release pruefen: `npm run typecheck`, `npm audit --audit-level=moderate`, mobile Preflight, Backend-Tests fuer Match-Regeln.
+- [x] Smoke-Test-Checkliste fuer echten Android-Test dokumentieren: `mobile/RELEASE_SMOKE_TEST.md`.
 - [ ] APK-Build ueber GitHub Actions starten und Smoke-Test auf echtem Android-Geraet durchfuehren.
 - [ ] Optional danach Release-Tag `mobile-v0.12.0-beta.2` setzen, wenn der APK-Smoke-Test passt.
 
