@@ -11,6 +11,22 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 
+const EVENT_MODE_LABELS = {
+  hybrid: "Hybrid",
+  local: "Vor Ort",
+  online: "Online",
+};
+const RESULT_ENTRY_MODE_LABELS = {
+  hybrid: "Ergebnis: Hybrid",
+  player_confirmed: "Ergebnis: beide",
+  staff_only: "Ergebnis: Staff",
+};
+const SCHEDULE_MODE_LABELS = {
+  fixed_by_staff: "Termin: Staff",
+  hybrid: "Termin: Hybrid",
+  player_proposal: "Termin: Vorschlag",
+};
+
 export default function AdminTournamentsPage() {
   const { isAdmin } = useAuth();
   const [list, setList] = useState([]);
@@ -62,12 +78,13 @@ export default function AdminTournamentsPage() {
       </div>
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
         <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[720px]">
+        <table className="w-full text-sm min-w-[860px]">
           <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
             <tr>
               <th className="text-left px-4 py-3">Titel</th>
               <th className="text-left px-4 py-3">Spiel</th>
               <th className="text-left px-4 py-3">Format</th>
+              <th className="text-left px-4 py-3">Regeln</th>
               <th className="text-left px-4 py-3">Status</th>
               <th className="text-right px-4 py-3">Teilnehmer</th>
               <th className="text-right px-4 py-3">Aktion</th>
@@ -81,6 +98,9 @@ export default function AdminTournamentsPage() {
                 </td>
                 <td className="px-4 py-3 text-white/70">{gameLabel(t.game) || "—"}</td>
                 <td className="px-4 py-3 text-white/70">{formatTournamentDisplay(t)}</td>
+                <td className="px-4 py-3">
+                  <RulePills tournament={t} />
+                </td>
                 <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
                 <td className="px-4 py-3 text-right">{t.participant_count}/{t.max_participants}</td>
                 <td className="px-4 py-3 text-right">
@@ -92,11 +112,35 @@ export default function AdminTournamentsPage() {
                 </td>
               </tr>
             ))}
-            {list.length === 0 && <tr><td colSpan="6" className="text-center py-10 text-white/40">Keine Turniere</td></tr>}
+            {list.length === 0 && <tr><td colSpan="7" className="text-center py-10 text-white/40">Keine Turniere</td></tr>}
           </tbody>
         </table>
         </div>
       </div>
     </AdminLayout>
   );
+}
+
+function RulePills({ tournament }) {
+  const eventMode = tournament.event_mode || (tournament.is_hybrid ? "hybrid" : tournament.is_online ? "online" : "online");
+  const resultMode = tournament.result_entry_mode || (eventMode === "local" ? "staff_only" : "player_confirmed");
+  const scheduleMode = tournament.schedule_mode || (eventMode === "local" ? "fixed_by_staff" : "player_proposal");
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <RulePill label={EVENT_MODE_LABELS[eventMode] || eventMode} tone={eventMode === "local" ? "gold" : eventMode === "hybrid" ? "purple" : "cyan"} />
+      <RulePill label={RESULT_ENTRY_MODE_LABELS[resultMode] || resultMode} />
+      <RulePill label={SCHEDULE_MODE_LABELS[scheduleMode] || scheduleMode} />
+    </div>
+  );
+}
+
+function RulePill({ label, tone = "default" }) {
+  const cls = tone === "cyan"
+    ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#29B6E8]"
+    : tone === "gold"
+      ? "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]"
+      : tone === "purple"
+        ? "border-[#9F7AEA]/35 bg-[#9F7AEA]/10 text-[#C4B5FD]"
+        : "border-white/15 bg-white/5 text-white/60";
+  return <span className={`rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${cls}`}>{label}</span>;
 }
