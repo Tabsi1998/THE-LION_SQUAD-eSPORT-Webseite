@@ -28,6 +28,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: Web-Navigation, Jahreswertungsseite, Widget und Admin-Hinweise nutzen sichtbare Begriffe wie Jahreswertung/Jahrespunkte statt unklarem Season-Pass.
 - Seit der Planerstellung umgesetzt: Backend-Defaulttexte, Achievements, Seed-Daten und SEO-Breadcrumbs verwenden ebenfalls Jahreswertung/Jahrespunkte.
 - Seit der Planerstellung umgesetzt: `0.12.0-beta.3` ist vorbereitet, inklusive Android `versionCode` 29, Changelog, Release-Historie und Hotfixes fuer Jahreswertung, Fast-Lap-Layout, Schnellzugriff und Tab-Reset.
+- Seit der Planerstellung umgesetzt: Admin-Jahreswertung erklaert die echte V2-Punkteformel, Gewichtungen, Teilnehmerfaktoren, Streichresultate und Auto-/Manuell-Quellenwahl sichtbar im Editor.
 - Ergebnislogik ist teilweise vorhanden: Bei klassischen Online-Matches koennen Teilnehmer Ergebnisse melden. Stimmen die letzten zwei Reports ueberein, wird das Match automatisch abgeschlossen. Weichen sie ab, geht das Match auf Klaerung.
 - Staff-Erfassung ist vorhanden: Turnierleitung kann klassische Matches direkt aktualisieren und V2-Heats ueber `/api/matches/{id}/result` werten.
 - Das Regelmodell fuer Vor-Ort-Staff-only, Online-Doppelmeldung und Hybrid ist im Backend und Admin begonnen. Offen bleibt die vollstaendige Durchsetzung/Pruefung in Legacy/V1-Flows und die bessere Erklaerung im Setup-Assistenten.
@@ -249,6 +250,7 @@ Umsetzung:
 - [x] UI-Begriffe vereinheitlichen, damit "Season-Punkte", "Profilpunkte" und "Achievements" nicht vermischt werden.
 - [x] Mobile `SeasonPassScreen` in Richtung "Jahreswertung" umbauen.
 - [x] Web-Begriffe fuer Navigation, Widget, Jahreswertungsseite und Admin-Hinweise auf Jahreswertung/Jahrespunkte angleichen.
+- [x] Admin-Editor fuer Jahreswertungen transparenter machen: Punkteformel, Teilnahme, Gewichtung, Teilnehmerfaktor und Quellen sind direkt sichtbar.
 
 ## Phase 9 - Weitere sinnvolle Erweiterungen
 
@@ -288,7 +290,7 @@ Fuer den naechsten APK-Build:
 - [x] Vor Release pruefen: `npm run typecheck`, `npm audit --audit-level=moderate`, mobile Preflight, Backend-Tests fuer Match-Regeln.
 - [x] Smoke-Test-Checkliste fuer echten Android-Test dokumentieren: `mobile/RELEASE_SMOKE_TEST.md`.
 - [ ] APK-Build ueber GitHub Actions starten und Smoke-Test auf echtem Android-Geraet durchfuehren.
-- [ ] Optional danach Release-Tag `mobile-v0.12.0-beta.3` setzen, wenn der APK-Smoke-Test passt.
+- [x] Release-Tag `mobile-v0.12.0-beta.3` gesetzt und gepusht.
 
 ## Prioritaet
 
@@ -301,4 +303,4 @@ Fuer den naechsten APK-Build:
 7. Profil und Mehr-Navigation modernisieren.
 8. Jahreswertung benennen und in App/Web klar darstellen.
 9. Staff-Dashboard, QR-Flows und Beta-Feedback als naechste Erweiterungen vorbereiten.
-10. Beta.2 bauen und testen.
+10. Beta.3 bauen und testen.
