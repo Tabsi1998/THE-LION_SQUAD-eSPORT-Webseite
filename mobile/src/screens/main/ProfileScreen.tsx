@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
-import { Image, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
@@ -85,6 +86,9 @@ export function ProfileScreen() {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [completeness, setCompleteness] = useState<{ score?: number; missing?: string[] }>({});
   const [form, setForm] = useState<Record<string, any>>({});
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [profileError, setProfileError] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -132,23 +136,35 @@ export function ProfileScreen() {
   }, [user]);
 
   const loadProfileData = useCallback(async () => {
-    if (guest) return;
-    const [achievementResult, completenessResult, preferenceResult, referenceResult] = await Promise.all([
-      api.get<AchievementData>("/achievements/me").catch(() => ({ data: { groups: [], awards: [] } })),
-      api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness").catch(() => ({ data: {} })),
-      api.get<Record<string, boolean>>("/users/me/notification-preferences").catch(() => ({ data: {} })),
-      api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } } })),
-    ]);
-    setAchievements(achievementResult.data || { groups: [], awards: [] });
-    setReferences(referenceResult.data || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } });
-    setCompleteness(completenessResult.data || {});
-    setForm((current) => ({
-      ...current,
-      notification_preferences: {
-        ...(current.notification_preferences || {}),
-        ...(preferenceResult.data || {}),
-      },
-    }));
+    setProfileError("");
+    if (guest) {
+      setProfileLoading(false);
+      setRefreshing(false);
+      return;
+    }
+    try {
+      const [achievementResult, completenessResult, preferenceResult, referenceResult] = await Promise.all([
+        api.get<AchievementData>("/achievements/me").catch(() => ({ data: { groups: [], awards: [] } })),
+        api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness").catch(() => ({ data: {} })),
+        api.get<Record<string, boolean>>("/users/me/notification-preferences").catch(() => ({ data: {} })),
+        api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } } })),
+      ]);
+      setAchievements(achievementResult.data || { groups: [], awards: [] });
+      setReferences(referenceResult.data || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } });
+      setCompleteness(completenessResult.data || {});
+      setForm((current) => ({
+        ...current,
+        notification_preferences: {
+          ...(current.notification_preferences || {}),
+          ...(preferenceResult.data || {}),
+        },
+      }));
+    } catch (err) {
+      setProfileError(errorMessage(err, "Profildaten konnten nicht geladen werden."));
+    } finally {
+      setProfileLoading(false);
+      setRefreshing(false);
+    }
   }, [guest]);
 
   useEffect(() => {
@@ -217,12 +233,23 @@ export function ProfileScreen() {
     }
   }, [navigation]);
 
+  const refreshProfile = useCallback(async () => {
+    setRefreshing(true);
+    if (!guest) {
+      await refreshMe().catch(() => {});
+    }
+    await loadProfileData();
+  }, [guest, loadProfileData, refreshMe]);
+
   const avatar = resolveMediaUrl(form.avatar_url || user?.avatar_url);
   const banner = resolveMediaUrl(form.banner_url || (user as any)?.banner_url);
 
   return (
     <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshProfile} tintColor={colors.cyan} />}
+      >
         <View style={styles.profileHero}>
           {banner ? <Image source={{ uri: banner }} style={styles.bannerImage} /> : <View style={styles.bannerFallback} />}
           <View style={styles.heroOverlay} />
@@ -251,8 +278,10 @@ export function ProfileScreen() {
         </ScrollView>
 
         {message ? <Muted style={message.includes("konnte") ? styles.error : styles.success}>{message}</Muted> : null}
+        {profileError ? <Muted style={styles.error}>{profileError}</Muted> : null}
+        {profileLoading && !guest ? <SkeletonList count={3} hasImage={false} /> : null}
 
-        {tab === "overview" ? (
+        {!profileLoading && tab === "overview" ? (
           <>
             <Card style={styles.card}>
               <Heading>Profilstatus</Heading>
@@ -291,7 +320,7 @@ export function ProfileScreen() {
           </>
         ) : null}
 
-        {tab === "references" ? (
+        {!profileLoading && tab === "references" ? (
           <>
             <Card style={styles.card}>
               <Heading>Meine Referenzen</Heading>
@@ -317,7 +346,7 @@ export function ProfileScreen() {
           </>
         ) : null}
 
-        {tab === "edit" ? (
+        {!profileLoading && tab === "edit" ? (
           <Card style={styles.card}>
             <Heading>Profil bearbeiten</Heading>
             {guest ? <Muted>Profilbearbeitung ist nur nach Login aktiv.</Muted> : null}
@@ -342,7 +371,7 @@ export function ProfileScreen() {
           </Card>
         ) : null}
 
-        {tab === "achievements" ? (
+        {!profileLoading && tab === "achievements" ? (
           <>
             <Card style={styles.card}>
               <View style={styles.cardTop}>
@@ -364,7 +393,7 @@ export function ProfileScreen() {
           </>
         ) : null}
 
-        {tab === "privacy" ? (
+        {!profileLoading && tab === "privacy" ? (
           <Card style={styles.card}>
             <Heading>Privatsphäre</Heading>
             <Toggle label="Öffentliches Profil" detail="Profil ist in der Community-Suche sichtbar." value={Boolean(form.privacy_public_profile)} onValueChange={(v) => setField(setForm, "privacy_public_profile", v)} />
@@ -381,7 +410,7 @@ export function ProfileScreen() {
           </Card>
         ) : null}
 
-        {tab === "notifications" ? (
+        {!profileLoading && tab === "notifications" ? (
           <Card style={styles.card}>
             <Heading>Benachrichtigungen</Heading>
             <Toggle label="Newsletter" detail="Grundsätzliche Zustimmung für News und Events." value={Boolean(form.newsletter_consent)} onValueChange={(v) => setField(setForm, "newsletter_consent", v)} />
@@ -403,7 +432,7 @@ export function ProfileScreen() {
           </Card>
         ) : null}
 
-        <Button label={guest ? "Live-Gastmodus aktiv" : "Profil aktualisieren"} variant="secondary" onPress={guest ? () => {} : async () => { await refreshMe(); await loadProfileData(); }} />
+        <Button label={guest ? "Live-Gastmodus aktiv" : refreshing ? "Aktualisiert ..." : "Profil aktualisieren"} variant="secondary" onPress={guest ? () => {} : refreshProfile} disabled={refreshing} />
         <Button label="Abmelden" variant="danger" onPress={logout} />
       </ScrollView>
     </Screen>

@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
-import { EmptyState, LoadingState } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -17,6 +17,7 @@ type Props = NativeStackScreenProps<MoreStackParamList, "DirectMessages">;
 export function DirectMessagesScreen({ navigation }: Props) {
   const [items, setItems] = useState<DirectConversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -28,8 +29,14 @@ export function DirectMessagesScreen({ navigation }: Props) {
       setError(errorMessage(err, "Nachrichten konnten nicht geladen werden."));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
+
+  const refresh = useCallback(() => {
+    setRefreshing(true);
+    load();
+  }, [load]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", load);
@@ -39,13 +46,16 @@ export function DirectMessagesScreen({ navigation }: Props) {
 
   return (
     <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.cyan} />}
+      >
         <View style={styles.header}>
           <Muted>Community</Muted>
           <Title>Nachrichten</Title>
           <Muted>Direkte Unterhaltungen mit Spielern, Freunden und Teammitgliedern.</Muted>
         </View>
-        {loading ? <LoadingState /> : null}
+        {loading ? <SkeletonList count={5} hasImage={false} /> : null}
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
         {!loading && !items.length ? <EmptyState title="Keine Nachrichten" detail="Neue Chats entstehen, sobald du einem Profil eine Nachricht schreibst." /> : null}
         {items.map((item) => {
@@ -54,6 +64,7 @@ export function DirectMessagesScreen({ navigation }: Props) {
             <Pressable
               key={item.user.id}
               onPress={() => navigation.navigate("DirectThread", { userId: item.user.id, title: name })}
+              style={({ pressed }) => [pressed && styles.pressed]}
             >
               <Card style={[styles.row, item.unread_count ? styles.unread : null]}>
                 <View style={styles.avatar}>
@@ -137,5 +148,8 @@ const styles = StyleSheet.create({
   },
   error: {
     color: colors.live,
+  },
+  pressed: {
+    opacity: 0.72,
   },
 });

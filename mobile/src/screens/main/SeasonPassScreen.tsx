@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { EmptyState, LoadingState } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
@@ -114,7 +114,7 @@ export function SeasonPassScreen({ navigation }: Props) {
           ) : null}
           {data?.season_start && data?.season_end ? (
             <Muted style={styles.dateRange}>
-              {formatDate(data.season_start)} – {formatDate(data.season_end)}
+              {formatDate(data.season_start)} - {formatDate(data.season_end)}
             </Muted>
           ) : null}
         </View>
@@ -130,7 +130,7 @@ export function SeasonPassScreen({ navigation }: Props) {
         {/* Top 3 Podium */}
         {top3.length > 0 ? (
           <Card style={styles.card}>
-            <Heading>Podium 🏆</Heading>
+            <Heading>Podium</Heading>
             {top3.map((entry) => (
               <RankRow
                 key={entry.user_id}
@@ -189,13 +189,13 @@ function RankRow({
   onPress?: () => void;
 }) {
   const rankColor = entry.rank === 1 ? colors.gold : entry.rank === 2 ? "#C0C0C0" : entry.rank === 3 ? "#CD7F32" : colors.muted;
-  const rankIcon = entry.rank === 1 ? "🥇" : entry.rank === 2 ? "🥈" : entry.rank === 3 ? "🥉" : null;
+  const rankIcon = entry.rank === 1 ? "trophy-outline" : entry.rank === 2 || entry.rank === 3 ? "medal-outline" : null;
 
-  return (
+  const content = (
     <View style={[styles.rankRow, highlight && styles.rankRowHighlight]}>
       <View style={styles.rankBadge}>
         {rankIcon ? (
-          <Body style={styles.rankEmoji}>{rankIcon}</Body>
+          <Ionicons name={rankIcon} color={rankColor} size={22} />
         ) : (
           <Muted style={[styles.rankNum, { color: rankColor }]}>#{entry.rank}</Muted>
         )}
@@ -213,6 +213,13 @@ function RankRow({
         <Muted style={styles.pointsLabel}>Pkt.</Muted>
       </View>
     </View>
+  );
+
+  if (!onPress) return content;
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
+      {content}
+    </Pressable>
   );
 }
 
@@ -306,9 +313,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: 32,
   },
-  rankEmoji: {
-    fontSize: 22,
-  },
   rankNum: {
     fontWeight: "900",
     fontSize: 15,
@@ -358,5 +362,8 @@ const styles = StyleSheet.create({
     color: colors.cyan,
     fontWeight: "900",
     fontSize: 13,
+  },
+  pressed: {
+    opacity: 0.72,
   },
 });
