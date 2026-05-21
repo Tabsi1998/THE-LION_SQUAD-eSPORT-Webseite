@@ -7,6 +7,7 @@ import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
+import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../lib/api";
@@ -80,13 +81,7 @@ export function InfoCenterScreen({ navigation, route }: Props) {
           <Muted>Sponsoren, Verein, Events, Referenzen und Profile als native App-Module.</Muted>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-          {sections.map((item) => (
-            <Pressable key={item.key} onPress={() => setSection(item.key)} style={[styles.tab, section === item.key && styles.tabActive]}>
-              <Muted style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Muted>
-            </Pressable>
-          ))}
-        </ScrollView>
+        <SegmentedTabs items={sections} value={section} onChange={setSection} />
 
         {loading ? (
           <SkeletonList count={4} hasImage={false} />
@@ -296,28 +291,6 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 6,
-  },
-  tabs: {
-    gap: 8,
-    paddingRight: 18,
-  },
-  tab: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderColor: colors.border,
-    borderRadius: 7,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  tabActive: {
-    backgroundColor: "rgba(41, 182, 232, 0.16)",
-    borderColor: "rgba(41, 182, 232, 0.42)",
-  },
-  tabText: {
-    fontWeight: "900",
-  },
-  tabTextActive: {
-    color: colors.cyan,
   },
   card: {
     gap: 10,

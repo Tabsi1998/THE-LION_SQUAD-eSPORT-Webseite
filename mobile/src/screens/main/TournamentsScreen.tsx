@@ -5,6 +5,7 @@ import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
+import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import type { TournamentStackParamList } from "../../navigation/types";
@@ -135,13 +136,7 @@ export function TournamentsScreen({ navigation }: Props) {
           {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Alle sichtbaren Events, Turniere und Fast-Lap Challenges an einem Ort.</Muted>}
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-          {filters.map((item) => (
-            <Pressable key={item.key} onPress={() => setFilter(item.key)} style={[styles.tab, filter === item.key && styles.tabActive]}>
-              <Muted style={[styles.tabText, filter === item.key && styles.tabTextActive]}>{item.label}</Muted>
-            </Pressable>
-          ))}
-        </ScrollView>
+        <SegmentedTabs items={filters} value={filter} onChange={setFilter} />
 
         <View style={styles.stats}>
           <Stat label="Events" value={String(events.length)} />
@@ -220,28 +215,6 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 6,
-  },
-  tabs: {
-    gap: 8,
-    paddingRight: 18,
-  },
-  tab: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderColor: colors.border,
-    borderRadius: 7,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  tabActive: {
-    backgroundColor: "rgba(41,182,232,0.16)",
-    borderColor: "rgba(41,182,232,0.42)",
-  },
-  tabText: {
-    fontWeight: "900",
-  },
-  tabTextActive: {
-    color: colors.cyan,
   },
   stats: {
     flexDirection: "row",
