@@ -344,7 +344,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 </View>
                 <View style={styles.rowMain}>
                   <Body style={styles.rowTitle}>{participantLabel(registration)}</Body>
-                  <Muted>{registration.status || registration.registration_type || "registriert"}</Muted>
+                  <Muted>{formatStatus(registration.status || registration.registration_type || "registered")}</Muted>
                 </View>
                 {registration.seed ? <Pill label={`Seed ${registration.seed}`} /> : null}
               </View>

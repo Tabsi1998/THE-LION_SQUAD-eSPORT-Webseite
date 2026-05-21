@@ -10,7 +10,14 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
-import { formatDate, formatDateTime, formatStatus } from "../../lib/format";
+import {
+  formatDate,
+  formatDateTime,
+  formatEventMode,
+  formatResultEntryMode,
+  formatScheduleMode,
+  formatStatus,
+} from "../../lib/format";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ChatMessage, Tournament } from "../../types";
@@ -156,6 +163,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const hasScheduleProposals = pendingProposals.length > 0;
   const showScheduleCard = Boolean(canProposeSchedule || hasScheduleProposals || match.scheduled_at || stationLabel(match) || page?.schedule_mode === "fixed_by_staff");
   const scheduleStatus = match.schedule_status || match.status;
+  const eventModeLabel = formatEventMode(page?.event_mode);
+  const resultModeLabel = ["staff_only", "hybrid"].includes(String(page?.result_entry_mode || "")) ? formatResultEntryMode(page?.result_entry_mode) : "";
+  const scheduleModeLabel = ["fixed_by_staff", "hybrid"].includes(String(page?.schedule_mode || "")) ? formatScheduleMode(page?.schedule_mode) : "";
 
   const propose = useCallback(async () => {
     const scheduledAt = parseDateInput(proposalAt);
@@ -344,6 +354,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           ) : null}
           <View style={styles.pillRow}>
             <Pill label={scheduleLabels[String(scheduleStatus)] || formatStatus(scheduleStatus)} accent="gold" />
+            {eventModeLabel ? <Pill label={eventModeLabel} accent="cyan" /> : null}
+            {resultModeLabel ? <Pill label={resultModeLabel} /> : null}
+            {scheduleModeLabel ? <Pill label={scheduleModeLabel} /> : null}
             <Pill label={formatDateTime(match.scheduled_at)} />
             {stationLabel(match) ? <Pill label={`Station ${stationLabel(match)}`} accent="cyan" /> : null}
             {match.duration_minutes ? <Pill label={`${match.duration_minutes} Min.`} /> : null}
