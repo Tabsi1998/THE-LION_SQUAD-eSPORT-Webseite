@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-beta.3 - 2026-05-21
+
+- Mobile: Android-Chat-Tastaturanpassung korrigiert, damit der Composer auf Geraeten wie dem Galaxy S26 Ultra nicht doppelt nach oben verschoben wird.
+
 ## 1.0.0-beta.2 - 2026-05-21
 
 - Mobile: Chat-Ansicht scrollt beim automatischen Refresh nicht mehr aus der Leseposition und haelt den Composer dynamisch oberhalb der Android-Tastatur.

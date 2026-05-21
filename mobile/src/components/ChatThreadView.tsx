@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Dimensions,
   Keyboard,
   KeyboardAvoidingView,
   NativeScrollEvent,
@@ -52,7 +51,6 @@ export function ChatThreadView({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [allowed, setAllowed] = useState(true);
-  const [keyboardOverlap, setKeyboardOverlap] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
   const didInitialScroll = useRef(false);
@@ -89,21 +87,17 @@ export function ChatThreadView({
 
   useEffect(() => {
     if (Platform.OS !== "android") return undefined;
-    const showSub = Keyboard.addListener("keyboardDidShow", (event) => {
-      const windowHeight = Dimensions.get("window").height;
-      const keyboardTop = event.endCoordinates?.screenY ?? windowHeight;
-      setKeyboardOverlap(Math.max(0, windowHeight - keyboardTop - insets.bottom));
+    const showSub = Keyboard.addListener("keyboardDidShow", () => {
       if (nearBottomRef.current) scrollToLatest(true);
     });
     const hideSub = Keyboard.addListener("keyboardDidHide", () => {
-      setKeyboardOverlap(0);
       if (nearBottomRef.current) scrollToLatest(false);
     });
     return () => {
       showSub.remove();
       hideSub.remove();
     };
-  }, [insets.bottom, scrollToLatest]);
+  }, [scrollToLatest]);
 
   useEffect(() => {
     if (!mentionSearchUrl) {
@@ -154,7 +148,7 @@ export function ChatThreadView({
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={keyboardOffset}
       style={styles.wrap}
     >
@@ -194,7 +188,7 @@ export function ChatThreadView({
           ))}
         </View>
       ) : null}
-      <View style={[styles.composer, keyboardOverlap ? { marginBottom: keyboardOverlap } : null]}>
+      <View style={styles.composer}>
         <TextInput
           editable={allowed && !sending}
           multiline
