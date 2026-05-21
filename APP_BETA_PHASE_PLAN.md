@@ -29,11 +29,12 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: Backend-Defaulttexte, Achievements, Seed-Daten und SEO-Breadcrumbs verwenden ebenfalls Jahreswertung/Jahrespunkte.
 - Seit der Planerstellung umgesetzt: `0.12.0-beta.3` ist vorbereitet, inklusive Android `versionCode` 29, Changelog, Release-Historie und Hotfixes fuer Jahreswertung, Fast-Lap-Layout, Schnellzugriff und Tab-Reset.
 - Seit der Planerstellung umgesetzt: `1.0.0-beta.1` ist als Final-Beta-Schnitt vorbereitet, inklusive Android `versionCode` 31, nativer Profilnavigation aus News-Links und sauber formatierten Event-/Content-Statuslabels.
+- Seit der Planerstellung umgesetzt: Turnier-Regelpresets fuer Online, Vor-Ort und Hybrid sind im Admin verfuegbar; der Planungscheck warnt bei widerspruechlichen Ergebnis- oder Terminregeln.
 - Seit der Planerstellung umgesetzt: Admin-Jahreswertung erklaert die echte V2-Punkteformel, Gewichtungen, Teilnehmerfaktoren, Streichresultate und Auto-/Manuell-Quellenwahl sichtbar im Editor.
 - Ergebnislogik ist teilweise vorhanden: Bei klassischen Online-Matches koennen Teilnehmer Ergebnisse melden. Stimmen die letzten zwei Reports ueberein, wird das Match automatisch abgeschlossen. Weichen sie ab, geht das Match auf Klaerung.
 - Staff-Erfassung ist vorhanden: Turnierleitung kann klassische Matches direkt aktualisieren und V2-Heats ueber `/api/matches/{id}/result` werten.
 - Das Regelmodell fuer Vor-Ort-Staff-only, Online-Doppelmeldung und Hybrid ist im Backend und Admin begonnen. Offen bleibt die vollstaendige Durchsetzung/Pruefung in Legacy/V1-Flows und die bessere Erklaerung im Setup-Assistenten.
-- Terminabstimmung wird im Match-Hub ueber Backend-Flags gesteuert. Admin-Konfiguration ist auf Turnier- und Stage-Ebene moeglich, braucht aber noch Validierungs- und Preset-Komfort.
+- Terminabstimmung wird im Match-Hub ueber Backend-Flags gesteuert. Admin-Konfiguration ist auf Turnier- und Stage-Ebene moeglich; Presets und Planungswarnungen sind fuer Turnierregeln nachgezogen.
 - Mobile und Web-RichText nutzen robuste Embed-Aufloesung und gemeinsame Kartenlogik; offen bleibt nur noch, neue Embed-Typen und Track-spezifische Fast-Lap-Bilder backendseitig auszubauen.
 - Das Profil ist deutlich kompakter: Actions, Logout, Tabs, leere Zustaende, Rollenlabels und Erfolgstexte sind fuer die Beta geglaettet.
 - Season-Punkte existieren bereits beim Status `results_published`. Teilnahme, Platzierung, Gewichtung und Jahreswertung sind also kein kompletter Neubau, brauchen aber bessere Benennung, Transparenz und App-Darstellung.

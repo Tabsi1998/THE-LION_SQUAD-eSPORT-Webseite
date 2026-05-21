@@ -250,6 +250,27 @@ def _planning_report(matches: list[dict], tournament: dict | None = None) -> dic
     tournament = tournament or {}
     warnings: list[dict] = []
     errors: list[dict] = []
+    event_mode = tournament.get("event_mode") or ("local" if tournament.get("location") and not tournament.get("stream_link") else "online")
+    result_entry_mode = tournament.get("result_entry_mode") or ("staff_only" if event_mode == "local" else "player_confirmed")
+    schedule_mode = tournament.get("schedule_mode") or ("fixed_by_staff" if event_mode == "local" else "player_proposal")
+    if event_mode == "local" and result_entry_mode != "staff_only":
+        warnings.append({
+            "type": "rule_mode_conflict",
+            "severity": "warning",
+            "message": "Vor-Ort-Turnier erlaubt Spieler-Ergebnismeldungen. Fuer lokale Events ist meist 'Nur Turnierleitung' sinnvoll.",
+        })
+    if event_mode == "local" and schedule_mode != "fixed_by_staff":
+        warnings.append({
+            "type": "rule_mode_conflict",
+            "severity": "warning",
+            "message": "Vor-Ort-Turnier erlaubt Terminabstimmung. Fuer lokale Events ist meist 'Fix durch Turnierleitung' sinnvoll.",
+        })
+    if event_mode == "online" and result_entry_mode == "staff_only":
+        warnings.append({
+            "type": "rule_mode_conflict",
+            "severity": "warning",
+            "message": "Online-Turnier ist auf Staff-Erfassung gesetzt. Teilnehmer koennen keine Ergebnisse melden.",
+        })
     planned_by_station: dict[str, list[dict]] = {}
     active_matches = [
         match for match in matches

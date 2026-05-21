@@ -8,6 +8,7 @@ import { normalizeDateTimeFields } from "@/lib/datetime";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
 import { gameOptionLabel } from "@/lib/gameLabels";
+import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
 import { toast } from "sonner";
 
 const CREATE_STATUS_OPTIONS = [
@@ -65,6 +66,7 @@ export default function AdminTournamentNewPage() {
   useApiInvalidation(loadSources, ["games", "events"]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const applyRulePreset = (preset) => setForm((f) => ({ ...f, ...preset.values }));
   const setTeamMode = (value) => setForm((f) => ({ ...f, team_mode: value, team_size: value === "solo" ? 1 : Math.max(2, Number(f.team_size) || 2) }));
   const setFormat = (value) => setForm((f) => ({ ...f, format: value, bronze_match: BRONZE_FORMATS.has(value) ? f.bronze_match : false }));
   const addPrizeTop3 = (group) => set("prize_places", [
@@ -150,6 +152,7 @@ export default function AdminTournamentNewPage() {
             <Select label="Ergebniserfassung" value={form.result_entry_mode || ""} onChange={(v) => set("result_entry_mode", v || null)} options={RESULT_ENTRY_MODE_OPTIONS} testId="new-tr-result-entry-mode" />
             <Select label="Terminplanung" value={form.schedule_mode || ""} onChange={(v) => set("schedule_mode", v || null)} options={SCHEDULE_MODE_OPTIONS} testId="new-tr-schedule-mode" />
           </Row>
+          <RulePresetPicker form={form} onApply={applyRulePreset} />
           <div className="border border-white/10 bg-black/20 rounded-sm p-3 text-xs text-white/55">
             Vor-Ort-Turniere werden standardmaessig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmaessig Ergebnisberichte beider Parteien und Terminvorschlaege.
           </div>
@@ -302,6 +305,29 @@ function Textarea({ label, value, onChange, testId }) {
     <div className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
       <MarkdownEditor value={value || ""} onChange={onChange} rows={5} testId={testId} />
+    </div>
+  );
+}
+
+function RulePresetPicker({ form, onApply }) {
+  const activeKey = rulePresetKey(form);
+  const warnings = rulePresetWarnings(form);
+  return (
+    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
+      <div className="flex flex-wrap gap-2">
+        {RULE_PRESETS.map((preset) => (
+          <button
+            key={preset.key}
+            type="button"
+            onClick={() => onApply(preset)}
+            className={`px-3 py-2 border rounded-sm text-xs uppercase tracking-wider font-bold ${activeKey === preset.key ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/60 hover:text-white"}`}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 text-xs text-white/55">{ruleModeSummary(form)}</div>
+      {warnings.length > 0 && <div className="mt-2 text-xs text-[#FFD700]">{warnings.join(" ")}</div>}
     </div>
   );
 }

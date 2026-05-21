@@ -15,6 +15,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { gameOptionLabel } from "@/lib/gameLabels";
+import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
 import {
   REGISTRATION_STATUS_OPTIONS,
   STAFF_ROLE_OPTIONS,
@@ -1640,6 +1641,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(() => setEvents([]));
   }, []);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
+  const applyRulePreset = (preset) => setF((x) => ({ ...x, ...preset.values }));
   const setStructureField = (k, v) => setStructure((x) => ({ ...x, [k]: v }));
   const setFormat = (value) => {
     setF((current) => ({ ...current, format: value, bronze_match: BRONZE_FORMATS.has(value) ? current.bronze_match : false }));
@@ -1749,6 +1751,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
           <SelectField label="Ergebniserfassung" value={f.result_entry_mode || ""} onChange={(v)=>set("result_entry_mode",v || "")} options={RESULT_ENTRY_MODE_OPTIONS} />
           <SelectField label="Terminplanung" value={f.schedule_mode || ""} onChange={(v)=>set("schedule_mode",v || "")} options={SCHEDULE_MODE_OPTIONS} />
         </div>
+        <RulePresetPicker form={f} onApply={applyRulePreset} />
         <div className="border border-white/10 bg-black/20 rounded-sm p-3 text-xs text-white/55">
           Vor-Ort-Turniere werden standardmaessig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmaessig Ergebnisberichte beider Parteien und Terminvorschlaege.
         </div>
@@ -1852,6 +1855,29 @@ function SelectField({ label, value, onChange, options }) {
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
     </label>
+  );
+}
+
+function RulePresetPicker({ form, onApply }) {
+  const activeKey = rulePresetKey(form);
+  const warnings = rulePresetWarnings(form);
+  return (
+    <div className="border border-white/10 bg-[#121212] rounded-sm p-3">
+      <div className="flex flex-wrap gap-2">
+        {RULE_PRESETS.map((preset) => (
+          <button
+            key={preset.key}
+            type="button"
+            onClick={() => onApply(preset)}
+            className={`px-3 py-2 border rounded-sm text-xs uppercase tracking-wider font-bold ${activeKey === preset.key ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/60 hover:text-white"}`}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 text-xs text-white/55">{ruleModeSummary(form)}</div>
+      {warnings.length > 0 && <div className="mt-2 text-xs text-[#FFD700]">{warnings.join(" ")}</div>}
+    </div>
   );
 }
 
