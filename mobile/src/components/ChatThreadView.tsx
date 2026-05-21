@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, errorMessage } from "../lib/api";
 import { formatDate } from "../lib/format";
@@ -116,6 +116,7 @@ export function ChatThreadView({
         ref={scrollRef}
         contentContainerStyle={styles.messages}
         keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
       >
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
         {messages.length ? messages.map((message) => (
@@ -149,6 +150,10 @@ export function ChatThreadView({
           placeholder={allowed ? "Nachricht schreiben ..." : "Chat nicht verfügbar"}
           placeholderTextColor={colors.muted}
           style={styles.input}
+          onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80)}
+          onSubmitEditing={() => {
+            if (!text.includes("\n")) Keyboard.dismiss();
+          }}
           value={text}
         />
         <Pressable disabled={!text.trim() || sending || !allowed} onPress={send} style={[styles.send, (!text.trim() || sending || !allowed) && styles.disabled]}>
@@ -239,6 +244,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     padding: 12,
+    paddingBottom: Platform.OS === "android" ? 18 : 12,
   },
   suggestions: {
     backgroundColor: colors.surface,

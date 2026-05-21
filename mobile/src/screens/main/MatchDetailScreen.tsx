@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
@@ -65,10 +65,12 @@ type MatchPage = {
 };
 
 type V2ResultRow = {
+  dnf: boolean;
   forfeit: boolean;
   rank: string;
   registration_id: string;
   score: string;
+  time_ms: string;
 };
 
 const scheduleLabels: Record<string, string> = {
@@ -152,6 +154,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const participants = page?.participants || [];
   const pendingProposals = (page?.schedule_proposals || []).filter((proposal) => proposal.status === "pending");
   const isV2 = page?.collection === "matches_v2" || Boolean(match.slots?.length);
+  const v2Mode = rankingMode(match);
   const duelParticipants = participants.slice(0, 2);
   const canUseChat = Boolean(page?.can_act);
   const canPlayerReportResult = Boolean(page?.can_player_report_result ?? page?.can_report_score);
@@ -269,10 +272,12 @@ export function MatchDetailScreen({ navigation, route }: Props) {
         proof_url: proofUrl.trim() || null,
         note: resultNote.trim() || null,
         results: v2Rows.map((row) => ({
+          dnf: row.dnf,
           forfeit: row.forfeit,
           rank: Math.max(1, Number.parseInt(row.rank || "0", 10) || 1),
           registration_id: row.registration_id,
           score: numberOrNull(row.score),
+          time_ms: numberOrNull(row.time_ms),
         })),
       });
       await load();
@@ -342,8 +347,14 @@ export function MatchDetailScreen({ navigation, route }: Props) {
 
   return (
     <Screen padded={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 92 : 0}
+        style={styles.keyboard}
+      >
       <ScrollView
         contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
       >
         <View style={styles.header}>
@@ -447,14 +458,22 @@ export function MatchDetailScreen({ navigation, route }: Props) {
             ) : null}
             {canSubmitV2Result ? (
               <>
-                <Muted>Heat-Ergebnis nach Rang und Score erfassen.</Muted>
+                <Muted>{v2Mode === "time" ? "Zeit erfassen. Schnellste Zeit gewinnt automatisch." : v2Mode === "lower_score" ? "Score erfassen. Niedrigster Score gewinnt automatisch." : "Punkte erfassen. Hoechste Punkte gewinnen automatisch."}</Muted>
                 {v2Rows.map((row, index) => (
                   <View key={row.registration_id} style={styles.v2Row}>
                     <View style={styles.flex}>
                       <Body style={styles.strong}>{participantNameByRegistration(participants, row.registration_id)}</Body>
+                      <Muted>Platzierung wird automatisch berechnet.</Muted>
+                      <View style={styles.flagRow}>
+                        <ToggleChip label="Nicht erschienen" active={row.forfeit} tone="danger" onPress={() => updateV2Row(setV2Rows, index, { forfeit: !row.forfeit })} />
+                        <ToggleChip label="Disqualifiziert" active={row.dnf} tone="gold" onPress={() => updateV2Row(setV2Rows, index, { dnf: !row.dnf })} />
+                      </View>
                     </View>
-                    <FormInput label="Rang" value={row.rank} keyboardType="number-pad" onChangeText={(value) => updateV2Row(setV2Rows, index, { rank: value })} style={styles.smallInput} />
-                    <FormInput label="Score" value={row.score} keyboardType="numeric" onChangeText={(value) => updateV2Row(setV2Rows, index, { score: value })} style={styles.smallInput} />
+                    {v2Mode === "time" ? (
+                      <FormInput label="Zeit ms" value={row.time_ms} keyboardType="numeric" onChangeText={(value) => updateV2Row(setV2Rows, index, { time_ms: value })} style={styles.smallInput} />
+                    ) : (
+                      <FormInput label={v2Mode === "lower_score" ? "Score" : "Punkte"} value={row.score} keyboardType="numeric" onChangeText={(value) => updateV2Row(setV2Rows, index, { score: value })} style={styles.smallInput} />
+                    )}
                   </View>
                 ))}
                 <FormInput label="Nachweis-Link optional" value={proofUrl} onChangeText={setProofUrl} placeholder="https://..." />
@@ -502,6 +521,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           )}
         </Card>
       </ScrollView>
+      </KeyboardAvoidingView>
     </Screen>
   );
 }
@@ -524,6 +544,22 @@ function Pill({ label, accent }: { label: string; accent?: "cyan" | "gold" }) {
     <View style={[styles.pill, accent === "cyan" && styles.pillCyan, accent === "gold" && styles.pillGold]}>
       <Muted style={[styles.pillText, accent === "cyan" && styles.textCyan, accent === "gold" && styles.textGold]}>{label}</Muted>
     </View>
+  );
+}
+
+function ToggleChip({ label, active, onPress, tone = "cyan" }: { label: string; active: boolean; onPress: () => void; tone?: "cyan" | "gold" | "danger" }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.toggleChip,
+        active && tone === "cyan" && styles.toggleChipCyan,
+        active && tone === "gold" && styles.toggleChipGold,
+        active && tone === "danger" && styles.toggleChipDanger,
+      ]}
+    >
+      <Muted style={[styles.toggleChipText, active && styles.toggleChipTextActive]}>{label}</Muted>
+    </Pressable>
   );
 }
 
@@ -571,12 +607,21 @@ function buildV2Rows(page?: MatchPage | null): V2ResultRow[] {
     .map((participant, index) => {
       const existing: any = byRegistration.get(participant.registration_id || "");
       return {
+        dnf: Boolean(existing?.dnf),
         forfeit: Boolean(existing?.forfeit),
         rank: String(existing?.rank || index + 1),
         registration_id: participant.registration_id || "",
         score: existing?.score != null ? String(existing.score) : existing?.points != null ? String(existing.points) : "",
+        time_ms: existing?.time_ms != null ? String(existing.time_ms) : "",
       };
     });
+}
+
+function rankingMode(match: any) {
+  const raw = String(match?.settings?.calculation || match?.settings?.score_type || "points").toLowerCase().replace(/[-\s]/g, "_");
+  if (["time", "time_ms", "fastest", "fastest_lap", "lowest_time", "best_time"].includes(raw)) return "time";
+  if (["lower_score", "lowest_score", "low_score", "strokes", "penalty_points"].includes(raw)) return "lower_score";
+  return "higher_score";
 }
 
 function firstRegistrationId(participants?: MatchParticipant[]) {
@@ -699,11 +744,20 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  flagRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+    marginTop: 7,
+  },
   flowNotice: {
     gap: 8,
   },
   header: {
     gap: 9,
+  },
+  keyboard: {
+    flex: 1,
   },
   link: {
     color: colors.cyan,
@@ -781,6 +835,33 @@ const styles = StyleSheet.create({
   },
   textGold: {
     color: colors.gold,
+  },
+  toggleChip: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  toggleChipCyan: {
+    backgroundColor: "rgba(41,182,232,0.16)",
+    borderColor: "rgba(41,182,232,0.4)",
+  },
+  toggleChipDanger: {
+    backgroundColor: "rgba(255,59,48,0.16)",
+    borderColor: "rgba(255,59,48,0.42)",
+  },
+  toggleChipGold: {
+    backgroundColor: "rgba(240,180,41,0.16)",
+    borderColor: "rgba(240,180,41,0.42)",
+  },
+  toggleChipText: {
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  toggleChipTextActive: {
+    color: colors.white,
   },
   v2Row: {
     alignItems: "flex-end",

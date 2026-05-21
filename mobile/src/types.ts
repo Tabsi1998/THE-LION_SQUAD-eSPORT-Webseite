@@ -323,6 +323,7 @@ export type F1Challenge = {
   participant_count?: number;
   track_count?: number;
   tracks?: F1Track[];
+  can_manage_times?: boolean;
 };
 
 export type F1LeaderboardEntry = {

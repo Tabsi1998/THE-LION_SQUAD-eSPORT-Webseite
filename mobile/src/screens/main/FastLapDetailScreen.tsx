@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Card } from "../../components/Card";
 import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
@@ -12,7 +12,7 @@ import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime } from "../../lib/format";
 import { getRegistrationState, hasOnlineRegistration } from "../../lib/registration";
 import { colors } from "../../theme";
-import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload } from "../../types";
+import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload, PublicUser } from "../../types";
 
 type Props = { route: { params: { id: string } } };
 
@@ -24,6 +24,16 @@ export function FastLapDetailScreen({ route }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [managerUsers, setManagerUsers] = useState<PublicUser[]>([]);
+  const [managerSearch, setManagerSearch] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [timeInput, setTimeInput] = useState("");
+  const [penaltyInput, setPenaltyInput] = useState("");
+  const [proofUrl, setProofUrl] = useState("");
+  const [adminNote, setAdminNote] = useState("");
+  const [scoreScope, setScoreScope] = useState<"official" | "club_reference">("official");
+  const [invalidLap, setInvalidLap] = useState(false);
+  const [savingTime, setSavingTime] = useState(false);
 
   const tracks = challenge?.tracks || [];
   const activeTrackId = selectedTrackId || tracks[0]?.id || null;
@@ -42,6 +52,12 @@ export function FastLapDetailScreen({ route }: Props) {
         params: nextTrackId ? { track_id: nextTrackId } : undefined,
       });
       setLeaderboard(leaderboardResult.data);
+      if (nextChallenge.can_manage_times) {
+        const usersResult = await api.get<PublicUser[]>(`/f1/challenges/${nextChallenge.id}/assignable-users`).catch(() => ({ data: [] as PublicUser[] }));
+        setManagerUsers(Array.isArray(usersResult.data) ? usersResult.data : []);
+      } else {
+        setManagerUsers([]);
+      }
     } catch (err) {
       setError(errorMessage(err, "Fast-Lap Zeiten konnten nicht geladen werden."));
     } finally {
@@ -58,6 +74,54 @@ export function FastLapDetailScreen({ route }: Props) {
   const registration = useMemo(() => getRegistrationState(challenge, "Einreichung"), [challenge]);
   const showRegistrationInfo = hasOnlineRegistration(challenge) || challenge?.block_club_member_results || challenge?.allow_club_reference_times !== false;
   const participantCount = challenge?.participant_count || leaderboard?.entries.length || 0;
+  const selectedUser = managerUsers.find((item) => item.id === selectedUserId);
+  const forceReference = Boolean(challenge?.block_club_member_results && selectedUser?.is_club_member);
+  const filteredManagerUsers = useMemo(() => {
+    const q = managerSearch.trim().toLowerCase();
+    const source = q
+      ? managerUsers.filter((item) => `${item.display_name || ""} ${item.username || ""}`.toLowerCase().includes(q))
+      : managerUsers;
+    return source.slice(0, 8);
+  }, [managerSearch, managerUsers]);
+
+  const submitManagedTime = useCallback(async () => {
+    if (!challenge?.can_manage_times || !activeTrackId || !selectedUserId || savingTime) return;
+    const timeMs = parseLapTime(timeInput);
+    const penalty = Number(String(penaltyInput || "0").replace(",", ".")) || 0;
+    const note = adminNote.trim();
+    if (!timeMs) {
+      Alert.alert("Zeit fehlt", "Bitte eine Zeit im Format m:ss.SSS oder Millisekunden eintragen.");
+      return;
+    }
+    if ((penalty > 0 || invalidLap) && note.length < 5) {
+      Alert.alert("Begruendung fehlt", "Bei Strafzeit oder Disqualifikation braucht es eine kurze Begruendung.");
+      return;
+    }
+    setSavingTime(true);
+    setError("");
+    try {
+      await api.post(`/f1/challenges/${challenge.id}/times`, {
+        user_id: selectedUserId,
+        track_id: activeTrackId,
+        time_ms: timeMs,
+        penalty_seconds: penalty,
+        proof_url: proofUrl.trim() || null,
+        admin_note: note || null,
+        is_invalid: invalidLap,
+        score_scope: forceReference ? "club_reference" : scoreScope,
+      });
+      setTimeInput("");
+      setPenaltyInput("");
+      setProofUrl("");
+      setAdminNote("");
+      setInvalidLap(false);
+      await load(activeTrackId);
+    } catch (err) {
+      setError(errorMessage(err, "Zeit konnte nicht gespeichert werden."));
+    } finally {
+      setSavingTime(false);
+    }
+  }, [activeTrackId, adminNote, challenge, forceReference, invalidLap, load, penaltyInput, proofUrl, savingTime, scoreScope, selectedUserId, timeInput]);
 
   if (loading) {
     return (
@@ -190,6 +254,50 @@ export function FastLapDetailScreen({ route }: Props) {
           </Card>
         ) : null}
 
+        {challenge.can_manage_times ? (
+          <Card style={styles.managerCard}>
+            <Heading>Zeit eintragen</Heading>
+            <Muted>Fuer Admins und Fast-Lap-Team. Zeiten werden fuer die aktuell gewaehlte Strecke gespeichert.</Muted>
+            <TextInput
+              value={managerSearch}
+              onChangeText={setManagerSearch}
+              placeholder="Fahrer suchen ..."
+              placeholderTextColor={colors.muted}
+              style={styles.input}
+            />
+            <View style={styles.userGrid}>
+              {filteredManagerUsers.map((candidate) => (
+                <Pressable
+                  key={candidate.id}
+                  onPress={() => {
+                    setSelectedUserId(candidate.id);
+                    if (challenge.block_club_member_results && candidate.is_club_member) setScoreScope("club_reference");
+                  }}
+                  style={[styles.userChoice, selectedUserId === candidate.id && styles.userChoiceActive]}
+                >
+                  <Body style={styles.strong}>{candidate.display_name || candidate.username || "Fahrer"}</Body>
+                  {candidate.username ? <Muted>@{candidate.username}</Muted> : null}
+                </Pressable>
+              ))}
+            </View>
+            <View style={styles.inputGrid}>
+              <TextInput value={timeInput} onChangeText={setTimeInput} placeholder="Zeit z.B. 1:24.587" placeholderTextColor={colors.muted} style={styles.input} keyboardType="numbers-and-punctuation" />
+              <TextInput value={penaltyInput} onChangeText={setPenaltyInput} placeholder="Strafe Sekunden" placeholderTextColor={colors.muted} style={styles.input} keyboardType="numeric" />
+            </View>
+            <TextInput value={proofUrl} onChangeText={setProofUrl} placeholder="Proof URL optional" placeholderTextColor={colors.muted} style={styles.input} autoCapitalize="none" />
+            <TextInput value={adminNote} onChangeText={setAdminNote} placeholder={invalidLap || Number(penaltyInput) > 0 ? "Begruendung Pflicht" : "Notiz optional"} placeholderTextColor={colors.muted} style={[styles.input, styles.noteInput]} multiline />
+            <View style={styles.metaRow}>
+              <TogglePill label="Offizielle Wertung" active={!forceReference && scoreScope === "official"} disabled={forceReference} onPress={() => setScoreScope("official")} />
+              <TogglePill label="Vereins-Referenz" active={forceReference || scoreScope === "club_reference"} onPress={() => setScoreScope("club_reference")} />
+              <TogglePill label="Disqualifiziert" active={invalidLap} tone="danger" onPress={() => setInvalidLap((current) => !current)} />
+            </View>
+            {forceReference ? <Muted style={styles.warning}>Vereinsmitglied: laut Challenge-Regel nur als Referenzzeit.</Muted> : null}
+            <Pressable disabled={savingTime || !selectedUserId || !timeInput.trim()} onPress={submitManagedTime} style={[styles.saveButton, (savingTime || !selectedUserId || !timeInput.trim()) && styles.disabled]}>
+              <Body style={styles.saveButtonText}>{savingTime ? "Speichert ..." : "Zeit speichern"}</Body>
+            </Pressable>
+          </Card>
+        ) : null}
+
         {best ? (
           <Card style={styles.bestCard}>
             <View style={styles.bestIcon}>
@@ -254,6 +362,18 @@ function Pill({ label, tone = "cyan" }: { label: string; tone?: "cyan" | "gold" 
   );
 }
 
+function TogglePill({ label, active, onPress, disabled = false, tone = "cyan" }: { label: string; active: boolean; onPress: () => void; disabled?: boolean; tone?: "cyan" | "danger" }) {
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={[styles.togglePill, active && styles.togglePillActive, active && tone === "danger" && styles.togglePillDanger, disabled && styles.disabled]}
+    >
+      <Muted style={[styles.togglePillText, active && styles.togglePillTextActive]}>{label}</Muted>
+    </Pressable>
+  );
+}
+
 function Stat({ icon, label, value, tone = "cyan" }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: number; tone?: "cyan" | "gold" }) {
   return (
     <Card style={styles.stat}>
@@ -266,6 +386,19 @@ function Stat({ icon, label, value, tone = "cyan" }: { icon: keyof typeof Ionico
 
 function stripText(value: string) {
   return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function parseLapTime(value: string) {
+  const cleaned = value.trim().replace(",", ".");
+  if (!cleaned) return null;
+  if (/^\d+$/.test(cleaned)) return Number(cleaned);
+  const match = cleaned.match(/^(?:(\d+):)?(\d{1,2})(?:\.(\d{1,3}))?$/);
+  if (!match) return null;
+  const minutes = Number(match[1] || 0);
+  const seconds = Number(match[2] || 0);
+  const millis = Number((match[3] || "0").padEnd(3, "0"));
+  if (seconds >= 60) return null;
+  return minutes * 60000 + seconds * 1000 + millis;
 }
 
 const styles = StyleSheet.create({
@@ -417,6 +550,23 @@ const styles = StyleSheet.create({
     gap: 8,
     marginHorizontal: 18,
   },
+  input: {
+    backgroundColor: colors.black,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    color: colors.white,
+    minHeight: 46,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  inputGrid: {
+    gap: 10,
+  },
+  managerCard: {
+    gap: 10,
+    marginHorizontal: 18,
+  },
   warning: {
     color: colors.gold,
     fontWeight: "800",
@@ -482,6 +632,60 @@ const styles = StyleSheet.create({
   },
   pillGoldText: {
     color: colors.gold,
+  },
+  noteInput: {
+    minHeight: 72,
+    textAlignVertical: "top",
+  },
+  saveButton: {
+    alignItems: "center",
+    backgroundColor: colors.cyan,
+    borderRadius: 8,
+    minHeight: 46,
+    justifyContent: "center",
+  },
+  saveButtonText: {
+    color: colors.black,
+    fontWeight: "900",
+  },
+  togglePill: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  togglePillActive: {
+    backgroundColor: "rgba(41,182,232,0.16)",
+    borderColor: "rgba(41,182,232,0.42)",
+  },
+  togglePillDanger: {
+    backgroundColor: "rgba(255,59,48,0.16)",
+    borderColor: "rgba(255,59,48,0.42)",
+  },
+  togglePillText: {
+    fontWeight: "900",
+  },
+  togglePillTextActive: {
+    color: colors.white,
+  },
+  userChoice: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 10,
+  },
+  userChoiceActive: {
+    backgroundColor: "rgba(41,182,232,0.14)",
+    borderColor: "rgba(41,182,232,0.4)",
+  },
+  userGrid: {
+    gap: 8,
+  },
+  disabled: {
+    opacity: 0.5,
   },
   error: {
     color: colors.live,
