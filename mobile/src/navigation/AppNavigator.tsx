@@ -133,13 +133,7 @@ function MainTabs() {
       <Tabs.Screen
         name="More"
         component={MoreStackScreen}
-        options={{ title: "Mehr" }}
-        listeners={({ navigation }) => ({
-          tabPress: (event) => {
-            event.preventDefault();
-            navigation.navigate("More", { screen: "MoreHub" });
-          },
-        })}
+        options={{ title: "Mehr", popToTopOnBlur: true }}
       />
     </Tabs.Navigator>
   );
