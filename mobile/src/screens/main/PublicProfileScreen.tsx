@@ -3,7 +3,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
-import { EmptyState, LoadingState } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -109,7 +109,7 @@ export function PublicProfileScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <Screen>
-        <LoadingState label="Profil wird geladen ..." />
+        <SkeletonList count={4} hasImage={false} />
       </Screen>
     );
   }
@@ -134,6 +134,7 @@ export function PublicProfileScreen({ navigation, route }: Props) {
             style={styles.banner}
             fallback={<Ionicons name="person-circle-outline" color={colors.cyan} size={52} />}
           />
+          <View style={styles.heroShade} />
           <View style={styles.identityCard}>
             <MediaImage
               uri={profile.avatar_url}
@@ -481,6 +482,14 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     height: 172,
     width: "100%",
+  },
+  heroShade: {
+    backgroundColor: "rgba(0,0,0,0.28)",
+    height: 172,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
   },
   identityCard: {
     alignItems: "flex-end",
