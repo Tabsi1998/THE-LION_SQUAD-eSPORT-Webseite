@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0-beta.6 - 2026-05-21
+
+- Mobile: Chat-Tastaturanpassung auf `react-native-keyboard-controller` umgestellt, damit der Composer dynamisch an der echten Android-/iOS-Tastaturhoehe bleibt statt mit geratenen Offsets zu arbeiten.
+- Mobile: Expo-Notification-Abhaengigkeiten auf die SDK-54-kompatiblen Versionen aktualisiert und Reanimated/Worklets explizit ergaenzt, damit Keyboard- und Push-Native-Module im Release-Build sauber autogeneriert werden.
+
 ## 1.0.0-beta.5 - 2026-05-21
 
 - Backend: Direktnachrichten erzeugen jetzt immer eine In-App-/Push-Benachrichtigung, auch wenn optionale Community-Benachrichtigungen deaktiviert sind.

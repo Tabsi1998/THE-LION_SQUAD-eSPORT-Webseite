@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Keyboard,
-  KeyboardAvoidingView,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
@@ -11,7 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { api, errorMessage } from "../lib/api";
 import { formatDate } from "../lib/format";
 import type { ContentTarget } from "../lib/contentLinks";
@@ -54,8 +53,6 @@ export function ChatThreadView({
   const scrollRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
   const didInitialScroll = useRef(false);
-  const insets = useSafeAreaInsets();
-  const keyboardOffset = Platform.OS === "ios" ? insets.top + 44 : 0;
 
   const scrollToLatest = useCallback((animated = false) => {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated }));
@@ -148,8 +145,7 @@ export function ChatThreadView({
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={keyboardOffset}
+      behavior="padding"
       style={styles.wrap}
     >
       <ScrollView
