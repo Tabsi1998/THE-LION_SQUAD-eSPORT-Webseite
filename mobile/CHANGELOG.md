@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Mobile: Event-Hub, Dashboard-Timeline und Fast-Lap-Liste sortieren laufende und naechste Termine nach vorne; vergangene Inhalte rutschen darunter.
+- Mobile: News-Details zeigen die Kurzbeschreibung nicht mehr doppelt vor dem eigentlichen Beitrag.
+- Backend/Admin: Match-V2-Platzierungen werden aus Punkten, niedrigem Score oder Zeit automatisch neu berechnet; manuell falsche Ranks werden serverseitig korrigiert.
+
 ## 0.12.0-beta.3 - 2026-05-21
 
 - Mobile: Jahreswertung-Crash nach dem Laden behoben, indem die Hook-Reihenfolge in `SeasonPassScreen` stabilisiert wurde.

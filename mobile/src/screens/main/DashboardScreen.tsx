@@ -9,6 +9,7 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage, responseFromCache } from "../../lib/api";
+import { compareByNearestDate } from "../../lib/contentSort";
 import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import type { MainTabParamList } from "../../navigation/types";
@@ -113,7 +114,7 @@ export function DashboardScreen({ navigation }: Props) {
           ...data.me.tournaments.map(tournamentToTimeline),
           ...data.me.events.map(eventToTimeline),
       ];
-    return source.sort((a, b) => dateSort(a.date) - dateSort(b.date));
+    return source.sort((a, b) => compareByNearestDate(a.date, b.date, a.status, b.status, a.phaseLabel, b.phaseLabel));
   }, [data, isGuest]);
   const liveItems = useMemo(() => timeline.filter(isLiveTimelineItem).slice(0, 3), [timeline]);
 
@@ -322,12 +323,6 @@ function eventToTimeline(event: ClubEvent): TimelineItem {
     targetId: event.slug || event.id,
     registrationStatus: event.own_registration?.status,
   };
-}
-
-function dateSort(value?: string | null) {
-  if (!value) return Number.MAX_SAFE_INTEGER;
-  const date = new Date(value).getTime();
-  return Number.isNaN(date) ? Number.MAX_SAFE_INTEGER : date;
 }
 
 function isLiveTimelineItem(item: TimelineItem) {

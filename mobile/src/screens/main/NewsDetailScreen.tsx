@@ -89,7 +89,6 @@ export function NewsDetailScreen({ navigation, route }: Props) {
         <View style={styles.article}>
           <Muted>{formatDate(post.published_at || post.created_at)}{post.category ? ` · ${post.category}` : ""}</Muted>
           <Title>{post.title}</Title>
-          {post.excerpt || post.summary ? <Body style={styles.lead}>{post.excerpt || post.summary}</Body> : null}
           {post.content || post.body ? (
             <RichText text={post.content || post.body} embeds={post.content_embeds} onOpenContent={openContentTarget} />
           ) : (
@@ -192,10 +191,6 @@ const styles = StyleSheet.create({
   article: {
     gap: 12,
     paddingHorizontal: 18,
-  },
-  lead: {
-    color: colors.cyan,
-    fontWeight: "800",
   },
   card: {
     gap: 10,

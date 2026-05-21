@@ -8,6 +8,7 @@ import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage, responseFromCache } from "../../lib/api";
+import { compareByNearestDate } from "../../lib/contentSort";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ClubEvent, F1Challenge, Tournament } from "../../types";
@@ -105,7 +106,7 @@ export function TournamentsScreen({ navigation }: Props) {
       })),
     ];
     const visible = mapped.filter((item) => matchesFilter(item, filter));
-    return visible.sort((a, b) => dateSort(a.date) - dateSort(b.date));
+    return visible.sort((a, b) => compareByNearestDate(a.date, b.date, a.status, b.status, a.phase, b.phase));
   }, [events, fastlaps, filter, tournaments]);
   const groupedItems = useMemo(() => ({
     events: items.filter((item) => item.kind === "event"),
@@ -195,12 +196,6 @@ function Stat({ label, value, tone = "cyan" }: { label: string; value: string; t
       <Muted>{label}</Muted>
     </Card>
   );
-}
-
-function dateSort(value?: string | null) {
-  if (!value) return Number.MAX_SAFE_INTEGER;
-  const date = new Date(value).getTime();
-  return Number.isNaN(date) ? Number.MAX_SAFE_INTEGER : date;
 }
 
 function matchesFilter(item: HubItem, filter: Filter) {

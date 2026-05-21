@@ -1407,11 +1407,11 @@ function MatchV2ResultControls({ match, filledSlots, labelFor, onSaveResult }) {
       note: byReg[slot.registration_id]?.note || "",
     }));
   };
-  const [rows, setRows] = useState(initialRows);
+  const [rows, setRows] = useState(() => autoRankRows(initialRows()));
   const [autoRank, setAutoRank] = useState(true);
   const [note, setNote] = useState(match.result_meta?.note || "");
   useEffect(() => {
-    setRows(initialRows());
+    setRows(autoRankRows(initialRows()));
     setAutoRank(true);
     setNote(match.result_meta?.note || "");
     // eslint-disable-next-line react-hooks/exhaustive-deps

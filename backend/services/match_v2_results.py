@@ -122,8 +122,7 @@ def normalize_v2_results(match: dict, raw_results: list[dict]) -> list[dict]:
         raise MatchV2ResultError("Match hat keine belegten Slots")
     if len(raw_results) != len(participants):
         raise MatchV2ResultError("Ergebnisliste muss alle belegten Teilnehmer enthalten")
-    if any(entry.get("rank") in (None, "") for entry in raw_results):
-        raw_results = _auto_rank_results(match, raw_results)
+    raw_results = _auto_rank_results(match, raw_results)
 
     seen_regs: set[str] = set()
     seen_ranks: set[int] = set()

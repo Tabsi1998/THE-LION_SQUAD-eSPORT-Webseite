@@ -90,6 +90,18 @@ def test_normalize_v2_results_auto_ranks_lower_score_when_configured():
     assert [row["registration_id"] for row in results] == ["r2", "r4", "r1", "r3"]
 
 
+def test_normalize_v2_results_recalculates_supplied_ranks_from_score():
+    results = normalize_v2_results(_source_match(), [
+        {"registration_id": "r1", "rank": 1, "score": 10},
+        {"registration_id": "r2", "rank": 2, "score": 15},
+        {"registration_id": "r3", "rank": 3, "score": 4},
+        {"registration_id": "r4", "rank": 4, "score": 8},
+    ])
+
+    assert [row["registration_id"] for row in results] == ["r2", "r1", "r4", "r3"]
+    assert [row["rank"] for row in results] == [1, 2, 3, 4]
+
+
 def test_v2_result_application_fills_advancement_slots():
     source = _source_match()
     winner_target = _target("m-b", "B")

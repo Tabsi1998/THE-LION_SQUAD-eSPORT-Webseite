@@ -10,6 +10,7 @@ import { Screen } from "../../components/Screen";
 import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
+import { compareByNearestDate } from "../../lib/contentSort";
 import { formatDate } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -27,7 +28,10 @@ export function FastLapScreen({ navigation }: Props) {
     setError("");
     try {
       const { data } = await api.get<F1Challenge[]>("/f1/challenges", { params: { limit: 100 } });
-      setItems(Array.isArray(data) ? data : []);
+      const sorted = Array.isArray(data)
+        ? [...data].sort((a, b) => compareByNearestDate(a.start_date, b.start_date, a.status, b.status, a.public_phase?.label, b.public_phase?.label))
+        : [];
+      setItems(sorted);
     } catch (err) {
       setError(errorMessage(err, "Fast-Lap Challenges konnten nicht geladen werden."));
     } finally {
