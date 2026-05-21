@@ -16,6 +16,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: mobile `SegmentedTabs` ist als gemeinsamer Baustein eingefuehrt und in Event-Hub, Info-Center, Turnierdetail sowie oeffentlichem Profil genutzt.
 - Seit der Planerstellung umgesetzt: mobile Jahreswertung nutzt echte Season-Standings, zeigt Quellen/Statistiken und trennt Jahreswertungs- von Profilpunkten.
 - Seit der Planerstellung umgesetzt: mobile `EmptyState` unterstuetzt Icons/Tones und ersetzt mehrere manuelle Leerzustaende.
+- Seit der Planerstellung umgesetzt: mobile Bottom-Tabbar nutzt einen Website-nahen Glas-Surface-Layer, versteckt sich bei Tastatur und die Glocke wurde visuell angeglichen.
 - Seit der Planerstellung umgesetzt: Web-Navigation, Jahreswertungsseite, Widget und Admin-Hinweise nutzen sichtbare Begriffe wie Jahreswertung/Jahrespunkte statt unklarem Season-Pass.
 - Seit der Planerstellung umgesetzt: Backend-Defaulttexte, Achievements, Seed-Daten und SEO-Breadcrumbs verwenden ebenfalls Jahreswertung/Jahrespunkte.
 - Seit der Planerstellung umgesetzt: `0.12.0-beta.2` ist vorbereitet, inklusive Android `versionCode` 28, Changelog und Release-Historie.
@@ -121,10 +122,10 @@ Ziel:
 
 App-Navigation:
 
-- Bottom-Tabbar optisch an `frontend/src/components/tls/BottomNav.jsx` anlehnen: dunkles halbtransparentes Surface, feiner Border-Top, aktiver Cyan-Indikator, kompakte Labels.
+- [x] Bottom-Tabbar optisch an `frontend/src/components/tls/BottomNav.jsx` anlehnen: dunkles halbtransparentes Surface, feiner Border-Top, aktiver Cyan-Indikator, kompakte Labels.
 - Blur/Transparenz in React Native pruefen: Expo `BlurView` nur falls performant und stabil, sonst Fallback mit `rgba(10,10,10,0.94)`.
-- Aktiver Tab bekommt klaren oberen Strich oder kleine Glow-Linie, nicht nur andere Textfarbe.
-- Benachrichtigungsglocke integrieren oder an die Tabbar anpassen, damit sie nicht wie ein Fremdkoerper ueber dem UI schwebt.
+- [x] Aktiver Tab bekommt klaren oberen Strich oder kleine Glow-Linie, nicht nur andere Textfarbe.
+- [x] Benachrichtigungsglocke integrieren oder an die Tabbar anpassen, damit sie nicht wie ein Fremdkoerper ueber dem UI schwebt.
 - Tab-Reihenfolge pruefen: Home, Turniere, Teams/Events, Jahreswertung/News, Profil/Mehr. Ziel ist weniger Springen zwischen "Mehr" und Haupttabs.
 
 Gemeinsame UI-Muster:

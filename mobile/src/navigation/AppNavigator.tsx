@@ -95,13 +95,14 @@ function MainTabs() {
     <Tabs.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarHideOnKeyboard: true,
         tabBarActiveTintColor: colors.cyan,
         tabBarInactiveTintColor: colors.muted,
+        tabBarBackground: () => <View style={styles.tabBarGlass} />,
         tabBarStyle: {
-          backgroundColor: "rgba(10,10,10,0.96)",
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          elevation: 14,
+          backgroundColor: "transparent",
+          borderTopWidth: 0,
+          elevation: 0,
           height: 62 + bottomInset,
           paddingTop: 8,
           paddingBottom: bottomInset,
@@ -111,6 +112,7 @@ function MainTabs() {
           shadowRadius: 16,
         },
         tabBarItemStyle: {
+          borderRadius: 8,
           minHeight: 50,
         },
         tabBarLabelStyle: {
@@ -234,6 +236,12 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     minWidth: 38,
   },
+  tabBarGlass: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(10,10,10,0.96)",
+    borderTopColor: "rgba(255,255,255,0.1)",
+    borderTopWidth: 1,
+  },
   tabActiveLine: {
     backgroundColor: "transparent",
     borderBottomLeftRadius: 2,
@@ -248,8 +256,8 @@ const styles = StyleSheet.create({
   },
   bell: {
     alignItems: "center",
-    backgroundColor: "rgba(18,18,18,0.92)",
-    borderColor: colors.border,
+    backgroundColor: "rgba(10,10,10,0.96)",
+    borderColor: "rgba(255,255,255,0.1)",
     borderRadius: 20,
     borderWidth: 1,
     height: 40,
