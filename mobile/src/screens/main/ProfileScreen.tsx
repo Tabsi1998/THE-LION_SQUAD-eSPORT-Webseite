@@ -42,13 +42,13 @@ type AchievementTier = {
   earned_at?: string;
 };
 
-const tabs: Array<{ key: TabKey; label: string }> = [
-  { key: "overview", label: "Übersicht" },
-  { key: "references", label: "Referenzen" },
-  { key: "edit", label: "Bearbeiten" },
-  { key: "achievements", label: "Erfolge" },
-  { key: "privacy", label: "Privat" },
-  { key: "notifications", label: "Mails" },
+const tabs: Array<{ key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
+  { key: "overview", label: "Übersicht", icon: "person-circle-outline" },
+  { key: "references", label: "Referenzen", icon: "ribbon-outline" },
+  { key: "edit", label: "Bearbeiten", icon: "create-outline" },
+  { key: "achievements", label: "Erfolge", icon: "trophy-outline" },
+  { key: "privacy", label: "Privat", icon: "shield-checkmark-outline" },
+  { key: "notifications", label: "Mails", icon: "notifications-outline" },
 ];
 
 const notificationLabels: Array<{ key: string; label: string; detail: string }> = [
@@ -240,6 +240,7 @@ export function ProfileScreen() {
 
   const refreshProfile = useCallback(async () => {
     setRefreshing(true);
+    setOpenGroups({});
     if (!guest) {
       await refreshMe().catch(() => {});
     }
@@ -279,12 +280,12 @@ export function ProfileScreen() {
           <ProfileAction icon="refresh-outline" label={refreshing ? "Lädt" : "Aktualisieren"} onPress={guest || refreshing ? undefined : refreshProfile} />
           <ProfileAction icon="shield-checkmark-outline" label="Privat" onPress={() => setTab("privacy")} />
           <ProfileAction icon="notifications-outline" label="Mails" onPress={() => setTab("notifications")} />
-          <ProfileAction icon="log-out-outline" label="Abmelden" danger onPress={logout} />
         </View>
 
         <View style={styles.tabs}>
           {tabs.map((item) => (
             <Pressable key={item.key} onPress={() => setTab(item.key)} style={[styles.tab, tab === item.key && styles.tabActive]}>
+              <Ionicons name={item.icon} color={tab === item.key ? colors.cyan : colors.muted} size={15} />
               <Muted style={[styles.tabText, tab === item.key && styles.tabTextActive]}>{item.label}</Muted>
             </Pressable>
           ))}
@@ -449,7 +450,9 @@ export function ProfileScreen() {
           <Card style={styles.card}>
             <Muted>Live-Gastmodus aktiv. Profilbearbeitung und persönliche Einstellungen sind nach Login verfügbar.</Muted>
           </Card>
-        ) : null}
+        ) : (
+          <AccountAction icon="log-out-outline" label="Abmelden" detail="Dieses Gerät aus deinem Konto ausloggen." onPress={logout} />
+        )}
       </ScrollView>
     </Screen>
   );
@@ -475,6 +478,31 @@ function ProfileAction({
     >
       <Ionicons name={icon} color={danger ? colors.live : colors.cyan} size={18} />
       <Muted style={[styles.profileActionText, danger && styles.profileActionDangerText]}>{label}</Muted>
+    </Pressable>
+  );
+}
+
+function AccountAction({
+  detail,
+  icon,
+  label,
+  onPress,
+}: {
+  detail: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.accountAction, pressed && styles.pressed]}>
+      <View style={styles.accountActionIcon}>
+        <Ionicons name={icon} color={colors.live} size={18} />
+      </View>
+      <View style={styles.accountActionText}>
+        <Body style={styles.accountActionTitle}>{label}</Body>
+        <Muted>{detail}</Muted>
+      </View>
+      <Ionicons name="chevron-forward" color={colors.live} size={16} />
     </Pressable>
   );
 }
@@ -741,10 +769,10 @@ const styles = StyleSheet.create({
     borderColor: "rgba(41, 182, 232, 0.28)",
     borderRadius: 7,
     borderWidth: 1,
-    flexBasis: "31.5%",
+    flexBasis: "23%",
     flexGrow: 1,
     gap: 6,
-    minHeight: 58,
+    minHeight: 56,
     justifyContent: "center",
     paddingHorizontal: 8,
     paddingVertical: 9,
@@ -771,12 +799,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tab: {
+    alignItems: "center",
     backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderColor: colors.border,
     borderRadius: 7,
     borderWidth: 1,
     flexBasis: "31.5%",
+    flexDirection: "row",
     flexGrow: 1,
+    gap: 6,
+    justifyContent: "center",
+    minHeight: 38,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -790,6 +823,33 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: colors.cyan,
+  },
+  accountAction: {
+    alignItems: "center",
+    backgroundColor: "rgba(255, 59, 48, 0.08)",
+    borderColor: "rgba(255, 59, 48, 0.24)",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 12,
+  },
+  accountActionIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(255, 59, 48, 0.12)",
+    borderRadius: 8,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  accountActionText: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  accountActionTitle: {
+    color: colors.live,
+    fontWeight: "900",
   },
   card: {
     gap: 12,
