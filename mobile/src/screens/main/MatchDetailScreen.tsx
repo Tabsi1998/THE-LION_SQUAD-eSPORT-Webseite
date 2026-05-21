@@ -34,6 +34,7 @@ type MatchParticipant = {
 };
 
 type ScheduleProposal = {
+  actor_registration_id?: string | null;
   id: string;
   actor?: { username?: string; display_name?: string | null } | null;
   note?: string | null;
@@ -422,7 +423,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                 <View key={proposal.id} style={styles.proposal}>
                   <Body style={styles.strong}>{formatDateTime(proposal.scheduled_at)}</Body>
                   <Muted>{proposal.actor?.display_name || proposal.actor?.username || "Teilnehmer"}{proposal.note ? ` · ${proposal.note}` : ""}</Muted>
-                  {canManageSchedule ? (
+                  {canManageSchedule && canDecideScheduleProposal(page, proposal) ? (
                     <>
                       <View style={styles.buttonRow}>
                         <Button label="Annehmen" onPress={() => decide(proposal, "accept")} disabled={busy} />
@@ -432,6 +433,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                       <FormInput label="Antwort optional" value={decisionNote} onChangeText={setDecisionNote} placeholder="Grund oder Hinweis" />
                       <Button label="Gegenvorschlag senden" variant="secondary" onPress={() => decide(proposal, "counter")} disabled={busy} />
                     </>
+                  ) : canManageSchedule ? (
+                    <Muted>Wartet auf Bestaetigung durch Gegenseite oder Turnierleitung.</Muted>
                   ) : null}
                 </View>
               ))}
@@ -682,6 +685,12 @@ function numberOrNull(value: string) {
   if (value.trim() === "") return null;
   const parsed = Number(value.replace(",", "."));
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+function canDecideScheduleProposal(page: MatchPage | null, proposal: ScheduleProposal) {
+  if (!page?.can_manage_schedule) return false;
+  if (!page.acting_registration_id) return true;
+  return proposal.actor_registration_id !== page.acting_registration_id;
 }
 
 function updateV2Row(setRows: React.Dispatch<React.SetStateAction<V2ResultRow[]>>, index: number, patch: Partial<V2ResultRow>) {
