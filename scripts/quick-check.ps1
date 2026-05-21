@@ -1,6 +1,7 @@
 param(
     [switch]$SkipBackendTests,
     [switch]$SkipFrontendBuild,
+    [switch]$SkipMobileTypecheck,
     [ValidateSet("Auto", "npm", "yarn", "corepack-yarn")]
     [string]$PackageManager = "Auto"
 )
@@ -79,6 +80,17 @@ if (-not $SkipBackendTests) {
 if (-not $SkipFrontendBuild) {
     Run-Step "Frontend-Build" {
         Invoke-FrontendBuild
+    }
+}
+
+if (-not $SkipMobileTypecheck) {
+    Run-Step "Mobile-Typecheck" {
+        Push-Location (Join-Path $repoRoot "mobile")
+        try {
+            npm run typecheck
+        } finally {
+            Pop-Location
+        }
     }
 }
 

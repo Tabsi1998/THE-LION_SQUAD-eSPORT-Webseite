@@ -38,9 +38,10 @@ Vor groesseren Updates lokal ausfuehren:
 powershell -ExecutionPolicy Bypass -File .\scripts\quick-check.ps1
 ```
 
-Der Schnellcheck kompiliert kritische Backend-Dateien, fuehrt die Match-V2-Unit-Tests aus
-und baut das Frontend. Bei reinen Backend-Aenderungen kann `-SkipFrontendBuild` genutzt
-werden.
+Der Schnellcheck kompiliert kritische Backend-Dateien, fuehrt die Match-V2-Unit-Tests aus,
+baut das Frontend und prueft die mobile App per TypeScript. Bei reinen Backend-Aenderungen
+kann `-SkipFrontendBuild` genutzt werden; bei Web/Backend-only Hotfixes kann zusaetzlich
+`-SkipMobileTypecheck` gesetzt werden.
 
 Im Admin:
 

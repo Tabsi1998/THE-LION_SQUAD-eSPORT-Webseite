@@ -2,7 +2,7 @@
 import re
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from database import get_db
 from auth import get_current_user, get_optional_user
 from services.visibility import user_can_see
@@ -28,6 +28,7 @@ from match_rules import loser_for_winner, match_allows_draw, validate_winner_id
 from services.match_notifications import notify_match_result_confirmed
 from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
 from services.match_v2_results import MatchV2ResultError, build_v2_result_application
+from services.rate_limit import enforce_rate_limit
 from services.station_labels import attach_station_info
 from services.user_notifications import create_user_notification
 
@@ -749,12 +750,19 @@ async def list_match_chat(match_id: str, user: dict | None = Depends(get_optiona
 
 
 @router.post("/{match_id}/chat")
-async def post_match_chat(match_id: str, body: MatchChatCreate, me: dict = Depends(get_current_user)):
+async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request, me: dict = Depends(get_current_user)):
     db = get_db()
     match, collection = await _find_match_any(match_id)
     await _ensure_match_tournament_unlocked(db, match)
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen im Matchchat schreiben")
+    await enforce_rate_limit(
+        request,
+        "matches:chat:user-match",
+        limit=30,
+        window_seconds=300,
+        subject=f"{me['id']}:{match_id}",
+    )
     now_iso = now_utc().isoformat()
     doc = {
         "id": new_id(),

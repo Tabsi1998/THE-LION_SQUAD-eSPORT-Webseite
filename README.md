@@ -143,10 +143,13 @@ Lokaler Schnellcheck vor Commit oder groesseren Deployments:
 powershell -ExecutionPolicy Bypass -File .\scripts\quick-check.ps1
 ```
 
-Fuer reine Backend-Aenderungen kann der Frontend-Build uebersprungen werden:
+Der Schnellcheck kompiliert kritische Backend-Dateien, fuehrt Match-V2-Unit-Tests aus,
+baut das Frontend und prueft die mobile App per TypeScript. Fuer reine Backend-Aenderungen
+kann der Frontend-Build oder der Mobile-Typecheck uebersprungen werden:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\quick-check.ps1 -SkipFrontendBuild
+powershell -ExecutionPolicy Bypass -File .\scripts\quick-check.ps1 -SkipMobileTypecheck
 ```
 
 Backend-Unit- und Smoke-Tests ohne laufendes Live-Backend:

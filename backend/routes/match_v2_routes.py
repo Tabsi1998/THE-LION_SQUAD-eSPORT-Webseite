@@ -1,5 +1,5 @@
 """v2 multi-slot match routes."""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import timedelta
 
 from auth import get_current_user, get_optional_user
@@ -16,6 +16,7 @@ from models import (
 from services.match_v2_results import MatchV2ResultError, build_v2_result_application
 from services.match_notifications import notify_match_result_confirmed
 from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
+from services.rate_limit import enforce_rate_limit
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     READ_STAFF_ROLES,
@@ -469,7 +470,7 @@ async def list_match_chat(match_id: str, user: dict | None = Depends(get_optiona
 
 
 @router.post("/{match_id}/chat")
-async def post_match_chat(match_id: str, body: MatchChatCreate, me: dict = Depends(get_current_user)):
+async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request, me: dict = Depends(get_current_user)):
     db = get_db()
     match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
     if not match:
@@ -477,6 +478,13 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, me: dict = Depen
     await _ensure_match_tournament_unlocked(db, match)
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen im Matchchat schreiben")
+    await enforce_rate_limit(
+        request,
+        "matches:chat:user-match",
+        limit=30,
+        window_seconds=300,
+        subject=f"{me['id']}:{match_id}",
+    )
     now_iso = now_utc().isoformat()
     doc = {
         "id": new_id(),
