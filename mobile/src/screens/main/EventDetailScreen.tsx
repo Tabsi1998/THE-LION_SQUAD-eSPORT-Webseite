@@ -9,6 +9,7 @@ import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
+import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
@@ -180,7 +181,10 @@ export function EventDetailScreen({ navigation, route }: Props) {
         />
 
         <View style={styles.header}>
-          <Muted>{event.public_phase?.label || formatStatus(event.status)} · {formatDateTime(event.start_date || event.date)}</Muted>
+          <View style={styles.headerMeta}>
+            <StatusBadge phase={event.public_phase} status={event.status} />
+            <Muted>{formatDateTime(event.start_date || event.date)}</Muted>
+          </View>
           <Title>{event.title || event.name || "Event"}</Title>
           <View style={styles.metaRow}>
             <Pill label={event.event_type || event.type || "Event"} />
@@ -369,6 +373,12 @@ const styles = StyleSheet.create({
   header: {
     gap: 10,
     paddingHorizontal: 18,
+  },
+  headerMeta: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
   metaRow: {
     flexDirection: "row",

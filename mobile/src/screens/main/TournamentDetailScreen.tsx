@@ -6,6 +6,7 @@ import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
+import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
@@ -218,7 +219,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
           <Title>{tournament.title}</Title>
           {tournament.description ? <Muted>{tournament.description.replace(/[#*_`]/g, "").slice(0, 300)}</Muted> : null}
           <View style={styles.pillRow}>
-            <Pill label={tournament.public_phase?.label || formatStatus(tournament.status)} accent="cyan" />
+            <StatusBadge phase={tournament.public_phase} status={tournament.status} />
             <Pill label={formatDate(tournament.start_date)} />
             <Pill label={tournament.format_label || tournament.format || "Format offen"} />
             <Pill label={`${tournament.participant_count ?? tournament.participants?.length ?? registrations.length ?? 0}${tournament.max_participants ? `/${tournament.max_participants}` : ""} Teilnehmer`} />

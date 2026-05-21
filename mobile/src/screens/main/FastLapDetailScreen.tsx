@@ -5,10 +5,11 @@ import { Card } from "../../components/Card";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
+import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
-import { formatDate, formatDateTime, formatStatus } from "../../lib/format";
+import { formatDate, formatDateTime } from "../../lib/format";
 import { getRegistrationState, hasOnlineRegistration } from "../../lib/registration";
 import { colors } from "../../theme";
 import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload } from "../../types";
@@ -92,7 +93,7 @@ export function FastLapDetailScreen({ route }: Props) {
               <Ionicons name="speedometer-outline" color={colors.black} size={22} />
             </View>
             <View style={styles.heroText}>
-              <Muted style={styles.heroEyebrow}>{challenge.public_phase?.label || formatStatus(challenge.status)}</Muted>
+              <StatusBadge phase={challenge.public_phase} status={challenge.status} />
               <Title>{challenge.title}</Title>
               <Muted>{formatDate(challenge.start_date)}</Muted>
             </View>
@@ -308,11 +309,6 @@ const styles = StyleSheet.create({
   heroText: {
     flex: 1,
     gap: 3,
-  },
-  heroEyebrow: {
-    color: colors.gold,
-    fontWeight: "900",
-    textTransform: "uppercase",
   },
   header: {
     gap: 10,
