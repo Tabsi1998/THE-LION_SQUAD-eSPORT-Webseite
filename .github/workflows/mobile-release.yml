@@ -6,7 +6,7 @@ on:
       channel:
         description: Release channel
         required: true
-        default: alpha
+        default: beta
         type: choice
         options:
           - alpha
@@ -209,7 +209,7 @@ jobs:
             echo ""
             echo "## Installation"
             echo ""
-            echo "Diese APK ist eine Alpha-Testversion. Bei Installation ausserhalb von Google Play kann Android weiterhin Hinweise zu externen Quellen oder Play Protect anzeigen. Fuer die sauberste Installation ohne Sideload-Warnung muss dieselbe App ueber Google Play Testing verteilt werden."
+            echo "Diese APK ist eine ${{ steps.meta.outputs.channel_label }}-Testversion. Bei Installation ausserhalb von Google Play kann Android weiterhin Hinweise zu externen Quellen oder Play Protect anzeigen. Fuer die sauberste Installation ohne Sideload-Warnung muss dieselbe App ueber Google Play Testing verteilt werden."
           } > "$NOTES_FILE"
           echo "notes_file=mobile/${NOTES_FILE}" >> "$GITHUB_OUTPUT"
 

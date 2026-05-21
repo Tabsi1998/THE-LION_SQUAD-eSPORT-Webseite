@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.12.0-beta.1 - 2026-05-21
+
+- Mobile: Erster Beta-Kanal vorbereitet, nachdem CI, Audit, Release-Preflight, Backend-Tests und Frontend-Build stabil laufen.
+- Mobile: Dashboard, More-Hub, News, Notifications, Info Center, Profil, Public Profile, Teams, Season-Pass und Fast-Lap-Bereiche visuell modernisiert und konsistenter gemacht.
+- Mobile: Fast-Lap-Detail und Team-Detail mit klareren Hero-Bereichen, Stat-Karten, Skeleton-Loading und robusterer Navigation geglaettet.
+- Mobile: Push-Token-Handling gehaertet, echte EAS Project-ID genutzt und Push-Token beim Logout sauber deregistriert.
+- Mobile: `npm audit --audit-level=moderate` durch sichere Dependency-Overrides wieder sauber gemacht.
+- CI: Backend-Live-Tests von normalen Unit-/Integration-Tests getrennt, damit CI ohne laufende Live-API stabil bleibt.
+
 ## 0.11.0-alpha.2 - 2026-05-21
 
 - Mobile: Echte Expo EAS Project-ID eingetragen (3eaaebbc-883e-469c-a135-09f3459e2c46)
