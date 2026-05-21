@@ -6,6 +6,7 @@ import { Card } from "../../components/Card";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
+import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatStatus } from "../../lib/format";
@@ -159,13 +160,7 @@ export function PublicProfileScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-          {tabs.map((item) => (
-            <Pressable key={item.key} onPress={() => setTab(item.key)} style={[styles.tab, tab === item.key && styles.tabActive]}>
-              <Muted style={[styles.tabText, tab === item.key && styles.tabTextActive]}>{item.label}</Muted>
-            </Pressable>
-          ))}
-        </ScrollView>
+        <SegmentedTabs items={tabs} value={tab} onChange={setTab} />
 
         {tab === "overview" ? (
           <>
@@ -514,28 +509,6 @@ const styles = StyleSheet.create({
   identityText: {
     flex: 1,
     gap: 5,
-  },
-  tabs: {
-    gap: 8,
-    paddingRight: 18,
-  },
-  tab: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderColor: colors.border,
-    borderRadius: 7,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  tabActive: {
-    backgroundColor: "rgba(41,182,232,0.16)",
-    borderColor: "rgba(41,182,232,0.42)",
-  },
-  tabText: {
-    fontWeight: "900",
-  },
-  tabTextActive: {
-    color: colors.cyan,
   },
   card: {
     gap: 10,

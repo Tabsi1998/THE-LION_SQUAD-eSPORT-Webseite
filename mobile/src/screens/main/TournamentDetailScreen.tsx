@@ -6,6 +6,7 @@ import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
+import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
@@ -228,13 +229,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-          {tabs.map((item) => (
-            <Pressable key={item.key} onPress={() => setTab(item.key)} style={[styles.tab, tab === item.key && styles.tabActive]}>
-              <Muted style={[styles.tabText, tab === item.key && styles.tabTextActive]}>{item.label}</Muted>
-            </Pressable>
-          ))}
-        </ScrollView>
+        <SegmentedTabs items={tabs} value={tab} onChange={setTab} />
 
         {tab === "overview" ? (
           <>
@@ -623,28 +618,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 10,
     padding: 16,
-  },
-  tabs: {
-    gap: 8,
-    paddingRight: 18,
-  },
-  tab: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderColor: colors.border,
-    borderRadius: 7,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  tabActive: {
-    backgroundColor: "rgba(41,182,232,0.16)",
-    borderColor: "rgba(41,182,232,0.42)",
-  },
-  tabText: {
-    fontWeight: "900",
-  },
-  tabTextActive: {
-    color: colors.cyan,
   },
   pillRow: {
     flexDirection: "row",
