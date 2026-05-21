@@ -3,10 +3,10 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
+import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
-import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../lib/api";
@@ -171,17 +171,18 @@ function Events({ items, onOpen }: { items: any[]; onOpen: (event: any) => void 
   return (
     <>
       {items.map((event) => (
-        <Pressable key={event.id} onPress={() => onOpen(event)} style={({ pressed }) => [pressed && styles.pressed]}>
-          <Card style={styles.card}>
-            <View style={styles.cardTop}>
-              <Heading>{event.title || event.name}</Heading>
-              <StatusBadge phase={event.public_phase} status={event.status} />
-            </View>
-            <Muted>{event.type || event.event_type || "Event"} · {event.date || event.start_date}</Muted>
-            <Body style={styles.strong}>{[event.location, event.city, event.country].filter(Boolean).join(", ") || "Ort offen"}</Body>
-            <Muted style={styles.link}>Details öffnen</Muted>
-          </Card>
-        </Pressable>
+        <ContentCard
+          key={event.id}
+          date={event.date || event.start_date}
+          description={event.description}
+          detail={[event.location, event.city, event.country].filter(Boolean).join(", ") || "Ort offen"}
+          image={event.banner_url}
+          kind="event"
+          onPress={() => onOpen(event)}
+          phase={event.public_phase}
+          status={event.status}
+          title={event.title || event.name}
+        />
       ))}
     </>
   );
