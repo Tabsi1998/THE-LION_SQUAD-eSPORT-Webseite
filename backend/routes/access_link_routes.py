@@ -16,6 +16,7 @@ from services.access_links import (
     new_access_token,
     public_access_link_payload,
 )
+from services.user_notifications import build_public_url, create_user_notification
 
 router = APIRouter(prefix="/api/access-links", tags=["access-links"])
 
@@ -29,6 +30,7 @@ class AccessLinkCreate(BaseModel):
     user_id: str | None = Field(default=None, max_length=120)
     email: str | None = Field(default=None, max_length=320)
     note: str | None = Field(default=None, max_length=500)
+    notify_user: bool = False
 
 
 def _collection_for_target(target_type: str):
@@ -57,6 +59,8 @@ def _safe_link_payload(link: dict, target: dict | None = None) -> dict:
     payload["is_active"] = link.get("is_active") is not False
     payload["user_id"] = link.get("user_id")
     payload["email"] = link.get("email")
+    payload["last_used_at"] = link.get("last_used_at")
+    payload["last_used_by"] = link.get("last_used_by")
     if target:
         payload["target"] = target
     return payload
@@ -87,6 +91,11 @@ async def list_access_links(
 async def create_access_link(body: AccessLinkCreate, me: dict = Depends(require_admin())):
     db = get_db()
     target = await _target_doc(body.target_type, body.target_id)
+    bound_user = None
+    if body.user_id:
+        bound_user = await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1})
+        if not bound_user:
+            raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
     grants = list(dict.fromkeys(body.grants or ["view"]))
     if any(grant in grants for grant in ("register", "submit")) and "view" not in grants:
         grants.insert(0, "view")
@@ -104,7 +113,7 @@ async def create_access_link(body: AccessLinkCreate, me: dict = Depends(require_
         "max_uses": body.max_uses,
         "use_count": 0,
         "user_id": body.user_id or None,
-        "email": (body.email or "").strip().lower() or None,
+        "email": ((body.email or (bound_user or {}).get("email") or "").strip().lower() or None),
         "note": (body.note or "").strip() or None,
         "is_active": True,
         "created_by": me.get("id"),
@@ -129,7 +138,23 @@ async def create_access_link(body: AccessLinkCreate, me: dict = Depends(require_
         "created_at": now,
     })
     doc.pop("_id", None)
-    return {**_safe_link_payload(doc, target), "token": token, "url": access_path(body.target_type, target, token)}
+    url = access_path(body.target_type, target, token)
+    absolute_url = await build_public_url(url)
+    if body.notify_user and bound_user:
+        target_label = target.get("name") or target.get("title") or body.target_id
+        await create_user_notification(
+            bound_user["id"],
+            "Speziallink freigeschaltet",
+            f"Du hast Zugriff auf {target_label}.",
+            url=absolute_url,
+            kind="access_link_invite",
+            meta={
+                "access_link_id": doc["id"],
+                "target_type": body.target_type,
+                "target_id": body.target_id,
+            },
+        )
+    return {**_safe_link_payload(doc, target), "token": token, "url": url, "absolute_url": absolute_url}
 
 
 @router.delete("/{link_id}")

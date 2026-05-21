@@ -22,10 +22,16 @@ async function copyText(value) {
 
 export function AccessLinksPanel({ targetType, targetId, allowRegister = false }) {
   const [links, setLinks] = useState([]);
+  const [users, setUsers] = useState([]);
   const [busy, setBusy] = useState(false);
   const [includeRegister, setIncludeRegister] = useState(allowRegister);
   const [note, setNote] = useState("");
   const [expiresInDays, setExpiresInDays] = useState("");
+  const [maxUses, setMaxUses] = useState("");
+  const [userId, setUserId] = useState("");
+  const [email, setEmail] = useState("");
+  const [notifyUser, setNotifyUser] = useState(false);
+  const [createdUrl, setCreatedUrl] = useState("");
 
   const load = useCallback(async () => {
     if (!targetType || !targetId) return;
@@ -39,10 +45,17 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false }
     load().catch(() => setLinks([]));
   }, [load]);
 
+  useEffect(() => {
+    api.get("/users")
+      .then(({ data }) => setUsers((data || []).filter((user) => user?.id)))
+      .catch(() => setUsers([]));
+  }, []);
+
   const create = async () => {
     setBusy(true);
     try {
       const days = Number(expiresInDays || 0);
+      const max = Number(maxUses || 0);
       const expiresAt = days > 0 ? new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString() : null;
       const grants = ["view", ...(includeRegister && allowRegister ? ["register"] : [])];
       const { data } = await api.post("/access-links", {
@@ -50,13 +63,19 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false }
         target_id: targetId,
         grants,
         expires_at: expiresAt,
+        max_uses: max > 0 ? max : null,
+        user_id: userId || null,
+        email: email.trim() || null,
         note: note.trim() || null,
+        notify_user: notifyUser && !!userId,
       });
-      const url = absoluteUrl(data.url);
+      const url = data.absolute_url || absoluteUrl(data.url);
+      setCreatedUrl(url);
       await copyText(url);
       toast.success("Speziallink erstellt und kopiert.");
       setNote("");
       setExpiresInDays("");
+      setMaxUses("");
       await load();
     } catch (err) {
       toast.error(formatRequestError(err, "Speziallink konnte nicht erstellt werden."));
@@ -99,7 +118,26 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false }
         </button>
       </div>
 
-      <div className="grid md:grid-cols-[1fr_8rem_auto] gap-2 items-end">
+      {createdUrl && (
+        <div className="flex flex-wrap items-center gap-2 border border-[#00FF88]/25 bg-[#00FF88]/10 rounded-sm p-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] uppercase tracking-widest font-bold text-[#00FF88]">Gerade erstellt</div>
+            <div className="mt-1 text-xs text-white/75 break-all">{createdUrl}</div>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              await copyText(createdUrl);
+              toast.success("Link kopiert.");
+            }}
+            className="inline-flex items-center gap-2 px-3 py-2 border border-[#00FF88]/35 text-[#00FF88] rounded-sm text-xs uppercase tracking-wider font-bold"
+          >
+            <Copy className="w-3.5 h-3.5" /> Kopieren
+          </button>
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-[1fr_8rem_8rem_auto] gap-2 items-end">
         <label className="block">
           <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">Notiz</span>
           <input
@@ -111,13 +149,25 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false }
           />
         </label>
         <label className="block">
-          <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">Tage</span>
+          <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">Gültig Tage</span>
           <input
             type="number"
             min="1"
             max="365"
             value={expiresInDays}
             onChange={(event) => setExpiresInDays(event.target.value)}
+            placeholder="offen"
+            className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="block">
+          <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">Max.</span>
+          <input
+            type="number"
+            min="1"
+            max="10000"
+            value={maxUses}
+            onChange={(event) => setMaxUses(event.target.value)}
             placeholder="offen"
             className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm"
           />
@@ -130,6 +180,42 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false }
         )}
       </div>
 
+      <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 items-end">
+        <label className="block">
+          <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">User optional</span>
+          <select
+            value={userId}
+            onChange={(event) => {
+              const nextUserId = event.target.value;
+              setUserId(nextUserId);
+              const selected = users.find((user) => user.id === nextUserId);
+              if (selected?.email) setEmail(selected.email);
+            }}
+            className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm"
+          >
+            <option value="">nicht gebunden</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.display_name || user.username || user.email} {user.email ? `(${user.email})` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">E-Mail optional</span>
+          <input
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="name@example.com"
+            className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="inline-flex items-center gap-2 text-xs text-white/70 pb-2">
+          <input type="checkbox" checked={notifyUser} disabled={!userId} onChange={(event) => setNotifyUser(event.target.checked)} className="accent-[#FFD700] disabled:opacity-40" />
+          User benachrichtigen
+        </label>
+      </div>
+
       <div className="space-y-2">
         {links.map((link) => (
           <div key={link.id} className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-[#0A0A0A]/70 rounded-sm px-3 py-2">
@@ -140,6 +226,8 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false }
               <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/35">
                 {link.use_count || 0}{link.max_uses ? `/${link.max_uses}` : ""} Nutzungen
                 {link.expires_at ? ` · bis ${new Date(link.expires_at).toLocaleDateString("de-DE")}` : " · ohne Ablauf"}
+                {link.user_id ? " · usergebunden" : ""}
+                {link.email ? ` · ${link.email}` : ""}
               </div>
             </div>
             <div className="flex items-center gap-1">
