@@ -15,6 +15,8 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Mobile Statuslabels sind zu technisch. `formatStatus()` ersetzt aktuell nur Unterstriche, wodurch Werte wie `approved` oder `waiting_result` roh wirken.
 - Das Profil ist funktional, aber schwerer zu bedienen als noetig: Tabs sind horizontal versteckt, Bearbeiten und Abmelden wirken zu gross, Gruppen bleiben offen, und die Mehr-Navigation merkt sich Unterseiten.
 - Season-Punkte existieren bereits beim Status `results_published`. Teilnahme, Platzierung, Gewichtung und Jahreswertung sind also kein kompletter Neubau, brauchen aber bessere Benennung, Transparenz und App-Darstellung.
+- Die mobile Website hat bereits eine app-artige Bottom-Navigation mit dunkler Transparenz, `backdrop-blur-xl`, Safe-Area-Padding, Icon-Fokus und aktivem Top-Indikator. Die native App-Tabbar ist dagegen noch einfacher und kann diese Designsprache aufnehmen.
+- Web und App nutzen aehnliche Inhalte, aber noch nicht immer dieselben UX-Muster: Statusbadges, Embed-Karten, Listen, Tabs, Actions und leere Zustaende sollten staerker vereinheitlicht werden.
 
 ## Zielbild
 
@@ -97,7 +99,44 @@ Mehr-Navigation:
 - Beim erneuten Tippen auf "Mehr" zurueck zum MoreHub navigieren.
 - Alternativ Stack bei Tabwechsel resetten, damit eine zuvor geoeffnete Unterseite nicht ueberraschend wieder offen ist.
 
-## Phase 6 - Jahreswertung statt unklarer Season-Pass
+## Phase 6 - Mobile Design-System und Navigations-Rework
+
+Ziel:
+
+- Die App soll sich wie eine native Lions-App anfuehlen, aber die gute mobile Website-Optik uebernehmen: dunkle transparente Bottom-Bar, leichter Blur/Glas-Effekt, klare Icons, aktive Indikatoren und sichere Abstaende fuer iOS/Android.
+- Website mobil, App und spaeter PWA sollen dieselbe visuelle Sprache sprechen, ohne doppelte Designentscheidungen.
+
+App-Navigation:
+
+- Bottom-Tabbar optisch an `frontend/src/components/tls/BottomNav.jsx` anlehnen: dunkles halbtransparentes Surface, feiner Border-Top, aktiver Cyan-Indikator, kompakte Labels.
+- Blur/Transparenz in React Native pruefen: Expo `BlurView` nur falls performant und stabil, sonst Fallback mit `rgba(10,10,10,0.94)`.
+- Aktiver Tab bekommt klaren oberen Strich oder kleine Glow-Linie, nicht nur andere Textfarbe.
+- Benachrichtigungsglocke integrieren oder an die Tabbar anpassen, damit sie nicht wie ein Fremdkoerper ueber dem UI schwebt.
+- Tab-Reihenfolge pruefen: Home, Turniere, Teams/Events, Jahreswertung/News, Profil/Mehr. Ziel ist weniger Springen zwischen "Mehr" und Haupttabs.
+
+Gemeinsame UI-Muster:
+
+- `StatusBadge` / `PhaseBadge` als App-Komponente nach Web-Vorbild nachziehen.
+- `ActionRow` fuer kompakte Icon-Actions statt grosser Buttons, z.B. Profil bearbeiten, Aktualisieren, Datenschutz, Logout.
+- `ContentCard` fuer Turnier/Event/Fast-Lap/News vereinheitlichen: Bild, Status, Datum, Primaraktion.
+- `SegmentedTabs` fuer sichtbare Seitenwechsel statt versteckter horizontaler Scroll-Tabs.
+- `EmptyState`, `SkeletonList`, Fehler- und Offline-Zustaende optisch angleichen.
+
+Mobile Website:
+
+- Pruefen, ob die BottomNav fuer eingeloggte User "Events" oder "Season/Jahreswertung" sinnvoller priorisiert, weil Events/Turniere/Jahreswertung fuer Vereinsbetrieb wichtiger sind.
+- Mobile Header und BottomNav duerfen sich nicht doppelt anfuehlen: Burger-Menue bleibt fuer tiefe Navigation, BottomNav fuer Hauptwege.
+- Scroll-Top-Button und Bottom-Banner muessen mit BottomNav/Safe-Area sauber zusammenspielen.
+- Admin- und Profilseiten mobil weiter verdichten: Tabellenkarten, Sticky-Actions und weniger horizontales Scrollen.
+
+Design-Checks:
+
+- Screenshots fuer kleine Smartphones, grosse Smartphones und Tablet-Breite.
+- Keine ueberlappenden Texte mit BottomNav, Bannern, Scroll-Top und Cookie-Dialog.
+- Farben bleiben TLS-typisch, aber nicht nur Cyan/Gold: Danger, Success, Neutral und Statusfarben klar getrennt.
+- Motion sparsam: kurze Press-States, keine dauerhaften Effekte, die Akku oder Lesbarkeit stoeren.
+
+## Phase 7 - Jahreswertung statt unklarer Season-Pass
 
 Namensoptionen:
 
@@ -121,13 +160,41 @@ Umsetzung:
 - UI-Begriffe vereinheitlichen, damit "Season-Punkte", "Profilpunkte" und "Achievements" nicht vermischt werden.
 - Mobile `SeasonPassScreen` in Richtung "Jahreswertung" umbauen.
 
-## Phase 7 - Beta 0.12.0-beta.2
+## Phase 8 - Weitere sinnvolle Erweiterungen
+
+Turnierbetrieb:
+
+- Staff-Dashboard fuer lokale Events: offene Matches, Stationen, fehlende Ergebnisse, letzte Aenderungen, Schnellwertung.
+- QR-Modus fuer Vor-Ort-Events: Teilnehmer, Staff oder Stationen koennen direkt zum richtigen Match/Check-in springen.
+- Audit-Ansicht fuer Ergebnis-Aenderungen: wer hat wann welches Ergebnis eingetragen oder bestaetigt.
+- Rollen feiner benennen: Turnierleitung, Station-Crew, Ergebnis-Erfasser, Admin.
+
+Kommunikation:
+
+- Match- und Turnierchat mit Kontext-Chips: Termin, Ergebnis offen, Klaerung noetig, Staff-Antwort.
+- Push-Benachrichtigungen fuer Ergebnis bestaetigt, Ergebnis-Konflikt, Match startet bald, Check-in offen.
+- News-Editor mit Embed-Vorschau fuer mobile Darstellung, damit der blaue Balken-Fall gar nicht erst ueberrascht.
+
+Inhalte und Medien:
+
+- Media-Qualitaetscheck im Admin: fehlende Banner, fehlende Track-Bilder, zu kleine Bilder, kaputte Links.
+- Automatische Social/OpenGraph-Vorschau fuer Turniere, Events, Fast-Laps und Jahreswertung.
+- Galerie/Album-Verknuepfung mit Events und Turnieren, damit Rueckblicke direkt sichtbar sind.
+
+Qualitaet und Betrieb:
+
+- E2E-Smoke fuer wichtigste mobile Web-Wege: Home, Turniere, Match, Profil, Jahreswertung.
+- Native App-Screenshot-Check fuer Dashboard, Match-Hub, Profil, Fast-Lap und News.
+- Monitoring fuer Push-Token, API-Fehler und langsame mobile Endpunkte.
+- Beta-Feedback-Kanal in App/Web: kurzer Report mit Screen, Version, User-Agent und Route.
+
+## Phase 9 - Beta 0.12.0-beta.2
 
 Fuer den naechsten APK-Build:
 
 - Version auf `0.12.0-beta.2` setzen.
 - Android `versionCode` auf `28` erhoehen.
-- Changelog mit Match-Regeln, Embed-Karten, Profilnavigation und Jahreswertung aktualisieren.
+- Changelog mit Match-Regeln, Embed-Karten, Profilnavigation, App-Design-Rework und Jahreswertung aktualisieren.
 - Vor Release pruefen: `npm run typecheck`, `npm audit --audit-level=moderate`, mobile Preflight, Backend-Tests fuer Match-Regeln.
 
 ## Prioritaet
@@ -136,6 +203,8 @@ Fuer den naechsten APK-Build:
 2. Mobile Match-Hub passend zu lokalen und Online-Turnieren.
 3. Statuslabels zentral sauber machen.
 4. Embed-Karten und Fast-Lap-Streckenbilder.
-5. Profil und Mehr-Navigation modernisieren.
-6. Jahreswertung benennen und in App/Web klar darstellen.
-7. Beta.2 bauen und testen.
+5. Mobile Design-System mit Bottom-Bar/Blur, gemeinsamen Cards und Tabs modernisieren.
+6. Profil und Mehr-Navigation modernisieren.
+7. Jahreswertung benennen und in App/Web klar darstellen.
+8. Staff-Dashboard, QR-Flows und Beta-Feedback als naechste Erweiterungen vorbereiten.
+9. Beta.2 bauen und testen.
