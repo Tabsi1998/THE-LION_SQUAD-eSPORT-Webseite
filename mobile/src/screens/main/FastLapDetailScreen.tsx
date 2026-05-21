@@ -26,6 +26,7 @@ export function FastLapDetailScreen({ route }: Props) {
 
   const tracks = challenge?.tracks || [];
   const activeTrackId = selectedTrackId || tracks[0]?.id || null;
+  const activeTrack = tracks.find((track) => track.id === activeTrackId) || leaderboard?.track || tracks[0] || null;
 
   const load = useCallback(async (trackId?: string | null) => {
     setError("");
@@ -161,6 +162,32 @@ export function FastLapDetailScreen({ route }: Props) {
             <Muted>Keine Strecken hinterlegt.</Muted>
           )}
         </View>
+
+        {activeTrack ? (
+          <Card style={styles.trackCard}>
+            <MediaImage
+              uri={activeTrack.image_url || challenge.banner_url}
+              style={styles.trackImage}
+              fallback={<Ionicons name="map-outline" color={colors.gold} size={30} />}
+            />
+            <View style={styles.trackBody}>
+              <View style={styles.trackTitleRow}>
+                <View style={styles.trackIcon}>
+                  <Ionicons name="map-outline" color={colors.black} size={18} />
+                </View>
+                <View style={styles.trackTitle}>
+                  <Muted>Aktuelle Strecke</Muted>
+                  <Heading>{activeTrack.name || "Strecke"}</Heading>
+                </View>
+              </View>
+              <View style={styles.metaRow}>
+                {activeTrack.country ? <Pill label={activeTrack.country} /> : null}
+                {challenge.vehicle ? <Pill label={challenge.vehicle} /> : null}
+                {challenge.weather ? <Pill label={challenge.weather} tone="gold" /> : null}
+              </View>
+            </View>
+          </Card>
+        ) : null}
 
         {best ? (
           <Card style={styles.bestCard}>
@@ -335,6 +362,39 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: colors.gold,
+  },
+  trackCard: {
+    gap: 0,
+    marginHorizontal: 18,
+    overflow: "hidden",
+    padding: 0,
+  },
+  trackImage: {
+    borderWidth: 0,
+    height: 154,
+    width: "100%",
+  },
+  trackBody: {
+    gap: 10,
+    padding: 14,
+  },
+  trackTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  trackIcon: {
+    alignItems: "center",
+    backgroundColor: colors.gold,
+    borderRadius: 9,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  trackTitle: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
   },
   bestCard: {
     alignItems: "center",
