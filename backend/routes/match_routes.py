@@ -137,6 +137,43 @@ def _schedule_proposals_enabled(policy: dict) -> bool:
     return policy.get("schedule_mode") in {"player_proposal", "hybrid"}
 
 
+def _score_report_resolution(match: dict, reports: list[dict]) -> dict | None:
+    if len(reports) < 2:
+        return None
+    first, second = reports[-2:]
+    score_a = second.get("score_a")
+    score_b = second.get("score_b")
+    if first.get("score_a") != score_a or first.get("score_b") != score_b:
+        return {
+            "status": "disputed",
+            "admin_note": match.get("admin_note") or "Abweichende Ergebnisberichte; bitte durch Turnierleitung pruefen.",
+            "updated_at": now_utc().isoformat(),
+        }
+    winner = None
+    if score_a > score_b:
+        winner = match.get("participant_a_id")
+    elif score_b > score_a:
+        winner = match.get("participant_b_id")
+    if not winner and not match_allows_draw(match):
+        return {
+            "score_a": score_a,
+            "score_b": score_b,
+            "winner_id": None,
+            "loser_id": None,
+            "status": "disputed",
+            "admin_note": match.get("admin_note") or "Unentschieden gemeldet; Gewinnerentscheidung erforderlich.",
+            "updated_at": now_utc().isoformat(),
+        }
+    return {
+        "score_a": score_a,
+        "score_b": score_b,
+        "winner_id": winner,
+        "loser_id": loser_for_winner(match, winner),
+        "status": "completed",
+        "updated_at": now_utc().isoformat(),
+    }
+
+
 async def _find_match_any(match_id: str) -> tuple[dict, str]:
     db = get_db()
     match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
@@ -1029,44 +1066,19 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
     # Check consensus - if 2 reports match, auto-complete
     m = await db.matches.find_one({"id": match_id})
     reports = m.get("reports", [])
-    if len(reports) >= 2:
-        last2 = reports[-2:]
-        if last2[0]["score_a"] == last2[1]["score_a"] and last2[0]["score_b"] == last2[1]["score_b"]:
-            winner = None
-            if body.score_a > body.score_b:
-                winner = m.get("participant_a_id")
-            elif body.score_b > body.score_a:
-                winner = m.get("participant_b_id")
-            if not winner and not match_allows_draw(m):
-                await db.matches.update_one({"id": match_id}, {"$set": {
-                    "score_a": body.score_a, "score_b": body.score_b,
-                    "winner_id": None, "loser_id": None,
-                    "status": "disputed",
-                    "admin_note": m.get("admin_note") or "Unentschieden gemeldet; Gewinnerentscheidung erforderlich.",
-                    "updated_at": now_utc().isoformat(),
-                }})
-            else:
-                await db.matches.update_one({"id": match_id}, {"$set": {
-                    "score_a": body.score_a, "score_b": body.score_b,
-                    "winner_id": winner,
-                    "loser_id": loser_for_winner(m, winner),
-                    "status": "completed", "updated_at": now_utc().isoformat(),
-                }})
-                # Advance bracket
-                m = await db.matches.find_one({"id": match_id})
-                all_matches = await db.matches.find({"tournament_id": m["tournament_id"]}).to_list(2000)
-                for um in advance_match_winner(m, all_matches):
-                    await db.matches.update_one({"id": um["id"]}, {"$set": um})
-                try:
-                    await notify_match_result_confirmed(db, m, "matches")
-                except Exception:
-                    pass
-        else:
-            await db.matches.update_one({"id": match_id}, {"$set": {
-                "status": "disputed",
-                "admin_note": m.get("admin_note") or "Abweichende Ergebnisberichte; bitte durch Turnierleitung pruefen.",
-                "updated_at": now_utc().isoformat(),
-            }})
+    resolution = _score_report_resolution(m, reports)
+    if resolution:
+        await db.matches.update_one({"id": match_id}, {"$set": resolution})
+        if resolution.get("status") == "completed":
+            # Advance bracket
+            m = await db.matches.find_one({"id": match_id})
+            all_matches = await db.matches.find({"tournament_id": m["tournament_id"]}).to_list(2000)
+            for um in advance_match_winner(m, all_matches):
+                await db.matches.update_one({"id": um["id"]}, {"$set": um})
+            try:
+                await notify_match_result_confirmed(db, m, "matches")
+            except Exception:
+                pass
     m = await db.matches.find_one({"id": match_id}, {"_id": 0})
     return m
 

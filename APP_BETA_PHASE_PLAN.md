@@ -31,6 +31,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: `1.0.0-beta.1` ist als Final-Beta-Schnitt vorbereitet, inklusive Android `versionCode` 31, nativer Profilnavigation aus News-Links und sauber formatierten Event-/Content-Statuslabels.
 - Seit der Planerstellung umgesetzt: Turnier-Regelpresets fuer Online, Vor-Ort und Hybrid sind im Admin verfuegbar; der Planungscheck warnt bei widerspruechlichen Ergebnis- oder Terminregeln.
 - Seit der Planerstellung umgesetzt: Legacy- und V2-Match-Policy-Tests decken lokale Staff-only-Matches, Online-Spielerflows, Stage-Overrides und V2-Staff-Erfassung ab.
+- Seit der Planerstellung umgesetzt: Ergebnisreport-Konsens, abweichende Reports und Knockout-Unentschieden sind als eigene Match-Resolution-Logik unit-getestet.
 - Seit der Planerstellung umgesetzt: Admin-Jahreswertung erklaert die echte V2-Punkteformel, Gewichtungen, Teilnehmerfaktoren, Streichresultate und Auto-/Manuell-Quellenwahl sichtbar im Editor.
 - Ergebnislogik ist teilweise vorhanden: Bei klassischen Online-Matches koennen Teilnehmer Ergebnisse melden. Stimmen die letzten zwei Reports ueberein, wird das Match automatisch abgeschlossen. Weichen sie ab, geht das Match auf Klaerung.
 - Staff-Erfassung ist vorhanden: Turnierleitung kann klassische Matches direkt aktualisieren und V2-Heats ueber `/api/matches/{id}/result` werten.
@@ -66,7 +67,7 @@ Backend-Akzeptanzkriterien:
 - `/api/matches/{id}/page` liefert klare Flags, z.B. `can_player_report_result`, `can_staff_submit_result`, `can_propose_schedule`, `result_entry_mode`, `schedule_mode`.
 - `/api/matches/{id}/report` blockiert Spielerreports, wenn `result_entry_mode=staff_only`.
 - `/api/matches/{id}/schedule-proposals` blockiert Vorschlaege, wenn `schedule_mode=fixed_by_staff`.
-- Tests decken lokale Staff-only-Matches, Online-Spielerflows, Stage-Overrides und V2-Staff-Erfassung ab; End-to-End-Konfliktfaelle bleiben fuer einen groesseren API-Test offen.
+- Tests decken lokale Staff-only-Matches, Online-Spielerflows, Stage-Overrides, V2-Staff-Erfassung sowie Ergebnisreport-Konsens/Konflikte ab; ein kompletter API-E2E-Smoke fuer reale Match-Reports bleibt optional offen.
 
 ## Phase 2 - Mobile Match-Hub Rework
 
