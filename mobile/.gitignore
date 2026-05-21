@@ -13,6 +13,9 @@ expo-env.d.ts
 # Native
 .kotlin/
 google-services.json
+*firebase-adminsdk*.json
+*serviceAccount*.json
+*service-account*.json
 *.orig.*
 *.jks
 *.p8

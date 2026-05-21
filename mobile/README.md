@@ -32,11 +32,28 @@ npm audit --audit-level=moderate
 
 Remote push notifications are delivered by the OS through Expo Push. The app does not need to keep a polling process running in the background for normal "app closed from recents" cases.
 
+The in-app popup is already implemented in `src/notifications/NotificationContext.tsx`. Real phone push on Android additionally needs Firebase/FCM in the native APK. If the app logs `Default FirebaseApp is not initialized`, the installed APK was built without `google-services.json`.
+
+Exact Android setup:
+
+1. Open Firebase Console and create/select the LionsAPP project.
+2. Add an Android app with package name `at.lionsquad.app`.
+3. Download the generated `google-services.json`.
+4. For local builds, place it at `mobile/google-services.json` before running `npm run android` or `npx expo prebuild --platform android --clean`.
+5. For GitHub APK releases, base64-encode that file and save it as a repository secret named `GOOGLE_SERVICES_JSON_BASE64`.
+6. Rebuild and reinstall the APK. Old APKs cannot gain Firebase/FCM by changing the server only.
+
+PowerShell helper for the GitHub secret value:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\Pfad\zu\google-services.json"))
+```
+
 Operational requirements:
 
 - Build/install a native Android or iOS build after `app.json` changes.
 - Android 13+ must grant notification permission.
-- Android release builds need valid Expo/EAS push credentials for the project id in `app.json`.
+- Android release builds need a valid Firebase `google-services.json` for package `at.lionsquad.app`.
 - The backend must be running the push sender code and able to reach `https://exp.host/--/api/v2/push/send`.
 - A user must have logged in once on the device so the Expo push token is registered under `/api/mobile/push-token`.
 - Notifications are not reliable after an explicit OS-level force stop or when the user/vendor blocks notifications or background activity for the app.

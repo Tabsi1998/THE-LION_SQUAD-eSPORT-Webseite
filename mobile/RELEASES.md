@@ -119,6 +119,14 @@ In GitHub unter `Actions` den Workflow `Mobile APK Release` starten. Der Workflo
 LionsAPP-BETA-v1.0.0-build31-<commit>.apk
 ```
 
+## Push-Konfiguration
+
+Android-Push funktioniert nur, wenn die APK mit Firebase/FCM-Konfiguration gebaut wurde. Dafuer braucht der Release-Workflow zusaetzlich dieses Repository-Secret:
+
+- `GOOGLE_SERVICES_JSON_BASE64`
+
+Die Datei kommt aus Firebase Console -> Android-App `at.lionsquad.app` -> `google-services.json`. Der Workflow bricht ohne dieses Secret ab, damit keine APK ohne funktionierende native Push-Initialisierung veroeffentlicht wird.
+
 ## Release-Signatur
 
 GitHub-Releases muessen mit dem stabilen Upload-Key signiert werden. Dafuer braucht der Workflow diese Repository-Secrets:

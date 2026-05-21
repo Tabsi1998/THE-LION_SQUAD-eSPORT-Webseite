@@ -96,6 +96,7 @@ jobs:
         working-directory: mobile
         env:
           CI: "1"
+          REQUIRE_ANDROID_PUSH_CONFIG: "1"
           GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
           ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
         run: |

@@ -12,6 +12,8 @@ Channel: `beta`
 4. `channel` auf `beta` setzen.
 5. Nach erfolgreichem Lauf das APK-Artefakt herunterladen.
 
+Der Workflow muss vor dem Build `Prepared mobile/google-services.json for Android Firebase/FCM push config.` ausgeben. Falls stattdessen `Missing GOOGLE_SERVICES_JSON_BASE64` erscheint, fehlt das Firebase-Secret fuer Android-Push.
+
 Erwarteter APK-Name:
 
 ```text
@@ -37,6 +39,7 @@ LionsAPP-BETA-v1.0.0-build31-<commit>.apk
 - Jahreswertung: echte Rangliste, Quellen und Profilpunkt-Trennung sichtbar.
 - Profil: kompakte Actions, Tabs, Referenzen und Logout wirken sauber.
 - Offline-Test: App kurz offline nehmen; Dashboard/Event-Hub/News zeigen gespeicherte Daten mit Offline-Hinweis.
+- Benachrichtigungen: In der App `Mehr` -> `Benachrichtigungen` oeffnen, Push-Status aktualisieren, Test senden und pruefen, dass ein Token registriert ist.
 
 ## Release-Entscheidung
 
