@@ -3,11 +3,11 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-n
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
-import { EmptyState, SkeletonList } from "../../components/ListState";
+import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted } from "../../components/Text";
-import { api, errorMessage } from "../../lib/api";
+import { api, errorMessage, responseFromCache } from "../../lib/api";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ClubEvent, F1Challenge, Tournament } from "../../types";
@@ -34,6 +34,7 @@ export function TournamentsScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [offline, setOffline] = useState(false);
 
   const load = useCallback(async () => {
     setError("");
@@ -52,6 +53,7 @@ export function TournamentsScreen({ navigation }: Props) {
       setEvents(Array.isArray(eventResult.data) ? eventResult.data : []);
       setTournaments(Array.isArray(tournamentResult.data) ? tournamentResult.data : []);
       setFastlaps(Array.isArray(fastLapResult.data) ? fastLapResult.data : []);
+      setOffline([eventResult, tournamentResult, fastLapResult].some(responseFromCache));
     } catch (err) {
       setError(errorMessage(err, "Events konnten nicht geladen werden."));
     } finally {
@@ -135,6 +137,7 @@ export function TournamentsScreen({ navigation }: Props) {
           <Heading>Events</Heading>
           {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Alle sichtbaren Events, Turniere und Fast-Lap Challenges an einem Ort.</Muted>}
         </View>
+        {offline && !error ? <OfflineNotice detail="Events, Turniere und Fast-Laps werden aus gespeicherten Daten angezeigt." /> : null}
 
         <SegmentedTabs items={filters} value={filter} onChange={setFilter} />
 

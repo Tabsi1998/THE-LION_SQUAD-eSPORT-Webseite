@@ -8,6 +8,7 @@
 - Mobile: Leere Listen und Hinweiskarten nutzen einheitlichere Empty-States mit Icons und Akzentfarben.
 - Mobile: Skeleton-Loading nutzt nun dieselben Surface- und Border-Tokens wie Karten.
 - Mobile: Detail-Fehler wie nicht gefundene Turniere, Events oder Matches nutzen einen eigenen Error-State statt neutraler Leerzustaende.
+- Mobile: Offline-/Cache-Fallbacks sind sichtbarer und wichtige Listen werden fuer den Offline-Fall persistiert.
 - Mobile: Bottom-Tabbar naeher an die mobile Website angeglichen, inklusive Glas-Surface, aktivem Indikator, Keyboard-Verhalten und angepasster Glocke.
 - Mobile: Statuslabels und Badge-Farbwahl fuer Ergebnisberichte, Klaerung, Staff-only, Rollen und Veroeffentlichungen erweitert.
 - Mobile: Jahreswertung nutzt jetzt die echten Season-Standings, trennt Jahrespunkte von Profilpunkten und zeigt Quellen/Statistiken nachvollziehbarer an.

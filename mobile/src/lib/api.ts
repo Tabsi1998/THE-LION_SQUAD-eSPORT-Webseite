@@ -19,6 +19,10 @@ export const api = axios.create({
   timeout: 15000, // 15s Timeout – verhindert endloses Warten bei schlechtem Netz
 });
 
+export function responseFromCache(response: unknown): boolean {
+  return Boolean((response as { _fromCache?: boolean } | null)?._fromCache);
+}
+
 export function configureAuthBridge(bridge: {
   readTokens: () => TokenSnapshot;
   persistSession: (session: AuthResponse) => Promise<void>;

@@ -30,7 +30,11 @@ const PERSIST_PATTERNS = [
   "/mobile/dashboard",
   "/mobile/news",
   "/mobile/tournaments",
+  "/events",
+  "/f1/challenges",
+  "/news",
   "/seasons/",
+  "/tournaments",
   "/mobile/profile",
 ];
 

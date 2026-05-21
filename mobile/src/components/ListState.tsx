@@ -44,6 +44,24 @@ export function ErrorState({ title = "Fehler beim Laden", detail }: { title?: st
   return <EmptyState icon="alert-circle-outline" title={title} detail={detail} tone="danger" />;
 }
 
+export function OfflineNotice({
+  detail = "Du siehst gespeicherte Daten. Ziehe zum Aktualisieren, sobald dein Netz wieder stabil ist.",
+}: {
+  detail?: string;
+}) {
+  return (
+    <View style={styles.notice}>
+      <View style={styles.noticeIcon}>
+        <Ionicons name="cloud-offline-outline" color={colors.gold} size={18} />
+      </View>
+      <View style={styles.noticeText}>
+        <Body style={styles.noticeTitle}>Offline-Modus</Body>
+        <Muted>{detail}</Muted>
+      </View>
+    </View>
+  );
+}
+
 /**
  * SkeletonCard – animierter Platzhalter für Listeneinträge während des Ladens.
  * Verwendung: <SkeletonCard hasImage /> oder <SkeletonCard lines={2} />
@@ -120,6 +138,33 @@ const styles = StyleSheet.create({
   },
   detail: {
     textAlign: "center",
+  },
+  notice: {
+    alignItems: "center",
+    backgroundColor: "rgba(255, 215, 0, 0.08)",
+    borderColor: "rgba(255, 215, 0, 0.24)",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 12,
+  },
+  noticeIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(255, 215, 0, 0.12)",
+    borderRadius: 8,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  noticeText: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  noticeTitle: {
+    color: colors.gold,
+    fontWeight: "900",
   },
 });
 

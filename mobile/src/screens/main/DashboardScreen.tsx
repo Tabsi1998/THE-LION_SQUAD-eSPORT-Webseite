@@ -4,11 +4,11 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
-import { EmptyState, SkeletonList } from "../../components/ListState";
+import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
-import { api, errorMessage } from "../../lib/api";
+import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import type { MainTabParamList } from "../../navigation/types";
@@ -59,6 +59,7 @@ export function DashboardScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [offline, setOffline] = useState(false);
   const isGuest = isGuestUser(user);
 
   const load = useCallback(async () => {
@@ -66,6 +67,7 @@ export function DashboardScreen({ navigation }: Props) {
     try {
       const response = await api.get<MobileDashboardData>("/mobile/dashboard");
       setData(normalizeDashboard(response.data));
+      setOffline(responseFromCache(response));
       if (!isGuest) {
         await refreshMe().catch(() => {});
       }
@@ -163,6 +165,7 @@ export function DashboardScreen({ navigation }: Props) {
         </Card>
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
+        {offline && !error ? <OfflineNotice /> : null}
 
         <View style={styles.grid}>
           <Stat label={isGuest ? "Turniere" : "Meine Termine"} value={String(isGuest ? data.stats.public_tournaments : data.stats.my_tournaments + data.stats.my_events)} />
