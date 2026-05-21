@@ -9,6 +9,7 @@ import { isGuestUser } from "../live";
 import { navigateToNotification } from "../navigation/rootNavigation";
 import { colors } from "../theme";
 import type { UserNotification } from "../types";
+import { configurePushNotifications, registerPushToken, setBadgeCount } from "./PushService";
 
 type NotificationContextValue = {
   items: UserNotification[];
@@ -21,6 +22,9 @@ type NotificationContextValue = {
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 
+// Push-Notifications beim App-Start konfigurieren (einmalig)
+configurePushNotifications();
+
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -28,7 +32,19 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [popups, setPopups] = useState<UserNotification[]>([]);
   const knownIds = useRef(new Set<string>());
   const primed = useRef(false);
+  const pushRegistered = useRef(false);
   const enabled = Boolean(user && !isGuestUser(user));
+
+  // Push-Token registrieren wenn User einloggt
+  useEffect(() => {
+    if (enabled && !pushRegistered.current) {
+      pushRegistered.current = true;
+      registerPushToken().catch(() => {});
+    }
+    if (!enabled) {
+      pushRegistered.current = false;
+    }
+  }, [enabled]);
 
   const load = useCallback(async () => {
     if (!enabled) {
@@ -87,14 +103,21 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     navigateToNotification(item);
   }, [markRead]);
 
+  const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
+
+  // App-Badge-Zähler aktualisieren wenn sich unread ändert
+  useEffect(() => {
+    setBadgeCount(unread).catch(() => {});
+  }, [unread]);
+
   const value = useMemo(() => ({
     items,
-    unread: items.filter((item) => !item.read).length,
+    unread,
     load,
     markRead,
     markAllRead,
     openNotification,
-  }), [items, load, markAllRead, markRead, openNotification]);
+  }), [items, unread, load, markAllRead, markRead, openNotification]);
 
   return (
     <NotificationContext.Provider value={value}>
