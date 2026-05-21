@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0-alpha.2 - 2026-05-21
+
+- Mobile: Echte Expo EAS Project-ID eingetragen (3eaaebbc-883e-469c-a135-09f3459e2c46)
+- Mobile: expo-updates URL auf echte EAS-URL aktualisiert
+- Mobile: Push-Notifications jetzt vollstaendig aktiviert (Expo Push Token Delivery)
+
 ## 0.11.0-alpha.1 - 2026-05-21
 
 - Mobile: Season Pass Screen hinzugefuegt (Rangliste mit Podium, Punkte-Erklaerung, Pull-to-Refresh)
