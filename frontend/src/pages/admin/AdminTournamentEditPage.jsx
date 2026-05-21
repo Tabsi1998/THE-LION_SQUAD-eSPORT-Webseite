@@ -946,6 +946,9 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
     min_players: 2,
     qualifiers_per_match: 2,
     duration_minutes: 30,
+    event_mode: "",
+    result_entry_mode: "",
+    schedule_mode: "",
     schema: DEFAULT_FFA_SCHEMA,
   });
   const confirm = useConfirm();
@@ -965,6 +968,9 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
           min_players: Number(form.min_players) || 2,
           qualifiers_per_match: Number(form.qualifiers_per_match) || 1,
           duration_minutes: Number(form.duration_minutes) || 30,
+          event_mode: form.event_mode || null,
+          result_entry_mode: form.result_entry_mode || null,
+          schedule_mode: form.schedule_mode || null,
           schema: form.schema || "",
           score_type: "points",
           calculation: "points",
@@ -1018,6 +1024,12 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
               {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId="stage-new-min" />}
               {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId="stage-new-qualifiers" />}
               <Fld label="Spieldauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId="stage-new-duration" />
+              <SelectField label="Austragung" value={form.event_mode} onChange={(v)=>set("event_mode", v)} options={[["", "Vom Turnier erben"], ...EVENT_MODE_OPTIONS]} />
+              <SelectField label="Ergebniserfassung" value={form.result_entry_mode} onChange={(v)=>set("result_entry_mode", v)} options={[["", "Vom Turnier erben"], ...RESULT_ENTRY_MODE_OPTIONS.filter(([value]) => value)]} />
+              <SelectField label="Terminplanung" value={form.schedule_mode} onChange={(v)=>set("schedule_mode", v)} options={[["", "Vom Turnier erben"], ...SCHEDULE_MODE_OPTIONS.filter(([value]) => value)]} />
+              <div className="md:col-span-3 text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
+                Leer lassen, wenn diese Phase die Turnier-Regeln nutzt. Overrides sind sinnvoll, wenn z.B. Gruppen online gespielt werden, das Finale aber vor Ort mit Staff-Erfassung laeuft.
+              </div>
               {config.showSchema ? (
                 <label className="md:col-span-3 block">
                   <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
@@ -1078,6 +1090,9 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
     min_players: settings.min_players || 2,
     qualifiers_per_match: settings.qualifiers_per_match || 2,
     duration_minutes: settings.duration_minutes || stage.duration_minutes || 30,
+    event_mode: settings.event_mode || "",
+    result_entry_mode: settings.result_entry_mode || "",
+    schedule_mode: settings.schedule_mode || "",
     schema: settings.schema || "",
   });
   const confirm = useConfirm();
@@ -1095,6 +1110,9 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
       min_players: Number(form.min_players) || 2,
       qualifiers_per_match: Number(form.qualifiers_per_match) || 1,
       duration_minutes: Number(form.duration_minutes) || 30,
+      event_mode: form.event_mode || null,
+      result_entry_mode: form.result_entry_mode || null,
+      schedule_mode: form.schedule_mode || null,
       schema: form.schema || "",
       score_type: settings.score_type || "points",
       calculation: settings.calculation || "points",
@@ -1183,6 +1201,9 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
             <span>{formatStageType(stage.stage_type)}</span>
             <span>·</span>
             <span>{matches.length} Spiele</span>
+            {settings.event_mode && <span>· {modeLabel(EVENT_MODE_OPTIONS, settings.event_mode)}</span>}
+            {settings.result_entry_mode && <span>· {modeLabel(RESULT_ENTRY_MODE_OPTIONS, settings.result_entry_mode)}</span>}
+            {settings.schedule_mode && <span>· {modeLabel(SCHEDULE_MODE_OPTIONS, settings.schedule_mode)}</span>}
             {matches.some((m) => m.is_preview) && <span>· Vorschau / Draft</span>}
             {Object.entries(statusCounts).map(([status, count]) => <span key={status}>· {count} {formatMatchStatus(status)}</span>)}
           </div>
@@ -1212,6 +1233,12 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
               {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId={`stage-min-${stage.id}`} />}
               {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId={`stage-qualifiers-${stage.id}`} />}
               <Fld label="Spieldauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId={`stage-duration-${stage.id}`} />
+              <SelectField label="Austragung" value={form.event_mode} onChange={(v)=>set("event_mode", v)} options={[["", "Vom Turnier erben"], ...EVENT_MODE_OPTIONS]} />
+              <SelectField label="Ergebniserfassung" value={form.result_entry_mode} onChange={(v)=>set("result_entry_mode", v)} options={[["", "Vom Turnier erben"], ...RESULT_ENTRY_MODE_OPTIONS.filter(([value]) => value)]} />
+              <SelectField label="Terminplanung" value={form.schedule_mode} onChange={(v)=>set("schedule_mode", v)} options={[["", "Vom Turnier erben"], ...SCHEDULE_MODE_OPTIONS.filter(([value]) => value)]} />
+            </div>
+            <div className="text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
+              Leer bedeutet: diese Phase erbt die Turnier-Regeln. Overrides gelten fuer Match-Hub, Terminabstimmung und Ergebnisfluss dieser Phase.
             </div>
             {config.showSchema ? (
               <label className="block">
@@ -1799,6 +1826,10 @@ function slugify(value) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "")
     .slice(0, 80);
+}
+
+function modeLabel(options, value) {
+  return options.find(([optionValue]) => optionValue === value)?.[1] || value;
 }
 
 function SelectField({ label, value, onChange, options }) {
