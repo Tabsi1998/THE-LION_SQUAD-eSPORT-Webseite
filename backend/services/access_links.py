@@ -110,3 +110,23 @@ async def record_access_link_use(db, link: dict | None, user: dict | None = None
             },
         },
     )
+
+
+async def touch_access_link(db, link: dict | None, user: dict | None = None, min_interval_seconds: int = 300) -> None:
+    """Record that a link was seen without consuming action uses."""
+    if not link or not link.get("id"):
+        return
+    last_used_at = parse_dt(link.get("last_used_at"))
+    current = now_utc()
+    if last_used_at and (current - last_used_at).total_seconds() < min_interval_seconds:
+        return
+    await db.access_links.update_one(
+        {"id": link["id"]},
+        {
+            "$set": {
+                "last_used_at": current.isoformat(),
+                "last_used_by": (user or {}).get("id"),
+                "updated_at": current.isoformat(),
+            },
+        },
+    )

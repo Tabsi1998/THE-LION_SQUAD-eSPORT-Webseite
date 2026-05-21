@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_current_user, require_admin, get_optional_user
 from services.visibility import user_can_see
-from services.access_links import public_access_link_payload, record_access_link_use, validate_access_link
+from services.access_links import public_access_link_payload, record_access_link_use, touch_access_link, validate_access_link
 from services.public_phase import derive_public_phase
 from services.station_labels import attach_station_info
 from services.tournament_permissions import (
@@ -1312,6 +1312,7 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
         or await has_tournament_staff_permission(user, t["id"], RESULT_STAFF_ROLES)
     )
     if access_link:
+        await touch_access_link(db, access_link, user)
         t["access_link"] = public_access_link_payload(access_link)
     if t.get("event_id"):
         related_f1_query = {"event_id": t["event_id"]}

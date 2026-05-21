@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from services.access_links import access_path, hash_access_token, new_access_token, validate_access_link
+from services.access_links import access_path, hash_access_token, new_access_token, touch_access_link, validate_access_link
 
 
 class FakeCollection:
@@ -21,6 +21,15 @@ class FakeCollection:
             and self.row.get("is_active") is not False
         ):
             return dict(self.row)
+        return None
+
+    async def update_one(self, query, update):
+        if not self.row or query.get("id") != self.row.get("id"):
+            return None
+        for key, value in (update.get("$set") or {}).items():
+            self.row[key] = value
+        for key, value in (update.get("$inc") or {}).items():
+            self.row[key] = int(self.row.get(key) or 0) + int(value)
         return None
 
 
@@ -75,3 +84,20 @@ def test_validate_access_link_rejects_wrong_grant_or_user():
 
     assert wrong_grant is None
     assert wrong_user is None
+
+
+def test_touch_access_link_updates_last_seen_without_incrementing_use_count():
+    link = {
+        "id": "al_1",
+        "target_type": "event",
+        "target_id": "ev_1",
+        "use_count": 0,
+        "is_active": True,
+    }
+    db = FakeDb(link)
+
+    asyncio.run(touch_access_link(db, link, {"id": "user_1"}, min_interval_seconds=0))
+
+    assert db.access_links.row["last_used_by"] == "user_1"
+    assert db.access_links.row["last_used_at"]
+    assert db.access_links.row["use_count"] == 0

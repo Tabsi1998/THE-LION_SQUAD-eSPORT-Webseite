@@ -15,6 +15,7 @@ from services.access_links import (
     hash_access_token,
     new_access_token,
     public_access_link_payload,
+    parse_dt,
 )
 from services.user_notifications import build_public_url, create_user_notification
 
@@ -61,6 +62,11 @@ def _safe_link_payload(link: dict, target: dict | None = None) -> dict:
     payload["email"] = link.get("email")
     payload["last_used_at"] = link.get("last_used_at")
     payload["last_used_by"] = link.get("last_used_by")
+    expires_at = parse_dt(link.get("expires_at"))
+    max_uses = link.get("max_uses")
+    use_count = int(link.get("use_count") or 0)
+    payload["is_expired"] = bool(expires_at and now_utc() > expires_at)
+    payload["is_exhausted"] = bool(max_uses is not None and use_count >= int(max_uses))
     if target:
         payload["target"] = target
     return payload

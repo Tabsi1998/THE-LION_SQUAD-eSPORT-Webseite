@@ -9,6 +9,12 @@ const TARGET_LABELS = {
   fastlap: "Fast-Lap",
 };
 
+function linkStateLabel(link) {
+  if (link.is_expired) return "Abgelaufen";
+  if (link.is_exhausted) return "Limit erreicht";
+  return "Aktiv";
+}
+
 function absoluteUrl(path) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
@@ -221,11 +227,14 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false }
           <div key={link.id} className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-[#0A0A0A]/70 rounded-sm px-3 py-2">
             <div className="min-w-0">
               <div className="text-xs font-bold text-white/80">
+                <span className={link.is_expired || link.is_exhausted ? "text-[#FF3B30]" : "text-[#00FF88]"}>{linkStateLabel(link)}</span>
+                <span className="text-white/30"> · </span>
                 {(link.grants || []).join(", ")} {link.note ? <span className="text-white/40 font-normal">- {link.note}</span> : null}
               </div>
               <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/35">
-                {link.use_count || 0}{link.max_uses ? `/${link.max_uses}` : ""} Nutzungen
+                {link.use_count || 0}{link.max_uses ? `/${link.max_uses}` : ""} Aktionen
                 {link.expires_at ? ` · bis ${new Date(link.expires_at).toLocaleDateString("de-DE")}` : " · ohne Ablauf"}
+                {link.last_used_at ? ` · zuletzt ${new Date(link.last_used_at).toLocaleDateString("de-DE")}` : " · nie geöffnet"}
                 {link.user_id ? " · usergebunden" : ""}
                 {link.email ? ` · ${link.email}` : ""}
               </div>

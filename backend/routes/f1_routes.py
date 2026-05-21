@@ -7,7 +7,7 @@ from fastapi.responses import RedirectResponse, StreamingResponse
 from database import get_db
 from auth import get_current_user, require_admin, get_optional_user
 from services.visibility import user_can_see
-from services.access_links import public_access_link_payload, validate_access_link
+from services.access_links import public_access_link_payload, touch_access_link, validate_access_link
 from services.public_phase import derive_public_phase
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import (
@@ -235,6 +235,7 @@ async def _get_visible_challenge_record(slug_or_id: str, user: dict | None = Non
         raise HTTPException(status_code=403, detail="Challenge ist nicht sichtbar")
     c["public_phase"] = derive_public_phase(c, "f1")
     if access_link:
+        await touch_access_link(db, access_link, user)
         c["access_link"] = public_access_link_payload(access_link)
     return c, was_old_slug
 

@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from database import get_db
 from auth import require_admin, get_optional_user, get_current_user
 from services.visibility import user_can_see
-from services.access_links import public_access_link_payload, record_access_link_use, validate_access_link
+from services.access_links import public_access_link_payload, record_access_link_use, touch_access_link, validate_access_link
 from services.content_embed_service import resolve_content_embeds
 from services.public_phase import derive_public_phase
 from services.sponsor_utils import dedupe_public_sponsors
@@ -391,6 +391,7 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     await _decorate_event(event, include_sponsors=True)
     await _attach_event_registration_view(event, user)
     if access_link:
+        await touch_access_link(db, access_link, user)
         event["access_link"] = public_access_link_payload(access_link)
     return event
 
