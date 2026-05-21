@@ -1,2 +1,21 @@
 /* Minimal app-level overrides */
 .App { min-height: 100vh; background: #0A0A0A; color: #fff; }
+
+/* iOS Safe Area für Bottom Navigation */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Verhindert dass Content hinter der BottomNav verschwindet (nur Mobile) */
+@media (max-width: 1023px) {
+  body:has(nav[aria-label="Mobile Navigation"]) main {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Viewport-Meta für PWA */
+@supports (padding: max(0px)) {
+  .safe-area-pb {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+}
