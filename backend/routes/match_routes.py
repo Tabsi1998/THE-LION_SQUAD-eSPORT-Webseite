@@ -138,9 +138,23 @@ def _schedule_proposals_enabled(policy: dict) -> bool:
 
 
 def _score_report_resolution(match: dict, reports: list[dict]) -> dict | None:
-    if len(reports) < 2:
+    latest_by_reporter = {}
+    reporter_order = []
+    for report in reports:
+        reporter_key = report.get("registration_id") or report.get("user_id")
+        if not reporter_key:
+            continue
+        if reporter_key not in latest_by_reporter:
+            reporter_order.append(reporter_key)
+        latest_by_reporter[reporter_key] = report
+    if len(latest_by_reporter) < 2:
         return None
-    first, second = reports[-2:]
+    latest_distinct_reports = [
+        latest_by_reporter[reporter_key]
+        for reporter_key in reporter_order
+        if reporter_key in latest_by_reporter
+    ]
+    first, second = latest_distinct_reports[-2:]
     score_a = second.get("score_a")
     score_b = second.get("score_b")
     if first.get("score_a") != score_a or first.get("score_b") != score_b:

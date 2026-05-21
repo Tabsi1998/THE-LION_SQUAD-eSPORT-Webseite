@@ -18,11 +18,25 @@ def _match(**overrides):
 
 
 def _report(score_a, score_b, user_id):
-    return {"score_a": score_a, "score_b": score_b, "user_id": user_id}
+    return {
+        "score_a": score_a,
+        "score_b": score_b,
+        "user_id": user_id,
+        "registration_id": f"reg-{user_id}",
+    }
 
 
 def test_score_report_resolution_waits_for_second_report():
     result = _score_report_resolution(_match(), [_report(2, 1, "u1")])
+
+    assert result is None
+
+
+def test_score_report_resolution_ignores_duplicate_reports_from_same_participant():
+    result = _score_report_resolution(
+        _match(),
+        [_report(2, 1, "u1"), _report(2, 1, "u1")],
+    )
 
     assert result is None
 
@@ -50,6 +64,16 @@ def test_score_report_resolution_marks_conflicting_reports_as_disputed():
     assert result["admin_note"].startswith("Abweichende Ergebnisberichte")
     assert "score_a" not in result
     assert "winner_id" not in result
+
+
+def test_score_report_resolution_uses_latest_report_per_participant():
+    result = _score_report_resolution(
+        _match(),
+        [_report(2, 1, "u1"), _report(1, 2, "u2"), _report(1, 2, "u1")],
+    )
+
+    assert result["status"] == "completed"
+    assert result["winner_id"] == "reg-b"
 
 
 def test_score_report_resolution_requires_winner_for_knockout_draw():
