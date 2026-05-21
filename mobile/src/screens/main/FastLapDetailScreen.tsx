@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
-import { EmptyState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -70,7 +70,7 @@ export function FastLapDetailScreen({ route }: Props) {
   if (!challenge) {
     return (
       <Screen>
-        <EmptyState title="Challenge nicht gefunden" detail={error || "Diese Challenge ist nicht sichtbar oder wurde entfernt."} />
+        <ErrorState title="Challenge nicht gefunden" detail={error || "Diese Challenge ist nicht sichtbar oder wurde entfernt."} />
       </Screen>
     );
   }

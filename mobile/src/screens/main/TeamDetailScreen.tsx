@@ -4,7 +4,7 @@ import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { EmptyState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -234,7 +234,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   if (!team) {
     return (
       <Screen>
-        <EmptyState title="Teamdetail nicht verfügbar" detail={error || "Das Team konnte nicht geladen werden."} />
+        <ErrorState title="Teamdetail nicht verfügbar" detail={error || "Das Team konnte nicht geladen werden."} />
       </Screen>
     );
   }

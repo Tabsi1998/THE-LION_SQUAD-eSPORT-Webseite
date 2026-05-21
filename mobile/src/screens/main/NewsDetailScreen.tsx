@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
-import { EmptyState, SkeletonList } from "../../components/ListState";
+import { ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
@@ -73,7 +73,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
   if (!post) {
     return (
       <Screen>
-        <EmptyState title="Beitrag nicht gefunden" detail={error || "Dieser Beitrag ist nicht sichtbar oder wurde entfernt."} />
+        <ErrorState title="Beitrag nicht gefunden" detail={error || "Dieser Beitrag ist nicht sichtbar oder wurde entfernt."} />
       </Screen>
     );
   }

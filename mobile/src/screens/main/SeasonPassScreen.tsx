@@ -3,7 +3,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
-import { EmptyState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
@@ -105,7 +105,7 @@ export function SeasonPassScreen({ navigation }: Props) {
   if (!data && error) {
     return (
       <Screen>
-        <EmptyState title="Jahreswertung nicht verfügbar" detail={error} />
+        <ErrorState title="Jahreswertung nicht verfügbar" detail={error} />
       </Screen>
     );
   }

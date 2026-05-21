@@ -6,7 +6,7 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { FormInput } from "../../components/FormInput";
-import { EmptyState, SkeletonList } from "../../components/ListState";
+import { ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
@@ -164,7 +164,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   if (!event) {
     return (
       <Screen>
-        <EmptyState title="Event nicht gefunden" detail={error || "Dieses Event ist nicht sichtbar oder wurde entfernt."} />
+        <ErrorState title="Event nicht gefunden" detail={error || "Dieses Event ist nicht sichtbar oder wurde entfernt."} />
       </Screen>
     );
   }

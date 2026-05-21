@@ -4,7 +4,7 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
-import { EmptyState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -335,7 +335,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   if (!page) {
     return (
       <Screen>
-        <EmptyState title="Match nicht gefunden" detail={error || "Dieses Match ist nicht sichtbar oder wurde entfernt."} />
+        <ErrorState title="Match nicht gefunden" detail={error || "Dieses Match ist nicht sichtbar oder wurde entfernt."} />
       </Screen>
     );
   }

@@ -4,7 +4,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
-import { EmptyState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -196,7 +196,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   if (!tournament) {
     return (
       <Screen>
-        <EmptyState title="Turnierdetail nicht verfügbar" detail={error || "Das Turnier konnte nicht geladen werden."} />
+        <ErrorState title="Turnierdetail nicht verfügbar" detail={error || "Das Turnier konnte nicht geladen werden."} />
       </Screen>
     );
   }

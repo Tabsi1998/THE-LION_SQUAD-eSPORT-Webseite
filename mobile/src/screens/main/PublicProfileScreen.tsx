@@ -3,7 +3,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
-import { EmptyState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
@@ -118,7 +118,7 @@ export function PublicProfileScreen({ navigation, route }: Props) {
   if (!profile) {
     return (
       <Screen>
-        <EmptyState title="Profil nicht sichtbar" detail={error || "Dieses Profil ist privat oder wurde entfernt."} />
+        <ErrorState title="Profil nicht sichtbar" detail={error || "Dieses Profil ist privat oder wurde entfernt."} />
       </Screen>
     );
   }

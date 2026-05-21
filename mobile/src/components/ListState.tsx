@@ -40,6 +40,10 @@ export function EmptyState({
   );
 }
 
+export function ErrorState({ title = "Fehler beim Laden", detail }: { title?: string; detail?: string }) {
+  return <EmptyState icon="alert-circle-outline" title={title} detail={detail} tone="danger" />;
+}
+
 /**
  * SkeletonCard – animierter Platzhalter für Listeneinträge während des Ladens.
  * Verwendung: <SkeletonCard hasImage /> oder <SkeletonCard lines={2} />

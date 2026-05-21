@@ -17,6 +17,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: mobile Jahreswertung nutzt echte Season-Standings, zeigt Quellen/Statistiken und trennt Jahreswertungs- von Profilpunkten.
 - Seit der Planerstellung umgesetzt: mobile `EmptyState` unterstuetzt Icons/Tones und ersetzt mehrere manuelle Leerzustaende.
 - Seit der Planerstellung umgesetzt: mobile `SkeletonList` nutzt dieselben Surface-/Border-Tokens wie Karten und wirkt beim Laden ruhiger.
+- Seit der Planerstellung umgesetzt: mobile `ErrorState` trennt Fehler-/Nicht-gefunden-Zustaende optisch von leeren Listen.
 - Seit der Planerstellung umgesetzt: mobile Bottom-Tabbar nutzt einen Website-nahen Glas-Surface-Layer, versteckt sich bei Tastatur und die Glocke wurde visuell angeglichen.
 - Seit der Planerstellung umgesetzt: Web-Navigation, Jahreswertungsseite, Widget und Admin-Hinweise nutzen sichtbare Begriffe wie Jahreswertung/Jahrespunkte statt unklarem Season-Pass.
 - Seit der Planerstellung umgesetzt: Backend-Defaulttexte, Achievements, Seed-Daten und SEO-Breadcrumbs verwenden ebenfalls Jahreswertung/Jahrespunkte.
@@ -137,7 +138,8 @@ Gemeinsame UI-Muster:
 - [x] `SegmentedTabs` fuer sichtbare Seitenwechsel statt versteckter horizontaler Scroll-Tabs als gemeinsamer Baustein einfuehren.
 - [x] `EmptyState` optisch angleichen: Icons, Akzentfarben und weniger manuelle Sonderlayouts.
 - [x] `SkeletonList` optisch an Karten/Surfaces angleichen.
-- Fehler- und Offline-Zustaende optisch angleichen.
+- [x] Fehlerzustaende optisch angleichen: `ErrorState` fuer nicht gefundene oder nicht verfuegbare Details.
+- Offline-Zustaende optisch angleichen.
 
 Mobile Website:
 
