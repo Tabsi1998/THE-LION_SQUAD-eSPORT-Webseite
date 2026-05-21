@@ -262,12 +262,17 @@ export function TeamDetailScreen({ navigation, route }: Props) {
               <Title>{team.name}</Title>
               {team.description ? <Body>{team.description}</Body> : <Muted>Keine Beschreibung hinterlegt.</Muted>}
               <View style={styles.wrap}>
-                <Pill label={`${stats.members} Mitglieder`} />
-                <Pill label={`${stats.squads} Squads`} tone="gold" />
                 <Pill label={stats.role} tone={canManage ? "success" : "cyan"} />
+                {canManage ? <Pill label="Verwaltung" tone="success" /> : null}
               </View>
             </View>
           </View>
+        </View>
+
+        <View style={styles.statGrid}>
+          <TeamStat icon="people-outline" label="Mitglieder" value={stats.members} />
+          <TeamStat icon="layers-outline" label="Squads" value={stats.squads} tone="gold" />
+          <TeamStat icon="chatbubbles-outline" label="Chat" value={team.chat_preview?.length || 0} />
         </View>
 
         {message ? <Muted style={styles.success}>{message}</Muted> : null}
@@ -531,6 +536,16 @@ function Pill({ label, tone = "default" }: { label: string; tone?: "default" | "
   );
 }
 
+function TeamStat({ icon, label, value, tone = "cyan" }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: number | string; tone?: "cyan" | "gold" }) {
+  return (
+    <Card style={styles.stat}>
+      <Ionicons name={icon} color={tone === "gold" ? colors.gold : colors.cyan} size={18} />
+      <Body style={[styles.statValue, tone === "gold" && styles.textGold]}>{String(value)}</Body>
+      <Muted>{label}</Muted>
+    </Card>
+  );
+}
+
 function memberRole(team: Team, member: TeamMember) {
   if (team.leader_id === member.id || team.leader?.id === member.id) return "leader";
   if (team.co_leader_ids?.includes(member.id) || member.role === "co_leader") return "co_leader";
@@ -593,6 +608,20 @@ const styles = StyleSheet.create({
   heroText: {
     flex: 1,
     gap: 5,
+  },
+  statGrid: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  stat: {
+    flex: 1,
+    gap: 3,
+    minHeight: 88,
+  },
+  statValue: {
+    color: colors.cyan,
+    fontSize: 20,
+    fontWeight: "900",
   },
   card: {
     gap: 12,
