@@ -37,12 +37,19 @@ function phaseState(phase?: { state?: string | null } | string | null) {
 }
 
 function toneForStatus(value: string): StatusTone {
-  const text = value.toLowerCase();
-  if (/(abgesagt|cancel|rejected|abgelehnt|gesperrt|geschlossen|closed|error|conflict|klaerung|klärung)/.test(text)) return "danger";
-  if (/(live|aktiv|active|open|offen|registration_open|check-in|checkin|angemeldet|registered|bestaetigt|bestätigt|confirmed)/.test(text)) return "success";
-  if (/(pending|ausstehend|wartet|vorschlag|draft|entwurf|planned|geplant|anmeldung)/.test(text)) return "gold";
-  if (/(archiv|beendet|finished|completed|veroeffentlicht|veröffentlicht)/.test(text)) return "default";
+  const text = normalizeStatusText(value);
+  if (/(abgesagt|cancel|rejected|abgelehnt|gesperrt|geschlossen|closed|error|conflict|klaerung|klarung|disputed|review|pruefung|prufung)/.test(text)) return "danger";
+  if (/(live|aktiv|active|open|offen|registration_open|check-in|checkin|angemeldet|registered|bestaetigt|bestatigt|confirmed|accepted|approved)/.test(text)) return "success";
+  if (/(pending|ausstehend|wartet|vorschlag|draft|entwurf|planned|geplant|anmeldung|scheduled|proposed|reported|result_pending)/.test(text)) return "gold";
+  if (/(archiv|beendet|finished|completed|veroeffentlicht|veroffentlicht|published)/.test(text)) return "default";
   return "cyan";
+}
+
+function normalizeStatusText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 const toneStyles: Record<StatusTone, { badge: ViewStyle; text: { color: string } }> = {

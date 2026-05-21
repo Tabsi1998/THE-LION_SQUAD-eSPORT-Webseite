@@ -27,7 +27,7 @@ export function formatDateTime(value?: string | null) {
 }
 
 export function formatStatus(value?: string | null) {
-  if (!value) return "offen";
+  if (!value) return "Offen";
   const key = String(value).trim().toLowerCase();
   return STATUS_LABELS[key] || humanizeStatus(key);
 }
@@ -50,9 +50,13 @@ export function formatScheduleMode(value?: string | null) {
 const STATUS_LABELS: Record<string, string> = {
   accepted: "Angenommen",
   active: "Aktiv",
-  announced: "Angekuendigt",
+  announced: "Angekündigt",
   archived: "Archiviert",
-  approved: "Bestaetigt",
+  approved: "Bestätigt",
+  auto_confirmed: "Automatisch bestätigt",
+  awaiting_confirmation: "Wartet auf Bestätigung",
+  awaiting_opponent: "Wartet auf Gegner",
+  awaiting_result: "Wartet auf Ergebnis",
   broken: "Defekt",
   busy: "Belegt",
   cancelled: "Abgesagt",
@@ -62,20 +66,25 @@ const STATUS_LABELS: Record<string, string> = {
   closed: "Geschlossen",
   community: "Community",
   completed: "Beendet",
-  confirmed: "Bestaetigt",
+  confirmed: "Bestätigt",
+  conflict: "Klärung nötig",
   countered: "Gegenvorschlag",
   declined: "Abgelehnt",
+  deleted: "Gelöscht",
+  disputed: "Klärung nötig",
   draft: "Entwurf",
-  escalated: "Turnierleitung noetig",
+  escalated: "Turnierleitung nötig",
   finished: "Beendet",
   forfeit: "Wertung",
   free: "Frei",
-  in_progress: "Laeuft",
+  in_progress: "Läuft",
   inactive: "Inaktiv",
   internal: "Intern",
   live: "Live",
+  locked: "Gesperrt",
   members: "Vereinsmitglieder",
   moderator: "Moderator",
+  needs_review: "Prüfung nötig",
   no_show: "Nicht erschienen",
   offline: "Offline",
   online: "Online",
@@ -83,8 +92,10 @@ const STATUS_LABELS: Record<string, string> = {
   paused: "Pausiert",
   pending: "Ausstehend",
   player: "Spieler",
+  player_confirmed: "Beide melden",
+  player_reported: "Von Spieler gemeldet",
   proposed: "Vorschlag offen",
-  public: "Oeffentlich",
+  public: "Öffentlich",
   ready: "Bereit",
   referee: "Schiedsrichter",
   registered: "Angemeldet",
@@ -93,14 +104,23 @@ const STATUS_LABELS: Record<string, string> = {
   registration_pending: "Anmeldung geplant",
   rejected: "Abgelehnt",
   reported: "Gemeldet",
+  reported_by_me: "Von dir gemeldet",
+  reported_by_opponent: "Vom Gegner gemeldet",
+  requires_admin: "Admin-Prüfung nötig",
+  requires_staff: "Turnierleitung nötig",
   reserved: "Reserviert",
-  results_published: "Ergebnisse veroeffentlicht",
+  result_conflict: "Ergebnis in Klärung",
+  result_pending: "Ergebnis offen",
+  result_reported: "Ergebnis gemeldet",
+  results_published: "Ergebnisse veröffentlicht",
   scheduled: "Geplant",
   scorekeeper: "Ergebnis-Erfasser",
+  staff_only: "Nur Turnierleitung",
   station_manager: "Station-Crew",
   stream_operator: "Stream-Team",
   superadmin: "Superadmin",
   tournament_admin: "Turnier-Admin",
+  unpublished: "Unveröffentlicht",
   waitlist: "Warteliste",
   waiting_result: "Wartet auf Ergebnis",
 };
@@ -120,7 +140,7 @@ const RESULT_ENTRY_MODE_LABELS: Record<string, string> = {
 const SCHEDULE_MODE_LABELS: Record<string, string> = {
   fixed_by_staff: "Termin: festgelegt",
   hybrid: "Termin: Hybrid",
-  player_proposal: "Termin: Vorschlaege",
+  player_proposal: "Termin: Vorschläge",
 };
 
 function humanizeStatus(value: string) {
