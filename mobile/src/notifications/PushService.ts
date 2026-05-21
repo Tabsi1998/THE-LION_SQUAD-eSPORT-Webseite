@@ -69,6 +69,17 @@ export function addPushNotificationResponseListener(onOpen: (item: UserNotificat
   };
 }
 
+export function addPushNotificationReceivedListener(onReceive: (item: UserNotification) => void) {
+  if (!Notifications) return undefined;
+  const subscription = Notifications.addNotificationReceivedListener((notification: unknown) => {
+    const item = notificationFromNotification(notification);
+    if (item) onReceive(item);
+  });
+  return () => {
+    subscription?.remove?.();
+  };
+}
+
 export async function consumeInitialPushNotification(): Promise<UserNotification | null> {
   if (!Notifications) return null;
   try {
@@ -137,8 +148,6 @@ export async function registerPushToken(): Promise<string | null> {
     await api.post("/mobile/push-token", {
       token,
       platform: Platform.OS,
-    }).catch((err) => {
-      console.warn("[PushService] Token-Registrierung fehlgeschlagen:", err?.message);
     });
 
     return token;
@@ -148,10 +157,21 @@ export async function registerPushToken(): Promise<string | null> {
   }
 }
 
+function notificationFromNotification(notification: unknown): UserNotification | null {
+  const content = (notification as {
+    request?: { content?: { title?: string | null; body?: string | null; data?: Record<string, unknown> } };
+  } | null)?.request?.content;
+  return notificationFromContent(content);
+}
+
 function notificationFromResponse(response: unknown): UserNotification | null {
   const content = (response as {
     notification?: { request?: { content?: { title?: string | null; body?: string | null; data?: Record<string, unknown> } } };
   } | null)?.notification?.request?.content;
+  return notificationFromContent(content);
+}
+
+function notificationFromContent(content?: { title?: string | null; body?: string | null; data?: Record<string, unknown> } | null): UserNotification | null {
   const data = content?.data || {};
   const notificationId = stringValue(data.notification_id || data.id);
   const kind = stringValue(data.kind);

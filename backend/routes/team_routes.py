@@ -156,16 +156,17 @@ async def _enrich_team_chat(messages: list[dict]) -> list[dict]:
     return messages
 
 
-async def _notify_team_mentions(db, team: dict, sender: dict, message: dict) -> None:
+async def _notify_team_mentions(db, team: dict, sender: dict, message: dict) -> set[str]:
     handles = {m.lower() for m in MENTION_RE.findall(message.get("message") or "")}
     if not handles:
-        return
+        return set()
     members = await db.users.find(
         {"id": {"$in": team.get("member_ids") or []}},
         {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1, "notification_preferences": 1, "newsletter_consent": 1},
     ).to_list(500)
     url = await build_public_url(f"/teams/{team['id']}")
     preferences_url = await build_public_url("/profile?tab=privacy")
+    notified_ids: set[str] = set()
     for member in members:
         if member.get("id") == sender.get("id"):
             continue
@@ -196,6 +197,25 @@ async def _notify_team_mentions(db, team: dict, sender: dict, message: dict) -> 
                 "sender_id": sender.get("id"),
                 "user_id": member["id"],
             },
+        )
+        notified_ids.add(member["id"])
+    return notified_ids
+
+
+async def _notify_team_chat_message(db, team: dict, sender: dict, message: dict, exclude_user_ids: set[str] | None = None) -> None:
+    excluded = set(exclude_user_ids or set())
+    excluded.add(sender.get("id"))
+    recipient_ids = [uid for uid in team.get("member_ids") or [] if uid and uid not in excluded]
+    if not recipient_ids:
+        return
+    for recipient_id in recipient_ids:
+        await create_user_notification(
+            recipient_id,
+            title=f"Neue Teamnachricht [{team.get('tag')}]",
+            body=f"{_user_label(sender)}: {(message.get('message') or '')[:140]}",
+            url=f"/teams/{team['id']}",
+            kind="team_chat_message",
+            meta={"team_id": team["id"], "message_id": message["id"]},
         )
 
 
@@ -336,7 +356,8 @@ async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(
         "updated_at": now,
     }
     await db.team_chat_messages.insert_one(message)
-    await _notify_team_mentions(db, team, me, message)
+    mentioned_user_ids = await _notify_team_mentions(db, team, me, message)
+    await _notify_team_chat_message(db, team, me, message, mentioned_user_ids)
     try:
         from badges import evaluate_user_progress
         await evaluate_user_progress(me["id"])

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { AppState, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../auth/AuthContext";
 import { Body, Muted } from "../components/Text";
@@ -10,6 +10,7 @@ import { navigateToNotification } from "../navigation/rootNavigation";
 import { colors } from "../theme";
 import type { UserNotification } from "../types";
 import {
+  addPushNotificationReceivedListener,
   addPushNotificationResponseListener,
   configurePushNotifications,
   consumeInitialPushNotification,
@@ -42,16 +43,21 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const initialPushHandled = useRef(false);
   const enabled = Boolean(user && !isGuestUser(user));
 
-  // Push-Token registrieren wenn User einloggt
-  useEffect(() => {
-    if (enabled && !pushRegistered.current) {
-      pushRegistered.current = true;
-      registerPushToken().catch(() => {});
-    }
-    if (!enabled) {
-      pushRegistered.current = false;
-    }
+  const ensurePushRegistered = useCallback(async () => {
+    if (!enabled || pushRegistered.current) return;
+    const token = await registerPushToken().catch(() => null);
+    pushRegistered.current = Boolean(token);
   }, [enabled]);
+
+  const mergeIncomingNotification = useCallback((item: UserNotification) => {
+    knownIds.current.add(item.id);
+    setItems((rows) => {
+      const existing = rows.find((row) => row.id === item.id);
+      if (existing) return rows.map((row) => row.id === item.id ? { ...row, ...item, read: row.read } : row);
+      return [item, ...rows].slice(0, 80);
+    });
+    setPopups((current) => [item, ...current.filter((row) => row.id !== item.id)].slice(0, 3));
+  }, []);
 
   const load = useCallback(async () => {
     if (!enabled) {
@@ -62,7 +68,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       return;
     }
     try {
-      const { data } = await api.get<UserNotification[]>("/admin/notifications");
+      const { data } = await api.get<UserNotification[]>("/mobile/notifications");
       const rows = Array.isArray(data) ? data : [];
       setItems(rows);
       const nextUnread = rows.filter((item) => !item.read && item.id && !knownIds.current.has(item.id)).slice(0, 3);
@@ -72,19 +78,37 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       knownIds.current = new Set(rows.map((item) => item.id).filter(Boolean));
       primed.current = true;
     } catch {
-      setItems([]);
+      // Keep the last known list visible when the network is temporarily unavailable.
     }
   }, [enabled]);
 
   useEffect(() => {
+    ensurePushRegistered();
     load();
-  }, [load]);
+  }, [ensurePushRegistered, load]);
 
   useEffect(() => {
     if (!enabled) return undefined;
-    const timer = setInterval(load, 15000);
+    const timer = setInterval(() => {
+      ensurePushRegistered();
+      load();
+    }, 5000);
     return () => clearInterval(timer);
-  }, [enabled, load]);
+  }, [enabled, ensurePushRegistered, load]);
+
+  useEffect(() => {
+    if (!enabled) {
+      pushRegistered.current = false;
+      return undefined;
+    }
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        ensurePushRegistered();
+        load();
+      }
+    });
+    return () => subscription.remove();
+  }, [enabled, ensurePushRegistered, load]);
 
   useEffect(() => {
     if (!popups.length) return undefined;
@@ -95,13 +119,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const markRead = useCallback(async (item: UserNotification) => {
     if (!item.read) {
       setItems((rows) => rows.map((row) => row.id === item.id ? { ...row, read: true } : row));
-      await api.post(`/admin/notifications/${item.id}/read`).catch(() => {});
+      await api.post(`/mobile/notifications/${item.id}/read`).catch(() => {});
     }
   }, []);
 
   const markAllRead = useCallback(async () => {
     setItems((rows) => rows.map((row) => ({ ...row, read: true })));
-    await api.post("/admin/notifications/read-all").catch(() => {});
+    await api.post("/mobile/notifications/read-all").catch(() => {});
   }, []);
 
   const openNotification = useCallback(async (item: UserNotification) => {
@@ -125,6 +149,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     };
 
     const removeListener = addPushNotificationResponseListener(openFromSystemNotification);
+    const removeReceivedListener = addPushNotificationReceivedListener((item) => {
+      mergeIncomingNotification(item);
+      load();
+    });
 
     if (!initialPushHandled.current) {
       initialPushHandled.current = true;
@@ -135,8 +163,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         .catch(() => {});
     }
 
-    return removeListener;
-  }, [enabled, load, openNotification]);
+    return () => {
+      removeListener?.();
+      removeReceivedListener?.();
+    };
+  }, [enabled, load, mergeIncomingNotification, openNotification]);
 
   const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
 

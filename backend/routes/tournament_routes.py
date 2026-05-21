@@ -453,10 +453,10 @@ async def _tournament_chat_user_ids(db, tid: str) -> set[str]:
     return {user_id for user_id in user_ids if user_id}
 
 
-async def _notify_tournament_mentions(db, tournament: dict, sender: dict, message: dict) -> None:
+async def _notify_tournament_mentions(db, tournament: dict, sender: dict, message: dict) -> set[str]:
     handles = {m.lower() for m in MENTION_RE.findall(message.get("message") or "")}
     if not handles:
-        return
+        return set()
     candidates = await db.users.find(
         {
             "is_active": True,
@@ -466,6 +466,7 @@ async def _notify_tournament_mentions(db, tournament: dict, sender: dict, messag
         {"_id": 0, "id": 1, "username": 1, "display_name": 1, "role": 1},
     ).to_list(100)
     allowed_ids = await _tournament_chat_user_ids(db, tournament["id"])
+    notified_ids: set[str] = set()
     for member in candidates:
         if member.get("id") == sender.get("id"):
             continue
@@ -477,6 +478,27 @@ async def _notify_tournament_mentions(db, tournament: dict, sender: dict, messag
             body=f"{_user_label(sender)} hat dich erwähnt: {(message.get('message') or '')[:140]}",
             url=f"/tournaments/{tournament.get('slug') or tournament['id']}",
             kind="tournament_chat_mention",
+            meta={"tournament_id": tournament["id"], "message_id": message["id"]},
+        )
+        notified_ids.add(member["id"])
+    return notified_ids
+
+
+async def _notify_tournament_chat_message(db, tournament: dict, sender: dict, message: dict, exclude_user_ids: set[str] | None = None) -> None:
+    allowed_ids = await _tournament_chat_user_ids(db, tournament["id"])
+    excluded = set(exclude_user_ids or set())
+    excluded.add(sender.get("id"))
+    recipient_ids = [uid for uid in allowed_ids if uid and uid not in excluded]
+    if not recipient_ids:
+        return
+    title = tournament.get("title") or "Turnier"
+    for recipient_id in recipient_ids:
+        await create_user_notification(
+            recipient_id,
+            title=f"Neue Turniernachricht: {title}",
+            body=f"{_user_label(sender)}: {(message.get('message') or '')[:140]}",
+            url=f"/tournaments/{tournament.get('slug') or tournament['id']}/chat",
+            kind="tournament_chat_message",
             meta={"tournament_id": tournament["id"], "message_id": message["id"]},
         )
 
@@ -1357,7 +1379,8 @@ async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = 
         "updated_at": now,
     }
     await db.tournament_chat_messages.insert_one(doc)
-    await _notify_tournament_mentions(db, tournament, me, doc)
+    mentioned_user_ids = await _notify_tournament_mentions(db, tournament, me, doc)
+    await _notify_tournament_chat_message(db, tournament, me, doc, mentioned_user_ids)
     try:
         from badges import evaluate_user_progress
         await evaluate_user_progress(me["id"])

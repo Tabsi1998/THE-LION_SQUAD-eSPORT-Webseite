@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-beta.4 - 2026-05-21
+
+- Mobile: Push-Token-Registrierung wird wiederholt, bis der Token wirklich beim Backend gespeichert wurde, statt nach einem fehlgeschlagenen Versuch stumm aufzugeben.
+- Mobile: Benachrichtigungen laufen ueber eigene Mobile-Endpunkte, aktualisieren beim App-Fokus schneller und zeigen eingehende Pushs sofort auch als In-App-Popup.
+- Backend: Normale Team- und Turnier-Chat-Nachrichten erzeugen jetzt Benachrichtigungen fuer die anderen Mitglieder/Teilnehmer, nicht nur `@username`-Erwaehnungen.
+- Backend: Expo-Push-Antworten werden ausgewertet und nicht mehr nutzbare Device-Tokens automatisch deaktiviert.
+
 ## 1.0.0-beta.3 - 2026-05-21
 
 - Mobile: Android-Chat-Tastaturanpassung korrigiert, damit der Composer auf Geraeten wie dem Galaxy S26 Ultra nicht doppelt nach oben verschoben wird.

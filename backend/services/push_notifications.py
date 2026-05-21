@@ -65,6 +65,28 @@ async def send_mobile_push_for_notification(notification: dict[str, Any]) -> int
         async with httpx.AsyncClient(timeout=8) as client:
             response = await client.post(EXPO_PUSH_URL, json=payloads)
             response.raise_for_status()
+        result = response.json()
+        rows = result.get("data") if isinstance(result, dict) else None
+        if isinstance(rows, dict):
+            rows = [rows]
+        failed_tokens = []
+        if isinstance(rows, list):
+            for token, row in zip(push_tokens, rows):
+                if not isinstance(row, dict) or row.get("status") != "error":
+                    continue
+                details = row.get("details") or {}
+                logger.warning(
+                    "Expo push token failed for notification %s: %s",
+                    notification.get("id"),
+                    row.get("message") or details,
+                )
+                if details.get("error") == "DeviceNotRegistered":
+                    failed_tokens.append(token)
+        if failed_tokens:
+            await db.mobile_push_tokens.update_many(
+                {"token": {"$in": failed_tokens}},
+                {"$set": {"enabled": False, "disabled_at": now_utc().isoformat()}},
+            )
         await db.mobile_push_tokens.update_many(
             {"token": {"$in": push_tokens}},
             {"$set": {"last_sent_at": now_utc().isoformat()}},
