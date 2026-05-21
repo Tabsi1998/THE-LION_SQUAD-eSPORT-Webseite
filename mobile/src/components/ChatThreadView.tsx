@@ -1,5 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import {
+  Dimensions,
+  Keyboard,
+  KeyboardAvoidingView,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, errorMessage } from "../lib/api";
 import { formatDate } from "../lib/format";
@@ -40,10 +52,16 @@ export function ChatThreadView({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [allowed, setAllowed] = useState(true);
+  const [keyboardOverlap, setKeyboardOverlap] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
+  const nearBottomRef = useRef(true);
+  const didInitialScroll = useRef(false);
   const insets = useSafeAreaInsets();
-  // Auf Android: Tastatur-Offset = Header-Höhe (ca. 56px) + StatusBar
   const keyboardOffset = Platform.OS === "ios" ? insets.top + 44 : 0;
+
+  const scrollToLatest = useCallback((animated = false) => {
+    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated }));
+  }, []);
 
   const load = useCallback(async () => {
     setError("");
@@ -51,20 +69,41 @@ export function ChatThreadView({
       const { data } = await api.get(listUrl);
       setMessages(extractMessages(data));
       setAllowed(canSend(data));
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 0);
+      if (!didInitialScroll.current || nearBottomRef.current) {
+        scrollToLatest(false);
+        didInitialScroll.current = true;
+      }
     } catch (err) {
       setAllowed(false);
       setError(errorMessage(err, lockedDetail || "Chat konnte nicht geladen werden."));
     } finally {
       setLoading(false);
     }
-  }, [canSend, extractMessages, listUrl, lockedDetail]);
+  }, [canSend, extractMessages, listUrl, lockedDetail, scrollToLatest]);
 
   useEffect(() => {
     load();
     const timer = setInterval(load, 7000);
     return () => clearInterval(timer);
   }, [load]);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return undefined;
+    const showSub = Keyboard.addListener("keyboardDidShow", (event) => {
+      const windowHeight = Dimensions.get("window").height;
+      const keyboardTop = event.endCoordinates?.screenY ?? windowHeight;
+      setKeyboardOverlap(Math.max(0, windowHeight - keyboardTop - insets.bottom));
+      if (nearBottomRef.current) scrollToLatest(true);
+    });
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardOverlap(0);
+      if (nearBottomRef.current) scrollToLatest(false);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [insets.bottom, scrollToLatest]);
 
   useEffect(() => {
     if (!mentionSearchUrl) {
@@ -96,13 +135,20 @@ export function ChatThreadView({
       const { data } = await api.post<ChatMessage>(postUrl, { message });
       setMessages((items) => [...items, data]);
       setText("");
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+      nearBottomRef.current = true;
+      setTimeout(() => scrollToLatest(true), 50);
     } catch (err) {
       setError(errorMessage(err, "Nachricht konnte nicht gesendet werden."));
     } finally {
       setSending(false);
     }
-  }, [allowed, postUrl, sending, text]);
+  }, [allowed, postUrl, scrollToLatest, sending, text]);
+
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+    nearBottomRef.current = distanceFromBottom < 96;
+  }, []);
 
   if (loading) return <SkeletonList count={5} hasImage={false} />;
 
@@ -114,9 +160,15 @@ export function ChatThreadView({
     >
       <ScrollView
         ref={scrollRef}
+        style={styles.scroller}
         contentContainerStyle={styles.messages}
         keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+        onContentSizeChange={() => {
+          if (!didInitialScroll.current || nearBottomRef.current) scrollToLatest(false);
+        }}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
         {messages.length ? messages.map((message) => (
@@ -142,7 +194,7 @@ export function ChatThreadView({
           ))}
         </View>
       ) : null}
-      <View style={styles.composer}>
+      <View style={[styles.composer, keyboardOverlap ? { marginBottom: keyboardOverlap } : null]}>
         <TextInput
           editable={allowed && !sending}
           multiline
@@ -150,7 +202,10 @@ export function ChatThreadView({
           placeholder={allowed ? "Nachricht schreiben ..." : "Chat nicht verfügbar"}
           placeholderTextColor={colors.muted}
           style={styles.input}
-          onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80)}
+          onFocus={() => {
+            nearBottomRef.current = true;
+            setTimeout(() => scrollToLatest(true), 80);
+          }}
           onSubmitEditing={() => {
             if (!text.includes("\n")) Keyboard.dismiss();
           }}
@@ -197,6 +252,9 @@ function mentionQuery(value: string) {
 
 const styles = StyleSheet.create({
   wrap: {
+    flex: 1,
+  },
+  scroller: {
     flex: 1,
   },
   messages: {

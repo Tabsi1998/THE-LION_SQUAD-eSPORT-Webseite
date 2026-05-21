@@ -9,7 +9,13 @@ import { isGuestUser } from "../live";
 import { navigateToNotification } from "../navigation/rootNavigation";
 import { colors } from "../theme";
 import type { UserNotification } from "../types";
-import { configurePushNotifications, registerPushToken, setBadgeCount } from "./PushService";
+import {
+  addPushNotificationResponseListener,
+  configurePushNotifications,
+  consumeInitialPushNotification,
+  registerPushToken,
+  setBadgeCount,
+} from "./PushService";
 
 type NotificationContextValue = {
   items: UserNotification[];
@@ -33,6 +39,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const knownIds = useRef(new Set<string>());
   const primed = useRef(false);
   const pushRegistered = useRef(false);
+  const initialPushHandled = useRef(false);
   const enabled = Boolean(user && !isGuestUser(user));
 
   // Push-Token registrieren wenn User einloggt
@@ -102,6 +109,34 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     setPopups((rows) => rows.filter((row) => row.id !== item.id));
     navigateToNotification(item);
   }, [markRead]);
+
+  useEffect(() => {
+    if (!enabled) {
+      initialPushHandled.current = false;
+      return undefined;
+    }
+
+    const openFromSystemNotification = (item: UserNotification) => {
+      setTimeout(() => {
+        openNotification(item)
+          .then(load)
+          .catch(() => {});
+      }, 250);
+    };
+
+    const removeListener = addPushNotificationResponseListener(openFromSystemNotification);
+
+    if (!initialPushHandled.current) {
+      initialPushHandled.current = true;
+      consumeInitialPushNotification()
+        .then((item) => {
+          if (item) openFromSystemNotification(item);
+        })
+        .catch(() => {});
+    }
+
+    return removeListener;
+  }, [enabled, load, openNotification]);
 
   const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-beta.2 - 2026-05-21
+
+- Mobile: Chat-Ansicht scrollt beim automatischen Refresh nicht mehr aus der Leseposition und haelt den Composer dynamisch oberhalb der Android-Tastatur.
+- Mobile: Push-Notifications zeigen auch im Vordergrund System-Banner, oeffnen beim Antippen die passende App-Seite und behalten Cold-Start-Ziele bis zur Navigation bereit.
+- Mobile/Backend: Android-Pushs nutzen Channels und hohe Prioritaet; Release-Konfiguration enthaelt Notification-Permission und Expo-Notifications-Plugin.
+- Dokumentation: Mobile Push-Anforderungen fuer geschlossene App, Build, Berechtigungen, Backend-Erreichbarkeit und OS-Grenzen ergaenzt.
+
 ## 1.0.0-beta.1 - 2026-05-21
 
 - Mobile: Event-Hub, Dashboard-Timeline und Fast-Lap-Liste sortieren laufende und naechste Termine nach vorne; vergangene Inhalte rutschen darunter.

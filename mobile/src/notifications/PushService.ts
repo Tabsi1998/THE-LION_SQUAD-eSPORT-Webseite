@@ -4,7 +4,7 @@
  * Funktionsweise:
  * 1. Beim Login: Push-Permission anfragen + Expo-Push-Token beim Backend registrieren
  * 2. Beim Logout: Push-Token beim Backend deregistrieren
- * 3. Foreground-Notifications: Werden als In-App-Popup angezeigt (via NotificationContext)
+ * 3. Foreground-Notifications: Werden als System-Banner plus In-App-Popup angezeigt
  * 4. Background/Tap: App öffnet die richtige Seite (Deep-Link via navigateToNotification)
  *
  * WICHTIG: expo-notifications muss installiert sein:
@@ -17,6 +17,7 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import { api } from "../lib/api";
+import type { UserNotification } from "../types";
 
 // Graceful import – falls expo-notifications nicht installiert ist
 // Installieren mit: npx expo install expo-notifications expo-device
@@ -48,11 +49,36 @@ export function configurePushNotifications() {
   if (!Notifications) return;
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: false, // Wir zeigen eigene In-App-Popups via NotificationContext
+      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
     }),
   });
+}
+
+export function addPushNotificationResponseListener(onOpen: (item: UserNotification) => void) {
+  if (!Notifications) return undefined;
+  const subscription = Notifications.addNotificationResponseReceivedListener((response: unknown) => {
+    const item = notificationFromResponse(response);
+    if (item) onOpen(item);
+  });
+  return () => {
+    subscription?.remove?.();
+  };
+}
+
+export async function consumeInitialPushNotification(): Promise<UserNotification | null> {
+  if (!Notifications) return null;
+  try {
+    const response = await Notifications.getLastNotificationResponseAsync?.();
+    const item = notificationFromResponse(response);
+    await Notifications.clearLastNotificationResponseAsync?.();
+    return item;
+  } catch {
+    return null;
+  }
 }
 
 /** Fragt Push-Permission an und registriert den Token beim Backend */
@@ -120,6 +146,35 @@ export async function registerPushToken(): Promise<string | null> {
     console.warn("[PushService] Fehler bei Token-Registrierung:", err);
     return null;
   }
+}
+
+function notificationFromResponse(response: unknown): UserNotification | null {
+  const content = (response as {
+    notification?: { request?: { content?: { title?: string | null; body?: string | null; data?: Record<string, unknown> } } };
+  } | null)?.notification?.request?.content;
+  const data = content?.data || {};
+  const notificationId = stringValue(data.notification_id || data.id);
+  const kind = stringValue(data.kind);
+  const url = stringValue(data.url);
+  const meta = objectValue(data.meta);
+  if (!notificationId && !kind && !url) return null;
+  return {
+    id: notificationId || `${kind || "push"}:${Date.now()}`,
+    kind,
+    title: stringValue(content?.title) || "Benachrichtigung",
+    body: stringValue(content?.body),
+    url,
+    read: false,
+    meta,
+  };
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" || typeof value === "number" ? String(value) : "";
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 /** Deregistriert den Push-Token beim Backend (beim Logout) */

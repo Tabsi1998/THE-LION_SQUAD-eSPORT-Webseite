@@ -28,6 +28,21 @@ npx expo export --platform android
 npm audit --audit-level=moderate
 ```
 
+## Push Notifications
+
+Remote push notifications are delivered by the OS through Expo Push. The app does not need to keep a polling process running in the background for normal "app closed from recents" cases.
+
+Operational requirements:
+
+- Build/install a native Android or iOS build after `app.json` changes.
+- Android 13+ must grant notification permission.
+- Android release builds need valid Expo/EAS push credentials for the project id in `app.json`.
+- The backend must be running the push sender code and able to reach `https://exp.host/--/api/v2/push/send`.
+- A user must have logged in once on the device so the Expo push token is registered under `/api/mobile/push-token`.
+- Notifications are not reliable after an explicit OS-level force stop or when the user/vendor blocks notifications or background activity for the app.
+
+Current backend push sources include direct messages, mentions in team/tournament chat, team invites, tournament/match reminders and other entries created through `create_user_notification`.
+
 ## Implemented Foundation
 
 - Native Expo app shell

@@ -33,7 +33,7 @@ import { useAuth } from "../auth/AuthContext";
 import { isGuestUser } from "../live";
 import { useNotifications } from "../notifications/NotificationContext";
 import { colors } from "../theme";
-import { navigationRef } from "./rootNavigation";
+import { flushPendingNotification, navigationRef } from "./rootNavigation";
 import type {
   AuthStackParamList,
   MainTabParamList,
@@ -67,7 +67,7 @@ export function AppNavigator() {
   if (loading) return <BootScreen />;
 
   return (
-    <NavigationContainer ref={navigationRef} theme={theme}>
+    <NavigationContainer ref={navigationRef} theme={theme} onReady={flushPendingNotification}>
       {user ? <MainTabs /> : <AuthScreens />}
       {signedIn ? <NotificationBellOverlay /> : null}
     </NavigationContainer>

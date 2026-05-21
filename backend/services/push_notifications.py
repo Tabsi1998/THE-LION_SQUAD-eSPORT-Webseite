@@ -19,6 +19,13 @@ def _is_expo_token(token: str | None) -> bool:
     return value.startswith("ExponentPushToken[") or value.startswith("ExpoPushToken[")
 
 
+def _channel_for_kind(kind: str | None) -> str:
+    value = str(kind or "").lower()
+    if value.startswith(("tournament", "match", "station", "f1", "prize")):
+        return "tournaments"
+    return "default"
+
+
 async def send_mobile_push_for_notification(notification: dict[str, Any]) -> int:
     user_id = notification.get("user_id")
     if not user_id:
@@ -35,15 +42,18 @@ async def send_mobile_push_for_notification(notification: dict[str, Any]) -> int
 
     title = str(notification.get("title") or "LionsAPP")[:120]
     body = str(notification.get("body") or "")[:180]
+    kind = notification.get("kind")
     payloads = [
         {
             "to": token,
             "sound": "default",
+            "channelId": _channel_for_kind(kind),
+            "priority": "high",
             "title": title,
             "body": body,
             "data": {
                 "notification_id": notification.get("id"),
-                "kind": notification.get("kind"),
+                "kind": kind,
                 "url": notification.get("url"),
                 "meta": notification.get("meta") or {},
             },

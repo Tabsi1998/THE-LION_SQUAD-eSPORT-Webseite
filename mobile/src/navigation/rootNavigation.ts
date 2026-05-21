@@ -3,9 +3,13 @@ import type { MainTabParamList } from "./types";
 import type { UserNotification } from "../types";
 
 export const navigationRef = createNavigationContainerRef<MainTabParamList>();
+let pendingNotification: UserNotification | null = null;
 
 export function navigateToNotification(item: UserNotification) {
-  if (!navigationRef.isReady()) return false;
+  if (!navigationRef.isReady()) {
+    pendingNotification = item;
+    return false;
+  }
   const target = targetFromNotification(item);
   if (!target) {
     navigationRef.navigate("More", { screen: "Notifications" });
@@ -30,6 +34,13 @@ export function navigateToNotification(item: UserNotification) {
   }
   navigationRef.navigate("More", { screen: target.screen, params: target.params } as never);
   return true;
+}
+
+export function flushPendingNotification() {
+  if (!navigationRef.isReady() || !pendingNotification) return false;
+  const item = pendingNotification;
+  pendingNotification = null;
+  return navigateToNotification(item);
 }
 
 type NotificationTarget =

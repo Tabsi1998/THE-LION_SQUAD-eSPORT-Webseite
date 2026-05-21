@@ -2,7 +2,7 @@
   "expo": {
     "name": "LionsAPP",
     "slug": "lionsapp",
-    "version": "1.0.0-beta.1",
+    "version": "1.0.0-beta.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -14,6 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "buildNumber": "32",
       "bundleIdentifier": "at.lionsquad.app",
       "infoPlist": {
         "NSAppTransportSecurity": {
@@ -23,23 +24,26 @@
     },
     "android": {
       "package": "at.lionsquad.app",
-      "versionCode": 31,
+      "versionCode": 32,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0A0A"
       },
       "edgeToEdgeEnabled": true,
+      "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.INTERNET",
-        "android.permission.ACCESS_NETWORK_STATE"
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-notifications"
     ],
     "updates": {
       "enabled": false
