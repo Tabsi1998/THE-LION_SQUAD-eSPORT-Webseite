@@ -39,22 +39,10 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store",
-      [
-        "expo-updates",
-        {
-          "handleMissingAppDir": true
-        }
-      ]
+      "expo-secure-store"
     ],
     "updates": {
-      "enabled": true,
-      "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 3000,
-      "url": "https://u.expo.dev/3eaaebbc-883e-469c-a135-09f3459e2c46"
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
+      "enabled": false
     },
     "extra": {
       "eas": {
