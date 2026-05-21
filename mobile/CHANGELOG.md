@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.9.0-alpha.1 - 2026-05-21
+
+- Web-Frontend: Route-Konflikt /matches/:id behoben (MatchHubPage war nie erreichbar)
+- Web-Frontend: Dashboard-Notifications-Endpunkt auf /notifications/me korrigiert (kein 403 mehr fuer normale User)
+- Web-Frontend: Externes Pexels-Bild im Hero durch CSS-Gradient ersetzt (keine externe Abhaengigkeit mehr)
+- Web-Frontend: ProtectedRoute leitet bei fehlenden Rechten jetzt auf /403 statt /dashboard weiter
+- Web-Frontend: Passwort-Toggle (Eye/EyeOff) in Login und Register hinzugefuegt
+- Web-Frontend: Passwort-Staerke-Indikator (4 Balken) in Register hinzugefuegt
+- Web-Frontend: Scroll-to-Top jetzt auf allen Geraeten sichtbar (nicht mehr nur Mobile)
+- Web-Frontend: TournamentsPage mit Loading-Skeleton, Error-State und Retry-Button verbessert
+- Web-Frontend: Footer-Version dynamisch aus REACT_APP_VERSION Env-Variable
+- Web-Frontend: Neue BottomNav-Komponente fuer Mobile (Home, Turniere, Events, Dashboard, Profil)
+- Web-Frontend: PWA manifest.json mit standalone Display, App-Shortcuts und deutschen Metadaten
+- Web-Frontend: iOS Safe-Area (env(safe-area-inset-bottom)) fuer Notch-Geraete
+- Web-Frontend: AdminLayout Sidebar in 6 Gruppen unterteilt (Uebersicht, Mitglieder, eSports, Content, Verein, System)
+- Web-Frontend: Moderator-Sidebar-Fix: /admin/stations jetzt korrekt sichtbar
+
 ## 0.8.0-alpha.1 - 2026-05-20
 
 - Added a reusable mobile release preflight script that validates package/app version parity, package-lock version parity, Android package identity, Android versionCode, changelog coverage, release history coverage, and tag/version consistency.
