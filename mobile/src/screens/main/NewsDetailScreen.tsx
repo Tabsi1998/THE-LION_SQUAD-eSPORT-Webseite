@@ -91,7 +91,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
           <Title>{post.title}</Title>
           {post.excerpt || post.summary ? <Body style={styles.lead}>{post.excerpt || post.summary}</Body> : null}
           {post.content || post.body ? (
-            <RichText text={post.content || post.body} onOpenContent={openContentTarget} />
+            <RichText text={post.content || post.body} embeds={post.content_embeds} onOpenContent={openContentTarget} />
           ) : (
             <Muted>Kein weiterer Inhalt hinterlegt.</Muted>
           )}

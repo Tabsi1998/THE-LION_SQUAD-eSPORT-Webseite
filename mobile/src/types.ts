@@ -206,7 +206,26 @@ export type NewsPost = {
   linked_events?: ClubEvent[];
   linked_f1_challenges?: F1Challenge[];
   linked_tournaments?: Tournament[];
+  content_embeds?: ContentEmbed[];
   mentioned_users?: PublicUser[];
+};
+
+export type ContentEmbed = {
+  token: string;
+  kind: "event" | "fastlap" | "tournament" | string;
+  ref: string;
+  item?: {
+    id?: string;
+    slug?: string;
+    title?: string;
+    name?: string;
+    description?: string | null;
+    start_date?: string | null;
+    status?: string;
+    banner_url?: string | null;
+    location?: string | null;
+    public_phase?: { label?: string; state?: string; target_at?: string | null };
+  } | null;
 };
 
 export type DashboardAction = {
