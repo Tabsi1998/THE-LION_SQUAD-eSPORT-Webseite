@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.11.0-alpha.1 - 2026-05-21
+
+- Mobile: Season Pass Screen hinzugefuegt (Rangliste mit Podium, Punkte-Erklaerung, Pull-to-Refresh)
+- Mobile: MoreScreen komplett ueberarbeitet (Icons, Season Pass Einstieg, Discord-Link, App-Version)
+- Mobile: NewsScreen mit Suchfeld und Kategorie-Filter-Chips erweitert
+- Mobile: DashboardScreen mit Season Pass Quick-Link Karte (Gold-Styling)
+- Mobile: Offline-Cache (In-Memory + SecureStore) mit TTL und Stale-Fallback hinzugefuegt
+- Mobile: API-Timeout (15s), automatisches GET-Caching, Offline-Stale-Fallback, bessere Fehlermeldungen
+- Mobile: Push-Notifications Infrastruktur (PushService, Android Channels, graceful degradation)
+- Mobile: Push-Token Registrierung/Deregistrierung bei Login/Logout
+- Mobile: App-Badge-Zaehler wird automatisch mit ungelesenen Benachrichtigungen synchronisiert
+- Mobile: Chat-Tastatur-Bug behoben (Input-Feld wurde auf Android von Tastatur ueberlappt)
+- Mobile: Sponsoren im Info Center als Logo-Grid (2 Spalten, nur Logo, klickbar zur Website)
+- Mobile: AppNavigator um SeasonPass-Route erweitert
+- Web-Frontend: BottomNav Aktiv-Indikator Bug behoben, Gaeste-Navigation erweitert (News + Season)
+- Web-Frontend: ScrollTop-Button ueberlappt BottomNav auf Mobile behoben
+- Web-Frontend: Safe-Area-Inset Utilities in Tailwind (pb-safe-bottom etc.)
+- Web-Frontend: Nginx Gzip-Kompression vollstaendig (30+ MIME-Typen), Proxy-Keepalive
+- Web-Frontend: PWA manifest.json mit Season-Pass Shortcut, display_override, screenshots
+
 ## 0.10.0-alpha.1 - 2026-05-21
 
 - Mobile: SkeletonCard + SkeletonList Komponente hinzugefuegt (animierter Pulse-Effekt als Ladeplatzhalter)
