@@ -3,8 +3,8 @@ import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
+import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
-import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
@@ -346,47 +346,37 @@ function Section({ title, actionLabel, onAction, children }: { title: string; ac
 }
 
 function TimelineCard({ item, onPress }: { item: TimelineItem; onPress: () => void }) {
+  const detail = [item.detail, item.registrationStatus ? `Anmeldung: ${formatStatus(item.registrationStatus)}` : null]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
-      <Card style={styles.timelineCard}>
-        <MediaImage
-          uri={item.bannerUrl}
-          style={styles.thumb}
-          fallback={<Ionicons name={item.kind === "tournament" ? "trophy-outline" : "calendar-outline"} color={colors.cyan} size={22} />}
-        />
-        <View style={styles.flex}>
-          <View style={styles.rowTop}>
-            <Body style={styles.rowTitle}>{item.title}</Body>
-            <Badge label={item.kind === "tournament" ? "Turnier" : "Event"} />
-          </View>
-          <Muted>{formatDate(item.date)} · {item.phaseLabel || formatStatus(item.status)}</Muted>
-          {item.detail ? <Muted numberOfLines={1}>{item.detail}</Muted> : null}
-          {item.registrationStatus ? <Muted style={styles.memberHint}>Anmeldung: {formatStatus(item.registrationStatus)}</Muted> : null}
-        </View>
-      </Card>
-    </Pressable>
+    <ContentCard
+      kind={item.kind}
+      title={item.title}
+      image={item.bannerUrl}
+      date={item.date}
+      label={item.phaseLabel}
+      status={item.status}
+      detail={detail}
+      onPress={onPress}
+    />
   );
 }
 
 function NewsCard({ post, onPress }: { post: NewsPost; onPress: () => void }) {
+  const detail = [post.category, post.excerpt || post.summary].filter(Boolean).join(" · ");
+
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
-      <Card style={styles.newsCard}>
-        <MediaImage
-          uri={post.banner_url}
-          style={styles.newsImage}
-          fallback={<Ionicons name="newspaper-outline" color={colors.gold} size={24} />}
-        />
-        <View style={styles.flex}>
-          <View style={styles.rowTop}>
-            <Body style={styles.rowTitle}>{post.title}</Body>
-            {post.pinned ? <Badge label="Top" tone="gold" /> : null}
-          </View>
-          <Muted>{formatDate(post.published_at || post.created_at)}{post.category ? ` · ${post.category}` : ""}</Muted>
-          {post.excerpt || post.summary ? <Muted numberOfLines={2}>{post.excerpt || post.summary}</Muted> : null}
-        </View>
-      </Card>
-    </Pressable>
+    <ContentCard
+      kind="news"
+      title={post.title}
+      image={post.banner_url}
+      date={post.published_at || post.created_at}
+      label={post.pinned ? "Top" : null}
+      detail={detail}
+      onPress={onPress}
+    />
   );
 }
 
@@ -519,11 +509,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textTransform: "uppercase",
   },
-  timelineCard: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-  },
   compactCard: {
     gap: 4,
   },
@@ -542,20 +527,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 38,
   },
-  newsCard: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  newsImage: {
-    borderRadius: 8,
-    height: 82,
-    width: 92,
-  },
-  thumb: {
-    borderRadius: 8,
-    height: 66,
-    width: 72,
-  },
   flex: {
     flex: 1,
     gap: 3,
@@ -569,10 +540,6 @@ const styles = StyleSheet.create({
   rowTitle: {
     flex: 1,
     fontWeight: "900",
-  },
-  memberHint: {
-    color: colors.cyan,
-    fontWeight: "800",
   },
   badge: {
     backgroundColor: "rgba(41, 182, 232, 0.12)",
