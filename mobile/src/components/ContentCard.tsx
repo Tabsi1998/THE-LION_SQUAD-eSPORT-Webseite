@@ -15,6 +15,7 @@ export function ContentCard({
   detail,
   image,
   kind,
+  label,
   onPress,
   phase,
   status,
@@ -25,6 +26,7 @@ export function ContentCard({
   detail?: string | null;
   image?: string | null;
   kind: ContentCardKind;
+  label?: string | null;
   onPress?: () => void;
   phase?: { label?: string | null; state?: string | null } | string | null;
   status?: string | null;
@@ -47,7 +49,7 @@ export function ContentCard({
         <Body style={styles.title}>{title || labelForKind(kind)}</Body>
         <View style={styles.metaRow}>
           {date ? <Muted>{formatDate(date)}</Muted> : null}
-          {phase || status ? <StatusBadge phase={phase} status={status} /> : null}
+          {label || phase || status ? <StatusBadge label={label} phase={phase} status={status} /> : null}
         </View>
         {body ? <Muted numberOfLines={2}>{body}</Muted> : null}
       </View>

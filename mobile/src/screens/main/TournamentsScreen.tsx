@@ -1,15 +1,12 @@
-import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
+import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
-import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
-import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
-import { formatDateTime } from "../../lib/format";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ClubEvent, F1Challenge, Tournament } from "../../types";
@@ -159,7 +156,7 @@ export function TournamentsScreen({ navigation }: Props) {
             <HubSection title="Fast Laps" items={groupedItems.fastlaps} onOpen={open} />
           </>
         ) : items.length ? (
-          items.map((item) => <HubCard key={`${item.kind}-${item.id}`} item={item} onPress={() => open(item)} />)
+          items.map((item) => <HubContentCard key={`${item.kind}-${item.id}`} item={item} onPress={() => open(item)} />)
         ) : (
           <EmptyState title="Keine Einträge" detail="Für diese Auswahl sind aktuell keine sichtbaren Inhalte vorhanden." />
         )}
@@ -173,33 +170,23 @@ function HubSection({ title, items, onOpen }: { title: string; items: HubItem[];
   return (
     <View style={styles.section}>
       <Heading>{title}</Heading>
-      {items.map((item) => <HubCard key={`${item.kind}-${item.id}`} item={item} onPress={() => onOpen(item)} />)}
+      {items.map((item) => <HubContentCard key={`${item.kind}-${item.id}`} item={item} onPress={() => onOpen(item)} />)}
     </View>
   );
 }
 
-function HubCard({ item, onPress }: { item: HubItem; onPress: () => void }) {
+function HubContentCard({ item, onPress }: { item: HubItem; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
-      <Card style={styles.card}>
-        <MediaImage
-          uri={item.image}
-          style={styles.image}
-          fallback={<Ionicons name={iconFor(item.kind)} color={item.kind === "fastlap" ? colors.gold : colors.cyan} size={28} />}
-        />
-        <View style={styles.text}>
-          <View style={styles.top}>
-            <Body style={styles.title}>{item.title}</Body>
-            <View style={styles.badgeRow}>
-              <Pill label={labelFor(item.kind)} tone={item.kind === "fastlap" ? "gold" : "cyan"} />
-              <StatusBadge label={item.phase} status={item.status} />
-            </View>
-          </View>
-          <Muted>{formatDateTime(item.date)}</Muted>
-          {item.detail ? <Muted numberOfLines={2}>{item.detail}</Muted> : null}
-        </View>
-      </Card>
-    </Pressable>
+    <ContentCard
+      kind={item.kind}
+      title={item.title}
+      image={item.image}
+      date={item.date}
+      label={item.phase}
+      status={item.status}
+      detail={item.detail}
+      onPress={onPress}
+    />
   );
 }
 
@@ -209,14 +196,6 @@ function Stat({ label, value, tone = "cyan" }: { label: string; value: string; t
       <Body style={[styles.statValue, tone === "gold" && styles.gold]}>{value}</Body>
       <Muted>{label}</Muted>
     </Card>
-  );
-}
-
-function Pill({ label, tone = "cyan" }: { label: string; tone?: "cyan" | "gold" }) {
-  return (
-    <View style={[styles.pill, tone === "gold" && styles.pillGold]}>
-      <Muted style={[styles.pillText, tone === "gold" && styles.pillGoldText]}>{label}</Muted>
-    </View>
   );
 }
 
@@ -231,18 +210,6 @@ function matchesFilter(item: HubItem, filter: Filter) {
   if (filter === "events") return item.kind === "event";
   if (filter === "tournaments") return item.kind === "tournament";
   return item.kind === "fastlap";
-}
-
-function iconFor(kind: HubItem["kind"]) {
-  if (kind === "event") return "calendar-outline";
-  if (kind === "fastlap") return "speedometer-outline";
-  return "trophy-outline";
-}
-
-function labelFor(kind: HubItem["kind"]) {
-  if (kind === "event") return "Event";
-  if (kind === "fastlap") return "Fast Lap";
-  return "Turnier";
 }
 
 const styles = StyleSheet.create({
@@ -292,58 +259,8 @@ const styles = StyleSheet.create({
   gold: {
     color: colors.gold,
   },
-  card: {
-    flexDirection: "row",
-    gap: 12,
-  },
   section: {
     gap: 10,
-  },
-  image: {
-    borderRadius: 8,
-    height: 82,
-    width: 92,
-  },
-  text: {
-    flex: 1,
-    gap: 5,
-    minWidth: 0,
-  },
-  top: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: 8,
-  },
-  badgeRow: {
-    alignItems: "flex-end",
-    gap: 6,
-  },
-  title: {
-    flex: 1,
-    fontWeight: "900",
-  },
-  pill: {
-    backgroundColor: "rgba(41,182,232,0.12)",
-    borderColor: "rgba(41,182,232,0.28)",
-    borderRadius: 6,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  pillGold: {
-    backgroundColor: "rgba(240,180,41,0.12)",
-    borderColor: "rgba(240,180,41,0.32)",
-  },
-  pillText: {
-    color: colors.cyan,
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  pillGoldText: {
-    color: colors.gold,
-  },
-  pressed: {
-    opacity: 0.72,
   },
   error: {
     color: colors.live,
