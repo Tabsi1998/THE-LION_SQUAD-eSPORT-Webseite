@@ -254,7 +254,11 @@ const styles = StyleSheet.create({
     minWidth: 38,
   },
   tabBarGlass: {
-    ...StyleSheet.absoluteFillObject,
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
     backgroundColor: "rgba(10,10,10,0.96)",
     borderTopColor: "rgba(255,255,255,0.1)",
     borderTopWidth: 1,
