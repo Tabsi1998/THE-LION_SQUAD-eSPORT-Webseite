@@ -15,6 +15,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: mobile `StatusBadge` rendert Phase-Countdowns, Live-Indikator und dieselben Statusfarben konsistenter wie die Web-PhaseBadge.
 - Seit der Planerstellung umgesetzt: mobile `SegmentedTabs` ist als gemeinsamer Baustein eingefuehrt und in Event-Hub, Info-Center, Turnierdetail sowie oeffentlichem Profil genutzt.
 - Seit der Planerstellung umgesetzt: mobile Jahreswertung nutzt echte Season-Standings, zeigt Quellen/Statistiken und trennt Jahreswertungs- von Profilpunkten.
+- Seit der Planerstellung umgesetzt: mobile `EmptyState` unterstuetzt Icons/Tones und ersetzt mehrere manuelle Leerzustaende.
 - Seit der Planerstellung umgesetzt: Web-Navigation, Jahreswertungsseite, Widget und Admin-Hinweise nutzen sichtbare Begriffe wie Jahreswertung/Jahrespunkte statt unklarem Season-Pass.
 - Seit der Planerstellung umgesetzt: Backend-Defaulttexte, Achievements, Seed-Daten und SEO-Breadcrumbs verwenden ebenfalls Jahreswertung/Jahrespunkte.
 - Seit der Planerstellung umgesetzt: `0.12.0-beta.2` ist vorbereitet, inklusive Android `versionCode` 28, Changelog und Release-Historie.
@@ -132,7 +133,8 @@ Gemeinsame UI-Muster:
 - [x] `ActionRow`/`ActionTile` fuer kompakte Icon-Actions statt grosser Buttons, z.B. Profil bearbeiten, Aktualisieren, Datenschutz, Logout.
 - `ContentCard` fuer Turnier/Event/Fast-Lap/News vereinheitlichen: Bild, Status, Datum, Primaraktion.
 - [x] `SegmentedTabs` fuer sichtbare Seitenwechsel statt versteckter horizontaler Scroll-Tabs als gemeinsamer Baustein einfuehren.
-- `EmptyState`, `SkeletonList`, Fehler- und Offline-Zustaende optisch angleichen.
+- [x] `EmptyState` optisch angleichen: Icons, Akzentfarben und weniger manuelle Sonderlayouts.
+- `SkeletonList`, Fehler- und Offline-Zustaende optisch angleichen.
 
 Mobile Website:
 

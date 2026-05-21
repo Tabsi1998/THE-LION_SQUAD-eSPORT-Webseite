@@ -5,7 +5,7 @@ import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextI
 import { ActionRow, ActionTile } from "../../components/ActionRow";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { SkeletonList } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
@@ -329,7 +329,7 @@ export function ProfileScreen() {
                   <Muted>{insights.next.current || 0}/{insights.next.target || 0}</Muted>
                 </>
               ) : (
-                <Muted>Keine offenen automatischen Fortschritte gefunden.</Muted>
+                <EmptyState icon="checkmark-done-outline" title="Alles aktuell" detail="Keine offenen automatischen Fortschritte gefunden." />
               )}
             </Card>
           </>
@@ -355,7 +355,7 @@ export function ProfileScreen() {
               references.items.map((item) => <ReferenceCard key={item.id} item={item} onOpen={openReference} />)
             ) : (
               <Card style={styles.card}>
-                <Muted>Noch keine persönlichen Referenzen gefunden. Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier.</Muted>
+                <EmptyState icon="ribbon-outline" title="Noch keine Referenzen" detail="Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier." />
               </Card>
             )}
           </>

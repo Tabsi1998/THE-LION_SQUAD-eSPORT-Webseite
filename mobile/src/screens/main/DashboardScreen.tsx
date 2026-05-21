@@ -193,7 +193,7 @@ export function DashboardScreen({ navigation }: Props) {
               <TimelineCard key={`${item.kind}-${item.id}`} item={item} onPress={() => openTimelineItem(item)} />
             ))
           ) : (
-            <EmptyState title={isGuest ? "Noch keine Termine" : "Keine eigenen Termine"} detail={isGuest ? "Sobald Website-Termine veröffentlicht sind, stehen sie hier." : "Deine Turnier- und Event-Anmeldungen erscheinen hier automatisch."} />
+            <EmptyState icon="calendar-outline" title={isGuest ? "Noch keine Termine" : "Keine eigenen Termine"} detail={isGuest ? "Sobald Website-Termine veröffentlicht sind, stehen sie hier." : "Deine Turnier- und Event-Anmeldungen erscheinen hier automatisch."} />
           )}
         </Section>
 
@@ -215,7 +215,7 @@ export function DashboardScreen({ navigation }: Props) {
                 </Pressable>
               ))
             ) : (
-              <EmptyState title="Keine offenen Aktionen" detail="Check-ins, offene Matches und wichtige Hinweise landen automatisch hier." />
+              <EmptyState icon="checkmark-circle-outline" title="Keine offenen Aktionen" detail="Check-ins, offene Matches und wichtige Hinweise landen automatisch hier." />
             )}
           </Section>
         ) : null}
@@ -265,7 +265,7 @@ export function DashboardScreen({ navigation }: Props) {
               />
             ))
           ) : (
-            <EmptyState title="Keine News" detail="Aktuelle Website-News werden hier eingeblendet, sobald sie veröffentlicht sind." />
+            <EmptyState icon="newspaper-outline" title="Keine News" detail="Aktuelle Website-News werden hier eingeblendet, sobald sie veröffentlicht sind." />
           )}
         </Section>
 

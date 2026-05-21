@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { ActivityIndicator, Animated, StyleSheet, View } from "react-native";
 import { colors } from "../theme";
 import { Body, Muted } from "./Text";
@@ -12,9 +13,27 @@ export function LoadingState({ label = "Lade Daten ..." }: { label?: string }) {
   );
 }
 
-export function EmptyState({ title, detail }: { title: string; detail?: string }) {
+type EmptyTone = "cyan" | "gold" | "danger";
+
+export function EmptyState({
+  detail,
+  icon,
+  title,
+  tone = "cyan",
+}: {
+  detail?: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+  title: string;
+  tone?: EmptyTone;
+}) {
+  const accent = tone === "danger" ? colors.live : tone === "gold" ? colors.gold : colors.cyan;
   return (
     <View style={styles.center}>
+      {icon ? (
+        <View style={[styles.iconBadge, { borderColor: accent }]}>
+          <Ionicons name={icon} color={accent} size={22} />
+        </View>
+      ) : null}
       <Body style={styles.emptyTitle}>{title}</Body>
       {detail ? <Muted style={styles.detail}>{detail}</Muted> : null}
     </View>
@@ -78,11 +97,22 @@ export function SkeletonList({ count = 4, hasImage = true }: { count?: number; h
 const styles = StyleSheet.create({
   center: {
     alignItems: "center",
-    gap: 8,
+    gap: 9,
+    paddingHorizontal: 18,
     paddingVertical: 28,
+  },
+  iconBadge: {
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
   },
   emptyTitle: {
     fontWeight: "800",
+    textAlign: "center",
   },
   detail: {
     textAlign: "center",

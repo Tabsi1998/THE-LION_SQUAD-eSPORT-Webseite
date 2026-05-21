@@ -153,7 +153,7 @@ export function TournamentsScreen({ navigation }: Props) {
         ) : items.length ? (
           items.map((item) => <HubContentCard key={`${item.kind}-${item.id}`} item={item} onPress={() => open(item)} />)
         ) : (
-          <EmptyState title="Keine Einträge" detail="Für diese Auswahl sind aktuell keine sichtbaren Inhalte vorhanden." />
+          <EmptyState icon="calendar-clear-outline" title="Keine Einträge" detail="Für diese Auswahl sind aktuell keine sichtbaren Inhalte vorhanden." />
         )}
       </ScrollView>
     </Screen>

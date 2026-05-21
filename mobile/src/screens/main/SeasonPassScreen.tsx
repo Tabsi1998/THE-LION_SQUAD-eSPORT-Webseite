@@ -203,10 +203,7 @@ export function SeasonPassScreen({ navigation }: Props) {
 
         {leaderboard.length === 0 ? (
           <Card style={styles.card}>
-            <View style={styles.emptyBox}>
-              <Ionicons name="podium-outline" color={colors.muted} size={36} />
-              <Muted style={styles.emptyText}>Noch keine Einträge in dieser Jahreswertung.</Muted>
-            </View>
+            <EmptyState icon="podium-outline" title="Noch keine Einträge" detail="Sobald Wertungen freigegeben sind, erscheint hier die Jahresrangliste." tone="gold" />
           </Card>
         ) : null}
 
@@ -450,14 +447,6 @@ const styles = StyleSheet.create({
     color: colors.cyan,
     fontSize: 13,
     fontWeight: "900",
-  },
-  emptyBox: {
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 20,
-  },
-  emptyText: {
-    textAlign: "center",
   },
   pointRow: {
     alignItems: "center",

@@ -87,7 +87,7 @@ export function FastLapScreen({ navigation }: Props) {
         }
         ListEmptyComponent={
           featured ? null : (
-            <EmptyState title="Keine Fast-Lap Challenges" detail="Sobald Challenges veröffentlicht sind, erscheinen sie hier." />
+            <EmptyState icon="speedometer-outline" title="Keine Fast-Lap Challenges" detail="Sobald Challenges veröffentlicht sind, erscheinen sie hier." />
           )
         }
         refreshControl={

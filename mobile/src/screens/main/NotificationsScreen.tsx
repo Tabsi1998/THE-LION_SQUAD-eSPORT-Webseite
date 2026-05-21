@@ -78,12 +78,13 @@ export function NotificationsScreen({ navigation }: Props) {
         {loading ? <SkeletonList count={4} hasImage={false} /> : null}
         {!loading && !items.length ? (
           <EmptyState
+            icon="notifications-outline"
             title="Keine Benachrichtigungen"
             detail="Erinnerungen, Mentions, Nachrichten und Match-Updates erscheinen hier."
           />
         ) : null}
         {!loading && items.length > 0 && !visibleItems.length ? (
-          <EmptyState title="Alles gelesen" detail="Neue ungelesene Meldungen landen automatisch wieder hier." />
+          <EmptyState icon="checkmark-done-outline" title="Alles gelesen" detail="Neue ungelesene Meldungen landen automatisch wieder hier." />
         ) : null}
         {visibleItems.map((item) => (
           <Pressable key={item.id} onPress={() => openNotification(item)} style={({ pressed }) => [pressed && styles.pressed]}>
