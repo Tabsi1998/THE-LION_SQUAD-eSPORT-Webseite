@@ -1,7 +1,7 @@
 # LionsAPP Beta Smoke-Test
 
-Version: `0.12.0-beta.2`
-Android build: `28`
+Version: `0.12.0-beta.3`
+Android build: `29`
 Channel: `beta`
 
 ## GitHub Actions Build
@@ -15,7 +15,7 @@ Channel: `beta`
 Erwarteter APK-Name:
 
 ```text
-LionsAPP-BETA-v0.12.0-build28-<commit>.apk
+LionsAPP-BETA-v0.12.0-build29-<commit>.apk
 ```
 
 ## Installationscheck
@@ -49,6 +49,6 @@ Tag erst setzen, wenn:
 Danach optional:
 
 ```text
-git tag mobile-v0.12.0-beta.2
-git push origin mobile-v0.12.0-beta.2
+git tag mobile-v0.12.0-beta.3
+git push origin mobile-v0.12.0-beta.3
 ```

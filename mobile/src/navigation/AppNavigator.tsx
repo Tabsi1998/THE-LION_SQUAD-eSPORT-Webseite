@@ -129,13 +129,30 @@ function MainTabs() {
       })}
     >
       <Tabs.Screen name="Dashboard" component={DashboardScreen} options={{ title: "Home" }} />
-      <Tabs.Screen name="Tournaments" component={TournamentStackScreen} options={{ title: "Events" }} />
-      <Tabs.Screen name="Teams" component={TeamStackScreen} options={{ title: "Teams" }} />
+      <Tabs.Screen
+        name="Tournaments"
+        component={TournamentStackScreen}
+        options={{ title: "Events", popToTopOnBlur: true }}
+        listeners={({ navigation }) => ({
+          tabPress: () => navigation.navigate("Tournaments", { screen: "TournamentList" }),
+        })}
+      />
+      <Tabs.Screen
+        name="Teams"
+        component={TeamStackScreen}
+        options={{ title: "Teams", popToTopOnBlur: true }}
+        listeners={({ navigation }) => ({
+          tabPress: () => navigation.navigate("Teams", { screen: "TeamList" }),
+        })}
+      />
       <Tabs.Screen name="Profile" component={ProfileScreen} options={{ title: "Profil" }} />
       <Tabs.Screen
         name="More"
         component={MoreStackScreen}
         options={{ title: "Mehr", popToTopOnBlur: true }}
+        listeners={({ navigation }) => ({
+          tabPress: () => navigation.navigate("More", { screen: "MoreHub" }),
+        })}
       />
     </Tabs.Navigator>
   );

@@ -27,7 +27,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: Admin-Dashboard hat eine Tageszentrale fuer Setup, Ergebnis-Konflikte, Medien-Check und Systemstatus.
 - Seit der Planerstellung umgesetzt: Web-Navigation, Jahreswertungsseite, Widget und Admin-Hinweise nutzen sichtbare Begriffe wie Jahreswertung/Jahrespunkte statt unklarem Season-Pass.
 - Seit der Planerstellung umgesetzt: Backend-Defaulttexte, Achievements, Seed-Daten und SEO-Breadcrumbs verwenden ebenfalls Jahreswertung/Jahrespunkte.
-- Seit der Planerstellung umgesetzt: `0.12.0-beta.2` ist vorbereitet, inklusive Android `versionCode` 28, Changelog und Release-Historie.
+- Seit der Planerstellung umgesetzt: `0.12.0-beta.3` ist vorbereitet, inklusive Android `versionCode` 29, Changelog, Release-Historie und Hotfixes fuer Jahreswertung, Fast-Lap-Layout, Schnellzugriff und Tab-Reset.
 - Ergebnislogik ist teilweise vorhanden: Bei klassischen Online-Matches koennen Teilnehmer Ergebnisse melden. Stimmen die letzten zwei Reports ueberein, wird das Match automatisch abgeschlossen. Weichen sie ab, geht das Match auf Klaerung.
 - Staff-Erfassung ist vorhanden: Turnierleitung kann klassische Matches direkt aktualisieren und V2-Heats ueber `/api/matches/{id}/result` werten.
 - Das Regelmodell fuer Vor-Ort-Staff-only, Online-Doppelmeldung und Hybrid ist im Backend und Admin begonnen. Offen bleibt die vollstaendige Durchsetzung/Pruefung in Legacy/V1-Flows und die bessere Erklaerung im Setup-Assistenten.
@@ -278,17 +278,17 @@ Qualitaet und Betrieb:
 - Monitoring fuer Push-Token, API-Fehler und langsame mobile Endpunkte.
 - Beta-Feedback-Kanal in App/Web: kurzer Report mit Screen, Version, User-Agent und Route.
 
-## Phase 10 - Beta 0.12.0-beta.2
+## Phase 10 - Beta 0.12.0-beta.3
 
 Fuer den naechsten APK-Build:
 
-- [x] Version auf `0.12.0-beta.2` setzen.
-- [x] Android `versionCode` auf `28` erhoehen.
+- [x] Version auf `0.12.0-beta.3` setzen.
+- [x] Android `versionCode` auf `29` erhoehen.
 - [x] Changelog mit Match-Regeln, Embed-Karten, Profilnavigation und App-Design-Rework aktualisieren.
 - [x] Vor Release pruefen: `npm run typecheck`, `npm audit --audit-level=moderate`, mobile Preflight, Backend-Tests fuer Match-Regeln.
 - [x] Smoke-Test-Checkliste fuer echten Android-Test dokumentieren: `mobile/RELEASE_SMOKE_TEST.md`.
 - [ ] APK-Build ueber GitHub Actions starten und Smoke-Test auf echtem Android-Geraet durchfuehren.
-- [ ] Optional danach Release-Tag `mobile-v0.12.0-beta.2` setzen, wenn der APK-Smoke-Test passt.
+- [ ] Optional danach Release-Tag `mobile-v0.12.0-beta.3` setzen, wenn der APK-Smoke-Test passt.
 
 ## Prioritaet
 

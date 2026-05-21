@@ -120,7 +120,7 @@ function FeaturedChallengeCard({ item, onPress }: { item: F1Challenge; onPress: 
         />
         <View style={styles.featuredBody}>
           <View style={styles.top}>
-            <Heading style={styles.featuredTitle}>{item.title}</Heading>
+            <Heading style={styles.featuredTitle} numberOfLines={3}>{item.title}</Heading>
             <StatusBadge phase={item.public_phase} status={item.status} />
           </View>
           <Muted>{formatDate(item.start_date)} · {item.track_count || 0} Strecken · {item.participant_count || 0} Fahrer</Muted>
@@ -257,11 +257,12 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   featuredTitle: {
-    flex: 1,
+    flexShrink: 1,
+    lineHeight: 23,
   },
   top: {
     alignItems: "flex-start",
-    flexDirection: "row",
+    flexDirection: "column",
     gap: 8,
   },
   metaRow: {

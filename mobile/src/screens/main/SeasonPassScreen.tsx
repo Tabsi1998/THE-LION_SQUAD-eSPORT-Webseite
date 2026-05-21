@@ -94,6 +94,19 @@ export function SeasonPassScreen({ navigation }: Props) {
     load();
   }, [load]);
 
+  const leaderboard = data?.standings ?? [];
+  const top3 = leaderboard.slice(0, 3);
+  const rest = leaderboard.slice(3);
+  const ownEntry = useMemo(() => {
+    const userId = user?.id;
+    const username = user?.username;
+    return leaderboard.find((entry) => (userId && (entry.user_id === userId || entry.id === userId)) || (username && entry.username === username)) || null;
+  }, [leaderboard, user?.id, user?.username]);
+  const totalPoints = leaderboard.reduce((sum, row) => sum + entryPoints(row), 0);
+  const totalProfilePoints = leaderboard.reduce((sum, row) => sum + Number(row.profile_points || row.achievement_points || 0), 0);
+  const totalRatings = leaderboard.reduce((sum, row) => sum + entryEvents(row), 0);
+  const season = data?.season;
+
   if (loading) {
     return (
       <Screen>
@@ -109,19 +122,6 @@ export function SeasonPassScreen({ navigation }: Props) {
       </Screen>
     );
   }
-
-  const leaderboard = data?.standings ?? [];
-  const top3 = leaderboard.slice(0, 3);
-  const rest = leaderboard.slice(3);
-  const ownEntry = useMemo(() => {
-    const userId = user?.id;
-    const username = user?.username;
-    return leaderboard.find((entry) => (userId && (entry.user_id === userId || entry.id === userId)) || (username && entry.username === username)) || null;
-  }, [leaderboard, user?.id, user?.username]);
-  const totalPoints = leaderboard.reduce((sum, row) => sum + entryPoints(row), 0);
-  const totalProfilePoints = leaderboard.reduce((sum, row) => sum + Number(row.profile_points || row.achievement_points || 0), 0);
-  const totalRatings = leaderboard.reduce((sum, row) => sum + entryEvents(row), 0);
-  const season = data?.season;
 
   return (
     <Screen padded={false}>

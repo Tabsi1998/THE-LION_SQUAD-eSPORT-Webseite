@@ -2,7 +2,7 @@
   "expo": {
     "name": "LionsAPP",
     "slug": "lionsapp",
-    "version": "0.12.0-beta.2",
+    "version": "0.12.0-beta.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -23,7 +23,7 @@
     },
     "android": {
       "package": "at.lionsquad.app",
-      "versionCode": 28,
+      "versionCode": 29,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0A0A"

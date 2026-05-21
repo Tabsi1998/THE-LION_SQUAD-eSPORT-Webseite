@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.0-beta.3 - 2026-05-21
+
+- Mobile: Jahreswertung-Crash nach dem Laden behoben, indem die Hook-Reihenfolge in `SeasonPassScreen` stabilisiert wurde.
+- Mobile: Fast-Lap-Featured-Karte laesst lange Challenge-Namen sauber umbrechen und setzt Status/Startzeit untereinander statt gequetscht nebeneinander.
+- Mobile: Dashboard-Schnellzugriff neu sortiert: Nachrichten, Jahreswertung, News, Turniere, Fast Laps; Verein erscheint nur fuer Vereinsmitglieder.
+- Mobile: Events-, Teams- und Mehr-Tabs springen beim Tabwechsel oder erneutem Antippen wieder auf ihre Startansicht.
+
 ## 0.12.0-beta.2 - 2026-05-21
 
 - Mobile: Match-Hub zeigt Ergebnis- und Terminregeln klarer an und erklaert Staff-only, Online-Doppelmeldung und Hybrid-Ablauf ohne falsche Aktionsbuttons.

@@ -28,6 +28,11 @@ type TimelineItem = {
   targetId?: string;
   registrationStatus?: string | null;
 };
+type QuickActionItem = {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+};
 
 const emptyDashboard: MobileDashboardData = {
   me: { tournaments: [], events: [], matches: [], actions: [] },
@@ -61,6 +66,19 @@ export function DashboardScreen({ navigation }: Props) {
   const [error, setError] = useState("");
   const [offline, setOffline] = useState(false);
   const isGuest = isGuestUser(user);
+  const quickActions = useMemo(() => {
+    const actions: QuickActionItem[] = [
+      { icon: "chatbubbles-outline", label: "Nachrichten", onPress: () => navigation.navigate("More", { screen: "DirectMessages" }) },
+      { icon: "trophy-outline", label: "Jahreswertung", onPress: () => navigation.navigate("More", { screen: "SeasonPass" }) },
+      { icon: "newspaper-outline", label: "News", onPress: () => navigation.navigate("More", { screen: "NewsList" }) },
+      { icon: "calendar-outline", label: "Turniere", onPress: () => navigation.navigate("Tournaments", { screen: "TournamentList" }) },
+      { icon: "flash-outline", label: "Fast Laps", onPress: () => navigation.navigate("More", { screen: "FastLapList" }) },
+    ];
+    if (user?.is_club_member) {
+      actions.push({ icon: "shield-checkmark-outline", label: "Verein", onPress: () => navigation.navigate("More", { screen: "InfoCenter", params: { section: "benefits" } }) });
+    }
+    return actions;
+  }, [navigation, user?.is_club_member]);
 
   const load = useCallback(async () => {
     setError("");
@@ -175,12 +193,9 @@ export function DashboardScreen({ navigation }: Props) {
 
         <Section title="Schnellzugriff">
           <View style={styles.quickGrid}>
-            <QuickAction icon="chatbubbles-outline" label="Nachrichten" onPress={() => navigation.navigate("More", { screen: "DirectMessages" })} />
-            <QuickAction icon="notifications-outline" label="Alerts" onPress={() => navigation.navigate("More", { screen: "Notifications" })} />
-            <QuickAction icon="trophy-outline" label="Jahreswertung" onPress={() => navigation.navigate("More", { screen: "SeasonPass" })} />
-            <QuickAction icon="flash-outline" label="Fast Laps" onPress={() => navigation.navigate("More", { screen: "FastLapList" })} />
-            <QuickAction icon="newspaper-outline" label="News" onPress={() => navigation.navigate("More", { screen: "NewsList" })} />
-            <QuickAction icon="information-circle-outline" label="Verein" onPress={() => navigation.navigate("More", { screen: "InfoCenter", params: { section: "benefits" } })} />
+            {quickActions.map((action) => (
+              <QuickAction key={action.label} icon={action.icon} label={action.label} onPress={action.onPress} />
+            ))}
           </View>
         </Section>
 
