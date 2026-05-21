@@ -102,7 +102,7 @@ function targetFromUrl(url?: string | null): NotificationTarget | null {
   if (first === "f1" && parts[1] === "challenges" && parts[2]) return { area: "tournaments", screen: "FastLapDetail", params: { id: parts[2] } };
   if (first === "teams" && second) return { area: "teams", screen: "TeamDetail", params: { id: second } };
   if (first === "news" && second) return { area: "more", screen: "NewsDetail", params: { id: second } };
-  if (["u", "users", "user", "players", "player", "members", "member", "profiles"].includes(first || "") && second) {
+  if (["u", "users", "user", "players", "player", "profiles"].includes(first || "") && second) {
     return { area: "more", screen: "PublicProfile", params: { username: second } };
   }
   if (first === "profile" && second) return { area: "more", screen: "PublicProfile", params: { username: second } };

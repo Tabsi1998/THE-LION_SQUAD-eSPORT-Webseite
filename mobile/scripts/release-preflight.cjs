@@ -43,7 +43,9 @@ check(Boolean(sectionMatch && /(^|\n)- /.test(sectionMatch[1])), `CHANGELOG.md s
 check(releases.includes(version), `RELEASES.md historical list must contain ${version}`);
 
 if (tag) {
-  check(tag === `mobile-v${version}`, `Tag ${tag} must match mobile-v${version}`);
+  const baseTag = `mobile-v${version}`;
+  const buildTag = `${baseTag}-build${versionCode}`;
+  check(tag === baseTag || tag === buildTag, `Tag ${tag} must match ${baseTag} or ${buildTag}`);
 }
 
 if (version.includes("-alpha.")) {

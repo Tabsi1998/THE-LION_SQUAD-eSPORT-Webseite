@@ -6,6 +6,7 @@
 - Mobile: Event- und Content-Badges formatieren Backend-Phasen wie `announced` wieder als lesbare deutsche Labels.
 - Mobile: News-Details zeigen die Kurzbeschreibung nicht mehr doppelt vor dem eigentlichen Beitrag.
 - Mobile: News-Links und markierte Personen oeffnen Spieler- und Mitgliederprofile nativ in der App statt im Browser.
+- Mobile: Mitgliederseiten wie `/members/...` bleiben Website-/Vereinsprofile; nur normale Spieler-/Benutzerprofile werden nativ geoeffnet.
 - Mobile: Match-Staff kann in V2-Heats Nicht-erschienen/Forfeit und Disqualifikation direkt in der App markieren.
 - Mobile: Fast-Lap-Staff/Admins koennen Zeiten in der App eintragen, inklusive Fahrerwahl, Strecke, Strafzeit, Proof, Referenzwertung und Disqualifikation.
 - Mobile: Chat-Composer bleibt beim Schreiben besser oberhalb der Tastatur und scrollt beim Fokus zum unteren Nachrichtenbereich.

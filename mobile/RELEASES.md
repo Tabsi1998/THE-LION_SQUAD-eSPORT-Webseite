@@ -40,6 +40,12 @@ Regeln:
 
 Bei jedem Android-Release muss `expo.android.versionCode` in `mobile/app.json` um mindestens `1` erhoeht werden. Der `versionCode` ist der technische Android-Build-Zaehler und kann z.B. `15` sein, waehrend die sichtbare Version `0.1.1-alpha.1` ist.
 
+Soll dieselbe sichtbare App-Version als neuer Android-Build erneut gebaut werden, bleibt die SemVer-Version gleich und nur `expo.android.versionCode` steigt. Dafuer kann ein eindeutiger Build-Tag genutzt werden:
+
+```text
+mobile-v1.0.0-beta.1-build31
+```
+
 ## Release-Namen
 
 Interner Tag:
@@ -102,7 +108,7 @@ Historische Einordnung, neueste Version oben:
 In GitHub unter `Actions` den Workflow `Mobile APK Release` starten. Der Workflow erzeugt ein Artefakt mit diesem Namensschema:
 
 ```text
-LionsAPP-BETA-v1.0.0-build30-<commit>.apk
+LionsAPP-BETA-v1.0.0-build31-<commit>.apk
 ```
 
 ## Release-Signatur

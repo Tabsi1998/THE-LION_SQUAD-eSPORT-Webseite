@@ -28,7 +28,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: Web-Navigation, Jahreswertungsseite, Widget und Admin-Hinweise nutzen sichtbare Begriffe wie Jahreswertung/Jahrespunkte statt unklarem Season-Pass.
 - Seit der Planerstellung umgesetzt: Backend-Defaulttexte, Achievements, Seed-Daten und SEO-Breadcrumbs verwenden ebenfalls Jahreswertung/Jahrespunkte.
 - Seit der Planerstellung umgesetzt: `0.12.0-beta.3` ist vorbereitet, inklusive Android `versionCode` 29, Changelog, Release-Historie und Hotfixes fuer Jahreswertung, Fast-Lap-Layout, Schnellzugriff und Tab-Reset.
-- Seit der Planerstellung umgesetzt: `1.0.0-beta.1` ist als Final-Beta-Schnitt vorbereitet, inklusive Android `versionCode` 30, nativer Profilnavigation aus News-Links und sauber formatierten Event-/Content-Statuslabels.
+- Seit der Planerstellung umgesetzt: `1.0.0-beta.1` ist als Final-Beta-Schnitt vorbereitet, inklusive Android `versionCode` 31, nativer Profilnavigation aus News-Links und sauber formatierten Event-/Content-Statuslabels.
 - Seit der Planerstellung umgesetzt: Admin-Jahreswertung erklaert die echte V2-Punkteformel, Gewichtungen, Teilnehmerfaktoren, Streichresultate und Auto-/Manuell-Quellenwahl sichtbar im Editor.
 - Ergebnislogik ist teilweise vorhanden: Bei klassischen Online-Matches koennen Teilnehmer Ergebnisse melden. Stimmen die letzten zwei Reports ueberein, wird das Match automatisch abgeschlossen. Weichen sie ab, geht das Match auf Klaerung.
 - Staff-Erfassung ist vorhanden: Turnierleitung kann klassische Matches direkt aktualisieren und V2-Heats ueber `/api/matches/{id}/result` werten.
@@ -298,12 +298,12 @@ Fuer den naechsten APK-Build:
 Fuer den finalen Beta-Schnitt:
 
 - [x] Version auf `1.0.0-beta.1` setzen.
-- [x] Android `versionCode` auf `30` erhoehen.
+- [x] Android `versionCode` auf `31` erhoehen.
 - [x] App-Statuslabels fuer Event-/Content-Phasen erneut durch den deutschen Formatter fuehren.
-- [x] News-Profilverlinkungen fuer `/u`, `/players`, `/members`, `/users` und markierte Personen nativ in der App oeffnen.
+- [x] News-Profilverlinkungen fuer `/u`, `/players`, `/users` und markierte Personen nativ in der App oeffnen; `/members/...` bleibt als Vereinsprofil auf der Website.
 - [x] Changelog, Release-Historie und Smoke-Test-Checkliste aktualisieren.
 - [ ] APK-Build ueber GitHub Actions starten und Smoke-Test auf echtem Android-Geraet durchfuehren.
-- [ ] Release-Tag `mobile-v1.0.0-beta.1` setzen und pushen.
+- [ ] Release-Tag `mobile-v1.0.0-beta.1-build31` setzen und pushen.
 
 ## Prioritaet
 
