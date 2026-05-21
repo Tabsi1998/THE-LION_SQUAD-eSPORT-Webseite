@@ -234,7 +234,7 @@ export function DashboardScreen({ navigation }: Props) {
         ) : null}
 
         <Section
-          title="Season-Pass"
+          title="Jahreswertung"
           actionLabel="Rangliste"
           onAction={() => navigation.navigate("More", { screen: "SeasonPass" })}
         >
@@ -247,8 +247,8 @@ export function DashboardScreen({ navigation }: Props) {
                 <Ionicons name="trophy-outline" color={colors.gold} size={26} />
               </View>
               <View style={styles.flex}>
-                <Body style={styles.rowTitle}>Season {new Date().getFullYear()}</Body>
-                <Muted>Sammle Punkte durch Turniere, Events und Achievements.</Muted>
+                <Body style={styles.rowTitle}>Jahreswertung {new Date().getFullYear()}</Body>
+                <Muted>Punkte aus Turnieren, Events, Fast Laps und Erfolgen.</Muted>
                 <Muted style={styles.seasonHint}>Rangliste ansehen</Muted>
               </View>
             </Card>

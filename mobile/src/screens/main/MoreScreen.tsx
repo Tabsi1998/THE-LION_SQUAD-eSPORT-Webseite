@@ -24,8 +24,8 @@ type ModuleItem = {
 
 const featuredModules: ModuleItem[] = [
   {
-    title: "Season-Pass",
-    detail: "Punkte, Rangliste und Achievements der laufenden Season.",
+    title: "Jahreswertung",
+    detail: "Punkte, Rangliste und Jahres-Champion der laufenden Saison.",
     screen: "SeasonPass",
     badge: "Neu",
     icon: "trophy-outline",

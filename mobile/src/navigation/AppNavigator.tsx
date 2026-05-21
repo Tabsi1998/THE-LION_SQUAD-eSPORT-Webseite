@@ -188,7 +188,7 @@ function MoreStackScreen() {
       <MoreStack.Screen name="DirectMessages" component={DirectMessagesScreen} options={{ title: "Nachrichten" }} />
       <MoreStack.Screen name="DirectThread" component={DirectThreadScreen} options={({ route }) => ({ title: route.params.title || "Chat" })} />
       <MoreStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: "Benachrichtigungen" }} />
-      <MoreStack.Screen name="SeasonPass" component={SeasonPassScreen} options={{ title: "Season-Pass" }} />
+      <MoreStack.Screen name="SeasonPass" component={SeasonPassScreen} options={{ title: "Jahreswertung" }} />
     </MoreStack.Navigator>
   );
 }

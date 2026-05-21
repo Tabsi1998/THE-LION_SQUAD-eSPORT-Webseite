@@ -49,7 +49,7 @@ export function SeasonPassScreen({ navigation }: Props) {
       const { data: res } = await api.get<SeasonPassData>("/season-pass");
       setData(res || null);
     } catch (err) {
-      setError(errorMessage(err, "Season-Pass konnte nicht geladen werden."));
+      setError(errorMessage(err, "Jahreswertung konnte nicht geladen werden."));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -71,7 +71,7 @@ export function SeasonPassScreen({ navigation }: Props) {
   if (!data && error) {
     return (
       <Screen>
-        <EmptyState title="Season-Pass nicht verfügbar" detail={error} />
+        <EmptyState title="Jahreswertung nicht verfügbar" detail={error} />
       </Screen>
     );
   }
@@ -101,10 +101,10 @@ export function SeasonPassScreen({ navigation }: Props) {
             <Ionicons name="trophy-outline" color={colors.gold} size={38} />
           </View>
           <Title style={styles.heroTitle}>
-            {data?.season_name ?? `Season ${data?.season_year ?? new Date().getFullYear()}`}
+            {data?.season_name ?? `Jahreswertung ${data?.season_year ?? new Date().getFullYear()}`}
           </Title>
           <Muted style={styles.heroSub}>
-            {data?.description ?? "Sammle das ganze Jahr über Punkte durch Turniere, Events und Achievements. Der Beste gewinnt!"}
+            {data?.description ?? "Sammle das ganze Jahr über Punkte durch Turniere, Events, Fast Laps und Erfolge. Am Jahresende wird der Jahres-Champion gekürt."}
           </Muted>
           {data?.prize_description ? (
             <View style={styles.prizeBanner}>
@@ -159,14 +159,14 @@ export function SeasonPassScreen({ navigation }: Props) {
           <Card style={styles.card}>
             <View style={styles.emptyBox}>
               <Ionicons name="podium-outline" color={colors.muted} size={36} />
-              <Muted style={styles.emptyText}>Noch keine Einträge in dieser Season.</Muted>
+              <Muted style={styles.emptyText}>Noch keine Einträge in dieser Jahreswertung.</Muted>
             </View>
           </Card>
         ) : null}
 
         {/* Punkte-Erklärung */}
         <Card style={styles.card}>
-          <Heading>Wie bekomme ich Punkte?</Heading>
+          <Heading>Wie zählt die Jahreswertung?</Heading>
           <PointRow icon="trophy-outline" label="Turnier gewinnen" points="+50 Pkt." />
           <PointRow icon="medal-outline" label="Turnier Top 3" points="+25 Pkt." />
           <PointRow icon="people-outline" label="Turnier teilnehmen" points="+10 Pkt." />
