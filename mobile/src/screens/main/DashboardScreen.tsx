@@ -248,7 +248,7 @@ export function DashboardScreen({ navigation }: Props) {
               </View>
               <View style={styles.flex}>
                 <Body style={styles.rowTitle}>Jahreswertung {new Date().getFullYear()}</Body>
-                <Muted>Punkte aus Turnieren, Events, Fast Laps und Erfolgen.</Muted>
+                <Muted>Punkte aus Turnieren, Fast Laps, Events und gepflegten Wertungen.</Muted>
                 <Muted style={styles.seasonHint}>Rangliste ansehen</Muted>
               </View>
             </Card>

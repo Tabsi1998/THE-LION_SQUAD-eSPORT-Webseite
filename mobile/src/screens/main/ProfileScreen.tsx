@@ -342,7 +342,7 @@ export function ProfileScreen() {
               <View style={styles.statGrid}>
                 <Stat label="Gesamt" value={String(references.stats.total)} />
                 <Stat label="Podien" value={String(references.stats.podiums)} tone="gold" />
-                <Stat label="Punkte" value={String(references.stats.season_points || 0)} />
+                <Stat label="Jahrespkt." value={String(references.stats.season_points || 0)} />
               </View>
               <View style={styles.statGrid}>
                 <Stat label="Turniere" value={String(references.stats.tournaments)} />
