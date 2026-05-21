@@ -50,13 +50,13 @@ export default function DashboardPage() {
   const load = useCallback(async () => {
     const [m, n, p, c, pen] = await Promise.allSettled([
       api.get("/matches/upcoming"),
-      api.get("/admin/notifications"),
+      api.get("/notifications/me"),
       api.get("/prizes/me/open-count"),
       api.get("/users/me/profile-completeness"),
       api.get("/penalties/me"),
     ]);
     if (m.status === "fulfilled") setMatches(m.value.data);
-    if (n.status === "fulfilled") setNotifications(n.value.data);
+    if (n.status === "fulfilled") setNotifications(Array.isArray(n.value.data) ? n.value.data : (n.value.data?.items || []));
     if (p.status === "fulfilled") setOpenPrizes(p.value.data?.count || 0);
     if (c.status === "fulfilled") setCompleteness(c.value.data);
     if (pen.status === "fulfilled") setPenaltyCount(pen.value.data?.count || 0);

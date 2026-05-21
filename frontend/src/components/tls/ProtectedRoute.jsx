@@ -13,10 +13,10 @@ export function ProtectedRoute({ children, requireAdmin = false, requireMember =
   }
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname)}`} replace />;
   if (requireAdmin && !["tournament_admin", "club_admin", "superadmin"].includes(user.role)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/403" replace />;
   }
   if (requireModerator && !user.is_tournament_staff && !["moderator", "tournament_admin", "club_admin", "superadmin"].includes(user.role)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/403" replace />;
   }
   if (requireMember && !user.is_club_member && !["tournament_admin", "club_admin", "superadmin"].includes(user.role)) {
     return <Navigate to="/membership/join" replace />;

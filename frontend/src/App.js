@@ -11,9 +11,18 @@ import { CookieConsentProvider } from "@/components/tls/CookieConsent";
 import { AnalyticsHead } from "@/components/tls/AnalyticsHead";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 import { AppErrorBoundary } from "@/components/tls/AppErrorBoundary";
+import { BottomNav } from "@/components/tls/BottomNav";
 
 function RouteFallback() {
-  return <div className="min-h-screen flex items-center justify-center text-white/40 font-display tracking-widest">LADE …</div>;
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0A0A0A] gap-4">
+      <div className="relative w-12 h-12">
+        <div className="absolute inset-0 rounded-full border-2 border-[#29B6E8]/20" />
+        <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[#29B6E8] animate-spin" />
+      </div>
+      <span className="text-white/30 font-display tracking-[0.3em] text-xs uppercase">Lade …</span>
+    </div>
+  );
 }
 
 function MeRedirect() {
@@ -129,6 +138,7 @@ function App() {
             <ScrollManager />
             <Toaster theme="dark" position="top-right" richColors />
             <AppErrorBoundary>
+            <BottomNav />
             <Suspense fallback={<RouteFallback />}>
             <Routes>
           {/* Public — Verein */}
@@ -174,7 +184,7 @@ function App() {
           {/* User */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-          <Route path="/matches/:id" element={<ProtectedRoute><MatchHubPage /></ProtectedRoute>} />
+          <Route path="/hub/matches/:id" element={<ProtectedRoute><MatchHubPage /></ProtectedRoute>} />
           <Route path="/privacy-account" element={<ProtectedRoute><PrivacyAccountPage /></ProtectedRoute>} />
 
           {/* Member-only */}
