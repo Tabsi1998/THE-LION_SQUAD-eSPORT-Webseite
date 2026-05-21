@@ -9,7 +9,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: mobile Content-Karten wurden fuer Dashboard, Turnier-Hub, Fast-Lap-Liste, News- und Event-Kontext vereinheitlicht.
 - Seit der Planerstellung umgesetzt: mobile Statuslabels wurden erweitert, damit `approved`, `waiting_result`, Staff-only, Ergebnis-Konflikte und Rollen nicht mehr roh angezeigt werden.
 - Seit der Planerstellung umgesetzt: Fast-Lap-Details nutzen vorhandene Streckenbilder (`track.image_url`) mit Challenge-Banner als Fallback.
-- Seit der Planerstellung umgesetzt: Profil-Actions wurden kompakter gemacht, Logout ist eine separate Konto-Aktion, Tabs sind sichtbarer und die Mehr-Navigation resetet beim Tabwechsel.
+- Seit der Planerstellung umgesetzt: Profil-Actions wurden auf gemeinsame `ActionTile`/`ActionRow`-Bausteine umgestellt, Logout ist eine separate Konto-Aktion, Tabs sind sichtbarer und die Mehr-Navigation resetet beim Tabwechsel.
 - Seit der Planerstellung umgesetzt: Match-V2-Routen liefern Policy-Flags und blockieren Termin-Vorschlaege, wenn `schedule_mode=fixed_by_staff` gilt.
 - Seit der Planerstellung umgesetzt: Admin kann Turnier-Regeln auf Turnier- und Stage-Ebene konfigurieren; die Turnierliste zeigt Regelmodi kompakt an.
 - Seit der Planerstellung umgesetzt: mobile `StatusBadge` rendert Phase-Countdowns, Live-Indikator und dieselben Statusfarben konsistenter wie die Web-PhaseBadge.
@@ -129,7 +129,7 @@ App-Navigation:
 Gemeinsame UI-Muster:
 
 - [x] `StatusBadge` / `PhaseBadge` als App-Komponente nach Web-Vorbild nachziehen: Countdown, Live-Punkt, Statusfarben.
-- `ActionRow` fuer kompakte Icon-Actions statt grosser Buttons, z.B. Profil bearbeiten, Aktualisieren, Datenschutz, Logout.
+- [x] `ActionRow`/`ActionTile` fuer kompakte Icon-Actions statt grosser Buttons, z.B. Profil bearbeiten, Aktualisieren, Datenschutz, Logout.
 - `ContentCard` fuer Turnier/Event/Fast-Lap/News vereinheitlichen: Bild, Status, Datum, Primaraktion.
 - [x] `SegmentedTabs` fuer sichtbare Seitenwechsel statt versteckter horizontaler Scroll-Tabs als gemeinsamer Baustein einfuehren.
 - `EmptyState`, `SkeletonList`, Fehler- und Offline-Zustaende optisch angleichen.

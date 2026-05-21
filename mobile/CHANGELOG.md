@@ -4,7 +4,7 @@
 
 - Mobile: Match-Hub zeigt Ergebnis- und Terminregeln klarer an und erklaert Staff-only, Online-Doppelmeldung und Hybrid-Ablauf ohne falsche Aktionsbuttons.
 - Mobile: Dashboard, Turnier-Hub und Fast-Lap-Liste nutzen gemeinsame Content-Karten fuer konsistentere Medien-, Status- und Datumsdarstellung.
-- Mobile: Profil-Actions ueberarbeitet: Bearbeiten, Privat, Mails und Aktualisieren sind kompakter; Abmelden ist eine separate Konto-Aktion.
+- Mobile: Profil-Actions ueberarbeitet: Bearbeiten, Privat, Mails und Aktualisieren sind kompakter, nutzen gemeinsame Action-Bausteine; Abmelden ist eine separate Konto-Aktion.
 - Mobile: Statuslabels und Badge-Farbwahl fuer Ergebnisberichte, Klaerung, Staff-only, Rollen und Veroeffentlichungen erweitert.
 - Mobile: Jahreswertung nutzt jetzt die echten Season-Standings, trennt Jahrespunkte von Profilpunkten und zeigt Quellen/Statistiken nachvollziehbarer an.
 - Backend: Match-V2-Terminregeln respektieren `event_mode`, `result_entry_mode` und `schedule_mode`; feste Staff-Termine blockieren Spieler-Vorschlaege.
