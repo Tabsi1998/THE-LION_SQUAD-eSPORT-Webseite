@@ -1,4 +1,4 @@
-"""Season Pass v2 — points calculation and farming protection (Phase 7).
+"""Jahreswertung v2 — points calculation and farming protection (Phase 7).
 
 Formula:
     points = base_points × event_weight × participant_factor + bonus_points
@@ -202,7 +202,7 @@ async def _leaderboard_breakdowns(
 async def _achievement_summaries(db, user_ids: list[str]) -> dict[str, dict]:
     """Return non-negative profile achievement counts/points per user.
 
-    These are intentionally separate from Season-Pass points so the UI can
+    These are intentionally separate from Jahreswertung points so the UI can
     explain the difference instead of mixing two scoring systems silently.
     """
     if not user_ids:

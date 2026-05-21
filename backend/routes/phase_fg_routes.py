@@ -383,7 +383,7 @@ DEFAULT_NAV = {
         {"key": "esports", "label": "eSports", "visible": True, "order": 4, "children": [
             {"key": "tournaments", "to": "/tournaments", "label": "Turniere", "visible": True},
             {"key": "fastlap", "to": "/fastlap", "label": "Fast Lap", "visible": True},
-            {"key": "season", "to": "/seasons/current", "label": "Season Pass", "visible": True},
+            {"key": "season", "to": "/seasons/current", "label": "Jahreswertung", "visible": True},
         ]},
         {"key": "community", "label": "Community", "visible": True, "order": 5, "children": [
             {"key": "community_overview", "to": "/community", "label": "Übersicht", "visible": True},

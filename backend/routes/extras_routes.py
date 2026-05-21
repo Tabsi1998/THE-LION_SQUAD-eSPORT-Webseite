@@ -1199,7 +1199,7 @@ async def delete_season(sid: str, me: dict = Depends(require_admin())):
     return {"ok": True}
 
 
-# ---------- Phase 7: Season Pass v2 (Vereinsplattform spec) ----------
+# ---------- Phase 7: Jahreswertung v2 (Vereinsplattform spec) ----------
 @season_router.get("/v2/leaderboard")
 async def leaderboard_v2(
     season_id: str | None = None,

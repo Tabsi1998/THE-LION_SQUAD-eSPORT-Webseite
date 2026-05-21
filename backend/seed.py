@@ -401,11 +401,11 @@ async def seed_demo_data():
          "created_at": now_utc().isoformat()},
     ])
 
-    # Season 2026 — aggregated across both tournaments + F1 championship
+    # Jahreswertung 2026 — aggregated across both tournaments + F1 championship
     season_id = new_id()
     await db.seasons.insert_one({
         "id": season_id, "slug": "season-2026",
-        "name": "TLS Season 2026",
+        "name": "TLS Jahreswertung 2026",
         "description": "Die große THE LION SQUAD Meisterschaft: alle Turniere und Fast-Lap-Rennen der Saison zählen für den Champion-Titel.",
         "kind": "season", "status": "active",
         "tournament_ids": [mk_tid, smash_tid],

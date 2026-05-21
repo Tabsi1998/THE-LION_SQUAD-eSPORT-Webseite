@@ -345,7 +345,7 @@ async def season_meta(db, slug: str, base: dict, origin: str) -> dict:
         "type": "website",
     }
     meta["json_ld"] = webpage_json_ld(meta)
-    return add_breadcrumbs(meta, origin, [("Season Pass", "/seasons")], season.get("name"))
+    return add_breadcrumbs(meta, origin, [("Jahreswertung", "/seasons")], season.get("name"))
 
 
 async def gallery_meta(db, slug: str, base: dict, origin: str) -> dict:

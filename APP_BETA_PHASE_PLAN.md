@@ -16,6 +16,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: mobile `SegmentedTabs` ist als gemeinsamer Baustein eingefuehrt und in Event-Hub, Info-Center, Turnierdetail sowie oeffentlichem Profil genutzt.
 - Seit der Planerstellung umgesetzt: mobile Jahreswertung nutzt echte Season-Standings, zeigt Quellen/Statistiken und trennt Jahreswertungs- von Profilpunkten.
 - Seit der Planerstellung umgesetzt: Web-Navigation, Jahreswertungsseite, Widget und Admin-Hinweise nutzen sichtbare Begriffe wie Jahreswertung/Jahrespunkte statt unklarem Season-Pass.
+- Seit der Planerstellung umgesetzt: Backend-Defaulttexte, Achievements, Seed-Daten und SEO-Breadcrumbs verwenden ebenfalls Jahreswertung/Jahrespunkte.
 - Seit der Planerstellung umgesetzt: `0.12.0-beta.2` ist vorbereitet, inklusive Android `versionCode` 28, Changelog und Release-Historie.
 - Ergebnislogik ist teilweise vorhanden: Bei klassischen Online-Matches koennen Teilnehmer Ergebnisse melden. Stimmen die letzten zwei Reports ueberein, wird das Match automatisch abgeschlossen. Weichen sie ab, geht das Match auf Klaerung.
 - Staff-Erfassung ist vorhanden: Turnierleitung kann klassische Matches direkt aktualisieren und V2-Heats ueber `/api/matches/{id}/result` werten.
