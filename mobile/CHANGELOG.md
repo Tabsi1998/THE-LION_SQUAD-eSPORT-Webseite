@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-beta.10 - 2026-05-21
+
+- Mobile/CI: EAS-Projektkonfiguration fuer Android-Credentials ergaenzt und Firebase-Admin-Key-Dateien gegen versehentliche Commits geschuetzt.
+- Mobile/CI: Android-Release-Builds erzwingen jetzt eine Firebase/FCM `google-services.json`, damit keine APK ohne native Push-Initialisierung veroeffentlicht wird.
+- Mobile/Doku: Firebase-, Expo-FCM-v1- und GitHub-Secret-Schritte fuer echte Android-Push-Benachrichtigungen dokumentiert.
+
 ## 1.0.0-beta.9 - 2026-05-21
 
 - Mobile/CI: Android-Release blockiert den APK-Build nicht mehr, wenn noch kein `google-services.json` Secret fuer Firebase/FCM gesetzt ist.
