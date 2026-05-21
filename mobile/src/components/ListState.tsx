@@ -121,12 +121,14 @@ const styles = StyleSheet.create({
 
 const skeletonStyles = StyleSheet.create({
   card: {
-    backgroundColor: "#1A1A1A",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
     borderRadius: 8,
     overflow: "hidden",
   },
   image: {
-    backgroundColor: "#2A2A2A",
+    backgroundColor: "rgba(255, 255, 255, 0.07)",
     height: 138,
     width: "100%",
   },
@@ -135,7 +137,7 @@ const skeletonStyles = StyleSheet.create({
     padding: 14,
   },
   line: {
-    backgroundColor: "#2A2A2A",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
     borderRadius: 4,
     height: 12,
     width: "90%",
