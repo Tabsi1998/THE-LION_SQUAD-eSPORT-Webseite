@@ -3,10 +3,10 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Card } from "../../components/Card";
-import { EmptyState, LoadingState, SkeletonList } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
-import { Body, Heading, Muted } from "../../components/Text";
+import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
@@ -40,7 +40,6 @@ export function NewsScreen({ navigation }: Props) {
     load();
   }, [load]);
 
-  // Alle vorhandenen Kategorien aus den Daten extrahieren
   const categories = useMemo(() => {
     const cats = new Set<string>();
     for (const item of items) {
@@ -49,7 +48,6 @@ export function NewsScreen({ navigation }: Props) {
     return Array.from(cats).sort();
   }, [items]);
 
-  // Gefilterte + gesuchte Items
   const filtered = useMemo(() => {
     let result = items;
     if (activeCategory) {
@@ -68,6 +66,12 @@ export function NewsScreen({ navigation }: Props) {
     return result;
   }, [items, activeCategory, search]);
 
+  const featuredPost = useMemo(() => filtered.find((item) => item.pinned) || filtered[0] || null, [filtered]);
+  const listItems = useMemo(
+    () => (featuredPost ? filtered.filter((item) => item.id !== featuredPost.id) : filtered),
+    [featuredPost, filtered]
+  );
+
   if (loading) {
     return (
       <Screen>
@@ -79,18 +83,26 @@ export function NewsScreen({ navigation }: Props) {
   return (
     <Screen padded={false}>
       <FlatList
-        data={filtered}
+        data={listItems}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Heading>News</Heading>
+            <View style={styles.headerTop}>
+              <View style={styles.headerIcon}>
+                <Ionicons name="newspaper-outline" color={colors.black} size={20} />
+              </View>
+              <View style={styles.headerText}>
+                <Muted style={styles.eyebrow}>THE LION SQUAD</Muted>
+                <Title>News</Title>
+              </View>
+            </View>
+
             {error ? (
               <Muted style={styles.error}>{error}</Muted>
             ) : (
               <Muted>Aktuelle Ankündigungen, Updates und Vereinsnews.</Muted>
             )}
 
-            {/* Suchfeld */}
             <View style={styles.searchRow}>
               <Ionicons name="search-outline" color={colors.muted} size={16} style={styles.searchIcon} />
               <TextInput
@@ -109,20 +121,10 @@ export function NewsScreen({ navigation }: Props) {
               ) : null}
             </View>
 
-            {/* Kategorie-Filter Chips */}
             {categories.length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.chips}
-              >
-                <Pressable
-                  onPress={() => setActiveCategory(null)}
-                  style={[styles.chip, activeCategory === null && styles.chipActive]}
-                >
-                  <Muted style={[styles.chipText, activeCategory === null && styles.chipTextActive]}>
-                    Alle
-                  </Muted>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+                <Pressable onPress={() => setActiveCategory(null)} style={[styles.chip, activeCategory === null && styles.chipActive]}>
+                  <Muted style={[styles.chipText, activeCategory === null && styles.chipTextActive]}>Alle</Muted>
                 </Pressable>
                 {categories.map((cat) => (
                   <Pressable
@@ -130,31 +132,37 @@ export function NewsScreen({ navigation }: Props) {
                     onPress={() => setActiveCategory(activeCategory === cat ? null : cat)}
                     style={[styles.chip, activeCategory === cat && styles.chipActive]}
                   >
-                    <Muted style={[styles.chipText, activeCategory === cat && styles.chipTextActive]}>
-                      {cat}
-                    </Muted>
+                    <Muted style={[styles.chipText, activeCategory === cat && styles.chipTextActive]}>{cat}</Muted>
                   </Pressable>
                 ))}
               </ScrollView>
             ) : null}
 
-            {/* Ergebnis-Zähler */}
-            {(search || activeCategory) ? (
+            {search || activeCategory ? (
               <Muted style={styles.resultCount}>
                 {filtered.length} {filtered.length === 1 ? "Beitrag" : "Beiträge"} gefunden
               </Muted>
             ) : null}
+
+            {featuredPost ? (
+              <FeaturedNewsCard
+                post={featuredPost}
+                onPress={() => navigation.navigate("NewsDetail", { id: featuredPost.slug || featuredPost.id })}
+              />
+            ) : null}
           </View>
         }
         ListEmptyComponent={
-          <EmptyState
-            title={search || activeCategory ? "Keine Treffer" : "Keine News"}
-            detail={
-              search || activeCategory
-                ? "Versuche einen anderen Suchbegriff oder wähle eine andere Kategorie."
-                : "Sobald Beiträge veröffentlicht sind, erscheinen sie hier."
-            }
-          />
+          featuredPost ? null : (
+            <EmptyState
+              title={search || activeCategory ? "Keine Treffer" : "Keine News"}
+              detail={
+                search || activeCategory
+                  ? "Versuche einen anderen Suchbegriff oder wähle eine andere Kategorie."
+                  : "Sobald Beiträge veröffentlicht sind, erscheinen sie hier."
+              }
+            />
+          )
         }
         refreshControl={
           <RefreshControl
@@ -168,35 +176,63 @@ export function NewsScreen({ navigation }: Props) {
         }
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
-          <Pressable
-            onPress={() => navigation.navigate("NewsDetail", { id: item.slug || item.id })}
-            style={({ pressed }) => [pressed && styles.pressed]}
-          >
-            <Card style={styles.card}>
-              <MediaImage
-                uri={item.banner_url}
-                style={styles.image}
-                fallback={<Ionicons name="newspaper-outline" color={colors.gold} size={28} />}
-              />
-              <View style={styles.text}>
-                <View style={styles.top}>
-                  <Body style={styles.title}>{item.title}</Body>
-                  {item.pinned ? <Muted style={styles.badgePinned}>TOP</Muted> : null}
-                  {item.category ? <Muted style={styles.badgeCategory}>{item.category}</Muted> : null}
-                </View>
-                <Muted>
-                  {formatDate(item.published_at || item.created_at)}
-                </Muted>
-                {item.excerpt || item.summary ? (
-                  <Muted numberOfLines={3}>{item.excerpt || item.summary}</Muted>
-                ) : null}
-                <Muted style={styles.openHint}>Beitrag öffnen →</Muted>
-              </View>
-            </Card>
-          </Pressable>
+          <NewsCard post={item} onPress={() => navigation.navigate("NewsDetail", { id: item.slug || item.id })} />
         )}
       />
     </Screen>
+  );
+}
+
+function FeaturedNewsCard({ post, onPress }: { post: NewsPost; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
+      <Card style={styles.featuredCard}>
+        <MediaImage
+          uri={post.banner_url}
+          style={styles.featuredImage}
+          fallback={<Ionicons name="newspaper-outline" color={colors.gold} size={30} />}
+        />
+        <View style={styles.featuredBody}>
+          <View style={styles.top}>
+            {post.pinned ? <Muted style={styles.badgePinned}>TOP</Muted> : null}
+            {post.category ? <Muted style={styles.badgeCategory}>{post.category}</Muted> : null}
+          </View>
+          <Heading>{post.title}</Heading>
+          <Muted>{formatDate(post.published_at || post.created_at)}</Muted>
+          {post.excerpt || post.summary ? <Muted numberOfLines={3}>{post.excerpt || post.summary}</Muted> : null}
+          <View style={styles.openRow}>
+            <Muted style={styles.openHint}>Beitrag öffnen</Muted>
+            <Ionicons name="chevron-forward" color={colors.cyan} size={15} />
+          </View>
+        </View>
+      </Card>
+    </Pressable>
+  );
+}
+
+function NewsCard({ post, onPress }: { post: NewsPost; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
+      <Card style={styles.card}>
+        <MediaImage
+          uri={post.banner_url}
+          style={styles.image}
+          fallback={<Ionicons name="newspaper-outline" color={colors.gold} size={24} />}
+        />
+        <View style={styles.text}>
+          <View style={styles.top}>
+            <Body style={styles.title}>{post.title}</Body>
+            {post.category ? <Muted style={styles.badgeCategory}>{post.category}</Muted> : null}
+          </View>
+          <Muted>{formatDate(post.published_at || post.created_at)}</Muted>
+          {post.excerpt || post.summary ? <Muted numberOfLines={2}>{post.excerpt || post.summary}</Muted> : null}
+          <View style={styles.openRow}>
+            <Muted style={styles.openHint}>Beitrag öffnen</Muted>
+            <Ionicons name="chevron-forward" color={colors.cyan} size={15} />
+          </View>
+        </View>
+      </Card>
+    </Pressable>
   );
 }
 
@@ -207,9 +243,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   header: {
-    gap: 10,
-    marginBottom: 4,
+    gap: 12,
+    marginBottom: 2,
     paddingTop: 4,
+  },
+  headerTop: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  headerIcon: {
+    alignItems: "center",
+    backgroundColor: colors.cyan,
+    borderRadius: 10,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  headerText: {
+    flex: 1,
+    gap: 2,
+  },
+  eyebrow: {
+    color: colors.cyan,
+    fontWeight: "900",
+    textTransform: "uppercase",
   },
   searchRow: {
     alignItems: "center",
@@ -257,20 +315,34 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
   },
-  card: {
-    gap: 10,
-    padding: 0,
+  featuredCard: {
+    gap: 0,
     overflow: "hidden",
+    padding: 0,
   },
-  image: {
+  featuredImage: {
     borderWidth: 0,
-    height: 138,
+    height: 166,
     width: "100%",
   },
-  text: {
-    gap: 5,
+  featuredBody: {
+    gap: 6,
     padding: 14,
-    paddingTop: 4,
+  },
+  card: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  image: {
+    borderRadius: 8,
+    height: 88,
+    width: 92,
+  },
+  text: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
   },
   top: {
     alignItems: "flex-start",
@@ -281,7 +353,7 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     fontWeight: "900",
-    minWidth: "60%",
+    minWidth: "58%",
   },
   badgePinned: {
     backgroundColor: "rgba(240, 180, 41, 0.14)",
@@ -304,6 +376,11 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     paddingHorizontal: 7,
     paddingVertical: 3,
+  },
+  openRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4,
   },
   openHint: {
     color: colors.cyan,
