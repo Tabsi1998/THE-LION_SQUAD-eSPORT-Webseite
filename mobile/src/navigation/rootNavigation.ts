@@ -102,7 +102,10 @@ function targetFromUrl(url?: string | null): NotificationTarget | null {
   if (first === "f1" && parts[1] === "challenges" && parts[2]) return { area: "tournaments", screen: "FastLapDetail", params: { id: parts[2] } };
   if (first === "teams" && second) return { area: "teams", screen: "TeamDetail", params: { id: second } };
   if (first === "news" && second) return { area: "more", screen: "NewsDetail", params: { id: second } };
-  if ((first === "u" || first === "users" || first === "profile") && second) return { area: "more", screen: "PublicProfile", params: { username: second } };
+  if (["u", "users", "user", "players", "player", "members", "member", "profiles"].includes(first || "") && second) {
+    return { area: "more", screen: "PublicProfile", params: { username: second } };
+  }
+  if (first === "profile" && second) return { area: "more", screen: "PublicProfile", params: { username: second } };
   if (first === "profile" && parsed.query.includes("tab=inbox")) return { area: "more", screen: "DirectMessages" };
   if (first === "profile" && parsed.query.includes("tab=teams")) return { area: "teams", screen: "TeamList" };
   if (first === "profile") return { area: "profile" };

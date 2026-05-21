@@ -100,19 +100,22 @@ export function NewsDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>Markierte Personen</Heading>
             <View style={styles.mentionGrid}>
-              {post.mentioned_users.map((user) => (
-                <Pressable key={user.id || user.username} onPress={() => user.username ? navigation.navigate("PublicProfile", { username: user.username }) : undefined} style={({ pressed }) => [styles.mentionCard, pressed && styles.pressed]}>
-                  <MediaImage
-                    uri={user.avatar_url}
-                    style={styles.mentionAvatar}
-                    fallback={<Body style={styles.mentionInitial}>{(user.display_name || user.username || "?").slice(0, 1).toUpperCase()}</Body>}
-                  />
-                  <View style={styles.flex}>
-                    <Body style={styles.strong}>{user.display_name || user.username}</Body>
-                    {user.username ? <Muted>@{user.username}</Muted> : null}
-                  </View>
-                </Pressable>
-              ))}
+              {post.mentioned_users.map((user) => {
+                const profileTarget = user.username || user.id;
+                return (
+                  <Pressable key={user.id || user.username} onPress={() => profileTarget ? navigation.navigate("PublicProfile", { username: profileTarget }) : undefined} style={({ pressed }) => [styles.mentionCard, pressed && styles.pressed]}>
+                    <MediaImage
+                      uri={user.avatar_url}
+                      style={styles.mentionAvatar}
+                      fallback={<Body style={styles.mentionInitial}>{(user.display_name || user.username || "?").slice(0, 1).toUpperCase()}</Body>}
+                    />
+                    <View style={styles.flex}>
+                      <Body style={styles.strong}>{user.display_name || user.username}</Body>
+                      {user.username ? <Muted>@{user.username}</Muted> : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
             </View>
           </Card>
         ) : null}

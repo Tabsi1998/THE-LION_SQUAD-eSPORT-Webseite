@@ -34,7 +34,8 @@ export function StatusBadge({
 
   const remaining = targetMs ? formatRemaining(targetMs - now) : "";
   const prefix = remaining ? countdownPrefix(phaseCountdownKind(phase)) : "";
-  const text = [label || phaseLabel(phase) || formatStatus(status), prefix && `${prefix} ${remaining}`].filter(Boolean).join(" · ");
+  const statusLabel = formatStatus(label || phaseLabel(phase) || status);
+  const text = [statusLabel, prefix && `${prefix} ${remaining}`].filter(Boolean).join(" · ");
   const tone = toneForStatus(`${text} ${status || ""} ${phaseState(phase)}`);
   return (
     <View style={[styles.badge, toneStyles[tone].badge, style]}>
@@ -46,7 +47,7 @@ export function StatusBadge({
 
 function phaseLabel(phase?: PhaseLike | string | null) {
   if (!phase) return "";
-  return typeof phase === "string" ? phase : phase.label || "";
+  return typeof phase === "string" ? phase : phase.label || phase.state || "";
 }
 
 function phaseState(phase?: PhaseLike | string | null) {

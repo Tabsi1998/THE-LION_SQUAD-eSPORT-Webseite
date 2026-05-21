@@ -28,6 +28,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: Web-Navigation, Jahreswertungsseite, Widget und Admin-Hinweise nutzen sichtbare Begriffe wie Jahreswertung/Jahrespunkte statt unklarem Season-Pass.
 - Seit der Planerstellung umgesetzt: Backend-Defaulttexte, Achievements, Seed-Daten und SEO-Breadcrumbs verwenden ebenfalls Jahreswertung/Jahrespunkte.
 - Seit der Planerstellung umgesetzt: `0.12.0-beta.3` ist vorbereitet, inklusive Android `versionCode` 29, Changelog, Release-Historie und Hotfixes fuer Jahreswertung, Fast-Lap-Layout, Schnellzugriff und Tab-Reset.
+- Seit der Planerstellung umgesetzt: `1.0.0-beta.1` ist als Final-Beta-Schnitt vorbereitet, inklusive Android `versionCode` 30, nativer Profilnavigation aus News-Links und sauber formatierten Event-/Content-Statuslabels.
 - Seit der Planerstellung umgesetzt: Admin-Jahreswertung erklaert die echte V2-Punkteformel, Gewichtungen, Teilnehmerfaktoren, Streichresultate und Auto-/Manuell-Quellenwahl sichtbar im Editor.
 - Ergebnislogik ist teilweise vorhanden: Bei klassischen Online-Matches koennen Teilnehmer Ergebnisse melden. Stimmen die letzten zwei Reports ueberein, wird das Match automatisch abgeschlossen. Weichen sie ab, geht das Match auf Klaerung.
 - Staff-Erfassung ist vorhanden: Turnierleitung kann klassische Matches direkt aktualisieren und V2-Heats ueber `/api/matches/{id}/result` werten.
@@ -292,6 +293,18 @@ Fuer den naechsten APK-Build:
 - [ ] APK-Build ueber GitHub Actions starten und Smoke-Test auf echtem Android-Geraet durchfuehren.
 - [x] Release-Tag `mobile-v0.12.0-beta.3` gesetzt und gepusht.
 
+## Phase 11 - Final Beta 1.0.0-beta.1
+
+Fuer den finalen Beta-Schnitt:
+
+- [x] Version auf `1.0.0-beta.1` setzen.
+- [x] Android `versionCode` auf `30` erhoehen.
+- [x] App-Statuslabels fuer Event-/Content-Phasen erneut durch den deutschen Formatter fuehren.
+- [x] News-Profilverlinkungen fuer `/u`, `/players`, `/members`, `/users` und markierte Personen nativ in der App oeffnen.
+- [x] Changelog, Release-Historie und Smoke-Test-Checkliste aktualisieren.
+- [ ] APK-Build ueber GitHub Actions starten und Smoke-Test auf echtem Android-Geraet durchfuehren.
+- [ ] Release-Tag `mobile-v1.0.0-beta.1` setzen und pushen.
+
 ## Prioritaet
 
 1. Backend-Regelmodell fuer Ergebnis- und Terminrechte.
@@ -303,4 +316,4 @@ Fuer den naechsten APK-Build:
 7. Profil und Mehr-Navigation modernisieren.
 8. Jahreswertung benennen und in App/Web klar darstellen.
 9. Staff-Dashboard, QR-Flows und Beta-Feedback als naechste Erweiterungen vorbereiten.
-10. Beta.3 bauen und testen.
+10. Final Beta 1.0.0 bauen und testen.
