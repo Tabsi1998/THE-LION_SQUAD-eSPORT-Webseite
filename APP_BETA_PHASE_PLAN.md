@@ -21,6 +21,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: Offline-Fallbacks markieren Cache-Daten sichtbar und persistieren wichtige Listen wie News, Events, Turniere und Fast-Laps.
 - Seit der Planerstellung umgesetzt: App-Hauptnavigation benennt den Turnier-Tab als Event-Hub und Dashboard-Schnellzugriff priorisiert Jahreswertung und News.
 - Seit der Planerstellung umgesetzt: mobile Bottom-Tabbar nutzt einen Website-nahen Glas-Surface-Layer, versteckt sich bei Tastatur und die Glocke wurde visuell angeglichen.
+- Seit der Planerstellung umgesetzt: Website-Fehlerseiten fuehren mit Quick-Links zu Start, Events, Turnieren, News und Jahreswertung zurueck.
 - Seit der Planerstellung umgesetzt: Web-Navigation, Jahreswertungsseite, Widget und Admin-Hinweise nutzen sichtbare Begriffe wie Jahreswertung/Jahrespunkte statt unklarem Season-Pass.
 - Seit der Planerstellung umgesetzt: Backend-Defaulttexte, Achievements, Seed-Daten und SEO-Breadcrumbs verwenden ebenfalls Jahreswertung/Jahrespunkte.
 - Seit der Planerstellung umgesetzt: `0.12.0-beta.2` ist vorbereitet, inklusive Android `versionCode` 28, Changelog und Release-Historie.
@@ -187,7 +188,8 @@ Performance und technische Qualitaet:
 - Bundle pruefen: Admin-Schwergewichte lazy laden, Display-Seiten separat halten, Editor/Charts nur bei Bedarf laden.
 - Core-Web-Vitals-Ziele definieren: schnelle Startseite, stabile Layouts ohne Spruenge, schnelle Detailseiten.
 - API-Responses fuer Listen vereinheitlichen: kompakte Karten-Daten statt komplette Detailobjekte, Pagination/Filter sauber.
-- Fehlerseiten und Ladezustand modernisieren: 404/403/500 mit klarer Rueckfuehrung statt nur "nicht gefunden".
+- [x] Fehlerseiten modernisieren: 404/403/500 mit klarer Rueckfuehrung zu Start, Events, Turnieren, News und Jahreswertung.
+- Ladezustaende modernisieren und vereinheitlichen.
 
 SEO, Sharing und Content-Betrieb:
 
