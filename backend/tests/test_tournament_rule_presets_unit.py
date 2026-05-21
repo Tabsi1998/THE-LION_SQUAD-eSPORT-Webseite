@@ -30,6 +30,11 @@ def test_local_staff_only_preset_has_no_rule_warning():
 
     assert "rule_mode_conflict" not in _warning_types(report)
     assert report["warning_count"] == 0
+    assert report["rule_policy"] == {
+        "event_mode": "local",
+        "result_entry_mode": "staff_only",
+        "schedule_mode": "fixed_by_staff",
+    }
 
 
 def test_online_staff_only_warns_that_players_cannot_report():

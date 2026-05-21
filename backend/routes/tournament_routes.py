@@ -311,6 +311,11 @@ def _planning_report(matches: list[dict], tournament: dict | None = None) -> dic
                 })
     return {
         "ok": not errors,
+        "rule_policy": {
+            "event_mode": event_mode,
+            "result_entry_mode": result_entry_mode,
+            "schedule_mode": schedule_mode,
+        },
         "error_count": len(errors),
         "warning_count": len(warnings),
         "checked_matches": len(active_matches),
