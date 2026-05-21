@@ -53,7 +53,7 @@ export function NotificationsScreen({ navigation }: Props) {
               <View style={styles.meta}>
                 {item.kind ? <Muted style={styles.kind}>{item.kind}</Muted> : null}
                 {item.created_at ? <Muted>{formatDateTime(item.created_at)}</Muted> : null}
-                <Muted style={styles.openHint}>Oeffnen</Muted>
+                <Muted style={styles.openHint}>Öffnen</Muted>
               </View>
             </Card>
           </Pressable>

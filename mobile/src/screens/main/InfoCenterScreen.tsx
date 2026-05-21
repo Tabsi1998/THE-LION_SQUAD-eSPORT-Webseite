@@ -84,31 +84,33 @@ export function InfoCenterScreen({ navigation, route }: Props) {
 }
 
 function Sponsors({ items }: { items: any[] }) {
+  if (!items.length) return null;
   return (
-    <>
-      {items.map((sponsor) => (
-        <LinkedCard key={sponsor.id} url={sponsor.url || sponsor.link}>
-          <Card style={styles.card}>
-            <View style={styles.logoRow}>
-              <MediaImage
-                uri={sponsor.logo_url}
-                resizeMode="contain"
-                style={styles.logoBox}
-                fallback={<Body style={styles.logoFallback}>{(sponsor.name || "?").slice(0, 2).toUpperCase()}</Body>}
-              />
-              <View style={styles.logoTextWrap}>
-                <View style={styles.cardTop}>
-                  <Heading>{sponsor.name}</Heading>
-                  <Badge label={sponsor.tier || "Sponsor"} />
-                </View>
-                <Muted>{sponsor.description || sponsor.effective_status || "Aktiver Unterstützer"}</Muted>
-                {sponsor.url || sponsor.link ? <Muted style={styles.link}>Website öffnen</Muted> : null}
-              </View>
-            </View>
-          </Card>
-        </LinkedCard>
-      ))}
-    </>
+    <View style={styles.sponsorGrid}>
+      {items.map((sponsor) => {
+        const href = normalizeLink(sponsor.url || sponsor.link);
+        return (
+          <Pressable
+            key={sponsor.id}
+            onPress={href ? () => Linking.openURL(href) : undefined}
+            style={({ pressed }) => [styles.sponsorTile, pressed && styles.pressed]}
+            accessibilityLabel={`${sponsor.name} – Website öffnen`}
+            accessibilityRole="link"
+          >
+            <MediaImage
+              uri={sponsor.logo_url}
+              resizeMode="contain"
+              style={styles.sponsorLogo}
+              fallback={
+                <Body style={styles.sponsorFallback}>
+                  {(sponsor.name || "?").slice(0, 2).toUpperCase()}
+                </Body>
+              }
+            />
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -171,7 +173,7 @@ function Benefits({ isMember, membership, items }: { isMember: boolean; membersh
           <Heading>{isMember ? "Mitgliedschaft aktiv" : "Mitgliedschaft erforderlich"}</Heading>
           <Badge label={isMember ? status : "Gesperrt"} />
         </View>
-        <Muted>{isMember ? `Vorteile sind fuer deinen Account freigeschaltet${type ? ` (${type.replace(/_/g, " ")})` : ""}.` : "Diese Vorteile werden freigeschaltet, wenn der Account als Vereinsmitglied markiert ist."}</Muted>
+        <Muted>{isMember ? `Vorteile sind für deinen Account freigeschaltet${type ? ` (${type.replace(/_/g, " ")})` : ""}.` : "Diese Vorteile werden freigeschaltet, wenn der Account als Vereinsmitglied markiert ist."}</Muted>
       </Card>
       {items.map((benefit) => (
         <Card key={benefit.id || benefit.title} style={[styles.card, !isMember && (benefit.memberOnly || benefit.member_only) && styles.locked]}>
@@ -226,7 +228,7 @@ function Profiles({ items, onOpen }: { items: any[]; onOpen: (profile: any) => v
             {(profile.games || profile.favorite_games || []).map((game: string) => <Badge key={game} label={game} />)}
           </View>
           <Muted>{profile.achievements_count ?? profile.achievements?.length ?? 0} Achievements hinterlegt</Muted>
-          <Muted style={styles.link}>Profil oeffnen</Muted>
+          <Muted style={styles.link}>Profil öffnen</Muted>
           </Card>
         </Pressable>
       ))}
@@ -379,5 +381,31 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+  },
+  // Sponsoren-Grid: nur Logos, klickbar
+  sponsorGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  sponsorTile: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 80,
+    justifyContent: "center",
+    width: "47%",
+  },
+  sponsorLogo: {
+    borderRadius: 8,
+    height: 56,
+    width: "90%",
+  },
+  sponsorFallback: {
+    color: colors.cyan,
+    fontSize: 22,
+    fontWeight: "900",
   },
 });

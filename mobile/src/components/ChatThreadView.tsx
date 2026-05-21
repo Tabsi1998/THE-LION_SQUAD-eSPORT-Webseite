@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, errorMessage } from "../lib/api";
 import { formatDate } from "../lib/format";
 import type { ContentTarget } from "../lib/contentLinks";
@@ -40,6 +41,9 @@ export function ChatThreadView({
   const [error, setError] = useState("");
   const [allowed, setAllowed] = useState(true);
   const scrollRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
+  // Auf Android: Tastatur-Offset = Header-Höhe (ca. 56px) + StatusBar
+  const keyboardOffset = Platform.OS === "ios" ? insets.top + 44 : 0;
 
   const load = useCallback(async () => {
     setError("");
@@ -103,8 +107,16 @@ export function ChatThreadView({
   if (loading) return <LoadingState label="Chat wird geladen ..." />;
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.wrap}>
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.messages}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={keyboardOffset}
+      style={styles.wrap}
+    >
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.messages}
+        keyboardShouldPersistTaps="handled"
+      >
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
         {messages.length ? messages.map((message) => (
           <MessageBubble

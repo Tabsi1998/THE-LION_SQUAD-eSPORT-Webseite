@@ -120,7 +120,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
 
         {post.linked_tournaments?.length ? (
           <Card style={styles.card}>
-            <Heading>Verknuepfte Turniere</Heading>
+            <Heading>Verknüpfte Turniere</Heading>
             {post.linked_tournaments.map((tournament) => (
               <Pressable key={tournament.id} onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: tournament.slug || tournament.id } })} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
                 <View style={styles.flex}>
@@ -135,7 +135,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
 
         {post.linked_events?.length ? (
           <Card style={styles.card}>
-            <Heading>Verknuepfte Events</Heading>
+            <Heading>Verknüpfte Events</Heading>
             {post.linked_events.map((event) => (
               <Pressable key={event.id} onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id } })} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
                 <View style={styles.flex}>
@@ -150,7 +150,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
 
         {post.linked_f1_challenges?.length ? (
           <Card style={styles.card}>
-            <Heading>Verknuepfte Fast Laps</Heading>
+            <Heading>Verknüpfte Fast Laps</Heading>
             {post.linked_f1_challenges.map((challenge) => (
               <Pressable key={challenge.id} onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "FastLapDetail", params: { id: challenge.slug || challenge.id } })} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
                 <View style={styles.flex}>

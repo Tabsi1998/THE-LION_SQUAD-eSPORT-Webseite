@@ -62,7 +62,7 @@ type PublicProfilePayload = {
 type AchievementPayload = { awards?: any[]; groups?: any[] };
 
 const tabs: Array<{ key: TabKey; label: string }> = [
-  { key: "overview", label: "Uebersicht" },
+  { key: "overview", label: "Übersicht" },
   { key: "achievements", label: "Erfolge" },
   { key: "tournaments", label: "Turniere" },
   { key: "fastlaps", label: "Fast Laps" },
@@ -182,7 +182,7 @@ export function PublicProfileScreen({ navigation, route }: Props) {
             </Card>
 
             <InfoGrid
-              title="Oeffentliche Infos"
+              title="Öffentliche Infos"
               rows={[
                 ["Mitglied seit", formatDate(profile.created_at)],
                 ["Geburtstag", profile.birth_date ? formatDate(profile.birth_date) : ""],
@@ -271,7 +271,7 @@ function AchievementsTab({ awards, groups }: { awards: any[]; groups: any[] }) {
 }
 
 function TournamentTab({ items, onOpen }: { items: any[]; onOpen: (item: any) => void }) {
-  if (!items.length) return <EmptyState title="Keine Turniere" detail="Keine oeffentliche Turnierhistorie sichtbar." />;
+  if (!items.length) return <EmptyState title="Keine Turniere" detail="Keine öffentliche Turnierhistorie sichtbar." />;
   return (
     <View style={styles.list}>
       {items.map((item) => (
@@ -293,7 +293,7 @@ function TournamentTab({ items, onOpen }: { items: any[]; onOpen: (item: any) =>
 }
 
 function FastLapTab({ items, onOpen }: { items: any[]; onOpen: (item: any) => void }) {
-  if (!items.length) return <EmptyState title="Keine Fast-Lap-Zeiten" detail="Keine oeffentlichen Fast-Lap-Bestzeiten sichtbar." />;
+  if (!items.length) return <EmptyState title="Keine Fast-Lap-Zeiten" detail="Keine öffentlichen Fast-Lap-Bestzeiten sichtbar." />;
   return (
     <View style={styles.list}>
       {items.map((item, index) => (
@@ -315,7 +315,7 @@ function FastLapTab({ items, onOpen }: { items: any[]; onOpen: (item: any) => vo
 }
 
 function TeamTab({ items, onOpen }: { items: any[]; onOpen: (item: any) => void }) {
-  if (!items.length) return <EmptyState title="Keine Teams" detail="Keine oeffentlichen Teamdaten sichtbar." />;
+  if (!items.length) return <EmptyState title="Keine Teams" detail="Keine öffentlichen Teamdaten sichtbar." />;
   return (
     <View style={styles.list}>
       {items.map((team) => (

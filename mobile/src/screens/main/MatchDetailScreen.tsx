@@ -58,10 +58,10 @@ type V2ResultRow = {
 };
 
 const scheduleLabels: Record<string, string> = {
-  accepted: "Termin bestaetigt",
+  accepted: "Termin bestätigt",
   countered: "Gegenvorschlag",
   declined: "Abgelehnt",
-  escalated: "Turnierleitung noetig",
+  escalated: "Turnierleitung nötig",
   proposed: "Vorschlag offen",
 };
 
@@ -169,7 +169,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     if (action === "counter") {
       const scheduledAt = parseDateInput(counterAt);
       if (!scheduledAt) {
-        setError("Bitte fuer den Gegenvorschlag Datum und Uhrzeit eingeben.");
+        setError("Bitte für den Gegenvorschlag Datum und Uhrzeit eingeben.");
         return;
       }
       payload.scheduled_at = scheduledAt;
@@ -361,11 +361,11 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           {page.can_act ? (
             <>
               <FormInput label="Vorschlag" value={proposalAt} onChangeText={setProposalAt} placeholder="2026-05-19 20:00" />
-              <FormInput label="Notiz optional" value={proposalNote} onChangeText={setProposalNote} placeholder="z.B. nach 20:00 Uhr moeglich" />
+              <FormInput label="Notiz optional" value={proposalNote} onChangeText={setProposalNote} placeholder="z.B. nach 20:00 Uhr möglich" />
               <Button label={busy ? "Sendet ..." : "Termin vorschlagen"} onPress={propose} disabled={busy} />
             </>
           ) : (
-            <Muted>Termine koennen Teilnehmer, Team-Captains oder Turnierleitung vorschlagen.</Muted>
+            <Muted>Termine können Teilnehmer, Team-Captains oder Turnierleitung vorschlagen.</Muted>
           )}
           {pendingProposals.length ? (
             <View style={styles.stack}>
@@ -443,7 +443,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                     </Pressable>
                   ))}
                 </View>
-                <FormInput label="Forfeit-Begruendung" value={forfeitReason} onChangeText={setForfeitReason} placeholder="Mindestens 5 Zeichen" />
+                <FormInput label="Forfeit-Begründung" value={forfeitReason} onChangeText={setForfeitReason} placeholder="Mindestens 5 Zeichen" />
                 <Button label="Forfeit speichern" variant="danger" onPress={submitForfeit} disabled={busy || forfeitReason.trim().length < 5 || !forfeitWinnerId} />
               </>
             ) : null}
@@ -459,7 +459,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
               <Button label="Senden" onPress={sendMessage} disabled={busy || !message.trim()} />
             </View>
           ) : (
-            <Muted>Schreiben koennen Teilnehmer, Team-Captains oder Turnierleitung.</Muted>
+            <Muted>Schreiben können Teilnehmer, Team-Captains oder Turnierleitung.</Muted>
           )}
         </Card>
       </ScrollView>

@@ -124,7 +124,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
     try {
       await Linking.openURL(event.registration_url);
     } catch {
-      setError("Externer Anmeldelink konnte nicht geoeffnet werden.");
+      setError("Externer Anmeldelink konnte nicht geöffnet werden.");
     }
   }, [event?.registration_url]);
 
@@ -198,15 +198,15 @@ export function EventDetailScreen({ navigation, route }: Props) {
               {event.registration_summary?.reserved_seats || event.registration_summary?.registered_count || 0} reserviert
               {event.registration_summary?.registered_count != null ? ` · ${event.registration_summary.registered_count} Anmeldungen` : ""}
               {event.registration_summary?.companion_count ? ` · ${event.registration_summary.companion_count} Begleitp.` : ""}
-              {event.registration_summary?.max_participants ? ` · ${event.registration_summary.max_participants} Plaetze` : ""}
+              {event.registration_summary?.max_participants ? ` · ${event.registration_summary.max_participants} Plätze` : ""}
               {event.registration_summary?.spots_left != null ? ` · ${event.registration_summary.spots_left} frei` : ""}
             </Muted>
             <Muted>{registration.label}</Muted>
             {event.registration_opens_at || event.registration_closes_at ? (
               <Muted>
-                {event.registration_opens_at ? `Oeffnet: ${formatDateTime(event.registration_opens_at)}` : ""}
+                {event.registration_opens_at ? `Öffnet: ${formatDateTime(event.registration_opens_at)}` : ""}
                 {event.registration_opens_at && event.registration_closes_at ? " · " : ""}
-                {event.registration_closes_at ? `Schliesst: ${formatDateTime(event.registration_closes_at)}` : ""}
+                {event.registration_closes_at ? `Schließt: ${formatDateTime(event.registration_closes_at)}` : ""}
               </Muted>
             ) : null}
             {event.registration_url ? (
@@ -215,7 +215,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
               <>
                 <Muted style={styles.success}>
                   {formatStatus(event.own_registration?.status)}
-                  {event.own_registration?.seat_count ? ` · ${event.own_registration.seat_count} Platz/Plaetze` : ""}
+                  {event.own_registration?.seat_count ? ` · ${event.own_registration.seat_count} Platz/Plätze` : ""}
                   {event.own_registration?.companion_count ? ` · ${event.own_registration.companion_count} Begleitp.` : ""}
                 </Muted>
                 <Button label={busy ? "Wird abgemeldet ..." : "Vom Event abmelden"} variant="secondary" onPress={unregister} disabled={busy} />
@@ -243,7 +243,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
                   maxLength={500}
                   style={styles.noteInput}
                   onChangeText={setNote}
-                  placeholder="z.B. komme etwas spaeter"
+                  placeholder="z.B. komme etwas später"
                 />
                 <Button label={busy ? "Wird angemeldet ..." : "Zum Event anmelden"} onPress={register} disabled={busy} />
               </>
@@ -260,7 +260,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
 
         {event.tournaments?.length ? (
           <Card style={styles.card}>
-            <Heading>Verknuepfte Turniere</Heading>
+            <Heading>Verknüpfte Turniere</Heading>
             {event.tournaments.map((tournament) => (
               <Pressable key={tournament.id} onPress={() => navigation.navigate("TournamentDetail", { id: tournament.slug || tournament.id })} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
                 <View style={styles.flex}>

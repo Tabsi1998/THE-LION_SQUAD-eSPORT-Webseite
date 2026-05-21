@@ -243,32 +243,32 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 <Muted>{registration.label}</Muted>
                 {tournament.registration_open_from || tournament.registration_open_until ? (
                   <Muted>
-                    {tournament.registration_open_from ? `Oeffnet: ${formatDateTime(tournament.registration_open_from)}` : ""}
+                    {tournament.registration_open_from ? `Öffnet: ${formatDateTime(tournament.registration_open_from)}` : ""}
                     {tournament.registration_open_from && tournament.registration_open_until ? " · " : ""}
                     {tournament.registration_open_until ? `Endet: ${formatDateTime(tournament.registration_open_until)}` : ""}
                   </Muted>
                 ) : null}
                 {clubMemberBlocked && !registered ? (
-                  <Muted style={styles.warning}>Dieses Turnier ist fuer externe Teilnehmer vorgesehen. Vereinsmitglieder koennen sich hier nicht selbst anmelden.</Muted>
+                  <Muted style={styles.warning}>Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.</Muted>
                 ) : null}
                 {isTeamTournament && canSelfRegister && !manageableTeams.length ? (
-                  <Muted style={styles.errorText}>Fuer dieses Team-Turnier brauchst du ein Team, das du als Leader oder Co-Leader verwalten darfst.</Muted>
+                  <Muted style={styles.errorText}>Für dieses Team-Turnier brauchst du ein Team, das du als Leader oder Co-Leader verwalten darfst.</Muted>
                 ) : null}
                 {guest ? (
                   <Muted>Zum Anmelden bitte mit deinem Account einloggen.</Muted>
                 ) : registered ? (
                   <>
                     <Muted style={styles.success}>Du bist angemeldet: {formatStatus(ownRegistration?.status)}</Muted>
-                    {canCheckIn ? <Button label={busy ? "Check-in laeuft ..." : "Jetzt einchecken"} onPress={checkIn} disabled={busy} /> : null}
+                    {canCheckIn ? <Button label={busy ? "Check-in läuft ..." : "Jetzt einchecken"} onPress={checkIn} disabled={busy} /> : null}
                     {canSelfUnregister ? (
                       <Button label={busy ? "Wird abgemeldet ..." : "Vom Turnier abmelden"} variant="secondary" onPress={unregister} disabled={busy} />
                     ) : (
-                      <Muted>Abmeldung ist fuer diese Anmeldung aktuell nicht moeglich.</Muted>
+                      <Muted>Abmeldung ist für diese Anmeldung aktuell nicht möglich.</Muted>
                     )}
                   </>
                 ) : canSelfRegister ? (
                   <>
-                    <Muted>Mit der Anmeldung akzeptierst du Regeln und Datenschutz fuer dieses Turnier.</Muted>
+                    <Muted>Mit der Anmeldung akzeptierst du Regeln und Datenschutz für dieses Turnier.</Muted>
                     <Button
                       label={busy ? "Wird angemeldet ..." : isTeamTournament ? "Team anmelden" : "Zum Turnier anmelden"}
                       onPress={startRegistration}
@@ -276,7 +276,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                     />
                   </>
                 ) : (
-                  <Muted>Anmeldung ist aktuell nicht moeglich.</Muted>
+                  <Muted>Anmeldung ist aktuell nicht möglich.</Muted>
                 )}
               </View>
               <View style={styles.statGrid}>
@@ -424,7 +424,7 @@ function RegistrationModal({
             <View style={styles.modalHead}>
               <View style={styles.flex}>
                 <Heading>Turnier-Anmeldung</Heading>
-                <Muted>{isTeamTournament ? "Waehle dein verwaltbares Team aus." : `${tournament.game?.display_name || tournament.game?.name || "Dieses Spiel"} benoetigt diese Angaben.`}</Muted>
+                <Muted>{isTeamTournament ? "Wähle dein verwaltbares Team aus." : `${tournament.game?.display_name || tournament.game?.name || "Dieses Spiel"} benötigt diese Angaben.`}</Muted>
               </View>
               <Pressable onPress={onClose} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
                 <Body style={styles.closeText}>x</Body>
@@ -443,7 +443,7 @@ function RegistrationModal({
                     <View style={[styles.radio, teamId === team.id && styles.radioActive]} />
                   </Pressable>
                 )) : (
-                  <Muted style={styles.errorText}>Du hast aktuell kein Team, das du fuer dieses Turnier anmelden darfst.</Muted>
+                  <Muted style={styles.errorText}>Du hast aktuell kein Team, das du für dieses Turnier anmelden darfst.</Muted>
                 )}
               </View>
             ) : null}
@@ -464,7 +464,7 @@ function RegistrationModal({
             ) : null}
 
             <Muted>Mit der Anmeldung akzeptierst du die Turnierregeln und die Datenschutzhinweise.</Muted>
-            {missingRequired ? <Muted style={styles.errorText}>Bitte alle Pflicht-IDs ausfuellen.</Muted> : null}
+            {missingRequired ? <Muted style={styles.errorText}>Bitte alle Pflicht-IDs ausfüllen.</Muted> : null}
 
             <View style={styles.formActions}>
               <Button label="Abbrechen" variant="secondary" onPress={onClose} disabled={busy} />

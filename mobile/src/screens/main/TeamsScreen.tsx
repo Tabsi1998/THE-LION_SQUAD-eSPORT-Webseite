@@ -45,15 +45,6 @@ export function TeamsScreen({ navigation }: Props) {
     load();
   }, [load]);
 
-  if (loading) {
-    return (
-      <Screen>
-        <LoadingState label="Teams werden geladen ..." />
-      </Screen>
-    );
-  }
-
-  const list = myTeams.length ? myTeams : allTeams;
   const actOnInvite = useCallback(async (invite: TeamInvite, action: "accept" | "decline") => {
     setError("");
     try {
@@ -64,6 +55,16 @@ export function TeamsScreen({ navigation }: Props) {
       setError(errorMessage(err, "Einladung konnte nicht verarbeitet werden."));
     }
   }, [load]);
+
+  if (loading) {
+    return (
+      <Screen>
+        <LoadingState label="Teams werden geladen ..." />
+      </Screen>
+    );
+  }
+
+  const list = myTeams.length ? myTeams : allTeams;
 
   return (
     <Screen>

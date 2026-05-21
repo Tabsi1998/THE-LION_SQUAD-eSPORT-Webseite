@@ -169,14 +169,14 @@ export function TeamDetailScreen({ navigation, route }: Props) {
 
   const setRole = useCallback((member: TeamMember, role: "member" | "co_leader") => {
     if (!team) return;
-    showActionResult(() => api.post(`/teams/${team.id}/members/${member.id}/role`, { role }), role === "co_leader" ? "Co-Leader gesetzt." : "Rolle zurueckgesetzt.");
+    showActionResult(() => api.post(`/teams/${team.id}/members/${member.id}/role`, { role }), role === "co_leader" ? "Co-Leader gesetzt." : "Rolle zurückgesetzt.");
   }, [showActionResult, team]);
 
   const transferLeader = useCallback((member: TeamMember) => {
     if (!team) return;
-    Alert.alert("Leadership uebertragen?", `${member.display_name || member.username || "Dieses Mitglied"} wird neuer Team-Leader.`, [
+    Alert.alert("Leadership übertragen?", `${member.display_name || member.username || "Dieses Mitglied"} wird neuer Team-Leader.`, [
       { text: "Abbrechen", style: "cancel" },
-      { text: "Uebertragen", onPress: () => showActionResult(() => api.post(`/teams/${team.id}/transfer-leader`, { new_leader_id: member.id }), "Leadership uebertragen.") },
+      { text: "Übertragen", onPress: () => showActionResult(() => api.post(`/teams/${team.id}/transfer-leader`, { new_leader_id: member.id }), "Leadership übertragen.") },
     ]);
   }, [showActionResult, team]);
 
@@ -217,9 +217,9 @@ export function TeamDetailScreen({ navigation, route }: Props) {
 
   const deleteSquad = useCallback((squad: TeamSquad) => {
     if (!team || !squad.id) return;
-    Alert.alert("Squad loeschen?", `"${squad.name}" wird entfernt.`, [
+    Alert.alert("Squad löschen?", `"${squad.name}" wird entfernt.`, [
       { text: "Abbrechen", style: "cancel" },
-      { text: "Loeschen", style: "destructive", onPress: () => showActionResult(() => api.delete(`/teams/${team.id}/squads/${squad.id}`), "Squad geloescht.") },
+      { text: "Löschen", style: "destructive", onPress: () => showActionResult(() => api.delete(`/teams/${team.id}/squads/${squad.id}`), "Squad gelöscht.") },
     ]);
   }, [showActionResult, team]);
 
@@ -234,7 +234,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   if (!team) {
     return (
       <Screen>
-        <EmptyState title="Teamdetail nicht verfuegbar" detail={error || "Das Team konnte nicht geladen werden."} />
+        <EmptyState title="Teamdetail nicht verfügbar" detail={error || "Das Team konnte nicht geladen werden."} />
       </Screen>
     );
   }
@@ -279,9 +279,9 @@ export function TeamDetailScreen({ navigation, route }: Props) {
             {canManage ? <Pill label="Verwaltung aktiv" tone="success" /> : isMember ? <Pill label="Mitglied" /> : null}
           </View>
           <View style={styles.actionGrid}>
-            <Button label="Team-Chat oeffnen" onPress={() => navigation.navigate("TeamChat", { id: team.id, title: `${team.tag || team.name} Chat` })} />
-            {team.discord_link ? <Button label="Discord oeffnen" variant="secondary" onPress={() => Linking.openURL(normalizeLink(team.discord_link)).catch(() => setError("Discord-Link konnte nicht geoeffnet werden."))} /> : null}
-            {canManage ? <Button label={editOpen ? "Bearbeitung schliessen" : "Team bearbeiten"} variant="secondary" onPress={() => setEditOpen((open) => !open)} /> : null}
+            <Button label="Team-Chat öffnen" onPress={() => navigation.navigate("TeamChat", { id: team.id, title: `${team.tag || team.name} Chat` })} />
+            {team.discord_link ? <Button label="Discord öffnen" variant="secondary" onPress={() => Linking.openURL(normalizeLink(team.discord_link)).catch(() => setError("Discord-Link konnte nicht geöffnet werden."))} /> : null}
+            {canManage ? <Button label={editOpen ? "Bearbeitung schließen" : "Team bearbeiten"} variant="secondary" onPress={() => setEditOpen((open) => !open)} /> : null}
             {isMember && !isLeader ? <Button label="Team verlassen" variant="danger" disabled={busy} onPress={leave} /> : null}
           </View>
         </Card>
@@ -302,7 +302,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
         {canManage && team.join_code ? (
           <Card style={[styles.card, styles.manageCard]}>
             <Heading>Join-Code</Heading>
-            <Muted>Mit diesem Code koennen Spieler dem Team direkt beitreten.</Muted>
+            <Muted>Mit diesem Code können Spieler dem Team direkt beitreten.</Muted>
             <Body style={styles.joinCode}>{team.join_code}</Body>
           </Card>
         ) : null}

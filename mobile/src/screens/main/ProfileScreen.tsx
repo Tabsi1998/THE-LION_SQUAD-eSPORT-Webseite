@@ -295,7 +295,7 @@ export function ProfileScreen() {
           <>
             <Card style={styles.card}>
               <Heading>Meine Referenzen</Heading>
-              <Muted>Persoenliche Turnier- und Fast-Lap-Historie aus deinem Konto.</Muted>
+              <Muted>Persönliche Turnier- und Fast-Lap-Historie aus deinem Konto.</Muted>
               <View style={styles.statGrid}>
                 <Stat label="Gesamt" value={String(references.stats.total)} />
                 <Stat label="Podien" value={String(references.stats.podiums)} tone="gold" />
@@ -311,7 +311,7 @@ export function ProfileScreen() {
               references.items.map((item) => <ReferenceCard key={item.id} item={item} onOpen={openReference} />)
             ) : (
               <Card style={styles.card}>
-                <Muted>Noch keine persoenlichen Referenzen gefunden. Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier.</Muted>
+                <Muted>Noch keine persönlichen Referenzen gefunden. Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier.</Muted>
               </Card>
             )}
           </>

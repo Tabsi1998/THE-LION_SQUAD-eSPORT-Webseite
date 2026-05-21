@@ -57,7 +57,7 @@ export function FastLapScreen({ navigation }: Props) {
             {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Challenges, Strecken, Bestzeiten und Referenzzeiten aus der Live-Webseite.</Muted>}
           </View>
         }
-        ListEmptyComponent={<EmptyState title="Keine Fast-Lap Challenges" detail="Sobald Challenges veroeffentlicht sind, erscheinen sie hier." />}
+        ListEmptyComponent={<EmptyState title="Keine Fast-Lap Challenges" detail="Sobald Challenges veröffentlicht sind, erscheinen sie hier." />}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (

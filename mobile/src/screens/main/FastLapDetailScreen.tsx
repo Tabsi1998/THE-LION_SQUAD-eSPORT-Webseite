@@ -102,7 +102,7 @@ export function FastLapDetailScreen({ route }: Props) {
                 <Muted>{registration.label}</Muted>
                 {challenge.registration_open_from || challenge.registration_open_until ? (
                   <Muted>
-                    {challenge.registration_open_from ? `Oeffnet: ${formatDateTime(challenge.registration_open_from)}` : ""}
+                    {challenge.registration_open_from ? `Öffnet: ${formatDateTime(challenge.registration_open_from)}` : ""}
                     {challenge.registration_open_from && challenge.registration_open_until ? " · " : ""}
                     {challenge.registration_open_until ? `Endet: ${formatDateTime(challenge.registration_open_until)}` : ""}
                   </Muted>
@@ -114,11 +114,11 @@ export function FastLapDetailScreen({ route }: Props) {
             {challenge.block_club_member_results ? (
               <Muted style={styles.warning}>
                 {user?.is_club_member
-                  ? "Als Vereinsmitglied wirst du in dieser Challenge als Referenzzeit ausser Wertung gefuehrt."
-                  : "Diese Challenge ist fuer externe Fahrer gewertet. Vereinsmitglieder erscheinen als Referenzzeiten ausser Wertung."}
+                  ? "Als Vereinsmitglied wirst du in dieser Challenge als Referenzzeit außer Wertung geführt."
+                  : "Diese Challenge ist für externe Fahrer gewertet. Vereinsmitglieder erscheinen als Referenzzeiten außer Wertung."}
               </Muted>
             ) : challenge.allow_club_reference_times !== false ? (
-              <Muted>Vereins-Referenzzeiten sind separat moeglich und zaehlen nicht zur offiziellen Rangliste.</Muted>
+              <Muted>Vereins-Referenzzeiten sind separat möglich und zählen nicht zur offiziellen Rangliste.</Muted>
             ) : null}
             {challenge.show_club_reference_times === false ? <Muted>Referenzzeiten sind aktuell nur intern sichtbar.</Muted> : null}
           </Card>
@@ -144,7 +144,7 @@ export function FastLapDetailScreen({ route }: Props) {
             <Muted>Bestzeit</Muted>
             <Body style={styles.bestTime}>{best.time_str || "-"}</Body>
             <Body style={styles.strong}>{best.display_name || best.username || "Fahrer"}</Body>
-            <Muted>{best.attempts || 0} Versuche · {best.gap_str || "Fuehrung"}</Muted>
+            <Muted>{best.attempts || 0} Versuche · {best.gap_str || "Führung"}</Muted>
           </Card>
         ) : null}
 
