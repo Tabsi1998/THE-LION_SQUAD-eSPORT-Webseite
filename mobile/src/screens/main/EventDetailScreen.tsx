@@ -255,7 +255,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
 
         <Card style={styles.card}>
           <Heading>Infos</Heading>
-          {event.program || event.description ? <RichText text={event.program || event.description} onOpenContent={openContentTarget} /> : <Muted>Keine weiteren Event-Infos hinterlegt.</Muted>}
+          {event.program || event.description ? <RichText text={event.program || event.description} embeds={event.content_embeds} onOpenContent={openContentTarget} /> : <Muted>Keine weiteren Event-Infos hinterlegt.</Muted>}
         </Card>
 
         {event.tournaments?.length ? (

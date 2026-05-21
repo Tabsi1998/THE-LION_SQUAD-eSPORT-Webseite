@@ -188,6 +188,7 @@ export type ClubEvent = {
   allow_companions?: boolean;
   max_companions_per_registration?: number | null;
   own_registration?: { id?: string; status?: string; display_name?: string | null; companion_count?: number; seat_count?: number } | null;
+  content_embeds?: ContentEmbed[];
 };
 
 export type NewsPost = {
