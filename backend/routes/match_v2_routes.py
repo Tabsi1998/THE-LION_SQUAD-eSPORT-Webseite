@@ -28,6 +28,9 @@ from services.visibility import user_can_see
 
 router = APIRouter(prefix="/api/matches-v2", tags=["matches-v2"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+EVENT_MODES = {"local", "online", "hybrid"}
+RESULT_ENTRY_MODES = {"staff_only", "player_confirmed", "hybrid"}
+SCHEDULE_MODES = {"fixed_by_staff", "player_proposal", "hybrid"}
 TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
 
 
@@ -39,6 +42,71 @@ async def _ensure_match_tournament_unlocked(db, match: dict) -> None:
     tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "locked_at": 1})
     if tournament and tournament.get("locked_at"):
         raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
+
+
+def _mode_value(value: object, allowed: set[str]) -> str | None:
+    text = str(value or "").strip().lower()
+    return text if text in allowed else None
+
+
+def _first_mode(allowed: set[str], *values: object) -> str | None:
+    for value in values:
+        normalized = _mode_value(value, allowed)
+        if normalized:
+            return normalized
+    return None
+
+
+def _settings(source: dict | None) -> dict:
+    settings = (source or {}).get("settings")
+    return settings if isinstance(settings, dict) else {}
+
+
+def _legacy_event_mode(tournament: dict | None) -> str | None:
+    if (tournament or {}).get("is_hybrid") is True:
+        return "hybrid"
+    if (tournament or {}).get("is_online") is True:
+        return "online"
+    return None
+
+
+def _match_policy(match: dict, tournament: dict | None = None, stage: dict | None = None) -> dict:
+    match_settings = _settings(match)
+    stage_settings = _settings(stage)
+    event_mode = _first_mode(
+        EVENT_MODES,
+        match.get("event_mode"),
+        match_settings.get("event_mode"),
+        stage_settings.get("event_mode"),
+        (stage or {}).get("event_mode"),
+        (tournament or {}).get("event_mode"),
+        _legacy_event_mode(tournament),
+    ) or "online"
+    result_entry_mode = _first_mode(
+        RESULT_ENTRY_MODES,
+        match.get("result_entry_mode"),
+        match_settings.get("result_entry_mode"),
+        stage_settings.get("result_entry_mode"),
+        (stage or {}).get("result_entry_mode"),
+        (tournament or {}).get("result_entry_mode"),
+    ) or "staff_only"
+    schedule_mode = _first_mode(
+        SCHEDULE_MODES,
+        match.get("schedule_mode"),
+        match_settings.get("schedule_mode"),
+        stage_settings.get("schedule_mode"),
+        (stage or {}).get("schedule_mode"),
+        (tournament or {}).get("schedule_mode"),
+    ) or ("fixed_by_staff" if event_mode == "local" else "player_proposal")
+    return {
+        "event_mode": event_mode,
+        "result_entry_mode": result_entry_mode,
+        "schedule_mode": schedule_mode,
+    }
+
+
+def _schedule_proposals_enabled(policy: dict) -> bool:
+    return policy.get("schedule_mode") in {"player_proposal", "hybrid"}
 
 
 async def _user_registration_for_match(match: dict, user: dict | None) -> dict | None:
@@ -133,6 +201,17 @@ async def _require_v2_result_permission(user: dict, match: dict) -> None:
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Aktion")
 
 
+async def _can_submit_result_for_match(match: dict, user: dict | None) -> bool:
+    return bool(
+        user
+        and (
+            await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "match", match["id"])
+            or await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "stage", match.get("stage_id"))
+            or await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "station", match.get("station_id"))
+        )
+    )
+
+
 def _schedule_deadline(match: dict, tournament: dict | None = None):
     value = match.get("schedule_deadline_at") or (match.get("settings") or {}).get("schedule_deadline_at")
     if value:
@@ -202,6 +281,9 @@ async def _match_page_payload(match: dict, user: dict | None = None) -> dict:
     for proposal in proposals:
         proposal["actor"] = actors.get(proposal.get("actor_user_id"))
     can_act = bool(user and await _can_act_for_match(match, user))
+    policy = _match_policy(match, tournament, stage)
+    can_submit_result = await _can_submit_result_for_match(match, user)
+    can_propose_schedule = bool(can_act and _schedule_proposals_enabled(policy))
     acting_reg = await _acting_registration_for_match(match, user)
     return {
         "match": match,
@@ -210,6 +292,18 @@ async def _match_page_payload(match: dict, user: dict | None = None) -> dict:
         "participants": participants,
         "schedule_proposals": proposals,
         "can_act": can_act,
+        "can_report_score": False,
+        "can_player_report_result": False,
+        "can_submit_result": can_submit_result,
+        "can_staff_submit_result": can_submit_result,
+        "can_propose_schedule": can_propose_schedule,
+        "can_manage_schedule": can_propose_schedule,
+        "can_dispute": False,
+        "can_forfeit": False,
+        "event_mode": policy["event_mode"],
+        "result_entry_mode": policy["result_entry_mode"],
+        "schedule_mode": policy["schedule_mode"],
+        "collection": "matches_v2",
         "acting_registration_id": acting_reg.get("id") if acting_reg else None,
         "matchday": match.get("matchday_number") or match.get("round"),
         "matchday_label": match.get("matchday_label") or (f"Spieltag {match.get('round')}" if match.get("round") else "Match"),
@@ -255,10 +349,14 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
     if not match:
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
     await _ensure_match_tournament_unlocked(db, match)
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0})
+    stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
+    policy = _match_policy(match, tournament, stage)
+    if not _schedule_proposals_enabled(policy):
+        raise HTTPException(status_code=403, detail="Terminabstimmung ist fuer dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen Termine vorschlagen")
     acting_reg = await _acting_registration_for_match(match, me)
-    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0})
     now_iso = now_utc().isoformat()
     doc = {
         "id": new_id(),
@@ -292,6 +390,11 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     proposal = await db.match_schedule_proposals.find_one({"id": proposal_id, "match_id": match_id}, {"_id": 0})
     if not match or not proposal:
         raise HTTPException(status_code=404, detail="Terminvorschlag nicht gefunden")
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0})
+    stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
+    policy = _match_policy(match, tournament, stage)
+    if not _schedule_proposals_enabled(policy):
+        raise HTTPException(status_code=403, detail="Terminabstimmung ist fuer dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Keine Berechtigung fuer diesen Termin")
     acting_reg = await _acting_registration_for_match(match, me)
