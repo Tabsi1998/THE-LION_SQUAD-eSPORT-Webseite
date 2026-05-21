@@ -45,6 +45,8 @@ def test_in_app_notifications_use_the_same_profile_preferences():
     assert notification_allowed(user, "match_reminder") is False
     assert notification_allowed(user, "match_station") is False
     assert notification_allowed(user, "tournament_checkin") is False
+    assert notification_allowed(user, "match_chat_message") is True
+    assert notification_allowed(user, "match_chat_mention") is True
     assert notification_allowed(user, "direct_message") is True
 
 
@@ -52,6 +54,8 @@ def test_direct_message_notifications_are_required():
     user = {"notification_preferences": {"community_messages": False}}
     assert notification_allowed(user, "direct_message") is True
     assert notification_allowed(user, "team_chat_message") is False
+    assert notification_allowed(user, "match_chat_message") is False
+    assert notification_allowed(user, "match_chat_mention") is False
 
 
 def test_public_preferences_payload_contains_channels():

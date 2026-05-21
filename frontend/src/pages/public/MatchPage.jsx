@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { CalendarClock, Check, MessageSquare, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -13,6 +14,24 @@ const scheduleLabels = {
   accepted: "Termin bestätigt",
   declined: "Vorschlag abgelehnt",
   escalated: "Turnierleitung nötig",
+};
+
+const eventModeLabels = {
+  local: "Vor Ort",
+  online: "Online",
+  hybrid: "Hybrid",
+};
+
+const resultModeLabels = {
+  staff_only: "Ergebnis durch Turnierleitung",
+  player_confirmed: "Spieler bestaetigen Ergebnis",
+  hybrid: "Spieler + Staff",
+};
+
+const scheduleModeLabels = {
+  fixed_by_staff: "Termin durch Turnierleitung",
+  player_proposal: "Terminabstimmung",
+  hybrid: "Terminabstimmung + Staff",
 };
 
 function formatDateTime(value) {
@@ -122,6 +141,16 @@ export default function MatchPage() {
 
   const match = data.match || {};
   const latestProposal = (data.schedule_proposals || []).find((p) => p.status === "pending");
+  const canProposeSchedule = Boolean(data.can_propose_schedule);
+  const canManageSchedule = Boolean(data.can_manage_schedule);
+  const canUseChat = Boolean(user && data.can_act);
+  const showFixedScheduleNotice = data.schedule_mode === "fixed_by_staff" && !canProposeSchedule;
+  const addStaffMention = () => {
+    setMessage((current) => {
+      const prefix = current.trim() ? `${current.trim()} ` : "";
+      return `${prefix}@leitung `;
+    });
+  };
 
   return (
     <PublicLayout>
@@ -136,6 +165,11 @@ export default function MatchPage() {
             <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Terminstatus</div>
             <div className="mt-1 font-heading font-black uppercase text-[#FFD700]">{scheduleLabels[match.schedule_status] || "Noch offen"}</div>
             <div className="mt-1 text-sm text-white/65">{formatDateTime(match.scheduled_at)}</div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {eventModeLabels[data.event_mode] && <Pill>{eventModeLabels[data.event_mode]}</Pill>}
+              {resultModeLabels[data.result_entry_mode] && <Pill>{resultModeLabels[data.result_entry_mode]}</Pill>}
+              {scheduleModeLabels[data.schedule_mode] && <Pill>{scheduleModeLabels[data.schedule_mode]}</Pill>}
+            </div>
             {stationLabel(match) && (
               <div className="mt-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">Station {stationLabel(match)}</div>
             )}
@@ -159,7 +193,7 @@ export default function MatchPage() {
 
             <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
               <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Terminabstimmung</h2>
-              {data.can_act ? (
+              {canProposeSchedule ? (
                 <form onSubmit={propose} className="mt-4 grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
                   <Field label="Vorschlag">
                     <input type="datetime-local" value={proposalAt} onChange={(e) => setProposalAt(e.target.value)} className="input" />
@@ -169,8 +203,10 @@ export default function MatchPage() {
                   </Field>
                   <button disabled={busy} className="px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Vorschlagen</button>
                 </form>
+              ) : showFixedScheduleNotice ? (
+                <p className="mt-3 text-sm text-white/55">Termin und Station werden durch die Turnierleitung festgelegt. Rueckfragen bitte im Matchchat mit <button type="button" onClick={addStaffMention} className="text-[#29B6E8] font-bold hover:text-white">@leitung</button> markieren.</p>
               ) : (
-                <p className="mt-3 text-sm text-white/50">Terminänderungen können Teilnehmer, Team-Captains und Turnierleitung einreichen.</p>
+                <p className="mt-3 text-sm text-white/50">Termine koennen Teilnehmer, Team-Captains und Turnierleitung vorschlagen, sofern die Terminabstimmung aktiv ist.</p>
               )}
 
               <div className="mt-5 space-y-3">
@@ -182,14 +218,14 @@ export default function MatchPage() {
                         <div className="text-xs text-white/45 mt-1">{p.actor?.display_name || p.actor?.username || "Teilnehmer"} · {p.status}</div>
                         {p.note && <div className="text-xs text-white/60 mt-2">{p.note}</div>}
                       </div>
-                      {data.can_act && p.status === "pending" && (
+                      {canManageSchedule && p.status === "pending" && (
                         <div className="flex gap-1 shrink-0">
                           <button type="button" onClick={() => decide(p, "accept")} className="p-2 border border-[#00D26A]/40 text-[#00D26A] rounded-sm"><Check className="w-3.5 h-3.5" /></button>
                           <button type="button" onClick={() => decide(p, "decline")} className="p-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm"><X className="w-3.5 h-3.5" /></button>
                         </div>
                       )}
                     </div>
-                    {data.can_act && p.status === "pending" && (
+                    {canManageSchedule && p.status === "pending" && (
                       <div className="mt-3 grid md:grid-cols-[1fr_1fr_auto] gap-2 items-end">
                         <input type="datetime-local" value={counterAt} onChange={(e) => setCounterAt(e.target.value)} className="input" />
                         <input value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} className="input" placeholder="Antwort / Grund" />
@@ -214,10 +250,25 @@ export default function MatchPage() {
               ))}
               {chat.length === 0 && <div className="text-sm text-white/40">Noch keine Nachrichten.</div>}
             </div>
-            {user && data.can_act ? (
-              <form onSubmit={sendMessage} className="mt-4 flex gap-2">
-                <input value={message} onChange={(e) => setMessage(e.target.value)} className="input flex-1" placeholder="Nachricht schreiben" />
-                <button className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm"><Send className="w-4 h-4" /></button>
+            {canUseChat ? (
+              <form onSubmit={sendMessage} className="mt-4 space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={addStaffMention} className="px-2.5 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10">@leitung</button>
+                </div>
+                <div className="flex gap-2 items-end">
+                  <MentionTextarea
+                    value={message}
+                    onValueChange={setMessage}
+                    scope="tournament"
+                    scopeId={data.tournament?.id}
+                    rows={2}
+                    maxLength={1500}
+                    className="flex-1"
+                    textareaClassName="input w-full min-h-[4.5rem] resize-y"
+                    placeholder="Nachricht schreiben, @leitung oder @username markieren"
+                  />
+                  <button className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm"><Send className="w-4 h-4" /></button>
+                </div>
               </form>
             ) : (
               <p className="mt-4 text-xs text-white/45">Schreiben können Teilnehmer, Team-Captains und Turnierleitung.</p>
@@ -227,6 +278,10 @@ export default function MatchPage() {
       </section>
     </PublicLayout>
   );
+}
+
+function Pill({ children }) {
+  return <span className="rounded-sm border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/60">{children}</span>;
 }
 
 function Field({ label, children }) {

@@ -232,6 +232,13 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     }
   }, [busy, canUseChat, message, route.params.id]);
 
+  const addStaffMention = useCallback(() => {
+    setMessage((current) => {
+      const prefix = current.trim() ? `${current.trim()} ` : "";
+      return `${prefix}@leitung `;
+    });
+  }, []);
+
   const submitLegacyResult = useCallback(async () => {
     if (!canSubmitLegacyResult || busy) return;
     const a = Math.max(0, Number.parseInt(scoreA || "0", 10) || 0);
@@ -513,7 +520,12 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           {chat.length ? chat.map((item) => <ChatBubble key={item.id} message={item} own={item.user_id === user?.id} />) : <Muted>Noch keine Nachrichten.</Muted>}
           {canUseChat ? (
             <View style={styles.chatComposer}>
-              <FormInput label="Nachricht" value={message} onChangeText={setMessage} placeholder="Nachricht schreiben ..." style={styles.chatInput} />
+              <View style={styles.mentionQuickRow}>
+                <Pressable onPress={addStaffMention} style={styles.mentionChip}>
+                  <Muted style={styles.textCyan}>@leitung</Muted>
+                </Pressable>
+              </View>
+              <FormInput label="Nachricht" value={message} onChangeText={setMessage} placeholder="Nachricht schreiben, @leitung oder @username markieren ..." style={styles.chatInput} />
               <Button label="Senden" onPress={sendMessage} disabled={busy || !message.trim()} />
             </View>
           ) : (
@@ -751,6 +763,19 @@ const styles = StyleSheet.create({
     marginTop: 7,
   },
   flowNotice: {
+    gap: 8,
+  },
+  mentionChip: {
+    backgroundColor: "rgba(41,182,232,0.08)",
+    borderColor: "rgba(41,182,232,0.35)",
+    borderRadius: 7,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  mentionQuickRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   header: {

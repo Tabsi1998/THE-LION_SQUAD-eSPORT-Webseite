@@ -1,4 +1,5 @@
 """Match/Score/Dispute routes."""
+import re
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -28,12 +29,15 @@ from services.match_notifications import notify_match_result_confirmed
 from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
 from services.match_v2_results import MatchV2ResultError, build_v2_result_application
 from services.station_labels import attach_station_info
+from services.user_notifications import create_user_notification
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 EVENT_MODES = {"local", "online", "hybrid"}
 RESULT_ENTRY_MODES = {"staff_only", "player_confirmed", "hybrid"}
 SCHEDULE_MODES = {"fixed_by_staff", "player_proposal", "hybrid"}
+MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
+STAFF_MENTION_HANDLES = {"leitung", "turnierleitung", "orga", "organizer", "staff", "admin", "referee", "schiri", "scorekeeper"}
 USER_PUBLIC_PROJECTION = {
     "_id": 0,
     "id": 1,
@@ -175,6 +179,155 @@ async def _public_user_map(user_ids: list[str]) -> dict[str, dict]:
         {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1},
     ).to_list(500)
     return {u["id"]: u for u in users}
+
+
+def _user_label(user: dict | None) -> str:
+    return (user or {}).get("display_name") or (user or {}).get("username") or "Benutzer"
+
+
+def _match_label(match: dict) -> str:
+    return match.get("match_key") or match.get("round_name") or match.get("id") or "Match"
+
+
+async def _match_participant_user_ids(db, match: dict) -> set[str]:
+    regs = await _registrations_for_match(match)
+    user_ids = {reg.get("user_id") for reg in regs if reg.get("user_id")}
+    team_ids = {reg.get("team_id") for reg in regs if reg.get("team_id")}
+    if team_ids:
+        teams = await db.teams.find(
+            {"id": {"$in": list(team_ids)}},
+            {"_id": 0, "member_ids": 1, "leader_id": 1, "co_leader_ids": 1},
+        ).to_list(100)
+        for team in teams:
+            if team.get("leader_id"):
+                user_ids.add(team.get("leader_id"))
+            user_ids.update(team.get("co_leader_ids") or [])
+            user_ids.update(team.get("member_ids") or [])
+    return {user_id for user_id in user_ids if user_id}
+
+
+def _staff_assignment_matches_match(assignment: dict, match: dict) -> bool:
+    scope = assignment.get("scope") or "tournament"
+    scope_id = assignment.get("scope_id")
+    if scope == "tournament" or not scope_id:
+        return True
+    if scope == "match":
+        return scope_id == match.get("id")
+    if scope == "stage":
+        return scope_id == match.get("stage_id")
+    if scope == "station":
+        return scope_id == match.get("station_id")
+    return False
+
+
+async def _match_staff_user_ids(db, match: dict) -> set[str]:
+    tournament_id = match.get("tournament_id")
+    user_ids: set[str] = set()
+    global_staff = await db.users.find(
+        {"role": {"$in": sorted(STAFF_ROLES)}, "is_active": True, "is_banned": {"$ne": True}},
+        {"_id": 0, "id": 1},
+    ).to_list(200)
+    user_ids.update(row.get("id") for row in global_staff if row.get("id"))
+    if tournament_id:
+        assignments = await db.tournament_staff_assignments.find(
+            {
+                "tournament_id": tournament_id,
+                "is_active": {"$ne": False},
+                "role": {"$in": sorted(READ_STAFF_ROLES | RESULT_STAFF_ROLES)},
+            },
+            {"_id": 0, "user_id": 1, "scope": 1, "scope_id": 1},
+        ).to_list(500)
+        user_ids.update(
+            row.get("user_id")
+            for row in assignments
+            if row.get("user_id") and _staff_assignment_matches_match(row, match)
+        )
+    return {user_id for user_id in user_ids if user_id}
+
+
+async def _match_chat_user_ids(db, match: dict) -> set[str]:
+    return (await _match_participant_user_ids(db, match)) | (await _match_staff_user_ids(db, match))
+
+
+def _match_requires_staff_chat_notice(policy: dict) -> bool:
+    return (
+        policy.get("event_mode") == "local"
+        or policy.get("result_entry_mode") == "staff_only"
+        or policy.get("schedule_mode") == "fixed_by_staff"
+    )
+
+
+async def _mentioned_match_user_ids(db, match: dict, message: str) -> set[str]:
+    handles = {handle.lower() for handle in MENTION_RE.findall(message or "")}
+    user_handles = sorted(handles - STAFF_MENTION_HANDLES)
+    if not user_handles:
+        return set()
+    candidates = await db.users.find(
+        {
+            "is_active": True,
+            "is_banned": {"$ne": True},
+            "$or": [{"username": {"$regex": f"^{re.escape(handle)}$", "$options": "i"}} for handle in user_handles],
+        },
+        {"_id": 0, "id": 1, "role": 1},
+    ).to_list(100)
+    allowed_ids = await _match_chat_user_ids(db, match)
+    return {
+        candidate["id"]
+        for candidate in candidates
+        if candidate.get("id") in allowed_ids or candidate.get("role") in STAFF_ROLES
+    }
+
+
+async def _notify_match_chat_message(
+    db,
+    match: dict,
+    collection: str,
+    sender: dict,
+    message: dict,
+) -> None:
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0}) or {}
+    stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
+    policy = _match_policy(match, collection, tournament, stage)
+    handles = {handle.lower() for handle in MENTION_RE.findall(message.get("message") or "")}
+    staff_requested = bool(handles & STAFF_MENTION_HANDLES)
+    participant_ids = await _match_participant_user_ids(db, match)
+    staff_ids = await _match_staff_user_ids(db, match) if staff_requested or _match_requires_staff_chat_notice(policy) else set()
+    mentioned_ids = await _mentioned_match_user_ids(db, match, message.get("message") or "")
+    if staff_requested:
+        mentioned_ids.update(staff_ids)
+
+    sender_id = sender.get("id")
+    match_title = _match_label(match)
+    tournament_title = tournament.get("title") or "Turnier"
+    url = f"/matches/{match.get('id')}"
+    body = f"{_user_label(sender)}: {(message.get('message') or '')[:140]}"
+    meta = {
+        "match_id": match.get("id"),
+        "tournament_id": match.get("tournament_id"),
+        "stage_id": match.get("stage_id"),
+        "message_id": message.get("id"),
+    }
+
+    for recipient_id in {uid for uid in mentioned_ids if uid and uid != sender_id}:
+        await create_user_notification(
+            recipient_id,
+            title=f"Markierung im Matchchat: {match_title}",
+            body=body,
+            url=url,
+            kind="match_chat_mention",
+            meta=meta,
+        )
+
+    message_recipient_ids = (participant_ids | staff_ids) - mentioned_ids - {sender_id}
+    for recipient_id in {uid for uid in message_recipient_ids if uid}:
+        await create_user_notification(
+            recipient_id,
+            title=f"Neue Matchnachricht: {tournament_title}",
+            body=body,
+            url=url,
+            kind="match_chat_message",
+            meta=meta,
+        )
 
 
 async def _user_registration_for_match(match: dict, user: dict | None) -> dict | None:
@@ -598,7 +751,7 @@ async def list_match_chat(match_id: str, user: dict | None = Depends(get_optiona
 @router.post("/{match_id}/chat")
 async def post_match_chat(match_id: str, body: MatchChatCreate, me: dict = Depends(get_current_user)):
     db = get_db()
-    match, _collection = await _find_match_any(match_id)
+    match, collection = await _find_match_any(match_id)
     await _ensure_match_tournament_unlocked(db, match)
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen im Matchchat schreiben")
@@ -614,6 +767,10 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, me: dict = Depen
         "updated_at": now_iso,
     }
     await db.match_chat_messages.insert_one(doc)
+    try:
+        await _notify_match_chat_message(db, match, collection, me, doc)
+    except Exception:
+        pass
     try:
         from badges import evaluate_user_progress
         await evaluate_user_progress(me["id"])

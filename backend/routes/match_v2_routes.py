@@ -490,6 +490,11 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, me: dict = Depen
     }
     await db.match_chat_messages.insert_one(doc)
     try:
+        from routes.match_routes import _notify_match_chat_message
+        await _notify_match_chat_message(db, match, "matches_v2", me, doc)
+    except Exception:
+        pass
+    try:
         from badges import evaluate_user_progress
         await evaluate_user_progress(me["id"])
     except Exception:
