@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
-import { EmptyState, LoadingState } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -32,7 +32,7 @@ export function FastLapDetailScreen({ route }: Props) {
     try {
       const challengeResult = await api.get<F1Challenge>(`/f1/challenges/${route.params.id}`);
       const nextChallenge = challengeResult.data;
-      const nextTrackId = trackId || selectedTrackId || nextChallenge.tracks?.[0]?.id || null;
+      const nextTrackId = trackId || nextChallenge.tracks?.[0]?.id || null;
       setChallenge(nextChallenge);
       setSelectedTrackId(nextTrackId);
       const leaderboardResult = await api.get<F1LeaderboardPayload>(`/f1/challenges/${nextChallenge.slug || nextChallenge.id}/leaderboard`, {
@@ -45,7 +45,7 @@ export function FastLapDetailScreen({ route }: Props) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [route.params.id, selectedTrackId]);
+  }, [route.params.id]);
 
   useEffect(() => {
     load();
@@ -58,7 +58,7 @@ export function FastLapDetailScreen({ route }: Props) {
   if (loading) {
     return (
       <Screen>
-        <LoadingState label="Fast-Lap wird geladen ..." />
+        <SkeletonList count={4} />
       </Screen>
     );
   }
