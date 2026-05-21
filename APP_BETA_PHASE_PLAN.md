@@ -34,6 +34,7 @@ Dieser Plan buendelt die naechsten sinnvollen Arbeiten fuer App, Website und Bac
 - Seit der Planerstellung umgesetzt: Ergebnisreport-Konsens zwischen unterschiedlichen Teilnehmern, abweichende Reports und Knockout-Unentschieden sind als eigene Match-Resolution-Logik unit-getestet.
 - Seit der Planerstellung umgesetzt: Legacy-Match-Reports, automatische Ergebnisaufloesung, Staff-Ergebnisupdates, Disputes und Forfeits schreiben Audit-Logs mit Match-Kontext.
 - Seit der Planerstellung umgesetzt: Die App blendet eigene Terminentscheidung-Aktionen aus und zeigt bei eigenen Vorschlaegen einen wartenden Hinweis statt eines blockierten Buttons.
+- Seit der Planerstellung umgesetzt: `1.0.0-beta.10` ist als frischer Android-Build `41` fuer einen neuen APK-Tag vorbereitet.
 - Seit der Planerstellung umgesetzt: Admin-Jahreswertung erklaert die echte V2-Punkteformel, Gewichtungen, Teilnehmerfaktoren, Streichresultate und Auto-/Manuell-Quellenwahl sichtbar im Editor.
 - Ergebnislogik ist teilweise vorhanden: Bei klassischen Online-Matches koennen Teilnehmer Ergebnisse melden. Stimmen die letzten zwei Reports ueberein, wird das Match automatisch abgeschlossen. Weichen sie ab, geht das Match auf Klaerung.
 - Staff-Erfassung ist vorhanden: Turnierleitung kann klassische Matches direkt aktualisieren und V2-Heats ueber `/api/matches/{id}/result` werten.

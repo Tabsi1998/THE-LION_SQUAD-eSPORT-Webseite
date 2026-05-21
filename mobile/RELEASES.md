@@ -117,7 +117,7 @@ Historische Einordnung, neueste Version oben:
 In GitHub unter `Actions` den Workflow `Mobile APK Release` starten. Der Workflow erzeugt ein Artefakt mit diesem Namensschema:
 
 ```text
-LionsAPP-BETA-v1.0.0-build40-<commit>.apk
+LionsAPP-BETA-v1.0.0-build41-<commit>.apk
 ```
 
 ## Push-Konfiguration
