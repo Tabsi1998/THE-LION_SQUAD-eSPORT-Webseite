@@ -43,7 +43,7 @@ export type Tournament = {
   max_participants?: number | null;
   participant_count?: number;
   format_label?: string;
-  public_phase?: { label?: string; state?: string; target_at?: string | null };
+  public_phase?: { countdown_kind?: string | null; label?: string; state?: string; target_at?: string | null };
   start_date?: string | null;
   end_date?: string | null;
   registration_enabled?: boolean;
@@ -180,7 +180,7 @@ export type ClubEvent = {
   country?: string | null;
   status?: string;
   banner_url?: string | null;
-  public_phase?: { label?: string; state?: string; target_at?: string | null };
+  public_phase?: { countdown_kind?: string | null; label?: string; state?: string; target_at?: string | null };
   has_registration?: boolean;
   registration_url?: string | null;
   registration_opens_at?: string | null;
@@ -227,7 +227,7 @@ export type ContentEmbed = {
     track_image_url?: string | null;
     track?: { id?: string; slug?: string; name?: string; image_url?: string | null } | null;
     location?: string | null;
-    public_phase?: { label?: string; state?: string; target_at?: string | null };
+    public_phase?: { countdown_kind?: string | null; label?: string; state?: string; target_at?: string | null };
   } | null;
 };
 
@@ -306,7 +306,7 @@ export type F1Challenge = {
   title: string;
   description?: string | null;
   status?: string;
-  public_phase?: { label?: string; state?: string; target_at?: string | null };
+  public_phase?: { countdown_kind?: string | null; label?: string; state?: string; target_at?: string | null };
   online_registration_enabled?: boolean;
   registration_enabled?: boolean;
   registration_open_from?: string | null;
