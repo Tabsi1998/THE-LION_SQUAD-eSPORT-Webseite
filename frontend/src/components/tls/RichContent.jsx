@@ -58,11 +58,12 @@ function EmbedCard({ embed }) {
   const kind = normalizeKind(embed.kind);
   const meta = embedMeta(kind, item);
   const Icon = meta.icon;
+  const imageUrl = kind === "fastlap" ? item.track_image_url || item.track?.image_url || item.banner_url : item.banner_url;
   return (
     <Link to={meta.to} className={`my-5 grid sm:grid-cols-[140px_1fr] gap-0 border border-white/10 ${meta.border} bg-[#121212] rounded-sm overflow-hidden transition group`}>
       <div className="min-h-28 bg-[#080808] flex items-center justify-center">
-        {item.banner_url ? (
-          <img src={resolveMediaUrl(item.banner_url)} alt="" className="w-full h-full object-cover opacity-85 group-hover:opacity-100 transition" />
+        {imageUrl ? (
+          <img src={resolveMediaUrl(imageUrl)} alt="" className="w-full h-full object-cover opacity-85 group-hover:opacity-100 transition" />
         ) : (
           <Icon className={`w-8 h-8 ${meta.accent}`} />
         )}

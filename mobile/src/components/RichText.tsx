@@ -83,7 +83,7 @@ function renderEmbedCard(embed: ContentEmbed, index: number, compact: boolean, o
       date={item.start_date}
       description={item.description}
       detail={item.location}
-      image={item.banner_url}
+      image={kind === "fastlap" ? item.track_image_url || item.track?.image_url || item.banner_url : item.banner_url}
       kind={kind}
       onPress={target && onOpenContent ? () => onOpenContent(target) : undefined}
       phase={item.public_phase}

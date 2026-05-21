@@ -81,8 +81,23 @@ async def resolve_content_embeds(db: Any, text: str | None, user: dict | None = 
             {"$or": [{"id": {"$in": by_kind["fastlap"]}}, {"slug": {"$in": by_kind["fastlap"]}}]},
             {"_id": 0, "id": 1, "slug": 1, "title": 1, "description": 1, "start_date": 1, "end_date": 1, "registration_enabled": 1, "online_registration_enabled": 1, "registration_open_from": 1, "registration_open_until": 1, "is_invite_only": 1, "status": 1, "banner_url": 1, "is_championship": 1, "visibility": 1},
         ).to_list(100)
+        challenge_ids = [doc.get("id") for doc in docs if doc.get("id")]
+        track_docs = await db.f1_tracks.find(
+            {"challenge_id": {"$in": challenge_ids}, "image_url": {"$nin": [None, ""]}},
+            {"_id": 0, "id": 1, "slug": 1, "name": 1, "challenge_id": 1, "image_url": 1, "order_index": 1},
+        ).sort("order_index", 1).to_list(100) if challenge_ids else []
+        first_track_by_challenge: dict[str, dict[str, Any]] = {}
+        for track in track_docs:
+            challenge_id = track.get("challenge_id")
+            if challenge_id and challenge_id not in first_track_by_challenge:
+                first_track_by_challenge[challenge_id] = track
         for doc in docs:
             if await _can_show_embed("fastlap", doc, user):
+                track = first_track_by_challenge.get(doc.get("id"))
+                if track:
+                    doc["track"] = track
+                    doc["track_image_url"] = track.get("image_url")
+                    doc["banner_url"] = track.get("image_url") or doc.get("banner_url")
                 doc["public_phase"] = derive_public_phase(doc, "f1")
                 resolved[("fastlap", doc.get("id"))] = doc
                 resolved[("fastlap", doc.get("slug"))] = doc

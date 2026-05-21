@@ -76,7 +76,7 @@ Umsetzung:
 - [x] Mobile API fuer News/Events liefert die bereits vorhandenen `content_embeds` aus `content_embed_service.py`.
 - [x] Mobile `RichText` nutzt `embeds` und rendert verlinkte Inhalte ueber die gemeinsame `ContentCard`.
 - [x] Web `RichContent` und mobile `RichText` finden Embeds robust ueber Token, Ref, Slug und Alias-Schreibweisen.
-- [ ] Fast-Lap, Turnier und Event Karten nutzen `banner_url`; Fast-Lap-Strecken nutzen zusaetzlich `track.image_url`.
+- [x] Fast-Lap, Turnier und Event Karten nutzen `banner_url`; Fast-Lap-Embeds bevorzugen zusaetzlich das erste vorhandene `track.image_url`.
 
 ## Phase 4 - Fast-Lap-Streckenbilder
 
@@ -90,7 +90,7 @@ Umsetzung:
 
 - `FastLapDetailScreen` rendert `activeTrack.image_url`.
 - Backend/Admin pruefen: Track-Bild muss im Admin sauber pflegbar sein.
-- Embeds fuer Fast-Lap koennen optional das Track-Bild nutzen, wenn ein bestimmter Track verlinkt wird.
+- Fast-Lap-Embeds nutzen automatisch das erste vorhandene Track-Bild; optional kann spaeter ein spezifisches Track-Token wie `[[fastlap:challenge#track]]` folgen.
 
 ## Phase 5 - Profil und Mehr-Navigation
 

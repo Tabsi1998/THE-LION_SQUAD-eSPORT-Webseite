@@ -224,6 +224,8 @@ export type ContentEmbed = {
     start_date?: string | null;
     status?: string;
     banner_url?: string | null;
+    track_image_url?: string | null;
+    track?: { id?: string; slug?: string; name?: string; image_url?: string | null } | null;
     location?: string | null;
     public_phase?: { label?: string; state?: string; target_at?: string | null };
   } | null;
