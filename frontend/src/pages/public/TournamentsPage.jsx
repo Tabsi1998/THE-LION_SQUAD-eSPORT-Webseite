@@ -6,15 +6,25 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 export default function TournamentsPage() {
   const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
 
   const load = useCallback(async () => {
-    const q = statusFilter !== "all" ? `?status=${statusFilter}` : "";
-    const { data } = await api.get(`/tournaments${q}`);
-    setList(data);
+    try {
+      const q = statusFilter !== "all" ? `?status=${statusFilter}` : "";
+      const { data } = await api.get(`/tournaments${q}`);
+      setList(data);
+      setError(false);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, [statusFilter]);
 
   useEffect(() => {
+    setLoading(true);
     load();
     const iv = setInterval(load, 15000);
     return () => clearInterval(iv);
@@ -54,10 +64,38 @@ export default function TournamentsPage() {
             </button>
           ))}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {list.map((t, i) => <TournamentCard key={t.id} tournament={t} index={i} />)}
-          {list.length === 0 && <div className="col-span-full text-white/40 text-center py-20 font-display tracking-widest">KEINE TURNIERE GEFUNDEN</div>}
-        </div>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden animate-pulse">
+                <div className="aspect-video bg-white/5" />
+                <div className="p-5 space-y-3">
+                  <div className="h-3 bg-white/10 rounded-sm w-1/3" />
+                  <div className="h-5 bg-white/10 rounded-sm w-3/4" />
+                  <div className="h-3 bg-white/5 rounded-sm w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="col-span-full text-center py-20">
+            <div className="text-[#FF3B30] font-display tracking-widest text-sm">FEHLER BEIM LADEN</div>
+            <p className="mt-2 text-white/40 text-sm">Turniere konnten nicht geladen werden. Bitte Seite neu laden.</p>
+            <button onClick={load} className="mt-4 px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10 transition">
+              Erneut versuchen
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {list.map((t, i) => <TournamentCard key={t.id} tournament={t} index={i} />)}
+            {list.length === 0 && (
+              <div className="col-span-full text-center py-20">
+                <div className="text-white/20 font-display tracking-widest text-sm mb-2">KEINE TURNIERE GEFUNDEN</div>
+                <p className="text-white/40 text-sm">Für diesen Filter gibt es aktuell keine Turniere.</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </PublicLayout>
   );

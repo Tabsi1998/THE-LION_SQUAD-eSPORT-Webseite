@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
 import { toast } from "sonner";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -11,6 +12,7 @@ export default function LoginPage() {
   const nav = useNavigate();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
 
@@ -32,7 +34,15 @@ export default function LoginPage() {
 
         <form onSubmit={submit} className="mt-8 space-y-4">
           <Field label="E-Mail" type="email" value={email} onChange={setEmail} required testId="login-email" />
-          <Field label="Passwort" type="password" value={pw} onChange={setPw} required testId="login-password" />
+          <PasswordField
+            label="Passwort"
+            value={pw}
+            onChange={setPw}
+            show={showPw}
+            onToggle={() => setShowPw((v) => !v)}
+            required
+            testId="login-password"
+          />
           {err && <div data-testid="login-error" className="text-sm text-[#FF3B30] bg-[#FF3B30]/10 border border-[#FF3B30]/30 p-2 rounded-sm">{err}</div>}
           <button
             data-testid="login-submit"
@@ -65,5 +75,31 @@ function Field({ label, value, onChange, type = "text", required, testId }) {
         className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2.5 rounded-sm text-white placeholder:text-white/30 focus:outline-none"
       />
     </label>
+  );
+}
+
+function PasswordField({ label, value, onChange, show, onToggle, required, testId }) {
+  return (
+    <div className="block">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <div className="relative">
+        <input
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required={required}
+          data-testid={testId}
+          className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2.5 pr-10 rounded-sm text-white placeholder:text-white/30 focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={show ? "Passwort verbergen" : "Passwort anzeigen"}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-[#29B6E8] transition"
+        >
+          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </div>
+    </div>
   );
 }

@@ -41,12 +41,10 @@ export default function HomePage() {
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-white/10 bg-grid-dense">
         <div className="absolute inset-0 pointer-events-none">
-          <img
-            src="https://images.pexels.com/photos/7915213/pexels-photo-7915213.jpeg"
-            alt=""
-            className="w-full h-full object-cover opacity-20"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/60 via-[#0A0A0A]/80 to-[#0A0A0A]" />
+          {/* Animierter Hintergrund statt externem Bild */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#29B6E8]/5 via-transparent to-[#9F7AEA]/5" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(41,182,232,0.12),transparent)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/40 via-[#0A0A0A]/70 to-[#0A0A0A]" />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28">
           <div className="grid lg:grid-cols-12 gap-8 items-center min-w-0">

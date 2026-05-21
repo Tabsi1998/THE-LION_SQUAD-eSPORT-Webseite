@@ -195,7 +195,7 @@ export function PublicLayout({ children }) {
               <Link to="/imprint" className="hover:text-[#29B6E8] transition" data-testid="footer-imprint">Impressum</Link>
               <Link to="/privacy" className="hover:text-[#29B6E8] transition" data-testid="footer-privacy">Datenschutz</Link>
               <button type="button" onClick={openCookieSettings} className="hover:text-[#29B6E8] transition">Cookies</button>
-              <span className="font-display tracking-widest hidden md:inline">v2.2</span>
+              <span className="font-display tracking-widest hidden md:inline">v{process.env.REACT_APP_VERSION || "2.2"}</span>
             </div>
           </div>
         </div>
@@ -204,10 +204,10 @@ export function PublicLayout({ children }) {
         <button
           type="button"
           onClick={scrollToTop}
-          className="md:hidden fixed bottom-5 right-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-sm border border-[#29B6E8]/45 bg-[#0A0A0A]/90 text-[#29B6E8] shadow-[0_0_18px_rgba(41,182,232,0.22)] backdrop-blur transition hover:bg-[#29B6E8] hover:text-black"
+          className="fixed bottom-5 right-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-sm border border-[#29B6E8]/45 bg-[#0A0A0A]/90 text-[#29B6E8] shadow-[0_0_18px_rgba(41,182,232,0.22)] backdrop-blur transition hover:bg-[#29B6E8] hover:text-black"
           aria-label="Nach oben"
           title="Nach oben"
-          data-testid="mobile-scroll-top"
+          data-testid="scroll-top-btn"
         >
           <ArrowUp className="h-5 w-5" />
         </button>
