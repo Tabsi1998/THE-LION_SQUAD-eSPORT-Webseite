@@ -2,7 +2,7 @@
   "expo": {
     "name": "LionsAPP",
     "slug": "lionsapp",
-    "version": "1.0.0-beta.10",
+    "version": "1.0.0-beta.11",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "41",
+      "buildNumber": "42",
       "bundleIdentifier": "at.lionsquad.app",
       "infoPlist": {
         "NSAppTransportSecurity": {
@@ -24,7 +24,7 @@
     },
     "android": {
       "package": "at.lionsquad.app",
-      "versionCode": 41,
+      "versionCode": 42,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0A0A"

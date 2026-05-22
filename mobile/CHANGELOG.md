@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-beta.11 - 2026-05-22
+
+- Mobile/CI: Frischen Android-Build 42 fuer die Firebase/FCM-Push-Konfiguration vorbereitet.
+
 ## 1.0.0-beta.10 - 2026-05-21
 
 - Mobile: Frischer Android-Build 41 enthaelt die Match-Hub-Korrektur fuer eigene Terminvorschlaege.
