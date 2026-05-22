@@ -17,7 +17,17 @@ declare const ErrorUtils: {
   setGlobalHandler?: (handler: (error: Error, isFatal?: boolean) => void) => void;
 } | undefined;
 
-const sessionId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+function randomSessionSuffix() {
+  const cryptoApi = globalThis.crypto;
+  if (cryptoApi?.getRandomValues) {
+    const bytes = new Uint8Array(8);
+    cryptoApi.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  return `${Date.now().toString(36)}-${Platform.OS}-${Device.modelId || Device.modelName || "device"}`;
+}
+
+const sessionId = `${Date.now().toString(36)}-${randomSessionSuffix()}`;
 let installed = false;
 
 function clip(value: unknown, limit: number) {

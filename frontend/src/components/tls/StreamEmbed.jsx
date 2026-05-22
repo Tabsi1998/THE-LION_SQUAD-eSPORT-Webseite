@@ -7,6 +7,24 @@
 import { Radio, ExternalLink } from "lucide-react";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 
+const YOUTUBE_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]);
+const KICK_HOSTS = new Set(["kick.com", "www.kick.com"]);
+
+function parseHttpsUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  try {
+    const parsed = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function isAllowedHost(url, hosts) {
+  return hosts.has(url.hostname.toLowerCase());
+}
+
 function normalizeTwitchChannel(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -19,6 +37,31 @@ function normalizeTwitchChannel(value) {
     // Fall through to handle cleanup below.
   }
   return raw.replace(/^@/, "").replace(/^twitch\.tv\//i, "").replace(/^www\.twitch\.tv\//i, "").split(/[/?#]/)[0].toLowerCase();
+}
+
+function youtubeVideoId(value) {
+  const parsed = parseHttpsUrl(value);
+  if (!parsed || !isAllowedHost(parsed, YOUTUBE_HOSTS)) return "";
+  const path = parsed.pathname.split("/").filter(Boolean);
+  const id = parsed.hostname.toLowerCase() === "youtu.be"
+    ? path[0]
+    : parsed.searchParams.get("v") || (path[0] === "embed" ? path[1] : "");
+  return /^[\w-]{11}$/.test(id || "") ? id : "";
+}
+
+function youtubeLiveHandle(value) {
+  const parsed = parseHttpsUrl(value);
+  if (!parsed || !isAllowedHost(parsed, YOUTUBE_HOSTS)) return "";
+  const path = parsed.pathname.split("/").filter(Boolean);
+  const raw = path[0]?.startsWith("@") ? path[0] : ["c", "user"].includes(path[0]) ? path[1] : "";
+  return /^@?[\w-]+$/.test(raw || "") ? raw : "";
+}
+
+function kickChannel(value) {
+  const parsed = parseHttpsUrl(value);
+  if (!parsed || !isAllowedHost(parsed, KICK_HOSTS)) return "";
+  const channel = parsed.pathname.split("/").filter(Boolean)[0] || "";
+  return /^[a-zA-Z0-9_.-]{2,64}$/.test(channel) ? channel : "";
 }
 
 export function StreamEmbed({ source, compact = false, showExternalLink = true }) {
@@ -40,14 +83,14 @@ export function StreamEmbed({ source, compact = false, showExternalLink = true }
       embedSrc = `https://player.twitch.tv/?${params.toString()}`;
     }
   } else if (platform === "youtube" && source.stream_url) {
-    const m = source.stream_url.match(/(?:youtu\.be\/|v=|\/embed\/)([\w-]{11})/);
-    if (m) embedSrc = `https://www.youtube.com/embed/${m[1]}?autoplay=0`;
-    else if (source.stream_url.includes("youtube.com/")) {
-      const handle = source.stream_url.match(/youtube\.com\/(@[\w-]+|c\/[\w-]+|user\/[\w-]+)/)?.[1];
+    const videoId = youtubeVideoId(source.stream_url);
+    if (videoId) embedSrc = `https://www.youtube.com/embed/${videoId}?autoplay=0`;
+    else {
+      const handle = youtubeLiveHandle(source.stream_url);
       if (handle) embedSrc = `https://www.youtube.com/embed/live_stream?channel=${encodeURIComponent(handle)}`;
     }
   } else if (platform === "kick" && source.stream_url) {
-    const channel = source.stream_url.replace(/.*kick\.com\//, "").replace(/\/.*$/, "");
+    const channel = kickChannel(source.stream_url);
     if (channel) embedSrc = `https://player.kick.com/${channel}`;
   }
 

@@ -5,6 +5,30 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Copy, Eye } from "lucide-react";
 
+function safeWidgetUrl({ type, id, track, base }) {
+  if (!id || !/^[A-Za-z0-9_-]+$/.test(String(id))) return "";
+  const path = type === "bracket" ? `/display/bracket/${encodeURIComponent(id)}`
+    : type === "f1" ? `/display/f1/${encodeURIComponent(id)}` : "";
+  if (!path) return "";
+  try {
+    const next = new URL(path, base);
+    if (type === "f1" && track) next.searchParams.set("track", String(track));
+    return next.toString();
+  } catch {
+    return "";
+  }
+}
+
+function escapeHtmlAttribute(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;",
+  }[char]));
+}
+
 export default function AdminWidgetsPage() {
   const [tournaments, setTournaments] = useState([]);
   const [challenges, setChallenges] = useState([]);
@@ -28,12 +52,9 @@ export default function AdminWidgetsPage() {
     api.get(`/f1/challenges/${selId}?include_draft=true`).then(({ data }) => setTracks(data.tracks || [])).catch(() => setTracks([]));
   }, [selType, selId]);
 
-  const path = selType === "bracket" ? `/display/bracket/${selId}`
-    : selType === "f1" ? `/display/f1/${selId}` : "";
-  const query = selType === "f1" && selTrack ? `?track=${encodeURIComponent(selTrack)}` : "";
   const publicBase = typeof window !== "undefined" ? window.location.origin : API_BASE;
-  const url = selId ? `${publicBase}${path}${query}` : "";
-  const iframe = url ? `<iframe src="${url}" width="100%" height="${height}" frameborder="0" style="border:none"></iframe>` : "";
+  const url = safeWidgetUrl({ type: selType, id: selId, track: selTrack, base: publicBase });
+  const iframe = url ? `<iframe src="${escapeHtmlAttribute(url)}" width="100%" height="${Number(height) || 600}" frameborder="0" style="border:none"></iframe>` : "";
 
   const copy = () => {
     navigator.clipboard.writeText(iframe);

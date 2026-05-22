@@ -71,8 +71,8 @@ function injectGoogleAnalytics(measurementId) {
   if (!id) return;
   const gtag = ensureGoogleTag();
   setGoogleConsent("denied", "default");
-  const escapedId = typeof CSS !== "undefined" && CSS.escape ? CSS.escape(id) : id.replace(/"/g, '\\"');
-  const existing = document.querySelector(`[${SCRIPT_ATTR}="true"][${GOOGLE_SCRIPT_ID_ATTR}="${escapedId}"]`);
+  const existing = Array.from(document.querySelectorAll(`[${SCRIPT_ATTR}="true"]`))
+    .find((node) => node.getAttribute(GOOGLE_SCRIPT_ID_ATTR) === id);
   if (!existing) {
     appendScript({
       async: "true",
