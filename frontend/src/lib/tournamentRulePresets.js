@@ -14,7 +14,7 @@ export const RULE_PRESETS = [
   {
     key: "hybrid",
     label: "Hybrid",
-    description: "Staff kann eingreifen, Spieleraktionen bleiben je nach Phase moeglich.",
+    description: "Staff kann eingreifen, Spieleraktionen bleiben je nach Phase möglich.",
     values: { event_mode: "hybrid", result_entry_mode: "hybrid", schedule_mode: "hybrid" },
   },
 ];

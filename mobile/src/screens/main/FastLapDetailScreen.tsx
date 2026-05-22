@@ -257,7 +257,7 @@ export function FastLapDetailScreen({ route }: Props) {
         {challenge.can_manage_times ? (
           <Card style={styles.managerCard}>
             <Heading>Zeit eintragen</Heading>
-            <Muted>Fuer Admins und Fast-Lap-Team. Zeiten werden fuer die aktuell gewaehlte Strecke gespeichert.</Muted>
+            <Muted>Für Admins und Fast-Lap-Team. Zeiten werden für die aktuell gewählte Strecke gespeichert.</Muted>
             <TextInput
               value={managerSearch}
               onChangeText={setManagerSearch}

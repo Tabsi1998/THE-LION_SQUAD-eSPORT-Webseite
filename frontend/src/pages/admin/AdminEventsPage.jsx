@@ -59,7 +59,7 @@ export default function AdminEventsPage() {
       description: "Das Event wird aus der öffentlichen Event-Liste entfernt.",
       confirmLabel: "Löschen",
     })) return;
-    try { await api.delete(`/events/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Event konnte nicht geloescht werden.")); }
+    try { await api.delete(`/events/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Event konnte nicht gelöscht werden.")); }
   };
 
   return (

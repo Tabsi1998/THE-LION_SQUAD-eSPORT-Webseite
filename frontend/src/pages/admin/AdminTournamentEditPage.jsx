@@ -452,7 +452,7 @@ export default function AdminTournamentEditPage() {
       .map((item) => item.message)
       .join("\n");
     if (!silent) {
-      if (data.ok && !data.warning_count) toast.success(`Planung OK: ${data.checked_matches} Matches geprueft.`);
+      if (data.ok && !data.warning_count) toast.success(`Planung OK: ${data.checked_matches} Matches geprüft.`);
       else toast[data.ok ? "warning" : "error"](`${data.error_count} Konflikte, ${data.warning_count} Hinweise${lines ? `\n${lines}` : ""}`);
     }
     return data;
@@ -489,7 +489,7 @@ export default function AdminTournamentEditPage() {
     const ok = await confirm({
       title: locked ? "Turnier sperren?" : "Turnier entsperren?",
       description: locked
-        ? "Danach sind Ergebnisse, Teilnehmer, Spielzeiten und Stationen nur noch lesbar. Loeschen bleibt moeglich."
+        ? "Danach sind Ergebnisse, Teilnehmer, Spielzeiten und Stationen nur noch lesbar. Löschen bleibt möglich."
         : "Danach kann die Turnierleitung wieder Aenderungen vornehmen.",
       confirmLabel: locked ? "Sperren" : "Entsperren",
       tone: locked ? "danger" : "info",
@@ -639,7 +639,7 @@ export default function AdminTournamentEditPage() {
             <Zap className="w-3.5 h-3.5" /> Stationen automatisch
           </button>}
           {isModerator && <button onClick={() => runPlanningCheck()} data-testid="admin-tr-planning-check" className="px-4 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#FFD700]/10 inline-flex items-center gap-2">
-            <Eye className="w-3.5 h-3.5" /> Planung pruefen
+            <Eye className="w-3.5 h-3.5" /> Planung prüfen
           </button>}
           {isModerator && <button onClick={reset} data-testid="admin-tr-reset" className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-sm hover:border-[#FF3B30]/60 hover:text-[#FF3B30] inline-flex items-center gap-2">
             <RefreshCw className="w-3.5 h-3.5" /> Zurücksetzen
@@ -810,7 +810,7 @@ export default function AdminTournamentEditPage() {
                       <MatchResultControls match={m} a={a} b={b} onSave={updateMatchResult} />
                     )}
                     {isModerator && <MatchScheduleControls match={m} stations={stations} defaultScheduledAt={t.start_date} onSave={updateMatchSchedule} />}
-                    <Link to={`/matches/${m.id}`} className="inline-flex text-[#29B6E8] text-xs font-bold uppercase hover:text-white">Oeffnen</Link>
+                    <Link to={`/matches/${m.id}`} className="inline-flex text-[#29B6E8] text-xs font-bold uppercase hover:text-white">Öffnen</Link>
                   </div>
                 </div>
               );
@@ -1251,7 +1251,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
               <SelectField label="Terminplanung" value={form.schedule_mode} onChange={(v)=>set("schedule_mode", v)} options={[["", "Vom Turnier erben"], ...SCHEDULE_MODE_OPTIONS.filter(([value]) => value)]} />
             </div>
             <div className="text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-              Leer bedeutet: diese Phase erbt die Turnier-Regeln. Overrides gelten fuer Match-Hub, Terminabstimmung und Ergebnisfluss dieser Phase.
+              Leer bedeutet: diese Phase erbt die Turnier-Regeln. Overrides gelten für Match-Hub, Terminabstimmung und Ergebnisfluss dieser Phase.
             </div>
             {config.showSchema ? (
               <label className="block">

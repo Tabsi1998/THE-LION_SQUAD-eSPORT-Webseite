@@ -123,7 +123,7 @@ export function ImprintPage() {
         <p>
           Diese Website ist das offizielle Informations- und Serviceangebot von {legalName}. Sie
           informiert über den Verein, Mitgliedschaft, Vorstand, Veranstaltungen, Community,
-          eSports-Turniere, Fast-Lap-Challenges, Ranglisten, News, Sponsoren und Kontaktmoeglichkeiten.
+          eSports-Turniere, Fast-Lap-Challenges, Ranglisten, News, Sponsoren und Kontaktmöglichkeiten.
         </p>
         <p>
           Der Vereinssitz liegt in Tirol. Die Vereinstätigkeit ist nicht auf Gewinn gerichtet,

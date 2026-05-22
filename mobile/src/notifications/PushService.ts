@@ -19,18 +19,6 @@ import Constants from "expo-constants";
 import { api } from "../lib/api";
 import type { UserNotification } from "../types";
 
-export type PushDiagnostics = {
-  nativeAvailable: boolean;
-  isDevice: boolean;
-  permissionStatus: string;
-  canAskAgain?: boolean;
-  projectId: string;
-  tokenPreview?: string;
-  channelCount?: number;
-  registerOk?: boolean;
-  error?: string;
-};
-
 // Graceful import – falls expo-notifications nicht installiert ist
 // Installieren mit: npx expo install expo-notifications expo-device
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -169,43 +157,6 @@ export async function registerPushToken(): Promise<string | null> {
   }
 }
 
-export async function getPushDiagnostics(register = false): Promise<PushDiagnostics> {
-  const projectId = getExpoProjectId();
-  const status: PushDiagnostics = {
-    nativeAvailable: Boolean(Notifications && Device),
-    isDevice: Boolean(Device?.isDevice),
-    permissionStatus: "unknown",
-    projectId,
-  };
-  if (!Notifications || !Device) return status;
-
-  try {
-    const permissions = await Notifications.getPermissionsAsync();
-    status.permissionStatus = permissions?.status || "unknown";
-    status.canAskAgain = permissions?.canAskAgain;
-
-    if (Platform.OS === "android") {
-      const channels = await Notifications.getNotificationChannelsAsync?.().catch(() => []);
-      status.channelCount = Array.isArray(channels) ? channels.length : 0;
-    }
-
-    if (register) {
-      const token = await registerPushToken();
-      status.registerOk = Boolean(token);
-      if (token) status.tokenPreview = previewToken(token);
-      return status;
-    }
-
-    if (Device.isDevice && permissions?.status === "granted") {
-      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-      if (tokenData?.data) status.tokenPreview = previewToken(tokenData.data);
-    }
-  } catch (err) {
-    status.error = err instanceof Error ? err.message : String(err);
-  }
-  return status;
-}
-
 function notificationFromNotification(notification: unknown): UserNotification | null {
   const content = (notification as {
     request?: { content?: { title?: string | null; body?: string | null; data?: Record<string, unknown> } };
@@ -240,10 +191,6 @@ function notificationFromContent(content?: { title?: string | null; body?: strin
 
 function stringValue(value: unknown) {
   return typeof value === "string" || typeof value === "number" ? String(value) : "";
-}
-
-function previewToken(value: string) {
-  return value.length > 28 ? `${value.slice(0, 28)}...` : value;
 }
 
 function objectValue(value: unknown): Record<string, unknown> {

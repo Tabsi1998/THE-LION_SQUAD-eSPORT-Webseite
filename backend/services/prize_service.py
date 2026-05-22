@@ -114,7 +114,7 @@ async def auto_create_for_tournament(tid: str) -> int:
                 await create_user_notification(
                     uid,
                     "Gewinn vorgemerkt",
-                    f"{doc.get('place_label') or _ordinal(place)} Platz bei {t.get('title') or 'dem Turnier'}: {prize_text}. Sobald der Gewinn abholbereit ist, bekommst du die naechste Meldung.",
+                    f"{doc.get('place_label') or _ordinal(place)} Platz bei {t.get('title') or 'dem Turnier'}: {prize_text}. Sobald der Gewinn abholbereit ist, bekommst du die nächste Meldung.",
                     url="/me/prizes",
                     kind="prize_pending",
                     meta={"tournament_id": tid, "pickup_id": doc["id"], "place": place},

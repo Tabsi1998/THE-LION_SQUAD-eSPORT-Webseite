@@ -24,7 +24,7 @@ const eventModeLabels = {
 
 const resultModeLabels = {
   staff_only: "Ergebnis durch Turnierleitung",
-  player_confirmed: "Spieler bestaetigen Ergebnis",
+  player_confirmed: "Spieler bestätigen Ergebnis",
   hybrid: "Spieler + Staff",
 };
 

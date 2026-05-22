@@ -36,19 +36,19 @@ def _classic_result_summary(match: dict, regs_by_id: dict[str, dict]) -> str:
     winner = _registration_name(regs_by_id.get(match.get("winner_id")), "Unentschieden")
     if match.get("status") == "forfeit":
         return f"{a} gegen {b} wurde per Forfeit gewertet. Gewinner: {winner}."
-    return f"{a} gegen {b} ist bestaetigt: {score}. Gewinner: {winner}."
+    return f"{a} gegen {b} ist bestätigt: {score}. Gewinner: {winner}."
 
 
 def _v2_result_summary(match: dict, regs_by_id: dict[str, dict]) -> str:
     results = sorted(match.get("results") or [], key=lambda row: int(row.get("rank") or 999))
     if not results:
-        return "Das Ergebnis wurde bestaetigt."
+        return "Das Ergebnis wurde bestätigt."
     parts = []
     for result in results[:4]:
         name = _registration_name(regs_by_id.get(result.get("registration_id")), "Teilnehmer")
         parts.append(f"{result.get('rank')}. {name}")
     suffix = f" (+{len(results) - 4} weitere)" if len(results) > 4 else ""
-    return "Ergebnis bestaetigt: " + ", ".join(parts) + suffix + "."
+    return "Ergebnis bestätigt: " + ", ".join(parts) + suffix + "."
 
 
 async def notify_match_result_confirmed(db, match: dict, collection_name: str = "matches", force: bool = False) -> int:
@@ -69,7 +69,7 @@ async def notify_match_result_confirmed(db, match: dict, collection_name: str = 
         {"id": match.get("tournament_id")},
         {"_id": 0, "id": 1, "slug": 1, "title": 1},
     ) or {}
-    title = "Ergebnis korrigiert" if force else "Ergebnis bestaetigt"
+    title = "Ergebnis korrigiert" if force else "Ergebnis bestätigt"
     tournament_title = tournament.get("title") or "Turnier"
     if collection_name == "matches_v2" or match.get("slots"):
         body = f"{tournament_title}: {_v2_result_summary(match, regs_by_id)}"

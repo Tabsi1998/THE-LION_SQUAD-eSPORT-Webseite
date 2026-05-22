@@ -50,7 +50,7 @@ export default function AdminDocumentsPage() {
       description: "Das Dokument wird aus dem Mitglieder-CMS entfernt.",
       confirmLabel: "Löschen",
     })) return;
-    try { await api.delete(`/documents/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Dokument konnte nicht geloescht werden.")); }
+    try { await api.delete(`/documents/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Dokument konnte nicht gelöscht werden.")); }
   };
 
   return (

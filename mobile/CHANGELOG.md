@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-beta.12 - 2026-05-22
+
+- Mobile: Push-Test- und Diagnosekarte aus der Benachrichtigungsansicht entfernt.
+- Mobile: Eigenes Android-Notification-Icon und Akzentfarbe für Push-Benachrichtigungen konfiguriert.
+- Mobile/Web/Backend: Sichtbare App-, Web- und Push-Texte in den betroffenen Bereichen auf echte Umlaute umgestellt.
+
 ## 1.0.0-beta.11 - 2026-05-22
 
 - Mobile/CI: Frischen Android-Build 42 fuer die Firebase/FCM-Push-Konfiguration vorbereitet.

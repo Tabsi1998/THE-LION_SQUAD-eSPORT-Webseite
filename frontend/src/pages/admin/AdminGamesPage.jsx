@@ -64,10 +64,10 @@ export default function AdminGamesPage() {
     })) return;
     try {
       await api.delete(`/games/${id}`);
-      toast.success("Spiel geloescht.");
+      toast.success("Spiel gelöscht.");
       load();
     } catch (err) {
-      toast.error(formatRequestError(err, "Spiel konnte nicht geloescht werden."));
+      toast.error(formatRequestError(err, "Spiel konnte nicht gelöscht werden."));
     }
   };
 
@@ -122,7 +122,7 @@ export default function AdminGamesPage() {
                       <button onClick={() => setEditing(toForm(g))} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Spiel bearbeiten" data-testid={`game-edit-${g.slug}`}>
                         <Pencil className="w-4 h-4" />
                       </button>
-                      <button onClick={() => del(g.id)} className="p-1 text-white/40 hover:text-[#FF3B30]" title="Spiel loeschen" data-testid={`game-delete-${g.slug}`}>
+                      <button onClick={() => del(g.id)} className="p-1 text-white/40 hover:text-[#FF3B30]" title="Spiel löschen" data-testid={`game-delete-${g.slug}`}>
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>

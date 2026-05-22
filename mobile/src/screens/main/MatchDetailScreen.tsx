@@ -434,7 +434,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                       <Button label="Gegenvorschlag senden" variant="secondary" onPress={() => decide(proposal, "counter")} disabled={busy} />
                     </>
                   ) : canManageSchedule ? (
-                    <Muted>Wartet auf Bestaetigung durch Gegenseite oder Turnierleitung.</Muted>
+                    <Muted>Wartet auf Bestätigung durch Gegenseite oder Turnierleitung.</Muted>
                   ) : null}
                 </View>
               ))}

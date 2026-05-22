@@ -233,7 +233,7 @@ export default function SetupWizardPage() {
                   </div>
                   <label className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={data.smtp_tls_verify !== false} onChange={(e) => upd("smtp_tls_verify", e.target.checked)} data-testid="wizard-smtp-tls-verify" className="accent-[#29B6E8]" />
-                    <span>TLS Zertifikat pruefen</span>
+                    <span>TLS Zertifikat prüfen</span>
                   </label>
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">SMTP Anmeldung</div>

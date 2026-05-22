@@ -39,17 +39,17 @@ export function getRegistrationState(item?: RegistrationLike | null, noun = "Anm
     return { state: "disabled", canRegister: false, label: `${noun} deaktiviert` };
   }
   if (status === "draft") {
-    return { state: "draft", canRegister: false, label: "Noch nicht veroeffentlicht" };
+    return { state: "draft", canRegister: false, label: "Noch nicht veröffentlicht" };
   }
   if (status === "scheduled" || status === "registration_pending" || status === "announced") {
     const suffix = openFromMs ? ` ab ${formatDateTime(openFrom)}` : "";
-    return { state: "scheduled", canRegister: false, label: `${noun} oeffnet${suffix}` };
+    return { state: "scheduled", canRegister: false, label: `${noun} öffnet${suffix}` };
   }
   if (status !== "registration_open") {
     return { state: "closed", canRegister: false, label: `${noun} geschlossen` };
   }
   if (openFromMs && now < openFromMs) {
-    return { state: "scheduled", canRegister: false, label: `${noun} oeffnet am ${formatDateTime(openFrom)}` };
+    return { state: "scheduled", canRegister: false, label: `${noun} öffnet am ${formatDateTime(openFrom)}` };
   }
   if (openUntilMs && now > openUntilMs) {
     return { state: "closed", canRegister: false, label: `${noun} seit ${formatDateTime(openUntil)} geschlossen` };

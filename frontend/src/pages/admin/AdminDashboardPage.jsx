@@ -27,7 +27,7 @@ export default function AdminDashboardPage() {
   ];
   const taskItems = [
     {
-      label: "Setup pruefen",
+      label: "Setup prüfen",
       detail: setupStatus && (!setupStatus.completed || (setupStatus.health_score || 0) < 100)
         ? `${setupStatus.health_score ?? 0}% abgeschlossen`
         : "Grundkonfiguration sieht sauber aus",
@@ -44,7 +44,7 @@ export default function AdminDashboardPage() {
     },
     {
       label: "Medien-Check",
-      detail: "Banner, Track-Bilder und ungenutzte Dateien pruefen",
+      detail: "Banner, Track-Bilder und ungenutzte Dateien prüfen",
       to: "/admin/media",
       icon: ImageIcon,
       tone: "#29B6E8",

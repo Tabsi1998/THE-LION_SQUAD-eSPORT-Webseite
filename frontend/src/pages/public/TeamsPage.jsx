@@ -138,7 +138,7 @@ function TeamDetail({ id }) {
       await api.delete(`/teams/${team.id}`);
       toast.success("Team gelöscht.");
       nav("/teams");
-    } catch (err) { toast.error(formatRequestError(err, "Team konnte nicht geloescht werden.")); }
+    } catch (err) { toast.error(formatRequestError(err, "Team konnte nicht gelöscht werden.")); }
   };
 
   const kickMember = async (m) => {

@@ -125,8 +125,8 @@ export default function F1DetailPage() {
               <div className="font-bold uppercase tracking-wider text-xs text-[#FFD700]">Vereins-Referenzzeiten</div>
               <div className="mt-1 text-white/60">
                 {challenge.block_club_member_results
-                  ? "Diese Challenge ist fuer externe Teilnehmer gewertet. Vereinsmitglieder erscheinen nur als Referenzzeiten ausser Wertung."
-                  : "Vereins-Referenzzeiten sind separat moeglich und zaehlen nicht zur offiziellen Rangliste."}
+                  ? "Diese Challenge ist für externe Teilnehmer gewertet. Vereinsmitglieder erscheinen nur als Referenzzeiten außer Wertung."
+                  : "Vereins-Referenzzeiten sind separat möglich und zählen nicht zur offiziellen Rangliste."}
                 {challenge.show_club_reference_times === false && <span> Die Referenzen sind aktuell nur intern sichtbar.</span>}
               </div>
             </div>
@@ -366,7 +366,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
     event.preventDefault();
     const ms = parseTimeStr(form.time_str);
     if (!ms) {
-      toast.error("Ungueltiges Zeitformat. Beispiel: 1:24.587");
+      toast.error("Ungültiges Zeitformat. Beispiel: 1:24.587");
       return;
     }
     const penalty = Number(form.penalty_seconds) || 0;
@@ -398,20 +398,20 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
 
   const deleteTime = async (time) => {
     const ok = await confirm({
-      title: "Zeit loeschen?",
+      title: "Zeit löschen?",
       description: `${time.user?.display_name || time.user?.username || "Fahrer"} - ${time.time_str} wird aus der Challenge entfernt.`,
-      confirmLabel: "Zeit loeschen",
+      confirmLabel: "Zeit löschen",
       tone: "danger",
     });
     if (!ok) return;
     setDeletingId(time.id);
     try {
       await api.delete(`/f1/times/${time.id}`);
-      toast.success("Zeit geloescht.");
+      toast.success("Zeit gelöscht.");
       await loadTimes();
       onSaved();
     } catch (err) {
-      toast.error(formatRequestError(err, "Zeit konnte nicht geloescht werden."));
+      toast.error(formatRequestError(err, "Zeit konnte nicht gelöscht werden."));
     } finally {
       setDeletingId(null);
     }
@@ -423,7 +423,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
             <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeit erfassen</div>
-            <div className="text-xs text-white/45 mt-1">Direkt fuer Zeitnehmer, Schiedsrichter und Organisation.</div>
+            <div className="text-xs text-white/45 mt-1">Direkt für Zeitnehmer, Schiedsrichter und Organisation.</div>
           </div>
           {currentUser && <div className="text-[10px] uppercase tracking-widest text-white/35">{currentUser.display_name || currentUser.username}</div>}
         </div>
@@ -454,9 +454,9 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
         </div>
         <div className="mt-2 grid md:grid-cols-2 gap-2">
           <input value={form.proof_url} onChange={(e) => set("proof_url", e.target.value)} placeholder="Proof URL optional" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-          <input value={form.admin_note} onChange={(e) => set("admin_note", e.target.value)} placeholder={Number(form.penalty_seconds) > 0 ? "Begruendung fuer Strafe" : "Notiz optional"} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+          <input value={form.admin_note} onChange={(e) => set("admin_note", e.target.value)} placeholder={Number(form.penalty_seconds) > 0 ? "Begründung für Strafe" : "Notiz optional"} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
         </div>
-        {forceReferenceScope && <div className="mt-2 text-[10px] text-[#FFD700] uppercase tracking-widest">Vereinsmitglied: nur Referenzzeit moeglich.</div>}
+        {forceReferenceScope && <div className="mt-2 text-[10px] text-[#FFD700] uppercase tracking-widest">Vereinsmitglied: nur Referenzzeit möglich.</div>}
       </form>
 
       <div className="mt-4 border-t border-white/10 pt-3">
@@ -483,7 +483,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
                   onClick={() => deleteTime(time)}
                   disabled={deletingId === time.id}
                   className="p-1.5 text-white/42 hover:text-[#FF3B30] disabled:opacity-40"
-                  title="Zeit loeschen"
+                  title="Zeit löschen"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

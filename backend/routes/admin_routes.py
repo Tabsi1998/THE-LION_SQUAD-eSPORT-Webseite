@@ -77,7 +77,7 @@ async def update_mobile_client_log(log_id: str, body: MobileLogPatch, me: dict =
     if body.status is not None:
         status = body.status.strip().lower()
         if status not in {"open", "info", "resolved", "ignored"}:
-            raise HTTPException(status_code=400, detail="Ungueltiger Status")
+            raise HTTPException(status_code=400, detail="Ungültiger Status")
         update["status"] = status
         if status == "resolved":
             update["resolved_at"] = now_utc().isoformat()

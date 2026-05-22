@@ -103,10 +103,10 @@ export default function AdminF1EditPage() {
     })) return;
     try {
       await api.delete(`/f1/tracks/${tid}`);
-      toast.success("Strecke geloescht.");
+      toast.success("Strecke gelöscht.");
       load();
     } catch (err) {
-      toast.error(formatRequestError(err, "Strecke konnte nicht geloescht werden."));
+      toast.error(formatRequestError(err, "Strecke konnte nicht gelöscht werden."));
     }
   };
 
@@ -152,10 +152,10 @@ export default function AdminF1EditPage() {
   const delTime = async (tid) => {
     try {
       await api.delete(`/f1/times/${tid}`);
-      toast.success("Zeit geloescht.");
+      toast.success("Zeit gelöscht.");
       loadTimes();
     } catch (err) {
-      toast.error(formatRequestError(err, "Zeit konnte nicht geloescht werden."));
+      toast.error(formatRequestError(err, "Zeit konnte nicht gelöscht werden."));
     }
   };
 

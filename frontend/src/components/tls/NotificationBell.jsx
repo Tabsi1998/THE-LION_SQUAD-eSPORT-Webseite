@@ -64,7 +64,7 @@ export function NotificationBell() {
               description: item.body || "Neue Benachrichtigung.",
               duration: 15000,
               action: item.url ? {
-                label: "Oeffnen",
+                label: "Öffnen",
                 onClick: async () => {
                   try { await api.post(`/admin/notifications/${item.id}/read`); } catch {}
                   openUrl(item.url);

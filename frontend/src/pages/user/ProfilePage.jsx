@@ -1232,11 +1232,11 @@ function TeamsPanel() {
     })) return;
     try {
       await api.delete(`/teams/${activeTeam.id}/squads/${squad.id}`);
-      toast.success("Squad geloescht.");
+      toast.success("Squad gelöscht.");
       setSquads((rows) => rows.filter((s) => s.id !== squad.id));
       loadTeams();
     } catch (err) {
-      toast.error(formatRequestError(err, "Squad konnte nicht geloescht werden."));
+      toast.error(formatRequestError(err, "Squad konnte nicht gelöscht werden."));
     }
   };
 

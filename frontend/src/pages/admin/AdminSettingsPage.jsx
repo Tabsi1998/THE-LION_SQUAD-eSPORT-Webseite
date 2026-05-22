@@ -398,7 +398,7 @@ export default function AdminSettingsPage() {
     if (savingBrand) return;
     if (imageUploadBusy) return toast.error("Bild-Upload läuft noch. Bitte kurz warten und dann speichern.");
     if (brand.analytics_provider === "google" && !isGoogleMeasurementId(brand.google_analytics_id)) {
-      return toast.error("Bitte eine gueltige Google Measurement ID eintragen, z.B. G-3X155KW480.");
+      return toast.error("Bitte eine gültige Google Measurement ID eintragen, z.B. G-3X155KW480.");
     }
     setSavingBrand(true);
     try {
@@ -861,7 +861,7 @@ export default function AdminSettingsPage() {
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">TLS Zertifikat</div>
                 <label className="h-[38px] flex items-center gap-2 bg-[#0A0A0A] border border-white/10 px-3 rounded-sm text-sm">
                   <input type="checkbox" checked={smtp.smtp_tls_verify !== false} onChange={(e) => setSmtp({ ...smtp, smtp_tls_verify: e.target.checked })} data-testid="smtp-tls-verify" className="accent-[#29B6E8]" />
-                  <span>Pruefen</span>
+                  <span>Prüfen</span>
                 </label>
               </div>
               <div>
@@ -987,7 +987,7 @@ export default function AdminSettingsPage() {
               <div data-testid="smtp-deliverability-result" className={`border rounded-sm p-4 text-xs space-y-3 ${smtpDeliverability.ok ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FFD700]/25 bg-[#FFD700]/5"}`}>
                 <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
                   {smtpDeliverability.ok ? <CheckCircle2 className="w-4 h-4 text-[#00FF88]" /> : <AlertTriangle className="w-4 h-4 text-[#FFD700]" />}
-                  Gmail Zustellbarkeit: {smtpDeliverability.ok ? "Basis OK" : "Pruefen"}
+                  Gmail Zustellbarkeit: {smtpDeliverability.ok ? "Basis OK" : "Prüfen"}
                 </div>
                 <div className="grid sm:grid-cols-3 gap-2 text-white/55">
                   <div>From: <span className="font-mono text-white/75">{smtpDeliverability.from_domain || "-"}</span></div>
@@ -1010,7 +1010,7 @@ export default function AdminSettingsPage() {
               </div>
             )}
             <p className="text-xs text-white/50">Testet die SMTP-Verbindung direkt. Auto-TLS verhält sich wie beim OmniFM-Bot: Port 465 SSL/TLS, Port 25 plain, sonst STARTTLS.</p>
-            <p className="text-xs text-white/50">Bei self-signed Zertifikat kann "TLS Zertifikat pruefen" deaktiviert werden; besser ist ein vertrauenswuerdiges Zertifikat am Mailserver.</p>
+            <p className="text-xs text-white/50">Bei self-signed Zertifikat kann "TLS Zertifikat prüfen" deaktiviert werden; besser ist ein vertrauenswürdiges Zertifikat am Mailserver.</p>
           </div>
         </div>
       )}
@@ -1535,7 +1535,7 @@ export default function AdminSettingsPage() {
                 <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Footer & SEO</span>
                 <h2 className="font-heading text-2xl font-black uppercase mt-1">Social Links</h2>
                 <p className="text-sm text-white/55 mt-2 max-w-2xl">
-                  Diese Liste steuert die Icons im Footer und die Social-Erkennung fuer Suchmaschinen. Nur aktive Links mit URL werden ausgespielt.
+                  Diese Liste steuert die Icons im Footer und die Social-Erkennung für Suchmaschinen. Nur aktive Links mit URL werden ausgespielt.
                 </p>
               </div>
               <button type="button" onClick={addSocialLink} className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider">
@@ -1577,7 +1577,7 @@ export default function AdminSettingsPage() {
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
                 <div>
                   <div className="font-heading font-bold uppercase">Analytics</div>
-                  <p className="text-xs text-white/50 mt-1">Bei Google Analytics nur die Measurement-ID eintragen, z.B. G-3X155KW480. Das Google-Tag wird automatisch mit Consent Mode eingebunden und erst nach Statistik-Zustimmung aktiv gemessen. Fuer DebugView die Seite mit ?ga_debug oeffnen.</p>
+                  <p className="text-xs text-white/50 mt-1">Bei Google Analytics nur die Measurement-ID eintragen, z.B. G-3X155KW480. Das Google-Tag wird automatisch mit Consent Mode eingebunden und erst nach Statistik-Zustimmung aktiv gemessen. Für DebugView die Seite mit ?ga_debug öffnen.</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <BrandSelect label="Analytics" value={brand.analytics_provider || ""} onChange={(v) => setBrandField("analytics_provider", v)} testId="brand-analytics-provider" options={[["", "Aus"], ["google", "Google Analytics"], ["plausible", "Plausible"]]} />
@@ -1588,7 +1588,7 @@ export default function AdminSettingsPage() {
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
               <div>
                 <div className="font-heading font-bold uppercase">Suchmaschinen-Verknuepfung</div>
-                <p className="text-xs text-white/50 mt-1">Fuer Search Console beim HTML-Tag nur den content-Wert eintragen, nicht das komplette Meta-Tag. IndexNow sendet Startseite und Sitemap aktiv an Microsoft/Bing-kompatible Suchmaschinen.</p>
+                <p className="text-xs text-white/50 mt-1">Für Search Console beim HTML-Tag nur den content-Wert eintragen, nicht das komplette Meta-Tag. IndexNow sendet Startseite und Sitemap aktiv an Microsoft/Bing-kompatible Suchmaschinen.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <BrandField label="Google Site Verification" value={brand.google_site_verification} onChange={(v) => setBrandField("google_site_verification", v)} testId="brand-google-verification" />
@@ -1831,7 +1831,7 @@ function SystemCard({ title, ok, detail, problem }) {
       <div className="flex items-center justify-between gap-3">
         <div className="font-heading font-bold uppercase">{title}</div>
         <span className={`text-[10px] font-black uppercase tracking-widest ${ready ? "text-[#00FF88]" : "text-[#FFD700]"}`}>
-          {ready ? "OK" : "Pruefen"}
+          {ready ? "OK" : "Prüfen"}
         </span>
       </div>
       <div className="mt-3 text-xs text-white/55 break-words">{detail || "-"}</div>

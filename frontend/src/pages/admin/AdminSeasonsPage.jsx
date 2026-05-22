@@ -187,7 +187,7 @@ function sourceMeta(item, fallbackWeight) {
 }
 
 function selectionText(ids) {
-  return ids?.length ? `${ids.length} manuell gewaehlt` : "Auto nach Zeitraum/Status";
+  return ids?.length ? `${ids.length} manuell gewählt` : "Auto nach Zeitraum/Status";
 }
 
 export default function AdminSeasonsPage() {
@@ -213,16 +213,16 @@ export default function AdminSeasonsPage() {
 
   const del = async (season) => {
     if (!await confirm({
-      title: "Jahreswertung loeschen?",
-      description: `Jahreswertung "${season.name}" wirklich loeschen?`,
-      confirmLabel: "Loeschen",
+      title: "Jahreswertung löschen?",
+      description: `Jahreswertung "${season.name}" wirklich löschen?`,
+      confirmLabel: "Löschen",
     })) return;
     try {
       await api.delete(`/seasons/${season.id}`);
-      toast.success("Jahreswertung geloescht.");
+      toast.success("Jahreswertung gelöscht.");
       load();
     } catch (err) {
-      toast.error(formatRequestError(err, "Jahreswertung konnte nicht geloescht werden."));
+      toast.error(formatRequestError(err, "Jahreswertung konnte nicht gelöscht werden."));
     }
   };
 
@@ -300,7 +300,7 @@ function SeasonCard({ season, onEdit, onDelete }) {
           </button>
           <Link to={`/seasons/${season.slug}`} target="_blank" className="px-3 py-1.5 border border-white/15 text-white/70 text-xs uppercase font-bold rounded-sm hover:text-white">Public</Link>
           <button onClick={onDelete} className="px-3 py-1.5 border border-[#FF3B30]/40 text-[#FF3B30] text-xs uppercase font-bold rounded-sm inline-flex items-center gap-1">
-            <Trash2 className="w-3 h-3" /> Loeschen
+            <Trash2 className="w-3 h-3" /> Löschen
           </button>
         </div>
       </div>
@@ -403,7 +403,7 @@ function SeasonModal({ season, tournaments, challenges, onClose, onSaved }) {
                 <Field label="Fallback-Punktetabelle">
                   <Input value={form.points_per_position} onChange={(v) => set("points_per_position", v)} testId="season-points" placeholder={DEFAULT_POINTS} />
                   <div className="text-[11px] text-white/35 mt-1.5">
-                    Wird fuer alte Fallback-Standings und Championship-Logik genutzt. Neue V2-Eintraege nutzen die feste Formel rechts.
+                    Wird für alte Fallback-Standings und Championship-Logik genutzt. Neue V2-Einträge nutzen die feste Formel rechts.
                   </div>
                 </Field>
                 <Field label="Streichresultate">
@@ -560,7 +560,7 @@ function SourcePicker({ label, helper, items, selected, onToggle, onSetSelected,
         <button type="button" onClick={() => onSetSelected(selected.filter((id) => !filtered.some((item) => item.id === id)))} className="px-2 py-1 border border-white/10 text-white/60 hover:text-white text-[10px] uppercase tracking-widest rounded-sm">
           Sichtbare loesen
         </button>
-        {selectedVisible > 0 && <span className="text-[10px] uppercase tracking-widest text-[#29B6E8] self-center">{selectedVisible} sichtbar gewaehlt</span>}
+        {selectedVisible > 0 && <span className="text-[10px] uppercase tracking-widest text-[#29B6E8] self-center">{selectedVisible} sichtbar gewählt</span>}
       </div>
 
       <div className="max-h-72 overflow-y-auto border border-white/10 rounded-sm p-2 space-y-1 bg-black/20">

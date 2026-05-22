@@ -26,7 +26,7 @@ export function ForgotPasswordPage() {
     <AuthShell title="Passwort vergessen" subtitle="Wir senden dir einen sicheren Link zum Zuruecksetzen.">
       {sent ? (
         <div className="text-sm text-white/70 border border-[#00FF88]/30 bg-[#00FF88]/10 p-4 rounded-sm">
-          Bitte pruefe dein Postfach. Der Link ist zeitlich begrenzt gueltig.
+          Bitte prüfe dein Postfach. Der Link ist zeitlich begrenzt gültig.
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4">
@@ -66,7 +66,7 @@ export function ResetPasswordPage() {
       toast.success(isInvite ? "Account aktiviert. Du kannst dich jetzt einloggen." : "Passwort aktualisiert.");
       nav("/login");
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Link ungueltig oder abgelaufen.");
+      toast.error(err.response?.data?.detail || "Link ungültig oder abgelaufen.");
     }
     setLoading(false);
   };

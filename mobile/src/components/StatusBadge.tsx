@@ -93,9 +93,9 @@ function formatRemaining(ms: number) {
 
 function toneForStatus(value: string): StatusTone {
   const text = normalizeStatusText(value);
-  if (/(abgesagt|cancel|rejected|abgelehnt|gesperrt|geschlossen|closed|error|conflict|klaerung|klarung|disputed|review|pruefung|prufung)/.test(text)) return "danger";
+  if (/(abgesagt|cancel|rejected|abgelehnt|gesperrt|geschlossen|closed|error|conflict|klärung|klaerung|klarung|disputed|review|prüfung|pruefung|prufung)/.test(text)) return "danger";
   if (/(^|\s)(live|lauft|in_progress)(\s|$)/.test(text)) return "danger";
-  if (/(aktiv|active|open|offen|registration_open|check-in|checkin|angemeldet|registered|bestaetigt|bestatigt|confirmed|accepted|approved)/.test(text)) return "success";
+  if (/(aktiv|active|open|offen|registration_open|check-in|checkin|angemeldet|registered|bestätigt|bestaetigt|bestatigt|confirmed|accepted|approved)/.test(text)) return "success";
   if (/(pending|ausstehend|wartet|vorschlag|draft|entwurf|planned|geplant|anmeldung|scheduled|proposed|reported|result_pending)/.test(text)) return "gold";
   if (/(archiv|beendet|finished|completed|veroeffentlicht|veroffentlicht|published)/.test(text)) return "default";
   return "cyan";
