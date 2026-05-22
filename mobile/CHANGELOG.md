@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0-beta.1 - 2026-05-22
+
+- Mobile: Finaler Beta-Build 45 nach Expo-SDK-56-Upgrade, Firebase/FCM-Push-Einrichtung und Android-Notification-Icon.
+- Mobile/Web/Backend: CodeQL-Security-Härtungen für Mobile-Logs, RichText, Stream-Embeds, Admin-Links, Backend-Dateipfade, Redirects und Exception-Ausgaben.
+- Backend/Admin: Push-Monitoring, Receipt-Prüfung und App-/Web-Logs bleiben für die Beta-Diagnose im Adminbereich verfügbar.
+
 ## 1.0.0-beta.13 - 2026-05-22
 
 - Mobile: Expo SDK 56, React Native 0.85 und React 19.2.3 als sauberen aktuellen Beta-Stand übernommen.
