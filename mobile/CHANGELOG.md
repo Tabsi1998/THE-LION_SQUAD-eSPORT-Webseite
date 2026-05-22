@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-beta.13 - 2026-05-22
+
+- Mobile: Expo SDK 56, React Native 0.85 und React 19.2.3 als sauberen aktuellen Beta-Stand übernommen.
+- Mobile/CI: Expo-Konfiguration bereinigt, `expo-doctor` in CI und APK-Release ergänzt und moderate npm-Audits wieder auf 0 gebracht.
+- Backend/Frontend: Sichere Dependency-Updates nachgezogen und CI auf Node 24 umgestellt.
+
 ## 1.0.0-beta.12 - 2026-05-22
 
 - Mobile: Push-Test- und Diagnosekarte aus der Benachrichtigungsansicht entfernt.

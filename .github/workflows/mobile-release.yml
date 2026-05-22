@@ -35,7 +35,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
@@ -50,6 +50,13 @@ jobs:
       - name: Typecheck mobile app
         working-directory: mobile
         run: npm run typecheck
+
+      - name: Validate Expo SDK compatibility
+        working-directory: mobile
+        run: |
+          npm audit --audit-level=moderate
+          npx expo install --check
+          npx expo-doctor
 
       - name: Resolve release metadata
         id: meta

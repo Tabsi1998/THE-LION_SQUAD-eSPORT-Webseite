@@ -1,7 +1,7 @@
 # LionsAPP Beta Smoke-Test
 
-Version: `1.0.0-beta.12`
-Android build: `43`
+Version: `1.0.0-beta.13`
+Android build: `44`
 Channel: `beta`
 
 ## GitHub Actions Build
@@ -17,7 +17,7 @@ Der Workflow muss vor dem Build `Prepared mobile/google-services.json for Androi
 Erwarteter APK-Name:
 
 ```text
-LionsAPP-BETA-v1.0.0-build43-<commit>.apk
+LionsAPP-BETA-v1.0.0-build44-<commit>.apk
 ```
 
 ## Handy-Matrix
@@ -80,6 +80,6 @@ Tag erst setzen, wenn:
 Danach optional:
 
 ```text
-git tag mobile-v1.0.0-beta.12-build43
-git push origin mobile-v1.0.0-beta.12-build43
+git tag mobile-v1.0.0-beta.13-build44
+git push origin mobile-v1.0.0-beta.13-build44
 ```
