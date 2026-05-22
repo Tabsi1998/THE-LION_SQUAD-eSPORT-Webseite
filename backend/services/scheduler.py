@@ -9,6 +9,7 @@ Runs recurring jobs in the FastAPI process:
   - f1_prize_reminders every 5 minutes
   - birthday_greetings every 6 hours
   - game_server_sync every 5 minutes
+  - mobile_push_receipts every 5 minutes
 
 Designed to be safe-by-default: every job catches its own exceptions so the
 scheduler never crashes the app.
@@ -113,6 +114,16 @@ async def _safe_game_server_sync():
         logger.exception(f"[scheduler] game_server_sync crash: {exc}")
 
 
+async def _safe_mobile_push_receipts():
+    try:
+        from services.push_notifications import check_recent_mobile_push_receipts
+        res = await check_recent_mobile_push_receipts(limit=100)
+        if res.get("checked") or res.get("errors") or res.get("disabled"):
+            logger.info(f"[scheduler] mobile_push_receipts {res}")
+    except Exception as exc:
+        logger.exception(f"[scheduler] mobile_push_receipts crash: {exc}")
+
+
 def _parse_dt(value):
     if not value:
         return None
@@ -210,11 +221,13 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_game_server_sync, IntervalTrigger(seconds=60), id="game_server_sync",
                   max_instances=1, coalesce=True)
+    sched.add_job(_safe_mobile_push_receipts, IntervalTrigger(minutes=5), id="mobile_push_receipts",
+                  max_instances=1, coalesce=True)
     sched.add_job(_safe_status_transitions, IntervalTrigger(seconds=60), id="status_transitions",
                   max_instances=1, coalesce=True)
     sched.start()
     _scheduler = sched
-    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · f1_prize_reminders 5m · birthday 6h · twitch 90s · game_server_sync 60s)")
+    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · f1_prize_reminders 5m · birthday 6h · twitch 90s · game_server_sync 60s · mobile_push_receipts 5m)")
     return sched
 
 

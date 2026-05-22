@@ -95,19 +95,43 @@ export default function AdminMobilePushPage() {
     }
   };
 
+  const checkAllReceipts = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { data } = await api.post("/admin/mobile-push/receipts");
+      toast.success(`${Number(data?.checked || 0)} Receipt(s) geprüft, ${Number(data?.disabled || 0)} Token deaktiviert.`);
+      await loadUsers();
+      await loadStatus(selected);
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Mobile</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Push-Tests</h1>
+          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Push-Monitoring</h1>
         </div>
-        <button
-          onClick={() => { loadUsers(); loadStatus(); }}
-          className="inline-flex items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Aktualisieren
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={checkAllReceipts}
+            disabled={busy}
+            className="inline-flex items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50 disabled:opacity-50"
+          >
+            <BellRing className="w-4 h-4" /> Alle Receipts
+          </button>
+          <button
+            onClick={() => { loadUsers(); loadStatus(); }}
+            className="inline-flex items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Aktualisieren
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
@@ -203,7 +227,38 @@ export default function AdminMobilePushPage() {
             <div className="p-4 border-b border-white/10">
               <h3 className="font-bold uppercase tracking-wider text-sm">Token-Status</h3>
             </div>
-            <div className="overflow-x-auto">
+            <div className="md:hidden divide-y divide-white/5">
+              {(status?.tokens || []).map((token, index) => (
+                <article key={`${token.token_preview}-card-${index}`} className="p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-mono text-xs text-white/65 truncate">{token.token_preview}</div>
+                      <div className="text-xs text-white/45 mt-1">{token.platform || "-"} · {token.enabled === false ? "inaktiv" : "aktiv"}</div>
+                    </div>
+                    <span className={`text-[10px] font-black uppercase tracking-wider border px-2 py-1 rounded-sm ${token.enabled === false ? "border-[#FFCC00]/40 text-[#FFD95A]" : "border-[#00FF88]/40 text-[#00FF88]"}`}>
+                      {token.enabled === false ? "Aus" : "An"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-2">
+                      <div className="text-white/35 uppercase tracking-wider text-[10px]">Ticket</div>
+                      <div>{token.last_ticket_status || "-"}</div>
+                      {token.last_ticket_error ? <div className="text-[#FF6B61] break-words">{token.last_ticket_error}</div> : null}
+                    </div>
+                    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-2">
+                      <div className="text-white/35 uppercase tracking-wider text-[10px]">Receipt</div>
+                      <div>{token.last_receipt_status || "-"}</div>
+                      {token.last_receipt_error ? <div className="text-[#FF6B61] break-words">{token.last_receipt_error}</div> : null}
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-white/40">Letzter Versand: {formatTime(token.last_sent_at)}</div>
+                </article>
+              ))}
+              {!(status?.tokens || []).length && (
+                <div className="text-center py-10 text-white/40">Keine Tokens für diesen Benutzer</div>
+              )}
+            </div>
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm min-w-[760px]">
                 <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
                   <tr>

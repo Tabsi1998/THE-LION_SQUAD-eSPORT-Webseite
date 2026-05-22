@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+import hashlib
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -48,6 +49,8 @@ class MobileClientLogCreate(BaseModel):
 
 
 LOG_LEVELS = {"debug", "info", "warn", "warning", "error", "fatal"}
+LOG_DEDUPE_SECONDS = 30
+LOG_RETENTION_DAYS = 90
 
 
 def _clip_text(value: str | None, limit: int) -> str | None:
@@ -67,6 +70,30 @@ def _safe_log_context(value: dict[str, Any] | None) -> dict[str, Any] | None:
     if len(encoded) <= 8000:
         return value
     return {"truncated": True, "raw": encoded[:8000]}
+
+
+def _log_priority(level: str) -> tuple[str, int]:
+    if level == "fatal":
+        return "critical", 0
+    if level == "error":
+        return "high", 1
+    if level == "warn":
+        return "normal", 2
+    return "low", 3
+
+
+def _log_fingerprint(body: MobileClientLogCreate, level: str, message: str) -> str:
+    stack_head = (body.stack or "").strip().splitlines()[0][:240] if body.stack else ""
+    parts = [
+        level,
+        (body.source or "").strip().lower(),
+        (body.screen or "").strip().lower(),
+        (body.error_name or "").strip().lower(),
+        message.strip().lower()[:500],
+        stack_head.strip().lower(),
+    ]
+    raw = "|".join(parts)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _parse_dt(value):
@@ -762,11 +789,57 @@ async def create_mobile_client_log(body: MobileClientLogCreate, user: dict = Dep
         level = "warn"
     if level not in LOG_LEVELS:
         level = "info"
+    now = now_utc()
+    now_iso = now.isoformat()
+    message = _clip_text(body.message, 2000) or ""
+    priority, priority_rank = _log_priority(level)
+    fingerprint = _log_fingerprint(body, level, message)
+    session_id = _clip_text(body.session_id, 120)
+    dedupe_query = {
+        "user_id": user["id"],
+        "fingerprint": fingerprint,
+        "last_seen_at": {"$gte": (now - timedelta(seconds=LOG_DEDUPE_SECONDS)).isoformat()},
+    }
+    if session_id:
+        dedupe_query["session_id"] = session_id
+    existing = await db.mobile_client_logs.find_one(dedupe_query, {"_id": 0, "id": 1})
+    if existing:
+        await db.mobile_client_logs.update_one(
+            {"id": existing["id"]},
+            {
+                "$set": {
+                    "level": level,
+                    "priority": priority,
+                    "priority_rank": priority_rank,
+                    "status": "open" if level in {"warn", "error", "fatal"} else "info",
+                    "message": message,
+                    "source": _clip_text(body.source, 120),
+                    "screen": _clip_text(body.screen, 120),
+                    "error_name": _clip_text(body.error_name, 160),
+                    "stack": _clip_text(body.stack, 8000),
+                    "context": _safe_log_context(body.context),
+                    "platform": _clip_text(body.platform, 40),
+                    "device_name": _clip_text(body.device_name, 160),
+                    "os_version": _clip_text(body.os_version, 80),
+                    "app_version": _clip_text(body.app_version, 80),
+                    "build_version": _clip_text(body.build_version, 80),
+                    "last_seen_at": now_iso,
+                    "received_at": now_iso,
+                    "expires_at": now + timedelta(days=LOG_RETENTION_DAYS),
+                },
+                "$inc": {"repeat_count": 1},
+            },
+        )
+        return {"ok": True, "id": existing["id"], "deduped": True}
     row = {
         "id": new_id(),
         "level": level,
         "status": "open" if level in {"warn", "error", "fatal"} else "info",
-        "message": _clip_text(body.message, 2000),
+        "priority": priority,
+        "priority_rank": priority_rank,
+        "fingerprint": fingerprint,
+        "repeat_count": 1,
+        "message": message,
         "source": _clip_text(body.source, 120),
         "screen": _clip_text(body.screen, 120),
         "error_name": _clip_text(body.error_name, 160),
@@ -777,9 +850,12 @@ async def create_mobile_client_log(body: MobileClientLogCreate, user: dict = Dep
         "os_version": _clip_text(body.os_version, 80),
         "app_version": _clip_text(body.app_version, 80),
         "build_version": _clip_text(body.build_version, 80),
-        "session_id": _clip_text(body.session_id, 120),
+        "session_id": session_id,
         "created_at": (_parse_dt(body.created_at) or now_utc()).isoformat(),
-        "received_at": now_utc().isoformat(),
+        "received_at": now_iso,
+        "first_seen_at": now_iso,
+        "last_seen_at": now_iso,
+        "expires_at": now + timedelta(days=LOG_RETENTION_DAYS),
         "user_id": user["id"],
         "username": user.get("username"),
         "display_name": user.get("display_name"),

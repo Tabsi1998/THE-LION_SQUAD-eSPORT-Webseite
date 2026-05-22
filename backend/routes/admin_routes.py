@@ -30,6 +30,16 @@ def _token_preview(token: str | None) -> str:
 @router.get("/dashboard")
 async def dashboard(me: dict = Depends(require_admin())):
     db = get_db()
+    try:
+        from services.push_notifications import mobile_push_health_summary
+        mobile_push = await mobile_push_health_summary()
+    except Exception as exc:
+        mobile_push = {"active_tokens": 0, "users_with_tokens": 0, "ticket_errors": 0, "receipt_errors": 0, "error": str(exc)}
+    client_logs = {
+        "open": await db.mobile_client_logs.count_documents({"status": "open"}),
+        "critical_open": await db.mobile_client_logs.count_documents({"status": "open", "priority": "critical"}),
+        "high_open": await db.mobile_client_logs.count_documents({"status": "open", "priority": "high"}),
+    }
     return {
         "player_count": await db.users.count_documents({"is_active": True}),
         "team_count": await db.teams.count_documents({}),
@@ -41,6 +51,8 @@ async def dashboard(me: dict = Depends(require_admin())):
         "total_tournaments": await db.tournaments.count_documents({}),
         "total_f1_challenges": await db.f1_challenges.count_documents({}),
         "total_events": await db.events.count_documents({}),
+        "mobile_push": mobile_push,
+        "client_logs": client_logs,
         "recent_audit_logs": await db.audit_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(20),
     }
 
@@ -58,6 +70,8 @@ async def mobile_client_logs(
     limit: int = Query(default=100, ge=1, le=500),
     level: str = "",
     status: str = "",
+    priority: str = "",
+    platform: str = "",
     user_id: str = "",
     q: str = "",
     me: dict = Depends(require_admin()),
@@ -68,6 +82,10 @@ async def mobile_client_logs(
         query["level"] = level.strip().lower()
     if status:
         query["status"] = status.strip().lower()
+    if priority:
+        query["priority"] = priority.strip().lower()
+    if platform:
+        query["platform"] = platform.strip().lower()
     if user_id:
         query["user_id"] = user_id.strip()
     search = q.strip()
@@ -79,7 +97,7 @@ async def mobile_client_logs(
             {"username": {"$regex": search, "$options": "i"}},
             {"display_name": {"$regex": search, "$options": "i"}},
         ]
-    return await db.mobile_client_logs.find(query, {"_id": 0}).sort("received_at", -1).to_list(limit)
+    return await db.mobile_client_logs.find(query, {"_id": 0}).sort([("priority_rank", 1), ("received_at", -1)]).to_list(limit)
 
 
 @router.patch("/mobile-logs/{log_id}")
@@ -201,6 +219,12 @@ async def mobile_push_receipts_for_user(user_id: str, me: dict = Depends(require
     return await check_mobile_push_receipts_for_user(user_id)
 
 
+@router.post("/mobile-push/receipts")
+async def mobile_push_receipts_all(me: dict = Depends(require_admin())):
+    from services.push_notifications import check_recent_mobile_push_receipts
+    return await check_recent_mobile_push_receipts(limit=200)
+
+
 def _upload_status() -> dict:
     upload_dir = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
     public_dir = upload_dir / "public"
@@ -267,6 +291,11 @@ async def system_status(me: dict = Depends(require_admin())):
     except Exception as exc:
         scheduler = {"running": False, "jobs": [], "error": str(exc)}
     try:
+        from services.push_notifications import mobile_push_health_summary
+        mobile_push = await mobile_push_health_summary()
+    except Exception as exc:
+        mobile_push = {"active_tokens": 0, "users_with_tokens": 0, "ticket_errors": 0, "receipt_errors": 0, "error": str(exc)}
+    try:
         await db.command("ping")
         database = {"ok": True}
     except Exception as exc:
@@ -295,6 +324,7 @@ async def system_status(me: dict = Depends(require_admin())):
         },
         "uploads": uploads,
         "scheduler": scheduler,
+        "mobile_push": mobile_push,
         "mail_queue": {**queue_counts, **{k: v for k, v in queue_stats.items() if k != "counts"}},
     }
 

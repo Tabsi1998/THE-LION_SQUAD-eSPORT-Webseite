@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity } from "lucide-react";
+import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug } from "lucide-react";
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
@@ -24,7 +24,10 @@ export default function AdminDashboardPage() {
     { label: "Offene Disputes", value: data?.open_disputes, icon: AlertTriangle, color: "#FF3B30" },
     { label: "Fast Lap Live", value: data?.active_f1, icon: Flag, color: "#29B6E8" },
     { label: "Events Gesamt", value: data?.total_events, icon: CalendarDays, color: "#29B6E8" },
+    { label: "Push aktiv", value: data?.mobile_push?.active_tokens, icon: BellRing, color: "#00FF88" },
+    { label: "Offene Logs", value: data?.client_logs?.open, icon: Bug, color: "#FFD700" },
   ];
+  const pushErrors = Number(data?.mobile_push?.ticket_errors || 0) + Number(data?.mobile_push?.receipt_errors || 0);
   const taskItems = [
     {
       label: "Setup prüfen",
@@ -41,6 +44,20 @@ export default function AdminDashboardPage() {
       to: "/admin/tournaments",
       icon: AlertTriangle,
       tone: (data?.open_disputes || 0) > 0 ? "#FF3B30" : "#00FF88",
+    },
+    {
+      label: "Push-Monitoring",
+      detail: `${data?.mobile_push?.active_tokens ?? 0} aktive Tokens, ${pushErrors} Fehler`,
+      to: "/admin/mobile-push",
+      icon: BellRing,
+      tone: pushErrors > 0 ? "#FF3B30" : (data?.mobile_push?.active_tokens || 0) > 0 ? "#00FF88" : "#FFD700",
+    },
+    {
+      label: "Client-Logs",
+      detail: `${data?.client_logs?.critical_open ?? 0} kritisch, ${data?.client_logs?.high_open ?? 0} hoch offen`,
+      to: "/admin/mobile-logs",
+      icon: Bug,
+      tone: (data?.client_logs?.critical_open || 0) > 0 ? "#FF3B30" : (data?.client_logs?.open || 0) > 0 ? "#FFD700" : "#00FF88",
     },
     {
       label: "Medien-Check",
@@ -106,7 +123,7 @@ export default function AdminDashboardPage() {
           </div>
           <span className="text-xs text-white/40">{new Date().toLocaleDateString("de-DE")}</span>
         </div>
-        <div className="grid md:grid-cols-4 gap-3">
+        <div className="grid md:grid-cols-3 xl:grid-cols-6 gap-3">
           {taskItems.map((item) => (
             <Link key={item.label} to={item.to} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 hover:border-[#29B6E8]/50 transition group">
               <div className="flex items-center justify-between gap-3">
