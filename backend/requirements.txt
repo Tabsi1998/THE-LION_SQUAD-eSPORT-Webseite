@@ -9,7 +9,7 @@ Jinja2==3.1.6
 motor==3.7.1
 pillow==12.2.0
 pydantic==2.13.4
-PyJWT==2.12.1
+PyJWT==2.13.0
 pymongo==4.17.0
 python-dotenv==1.2.2
 python-multipart==0.0.29
