@@ -1,6 +1,7 @@
 """Admin-only routes: dashboard KPIs, audit logs, notifications."""
 import os
 import pathlib
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from database import get_db
@@ -9,6 +10,7 @@ from models import now_utc
 from services.user_notifications import create_user_notification
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+logger = logging.getLogger("tls.admin")
 
 
 class MobileLogPatch(BaseModel):
@@ -34,7 +36,8 @@ async def dashboard(me: dict = Depends(require_admin())):
         from services.push_notifications import mobile_push_health_summary
         mobile_push = await mobile_push_health_summary()
     except Exception as exc:
-        mobile_push = {"active_tokens": 0, "users_with_tokens": 0, "ticket_errors": 0, "receipt_errors": 0, "error": str(exc)}
+        logger.warning("mobile push summary failed", exc_info=True)
+        mobile_push = {"active_tokens": 0, "users_with_tokens": 0, "ticket_errors": 0, "receipt_errors": 0, "error": "Push-Status konnte nicht geladen werden."}
     client_logs = {
         "open": await db.mobile_client_logs.count_documents({"status": "open"}),
         "critical_open": await db.mobile_client_logs.count_documents({"status": "open", "priority": "critical"}),
@@ -238,7 +241,8 @@ def _upload_status() -> dict:
             probe.write_text("ok", encoding="utf-8")
             probe.unlink(missing_ok=True)
         except Exception as exc:
-            error = str(exc)
+            logger.warning("upload directory write check failed for %s", label, exc_info=True)
+            error = "Schreibtest fehlgeschlagen."
             try:
                 (path / ".tls-write-test").unlink(missing_ok=True)
             except Exception:
@@ -289,17 +293,20 @@ async def system_status(me: dict = Depends(require_admin())):
         from services.scheduler import get_scheduler_status
         scheduler = get_scheduler_status()
     except Exception as exc:
-        scheduler = {"running": False, "jobs": [], "error": str(exc)}
+        logger.warning("scheduler status failed", exc_info=True)
+        scheduler = {"running": False, "jobs": [], "error": "Scheduler-Status konnte nicht geladen werden."}
     try:
         from services.push_notifications import mobile_push_health_summary
         mobile_push = await mobile_push_health_summary()
     except Exception as exc:
-        mobile_push = {"active_tokens": 0, "users_with_tokens": 0, "ticket_errors": 0, "receipt_errors": 0, "error": str(exc)}
+        logger.warning("mobile push health failed", exc_info=True)
+        mobile_push = {"active_tokens": 0, "users_with_tokens": 0, "ticket_errors": 0, "receipt_errors": 0, "error": "Push-Status konnte nicht geladen werden."}
     try:
         await db.command("ping")
         database = {"ok": True}
     except Exception as exc:
-        database = {"ok": False, "error": str(exc)}
+        logger.warning("database health check failed", exc_info=True)
+        database = {"ok": False, "error": "Datenbankprüfung fehlgeschlagen."}
     uploads = _upload_status()
     smtp_ready = bool(mail.get("enabled", True)) and (
         mail.get("provider") == "smtp" and bool(mail.get("smtp_host"))

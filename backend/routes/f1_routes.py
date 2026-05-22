@@ -2,6 +2,7 @@
 import io
 import csv
 from datetime import datetime
+from urllib.parse import quote, urlencode
 from fastapi import APIRouter, HTTPException, Depends, Response
 from fastapi.responses import RedirectResponse, StreamingResponse
 from database import get_db
@@ -284,8 +285,8 @@ async def get_challenge(slug_or_id: str, include_draft: bool = False, access: st
     db = get_db()
     c, was_old_slug = await _get_visible_challenge_record(slug_or_id, user, include_draft=include_draft, access=access)
     if was_old_slug and c.get("slug"):
-        suffix = f"?access={access}" if access else ""
-        return RedirectResponse(url=f"/api/f1/challenges/{c['slug']}{suffix}", status_code=301)
+        suffix = f"?{urlencode({'access': access})}" if access else ""
+        return RedirectResponse(url=f"/api/f1/challenges/{quote(str(c['slug']), safe='')}{suffix}", status_code=301)
     await _annotate_reference_policy(c, include_counts=True)
     c["can_manage_times"] = await _has_f1_staff_permission(user, c["id"], F1_RESULT_STAFF_ROLES)
     tracks = await db.f1_tracks.find({"challenge_id": c["id"]}, {"_id": 0}).sort("order_index", 1).to_list(100)

@@ -5,7 +5,7 @@ import { AlertTriangle, Home, RefreshCw } from "lucide-react";
 class AppErrorBoundaryInner extends Component {
   constructor(props) {
     super(props);
-    this.state = { error: null, errorInfo: null, resetKey: props.resetKey };
+    this.state = { error: null, resetKey: props.resetKey };
   }
 
   static getDerivedStateFromError(error) {
@@ -14,13 +14,12 @@ class AppErrorBoundaryInner extends Component {
 
   static getDerivedStateFromProps(props, state) {
     if (props.resetKey !== state.resetKey) {
-      return { error: null, errorInfo: null, resetKey: props.resetKey };
+      return { error: null, resetKey: props.resetKey };
     }
     return null;
   }
 
   componentDidCatch(error, errorInfo) {
-    this.setState({ errorInfo });
     console.error("[TLS] Frontend-Fehler:", error, errorInfo);
   }
 

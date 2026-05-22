@@ -55,7 +55,7 @@ def test_preview_json_ld_escapes_script_end_marker():
     match = re.search(r'<script type="application/ld\+json">(.+?)</script>', html, re.S)
 
     assert match
-    assert "<\\/script>" in match.group(1)
+    assert "\\u003c/script\\u003e" in match.group(1)
     assert json.loads(match.group(1))["name"] == "</script>"
 
 

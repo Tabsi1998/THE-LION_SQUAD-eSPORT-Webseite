@@ -477,6 +477,9 @@ def static_page_meta(slug: str, base: dict) -> dict | None:
 def json_ld_script_content(data: dict) -> str:
     return (
         json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
         .replace("</", "<\\/")
         .replace("\u2028", "\\u2028")
         .replace("\u2029", "\\u2029")
@@ -484,35 +487,35 @@ def json_ld_script_content(data: dict) -> str:
 
 
 def render_preview_html(meta: dict) -> str:
-    title = escape(meta["title"])
-    description = escape(meta["description"])
-    image = escape(meta["image"])
-    favicon = escape(meta.get("favicon") or "")
+    title = escape(str(meta["title"]), quote=True)
+    description = escape(str(meta["description"]), quote=True)
+    image = escape(str(meta["image"]), quote=True)
+    favicon = escape(str(meta.get("favicon") or ""), quote=True)
     favicon_links = (
         f'<link rel="icon" href="{favicon}" />\n'
         f'    <link rel="apple-touch-icon" href="{favicon}" />'
         if favicon
         else ""
     )
-    url = escape(meta["url"])
-    canonical = escape(meta["canonical"])
-    site_name = escape(meta["site_name"])
-    type_ = escape(meta.get("type") or "website")
-    locale = escape(meta.get("locale") or "de_AT")
-    robots = escape(meta.get("robots") or "index, follow")
+    url = escape(str(meta["url"]), quote=True)
+    canonical = escape(str(meta["canonical"]), quote=True)
+    site_name = escape(str(meta["site_name"]), quote=True)
+    type_ = escape(str(meta.get("type") or "website"), quote=True)
+    locale = escape(str(meta.get("locale") or "de_AT"), quote=True)
+    robots = escape(str(meta.get("robots") or "index, follow"), quote=True)
     json_ld = json_ld_script_content(meta.get("json_ld") or webpage_json_ld(meta))
     optional = []
     image_type = image_mime_type(meta.get("image"))
     if image_type:
-        optional.append(f'<meta property="og:image:type" content="{escape(image_type)}" />')
+        optional.append(f'<meta property="og:image:type" content="{escape(image_type, quote=True)}" />')
     if meta.get("published_time"):
-        optional.append(f'<meta property="article:published_time" content="{escape(str(meta["published_time"]))}" />')
+        optional.append(f'<meta property="article:published_time" content="{escape(str(meta["published_time"]), quote=True)}" />')
     if meta.get("modified_time"):
-        optional.append(f'<meta property="article:modified_time" content="{escape(str(meta["modified_time"]))}" />')
+        optional.append(f'<meta property="article:modified_time" content="{escape(str(meta["modified_time"]), quote=True)}" />')
     if meta.get("google_site_verification"):
-        optional.append(f'<meta name="google-site-verification" content="{escape(str(meta["google_site_verification"]))}" />')
+        optional.append(f'<meta name="google-site-verification" content="{escape(str(meta["google_site_verification"]), quote=True)}" />')
     if meta.get("msvalidate_01"):
-        optional.append(f'<meta name="msvalidate.01" content="{escape(str(meta["msvalidate_01"]))}" />')
+        optional.append(f'<meta name="msvalidate.01" content="{escape(str(meta["msvalidate_01"]), quote=True)}" />')
     return f"""<!doctype html>
 <html lang="de">
   <head>

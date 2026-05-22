@@ -35,13 +35,35 @@ function clip(value: unknown, limit: number) {
   return text.length > limit ? text.slice(0, limit) : text;
 }
 
+function scrubLogText(value: unknown, limit: number) {
+  return clip(value, limit)
+    .replace(/file:\/\/[^\s)]+/gi, "[local-file]")
+    .replace(/[A-Z]:\\[^\s)]+/gi, "[local-path]")
+    .replace(/\/(?:data|storage|Users|home)\/[^\s)]+/gi, "[local-path]");
+}
+
+function sanitizeContext(value: unknown, depth = 0): unknown {
+  if (depth > 2) return "[truncated]";
+  if (value == null || typeof value === "number" || typeof value === "boolean") return value;
+  if (typeof value === "string") return scrubLogText(value, 600);
+  if (Array.isArray(value)) return value.slice(0, 20).map((item) => sanitizeContext(item, depth + 1));
+  if (typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    Object.entries(value as Record<string, unknown>).slice(0, 30).forEach(([key, item]) => {
+      out[scrubLogText(key, 80)] = sanitizeContext(item, depth + 1);
+    });
+    return out;
+  }
+  return scrubLogText(value, 200);
+}
+
 function describeArg(value: unknown): string {
-  if (value instanceof Error) return value.stack || value.message || value.name;
-  if (typeof value === "string") return value;
+  if (value instanceof Error) return scrubLogText(value.message || value.name, 1000);
+  if (typeof value === "string") return scrubLogText(value, 1000);
   try {
-    return JSON.stringify(value);
+    return scrubLogText(JSON.stringify(value), 1000);
   } catch {
-    return String(value);
+    return scrubLogText(value, 1000);
   }
 }
 
@@ -49,7 +71,7 @@ function errorDetails(error: unknown) {
   if (error instanceof Error) {
     return {
       error_name: clip(error.name || "Error", 160),
-      stack: clip(error.stack || error.message, 8000),
+      stack: scrubLogText(error.message, 1000),
     };
   }
   return {};
@@ -69,10 +91,10 @@ function buildVersion() {
 export function sendMobileLog(level: MobileLogLevel, message: string, options: MobileLogOptions = {}) {
   const payload = {
     level,
-    message: clip(message, 2000),
+    message: scrubLogText(message, 2000),
     source: options.source,
     screen: options.screen,
-    context: options.context,
+    context: sanitizeContext(options.context),
     platform: Platform.OS,
     device_name: Device.deviceName || Device.modelName || "",
     os_version: Device.osVersion || "",

@@ -44,15 +44,15 @@ def prepare_upload_volume(uid: int, gid: int) -> None:
     for root, dirs, files in os.walk(UPLOAD_DIR):
         root_path = pathlib.Path(root)
         _chown_if_needed(root_path, uid, gid)
-        _chmod(root_path, 0o775)
+        _chmod(root_path, 0o750)
         for name in dirs:
             path = root_path / name
             _chown_if_needed(path, uid, gid)
-            _chmod(path, 0o775)
+            _chmod(path, 0o750)
         for name in files:
             path = root_path / name
             _chown_if_needed(path, uid, gid)
-            _chmod(path, 0o664)
+            _chmod(path, 0o640)
 
 
 def drop_privileges(user: pwd.struct_passwd) -> None:

@@ -16,6 +16,10 @@ logger = logging.getLogger("tls.prizes")
 DEFAULT_PICKUP_WINDOW_DAYS = 90
 
 
+def _log_safe(value, limit: int = 160) -> str:
+    return str(value or "").replace("\r", " ").replace("\n", " ")[:limit]
+
+
 def _ordinal(rank: int) -> str:
     return f"{rank}."
 
@@ -120,8 +124,8 @@ async def auto_create_for_tournament(tid: str) -> int:
                     meta={"tournament_id": tid, "pickup_id": doc["id"], "place": place},
                 )
             except Exception as exc:
-                logger.warning(f"[prizes] notification failed for pickup {doc['id']}: {exc}")
-        logger.info(f"[prizes] created pickup {doc['id']} place {place} tournament {tid}")
+                logger.warning("[prizes] notification failed for pickup %s", _log_safe(doc.get("id")), exc_info=True)
+        logger.info("[prizes] created pickup %s place %s tournament %s", _log_safe(doc.get("id")), place, _log_safe(tid))
     return created
 
 

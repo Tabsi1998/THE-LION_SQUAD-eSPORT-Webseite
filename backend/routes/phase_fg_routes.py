@@ -279,14 +279,21 @@ async def _clear_media_references(url: str) -> int:
 
 
 def _media_file_path(filename: str) -> Path:
-    if "/" in filename or "\\" in filename or ".." in filename or filename.startswith("."):
+    safe_name = Path(filename).name
+    if safe_name != filename or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,180}", safe_name):
         raise HTTPException(400, "Ungueltiger Dateiname.")
-    p = PUBLIC_UPLOAD_DIR / filename
-    if not p.exists():
-        p = UPLOAD_DIR / filename
-    if not p.exists() or not p.is_file() or p.suffix.lower() not in PUBLIC_IMAGE_EXTS:
+    if Path(safe_name).suffix.lower() not in PUBLIC_IMAGE_EXTS:
         raise HTTPException(404, "Datei nicht gefunden.")
-    return p
+    for base_dir in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
+        base = base_dir.resolve(strict=False)
+        candidate = (base / safe_name).resolve(strict=False)
+        try:
+            candidate.relative_to(base)
+        except ValueError:
+            continue
+        if candidate.exists() and candidate.is_file():
+            return candidate
+    raise HTTPException(404, "Datei nicht gefunden.")
 
 
 @admin_media_router.post("/{filename}/rotate")
@@ -322,7 +329,7 @@ async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = De
     except UnidentifiedImageError:
         raise HTTPException(400, "Ungueltige Bilddatei.")
     except OSError as exc:
-        raise HTTPException(500, f"Drehen fehlgeschlagen: {exc}")
+        raise HTTPException(500, "Drehen fehlgeschlagen.")
 
     stat = p.stat()
     updated_at = now_utc().isoformat()
@@ -342,19 +349,11 @@ async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = De
 @admin_media_router.delete("/{filename}")
 async def admin_delete_media(filename: str, me: dict = Depends(require_admin())):
     """Delete a file from upload dir. Path-traversal protected."""
-    if "/" in filename or ".." in filename or filename.startswith("."):
-        raise HTTPException(400, "Ungültiger Dateiname.")
-    p = PUBLIC_UPLOAD_DIR / filename
-    if not p.exists():
-        p = UPLOAD_DIR / filename
-    if p.suffix.lower() not in PUBLIC_IMAGE_EXTS:
-        raise HTTPException(404, "Datei nicht gefunden.")
-    if not p.exists() or not p.is_file():
-        raise HTTPException(404, "Datei nicht gefunden.")
+    p = _media_file_path(filename)
     try:
         p.unlink()
     except OSError as e:
-        raise HTTPException(500, f"Löschen fehlgeschlagen: {e}")
+        raise HTTPException(500, "Löschen fehlgeschlagen.")
     cleared_refs = await _clear_media_references(f"/api/static/uploads/{filename}")
     meta = await get_db().media_uploads.delete_many({"filename": filename})
     return {"ok": True, "cleared_references": cleared_refs, "deleted_metadata": meta.deleted_count}

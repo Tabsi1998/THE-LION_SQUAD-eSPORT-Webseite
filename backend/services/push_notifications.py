@@ -29,6 +29,10 @@ def _channel_for_kind(kind: str | None) -> str:
     return "default"
 
 
+def _log_safe(value: Any, limit: int = 240) -> str:
+    return str(value or "").replace("\r", " ").replace("\n", " ")[:limit]
+
+
 async def send_mobile_push_for_notification(notification: dict[str, Any]) -> int:
     user_id = notification.get("user_id")
     if not user_id:
@@ -95,8 +99,8 @@ async def send_mobile_push_for_notification(notification: dict[str, Any]) -> int
                 details = row.get("details") or {}
                 logger.warning(
                     "Expo push token failed for notification %s: %s",
-                    notification.get("id"),
-                    row.get("message") or details,
+                    _log_safe(notification.get("id"), 80),
+                    _log_safe(row.get("message") or details),
                 )
                 ticket_updates.append(
                     {
@@ -132,7 +136,7 @@ async def send_mobile_push_for_notification(notification: dict[str, Any]) -> int
         )
         return len(push_tokens)
     except Exception as exc:
-        logger.warning("Expo push delivery failed for notification %s: %s", notification.get("id"), exc)
+        logger.warning("Expo push delivery failed for notification %s", _log_safe(notification.get("id"), 80), exc_info=True)
         return 0
 
 
@@ -147,8 +151,8 @@ async def _check_receipts_for_tokens(tokens: list[dict[str, Any]]) -> dict[str, 
             response.raise_for_status()
         result = response.json()
     except Exception as exc:
-        logger.warning("Expo push receipt check failed: %s", exc)
-        return {"checked": 0, "receipts": [], "disabled": 0, "errors": 0, "error": str(exc)}
+        logger.warning("Expo push receipt check failed", exc_info=True)
+        return {"checked": 0, "receipts": [], "disabled": 0, "errors": 0, "error": "Receipt-Prüfung fehlgeschlagen."}
 
     data = result.get("data") if isinstance(result, dict) else {}
     if not isinstance(data, dict):

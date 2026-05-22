@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse
 from typing import Optional
 from datetime import datetime, timezone
+from urllib.parse import quote, urlencode
 from database import get_db
 from auth import require_admin, get_optional_user, get_current_user
 from services.visibility import user_can_see
@@ -355,8 +356,8 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     if not has_access and not await _user_can_see(user, event.get("visibility") or "public"):
         raise HTTPException(403, "Event ist nicht sichtbar.")
     if was_old_slug and event.get("slug"):
-        suffix = f"?access={access}" if access else ""
-        return RedirectResponse(url=f"/api/events/{event['slug']}{suffix}", status_code=301)
+        suffix = f"?{urlencode({'access': access})}" if access else ""
+        return RedirectResponse(url=f"/api/events/{quote(str(event['slug']), safe='')}{suffix}", status_code=301)
     # Attach tournaments and f1 challenges
     event["tournaments"] = await _filter_related(
         await db.tournaments.find({"event_id": event["id"]}, {"_id": 0}).to_list(200),

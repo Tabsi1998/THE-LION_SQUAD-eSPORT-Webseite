@@ -17,6 +17,12 @@ const DEVICES = [
 ];
 const STATUSES = ["free", "busy", "broken", "reserved"];
 
+function stationExportUrl(tournamentId, orientation) {
+  if (!tournamentId || !/^[A-Za-z0-9_-]+$/.test(String(tournamentId))) return "#";
+  const params = new URLSearchParams({ orientation });
+  return `${API}/exports/tournaments/${encodeURIComponent(tournamentId)}/stations.pdf?${params.toString()}`;
+}
+
 export default function AdminStationsPage() {
   const { isAdmin } = useAuth();
   const [list, setList] = useState([]);
@@ -230,26 +236,33 @@ export default function AdminStationsPage() {
             {tournaments.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
           </select>
         </label>
+        {(() => {
+          const portraitUrl = stationExportUrl(activeTid, "portrait");
+          const landscapeUrl = stationExportUrl(activeTid, "landscape");
+          const disabled = !activeTid || !list.length || portraitUrl === "#";
+          return (
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           <a
-            href={activeTid ? `${API}/exports/tournaments/${activeTid}/stations.pdf?orientation=portrait` : "#"}
+            href={portraitUrl}
             target="_blank"
             rel="noreferrer"
-            aria-disabled={!activeTid || !list.length}
-            className={`px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 text-xs ${!activeTid || !list.length ? "pointer-events-none opacity-40" : "hover:border-[#29B6E8]/50 hover:text-[#29B6E8]"}`}
+            aria-disabled={disabled}
+            className={`px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 text-xs ${disabled ? "pointer-events-none opacity-40" : "hover:border-[#29B6E8]/50 hover:text-[#29B6E8]"}`}
           >
             PDF Hochformat
           </a>
           <a
-            href={activeTid ? `${API}/exports/tournaments/${activeTid}/stations.pdf?orientation=landscape` : "#"}
+            href={landscapeUrl}
             target="_blank"
             rel="noreferrer"
-            aria-disabled={!activeTid || !list.length}
-            className={`px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 text-xs ${!activeTid || !list.length ? "pointer-events-none opacity-40" : "hover:bg-[#29B6E8]/10"}`}
+            aria-disabled={disabled}
+            className={`px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 text-xs ${disabled ? "pointer-events-none opacity-40" : "hover:bg-[#29B6E8]/10"}`}
           >
             PDF Querformat
           </a>
         </div>
+          );
+        })()}
         <button type="button" onClick={autoAssign} disabled={!list.length || !unassignedMatches.length} className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
           <Wand2 className="w-4 h-4" /> Nächste Spiele verteilen
         </button>

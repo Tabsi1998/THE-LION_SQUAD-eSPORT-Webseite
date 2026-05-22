@@ -64,6 +64,26 @@ def ask_yes_no(prompt: str, default=True) -> bool:
     return val in ("j", "ja", "y", "yes")
 
 
+def save_secret_to_env(name: str, value: str) -> None:
+    env_path = ROOT / ".env"
+    lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+    prefix = f"{name}="
+    next_line = f"{name}={value}"
+    updated = False
+    for index, line in enumerate(lines):
+        if line.startswith(prefix):
+            lines[index] = next_line
+            updated = True
+            break
+    if not updated:
+        lines.append(next_line)
+    env_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    try:
+        os.chmod(env_path, 0o600)
+    except OSError:
+        pass
+
+
 async def main():
     banner()
     print(f"{BOLD}Willkommen beim THE LION SQUAD Setup-Assistenten.{RESET}")
@@ -124,8 +144,8 @@ async def main():
     jwt_secret = os.environ.get("JWT_SECRET", "")
     if not jwt_secret or len(jwt_secret) < 32:
         jwt_secret = secrets.token_hex(32)
-        print(f"{GREEN}  → Neues JWT-Secret generiert (bitte in .env speichern):{RESET}")
-        print(f"    JWT_SECRET={jwt_secret}")
+        save_secret_to_env("JWT_SECRET", jwt_secret)
+        print(f"{GREEN}  → Neues JWT-Secret generiert und in .env gespeichert.{RESET}")
 
     print(f"\n{YELLOW}Konfiguration schreiben …{RESET}")
 
@@ -189,9 +209,7 @@ async def main():
             print(f"{GREEN}  ✓ Demo-Daten angelegt{RESET}")
 
     print(f"\n{BOLD}{GREEN}✓ Setup abgeschlossen.{RESET}")
-    print(f"\n{DIM}Öffne {CYAN}https://{domain}{RESET}{DIM} und logge dich ein:{RESET}")
-    print(f"  {BOLD}E-Mail:{RESET}   {admin_email}")
-    print(f"  {BOLD}Passwort:{RESET} {'*' * len(admin_pw)}")
+    print(f"\n{DIM}Öffne {CYAN}https://{domain}{RESET}{DIM} und logge dich mit dem eben gesetzten Superadmin-Konto ein.{RESET}")
     print(f"\n{YELLOW}Wichtig: Ändere dein Passwort über das Profil, falls jemand Zugriff auf diese Session hatte.{RESET}\n")
     client.close()
 

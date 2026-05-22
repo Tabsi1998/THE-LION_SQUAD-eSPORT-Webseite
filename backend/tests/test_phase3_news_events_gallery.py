@@ -336,7 +336,7 @@ def event_ctx(admin):
     })
     assert drf.status_code == 200
     return {
-        "public": admin.get(f"{BASE_URL}/api/events/{pid}").json() if False else pub.json() | {"id": pid, "slug": f"test-lan-{suf}"},
+        "public": pub.json() | {"id": pid, "slug": f"test-lan-{suf}"},
         "members": mem.json(),
         "draft": drf.json(),
         "suf": suf,

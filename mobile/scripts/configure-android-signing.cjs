@@ -3,11 +3,22 @@ const path = require("path");
 
 const gradlePath = path.join(__dirname, "..", "android", "app", "build.gradle");
 
-if (!fs.existsSync(gradlePath)) {
+let resolvedGradlePath;
+try {
+  resolvedGradlePath = fs.realpathSync(gradlePath);
+} catch (error) {
+  if (error && error.code === "ENOENT") {
+    throw new Error(`Android Gradle file not found: ${gradlePath}`);
+  }
+  throw error;
+}
+
+const appDir = fs.realpathSync(path.join(__dirname, "..", "android", "app"));
+if (!resolvedGradlePath.startsWith(`${appDir}${path.sep}`)) {
   throw new Error(`Android Gradle file not found: ${gradlePath}`);
 }
 
-let source = fs.readFileSync(gradlePath, "utf8");
+let source = fs.readFileSync(resolvedGradlePath, "utf8");
 
 if (!source.includes("TLS_UPLOAD_STORE_FILE")) {
   source = source.replace(
@@ -38,4 +49,6 @@ if (lastDebugSigning === -1) {
     source.slice(lastDebugSigning + debugSigning.length);
 }
 
-fs.writeFileSync(gradlePath, source);
+const tempPath = `${resolvedGradlePath}.tmp`;
+fs.writeFileSync(tempPath, source, { mode: 0o600 });
+fs.renameSync(tempPath, resolvedGradlePath);

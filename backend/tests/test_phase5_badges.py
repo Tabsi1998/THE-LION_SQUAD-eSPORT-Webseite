@@ -255,9 +255,10 @@ class TestBadgeTriggers:
         codes = [b["code"] for b in r.json().get("badges", [])]
         assert "first_lap" in codes, f"first_lap not awarded! got {codes}"
         # Idempotency: submit second lap, verify only 1 first_lap badge
-        r = requests.post(f"{BASE_URL}/api/f1/challenges/{cid}/times",
-                          json={"user_id": new_user_id, "track_id": track_id,
-                                "time_ms": 95000}, headers=admin_headers)
+        second_lap = requests.post(f"{BASE_URL}/api/f1/challenges/{cid}/times",
+                                   json={"user_id": new_user_id, "track_id": track_id,
+                                         "time_ms": 95000}, headers=admin_headers)
+        assert second_lap.status_code in (200, 201), f"second lap submit failed: {second_lap.status_code} {second_lap.text}"
         r = requests.get(f"{BASE_URL}/api/users/public/{username}")
         codes = [b["code"] for b in r.json().get("badges", [])]
         assert codes.count("first_lap") == 1, "first_lap awarded twice!"

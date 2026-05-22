@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse, StreamingResponse
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 import math
+from urllib.parse import quote, urlencode
 from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_current_user, require_admin, get_optional_user
@@ -1330,8 +1331,8 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
     if not (is_admin or is_assigned or is_participant or has_access) and not await user_can_see(user, t.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Turnier ist nicht sichtbar")
     if was_old_slug and t.get("slug"):
-        suffix = f"?access={access}" if access else ""
-        return RedirectResponse(url=f"/api/tournaments/{t['slug']}{suffix}", status_code=301)
+        suffix = f"?{urlencode({'access': access})}" if access else ""
+        return RedirectResponse(url=f"/api/tournaments/{quote(str(t['slug']), safe='')}{suffix}", status_code=301)
     await _enrich_tournament(t, user)
     t["can_manage_results"] = bool(
         is_admin

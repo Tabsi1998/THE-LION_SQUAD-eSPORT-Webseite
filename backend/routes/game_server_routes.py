@@ -1,4 +1,5 @@
 """Community game server directory and admin maintenance."""
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Literal, Optional
@@ -31,6 +32,10 @@ DEMO_GAME_SERVERS = [
     {"name": "THE LION SQUAD (ARK)", "game_name": "ARK", "slug": "ark", "status": "offline", "visibility": "members", "address": "gameserver.lionsquad.at:7777", "sort_order": 80},
     {"name": "THE LION SQUAD (Satisfactory)", "game_name": "Satisfactory", "slug": "satisfactory", "status": "offline", "visibility": "members", "address": "gameserver.lionsquad.at:7778", "sort_order": 90},
 ]
+
+
+def _public_sync_error(error: str) -> str:
+    return "Sync konnte den Server vom Webserver aus nicht erreichen. Letzter Status bleibt erhalten."
 
 DEMO_GAME_SERVER_SLUGS = {item["slug"] for item in DEMO_GAME_SERVERS}
 
@@ -324,11 +329,12 @@ async def _sync_one(db, server: dict) -> dict:
     except GameServerProbeError as exc:
         error = str(exc)
     except Exception as exc:
-        error = f"{type(exc).__name__}: {exc}"
+        error = str(exc)
+        logging.getLogger("tls.game_servers").warning("game server sync failed", exc_info=True)
     updates = {
         "last_sync_at": now_utc().isoformat(),
         "last_sync_error": None,
-        "last_sync_note": f"Sync konnte den Server vom Webserver aus nicht erreichen. Letzter Status bleibt erhalten. {summarize_probe_failure(error)}",
+        "last_sync_note": f"{_public_sync_error(error)} {summarize_probe_failure(error)}",
         "updated_at": now_utc().isoformat(),
     }
     if not server.get("last_sync_at") and not _maintenance_active(server) and server.get("status") != "planned":
@@ -340,7 +346,7 @@ async def _sync_one(db, server: dict) -> dict:
         {"$set": updates},
     )
     synced = await db.game_servers.find_one({"id": server["id"]}, {"_id": 0})
-    return {"ok": False, "error": error, "server": _public_doc(synced, include_admin_fields=True)}
+    return {"ok": False, "error": _public_sync_error(error), "server": _public_doc(synced, include_admin_fields=True)}
 
 
 @router.post("/sync")
