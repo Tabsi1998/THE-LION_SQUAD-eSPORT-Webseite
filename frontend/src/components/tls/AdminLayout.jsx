@@ -7,7 +7,7 @@ import {
   ExternalLink, Menu, X, Settings as SettingsIcon,
   ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon,
   Award, Inbox, UserCheck, Medal,
-  FolderOpen, FileText, AlertTriangle, Handshake, Bug,
+  FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -71,6 +71,7 @@ const ADMIN_GROUPS = [
       { to: "/admin/widgets", label: "Widgets", icon: Code2 },
       { to: "/admin/audit", label: "Audit Logs", icon: ShieldCheck },
       { to: "/admin/mobile-logs", label: "App-Logs", icon: Bug },
+      { to: "/admin/mobile-push", label: "Push-Tests", icon: BellRing },
       { to: "/admin/settings", label: "Einstellungen", icon: SettingsIcon },
     ],
   },

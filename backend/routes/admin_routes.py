@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from database import get_db
 from auth import require_admin, get_current_user
 from models import now_utc
+from services.user_notifications import create_user_notification
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -13,6 +14,17 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 class MobileLogPatch(BaseModel):
     status: str | None = Field(default=None, max_length=20)
     admin_note: str | None = Field(default=None, max_length=2000)
+
+
+class MobilePushTestCreate(BaseModel):
+    user_id: str | None = Field(default=None, max_length=80)
+    title: str = Field(default="LionsAPP Push-Test", max_length=120)
+    body: str = Field(default="Wenn du diese Nachricht am Handy siehst, funktionieren Push-Benachrichtigungen.", max_length=240)
+
+
+def _token_preview(token: str | None) -> str:
+    value = str(token or "")
+    return f"{value[:24]}..." if len(value) > 24 else value
 
 
 @router.get("/dashboard")
@@ -88,6 +100,105 @@ async def update_mobile_client_log(log_id: str, body: MobileLogPatch, me: dict =
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Log nicht gefunden")
     return await db.mobile_client_logs.find_one({"id": log_id}, {"_id": 0})
+
+
+@router.get("/mobile-push/users")
+async def mobile_push_users(q: str = "", limit: int = Query(default=40, ge=1, le=100), me: dict = Depends(require_admin())):
+    db = get_db()
+    token_rows = await db.mobile_push_tokens.find(
+        {},
+        {
+            "_id": 0,
+            "user_id": 1,
+            "token": 1,
+            "platform": 1,
+            "enabled": 1,
+            "updated_at": 1,
+            "last_sent_at": 1,
+            "last_ticket_status": 1,
+            "last_ticket_error": 1,
+            "last_receipt_status": 1,
+            "last_receipt_error": 1,
+        },
+    ).sort("updated_at", -1).to_list(500)
+    user_ids = list({row.get("user_id") for row in token_rows if row.get("user_id")})
+    users = await db.users.find(
+        {"id": {"$in": user_ids}},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1, "role": 1},
+    ).to_list(500)
+    user_by_id = {user["id"]: user for user in users if user.get("id")}
+    needle = q.strip().lower()
+    rows = []
+    for user_id in user_ids:
+        user = user_by_id.get(user_id) or {"id": user_id}
+        haystack = " ".join(str(user.get(key) or "") for key in ("username", "display_name", "email", "id")).lower()
+        if needle and needle not in haystack:
+            continue
+        tokens = [row for row in token_rows if row.get("user_id") == user_id]
+        enabled_tokens = [row for row in tokens if row.get("enabled") is not False]
+        latest = tokens[0] if tokens else {}
+        rows.append({
+            **user,
+            "token_count": len(tokens),
+            "enabled_token_count": len(enabled_tokens),
+            "has_enabled_token": bool(enabled_tokens),
+            "platforms": sorted({row.get("platform") or "unknown" for row in tokens}),
+            "latest_token_preview": _token_preview(latest.get("token")),
+            "latest_updated_at": latest.get("updated_at"),
+            "last_sent_at": latest.get("last_sent_at"),
+            "last_ticket_status": latest.get("last_ticket_status"),
+            "last_ticket_error": latest.get("last_ticket_error"),
+            "last_receipt_status": latest.get("last_receipt_status"),
+            "last_receipt_error": latest.get("last_receipt_error"),
+        })
+    return rows[:limit]
+
+
+@router.get("/mobile-push/status/{user_id}")
+async def mobile_push_status_for_user(user_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    user = await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1},
+    )
+    if not user:
+        raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
+    tokens = await db.mobile_push_tokens.find({"user_id": user_id}, {"_id": 0}).sort("updated_at", -1).to_list(20)
+    for token in tokens:
+        token["token_preview"] = _token_preview(token.get("token"))
+        token.pop("token", None)
+    return {
+        "user": user,
+        "tokens": tokens,
+        "enabled_count": len([row for row in tokens if row.get("enabled") is not False]),
+        "has_enabled_token": any(row.get("enabled") is not False for row in tokens),
+    }
+
+
+@router.post("/mobile-push/test")
+async def mobile_push_test(body: MobilePushTestCreate, me: dict = Depends(require_admin())):
+    target_id = body.user_id or me["id"]
+    notification = await create_user_notification(
+        target_id,
+        title=body.title.strip() or "LionsAPP Push-Test",
+        body=body.body.strip() or "Wenn du diese Nachricht am Handy siehst, funktionieren Push-Benachrichtigungen.",
+        url="/profile?tab=inbox",
+        kind="admin_push_test",
+        meta={"admin_test": True, "sent_by": me["id"]},
+    )
+    if not notification:
+        raise HTTPException(status_code=400, detail="Benachrichtigung konnte nicht erstellt werden")
+    return {"ok": True, "notification": notification}
+
+
+@router.post("/mobile-push/receipts/{user_id}")
+async def mobile_push_receipts_for_user(user_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    exists = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1})
+    if not exists:
+        raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
+    from services.push_notifications import check_mobile_push_receipts_for_user
+    return await check_mobile_push_receipts_for_user(user_id)
 
 
 def _upload_status() -> dict:
