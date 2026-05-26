@@ -858,7 +858,7 @@ function ReferenceStatsPanel({ stats = {}, onOpen }) {
           </button>
         )}
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         {rows.map((row) => <QuickStat key={row.label} {...row} />)}
       </div>
     </section>
@@ -888,29 +888,33 @@ function ReferenceRow({ item, expanded = false }) {
   const rank = item.rank ? `#${item.rank}` : "-";
   const date = formatPublicDate(item.date);
   const content = (
-    <div data-testid={`profile-reference-${item.id}`} className="flex items-center justify-between gap-3 px-4 py-3 border border-white/10 rounded-sm bg-[#121212] hover:border-[#29B6E8]/60 transition">
-      <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${isFastlap ? "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]" : "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#29B6E8]"}`}>
-        {isFastlap ? <Radio className="w-5 h-5" /> : <Trophy className="w-5 h-5" />}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-[10px] font-bold uppercase tracking-widest ${isFastlap ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{referenceKindLabel(item.kind)}</span>
-          {item.points != null && <span className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700] border border-[#FFD700]/35 px-1.5 py-0.5 rounded-sm">{item.points} Punkte</span>}
-          {item.time_str && <span className="text-[10px] font-bold uppercase tracking-widest text-white/70 border border-white/10 px-1.5 py-0.5 rounded-sm">{item.time_str}</span>}
+    <div data-testid={`profile-reference-${item.id}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:px-4 sm:py-3 border border-white/10 rounded-sm bg-[#121212] hover:border-[#29B6E8]/60 transition min-w-0 overflow-hidden">
+      <div className="flex items-start gap-3 min-w-0 flex-1 w-full">
+        <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${isFastlap ? "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]" : "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#29B6E8]"}`}>
+          {isFastlap ? <Radio className="w-5 h-5" /> : <Trophy className="w-5 h-5" />}
         </div>
-        <div className="mt-1 font-heading text-base font-bold truncate">{item.title || "Referenz"}</div>
-        <div className="text-xs text-white/50 mt-0.5 flex items-center gap-2 flex-wrap">
-          {item.subtitle && <span>{item.subtitle}</span>}
-          {date && <span>· {date}</span>}
-          {expanded && statusLabel(item.status) && <span>· {statusLabel(item.status)}</span>}
-          {expanded && item.participant_count && <span>· {item.participant_count} Teilnehmer</span>}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-[10px] font-bold uppercase tracking-widest ${isFastlap ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{referenceKindLabel(item.kind)}</span>
+            {item.points != null && <span className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700] border border-[#FFD700]/35 px-1.5 py-0.5 rounded-sm">{item.points} Punkte</span>}
+            {item.time_str && <span className="text-[10px] font-bold uppercase tracking-widest text-white/70 border border-white/10 px-1.5 py-0.5 rounded-sm break-all">{item.time_str}</span>}
+          </div>
+          <div className="mt-1 font-heading text-base font-bold break-words">{item.title || "Referenz"}</div>
+          <div className="text-xs text-white/50 mt-0.5 flex items-center gap-x-2 gap-y-1 flex-wrap">
+            {item.subtitle && <span className="break-words">{item.subtitle}</span>}
+            {date && <span>{date}</span>}
+            {expanded && statusLabel(item.status) && <span>{statusLabel(item.status)}</span>}
+            {expanded && item.participant_count && <span>{item.participant_count} Teilnehmer</span>}
+          </div>
         </div>
       </div>
-      <div className="shrink-0 text-right">
-        <div className={`font-display text-xl font-bold tabular-nums ${item.rank && Number(item.rank) <= 3 ? "text-[#FFD700]" : "text-white"}`}>{rank}</div>
-        <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Rang</div>
+      <div className="flex items-center justify-between gap-3 sm:justify-end sm:shrink-0 sm:text-right w-full sm:w-auto border-t border-white/10 pt-3 sm:border-0 sm:pt-0">
+        <div>
+          <div className={`font-display text-xl font-bold tabular-nums ${item.rank && Number(item.rank) <= 3 ? "text-[#FFD700]" : "text-white"}`}>{rank}</div>
+          <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Rang</div>
+        </div>
+        {target && <ExternalLink className="w-4 h-4 text-white/30 shrink-0" />}
       </div>
-      {target && <ExternalLink className="w-4 h-4 text-white/30 shrink-0" />}
     </div>
   );
   if (!target) return content;
@@ -919,9 +923,9 @@ function ReferenceRow({ item, expanded = false }) {
 
 function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", testId }) {
   return (
-    <div data-testid={testId} className="border border-white/10 rounded-sm bg-[#121212] px-3 py-3">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-white/40"><Icon className="w-3 h-3" /> {label}</div>
-      <div className="mt-1 font-display font-bold text-2xl tabular-nums" style={{ color }}>{value}</div>
+    <div data-testid={testId} className="border border-white/10 rounded-sm bg-[#121212] px-3 py-3 min-w-0">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-white/40 min-w-0"><Icon className="w-3 h-3 shrink-0" /> <span className="truncate">{label}</span></div>
+      <div className="mt-1 font-display font-bold text-xl sm:text-2xl tabular-nums break-words" style={{ color }}>{value}</div>
     </div>
   );
 }

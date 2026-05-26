@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Trophy, Bell, Crown, Gift, Award, UserCheck, AlertTriangle, Medal, Users } from "lucide-react";
+import { Trophy, Bell, Crown, Gift, Award, UserCheck, AlertTriangle, Medal, Users, Eye } from "lucide-react";
 
 function DashboardAvatar({ user, isClubMember }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -174,6 +174,15 @@ export default function DashboardPage() {
             <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Profil</div>
             <div className="mt-2 font-heading text-lg font-bold">Einstellungen</div>
           </Link>
+          {user?.username && (
+            <Link to={`/u/${user.username}`} data-testid="dashboard-public-profile-link" className="border border-[#29B6E8]/35 hover:border-[#29B6E8]/80 rounded-sm p-5 bg-[#121212] transition">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Öffentlich</div>
+                <Eye className="w-4 h-4 text-[#29B6E8]" />
+              </div>
+              <div className="mt-2 font-heading text-lg font-bold">Öffentliches Profil</div>
+            </Link>
+          )}
           <Link to="/profile?tab=teams" data-testid="dashboard-teams-link" className="border border-[#10B981]/30 hover:border-[#10B981]/70 rounded-sm p-5 bg-[#121212] transition">
             <div className="flex items-center justify-between">
               <div className="text-[11px] uppercase tracking-widest text-[#10B981] font-bold">Teams</div>
