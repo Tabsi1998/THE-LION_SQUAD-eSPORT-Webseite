@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CalendarClock, Check, MessageSquare, Send, X } from "lucide-react";
+import { CalendarClock, Check, ExternalLink, MessageSquare, RefreshCw, Send, Trophy, X } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
@@ -67,19 +67,38 @@ export default function MatchPage() {
   const [counterAt, setCounterAt] = useState("");
   const [decisionNote, setDecisionNote] = useState("");
   const [message, setMessage] = useState("");
+  const [scoreA, setScoreA] = useState("");
+  const [scoreB, setScoreB] = useState("");
+  const [proofUrl, setProofUrl] = useState("");
+  const [reportNote, setReportNote] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ preserveDrafts = true } = {}) => {
     const [{ data: page }, { data: messages }] = await Promise.all([
       api.get(`/matches/${id}/page`),
       api.get(`/matches/${id}/chat`),
     ]);
     setData(page);
     setChat(messages || []);
-    setProposalAt(toLocalInput(page.match?.scheduled_at));
+    const nextMatch = page.match || {};
+    if (preserveDrafts) {
+      setProposalAt((current) => current || toLocalInput(nextMatch.scheduled_at));
+      setScoreA((current) => current || String(nextMatch.score_a ?? 0));
+      setScoreB((current) => current || String(nextMatch.score_b ?? 0));
+    } else {
+      setProposalAt(toLocalInput(nextMatch.scheduled_at));
+      setScoreA(String(nextMatch.score_a ?? 0));
+      setScoreB(String(nextMatch.score_b ?? 0));
+    }
   }, [id]);
 
-  useEffect(() => { load().catch(() => setData(null)); }, [load]);
+  useEffect(() => {
+    load({ preserveDrafts: false }).catch(() => setData(null));
+    const timer = window.setInterval(() => {
+      load().catch(() => {});
+    }, 10000);
+    return () => window.clearInterval(timer);
+  }, [load]);
   useApiInvalidation(load, ["matches", "matches_v2", "tournaments"]);
 
   const title = data?.tournament?.title ? `${data.matchday_label} - ${data.tournament.title}` : "Match";
@@ -123,6 +142,27 @@ export default function MatchPage() {
     }
   };
 
+  const reportResult = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api.post(`/matches/${id}/report`, {
+        score_a: Math.max(0, Number.parseInt(scoreA || "0", 10) || 0),
+        score_b: Math.max(0, Number.parseInt(scoreB || "0", 10) || 0),
+        screenshot_url: proofUrl.trim() || null,
+        note: reportNote.trim() || null,
+      });
+      toast.success("Ergebnis gemeldet.");
+      setProofUrl("");
+      setReportNote("");
+      await load({ preserveDrafts: false });
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!message.trim()) return;
@@ -144,6 +184,13 @@ export default function MatchPage() {
   const canProposeSchedule = Boolean(data.can_propose_schedule);
   const canManageSchedule = Boolean(data.can_manage_schedule);
   const canUseChat = Boolean(user && data.can_act);
+  const participants = data.participants || [];
+  const duelParticipants = participants.slice(0, 2);
+  const isCompleted = ["completed", "forfeit"].includes(String(match.status));
+  const canReportScore = Boolean(data.can_player_report_result || data.can_report_score);
+  const canInlineReport = Boolean(canReportScore && data.collection !== "matches_v2" && duelParticipants.length >= 2 && !isCompleted);
+  const canOpenResultHub = Boolean(user && !isCompleted && (canReportScore || data.can_staff_submit_result || data.can_submit_result || data.can_dispute || data.can_forfeit));
+  const reports = Array.isArray(match.reports) ? match.reports : [];
   const showFixedScheduleNotice = data.schedule_mode === "fixed_by_staff" && !canProposeSchedule;
   const addStaffMention = () => {
     setMessage((current) => {
@@ -176,12 +223,59 @@ export default function MatchPage() {
           </div>
         </div>
 
-        <div className="mt-8 grid lg:grid-cols-[minmax(0,1fr)_24rem] gap-6">
+        <div className="mt-8 border border-[#29B6E8]/35 bg-[#0F1D23] rounded-sm p-5" data-testid="match-result-card">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Ergebnis</h2>
+              <p className="mt-1 text-sm text-white/55">Der Matchstand aktualisiert sich automatisch.</p>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-sm border border-[#29B6E8]/25 bg-[#29B6E8]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]">
+              <RefreshCw className="w-3.5 h-3.5" /> Live-Refresh
+            </div>
+          </div>
+
+          <div className="mt-5 grid md:grid-cols-[1fr_auto_1fr] gap-3 items-stretch">
+            <ResultSide participant={duelParticipants[0]} score={match.score_a} isWinner={match.winner_id && match.winner_id === duelParticipants[0]?.registration_id} />
+            <div className="hidden md:flex items-center justify-center font-display text-3xl text-white/35">:</div>
+            <ResultSide participant={duelParticipants[1]} score={match.score_b} isWinner={match.winner_id && match.winner_id === duelParticipants[1]?.registration_id} />
+          </div>
+
+          {canInlineReport ? (
+            <form onSubmit={reportResult} className="mt-5 border-t border-white/10 pt-5">
+              <div className="grid sm:grid-cols-[1fr_1fr] gap-3">
+                <Field label={`${duelParticipants[0]?.display_name || "Seite A"} Punkte`}>
+                  <input type="number" min="0" value={scoreA} onChange={(e) => setScoreA(e.target.value)} className="input text-center font-display text-2xl font-bold" data-testid="match-inline-score-a" />
+                </Field>
+                <Field label={`${duelParticipants[1]?.display_name || "Seite B"} Punkte`}>
+                  <input type="number" min="0" value={scoreB} onChange={(e) => setScoreB(e.target.value)} className="input text-center font-display text-2xl font-bold" data-testid="match-inline-score-b" />
+                </Field>
+              </div>
+              <div className="mt-3 grid sm:grid-cols-2 gap-3">
+                <input type="url" value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} className="input" placeholder="Screenshot-/Beweis-Link optional" />
+                <input value={reportNote} onChange={(e) => setReportNote(e.target.value)} className="input" placeholder="Notiz optional" />
+              </div>
+              <button disabled={busy} className="mt-4 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-inline-report-btn">Ergebnis melden</button>
+            </form>
+          ) : canOpenResultHub ? (
+            <Link to={`/hub/matches/${id}`} className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#1E95C2]" data-testid="match-result-cta">
+              Ergebnis-Aktionen öffnen <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
+          ) : !user && !isCompleted ? (
+            <Link to={`/login?next=/matches/${id}`} className="mt-5 inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#29B6E8]/10">
+              Login zum Ergebnis melden
+            </Link>
+          ) : (
+            <p className="mt-4 text-sm text-white/50">{isCompleted ? "Dieses Match ist abgeschlossen." : resultModeLabels[data.result_entry_mode] || "Ergebnis wird durch die Turnierleitung gepflegt."}</p>
+          )}
+          {reports.length > 0 && <p className="mt-3 text-xs text-white/45">{reports.length} Ergebnismeldung{reports.length === 1 ? "" : "en"} vorhanden.</p>}
+        </div>
+
+        <div className="mt-6 grid lg:grid-cols-[minmax(0,1fr)_24rem] gap-6">
           <div className="space-y-6">
             <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
               <h2 className="font-heading text-xl font-black uppercase">Teilnehmer</h2>
               <div className="mt-4 grid md:grid-cols-2 gap-3">
-                {(data.participants || []).map((p) => (
+                {participants.map((p) => (
                   <div key={p.slot} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
                     <div className="text-[10px] uppercase tracking-widest text-white/35">Slot {p.slot}</div>
                     <div className="mt-1 font-heading text-lg font-bold uppercase">{p.display_name || "Offen"}</div>
@@ -282,6 +376,17 @@ export default function MatchPage() {
 
 function Pill({ children }) {
   return <span className="rounded-sm border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/60">{children}</span>;
+}
+
+function ResultSide({ participant, score, isWinner }) {
+  return (
+    <div className={`border rounded-sm bg-[#0A0A0A] p-4 ${isWinner ? "border-[#29B6E8]/70 shadow-[0_0_18px_rgba(41,182,232,0.18)]" : "border-white/10"}`}>
+      <div className="text-[10px] uppercase tracking-widest text-white/35">Slot {participant?.slot || "-"}</div>
+      <div className="mt-1 font-heading text-lg font-bold uppercase truncate">{participant?.display_name || "Offen"}</div>
+      {participant?.team && <div className="mt-1 text-xs text-[#29B6E8] truncate">[{participant.team.tag}] {participant.team.name}</div>}
+      <div className={`mt-3 font-display text-5xl font-bold ${isWinner ? "text-[#29B6E8]" : "text-white/75"}`}>{score ?? 0}</div>
+    </div>
+  );
 }
 
 function Field({ label, children }) {

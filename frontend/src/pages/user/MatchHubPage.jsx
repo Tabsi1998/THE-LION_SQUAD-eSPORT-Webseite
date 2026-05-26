@@ -18,14 +18,25 @@ export default function MatchHubPage() {
   const [proofUrl, setProofUrl] = useState("");
   const [disputeReason, setDisputeReason] = useState("");
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ preserveDrafts = true } = {}) => {
     const { data } = await api.get(`/matches/${id}`);
     setM(data);
-    setScoreA(data.score_a || 0);
-    setScoreB(data.score_b || 0);
+    if (preserveDrafts) {
+      setScoreA((current) => current || data.score_a || 0);
+      setScoreB((current) => current || data.score_b || 0);
+    } else {
+      setScoreA(data.score_a || 0);
+      setScoreB(data.score_b || 0);
+    }
   }, [id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load({ preserveDrafts: false });
+    const timer = window.setInterval(() => {
+      load().catch(() => {});
+    }, 10000);
+    return () => window.clearInterval(timer);
+  }, [load]);
   useApiInvalidation(load, ["matches", "tournaments"]);
 
   if (!m) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
@@ -42,7 +53,7 @@ export default function MatchHubPage() {
       toast.success("Ergebnis gemeldet.");
       setReportNote("");
       setProofUrl("");
-      load();
+      await load({ preserveDrafts: false });
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
 
@@ -52,7 +63,7 @@ export default function MatchHubPage() {
       await api.post(`/matches/${m.id}/dispute`, { reason: disputeReason });
       toast.success("Klärfall erstellt.");
       setDisputeReason("");
-      load();
+      await load({ preserveDrafts: false });
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
 

@@ -61,7 +61,13 @@ export default function DashboardPage() {
     if (c.status === "fulfilled") setCompleteness(c.value.data);
     if (pen.status === "fulfilled") setPenaltyCount(pen.value.data?.count || 0);
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const timer = window.setInterval(() => {
+      load().catch(() => {});
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [load]);
   useApiInvalidation(load, ["matches", "prizes", "users", "penalties", "achievements", "membership", "tournaments", "f1", "admin/notifications"]);
 
   return (
@@ -119,6 +125,7 @@ export default function DashboardPage() {
                     <StatusBadge status={m.status} />
                   </div>
                   {m.scheduled_at && <div className="text-xs text-white/50 mt-1">{new Date(m.scheduled_at).toLocaleString("de-DE")}</div>}
+                  <div className="mt-2 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]">Match öffnen · Ergebnis direkt erfassen</div>
                 </Link>
               ))}
             </div>
