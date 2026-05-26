@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
-import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
+import { Image, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch, TextInput, View } from "react-native";
 import { ActionRow, ActionTile } from "../../components/ActionRow";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -10,6 +10,7 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
+import { API_BASE_URL } from "../../config";
 import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import { colors } from "../../theme";
@@ -248,6 +249,18 @@ export function ProfileScreen() {
     await loadProfileData();
   }, [guest, loadProfileData, refreshMe]);
 
+  const openPublicProfile = useCallback(() => {
+    const username = user?.username;
+    if (!username) return;
+    navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username } });
+  }, [navigation, user?.username]);
+
+  const sharePublicProfile = useCallback(() => {
+    const username = user?.username;
+    if (!username) return;
+    Share.share({ message: `${API_BASE_URL}/u/${username}` }).catch(() => {});
+  }, [user?.username]);
+
   const avatar = resolveMediaUrl(form.avatar_url || user?.avatar_url);
   const banner = resolveMediaUrl(form.banner_url || (user as any)?.banner_url);
 
@@ -278,6 +291,8 @@ export function ProfileScreen() {
 
         <View style={styles.quickActions}>
           <ActionTile icon="create-outline" label="Bearbeiten" onPress={() => setTab("edit")} />
+          <ActionTile icon="open-outline" label="Öffentlich" onPress={guest ? undefined : openPublicProfile} />
+          <ActionTile icon="share-social-outline" label="Teilen" onPress={guest ? undefined : sharePublicProfile} />
           <ActionTile icon="refresh-outline" label={refreshing ? "Lädt" : "Aktualisieren"} onPress={guest || refreshing ? undefined : refreshProfile} />
           <ActionTile icon="shield-checkmark-outline" label="Privat" onPress={() => setTab("privacy")} />
           <ActionTile icon="notifications-outline" label="Mails" onPress={() => setTab("notifications")} />

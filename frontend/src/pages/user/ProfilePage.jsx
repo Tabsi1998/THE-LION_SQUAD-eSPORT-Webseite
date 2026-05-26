@@ -10,7 +10,7 @@ import { gameLabel } from "@/lib/gameLabels";
 import { buildDirtyPayload, hasPayloadChanges, sameValue } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
-import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil, Target, RefreshCw, Sparkles, Bell, Mail, Check, X, UserPlus, MessageSquare, Send, Search } from "lucide-react";
+import { ExternalLink, Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil, Target, RefreshCw, Sparkles, Bell, Mail, Check, X, UserPlus, MessageSquare, Send, Search, Copy } from "lucide-react";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 
 const TABS = [
@@ -369,11 +369,22 @@ export default function ProfilePage() {
   if (!user) return null;
 
   const achInsights = achData ? achievementInsights(achData) : null;
+  const publicProfilePath = `/u/${user.username}`;
+  const publicProfileUrl = `${window.location.origin}${publicProfilePath}`;
+  const copyPublicProfileUrl = () => {
+    if (!navigator?.clipboard) {
+      toast.error("Profil-Link konnte nicht kopiert werden.");
+      return;
+    }
+    navigator.clipboard.writeText(publicProfileUrl)
+      .then(() => toast.success("Profil-Link kopiert."))
+      .catch(() => toast.error("Profil-Link konnte nicht kopiert werden."));
+  };
 
   return (
     <PublicLayout>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
           <div>
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">EINSTELLUNGEN</span>
             <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Mein Profil</h1>
@@ -387,11 +398,43 @@ export default function ProfilePage() {
               <span>@{user.username}</span>
             </div>
           </div>
-          {user?.username && (
-            <Link to={`/u/${user.username}`} data-testid="profile-view-public" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 transition">
-              <ExternalLink className="w-3.5 h-3.5" /> Öffentliches Profil
-            </Link>
-          )}
+        </div>
+
+        <div className="mt-6 grid sm:grid-cols-3 gap-3" data-testid="profile-quick-actions">
+          <button
+            type="button"
+            onClick={() => setTab("basic")}
+            className="text-left border border-white/10 bg-[#121212] rounded-sm p-4 hover:border-[#29B6E8]/55 transition group"
+          >
+            <div className="w-10 h-10 rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/10 text-[#29B6E8] flex items-center justify-center">
+              <Pencil className="w-5 h-5" />
+            </div>
+            <div className="mt-3 text-[10px] uppercase tracking-widest text-white/40 font-bold">Profil</div>
+            <div className="font-heading text-lg font-bold uppercase group-hover:text-[#29B6E8]">Bearbeiten</div>
+          </button>
+          <Link
+            to={publicProfilePath}
+            data-testid="profile-view-public"
+            className="block border border-[#29B6E8]/35 bg-[#29B6E8]/10 rounded-sm p-4 hover:border-[#29B6E8] transition group"
+          >
+            <div className="w-10 h-10 rounded-sm border border-[#29B6E8]/40 bg-[#29B6E8]/15 text-[#29B6E8] flex items-center justify-center">
+              <ExternalLink className="w-5 h-5" />
+            </div>
+            <div className="mt-3 text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">Öffentlich</div>
+            <div className="font-heading text-lg font-bold uppercase group-hover:text-[#29B6E8]">Profil ansehen</div>
+          </Link>
+          <button
+            type="button"
+            onClick={copyPublicProfileUrl}
+            data-testid="profile-share-public"
+            className="text-left border border-white/10 bg-[#121212] rounded-sm p-4 hover:border-[#FFD700]/55 transition group"
+          >
+            <div className="w-10 h-10 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/10 text-[#FFD700] flex items-center justify-center">
+              <Copy className="w-5 h-5" />
+            </div>
+            <div className="mt-3 text-[10px] uppercase tracking-widest text-white/40 font-bold">Teilen</div>
+            <div className="font-heading text-lg font-bold uppercase group-hover:text-[#FFD700]">Link kopieren</div>
+          </button>
         </div>
 
         <div className="mt-8 flex border-b border-white/10 overflow-x-auto">
