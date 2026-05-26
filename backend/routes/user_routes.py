@@ -9,6 +9,7 @@ from database import get_db
 from auth import get_current_user, get_optional_user, require_admin, require_super, hash_password, hash_token
 from email_service import send_template
 from services.membership_service import get_membership, derived_user_type, is_active_member
+from services.profile_references import empty_profile_references, personal_profile_references
 from services.visibility import user_can_see
 from services.notification_preferences import (
     OPTIONAL_EMAIL_PREFERENCES,
@@ -606,12 +607,14 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
     tournaments = []
     f1_bests = []
     teams = []
+    references = empty_profile_references()
     stats = {"tournaments": 0, "wins": 0, "top3": 0, "matches_played": 0, "matches_won": 0,
              "fast_laps": 0, "pole_positions": 0, "badges": len(badges), "points": total_points,
              "level": achievement_level["level"],
              "twitch_live_sessions": int(u.get("twitch_live_sessions_count") or 0),
              "twitch_stream_minutes": int(u.get("twitch_stream_minutes") or 0)}
     if public:
+        references = await personal_profile_references(u, public_only=True)
         regs = await db.tournament_registrations.find({"user_id": user_id}, {"_id": 0}).to_list(200)
         t_ids = list({r["tournament_id"] for r in regs})
         tournaments_raw = await db.tournaments.find(
@@ -729,6 +732,7 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
         "tournaments": tournaments,
         "f1_bests": f1_bests,
         "teams": teams,
+        "references": references,
         "socials": socials,
     }
 

@@ -276,6 +276,11 @@ export default function PublicProfilePage() {
     : null;
   const socialLinks = publicSocialLinks(profile, twitchUrl);
   const gamingIds = publicGamingIds(profile);
+  const profileReferences = Array.isArray(profile.references)
+    ? { items: profile.references, stats: { total: profile.references.length, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } }
+    : (profile.references || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } });
+  const referenceItems = Array.isArray(profileReferences.items) ? profileReferences.items : [];
+  const referenceStats = profileReferences.stats || {};
   const relationship = profile.relationship || { status: user?.id === profile.id ? "self" : "anonymous" };
   const isOwnProfile = user?.id === profile.id;
 
@@ -443,6 +448,7 @@ export default function PublicProfilePage() {
           {[
             ["overview", "Übersicht"],
             ["badges", `Achievements (${achievementsData?.awards?.length || 0})`],
+            ["references", `Referenzen (${referenceStats.total || referenceItems.length})`],
             ["tournaments", `Turniere (${profile.tournaments?.length || 0})`],
             ["fastlap", `Fast Lap (${profile.f1_bests?.length || 0})`],
             ["teams", `Teams (${profile.teams?.length || 0})`],
@@ -456,7 +462,7 @@ export default function PublicProfilePage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {isPrivate && (tab === "tournaments" || tab === "fastlap" || tab === "teams") && (
+        {isPrivate && (tab === "references" || tab === "tournaments" || tab === "fastlap" || tab === "teams") && (
           <div className="py-20 text-center text-white/40">
             <Lock className="w-8 h-8 mx-auto mb-3 opacity-50" />
             <p>Diese Daten hat {profile.display_name} privat gestellt.</p>
@@ -468,6 +474,7 @@ export default function PublicProfilePage() {
             <div className="lg:col-span-2 space-y-8">
               <PublicInfoPanel profile={profile} joinedDate={joinedDate} />
               <PublicSetupPanel profile={profile} />
+              <ReferenceStatsPanel stats={referenceStats} onOpen={() => setTab("references")} />
               {/* Recent achievements */}
               <div>
               <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Medal className="w-5 h-5 text-[#FFD700]" /> Letzte Achievements</h2>
@@ -542,13 +549,13 @@ export default function PublicProfilePage() {
               {gamingIds.length > 0 && <GamingIdsCard ids={gamingIds} />}
 
               <div>
-                <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Recent Turniere</h2>
-                {profile.tournaments?.length ? (
+                <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Referenzen</h2>
+                {referenceItems.length ? (
                   <div className="space-y-2">
-                    {profile.tournaments.slice(0, 5).map((t) => <TournamentRow key={t.id} t={t} />)}
+                    {referenceItems.slice(0, 5).map((item) => <ReferenceRow key={item.id} item={item} />)}
                   </div>
                 ) : (
-                  <EmptyState text="Noch keine Turniere gespielt." />
+                  <EmptyState text="Noch keine Referenzen sichtbar." />
                 )}
               </div>
             </div>
@@ -558,6 +565,17 @@ export default function PublicProfilePage() {
         {tab === "badges" && (
           <div>
             <AchievementGroupsView groups={achievementsData?.groups || []} earnedOnly emptyText="Noch keine Achievements freigeschaltet." />
+          </div>
+        )}
+
+        {tab === "references" && !isPrivate && (
+          <div className="space-y-6">
+            <ReferenceStatsPanel stats={referenceStats} />
+            {referenceItems.length ? (
+              <div className="grid gap-3" data-testid="public-profile-references">
+                {referenceItems.map((item) => <ReferenceRow key={item.id} item={item} expanded />)}
+              </div>
+            ) : <EmptyState text="Keine öffentlichen Referenzen." />}
           </div>
         )}
 
@@ -814,6 +832,89 @@ function DiscordContactCard({ discordName, isOwnProfile, onMessage }) {
       )}
     </div>
   );
+}
+
+function ReferenceStatsPanel({ stats = {}, onOpen }) {
+  const rows = [
+    { label: "Referenzen", value: stats.total || 0, icon: Trophy, color: "#29B6E8" },
+    { label: "Podien", value: stats.podiums || 0, icon: Medal, color: "#FFD700" },
+    { label: "Siege", value: stats.wins || 0, icon: Crown, color: "#FFD700" },
+    { label: "Punkte", value: stats.season_points || 0, icon: TrendingUp, color: "#29B6E8" },
+    { label: "Turniere", value: stats.tournaments || 0, icon: Flag, color: "#FFFFFF" },
+    { label: "Fast Laps", value: stats.fastlaps || 0, icon: Radio, color: "#C0C0C0" },
+  ];
+  return (
+    <section className="border border-white/10 bg-[#121212] rounded-sm p-5">
+      <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#29B6E8]">Historie</div>
+          <h2 className="mt-1 font-heading text-2xl font-bold uppercase flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-[#29B6E8]" /> Referenzen
+          </h2>
+        </div>
+        {onOpen && (
+          <button type="button" onClick={onOpen} className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#29B6E8]/10">
+            Alle ansehen <ExternalLink className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        {rows.map((row) => <QuickStat key={row.label} {...row} />)}
+      </div>
+    </section>
+  );
+}
+
+function referenceTarget(item) {
+  if (!item?.target_id) return "";
+  return item.kind === "fastlap"
+    ? `/fastlap/${item.target_id}`
+    : `/tournaments/${item.target_id}`;
+}
+
+function referenceKindLabel(kind) {
+  return kind === "fastlap" ? "Fast Lap" : "Turnier";
+}
+
+function statusLabel(status) {
+  const raw = String(status || "").trim();
+  if (!raw) return "";
+  return raw.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function ReferenceRow({ item, expanded = false }) {
+  const isFastlap = item.kind === "fastlap";
+  const target = referenceTarget(item);
+  const rank = item.rank ? `#${item.rank}` : "-";
+  const date = formatPublicDate(item.date);
+  const content = (
+    <div data-testid={`profile-reference-${item.id}`} className="flex items-center justify-between gap-3 px-4 py-3 border border-white/10 rounded-sm bg-[#121212] hover:border-[#29B6E8]/60 transition">
+      <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${isFastlap ? "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]" : "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#29B6E8]"}`}>
+        {isFastlap ? <Radio className="w-5 h-5" /> : <Trophy className="w-5 h-5" />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-[10px] font-bold uppercase tracking-widest ${isFastlap ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{referenceKindLabel(item.kind)}</span>
+          {item.points != null && <span className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700] border border-[#FFD700]/35 px-1.5 py-0.5 rounded-sm">{item.points} Punkte</span>}
+          {item.time_str && <span className="text-[10px] font-bold uppercase tracking-widest text-white/70 border border-white/10 px-1.5 py-0.5 rounded-sm">{item.time_str}</span>}
+        </div>
+        <div className="mt-1 font-heading text-base font-bold truncate">{item.title || "Referenz"}</div>
+        <div className="text-xs text-white/50 mt-0.5 flex items-center gap-2 flex-wrap">
+          {item.subtitle && <span>{item.subtitle}</span>}
+          {date && <span>· {date}</span>}
+          {expanded && statusLabel(item.status) && <span>· {statusLabel(item.status)}</span>}
+          {expanded && item.participant_count && <span>· {item.participant_count} Teilnehmer</span>}
+        </div>
+      </div>
+      <div className="shrink-0 text-right">
+        <div className={`font-display text-xl font-bold tabular-nums ${item.rank && Number(item.rank) <= 3 ? "text-[#FFD700]" : "text-white"}`}>{rank}</div>
+        <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Rang</div>
+      </div>
+      {target && <ExternalLink className="w-4 h-4 text-white/30 shrink-0" />}
+    </div>
+  );
+  if (!target) return content;
+  return <Link to={target} className="block">{content}</Link>;
 }
 
 function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", testId }) {
