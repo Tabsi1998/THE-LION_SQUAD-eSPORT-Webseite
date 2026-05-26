@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0-beta.2 - 2026-05-26
+
+- Mobile: Match-Ergebnisaktionen stehen in der Matchdetail-Ansicht weiter oben und sind auf dem Handy schneller erreichbar.
+- Mobile: Matchdetails aktualisieren Ergebnis-, Dispute- und Forfeit-Aenderungen nach dem Speichern sofort mit einem frischen Backend-Reload.
+- Mobile/Web: Matchansichten aktualisieren laufende Matchdaten automatisch, damit Ergebnisstatus ohne manuelles Neuladen sichtbar werden.
+
 ## 1.5.0-beta.1 - 2026-05-22
 
 - Mobile: Finaler Beta-Build 45 nach Expo-SDK-56-Upgrade, Firebase/FCM-Push-Einrichtung und Android-Notification-Icon.
