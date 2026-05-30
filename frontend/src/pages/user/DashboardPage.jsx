@@ -7,6 +7,8 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Trophy, Bell, Crown, Gift, Award, UserCheck, AlertTriangle, Medal, Users, Eye } from "lucide-react";
 
+const OPEN_MATCH_STATUSES = new Set(["ready", "scheduled", "in_progress", "waiting_result"]);
+
 function DashboardAvatar({ user, isClubMember }) {
   const [imageFailed, setImageFailed] = useState(false);
   const avatarUrl = user?.avatar_url ? resolveMediaUrl(user.avatar_url) : "";
@@ -55,7 +57,10 @@ export default function DashboardPage() {
       api.get("/users/me/profile-completeness"),
       api.get("/penalties/me"),
     ]);
-    if (m.status === "fulfilled") setMatches(m.value.data);
+    if (m.status === "fulfilled") {
+      const rows = Array.isArray(m.value.data) ? m.value.data : [];
+      setMatches(rows.filter((match) => OPEN_MATCH_STATUSES.has(String(match.status || ""))));
+    }
     if (n.status === "fulfilled") setNotifications(Array.isArray(n.value.data) ? n.value.data : (n.value.data?.items || []));
     if (p.status === "fulfilled") setOpenPrizes(p.value.data?.count || 0);
     if (c.status === "fulfilled") setCompleteness(c.value.data);
@@ -65,7 +70,7 @@ export default function DashboardPage() {
     load();
     const timer = window.setInterval(() => {
       load().catch(() => {});
-    }, 30000);
+    }, 10000);
     return () => window.clearInterval(timer);
   }, [load]);
   useApiInvalidation(load, ["matches", "prizes", "users", "penalties", "achievements", "membership", "tournaments", "f1", "admin/notifications"]);
@@ -121,9 +126,10 @@ export default function DashboardPage() {
                   className="block border border-white/10 rounded-sm p-3 hover:border-[#29B6E8]/60 transition"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="text-sm text-white">{m.round_name || `Runde ${m.round}`}</div>
+                    <div className="text-sm text-white">{m.tournament_title || m.round_name || `Runde ${m.round}`}</div>
                     <StatusBadge status={m.status} />
                   </div>
+                  {m.tournament_title && <div className="text-xs text-white/45 mt-1">{m.round_name || `Runde ${m.round || "-"}`}</div>}
                   {m.scheduled_at && <div className="text-xs text-white/50 mt-1">{new Date(m.scheduled_at).toLocaleString("de-DE")}</div>}
                   <div className="mt-2 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]">Match öffnen · Ergebnis direkt erfassen</div>
                 </Link>

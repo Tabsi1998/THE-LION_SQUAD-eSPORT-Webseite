@@ -41,6 +41,7 @@ const tabs: Array<{ key: TabKey; label: string }> = [
   { key: "participants", label: "Spieler" },
   { key: "rules", label: "Regeln" },
 ];
+const OPEN_MATCH_STATUSES = new Set(["ready", "scheduled", "in_progress", "waiting_result"]);
 
 export function TournamentDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
@@ -78,6 +79,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     load();
+    const timer = setInterval(load, 10000);
+    return () => clearInterval(timer);
   }, [load]);
 
   const registrations = bracket.registrations || [];
@@ -116,6 +119,12 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const legacyMatches = bracket.matches || tournament?.matches || [];
   const v2Matches = bracket.matches_v2 || [];
   const allMatches = v2Matches.length ? v2Matches : legacyMatches;
+  const upcomingMatches = useMemo(() => {
+    const open = allMatches.filter((match) => OPEN_MATCH_STATUSES.has(String(match.status || "")));
+    if (!ownRegistration?.id) return open.slice(0, 5);
+    const ownOpen = open.filter((match) => matchIncludesRegistration(match, ownRegistration.id));
+    return (ownOpen.length ? ownOpen : open).slice(0, 5);
+  }, [allMatches, ownRegistration?.id]);
 
   const register = useCallback(async (payload: RegistrationPayload = {}) => {
     if (!tournament || busy) return;
@@ -294,9 +303,9 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
             </Card>
             <Card style={styles.card}>
               <Heading>Nächste Matches</Heading>
-              {allMatches.length ? allMatches.slice(0, 5).map((match) => (
+              {upcomingMatches.length ? upcomingMatches.map((match) => (
                 <MatchCard key={match.id} match={match} regMap={regMap} compact onPress={() => navigation.navigate("MatchDetail", { id: match.id })} />
-              )) : <Muted>Noch keine Matches generiert.</Muted>}
+              )) : <Muted>Keine offenen Matches.</Muted>}
             </Card>
           </>
         ) : null}
@@ -551,6 +560,12 @@ function MatchCard({ match, regMap, compact = false, onPress }: { match: any; re
 function participantLabel(registration: any) {
   if (!registration) return "";
   return registration.display_name || registration.ingame_name || registration.user?.display_name || registration.user?.username || registration.name || "";
+}
+
+function matchIncludesRegistration(match: any, registrationId: string) {
+  if (!registrationId) return false;
+  if (match.participant_a_id === registrationId || match.participant_b_id === registrationId) return true;
+  return Boolean((match.slots || []).some((slot: any) => slot.registration_id === registrationId));
 }
 
 function formatSection(value: string) {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0-beta.5 - 2026-05-30
+
+- Backend/Web/Mobile: Eigene offene Matches werden jetzt aus Legacy- und V2-Matches sauber zusammengefuehrt und abgeschlossene Matches fallen direkt aus der Liste.
+- Mobile: Turnierdetails aktualisieren die naechsten Matches automatisch und priorisieren die offenen Matches der eigenen Anmeldung.
+- Web/Mobile: Dashboard-Matchlisten pollen schneller und filtern erledigte Matches zusaetzlich clientseitig aus.
+
 ## 1.5.0-beta.4 - 2026-05-30
 
 - Backend: Jahreswertungs-Top-3 erscheinen als eigene Referenz, ohne normale Season-Punkte mit Turnier- und Fast-Lap-Referenzen zu vermischen.

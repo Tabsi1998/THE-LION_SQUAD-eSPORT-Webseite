@@ -1,6 +1,6 @@
 """Match/Score/Dispute routes."""
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from database import get_db
@@ -37,6 +37,8 @@ STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 EVENT_MODES = {"local", "online", "hybrid"}
 RESULT_ENTRY_MODES = {"staff_only", "player_confirmed", "hybrid"}
 SCHEDULE_MODES = {"fixed_by_staff", "player_proposal", "hybrid"}
+OPEN_MATCH_STATUSES = {"ready", "scheduled", "in_progress", "waiting_result"}
+ACTIVE_MATCH_REGISTRATION_STATUSES = {"registered", "approved", "checked_in"}
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 STAFF_MENTION_HANDLES = {"leitung", "turnierleitung", "orga", "organizer", "staff", "admin", "referee", "schiri", "scorekeeper"}
 USER_PUBLIC_PROJECTION = {
@@ -57,6 +59,28 @@ async def _ensure_match_tournament_unlocked(db, match: dict) -> None:
 
 def _is_staff(user: dict | None) -> bool:
     return bool(user and user.get("role") in STAFF_ROLES)
+
+
+def _upcoming_sort_key(match: dict) -> tuple:
+    scheduled = match.get("scheduled_at")
+    if scheduled:
+        try:
+            parsed = datetime.fromisoformat(str(scheduled).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return (0, parsed.astimezone(timezone.utc))
+        except (TypeError, ValueError):
+            pass
+    return (1, int(match.get("round") or 9999), str(match.get("match_key") or match.get("id") or ""))
+
+
+async def _team_ids_for_user(user_id: str) -> list[str]:
+    db = get_db()
+    memberships = await db.team_members.find(
+        {"user_id": user_id},
+        {"_id": 0, "team_id": 1},
+    ).to_list(200)
+    return [row["team_id"] for row in memberships if row.get("team_id")]
 
 
 def _mode_value(value: object, allowed: set[str]) -> str | None:
@@ -651,15 +675,38 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
 @router.get("/upcoming")
 async def my_upcoming(me: dict = Depends(get_current_user)):
     db = get_db()
+    team_ids = await _team_ids_for_user(me["id"])
+    reg_query = {"user_id": me["id"]}
+    if team_ids:
+        reg_query = {"$or": [{"user_id": me["id"]}, {"team_id": {"$in": team_ids}}]}
     regs = await db.tournament_registrations.find(
-        {"user_id": me["id"]}, {"_id": 0, "id": 1, "tournament_id": 1}
+        {**reg_query, "status": {"$in": list(ACTIVE_MATCH_REGISTRATION_STATUSES)}},
+        {"_id": 0, "id": 1, "tournament_id": 1},
     ).to_list(200)
     reg_ids = [r["id"] for r in regs]
-    matches = await db.matches.find({
+    if not reg_ids:
+        return []
+    match_query = {
         "$or": [{"participant_a_id": {"$in": reg_ids}},
-                {"participant_b_id": {"$in": reg_ids}}],
-        "status": {"$in": ["ready", "scheduled", "in_progress", "waiting_result"]},
-    }, {"_id": 0}).to_list(200)
+                {"participant_b_id": {"$in": reg_ids}},
+                {"slots.registration_id": {"$in": reg_ids}}],
+        "status": {"$in": list(OPEN_MATCH_STATUSES)},
+    }
+    legacy = await db.matches.find(match_query, {"_id": 0}).to_list(200)
+    v2 = await db.matches_v2.find(match_query, {"_id": 0}).to_list(200)
+    matches = sorted([{**m, "collection": "matches"} for m in legacy] + [{**m, "collection": "matches_v2"} for m in v2], key=_upcoming_sort_key)[:12]
+    tournament_ids = list({match.get("tournament_id") for match in matches if match.get("tournament_id")})
+    tournaments = {
+        tournament["id"]: tournament
+        for tournament in await db.tournaments.find(
+            {"id": {"$in": tournament_ids}},
+            {"_id": 0, "id": 1, "title": 1, "slug": 1},
+        ).to_list(100)
+    }
+    for match in matches:
+        tournament = tournaments.get(match.get("tournament_id") or "") or {}
+        match["tournament_title"] = tournament.get("title")
+        match["tournament_slug"] = tournament.get("slug")
     return matches
 
 
