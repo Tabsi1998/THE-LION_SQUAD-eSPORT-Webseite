@@ -73,7 +73,6 @@ class FakeDb:
     def __init__(self, **collections):
         names = [
             "team_members",
-            "season_points",
             "tournaments",
             "f1_challenges",
             "f1_tracks",
@@ -87,19 +86,8 @@ class FakeDb:
             setattr(self, name, FakeCollection(collections.get(name, [])))
 
 
-def test_tournament_reference_backfills_rank_for_mini_season_points(monkeypatch):
+def test_tournament_reference_backfills_rank_from_final_placement(monkeypatch):
     db = FakeDb(
-        season_points=[
-            {
-                "user_id": "user-1",
-                "source_type": "mini",
-                "source_id": "tour-1",
-                "source_name": "Mini Cup",
-                "rank": None,
-                "total_points": 20,
-                "created_at": "2026-05-28T10:00:00Z",
-            }
-        ],
         tournaments=[
             {
                 "id": "tour-1",
@@ -129,7 +117,9 @@ def test_tournament_reference_backfills_rank_for_mini_season_points(monkeypatch)
 
     assert result["items"][0]["rank"] == 2
     assert result["items"][0]["participant_count"] == 2
+    assert result["items"][0]["points"] is None
     assert result["stats"]["podiums"] == 1
+    assert "season_points" not in result["stats"]
 
 
 def test_registration_reference_gets_rank_from_v2_results(monkeypatch):
@@ -169,3 +159,4 @@ def test_registration_reference_gets_rank_from_v2_results(monkeypatch):
     assert result["items"][0]["rank"] == 1
     assert result["items"][0]["participant_count"] == 2
     assert result["stats"]["wins"] == 1
+    assert "season_points" not in result["stats"]

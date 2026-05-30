@@ -85,7 +85,7 @@ export function ProfileScreen() {
   const { user, logout, refreshMe } = useAuth();
   const [tab, setTab] = useState<TabKey>("overview");
   const [achievements, setAchievements] = useState<AchievementData>({ groups: [], awards: [] });
-  const [references, setReferences] = useState<PersonalReferenceData>({ items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } });
+  const [references, setReferences] = useState<PersonalReferenceData>({ items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [completeness, setCompleteness] = useState<{ score?: number; missing?: string[] }>({});
   const [form, setForm] = useState<Record<string, any>>({});
@@ -150,10 +150,10 @@ export function ProfileScreen() {
         api.get<AchievementData>("/achievements/me").catch(() => ({ data: { groups: [], awards: [] } })),
         api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness").catch(() => ({ data: {} })),
         api.get<Record<string, boolean>>("/users/me/notification-preferences").catch(() => ({ data: {} })),
-        api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } } })),
+        api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } } })),
       ]);
       setAchievements(achievementResult.data || { groups: [], awards: [] });
-      setReferences(referenceResult.data || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } });
+      setReferences(referenceResult.data || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
       setCompleteness(completenessResult.data || {});
       setForm((current) => ({
         ...current,
@@ -358,12 +358,11 @@ export function ProfileScreen() {
               <View style={styles.statGrid}>
                 <Stat label="Gesamt" value={String(references.stats.total)} />
                 <Stat label="Podien" value={String(references.stats.podiums)} tone="gold" />
-                <Stat label="Jahrespkt." value={String(references.stats.season_points || 0)} />
+                <Stat label="Siege" value={String(references.stats.wins)} />
               </View>
               <View style={styles.statGrid}>
                 <Stat label="Turniere" value={String(references.stats.tournaments)} />
                 <Stat label="Fast Laps" value={String(references.stats.fastlaps)} tone="gold" />
-                <Stat label="Siege" value={String(references.stats.wins)} />
               </View>
             </Card>
             {references.items.length ? (
@@ -587,7 +586,6 @@ function ReferenceCard({ item, onOpen }: { item: PersonalReferenceItem; onOpen?:
       </View>
       <View style={styles.referenceMeta}>
         {item.time_str ? <Pill label={item.time_str} tone="cyan" /> : null}
-        {item.points != null ? <Pill label={`${item.points} Punkte`} tone="gold" /> : null}
         <Pill label={isFastlap ? "Fast Lap" : "Turnier"} />
       </View>
     </Card>

@@ -277,8 +277,8 @@ export default function PublicProfilePage() {
   const socialLinks = publicSocialLinks(profile, twitchUrl);
   const gamingIds = publicGamingIds(profile);
   const profileReferences = Array.isArray(profile.references)
-    ? { items: profile.references, stats: { total: profile.references.length, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } }
-    : (profile.references || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } });
+    ? { items: profile.references, stats: { total: profile.references.length, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } }
+    : (profile.references || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
   const referenceItems = Array.isArray(profileReferences.items) ? profileReferences.items : [];
   const referenceStats = profileReferences.stats || {};
   const relationship = profile.relationship || { status: user?.id === profile.id ? "self" : "anonymous" };
@@ -839,7 +839,6 @@ function ReferenceStatsPanel({ stats = {}, onOpen }) {
     { label: "Referenzen", value: stats.total || 0, icon: Trophy, color: "#29B6E8" },
     { label: "Podien", value: stats.podiums || 0, icon: Medal, color: "#FFD700" },
     { label: "Siege", value: stats.wins || 0, icon: Crown, color: "#FFD700" },
-    { label: "Punkte", value: stats.season_points || 0, icon: TrendingUp, color: "#29B6E8" },
     { label: "Turniere", value: stats.tournaments || 0, icon: Flag, color: "#FFFFFF" },
     { label: "Fast Laps", value: stats.fastlaps || 0, icon: Radio, color: "#C0C0C0" },
   ];
@@ -858,7 +857,7 @@ function ReferenceStatsPanel({ stats = {}, onOpen }) {
           </button>
         )}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
         {rows.map((row) => <QuickStat key={row.label} {...row} />)}
       </div>
     </section>
@@ -896,7 +895,6 @@ function ReferenceRow({ item, expanded = false }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`text-[10px] font-bold uppercase tracking-widest ${isFastlap ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{referenceKindLabel(item.kind)}</span>
-            {item.points != null && <span className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700] border border-[#FFD700]/35 px-1.5 py-0.5 rounded-sm">{item.points} Punkte</span>}
             {item.time_str && <span className="text-[10px] font-bold uppercase tracking-widest text-white/70 border border-white/10 px-1.5 py-0.5 rounded-sm break-all">{item.time_str}</span>}
           </div>
           <div className="mt-1 font-heading text-base font-bold break-words">{item.title || "Referenz"}</div>

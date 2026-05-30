@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0-beta.3 - 2026-05-30
+
+- Mobile: Referenzen zeigen keine Jahreswertungs-/Season-Punkte mehr, sondern nur Turnier- und Fast-Lap-Historie.
+- Backend/Web/Mobile: Profil-Referenzen werden aus echten Turnierplatzierungen und Fast-Lap-Zeiten aufgebaut, damit Rangwerte nicht als `-` stehen bleiben.
+- Web: Der Referenzbereich im oeffentlichen Profil blendet Jahreswertungspunkte aus und bleibt auf mobilen Layouts kompakt lesbar.
+- Mobile/CI: Expo-SDK-56-Patch-Abhaengigkeiten fuer den APK-Release-Check aktualisiert.
+
 ## 1.5.0-beta.2 - 2026-05-26
 
 - Mobile: Match-Ergebnisaktionen stehen in der Matchdetail-Ansicht weiter oben und sind auf dem Handy schneller erreichbar.

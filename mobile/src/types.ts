@@ -311,7 +311,6 @@ export type PersonalReferenceData = {
     fastlaps: number;
     wins: number;
     podiums: number;
-    season_points: number;
   };
 };
 

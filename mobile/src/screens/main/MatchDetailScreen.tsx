@@ -167,12 +167,13 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const pendingProposals = (page?.schedule_proposals || []).filter((proposal) => proposal.status === "pending");
   const isV2 = page?.collection === "matches_v2" || Boolean(match.slots?.length);
   const v2Mode = rankingMode(match);
+  const isCompleted = ["completed", "forfeit"].includes(String(match.status));
   const duelParticipants = participants.slice(0, 2);
   const canUseChat = Boolean(page?.can_act);
   const canPlayerReportResult = Boolean(page?.can_player_report_result ?? page?.can_report_score);
   const canStaffSubmitResult = Boolean(page?.can_staff_submit_result ?? page?.can_submit_result);
-  const canSubmitLegacyResult = Boolean(!isV2 && duelParticipants.length >= 2 && (canPlayerReportResult || canStaffSubmitResult));
-  const canSubmitV2Result = Boolean(isV2 && canStaffSubmitResult && v2Rows.length);
+  const canSubmitLegacyResult = Boolean(!isV2 && !isCompleted && duelParticipants.length >= 2 && (canPlayerReportResult || canStaffSubmitResult));
+  const canSubmitV2Result = Boolean(isV2 && !isCompleted && canStaffSubmitResult && v2Rows.length);
   const canProposeSchedule = Boolean(page?.can_propose_schedule);
   const canManageSchedule = Boolean(page?.can_manage_schedule);
   const hasScheduleProposals = pendingProposals.length > 0;
@@ -181,7 +182,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const eventModeLabel = formatEventMode(page?.event_mode);
   const resultModeLabel = formatResultEntryMode(page?.result_entry_mode);
   const scheduleModeLabel = formatScheduleMode(page?.schedule_mode);
-  const hasResultActions = Boolean(canSubmitLegacyResult || canSubmitV2Result || page?.can_dispute || page?.can_forfeit);
+  const hasResultActions = Boolean(canSubmitLegacyResult || canSubmitV2Result || (!isCompleted && page?.can_dispute) || (!isCompleted && page?.can_forfeit));
   const showFlowNotice = Boolean(!hasResultActions && (page?.result_entry_mode || page?.schedule_mode));
 
   const propose = useCallback(async () => {
