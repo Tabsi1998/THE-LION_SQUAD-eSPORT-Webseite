@@ -50,7 +50,13 @@ const tabs: Array<{ key: TabKey; label: string; icon: keyof typeof Ionicons.glyp
   { key: "edit", label: "Bearbeiten", icon: "create-outline" },
   { key: "achievements", label: "Erfolge", icon: "trophy-outline" },
   { key: "privacy", label: "Privat", icon: "shield-checkmark-outline" },
-  { key: "notifications", label: "Mails", icon: "notifications-outline" },
+  { key: "notifications", label: "Benachr.", icon: "notifications-outline" },
+];
+
+const notificationChannels: Array<{ key: string; label: string; detail: string }> = [
+  { key: "email", label: "E-Mail", detail: "Nur wichtige optionale Hinweise per Mail." },
+  { key: "push", label: "Push", detail: "System-Benachrichtigungen am Handy." },
+  { key: "in_app", label: "In-App", detail: "Hinweise in App, Web und Notification-Center." },
 ];
 
 const notificationLabels: Array<{ key: string; label: string; detail: string }> = [
@@ -149,7 +155,7 @@ export function ProfileScreen() {
       const [achievementResult, completenessResult, preferenceResult, referenceResult] = await Promise.all([
         api.get<AchievementData>("/achievements/me").catch(() => ({ data: { groups: [], awards: [] } })),
         api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness").catch(() => ({ data: {} })),
-        api.get<Record<string, boolean>>("/users/me/notification-preferences").catch(() => ({ data: {} })),
+        api.get<{ preferences?: Record<string, boolean> } | Record<string, boolean>>("/users/me/notification-preferences").catch(() => ({ data: {} })),
         api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } } })),
       ]);
       setAchievements(achievementResult.data || { groups: [], awards: [] });
@@ -159,7 +165,7 @@ export function ProfileScreen() {
         ...current,
         notification_preferences: {
           ...(current.notification_preferences || {}),
-          ...(preferenceResult.data || {}),
+          ...(((preferenceResult.data as any)?.preferences || preferenceResult.data || {}) as Record<string, boolean>),
         },
       }));
     } catch (err) {
@@ -267,6 +273,13 @@ export function ProfileScreen() {
 
   const avatar = resolveMediaUrl(form.avatar_url || user?.avatar_url);
   const banner = resolveMediaUrl(form.banner_url || (user as any)?.banner_url);
+  const notificationEnabled = useCallback((key: string) => {
+    if (key === "news_events" && !form.newsletter_consent) return false;
+    const pref = form.notification_preferences || {};
+    if (Object.prototype.hasOwnProperty.call(pref, key)) return Boolean(pref[key]);
+    if (key === "news_events") return Boolean(form.newsletter_consent);
+    return true;
+  }, [form.newsletter_consent, form.notification_preferences]);
 
   return (
     <Screen padded={false}>
@@ -299,7 +312,7 @@ export function ProfileScreen() {
           <ActionTile icon="share-social-outline" label="Teilen" onPress={guest ? undefined : sharePublicProfile} />
           <ActionTile icon="refresh-outline" label={refreshing ? "Lädt" : "Aktualisieren"} onPress={guest || refreshing ? undefined : refreshProfile} />
           <ActionTile icon="shield-checkmark-outline" label="Privat" onPress={() => setTab("privacy")} />
-          <ActionTile icon="notifications-outline" label="Mails" onPress={() => setTab("notifications")} />
+          <ActionTile icon="notifications-outline" label="Benachr." onPress={() => setTab("notifications")} />
         </View>
 
         <View style={styles.tabs}>
@@ -453,12 +466,28 @@ export function ProfileScreen() {
           <Card style={styles.card}>
             <Heading>Benachrichtigungen</Heading>
             <Toggle label="Newsletter" detail="Grundsätzliche Zustimmung für News und Events." value={Boolean(form.newsletter_consent)} onValueChange={(v) => setField(setForm, "newsletter_consent", v)} />
+            <Muted style={styles.sectionText}>Kanäle</Muted>
+            {notificationChannels.map((item) => (
+              <Toggle
+                key={item.key}
+                label={item.label}
+                detail={item.detail}
+                value={notificationEnabled(item.key)}
+                onValueChange={(v) =>
+                  setForm((current) => ({
+                    ...current,
+                    notification_preferences: { ...(current.notification_preferences || {}), [item.key]: v },
+                  }))
+                }
+              />
+            ))}
+            <Muted style={styles.sectionText}>Arten</Muted>
             {notificationLabels.map((item) => (
               <Toggle
                 key={item.key}
                 label={item.label}
                 detail={item.detail}
-                value={form.notification_preferences?.[item.key] ?? true}
+                value={notificationEnabled(item.key)}
                 onValueChange={(v) =>
                   setForm((current) => ({
                     ...current,
@@ -810,6 +839,12 @@ const styles = StyleSheet.create({
   },
   strong: {
     fontWeight: "900",
+  },
+  sectionText: {
+    color: colors.cyan,
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
   },
   field: {
     gap: 7,

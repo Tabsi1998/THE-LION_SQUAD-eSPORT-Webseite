@@ -7,6 +7,7 @@ from services.notification_preferences import (
     email_allowed,
     notification_allowed,
     normalized_preferences,
+    push_allowed,
     public_preferences_payload,
 )
 
@@ -40,6 +41,22 @@ def test_user_can_disable_optional_match_mails():
     assert email_allowed(user, "password_reset") is True
 
 
+def test_user_can_disable_email_channel_without_blocking_required_mail():
+    user = {"notification_preferences": {"email": False, "match_reminders": True}}
+    assert email_allowed(user, "match_lead_10m") is False
+    assert email_allowed(user, "password_reset") is True
+
+
+def test_push_and_in_app_channels_are_independent():
+    user = {"notification_preferences": {"push": False, "in_app": True, "match_reminders": True}}
+    assert push_allowed(user, "match_reminder") is False
+    assert notification_allowed(user, "match_reminder") is True
+    user["notification_preferences"]["push"] = True
+    user["notification_preferences"]["in_app"] = False
+    assert push_allowed(user, "match_reminder") is True
+    assert notification_allowed(user, "match_reminder") is False
+
+
 def test_in_app_notifications_use_the_same_profile_preferences():
     user = {"notification_preferences": {"match_reminders": False, "tournament_updates": False}}
     assert notification_allowed(user, "match_reminder") is False
@@ -61,5 +78,7 @@ def test_direct_message_notifications_are_required():
 def test_public_preferences_payload_contains_channels():
     payload = public_preferences_payload({"newsletter_consent": True})
     assert payload["preferences"]["news_events"] is True
-    keys = {channel["key"] for channel in payload["channels"]}
-    assert {"match_reminders", "news_events", "membership_updates", "birthday_greetings"}.issubset(keys)
+    channel_keys = {channel["key"] for channel in payload["channels"]}
+    category_keys = {category["key"] for category in payload["categories"]}
+    assert {"email", "push", "in_app"}.issubset(channel_keys)
+    assert {"match_reminders", "news_events", "membership_updates", "birthday_greetings"}.issubset(category_keys)

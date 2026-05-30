@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0-beta.7 - 2026-05-30
+
+- Backend/Web/Mobile: Benachrichtigungen haben jetzt getrennte Schalter fuer E-Mail, Push und In-App sowie eigene Kategorien fuer Match-Erinnerungen, Turnier-Updates und News/Events.
+- Backend: Wiederholte In-App-/Push-Benachrichtigungen werden dedupliziert und per Cooldown begrenzt, damit kurze Notification-Spitzen nicht mehr spamartig wirken.
+- Backend: Geplante Match- und Check-in-Erinnerungen verschicken deutlich weniger E-Mails; Push/In-App bleiben fuer operative Hinweise im Vordergrund.
+
 ## 1.5.0-beta.6 - 2026-05-30
 
 - Mobile: Abgeschlossene Turniere zeigen in der Detailansicht jetzt prominent "Turnier beendet", Abschlusszeit, Champion, Top-3-Platzierungen und Turnierstatistiken.

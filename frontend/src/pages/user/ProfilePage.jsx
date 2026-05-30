@@ -94,6 +94,12 @@ const EMAIL_PREFERENCES = [
   { k: "news_events", l: "News & Events", d: "Neue Vereinsnews, neue Events und wichtige Ankündigungen.", requiresNewsletter: true },
 ];
 
+const NOTIFICATION_CHANNELS = [
+  { k: "email", l: "E-Mail", d: "Nur wichtige optionale Hinweise per Mail.", defaultOn: true },
+  { k: "push", l: "Push", d: "System-Benachrichtigungen auf registrierten Mobilgeräten.", defaultOn: true },
+  { k: "in_app", l: "In-App", d: "Hinweise in Web, App und Notification-Center.", defaultOn: true },
+];
+
 const ACHIEVEMENT_ACTIONS = {
   profile_completion: "Profil weiter ausfüllen",
   tournaments_joined: "Bei Turnieren mitmachen",
@@ -320,7 +326,7 @@ export default function ProfilePage() {
   const notificationEnabled = (field) => {
     if (field === "news_events" && !form.newsletter_consent) return false;
     const pref = form.notification_preferences || {};
-    const meta = EMAIL_PREFERENCES.find((item) => item.k === field);
+    const meta = [...NOTIFICATION_CHANNELS, ...EMAIL_PREFERENCES].find((item) => item.k === field);
     if (Object.prototype.hasOwnProperty.call(pref, field)) return !!pref[field];
     return !!meta?.defaultOn || (field === "news_events" && !!form.newsletter_consent);
   };
@@ -593,10 +599,34 @@ export default function ProfilePage() {
                 <div className="flex items-start gap-3 mb-4">
                   <Bell className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />
                   <div>
-                    <h3 className="font-heading font-black uppercase mb-1">E-Mail-Benachrichtigungen</h3>
-                    <p className="text-xs text-white/50">Wähle, welche optionalen E-Mails du bekommen möchtest. Account- und Sicherheitsmails bleiben immer aktiv.</p>
+                    <h3 className="font-heading font-black uppercase mb-1">Benachrichtigungen</h3>
+                    <p className="text-xs text-white/50">Steuere getrennt, ob Hinweise per E-Mail, Push oder In-App ankommen. Account- und Sicherheitsmails bleiben immer aktiv.</p>
                   </div>
                 </div>
+                <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">Kanäle</div>
+                <div className="grid sm:grid-cols-3 gap-3 mb-5">
+                  {NOTIFICATION_CHANNELS.map((pref) => {
+                    const checked = notificationEnabled(pref.k);
+                    return (
+                      <label key={pref.k} className={`flex items-start gap-3 border rounded-sm p-3 ${checked ? "border-[#29B6E8]/45 bg-[#29B6E8]/5" : "border-white/10 bg-[#121212]"}`}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => setNotificationPreference(pref.k, e.target.checked)}
+                          data-testid={`profile-notification-channel-${pref.k}`}
+                          className="accent-[#29B6E8] mt-1"
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 font-bold text-white text-sm">
+                            <Bell className="w-3.5 h-3.5 text-[#29B6E8]" /> {pref.l}
+                          </div>
+                          <div className="text-xs text-white/50 mt-1">{pref.d}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">Arten</div>
                 <div className="grid sm:grid-cols-2 gap-3">
                   {EMAIL_PREFERENCES.map((pref) => {
                     const disabled = pref.requiresNewsletter && !form.newsletter_consent;

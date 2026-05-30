@@ -11,6 +11,8 @@ export type User = {
   is_club_member?: boolean;
   is_tournament_staff?: boolean;
   membership?: Record<string, unknown> | null;
+  newsletter_consent?: boolean;
+  notification_preferences?: Record<string, boolean>;
 };
 
 export type AuthResponse = {

@@ -49,6 +49,24 @@ OPTIONAL_EMAIL_PREFERENCES = {
     },
 }
 
+DELIVERY_CHANNEL_PREFERENCES = {
+    "email": {
+        "label": "E-Mail",
+        "description": "Nur wichtige optionale Benachrichtigungen per E-Mail erhalten.",
+        "default": True,
+    },
+    "push": {
+        "label": "Push",
+        "description": "Benachrichtigungen auf registrierten Mobilgeräten erhalten.",
+        "default": True,
+    },
+    "in_app": {
+        "label": "In-App",
+        "description": "Benachrichtigungen im Web und in der App anzeigen.",
+        "default": True,
+    },
+}
+
 
 TEMPLATE_CATEGORY = {
     "registration_received": "tournament_updates",
@@ -127,6 +145,8 @@ def normalized_preferences(user: dict | None) -> dict[str, bool]:
     raw = user.get("notification_preferences") or {}
     newsletter = bool(user.get("newsletter_consent"))
     prefs: dict[str, bool] = {}
+    for key, meta in DELIVERY_CHANNEL_PREFERENCES.items():
+        prefs[key] = bool(raw[key]) if key in raw else bool(meta.get("default"))
     for key, meta in OPTIONAL_EMAIL_PREFERENCES.items():
         default = bool(meta.get("default"))
         if meta.get("requires_newsletter_consent"):
@@ -141,9 +161,11 @@ def email_allowed(user: dict | None, template_key: str, category: str | None = N
     if template_key in REQUIRED_EMAIL_TEMPLATES:
         return True
     category = category or TEMPLATE_CATEGORY.get(template_key)
+    prefs = normalized_preferences(user)
+    if not prefs.get("email", True):
+        return False
     if not category:
         return True
-    prefs = normalized_preferences(user)
     return bool(prefs.get(category, True))
 
 
@@ -151,9 +173,23 @@ def notification_allowed(user: dict | None, kind: str, category: str | None = No
     if kind in REQUIRED_NOTIFICATION_KINDS:
         return True
     category = category or NOTIFICATION_KIND_CATEGORY.get(kind)
+    prefs = normalized_preferences(user)
+    if not prefs.get("in_app", True):
+        return False
     if not category:
         return True
+    return bool(prefs.get(category, True))
+
+
+def push_allowed(user: dict | None, kind: str, category: str | None = None) -> bool:
+    if kind in REQUIRED_NOTIFICATION_KINDS:
+        return True
+    category = category or NOTIFICATION_KIND_CATEGORY.get(kind)
     prefs = normalized_preferences(user)
+    if not prefs.get("push", True):
+        return False
+    if not category:
+        return True
     return bool(prefs.get(category, True))
 
 
@@ -173,6 +209,9 @@ def public_preferences_payload(user: dict | None) -> dict[str, Any]:
         "newsletter_consent": bool((user or {}).get("newsletter_consent")),
         "preferences": normalized_preferences(user),
         "channels": [
+            {"key": key, **meta} for key, meta in DELIVERY_CHANNEL_PREFERENCES.items()
+        ],
+        "categories": [
             {"key": key, **meta} for key, meta in OPTIONAL_EMAIL_PREFERENCES.items()
         ],
     }
