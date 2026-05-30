@@ -10,7 +10,7 @@ import { gameLabel } from "@/lib/gameLabels";
 import { buildDirtyPayload, hasPayloadChanges, sameValue } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
-import { Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil, Target, RefreshCw, Sparkles, Bell, Mail, Check, X, UserPlus, MessageSquare, Send, Search } from "lucide-react";
+import { Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil, Target, RefreshCw, Sparkles, Bell, Check, X, UserPlus, MessageSquare, Send, Search } from "lucide-react";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 
 const TABS = [
@@ -99,6 +99,7 @@ const NOTIFICATION_CHANNELS = [
   { k: "push", l: "Push", d: "System-Benachrichtigungen auf registrierten Mobilgeräten.", defaultOn: true },
   { k: "in_app", l: "In-App", d: "Hinweise in Web, App und Notification-Center.", defaultOn: true },
 ];
+const notificationPreferenceKey = (channel, topic) => `${channel}:${topic}`;
 
 const ACHIEVEMENT_ACTIONS = {
   profile_completion: "Profil weiter ausfüllen",
@@ -329,6 +330,15 @@ export default function ProfilePage() {
     const meta = [...NOTIFICATION_CHANNELS, ...EMAIL_PREFERENCES].find((item) => item.k === field);
     if (Object.prototype.hasOwnProperty.call(pref, field)) return !!pref[field];
     return !!meta?.defaultOn || (field === "news_events" && !!form.newsletter_consent);
+  };
+  const notificationTopicEnabled = (channel, topic) => {
+    const pref = form.notification_preferences || {};
+    if (channel === "email" && topic.requiresNewsletter && !form.newsletter_consent) return false;
+    const key = notificationPreferenceKey(channel, topic.k);
+    if (Object.prototype.hasOwnProperty.call(pref, key)) return !!pref[key];
+    if (Object.prototype.hasOwnProperty.call(pref, topic.k)) return !!pref[topic.k];
+    if (topic.k === "news_events") return !!form.newsletter_consent;
+    return topic.defaultOn !== false;
   };
 
   const submit = async (e) => {
@@ -626,30 +636,52 @@ export default function ProfilePage() {
                     );
                   })}
                 </div>
-                <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">Arten</div>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {EMAIL_PREFERENCES.map((pref) => {
-                    const disabled = pref.requiresNewsletter && !form.newsletter_consent;
-                    const checked = notificationEnabled(pref.k);
-                    return (
-                      <label key={pref.k} className={`flex items-start gap-3 border rounded-sm p-3 ${checked ? "border-[#29B6E8]/45 bg-[#29B6E8]/5" : "border-white/10 bg-[#121212]"} ${disabled ? "opacity-55" : ""}`}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={disabled}
-                          onChange={(e) => setNotificationPreference(pref.k, e.target.checked)}
-                          data-testid={`profile-mail-pref-${pref.k}`}
-                          className="accent-[#29B6E8] mt-1"
-                        />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 font-bold text-white text-sm">
-                            <Mail className="w-3.5 h-3.5 text-[#29B6E8]" /> {pref.l}
-                          </div>
-                          <div className="text-xs text-white/50 mt-1">{disabled ? "Newsletter-Einwilligung zuerst aktivieren." : pref.d}</div>
-                        </div>
-                      </label>
-                    );
-                  })}
+                <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">Jede Benachrichtigung pro Kanal</div>
+                <div className="overflow-x-auto border border-white/10 rounded-sm">
+                  <table className="w-full min-w-[720px] text-sm">
+                    <thead className="bg-[#121212] text-[10px] uppercase tracking-widest text-white/45">
+                      <tr>
+                        <th className="text-left px-3 py-3">Benachrichtigung</th>
+                        {NOTIFICATION_CHANNELS.map((channel) => (
+                          <th key={channel.k} className="text-center px-3 py-3">{channel.l}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {EMAIL_PREFERENCES.map((topic) => (
+                        <tr key={topic.k} className="bg-[#0A0A0A]">
+                          <td className="px-3 py-3 align-top">
+                            <div className="font-bold text-white">{topic.l}</div>
+                            <div className="text-xs text-white/50 mt-1">{topic.d}</div>
+                            {topic.requiresNewsletter && !form.newsletter_consent ? (
+                              <div className="text-[11px] text-[#FFD700] mt-1">E-Mail benötigt Newsletter-Zustimmung.</div>
+                            ) : null}
+                          </td>
+                          {NOTIFICATION_CHANNELS.map((channel) => {
+                            const key = notificationPreferenceKey(channel.k, topic.k);
+                            const channelEnabled = notificationEnabled(channel.k);
+                            const disabled = !channelEnabled || (channel.k === "email" && topic.requiresNewsletter && !form.newsletter_consent);
+                            const checked = channelEnabled && notificationTopicEnabled(channel.k, topic);
+                            return (
+                              <td key={key} className="px-3 py-3 text-center align-top">
+                                <label className={`inline-flex items-center justify-center gap-2 px-2 py-1.5 border rounded-sm ${checked ? "border-[#29B6E8]/45 bg-[#29B6E8]/10" : "border-white/10 bg-[#121212]"} ${disabled ? "opacity-45" : ""}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={disabled}
+                                    onChange={(e) => setNotificationPreference(key, e.target.checked)}
+                                    data-testid={`profile-notification-${channel.k}-${topic.k}`}
+                                    className="accent-[#29B6E8]"
+                                  />
+                                  <span className="text-[11px] font-bold uppercase tracking-wider">{checked ? "An" : "Aus"}</span>
+                                </label>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 

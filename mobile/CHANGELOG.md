@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0-beta.9 - 2026-05-30
+
+- Backend/Web/Mobile: Jede Benachrichtigungsart kann jetzt getrennt fuer E-Mail, Push und In-App aktiviert oder deaktiviert werden.
+- Backend: Alte globale Kanal- und Themen-Schalter bleiben kompatibel, neue Kanal-Themen-Schalter steuern die tatsaechliche Zustellung genauer.
+- Web/Mobile: Die Privatsphaere-/Benachrichtigungs-Einstellungen zeigen jetzt eine Kanal-Matrix fuer Match-Erinnerungen, Turnier-Updates, Gewinne, Mitgliedschaft, Geburtstag, Community und News/Events.
+
 ## 1.5.0-beta.8 - 2026-05-30
 
 - Mobile: Das eigene oeffentliche Profil ist jetzt direkt im Mehr-Hub neben Mitgliedervorteilen, Spielerprofilen und Referenzen erreichbar.

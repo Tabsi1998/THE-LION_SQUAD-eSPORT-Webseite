@@ -68,6 +68,7 @@ const notificationLabels: Array<{ key: string; label: string; detail: string }> 
   { key: "community_messages", label: "Community", detail: "Direktnachrichten und Erwähnungen." },
   { key: "news_events", label: "News & Events", detail: "Vereinsnews, Events und Ankündigungen." },
 ];
+const notificationPreferenceKey = (channel: string, topic: string) => `${channel}:${topic}`;
 
 const dmOptions = [
   ["everyone", "Alle"],
@@ -280,6 +281,15 @@ export function ProfileScreen() {
     if (key === "news_events") return Boolean(form.newsletter_consent);
     return true;
   }, [form.newsletter_consent, form.notification_preferences]);
+  const notificationTopicEnabled = useCallback((channel: string, topic: string) => {
+    if (channel === "email" && topic === "news_events" && !form.newsletter_consent) return false;
+    const pref = form.notification_preferences || {};
+    const key = notificationPreferenceKey(channel, topic);
+    if (Object.prototype.hasOwnProperty.call(pref, key)) return Boolean(pref[key]);
+    if (Object.prototype.hasOwnProperty.call(pref, topic)) return Boolean(pref[topic]);
+    if (topic === "news_events") return Boolean(form.newsletter_consent);
+    return true;
+  }, [form.newsletter_consent, form.notification_preferences]);
 
   return (
     <Screen padded={false}>
@@ -481,20 +491,35 @@ export function ProfileScreen() {
                 }
               />
             ))}
-            <Muted style={styles.sectionText}>Arten</Muted>
+            <Muted style={styles.sectionText}>Jede Benachrichtigung pro Kanal</Muted>
             {notificationLabels.map((item) => (
-              <Toggle
-                key={item.key}
-                label={item.label}
-                detail={item.detail}
-                value={notificationEnabled(item.key)}
-                onValueChange={(v) =>
-                  setForm((current) => ({
-                    ...current,
-                    notification_preferences: { ...(current.notification_preferences || {}), [item.key]: v },
-                  }))
-                }
-              />
+              <View key={item.key} style={styles.notificationTopic}>
+                <Body style={styles.strong}>{item.label}</Body>
+                <Muted>{item.detail}</Muted>
+                {item.key === "news_events" && !form.newsletter_consent ? <Muted style={styles.warningText}>E-Mail benötigt Newsletter-Zustimmung.</Muted> : null}
+                <View style={styles.notificationMatrix}>
+                  {notificationChannels.map((channel) => {
+                    const key = notificationPreferenceKey(channel.key, item.key);
+                    const channelEnabled = notificationEnabled(channel.key);
+                    const disabled = !channelEnabled || (channel.key === "email" && item.key === "news_events" && !form.newsletter_consent);
+                    const enabled = channelEnabled && notificationTopicEnabled(channel.key, item.key);
+                    return (
+                      <MatrixToggle
+                        key={key}
+                        label={channel.label}
+                        value={enabled}
+                        disabled={disabled}
+                        onValueChange={(v) =>
+                          setForm((current) => ({
+                            ...current,
+                            notification_preferences: { ...(current.notification_preferences || {}), [key]: v },
+                          }))
+                        }
+                      />
+                    );
+                  })}
+                </View>
+              </View>
             ))}
             <Button label="Benachrichtigungen speichern" onPress={save} disabled={guest || saving} />
           </Card>
@@ -551,6 +576,21 @@ function Toggle({ label, detail, value, onValueChange }: { label: string; detail
         <Muted>{detail}</Muted>
       </View>
       <Switch value={value} onValueChange={onValueChange} trackColor={{ false: "rgba(255,255,255,0.16)", true: "rgba(41,182,232,0.45)" }} thumbColor={value ? colors.cyan : colors.muted} />
+    </View>
+  );
+}
+
+function MatrixToggle({ label, value, disabled, onValueChange }: { label: string; value: boolean; disabled?: boolean; onValueChange: (value: boolean) => void }) {
+  return (
+    <View style={[styles.matrixToggle, value && styles.matrixToggleActive, disabled && styles.matrixToggleDisabled]}>
+      <Muted style={[styles.matrixLabel, value && styles.matrixLabelActive]}>{label}</Muted>
+      <Switch
+        value={value}
+        disabled={disabled}
+        onValueChange={onValueChange}
+        trackColor={{ false: "rgba(255,255,255,0.16)", true: "rgba(41,182,232,0.45)" }}
+        thumbColor={value ? colors.cyan : colors.muted}
+      />
     </View>
   );
 }
@@ -846,6 +886,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textTransform: "uppercase",
   },
+  warningText: {
+    color: colors.gold,
+  },
   field: {
     gap: 7,
   },
@@ -878,6 +921,45 @@ const styles = StyleSheet.create({
   toggleText: {
     flex: 1,
     gap: 3,
+  },
+  notificationTopic: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    gap: 8,
+    paddingTop: 12,
+  },
+  notificationMatrix: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  matrixToggle: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: colors.border,
+    borderRadius: 6,
+    borderWidth: 1,
+    flexBasis: "31%",
+    flexDirection: "row",
+    flexGrow: 1,
+    justifyContent: "space-between",
+    minHeight: 42,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  matrixToggleActive: {
+    backgroundColor: "rgba(41,182,232,0.12)",
+    borderColor: "rgba(41,182,232,0.42)",
+  },
+  matrixToggleDisabled: {
+    opacity: 0.45,
+  },
+  matrixLabel: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  matrixLabelActive: {
+    color: colors.cyan,
   },
   optionGrid: {
     flexDirection: "row",

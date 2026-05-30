@@ -67,6 +67,8 @@ DELIVERY_CHANNEL_PREFERENCES = {
     },
 }
 
+CHANNEL_TOPIC_SEPARATOR = ":"
+
 
 TEMPLATE_CATEGORY = {
     "registration_received": "tournament_updates",
@@ -127,9 +129,7 @@ NOTIFICATION_KIND_CATEGORY = {
 }
 
 
-REQUIRED_NOTIFICATION_KINDS = {
-    "direct_message",
-}
+REQUIRED_NOTIFICATION_KINDS: set[str] = set()
 
 
 REQUIRED_EMAIL_TEMPLATES = {
@@ -138,6 +138,10 @@ REQUIRED_EMAIL_TEMPLATES = {
     "user_invite",
     "test",
 }
+
+
+def preference_key(channel: str, topic: str) -> str:
+    return f"{channel}{CHANNEL_TOPIC_SEPARATOR}{topic}"
 
 
 def normalized_preferences(user: dict | None) -> dict[str, bool]:
@@ -154,43 +158,45 @@ def normalized_preferences(user: dict | None) -> dict[str, bool]:
         prefs[key] = bool(raw[key]) if key in raw else default
         if meta.get("requires_newsletter_consent") and not newsletter:
             prefs[key] = False
+    for channel in DELIVERY_CHANNEL_PREFERENCES:
+        for topic, meta in OPTIONAL_EMAIL_PREFERENCES.items():
+            key = preference_key(channel, topic)
+            if key in raw:
+                value = bool(raw[key])
+            else:
+                value = bool(prefs.get(topic, meta.get("default", True)))
+            if channel == "email" and meta.get("requires_newsletter_consent") and not newsletter:
+                value = False
+            prefs[key] = value
     return prefs
+
+
+def channel_topic_allowed(user: dict | None, channel: str, category: str | None, required: bool = False) -> bool:
+    if required:
+        return True
+    prefs = normalized_preferences(user)
+    if not prefs.get(channel, True):
+        return False
+    if not category:
+        return True
+    return bool(prefs.get(preference_key(channel, category), prefs.get(category, True)))
 
 
 def email_allowed(user: dict | None, template_key: str, category: str | None = None) -> bool:
     if template_key in REQUIRED_EMAIL_TEMPLATES:
         return True
     category = category or TEMPLATE_CATEGORY.get(template_key)
-    prefs = normalized_preferences(user)
-    if not prefs.get("email", True):
-        return False
-    if not category:
-        return True
-    return bool(prefs.get(category, True))
+    return channel_topic_allowed(user, "email", category)
 
 
 def notification_allowed(user: dict | None, kind: str, category: str | None = None) -> bool:
-    if kind in REQUIRED_NOTIFICATION_KINDS:
-        return True
     category = category or NOTIFICATION_KIND_CATEGORY.get(kind)
-    prefs = normalized_preferences(user)
-    if not prefs.get("in_app", True):
-        return False
-    if not category:
-        return True
-    return bool(prefs.get(category, True))
+    return channel_topic_allowed(user, "in_app", category, required=kind in REQUIRED_NOTIFICATION_KINDS)
 
 
 def push_allowed(user: dict | None, kind: str, category: str | None = None) -> bool:
-    if kind in REQUIRED_NOTIFICATION_KINDS:
-        return True
     category = category or NOTIFICATION_KIND_CATEGORY.get(kind)
-    prefs = normalized_preferences(user)
-    if not prefs.get("push", True):
-        return False
-    if not category:
-        return True
-    return bool(prefs.get(category, True))
+    return channel_topic_allowed(user, "push", category, required=kind in REQUIRED_NOTIFICATION_KINDS)
 
 
 async def send_user_template(user: dict | None, template_key: str, category: str | None = None, **kwargs) -> dict:

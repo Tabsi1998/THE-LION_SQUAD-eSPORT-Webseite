@@ -14,6 +14,7 @@ from services.visibility import user_can_see
 from services.notification_preferences import (
     DELIVERY_CHANNEL_PREFERENCES,
     OPTIONAL_EMAIL_PREFERENCES,
+    preference_key,
     public_preferences_payload,
 )
 from models import (
@@ -161,6 +162,11 @@ def _normalize_notification_preferences(value) -> dict:
     if not isinstance(value, dict):
         return {}
     allowed = set(OPTIONAL_EMAIL_PREFERENCES) | set(DELIVERY_CHANNEL_PREFERENCES)
+    allowed |= {
+        preference_key(channel, topic)
+        for channel in DELIVERY_CHANNEL_PREFERENCES
+        for topic in OPTIONAL_EMAIL_PREFERENCES
+    }
     return {key: bool(value[key]) for key in allowed if key in value}
 
 
