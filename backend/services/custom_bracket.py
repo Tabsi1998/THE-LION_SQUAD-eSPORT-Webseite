@@ -385,6 +385,123 @@ def _ready_status_for_slots(slots: list[dict], min_players: int) -> str:
     return "ready" if not has_pending_ref and filled >= min_players else "pending"
 
 
+def _clear_seed_slot(slot: dict, preview: bool) -> None:
+    slot["registration_id"] = None
+    slot["user_id"] = None
+    slot["status"] = "preview" if preview else "bye"
+
+
+def _fill_seed_slot(slot: dict, registration: dict) -> None:
+    slot["registration_id"] = registration.get("id")
+    slot["user_id"] = registration.get("user_id")
+    slot["status"] = "filled"
+
+
+def _balanced_entry_counts(capacities: list[int], participant_count: int, min_players: int) -> list[int]:
+    if not capacities or participant_count <= 0:
+        return [0 for _ in capacities]
+    max_capacity = max(capacities)
+    if max_capacity <= 0:
+        return [0 for _ in capacities]
+
+    if participant_count >= sum(min(capacity, min_players) for capacity in capacities):
+        active_indexes = list(range(len(capacities)))
+    else:
+        active_count = max(1, math.ceil(participant_count / max_capacity))
+        active_indexes = list(range(min(active_count, len(capacities))))
+
+    counts = [0 for _ in capacities]
+    remaining = participant_count
+    while remaining > 0:
+        progressed = False
+        for index in active_indexes:
+            if remaining <= 0:
+                break
+            if counts[index] >= capacities[index]:
+                continue
+            counts[index] += 1
+            remaining -= 1
+            progressed = True
+        if not progressed:
+            break
+    return counts
+
+
+def _compact_entry_seed_slots(docs: list[dict], preview: bool) -> None:
+    """Spread real first-round entrants across open seed slots before the bracket is fixed."""
+    groups: dict[tuple, list[dict]] = {}
+    for doc in docs:
+        slots = doc.get("slots") or []
+        if not slots or doc.get("round") != 1:
+            continue
+        if any((slot.get("source") or {}).get("type") == "rank" for slot in slots):
+            continue
+        seed_slots = [slot for slot in slots if (slot.get("source") or {}).get("type") == "seed"]
+        if not seed_slots:
+            continue
+        key = (
+            doc.get("section") or "MAIN",
+            doc.get("stage_type") or "",
+            doc.get("match_type") or "",
+            int((doc.get("settings") or {}).get("min_players") or 2),
+        )
+        groups.setdefault(key, []).append(doc)
+
+    for (_section, _stage_type, match_type, min_players), group in groups.items():
+        if match_type == "duel":
+            continue
+        if len(group) < 2:
+            continue
+        group.sort(key=lambda item: (item.get("order") or 0, item.get("match_key") or ""))
+        seed_slots_by_match: list[list[dict]] = [
+            [slot for slot in (doc.get("slots") or []) if (slot.get("source") or {}).get("type") == "seed"]
+            for doc in group
+        ]
+        participants = []
+        seen_registration_ids: set[str] = set()
+        for slots in seed_slots_by_match:
+            for slot in slots:
+                registration_id = slot.get("registration_id")
+                if not registration_id or registration_id in seen_registration_ids:
+                    continue
+                source = slot.get("source") or {}
+                participants.append({
+                    "id": registration_id,
+                    "user_id": slot.get("user_id"),
+                    "seed": source.get("seed") or slot.get("seed") or 999999,
+                })
+                seen_registration_ids.add(registration_id)
+
+        if not participants:
+            continue
+        participants.sort(key=lambda item: (int(item.get("seed") or 999999), item.get("id") or ""))
+        capacities = [len(slots) for slots in seed_slots_by_match]
+        if len(participants) >= sum(capacities):
+            continue
+        target_counts = _balanced_entry_counts(capacities, len(participants), int(min_players or 2))
+
+        for slots in seed_slots_by_match:
+            for slot in slots:
+                _clear_seed_slot(slot, preview)
+
+        target_slots: list[dict] = []
+        for slot_index in range(max(capacities)):
+            for match_index, slots in enumerate(seed_slots_by_match):
+                if slot_index >= target_counts[match_index]:
+                    continue
+                if slot_index < len(slots):
+                    target_slots.append(slots[slot_index])
+
+        for registration, slot in zip(participants, target_slots):
+            _fill_seed_slot(slot, registration)
+
+        for doc in group:
+            if preview:
+                doc["status"] = "preview"
+            else:
+                doc["status"] = _ready_status_for_slots(doc.get("slots") or [], int((doc.get("settings") or {}).get("min_players") or 2))
+
+
 def _apply_auto_byes(docs: list[dict]) -> None:
     by_id = {doc["id"]: doc for doc in docs}
     for doc in sorted(docs, key=lambda item: (item.get("round") or 0, item.get("order") or 0)):
@@ -526,6 +643,8 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
                 "to_match_id": doc["id"],
                 "to_slot": slot["slot"],
             })
+
+    _compact_entry_seed_slots(docs, preview)
 
     if not preview:
         _apply_auto_byes(docs)

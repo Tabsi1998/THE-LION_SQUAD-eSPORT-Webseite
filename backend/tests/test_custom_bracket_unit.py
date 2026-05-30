@@ -80,6 +80,43 @@ def test_v2_generator_builds_slots_and_advancement():
     assert {entry["flow"] for entry in by_key["A"]["advancement"]} == {"W", "L"}
 
 
+def test_v2_generator_compacts_first_round_ffa_seed_slots():
+    schema = "\n".join([
+        "[WB]",
+        "A=[1,2,3,4]",
+        "B=[5,6,7,8]",
+        "C=[9,10,11,12]",
+        "D=[13,14,15,16]",
+        "E=[17,18,19,20]",
+        "F=[21,22,23,24]",
+        "G=[25,26,27,28]",
+        "H=[29,30,31,32]",
+    ])
+    tournament = {"id": "t1", "seeding_mode": "manual"}
+    stage = {
+        "id": "s1",
+        "number": 1,
+        "stage_type": "ffa_custom_bracket",
+        "match_type": "ffa",
+        "settings": {"schema": schema, "min_players": 2, "qualifiers_per_match": 2},
+    }
+    registrations = [
+        {"id": f"r{i}", "user_id": f"u{i}", "status": "approved", "seed": i}
+        for i in range(1, 29)
+    ]
+
+    matches = build_matches_v2_from_schema(tournament, stage, registrations)
+    counts = [
+        sum(1 for slot in match["slots"] if slot.get("registration_id"))
+        for match in matches
+    ]
+    by_key = {match["match_key"]: match for match in matches}
+
+    assert counts == [4, 4, 4, 4, 3, 3, 3, 3]
+    assert {match["status"] for match in matches} == {"ready"}
+    assert [slot["registration_id"] for slot in by_key["H"]["slots"] if slot.get("registration_id")] == ["r8", "r16", "r24"]
+
+
 def test_v2_generator_can_build_preview_without_registrations():
     tournament = {"id": "t1", "seeding_mode": "manual"}
     stage = {
