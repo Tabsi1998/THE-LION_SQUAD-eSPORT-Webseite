@@ -46,6 +46,9 @@ export type Tournament = {
   public_phase?: { countdown_kind?: string | null; label?: string; state?: string; target_at?: string | null };
   start_date?: string | null;
   end_date?: string | null;
+  completed_at?: string | null;
+  results_published_at?: string | null;
+  updated_at?: string | null;
   registration_enabled?: boolean;
   registration_open_from?: string | null;
   registration_open_until?: string | null;

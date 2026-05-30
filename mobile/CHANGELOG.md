@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0-beta.6 - 2026-05-30
+
+- Mobile: Abgeschlossene Turniere zeigen in der Detailansicht jetzt prominent "Turnier beendet", Abschlusszeit, Champion, Top-3-Platzierungen und Turnierstatistiken.
+- Mobile: Die Übersicht abgeschlossener Turniere priorisiert finale Rangliste und Match-Historie, statt alte offene Matchbereiche in den Vordergrund zu stellen.
+- Mobile: Ranglisten heben die ersten drei Plätze klarer hervor und nutzen dieselbe Standings-Quelle wie die Turnierauswertung.
+
 ## 1.5.0-beta.5 - 2026-05-30
 
 - Backend/Web/Mobile: Eigene offene Matches werden jetzt aus Legacy- und V2-Matches sauber zusammengefuehrt und abgeschlossene Matches fallen direkt aus der Liste.
