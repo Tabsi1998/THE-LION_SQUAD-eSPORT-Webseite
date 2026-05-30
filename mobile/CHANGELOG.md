@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0-beta.4 - 2026-05-30
+
+- Backend: Jahreswertungs-Top-3 erscheinen als eigene Referenz, ohne normale Season-Punkte mit Turnier- und Fast-Lap-Referenzen zu vermischen.
+- Backend: V2/Heat-Turniere vergeben beim Veröffentlichen jetzt Jahreswertungspunkte aus den Stage-Ergebnissen.
+- Web/Mobile: Jahreswertungs-Referenzen öffnen die Jahreswertung und zeigen Rang sowie Jahrespunkte getrennt von normalen Turnier-/Fast-Lap-Referenzen.
+
 ## 1.5.0-beta.3 - 2026-05-30
 
 - Mobile: Referenzen zeigen keine Jahreswertungs-/Season-Punkte mehr, sondern nur Turnier- und Fast-Lap-Historie.

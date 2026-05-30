@@ -235,6 +235,10 @@ export function ProfileScreen() {
       navigation.navigate("Tournaments", { screen: "FastLapDetail", params: { id: item.target_id } });
       return;
     }
+    if (item.kind === "season") {
+      navigation.navigate("More", { screen: "SeasonPass" });
+      return;
+    }
     if (item.kind === "tournament") {
       navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id: item.target_id } });
     }
@@ -566,15 +570,16 @@ function TierRow({ tier, accent }: { tier: AchievementTier; accent: string }) {
 
 function ReferenceCard({ item, onOpen }: { item: PersonalReferenceItem; onOpen?: (item: PersonalReferenceItem) => void }) {
   const isFastlap = item.kind === "fastlap";
+  const isSeason = item.kind === "season";
   const content = (
     <Card style={styles.referenceCard}>
       <View style={styles.referenceTop}>
-        <View style={[styles.referenceIcon, isFastlap ? styles.referenceIconFastlap : styles.referenceIconTournament]}>
-          <Body style={styles.referenceIconText}>{isFastlap ? "FL" : "T"}</Body>
+        <View style={[styles.referenceIcon, isFastlap || isSeason ? styles.referenceIconFastlap : styles.referenceIconTournament]}>
+          <Body style={styles.referenceIconText}>{isFastlap ? "FL" : isSeason ? "JW" : "T"}</Body>
         </View>
         <View style={styles.referenceText}>
           <Body style={styles.strong}>{item.title}</Body>
-          <Muted>{item.subtitle || (isFastlap ? "Fast Lap" : "Turnier")}</Muted>
+          <Muted>{item.subtitle || (isFastlap ? "Fast Lap" : isSeason ? "Jahreswertung" : "Turnier")}</Muted>
           <Muted>{formatDate(item.date)} · {formatStatus(item.status)}</Muted>
         </View>
         <View style={styles.referenceRank}>
@@ -586,7 +591,8 @@ function ReferenceCard({ item, onOpen }: { item: PersonalReferenceItem; onOpen?:
       </View>
       <View style={styles.referenceMeta}>
         {item.time_str ? <Pill label={item.time_str} tone="cyan" /> : null}
-        <Pill label={isFastlap ? "Fast Lap" : "Turnier"} />
+        {isSeason && item.points != null ? <Pill label={`${item.points} Jahrespunkte`} tone="gold" /> : null}
+        <Pill label={isFastlap ? "Fast Lap" : isSeason ? "Jahreswertung" : "Turnier"} />
       </View>
     </Card>
   );

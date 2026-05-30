@@ -2462,23 +2462,40 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
         try:
             from services.season_service import award_points
             from badges import on_tournament_completed
-            # Build placements from matches.final_position
-            regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+            # Build placements from published legacy finals or stage-engine results.
+            regs = await db.tournament_registrations.find(
+                {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+                {"_id": 0},
+            ).to_list(500)
             reg_map = {r["id"]: r for r in regs}
             num_participants = len(regs)
             matches = await db.matches.find({"tournament_id": tid, "final_position": {"$ne": None}}, {"_id": 0}).to_list(200)
             placements = []
-            seen = set()
+            placed_reg_ids = set()
             for m in matches:
                 rid = m.get("winner_id")
-                if rid and rid in reg_map and rid not in seen:
+                if rid and rid in reg_map and rid not in placed_reg_ids:
                     reg = reg_map[rid]
                     placements.append({
                         "user_id": reg.get("user_id"),
                         "team_id": reg.get("team_id"),
                         "rank": m["final_position"],
                     })
-                    seen.add(rid)
+                    placed_reg_ids.add(rid)
+            if not placements:
+                matches_v2 = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+                if matches_v2:
+                    for row in _v2_standings(matches_v2, regs):
+                        rid = row.get("registration_id")
+                        if not rid or rid not in reg_map or rid in placed_reg_ids or not row.get("played"):
+                            continue
+                        reg = reg_map[rid]
+                        placements.append({
+                            "user_id": reg.get("user_id"),
+                            "team_id": reg.get("team_id"),
+                            "rank": row.get("rank"),
+                        })
+                        placed_reg_ids.add(rid)
             # Source type by season weight: <=1.5 mini, <=2.5 normal, else major
             weight = float(t.get("season_weight") or 2.0)
             source_type = "mini" if weight < 1.5 else ("major" if weight >= 2.5 else "tournament")
@@ -2496,12 +2513,10 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
                     weight=weight,
                 )
             # Participation points for everyone else
-            placed_user_ids = {p.get("user_id") for p in placements}
             for r in regs:
-                uid = r.get("user_id")
-                if uid and uid not in placed_user_ids:
+                if r.get("id") not in placed_reg_ids and (r.get("user_id") or r.get("team_id")):
                     await award_points(
-                        user_id=uid, source_type=source_type, source_id=tid,
+                        user_id=r.get("user_id"), team_id=r.get("team_id"), source_type=source_type, source_id=tid,
                         source_name=t.get("title"), rank=None,
                         num_participants=num_participants, weight=weight,
                     )

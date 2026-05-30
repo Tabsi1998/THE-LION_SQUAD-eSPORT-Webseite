@@ -73,6 +73,7 @@ class FakeDb:
     def __init__(self, **collections):
         names = [
             "team_members",
+            "seasons",
             "tournaments",
             "f1_challenges",
             "f1_tracks",

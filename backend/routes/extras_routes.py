@@ -1326,6 +1326,62 @@ async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
     return (explicit_t or auto_t), (explicit_f or auto_f)
 
 
+def _season_v2_standings(matches_v2: list[dict], regs: list[dict]) -> list[dict]:
+    rank_map = {
+        r["id"]: {
+            "registration_id": r["id"],
+            "played": 0,
+            "won": 0,
+            "top2": 0,
+            "points": 0,
+            "rank_sum": 0,
+            "furthest_round": 0,
+        }
+        for r in regs
+        if r.get("id")
+    }
+    for match in matches_v2:
+        if match.get("status") not in {"completed", "forfeit"}:
+            continue
+        for result in match.get("results") or []:
+            rid = result.get("registration_id")
+            if rid not in rank_map:
+                continue
+            try:
+                rank = int(result.get("rank") or 999)
+            except (TypeError, ValueError):
+                rank = 999
+            row = rank_map[rid]
+            row["played"] += 1
+            row["rank_sum"] += rank
+            row["furthest_round"] = max(row["furthest_round"], int(match.get("round") or 0))
+            if rank == 1:
+                row["won"] += 1
+            if rank <= 2:
+                row["top2"] += 1
+            score = result.get("points")
+            if score is None:
+                score = result.get("score")
+            if isinstance(score, (int, float)):
+                row["points"] += score
+    rows = list(rank_map.values())
+    for row in rows:
+        row["avg_rank"] = round(row["rank_sum"] / row["played"], 2) if row["played"] else None
+    rows.sort(
+        key=lambda row: (
+            row["furthest_round"],
+            row["won"],
+            row["top2"],
+            row["points"],
+            -(row["avg_rank"] or 999),
+        ),
+        reverse=True,
+    )
+    for index, row in enumerate(rows, start=1):
+        row["rank"] = index
+    return rows
+
+
 @season_router.get("/{slug_or_id}/standings")
 async def season_standings(slug_or_id: str):
     """Aggregate standings over all season point sources."""
@@ -1364,8 +1420,21 @@ async def season_standings(slug_or_id: str):
     # Tournaments: use standings endpoint results (rank -> points)
     for tid in tournament_ids:
         matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(2000)
-        regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+        regs = await db.tournament_registrations.find(
+            {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+            {"_id": 0},
+        ).to_list(500)
         reg_user_map = {r["id"]: r.get("user_id") for r in regs}
+        matches_v2 = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+        if matches_v2:
+            for row in _season_v2_standings(matches_v2, regs):
+                uid = reg_user_map.get(row.get("registration_id"))
+                if not uid or not row.get("played"):
+                    continue
+                pos = int(row.get("rank") or 999) - 1
+                pts = points_system[pos] if 0 <= pos < len(points_system) else 0
+                add_points(uid, pts, pos == 0)
+            continue
         # compute rank via furthest round + wins
         rank_map = {}
         for r in regs:
@@ -1391,7 +1460,12 @@ async def season_standings(slug_or_id: str):
         tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).to_list(100)
         for tr in tracks:
             times = await db.f1_lap_times.find(
-                {"challenge_id": cid, "track_id": tr["id"], "is_invalid": {"$ne": True}},
+                {
+                    "challenge_id": cid,
+                    "track_id": tr["id"],
+                    "is_invalid": {"$ne": True},
+                    "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}],
+                },
                 {"_id": 0},
             ).to_list(5000)
             best_per_user: dict = {}

@@ -8,6 +8,7 @@ from services.visibility import user_can_see
 
 RESULT_TOURNAMENT_STATUSES = {"completed", "results_published", "archived"}
 REFERENCE_REGISTRATION_STATUSES = {"approved", "checked_in"}
+REFERENCE_SEASON_STATUSES = {"active", "completed", "archived"}
 
 
 def _parse_dt(value):
@@ -524,6 +525,32 @@ async def personal_profile_references(user: dict, public_only: bool = False) -> 
             "time_ms": ranked.get("effective_ms"),
             "time_str": ranked.get("time_str"),
         })
+
+    season_rows = await db.seasons.find(
+        {"status": {"$in": list(REFERENCE_SEASON_STATUSES)}},
+        {"_id": 0, "id": 1, "slug": 1, "name": 1, "kind": 1, "status": 1, "start_date": 1, "end_date": 1, "banner_url": 1},
+    ).sort("end_date", -1).to_list(20)
+    if season_rows:
+        from services.season_service import aggregate_leaderboard
+        for season in season_rows:
+            standings = await aggregate_leaderboard(season_id=season.get("id"), limit=3)
+            for index, row in enumerate(standings, start=1):
+                if row.get("id") != user_id or index > 3:
+                    continue
+                items.append({
+                    "id": f"season:{season['id']}",
+                    "kind": "season",
+                    "title": season.get("name") or "Jahreswertung",
+                    "subtitle": "Jahreswertung" if season.get("kind") != "circuit" else "Circuit",
+                    "rank": index,
+                    "points": row.get("total_points"),
+                    "status": season.get("status"),
+                    "date": season.get("end_date") or season.get("start_date"),
+                    "target_id": season.get("slug") or season.get("id"),
+                    "banner_url": season.get("banner_url"),
+                    "participant_count": len(standings),
+                })
+                break
 
     items.sort(key=lambda row: _date_key(row), reverse=True)
     wins = len([item for item in items if int(item.get("rank") or 0) == 1])

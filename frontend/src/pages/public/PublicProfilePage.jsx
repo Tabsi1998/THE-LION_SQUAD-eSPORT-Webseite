@@ -866,12 +866,13 @@ function ReferenceStatsPanel({ stats = {}, onOpen }) {
 
 function referenceTarget(item) {
   if (!item?.target_id) return "";
-  return item.kind === "fastlap"
-    ? `/fastlap/${item.target_id}`
-    : `/tournaments/${item.target_id}`;
+  if (item.kind === "fastlap") return `/fastlap/${item.target_id}`;
+  if (item.kind === "season") return `/seasons/${item.target_id}`;
+  return `/tournaments/${item.target_id}`;
 }
 
 function referenceKindLabel(kind) {
+  if (kind === "season") return "Jahreswertung";
   return kind === "fastlap" ? "Fast Lap" : "Turnier";
 }
 
@@ -883,18 +884,20 @@ function statusLabel(status) {
 
 function ReferenceRow({ item, expanded = false }) {
   const isFastlap = item.kind === "fastlap";
+  const isSeason = item.kind === "season";
   const target = referenceTarget(item);
   const rank = item.rank ? `#${item.rank}` : "-";
   const date = formatPublicDate(item.date);
   const content = (
     <div data-testid={`profile-reference-${item.id}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:px-4 sm:py-3 border border-white/10 rounded-sm bg-[#121212] hover:border-[#29B6E8]/60 transition min-w-0 overflow-hidden">
       <div className="flex items-start gap-3 min-w-0 flex-1 w-full">
-        <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${isFastlap ? "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]" : "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#29B6E8]"}`}>
+        <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${isFastlap || isSeason ? "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]" : "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#29B6E8]"}`}>
           {isFastlap ? <Radio className="w-5 h-5" /> : <Trophy className="w-5 h-5" />}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-[10px] font-bold uppercase tracking-widest ${isFastlap ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{referenceKindLabel(item.kind)}</span>
+            <span className={`text-[10px] font-bold uppercase tracking-widest ${isFastlap || isSeason ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{referenceKindLabel(item.kind)}</span>
+            {isSeason && item.points != null && <span className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700] border border-[#FFD700]/35 px-1.5 py-0.5 rounded-sm">{item.points} Jahrespunkte</span>}
             {item.time_str && <span className="text-[10px] font-bold uppercase tracking-widest text-white/70 border border-white/10 px-1.5 py-0.5 rounded-sm break-all">{item.time_str}</span>}
           </div>
           <div className="mt-1 font-heading text-base font-bold break-words">{item.title || "Referenz"}</div>
