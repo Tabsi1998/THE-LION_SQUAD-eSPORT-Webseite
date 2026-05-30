@@ -6,6 +6,8 @@ import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
+import { useAuth } from "../../auth/AuthContext";
+import { isGuestUser } from "../../live";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 
@@ -19,6 +21,7 @@ type ModuleItem = {
   badgeTone?: "cyan" | "gold" | "green";
   section?: NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>;
   screen?: "NewsList" | "FastLapList" | "DirectMessages" | "Notifications" | "SeasonPass";
+  ownPublicProfile?: boolean;
   externalUrl?: string;
 };
 
@@ -55,6 +58,13 @@ const featuredModules: ModuleItem[] = [
 ];
 
 const clubModules: ModuleItem[] = [
+  {
+    title: "Öffentliches Profil",
+    detail: "Deine öffentliche Profilseite mit Referenzen und Community-Infos.",
+    ownPublicProfile: true,
+    badge: "Profil",
+    icon: "open-outline",
+  },
   {
     title: "Fast Laps",
     detail: "Challenges, Strecken und Bestzeiten direkt in LionsAPP ansehen.",
@@ -120,11 +130,17 @@ const partnerModules: ModuleItem[] = [
 ];
 
 export function MoreScreen({ navigation }: Props) {
+  const { user } = useAuth();
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
 
   const handlePress = (item: ModuleItem) => {
     if (item.externalUrl) {
       Linking.openURL(item.externalUrl).catch(() => {});
+      return;
+    }
+    if (item.ownPublicProfile) {
+      if (!user?.username || isGuestUser(user)) return;
+      navigation.navigate("PublicProfile", { username: user.username });
       return;
     }
     if (item.screen) {

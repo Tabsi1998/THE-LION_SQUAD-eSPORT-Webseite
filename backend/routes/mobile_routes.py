@@ -530,14 +530,14 @@ async def mobile_profile_references(user: dict = Depends(get_current_user)):
 @router.get("/notifications")
 async def mobile_notifications(user: dict = Depends(get_current_user)):
     db = get_db()
-    return await db.notifications.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(80)
+    return await db.notifications.find({"user_id": user["id"], "in_app_visible": {"$ne": False}}, {"_id": 0}).sort("created_at", -1).to_list(80)
 
 
 @router.post("/notifications/{notification_id}/read")
 async def mark_mobile_notification_read(notification_id: str, user: dict = Depends(get_current_user)):
     db = get_db()
     await db.notifications.update_one(
-        {"id": notification_id, "user_id": user["id"]},
+        {"id": notification_id, "user_id": user["id"], "in_app_visible": {"$ne": False}},
         {"$set": {"read": True, "read_at": now_utc().isoformat()}},
     )
     return {"ok": True}
@@ -547,7 +547,7 @@ async def mark_mobile_notification_read(notification_id: str, user: dict = Depen
 async def mark_all_mobile_notifications_read(user: dict = Depends(get_current_user)):
     db = get_db()
     await db.notifications.update_many(
-        {"user_id": user["id"], "read": {"$ne": True}},
+        {"user_id": user["id"], "read": {"$ne": True}, "in_app_visible": {"$ne": False}},
         {"$set": {"read": True, "read_at": now_utc().isoformat()}},
     )
     return {"ok": True}

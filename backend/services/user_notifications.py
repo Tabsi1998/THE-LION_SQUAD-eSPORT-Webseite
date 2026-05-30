@@ -56,7 +56,9 @@ async def create_user_notification(
         {"_id": 0, "id": 1, "newsletter_consent": 1, "notification_preferences": 1},
     )
     category = (meta or {}).get("category")
-    if user and not notification_allowed(user, kind, category):
+    in_app_allowed = (not user) or notification_allowed(user, kind, category)
+    push_channel_allowed = push_allowed(user, kind, category)
+    if not in_app_allowed and not push_channel_allowed:
         return None
     meta = meta or {}
     dedupe_key = meta.get("dedupe_key")
@@ -93,6 +95,7 @@ async def create_user_notification(
         "body": body,
         "url": url,
         "read": False,
+        "in_app_visible": bool(in_app_allowed),
         "meta": meta,
         "created_at": now_utc().isoformat(),
     }
@@ -100,7 +103,7 @@ async def create_user_notification(
     doc.pop("_id", None)
     try:
         push_sent_count = 0
-        if push_allowed(user, kind, category):
+        if push_channel_allowed:
             from services.push_notifications import send_mobile_push_for_notification
             push_sent_count = await send_mobile_push_for_notification(doc)
         doc["push_sent_count"] = push_sent_count

@@ -1,5 +1,6 @@
 import pathlib
 import sys
+import types
 
 import pytest
 
@@ -54,6 +55,8 @@ def _matches(row, query):
         if isinstance(expected, dict):
             if "$gte" in expected and not (actual >= expected["$gte"]):
                 return False
+            if "$ne" in expected and actual == expected["$ne"]:
+                return False
             continue
         if actual != expected:
             return False
@@ -95,3 +98,23 @@ async def test_create_user_notification_uses_kind_cooldown(monkeypatch):
 
     assert created is None
     assert len(db.notifications.rows) == 1
+
+
+@pytest.mark.anyio
+async def test_push_can_be_sent_when_in_app_channel_is_disabled(monkeypatch):
+    db = _Db({"id": "u1", "notification_preferences": {"push": True, "in_app": False, "match_reminders": True}})
+    monkeypatch.setattr("services.user_notifications.get_db", lambda: db)
+    push_module = types.ModuleType("services.push_notifications")
+
+    async def _send_push(_notification):
+        return 1
+
+    push_module.send_mobile_push_for_notification = _send_push
+    monkeypatch.setitem(sys.modules, "services.push_notifications", push_module)
+
+    created = await create_user_notification("u1", "Match", kind="match_reminder", meta={"dedupe_key": "push-only"})
+
+    assert created is not None
+    assert created["push_sent_count"] == 1
+    assert created["in_app_visible"] is False
+    assert db.notifications.rows[0]["in_app_visible"] is False

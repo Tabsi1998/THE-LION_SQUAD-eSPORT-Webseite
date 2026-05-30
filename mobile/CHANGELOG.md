@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0-beta.8 - 2026-05-30
+
+- Mobile: Das eigene oeffentliche Profil ist jetzt direkt im Mehr-Hub neben Mitgliedervorteilen, Spielerprofilen und Referenzen erreichbar.
+- Backend: Push-Benachrichtigungen koennen weiterhin zugestellt werden, auch wenn Nutzer den In-App-Kanal deaktiviert haben.
+- Backend/Mobile: Ausgeblendete In-App-Benachrichtigungen erscheinen nicht mehr in den Benachrichtigungslisten oder Zaehlern.
+
 ## 1.5.0-beta.7 - 2026-05-30
 
 - Backend/Web/Mobile: Benachrichtigungen haben jetzt getrennte Schalter fuer E-Mail, Push und In-App sowie eigene Kategorien fuer Match-Erinnerungen, Turnier-Updates und News/Events.
