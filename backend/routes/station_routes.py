@@ -5,13 +5,12 @@ from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import get_current_user, require_admin
 from models import StationCreate, StationUpdate, now_utc, new_id
-from match_rules import participant_source_ids
 from services.tournament_permissions import (
     has_tournament_staff_permission,
     is_global_tournament_admin,
     require_tournament_staff_permission,
 )
-from services.user_notifications import create_user_notification
+from services.station_runtime import notify_match_started
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
 TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
@@ -70,6 +69,12 @@ def _match_sort_key(match: dict) -> tuple:
     )
 
 
+def _match_has_participants(match: dict) -> bool:
+    if match.get("slots"):
+        return any(slot.get("registration_id") for slot in match.get("slots") or [])
+    return bool(match.get("participant_a_id") or match.get("participant_b_id"))
+
+
 def _parse_dt(value: str | None) -> datetime | None:
     if not value:
         return None
@@ -86,59 +91,6 @@ def _duration_for_match(match: dict, tournament: dict) -> int:
         return max(1, int(duration))
     except Exception:
         return 30
-
-
-async def _station_label(station: dict) -> str:
-    parts = [station.get("name") or station.get("id") or "Station"]
-    if station.get("device_type"):
-        parts.append(station["device_type"])
-    if station.get("notes"):
-        parts.append(station["notes"])
-    return " · ".join(parts)
-
-
-async def _registration_label(db, registration_id: str | None) -> str:
-    if not registration_id:
-        return "Offen"
-    reg = await db.tournament_registrations.find_one({"id": registration_id}, {"_id": 0})
-    if not reg:
-        return registration_id
-    return reg.get("display_name") or reg.get("ingame_name") or registration_id
-
-
-async def _match_label(db, match: dict) -> str:
-    if match.get("slots"):
-        names = []
-        for slot in match.get("slots") or []:
-            if slot.get("registration_id"):
-                names.append(await _registration_label(db, slot.get("registration_id")))
-        return f"{match.get('match_key') or 'Durchgang'} · {' / '.join(names[:4]) or 'Offen'}"
-    a = await _registration_label(db, match.get("participant_a_id"))
-    b = await _registration_label(db, match.get("participant_b_id"))
-    return f"{a} gegen {b}"
-
-
-async def _notify_station_assignment(db, match: dict, station: dict) -> None:
-    reg_ids = participant_source_ids(match)
-    if not reg_ids:
-        return
-    regs = await db.tournament_registrations.find({"id": {"$in": reg_ids}}, {"_id": 0}).to_list(50)
-    station_name = await _station_label(station)
-    match_name = await _match_label(db, match)
-    collection_name = "matches_v2" if match.get("slots") else "matches"
-    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "slug": 1}) or {}
-    url = f"/matches/{match.get('id')}" if collection_name == "matches" else f"/tournaments/{tournament.get('slug') or match.get('tournament_id')}/bracket"
-    for reg in regs:
-        if not reg.get("user_id"):
-            continue
-        await create_user_notification(
-            reg["user_id"],
-            "Station zugewiesen",
-            f"{match_name} ist auf {station_name} eingeteilt.",
-            url=url,
-            kind="match_station",
-            meta={"match_id": match.get("id"), "station_id": station.get("id"), "tournament_id": match.get("tournament_id")},
-        )
 
 
 @router.get("")
@@ -203,18 +155,29 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
         {"current_match_id": match["id"], "id": {"$ne": station["id"]}},
         {"$set": {"current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()}},
     )
+    now_iso = now_utc().isoformat()
+    match_updates = {
+        "station_id": station["id"],
+        "status": _station_match_status(match, start_now),
+        "updated_at": now_iso,
+    }
+    if start_now:
+        match_updates["started_at"] = now_iso
+        match_updates["scheduled_at"] = match.get("scheduled_at") or now_iso
     await db.stations.update_one({"id": station["id"]}, {"$set": {
         "current_match_id": match["id"],
         "current_match_type": collection_name,
         "status": "busy" if start_now else "reserved",
-        "updated_at": now_utc().isoformat(),
+        "updated_at": now_iso,
     }})
-    await db[collection_name].update_one({"id": match["id"]}, {"$set": {
-        "station_id": station["id"],
-        "status": _station_match_status(match, start_now),
-        "updated_at": now_utc().isoformat(),
-    }})
-    await _notify_station_assignment(db, match, station)
+    await db[collection_name].update_one({"id": match["id"]}, {"$set": match_updates})
+    if start_now:
+        await db.tournaments.update_one(
+            {"id": match["tournament_id"], "status": {"$in": ["scheduled", "registration_open", "registration_closed", "check_in"]}},
+            {"$set": {"status": "live", "updated_at": now_iso}},
+        )
+        started_match = {**match, **match_updates}
+        await notify_match_started(db, started_match, station, collection_name)
 
 
 @router.post("/bulk")
@@ -275,17 +238,20 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
     stations = await db.stations.find(station_query, {"_id": 0}).sort("name", 1).to_list(200)
     if not stations:
         return {"assigned": 0, "items": [], "planned": bool(plan and not start_now)}
+    status_filter = ["ready", "scheduled"] if start_now else ["preview", "pending", "ready", "scheduled"]
+    station_filter = {"$in": [None, ""]} if not start_now else {"$in": [None, "", *[station["id"] for station in stations]]}
     matches = await db.matches.find({
         "tournament_id": tournament_id,
-        "station_id": {"$in": [None, ""]},
-        "status": {"$in": ["preview", "pending", "ready", "scheduled"]},
+        "station_id": station_filter,
+        "status": {"$in": status_filter},
     }, {"_id": 0}).to_list(1000)
     matches_v2 = await db.matches_v2.find({
         "tournament_id": tournament_id,
-        "station_id": {"$in": [None, ""]},
-        "status": {"$in": ["preview", "pending", "ready", "scheduled"]},
+        "station_id": station_filter,
+        "status": {"$in": status_filter},
     }, {"_id": 0}).to_list(3000)
     candidates = [("matches", m) for m in matches] + [("matches_v2", m) for m in matches_v2]
+    candidates = [item for item in candidates if _match_has_participants(item[1])]
     candidates.sort(key=lambda item: _match_sort_key(item[1]))
 
     if plan and not start_now:
@@ -314,8 +280,28 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
         return {"assigned": len(assigned), "items": assigned, "planned": True}
 
     assigned = []
-    for station, (collection_name, match) in zip(stations, candidates):
+    used_match_ids: set[str] = set()
+    for station in stations:
+        preferred_index = next(
+            (
+                index for index, (_collection_name, match) in enumerate(candidates)
+                if match.get("id") not in used_match_ids and match.get("station_id") == station["id"]
+            ),
+            None,
+        )
+        fallback_index = next(
+            (
+                index for index, (_collection_name, match) in enumerate(candidates)
+                if match.get("id") not in used_match_ids and not match.get("station_id")
+            ),
+            None,
+        )
+        candidate_index = preferred_index if preferred_index is not None else fallback_index
+        if candidate_index is None:
+            continue
+        collection_name, match = candidates[candidate_index]
         await _assign_match_to_station(db, station, match, collection_name, start_now=start_now)
+        used_match_ids.add(match["id"])
         assigned.append({"station_id": station["id"], "match_id": match["id"], "match_type": collection_name})
     return {"assigned": len(assigned), "items": assigned, "planned": False}
 

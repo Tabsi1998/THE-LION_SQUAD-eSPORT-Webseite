@@ -43,6 +43,7 @@ export default function AdminTournamentNewPage() {
     start_date: "", end_date: "",
     status: "draft",
     site_banner_enabled: false,
+    auto_start_enabled: false,
     event_mode: "online", result_entry_mode: "", schedule_mode: "",
     best_of: 1, bronze_match: false, seeding_mode: "random",
     is_public: true, rules: "", prize_pool: "",
@@ -145,7 +146,7 @@ export default function AdminTournamentNewPage() {
             <Field label="Anmeldung endet" type="datetime-local" value={form.registration_open_until} onChange={(v) => set("registration_open_until", v)} testId="new-tr-reg-until" />
           </Row>
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
-            Anmeldung, Check-in, Live und Beendet werden anhand dieser Zeiten automatisch geschaltet. Manuelle Sonderstatus setzt du später in der Bearbeitung.
+            Anmeldung und Check-in koennen zeitgesteuert wechseln. Live-Start und echte Matchstarts bleiben standardmaessig bei der Turnierleitung.
           </div>
           <Row>
             <Select label="Austragung" value={form.event_mode} onChange={(v) => set("event_mode", v)} options={EVENT_MODE_OPTIONS} testId="new-tr-event-mode" />
@@ -164,6 +165,10 @@ export default function AdminTournamentNewPage() {
             <label className="flex items-start gap-2 text-sm text-white/75">
               <input type="checkbox" checked={form.site_banner_enabled} onChange={(e) => set("site_banner_enabled", e.target.checked)} data-testid="new-tr-site-banner" className="accent-[#FFD700] mt-1" />
               <span>Automatisches Turnier-Hinweisbanner für dieses Turnier anzeigen</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-white/75 sm:col-span-2">
+              <input type="checkbox" checked={form.auto_start_enabled} onChange={(e) => set("auto_start_enabled", e.target.checked)} data-testid="new-tr-auto-start" className="accent-[#29B6E8] mt-1" />
+              <span>Turnier anhand Start-/Endzeit automatisch live/beendet schalten. Für Vor-Ort-Turniere ausgeschaltet lassen.</span>
             </label>
           </div>
           <Details title="Weitere Zeiten und Sonderfälle">

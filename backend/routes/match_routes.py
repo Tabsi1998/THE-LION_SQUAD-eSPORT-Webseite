@@ -28,6 +28,7 @@ from match_rules import loser_for_winner, match_allows_draw, validate_winner_id
 from services.match_notifications import notify_match_result_confirmed
 from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
 from services.match_v2_results import MatchV2ResultError, build_v2_result_application
+from services.station_runtime import release_station_for_match
 from services.rate_limit import enforce_rate_limit
 from services.station_labels import attach_station_info
 from services.user_notifications import create_user_notification
@@ -976,6 +977,10 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
         await notify_match_result_confirmed(db, updated, "matches_v2", force=force)
     except Exception:
         pass
+    try:
+        await release_station_for_match(db, updated, "matches_v2")
+    except Exception:
+        pass
     return {
         "ok": True,
         "match": updated,
@@ -1119,6 +1124,10 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
                 await notify_match_result_confirmed(db, m, "matches")
             except Exception:
                 pass
+            try:
+                await release_station_for_match(db, m, "matches")
+            except Exception:
+                pass
     m.pop("_id", None)
     return m
 
@@ -1183,6 +1192,10 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
                 await db.matches.update_one({"id": um["id"]}, {"$set": um})
             try:
                 await notify_match_result_confirmed(db, m, "matches")
+            except Exception:
+                pass
+            try:
+                await release_station_for_match(db, m, "matches")
             except Exception:
                 pass
     m = await db.matches.find_one({"id": match_id}, {"_id": 0})
@@ -1258,6 +1271,10 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(get_current_user
         await db.matches.update_one({"id": um["id"]}, {"$set": um})
     try:
         await notify_match_result_confirmed(db, m, "matches")
+    except Exception:
+        pass
+    try:
+        await release_station_for_match(db, m, "matches")
     except Exception:
         pass
     m.pop("_id", None)

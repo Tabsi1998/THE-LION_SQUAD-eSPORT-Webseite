@@ -454,6 +454,7 @@ class TournamentCreate(BaseModel):
     event_mode: TournamentEventMode = "online"
     result_entry_mode: Optional[TournamentResultEntryMode] = None
     schedule_mode: Optional[TournamentScheduleMode] = None
+    auto_start_enabled: bool = False
     # Phase 7
     season_weight: float = 2.0
     visibility: Literal["public", "community", "members", "internal"] = "public"
@@ -510,6 +511,7 @@ class TournamentUpdate(BaseModel):
     event_mode: Optional[TournamentEventMode] = None
     result_entry_mode: Optional[TournamentResultEntryMode] = None
     schedule_mode: Optional[TournamentScheduleMode] = None
+    auto_start_enabled: Optional[bool] = None
     season_weight: Optional[float] = None
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None
     site_banner_enabled: Optional[bool] = None

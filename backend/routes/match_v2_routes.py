@@ -17,6 +17,7 @@ from services.match_v2_results import MatchV2ResultError, build_v2_result_applic
 from services.match_notifications import notify_match_result_confirmed
 from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
 from services.rate_limit import enforce_rate_limit
+from services.station_runtime import release_station_for_match
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     READ_STAFF_ROLES,
@@ -601,6 +602,10 @@ async def submit_match_v2_result(match_id: str, body: MatchV2ResultSubmit,
     updated = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
     try:
         await notify_match_result_confirmed(db, updated, "matches_v2", force=force)
+    except Exception:
+        pass
+    try:
+        await release_station_for_match(db, updated, "matches_v2")
     except Exception:
         pass
     return {

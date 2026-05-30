@@ -1563,6 +1563,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     is_public: source.is_public !== false,
     visibility: source.visibility || "public",
     site_banner_enabled: !!source.site_banner_enabled,
+    auto_start_enabled: !!source.auto_start_enabled,
     event_mode: source.event_mode || "online",
     result_entry_mode: source.result_entry_mode || "",
     schedule_mode: source.schedule_mode || "",
@@ -1613,6 +1614,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     is_public: tournament.is_public !== false,
     visibility: tournament.visibility || "public",
     site_banner_enabled: !!tournament.site_banner_enabled,
+    auto_start_enabled: !!tournament.auto_start_enabled,
     event_mode: tournament.event_mode || "online",
     result_entry_mode: tournament.result_entry_mode || "",
     schedule_mode: tournament.schedule_mode || "",
@@ -1759,6 +1761,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
           <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.registration_enabled} onChange={(e)=>set("registration_enabled",e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Öffentliche Anmeldung erlauben</span></label>
           <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.is_invite_only} onChange={(e)=>set("is_invite_only",e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Nur Einladung/manuelle Teilnehmer</span></label>
           <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.site_banner_enabled} onChange={(e)=>set("site_banner_enabled",e.target.checked)} className="accent-[#FFD700] mt-1"/><span>Automatisches Turnier-Hinweisbanner anzeigen</span></label>
+          <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.auto_start_enabled} onChange={(e)=>set("auto_start_enabled",e.target.checked)} data-testid="tr-edit-auto-start" className="accent-[#29B6E8] mt-1"/><span>Start-/Endzeit darf Turnier automatisch live/beendet schalten</span></label>
           <label className="flex items-start gap-2 text-sm text-white/75 sm:col-span-2"><input type="checkbox" checked={f.block_club_member_registration} onChange={(e)=>set("block_club_member_registration",e.target.checked)} className="accent-[#FFD700] mt-1"/><span>Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten</span></label>
         </div>
       </div>

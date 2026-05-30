@@ -178,11 +178,21 @@ export default function AdminStationsPage() {
   const autoAssign = async () => {
     if (!activeTid) return;
     try {
-      const { data } = await api.post(`/stations/auto-assign?tournament_id=${encodeURIComponent(activeTid)}`);
-      toast.success(`${data.assigned} Spiele automatisch zugewiesen.`);
+      const { data } = await api.post(`/stations/auto-assign?tournament_id=${encodeURIComponent(activeTid)}&plan=true`);
+      toast.success(`${data.assigned} Spiele geplant.`);
       loadStations(); loadMatches();
     } catch (e) {
-      toast.error(formatRequestError(e, "Automatische Zuweisung konnte nicht ausgeführt werden."));
+      toast.error(formatRequestError(e, "Automatische Planung konnte nicht ausgeführt werden."));
+    }
+  };
+  const startFreeStations = async () => {
+    if (!activeTid) return;
+    try {
+      const { data } = await api.post(`/stations/auto-assign?tournament_id=${encodeURIComponent(activeTid)}&start_now=true&plan=false`);
+      toast.success(`${data.assigned} Spiel${Number(data.assigned) === 1 ? "" : "e"} gestartet.`);
+      loadStations(); loadMatches();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Freie Stationen konnten nicht gestartet werden."));
     }
   };
   const clearStation = async (sid) => {
@@ -200,6 +210,13 @@ export default function AdminStationsPage() {
   const unassignedMatches = safeArray(matches).filter(
     (m) => !m.station_id && ["ready", "scheduled"].includes(m.status)
   );
+  const occupiedMatchIds = new Set(safeArray(list).map((station) => station.current_match_id).filter(Boolean));
+  const queuedMatches = safeArray(matches)
+    .filter((m) => m.station_id && ["ready", "scheduled"].includes(m.status))
+    .sort((a, b) => (Date.parse(a.scheduled_at || "") || Number.MAX_SAFE_INTEGER) - (Date.parse(b.scheduled_at || "") || Number.MAX_SAFE_INTEGER));
+  const plannedQueue = queuedMatches.filter((m) => !occupiedMatchIds.has(m.id));
+  const freeStations = safeArray(list).filter((station) => ["free", "reserved"].includes(station.status) && !station.current_match_id);
+  const startableCount = safeArray(matches).filter((m) => ["ready", "scheduled"].includes(m.status)).length;
 
   const nameOfMatch = (m) => {
     if (!m) return "—";
@@ -263,8 +280,11 @@ export default function AdminStationsPage() {
         </div>
           );
         })()}
-        <button type="button" onClick={autoAssign} disabled={!list.length || !unassignedMatches.length} className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
-          <Wand2 className="w-4 h-4" /> Nächste Spiele verteilen
+        <button type="button" onClick={autoAssign} disabled={!list.length || !unassignedMatches.length} className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
+          <Wand2 className="w-4 h-4" /> Zeitplan füllen
+        </button>
+        <button type="button" onClick={startFreeStations} disabled={!freeStations.length || !startableCount} className="px-4 py-2 bg-[#00FF88] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
+          <Play className="w-4 h-4" /> Freie Stationen starten
         </button>
       </div>
 
@@ -310,6 +330,19 @@ export default function AdminStationsPage() {
               ))}
               {loadingMatches && <div className="text-white/40 text-xs text-center py-6">Spiele werden geladen …</div>}
               {!loadingMatches && unassignedMatches.length === 0 && <div className="text-white/40 text-xs text-center py-6">Keine offenen Spiele</div>}
+            </div>
+          </div>
+          <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-3">Geplante Queue</div>
+            <div className="space-y-1.5 max-h-[260px] overflow-y-auto">
+              {plannedQueue.map((m) => (
+                <div key={m.id} className="p-2 border border-white/10 rounded-sm text-xs bg-[#0A0A0A]">
+                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{detailOfMatch(m)}</div>
+                  <div className="text-white font-semibold mt-0.5 truncate">{nameOfMatch(m)}</div>
+                  <div className="mt-1 text-white/40">Station {stationName(m.station_id, list)}{m.scheduled_at ? ` · ${formatDateTime(m.scheduled_at)}` : ""}</div>
+                </div>
+              ))}
+              {plannedQueue.length === 0 && <div className="text-white/40 text-xs text-center py-6">Keine geplanten Spiele</div>}
             </div>
           </div>
         </div>
@@ -399,6 +432,11 @@ export default function AdminStationsPage() {
 
 function safeArray(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
+}
+
+function stationName(stationId, stations) {
+  const station = safeArray(stations).find((item) => item.id === stationId);
+  return station?.name || station?.label || stationId || "offen";
 }
 
 function StationDuelResult({ match, regById, onSaved }) {

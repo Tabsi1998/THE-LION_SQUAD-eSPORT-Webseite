@@ -156,7 +156,8 @@ def _next_status(doc: dict, now: datetime, kind: str = "tournament") -> str | No
 
     if status in ("draft", "paused", "completed", "results_published", "archived", "cancelled"):
         return None
-    if end and now >= end:
+    auto_start_enabled = bool(doc.get("auto_start_enabled"))
+    if end and now >= end and (kind != "tournament" or auto_start_enabled):
         return "completed"
     if status == "scheduled" and reg_enabled and reg_from and now >= reg_from and (not reg_until or now <= reg_until):
         return "registration_open"
@@ -167,6 +168,8 @@ def _next_status(doc: dict, now: datetime, kind: str = "tournament") -> str | No
     if status == "check_in" and check_until and now > check_until:
         return "registration_closed"
     if status in ("scheduled", "registration_open", "registration_closed", "check_in", "checkin_open") and start and now >= start:
+        if kind == "tournament" and not auto_start_enabled:
+            return None
         return "live"
     return None
 
