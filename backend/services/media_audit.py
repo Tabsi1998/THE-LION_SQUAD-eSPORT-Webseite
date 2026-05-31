@@ -18,7 +18,7 @@ ADMIN_OWNER_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "su
 MEDIA_SCOPES = {"user", "admin", "sponsor", "branding", "gallery"}
 
 TARGETS: list[tuple[str, list[str]]] = [
-    ("settings", ["logo_url", "mascot_url", "favicon_url", "avatar_url"]),
+    ("settings", ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "favicon_url", "favicon_light_url", "favicon_dark_url", "avatar_url"]),
     ("users", ["avatar_url", "banner_url"]),
     ("teams", ["logo_url", "banner_url"]),
     ("sponsors", ["logo_url"]),
@@ -47,7 +47,7 @@ TEXT_TARGETS: list[tuple[str, list[str]]] = [
 
 SCOPE_TARGETS: list[tuple[str, list[str], str]] = [
     ("users", ["avatar_url", "banner_url"], "user"),
-    ("settings", ["logo_url", "mascot_url", "favicon_url", "avatar_url"], "branding"),
+    ("settings", ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "favicon_url", "favicon_light_url", "favicon_dark_url", "avatar_url"], "branding"),
     ("sponsors", ["logo_url"], "sponsor"),
     ("gallery_albums", ["cover_url"], "gallery"),
     ("gallery_photos", ["image_url", "thumbnail_url"], "gallery"),

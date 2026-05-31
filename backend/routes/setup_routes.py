@@ -42,7 +42,7 @@ def _image_mime_from_url(value: str | None) -> str:
 
 
 def _effective_favicon_url(branding: dict) -> str:
-    custom = branding.get("favicon_url")
+    custom = branding.get("favicon_url") or branding.get("favicon_light_url") or branding.get("favicon_dark_url")
     if custom:
         return custom
     return ""
@@ -422,7 +422,7 @@ async def web_manifest():
     name = branding.get("site_title") or name
     description = branding.get("site_description") or "Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben."
     icon = _effective_favicon_url(branding)
-    default_screenshot = branding.get("logo_url") or branding.get("mascot_url") or "/assets/brand/tls-wordmark.png"
+    default_screenshot = branding.get("share_banner_url") or branding.get("logo_url") or branding.get("logo_light_url") or branding.get("logo_dark_url") or branding.get("mascot_url") or "/assets/brand/tls-wordmark.png"
     manifest = {
         "name": name,
         "short_name": "TLS",
@@ -436,9 +436,13 @@ async def web_manifest():
             {"src": default_screenshot, "sizes": "1200x630", "type": _image_mime_from_url(default_screenshot), "form_factor": "wide"},
         ],
     }
-    if icon:
-        manifest["icons"] = [
-            {"src": icon, "sizes": "192x192", "type": _image_mime_from_url(icon), "purpose": "any"},
-            {"src": icon, "sizes": "512x512", "type": _image_mime_from_url(icon), "purpose": "any maskable"},
-        ]
+    icons = []
+    for src in [branding.get("favicon_light_url"), branding.get("favicon_dark_url"), icon]:
+        if src and src not in [item["src"] for item in icons]:
+            icons.extend([
+                {"src": src, "sizes": "192x192", "type": _image_mime_from_url(src), "purpose": "any"},
+                {"src": src, "sizes": "512x512", "type": _image_mime_from_url(src), "purpose": "any maskable"},
+            ])
+    if icons:
+        manifest["icons"] = icons
     return Response(content=json.dumps(manifest), media_type="application/manifest+json")

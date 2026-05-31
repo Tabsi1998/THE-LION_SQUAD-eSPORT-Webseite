@@ -70,8 +70,13 @@ class BrandingSettings(BaseModel):
     site_description: Optional[str] = None
     primary_color: Optional[str] = None
     logo_url: Optional[str] = None
+    logo_light_url: Optional[str] = None
+    logo_dark_url: Optional[str] = None
+    share_banner_url: Optional[str] = None
     mascot_url: Optional[str] = None
     favicon_url: Optional[str] = None
+    favicon_light_url: Optional[str] = None
+    favicon_dark_url: Optional[str] = None
     domain: Optional[str] = None
     timezone: Optional[str] = None
     contact_email: Optional[str] = None
@@ -536,8 +541,13 @@ async def public_settings(response: Response):
         "site_description": b.get("site_description") or "Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.",
         "primary_color": b.get("primary_color", "#29B6E8"),
         "logo_url": b.get("logo_url"),
+        "logo_light_url": b.get("logo_light_url"),
+        "logo_dark_url": b.get("logo_dark_url"),
+        "share_banner_url": b.get("share_banner_url"),
         "mascot_url": b.get("mascot_url"),
         "favicon_url": b.get("favicon_url"),
+        "favicon_light_url": b.get("favicon_light_url"),
+        "favicon_dark_url": b.get("favicon_dark_url"),
         "domain": domain,
         "timezone": b.get("timezone") or "Europe/Vienna",
         "contact_email": contact_email,
@@ -1712,10 +1722,13 @@ async def _pdf_sponsors(db):
 
 
 async def _pdf_branding(db):
-    return await db.settings.find_one(
+    branding = await db.settings.find_one(
         {"id": "branding"},
-        {"_id": 0, "logo_url": 1, "mascot_url": 1, "domain": 1, "site_title": 1, "club_name": 1},
+        {"_id": 0, "logo_url": 1, "logo_light_url": 1, "logo_dark_url": 1, "mascot_url": 1, "domain": 1, "site_title": 1, "club_name": 1},
     ) or {}
+    if not branding.get("logo_url"):
+        branding["logo_url"] = branding.get("logo_dark_url") or branding.get("logo_light_url")
+    return branding
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/participants.pdf")

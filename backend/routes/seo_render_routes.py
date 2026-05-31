@@ -32,10 +32,40 @@ MONTHS_DE = [
 
 
 def effective_favicon_url(branding: dict) -> str:
-    custom = branding.get("favicon_url")
+    custom = branding.get("favicon_url") or branding.get("favicon_light_url") or branding.get("favicon_dark_url")
     if custom:
         return custom
     return ""
+
+
+def effective_favicon_urls(branding: dict) -> dict:
+    fallback = effective_favicon_url(branding)
+    return {
+        "light": branding.get("favicon_light_url") or fallback,
+        "dark": branding.get("favicon_dark_url") or fallback,
+        "default": fallback,
+    }
+
+
+def effective_logo_url(branding: dict) -> str:
+    return (
+        branding.get("logo_url")
+        or branding.get("logo_light_url")
+        or branding.get("logo_dark_url")
+        or branding.get("mascot_url")
+        or DEFAULT_SHARE_IMAGE
+    )
+
+
+def effective_share_image_url(branding: dict) -> str:
+    return (
+        branding.get("share_banner_url")
+        or branding.get("logo_url")
+        or branding.get("logo_light_url")
+        or branding.get("logo_dark_url")
+        or branding.get("mascot_url")
+        or DEFAULT_SHARE_IMAGE
+    )
 
 
 @router.get("/preview")
@@ -154,16 +184,11 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
     canonical = f"{origin}{path}"
     site_name = branding.get("club_name") or "THE LION SQUAD"
     default_description = branding.get("site_description") or DEFAULT_SITE_DESCRIPTION
-    default_image = absolute_url(
-        branding.get("logo_url") or branding.get("mascot_url") or DEFAULT_SHARE_IMAGE,
-        origin,
-    )
-    default_logo = absolute_url(
-        branding.get("logo_url") or branding.get("mascot_url") or DEFAULT_SHARE_IMAGE,
-        origin,
-    )
+    default_image = absolute_url(effective_share_image_url(branding), origin)
+    default_logo = absolute_url(effective_logo_url(branding), origin)
     favicon_value = effective_favicon_url(branding)
     favicon = absolute_url(favicon_value, origin) if favicon_value else ""
+    favicon_urls = effective_favicon_urls(branding)
 
     meta = {
         "title": branding.get("site_title") or "THE LION SQUAD - eSPORTS",
@@ -171,6 +196,8 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         "image": default_image,
         "logo": default_logo,
         "favicon": favicon,
+        "favicon_light": absolute_url(favicon_urls["light"], origin) if favicon_urls.get("light") else "",
+        "favicon_dark": absolute_url(favicon_urls["dark"], origin) if favicon_urls.get("dark") else "",
         "url": canonical,
         "canonical": canonical,
         "site_name": site_name,
@@ -623,12 +650,17 @@ def render_preview_html(meta: dict) -> str:
     description = escape(str(meta["description"]), quote=True)
     image = escape(str(meta["image"]), quote=True)
     favicon = escape(str(meta.get("favicon") or ""), quote=True)
-    favicon_links = (
-        f'<link rel="icon" href="{favicon}" />\n'
-        f'    <link rel="apple-touch-icon" href="{favicon}" />'
-        if favicon
-        else ""
-    )
+    favicon_light = escape(str(meta.get("favicon_light") or ""), quote=True)
+    favicon_dark = escape(str(meta.get("favicon_dark") or ""), quote=True)
+    favicon_parts = []
+    if favicon_light and favicon_light != favicon:
+        favicon_parts.append(f'<link rel="icon" href="{favicon_light}" media="(prefers-color-scheme: light)" />')
+    if favicon_dark and favicon_dark != favicon_light:
+        favicon_parts.append(f'<link rel="icon" href="{favicon_dark}" media="(prefers-color-scheme: dark)" />')
+    if favicon:
+        favicon_parts.append(f'<link rel="icon" href="{favicon}" />')
+        favicon_parts.append(f'<link rel="apple-touch-icon" href="{favicon}" />')
+    favicon_links = "\n    ".join(favicon_parts)
     url = escape(str(meta["url"]), quote=True)
     canonical = escape(str(meta["canonical"]), quote=True)
     site_name = escape(str(meta["site_name"]), quote=True)

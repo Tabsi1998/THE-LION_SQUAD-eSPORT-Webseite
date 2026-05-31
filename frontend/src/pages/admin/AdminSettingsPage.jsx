@@ -206,7 +206,8 @@ export default function AdminSettingsPage() {
   const [sendingNewsletter, setSendingNewsletter] = useState(false);
   const [brand, setBrand] = useState({
     club_name: "", tagline: "", site_title: "THE LION SQUAD - eSPORTS", site_description: "", primary_color: "#29B6E8",
-    logo_url: "", mascot_url: "", favicon_url: "", contact_email: "", domain: "", timezone: "Europe/Vienna",
+    logo_url: "", logo_light_url: "", logo_dark_url: "", share_banner_url: "", mascot_url: "",
+    favicon_url: "", favicon_light_url: "", favicon_dark_url: "", contact_email: "", domain: "", timezone: "Europe/Vienna",
     legal_name: "", legal_form: "eingetragener Verein nach österreichischem Vereinsrecht", zvr_number: "",
     street_address: "", address_extra: "", postal_code: "", city: "", state: "Tirol", country: "Oesterreich",
     registered_seat: "", register_authority: "", representative_name: "", representative_role: "",
@@ -1486,9 +1487,17 @@ export default function AdminSettingsPage() {
               <BrandField label="Kontakt E-Mail" value={brand.contact_email} onChange={(v) => setBrandField("contact_email", v)} testId="brand-contact-email" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ImageUpload value={brand.logo_url} onChange={(v) => setBrandField("logo_url", v)} label="Vereinslogo" testId="brand-logo" variant="square" allowLibrary />
-              <ImageUpload value={brand.mascot_url} onChange={(v) => setBrandField("mascot_url", v)} label="Maskottchen" testId="brand-mascot" variant="square" allowLibrary />
-              <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Favicon / Browser Icon" testId="brand-favicon" variant="square" allowLibrary />
+              <ImageUpload value={brand.logo_url} onChange={(v) => setBrandField("logo_url", v)} label="Logo Fallback" testId="brand-logo" variant="square" allowLibrary />
+              <ImageUpload value={brand.logo_dark_url} onChange={(v) => setBrandField("logo_dark_url", v)} label="Logo auf dunklem Hintergrund" testId="brand-logo-dark" variant="square" allowLibrary />
+              <ImageUpload value={brand.logo_light_url} onChange={(v) => setBrandField("logo_light_url", v)} label="Logo auf hellem Hintergrund" testId="brand-logo-light" variant="square" allowLibrary />
+              <ImageUpload value={brand.share_banner_url} onChange={(v) => setBrandField("share_banner_url", v)} label="SEO-/Teilen-Banner Fallback" testId="brand-share-banner" variant="wide" allowLibrary />
+              <ImageUpload value={brand.mascot_url} onChange={(v) => setBrandField("mascot_url", v)} label="Maskottchen Fallback" testId="brand-mascot" variant="square" allowLibrary />
+              <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Favicon Fallback" testId="brand-favicon" variant="square" allowLibrary />
+              <ImageUpload value={brand.favicon_light_url} onChange={(v) => setBrandField("favicon_light_url", v)} label="Favicon fuer hellen Modus" testId="brand-favicon-light" variant="square" allowLibrary />
+              <ImageUpload value={brand.favicon_dark_url} onChange={(v) => setBrandField("favicon_dark_url", v)} label="Favicon fuer dunklen Modus" testId="brand-favicon-dark" variant="square" allowLibrary />
+            </div>
+            <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/60">
+              SEO-Bilder werden automatisch priorisiert: Beitrags-/Event-/Turnierbild zuerst, danach der SEO-/Teilen-Banner, danach Logo oder Maskottchen. Das Favicon kann je nach Browser-Farbmodus hell/dunkel ausgeliefert werden.
             </div>
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
