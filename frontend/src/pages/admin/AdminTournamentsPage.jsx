@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
-import { Plus, Trash2, Play, Pause } from "lucide-react";
+import { Plus, Trash2, Play, Pause, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -26,10 +26,33 @@ const SCHEDULE_MODE_LABELS = {
   hybrid: "Termin: Hybrid",
   player_proposal: "Termin: Vorschlag",
 };
+const TOURNAMENT_STATUS_FILTERS = [
+  ["", "Alle Status"],
+  ["draft", "Entwurf"],
+  ["scheduled", "Angekuendigt"],
+  ["registration_open", "Anmeldung offen"],
+  ["registration_closed", "Anmeldung geschlossen"],
+  ["live", "Live"],
+  ["paused", "Pausiert"],
+  ["completed", "Abgeschlossen"],
+  ["results_published", "Ergebnisse online"],
+  ["archived", "Archiviert"],
+  ["cancelled", "Abgesagt"],
+];
+
+function normalizeSearch(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
 
 export default function AdminTournamentsPage() {
   const { isAdmin } = useAuth();
   const [list, setList] = useState([]);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const confirm = useConfirm();
   const load = useCallback(async () => {
     const { data } = await api.get("/tournaments?include_drafts=true");
@@ -62,6 +85,28 @@ export default function AdminTournamentsPage() {
       toast.error(formatRequestError(e, "Turnier konnte nicht gelöscht werden."));
     }
   };
+  const statusCounts = useMemo(() => list.reduce((acc, tournament) => {
+    const key = tournament.status || "unknown";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {}), [list]);
+  const filteredList = useMemo(() => {
+    const q = normalizeSearch(query);
+    return list.filter((tournament) => {
+      if (statusFilter && tournament.status !== statusFilter) return false;
+      if (!q) return true;
+      const haystack = normalizeSearch([
+        tournament.title,
+        tournament.slug,
+        tournament.platform,
+        tournament.format,
+        tournament.format_label,
+        tournament.game?.name,
+        gameLabel(tournament.game),
+      ].filter(Boolean).join(" "));
+      return haystack.includes(q);
+    });
+  }, [list, query, statusFilter]);
 
   return (
     <AdminLayout>
@@ -75,6 +120,33 @@ export default function AdminTournamentsPage() {
             <Plus className="w-4 h-4" /> Neues Turnier
           </Link>
         )}
+      </div>
+      <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem_auto]">
+        <label className="relative block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            data-testid="admin-tournament-search"
+            className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/35 focus:border-[#29B6E8]/60 focus:outline-none"
+            placeholder="Turnier, Spiel, Slug oder Plattform suchen"
+          />
+        </label>
+        <select
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
+          data-testid="admin-tournament-status-filter"
+          className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5 text-sm text-white focus:border-[#29B6E8]/60 focus:outline-none"
+        >
+          {TOURNAMENT_STATUS_FILTERS.map(([value, label]) => (
+            <option key={value || "all"} value={value}>
+              {label} ({value ? statusCounts[value] || 0 : list.length})
+            </option>
+          ))}
+        </select>
+        <div className="flex items-center justify-end rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/55">
+          {filteredList.length} / {list.length} sichtbar
+        </div>
       </div>
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
         <div className="overflow-x-auto">
@@ -91,7 +163,7 @@ export default function AdminTournamentsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {list.map((t) => (
+            {filteredList.map((t) => (
               <tr key={t.id} data-testid={`admin-tr-${t.slug}`}>
                 <td className="px-4 py-3">
                   <Link to={`/admin/tournaments/${t.id}`} className="font-semibold hover:text-[#29B6E8]">{t.title}</Link>
@@ -105,6 +177,7 @@ export default function AdminTournamentsPage() {
                 <td className="px-4 py-3 text-right">{t.participant_count}/{t.max_participants}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
+                    <Link to={`/admin/tournaments/${t.id}?tab=participants`} title="Teilnehmer" className="p-2 hover:text-[#29B6E8]"><Users className="w-3.5 h-3.5" /></Link>
                     {isAdmin && t.status === "draft" && <button onClick={() => setStatus(t.id, "registration_open")} title="Anmeldung öffnen" className="p-2 hover:text-[#00FF88]"><Play className="w-3.5 h-3.5" /></button>}
                     {isAdmin && t.status === "live" && <button onClick={() => setStatus(t.id, "paused")} title="Pause" className="p-2 hover:text-[#FFD700]"><Pause className="w-3.5 h-3.5" /></button>}
                     {isAdmin && <button onClick={() => del(t.id)} className="p-2 hover:text-[#FF3B30]" title="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
@@ -112,7 +185,7 @@ export default function AdminTournamentsPage() {
                 </td>
               </tr>
             ))}
-            {list.length === 0 && <tr><td colSpan="7" className="text-center py-10 text-white/40">Keine Turniere</td></tr>}
+            {filteredList.length === 0 && <tr><td colSpan="7" className="text-center py-10 text-white/40">{list.length === 0 ? "Keine Turniere" : "Keine Turniere fuer diesen Filter"}</td></tr>}
           </tbody>
         </table>
         </div>
