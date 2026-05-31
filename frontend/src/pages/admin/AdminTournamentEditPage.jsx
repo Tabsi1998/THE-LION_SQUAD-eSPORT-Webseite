@@ -10,7 +10,7 @@ import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { formatDateTime, fromDateTimeLocal, normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
-import { Zap, RefreshCw, Eye } from "lucide-react";
+import { Zap, RefreshCw, Eye, Search } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
@@ -123,6 +123,14 @@ function matchSortValue(match) {
   ];
 }
 
+function normalizeSearch(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
 function sortMatchesForPlan(a, b) {
   const av = matchSortValue(a);
   const bv = matchSortValue(b);
@@ -191,6 +199,8 @@ export default function AdminTournamentEditPage() {
   const [matchesV2, setMatchesV2] = useState([]);
   const [stations, setStations] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [participantQuery, setParticipantQuery] = useState("");
+  const [participantStatusFilter, setParticipantStatusFilter] = useState("");
   const [participantForm, setParticipantForm] = useState({
     user_id: "",
     team_id: "",
@@ -605,6 +615,25 @@ export default function AdminTournamentEditPage() {
     ["edit", "Bearbeiten"],
   ];
   const activeTab = availableTabs.some(([key]) => key === tab) ? tab : "participants";
+  const registrationCounts = regs.reduce((acc, registration) => {
+    const key = registration.status || "pending";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const participantSearch = normalizeSearch(participantQuery);
+  const filteredRegistrations = regs.filter((registration) => {
+    if (participantStatusFilter && registration.status !== participantStatusFilter) return false;
+    if (!participantSearch) return true;
+    const haystack = normalizeSearch([
+      registration.display_name,
+      registration.ingame_name,
+      registration.discord,
+      registration.user?.display_name,
+      registration.user?.email,
+      registration.team?.name,
+    ].filter(Boolean).join(" "));
+    return haystack.includes(participantSearch);
+  });
 
   return (
     <AdminLayout>
@@ -696,9 +725,35 @@ export default function AdminTournamentEditPage() {
             onSubmit={addParticipant}
           />
         )}
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem_auto]">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+            <input
+              value={participantQuery}
+              onChange={(event) => setParticipantQuery(event.target.value)}
+              data-testid="admin-reg-search"
+              className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/35 focus:border-[#29B6E8]/60 focus:outline-none"
+              placeholder="Name, Discord, E-Mail oder Team suchen"
+            />
+          </label>
+          <select
+            value={participantStatusFilter}
+            onChange={(event) => setParticipantStatusFilter(event.target.value)}
+            data-testid="admin-reg-status-filter"
+            className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5 text-sm text-white focus:border-[#29B6E8]/60 focus:outline-none"
+          >
+            <option value="">Alle Status ({regs.length})</option>
+            {REGISTRATION_STATUS_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>{label} ({registrationCounts[value] || 0})</option>
+            ))}
+          </select>
+          <div className="flex items-center justify-end rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/55">
+            {filteredRegistrations.length} / {regs.length} sichtbar
+          </div>
+        </div>
         <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <div className="md:hidden divide-y divide-white/5">
-            {regs.map((r, i) => (
+            {filteredRegistrations.map((r, i) => (
               <div key={r.id} className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -729,7 +784,7 @@ export default function AdminTournamentEditPage() {
                 </div>
               </div>
             ))}
-            {regs.length === 0 && <div className="text-center py-10 text-white/40">Keine Anmeldungen</div>}
+            {filteredRegistrations.length === 0 && <div className="text-center py-10 text-white/40">{regs.length === 0 ? "Keine Anmeldungen" : "Keine Anmeldungen fuer diesen Filter"}</div>}
           </div>
           <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
@@ -743,7 +798,7 @@ export default function AdminTournamentEditPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {regs.map((r, i) => (
+              {filteredRegistrations.map((r, i) => (
                 <tr key={r.id}>
                   <td className="px-4 py-3 text-white/50">{i + 1}</td>
                   <td className="px-4 py-3">{r.display_name || r.user?.display_name || r.ingame_name}</td>
@@ -772,7 +827,7 @@ export default function AdminTournamentEditPage() {
                   </td>
                 </tr>
               ))}
-              {regs.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-white/40">Keine Anmeldungen</td></tr>}
+              {filteredRegistrations.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-white/40">{regs.length === 0 ? "Keine Anmeldungen" : "Keine Anmeldungen fuer diesen Filter"}</td></tr>}
             </tbody>
           </table>
           </div>
