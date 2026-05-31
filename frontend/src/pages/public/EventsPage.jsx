@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
+import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { plainTextPreview } from "@/lib/textPreview";
@@ -59,11 +60,15 @@ export default function EventsPage() {
         </div>
 
         {filtered.length === 0 ? (
-          <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
-            <Calendar className="w-10 h-10 mx-auto opacity-40 mb-3" />
-            <div className="font-heading font-bold text-lg">Keine Events</div>
-            <div className="text-sm mt-1">{tab === "upcoming" ? "Aktuell sind keine Events geplant. Schau bald wieder vorbei." : "Keine vergangenen Events in dieser Auswahl."}</div>
-          </div>
+          <PublicEmptyState
+            icon={Calendar}
+            eyebrow="Events"
+            title={tab === "upcoming" ? "Aktuell keine kommenden Events" : "Keine vergangenen Events in dieser Auswahl"}
+            description={tab === "upcoming" ? "Sobald neue Vereinsabende, LANs oder Messe-Termine geplant sind, landen sie hier automatisch." : "Aendere den Event-Typ oder wechsle zur kommenden Ansicht."}
+            primaryAction={tab === "upcoming" ? { to: "/tournaments", label: "Turniere ansehen" } : { label: "Kommende Events", onClick: () => setTab("upcoming") }}
+            secondaryAction={{ to: "/news", label: "News lesen" }}
+            className="mt-10"
+          />
         ) : (
           <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-5 min-w-0">
             {filtered.map((e) => <EventCard key={e.id} e={e} meta={meta} />)}

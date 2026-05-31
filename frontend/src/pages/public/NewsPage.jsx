@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Pin, Newspaper, Crown, Lock } from "lucide-react";
@@ -75,11 +76,15 @@ export default function NewsPage() {
         {loading ? (
           <div className="mt-10 text-white/40 text-sm">Lade …</div>
         ) : list.length === 0 ? (
-          <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
-            <Newspaper className="w-10 h-10 mx-auto opacity-40 mb-3" />
-            <div className="font-heading font-bold text-lg">Keine News</div>
-            <div className="text-sm mt-1">In dieser Kategorie liegen aktuell keine News vor.</div>
-          </div>
+          <PublicEmptyState
+            icon={Newspaper}
+            eyebrow="News"
+            title={activeCat ? "Keine News in dieser Kategorie" : "Noch keine News sichtbar"}
+            description={activeCat ? "Waehle eine andere Kategorie oder komm spaeter wieder, sobald neue Updates veroeffentlicht sind." : "Neue Ankuendigungen, Recaps und Vereinsupdates erscheinen hier automatisch."}
+            primaryAction={activeCat ? { label: "Alle News", onClick: () => setActiveCat("") } : { to: "/events", label: "Events ansehen" }}
+            secondaryAction={{ to: "/tournaments", label: "Turniere" }}
+            className="mt-10"
+          />
         ) : (
           <div className="mt-10 space-y-10">
             {pinned.length > 0 && (

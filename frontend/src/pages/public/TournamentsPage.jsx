@@ -2,13 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentCard } from "@/components/tls/TournamentCard";
+import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { Trophy } from "lucide-react";
 
 export default function TournamentsPage() {
   useDocumentTitle(
     "eSports Turniere",
-    "Aktuelle eSports Turniere von THE LION SQUAD: Anmeldung, Check-in, Brackets, Spielpläne und Ranglisten für Gaming Events in Tirol."
+    "Aktuelle eSports Turniere von THE LION SQUAD: Anmeldung, Check-in, Brackets, Spielplaene und Ranglisten fuer Gaming Events in Tirol."
   );
 
   const [list, setList] = useState([]);
@@ -95,10 +97,15 @@ export default function TournamentsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {list.map((t, i) => <TournamentCard key={t.id} tournament={t} index={i} />)}
             {list.length === 0 && (
-              <div className="col-span-full text-center py-20">
-                <div className="text-white/20 font-display tracking-widest text-sm mb-2">KEINE TURNIERE GEFUNDEN</div>
-                <p className="text-white/40 text-sm">Für diesen Filter gibt es aktuell keine Turniere.</p>
-              </div>
+              <PublicEmptyState
+                icon={Trophy}
+                eyebrow="Turniere"
+                title={statusFilter === "all" ? "Noch keine Turniere sichtbar" : "Keine Turniere in diesem Filter"}
+                description={statusFilter === "all" ? "Sobald neue Cups, Ligen oder Community-Turniere angelegt sind, erscheinen sie hier automatisch." : "Wechsle auf alle Turniere oder schau spaeter wieder rein, wenn sich der Status aendert."}
+                primaryAction={statusFilter === "all" ? { to: "/events", label: "Events ansehen" } : { to: "/tournaments", label: "Alle Turniere" }}
+                secondaryAction={{ to: "/fastlap", label: "Fast Lap" }}
+                className="col-span-full"
+              />
             )}
           </div>
         )}

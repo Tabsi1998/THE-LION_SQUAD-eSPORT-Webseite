@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
@@ -40,7 +41,16 @@ export default function F1ListPage() {
       </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5">
         {list.map((c) => <FastLapCard key={c.id} challenge={c} />)}
-        {list.length === 0 && <div className="text-center py-16 text-white/40 font-display tracking-widest">KEINE CHALLENGES VORHANDEN</div>}
+        {list.length === 0 && (
+          <PublicEmptyState
+            icon={Flag}
+            eyebrow="Fast Lap"
+            title="Noch keine Challenges sichtbar"
+            description="Sobald eine Fast-Lap-Challenge aktiv oder angekuendigt ist, findest du hier Strecken, Leaderboards und Teilnahmeinfos."
+            primaryAction={{ to: "/tournaments", label: "Turniere ansehen" }}
+            secondaryAction={{ to: "/news", label: "News lesen" }}
+          />
+        )}
       </div>
     </PublicLayout>
   );
