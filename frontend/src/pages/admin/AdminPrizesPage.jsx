@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
@@ -28,9 +29,10 @@ function daysUntil(value) {
 }
 
 export default function AdminPrizesPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [allItems, setAllItems] = useState([]);
-  const [filter, setFilter] = useState("");
-  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState(searchParams.get("status") || "");
+  const [query, setQuery] = useState(searchParams.get("q") || "");
   const [loading, setLoading] = useState(true);
   const confirm = useConfirm();
   const prompt = usePrompt();
@@ -45,6 +47,28 @@ export default function AdminPrizesPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["prizes", "tournaments"]);
+
+  useEffect(() => {
+    const nextFilter = searchParams.get("status") || "";
+    const nextQuery = searchParams.get("q") || "";
+    if (nextFilter !== filter) setFilter(nextFilter);
+    if (nextQuery !== query) setQuery(nextQuery);
+  }, [searchParams, filter, query]);
+
+  const updateFilterParams = (patch) => {
+    const nextFilter = Object.prototype.hasOwnProperty.call(patch, "status") ? patch.status : filter;
+    const nextQuery = Object.prototype.hasOwnProperty.call(patch, "q") ? patch.q : query;
+    setFilter(nextFilter);
+    setQuery(nextQuery);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (nextFilter) params.set("status", nextFilter);
+      else params.delete("status");
+      if (nextQuery) params.set("q", nextQuery);
+      else params.delete("q");
+      return params;
+    }, { replace: true });
+  };
 
   const updateStatus = async (id, status, notes = "") => {
     try {
@@ -108,7 +132,7 @@ export default function AdminPrizesPage() {
         {[["pending", "Offen"], ["ready", "Bereit"], ["picked_up", "Abgeholt"], ["expired", "Verfallen"]].map(([k, label]) => {
           const Icn = STATUS_LABEL[k].icon;
           return (
-            <button key={k} onClick={() => setFilter(filter === k ? "" : k)} data-testid={`prize-stat-${k}`}
+            <button key={k} onClick={() => updateFilterParams({ status: filter === k ? "" : k })} data-testid={`prize-stat-${k}`}
               className={`border rounded-sm p-3 text-left transition-all ${filter === k ? STATUS_LABEL[k].color : "border-white/10 bg-[#121212] text-white/70 hover:border-white/20"}`}>
               <Icn className="w-4 h-4 mb-1" />
               <div className="text-2xl font-black">{counts[k] || 0}</div>
@@ -123,7 +147,7 @@ export default function AdminPrizesPage() {
           <Search className="w-4 h-4 text-white/35 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => updateFilterParams({ q: e.target.value })}
             data-testid="prizes-search"
             className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm pl-10 pr-3 py-2.5 text-sm focus:outline-none focus:border-[#29B6E8]"
             placeholder="Suchen nach Turnier, Empfänger oder Preis..."

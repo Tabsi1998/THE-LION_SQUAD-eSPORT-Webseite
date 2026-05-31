@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
@@ -50,9 +50,10 @@ function normalizeSearch(value) {
 
 export default function AdminTournamentsPage() {
   const { isAdmin } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [query, setQuery] = useState(searchParams.get("q") || "");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
   const confirm = useConfirm();
   const load = useCallback(async () => {
     const { data } = await api.get("/tournaments?include_drafts=true");
@@ -60,6 +61,28 @@ export default function AdminTournamentsPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["tournaments"]);
+
+  useEffect(() => {
+    const nextQuery = searchParams.get("q") || "";
+    const nextStatus = searchParams.get("status") || "";
+    if (nextQuery !== query) setQuery(nextQuery);
+    if (nextStatus !== statusFilter) setStatusFilter(nextStatus);
+  }, [searchParams, query, statusFilter]);
+
+  const updateFilterParams = (patch) => {
+    const nextQuery = Object.prototype.hasOwnProperty.call(patch, "q") ? patch.q : query;
+    const nextStatus = Object.prototype.hasOwnProperty.call(patch, "status") ? patch.status : statusFilter;
+    setQuery(nextQuery);
+    setStatusFilter(nextStatus);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (nextQuery) params.set("q", nextQuery);
+      else params.delete("q");
+      if (nextStatus) params.set("status", nextStatus);
+      else params.delete("status");
+      return params;
+    }, { replace: true });
+  };
 
   const setStatus = async (id, status) => {
     try {
@@ -124,9 +147,9 @@ export default function AdminTournamentsPage() {
       <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem_auto]">
         <label className="relative block">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            <input
+              value={query}
+            onChange={(event) => updateFilterParams({ q: event.target.value })}
             data-testid="admin-tournament-search"
             className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/35 focus:border-[#29B6E8]/60 focus:outline-none"
             placeholder="Turnier, Spiel, Slug oder Plattform suchen"
@@ -134,7 +157,7 @@ export default function AdminTournamentsPage() {
         </label>
         <select
           value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value)}
+          onChange={(event) => updateFilterParams({ status: event.target.value })}
           data-testid="admin-tournament-status-filter"
           className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5 text-sm text-white focus:border-[#29B6E8]/60 focus:outline-none"
         >
