@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
@@ -24,9 +24,10 @@ const VIS_ICON = { members: Crown, internal: Lock, community: null, public: null
 
 export default function NewsPage() {
   useDocumentTitle("News", "Aktuelle News, Ergebnisse, Ankündigungen, Events und Turnier-Updates von THE LION SQUAD eSports aus Tirol.");
+  const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ categories: [], visibilities: [] });
-  const [activeCat, setActiveCat] = useState("");
+  const [activeCat, setActiveCat] = useState(searchParams.get("category") || "");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,6 +46,21 @@ export default function NewsPage() {
 
   useApiInvalidation(load, ["news"]);
 
+  useEffect(() => {
+    const nextCategory = searchParams.get("category") || "";
+    if (nextCategory !== activeCat) setActiveCat(nextCategory);
+  }, [searchParams, activeCat]);
+
+  const selectCategory = (category) => {
+    setActiveCat(category);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (category) params.set("category", category);
+      else params.delete("category");
+      return params;
+    }, { replace: true });
+  };
+
   const pinned = list.filter((n) => n.pinned);
   const rest = list.filter((n) => !n.pinned);
 
@@ -59,14 +75,14 @@ export default function NewsPage() {
 
         <div className="mt-8 flex flex-wrap gap-2">
           <button
-            onClick={() => setActiveCat("")}
+            onClick={() => selectCategory("")}
             data-testid="news-filter-all"
             className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${!activeCat ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
           >Alle</button>
           {meta.categories.map((c) => (
             <button
               key={c.k}
-              onClick={() => setActiveCat(c.k)}
+              onClick={() => selectCategory(c.k)}
               data-testid={`news-filter-${c.k}`}
               className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${activeCat === c.k ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
             >{c.l}</button>
@@ -81,7 +97,7 @@ export default function NewsPage() {
             eyebrow="News"
             title={activeCat ? "Keine News in dieser Kategorie" : "Noch keine News sichtbar"}
             description={activeCat ? "Waehle eine andere Kategorie oder komm spaeter wieder, sobald neue Updates veroeffentlicht sind." : "Neue Ankuendigungen, Recaps und Vereinsupdates erscheinen hier automatisch."}
-            primaryAction={activeCat ? { label: "Alle News", onClick: () => setActiveCat("") } : { to: "/events", label: "Events ansehen" }}
+            primaryAction={activeCat ? { label: "Alle News", onClick: () => selectCategory("") } : { to: "/events", label: "Events ansehen" }}
             secondaryAction={{ to: "/tournaments", label: "Turniere" }}
             className="mt-10"
           />

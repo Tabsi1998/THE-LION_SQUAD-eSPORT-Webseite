@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
@@ -13,10 +13,11 @@ const VIS_ICON = { members: Crown, internal: Lock };
 
 export default function EventsPage() {
   useDocumentTitle("Events", "Gaming Events, Vereinsabende, LAN-Partys, Messen und öffentliche Termine von THE LION SQUAD eSports in Tirol.");
+  const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ types: [], statuses: [] });
-  const [typeFilter, setTypeFilter] = useState("");
-  const [tab, setTab] = useState("upcoming"); // upcoming | past
+  const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "");
+  const [tab, setTab] = useState(searchParams.get("view") === "past" ? "past" : "upcoming"); // upcoming | past
 
   useEffect(() => { api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, []);
 
@@ -30,6 +31,28 @@ export default function EventsPage() {
   }, [load]);
 
   useApiInvalidation(load, ["events"]);
+
+  useEffect(() => {
+    const nextTab = searchParams.get("view") === "past" ? "past" : "upcoming";
+    const nextType = searchParams.get("type") || "";
+    if (nextTab !== tab) setTab(nextTab);
+    if (nextType !== typeFilter) setTypeFilter(nextType);
+  }, [searchParams, tab, typeFilter]);
+
+  const updateEventFilters = (patch) => {
+    const nextTab = Object.prototype.hasOwnProperty.call(patch, "view") ? patch.view : tab;
+    const nextType = Object.prototype.hasOwnProperty.call(patch, "type") ? patch.type : typeFilter;
+    setTab(nextTab);
+    setTypeFilter(nextType);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (nextTab === "past") params.set("view", "past");
+      else params.delete("view");
+      if (nextType) params.set("type", nextType);
+      else params.delete("type");
+      return params;
+    }, { replace: true });
+  };
 
   const filtered = list.filter((e) => {
     if (typeFilter && e.event_type !== typeFilter) return false;
@@ -50,10 +73,10 @@ export default function EventsPage() {
 
         <div className="mt-8 flex flex-col md:flex-row gap-3 md:items-center md:justify-between min-w-0">
           <div className="flex flex-wrap gap-2 min-w-0">
-            <button onClick={() => setTab("upcoming")} data-testid="events-tab-upcoming" className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${tab === "upcoming" ? "bg-[#9F7AEA] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}>Kommend</button>
-            <button onClick={() => setTab("past")} data-testid="events-tab-past" className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${tab === "past" ? "bg-white/15 text-white" : "border border-white/10 text-white/60 hover:text-white"}`}>Vergangen</button>
+            <button onClick={() => updateEventFilters({ view: "upcoming" })} data-testid="events-tab-upcoming" className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${tab === "upcoming" ? "bg-[#9F7AEA] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}>Kommend</button>
+            <button onClick={() => updateEventFilters({ view: "past" })} data-testid="events-tab-past" className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${tab === "past" ? "bg-white/15 text-white" : "border border-white/10 text-white/60 hover:text-white"}`}>Vergangen</button>
           </div>
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} data-testid="events-type-filter" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm max-w-full">
+          <select value={typeFilter} onChange={(e) => updateEventFilters({ type: e.target.value })} data-testid="events-type-filter" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm max-w-full">
             <option value="">Alle Typen</option>
             {filterTypes.map((t) => <option key={t.k} value={t.k}>{t.l}</option>)}
           </select>
@@ -65,7 +88,7 @@ export default function EventsPage() {
             eyebrow="Events"
             title={tab === "upcoming" ? "Aktuell keine kommenden Events" : "Keine vergangenen Events in dieser Auswahl"}
             description={tab === "upcoming" ? "Sobald neue Vereinsabende, LANs oder Messe-Termine geplant sind, landen sie hier automatisch." : "Aendere den Event-Typ oder wechsle zur kommenden Ansicht."}
-            primaryAction={tab === "upcoming" ? { to: "/tournaments", label: "Turniere ansehen" } : { label: "Kommende Events", onClick: () => setTab("upcoming") }}
+            primaryAction={tab === "upcoming" ? { to: "/tournaments", label: "Turniere ansehen" } : { label: "Kommende Events", onClick: () => updateEventFilters({ view: "upcoming" }) }}
             secondaryAction={{ to: "/news", label: "News lesen" }}
             className="mt-10"
           />

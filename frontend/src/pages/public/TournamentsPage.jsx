@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentCard } from "@/components/tls/TournamentCard";
@@ -13,10 +14,11 @@ export default function TournamentsPage() {
     "Aktuelle eSports Turniere von THE LION SQUAD: Anmeldung, Check-in, Brackets, Spielplaene und Ranglisten fuer Gaming Events in Tirol."
   );
 
+  const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
 
   const load = useCallback(async () => {
     try {
@@ -40,6 +42,21 @@ export default function TournamentsPage() {
 
   useApiInvalidation(load, ["tournaments"]);
 
+  useEffect(() => {
+    const nextStatus = searchParams.get("status") || "all";
+    if (nextStatus !== statusFilter) setStatusFilter(nextStatus);
+  }, [searchParams, statusFilter]);
+
+  const selectStatusFilter = (value) => {
+    setStatusFilter(value);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (value && value !== "all") params.set("status", value);
+      else params.delete("status");
+      return params;
+    }, { replace: true });
+  };
+
   const filters = [
     { v: "all", label: "Alle" },
     { v: "registration_open", label: "Anmeldung" },
@@ -61,7 +78,7 @@ export default function TournamentsPage() {
             <button
               key={f.v}
               data-testid={`tournament-filter-${f.v}`}
-              onClick={() => setStatusFilter(f.v)}
+              onClick={() => selectStatusFilter(f.v)}
               className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm border transition ${
                 statusFilter === f.v
                   ? "bg-[#29B6E8] text-black border-[#29B6E8]"
