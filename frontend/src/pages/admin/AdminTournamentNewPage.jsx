@@ -10,6 +10,7 @@ import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
 import { toast } from "sonner";
+import { AlertTriangle } from "lucide-react";
 
 const CREATE_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -27,6 +28,36 @@ const PRIZE_GROUP_OPTIONS = [
   ["special", "Sonderpreis"],
 ];
 const BRONZE_FORMATS = new Set(["single_elim"]);
+
+function dateFromInput(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function buildPlanningWarnings(form, isTeam) {
+  const warnings = [];
+  const minParticipants = Number(form.min_participants || 0);
+  const maxParticipants = Number(form.max_participants || 0);
+  const start = dateFromInput(form.start_date);
+  const end = dateFromInput(form.end_date);
+  const registrationFrom = dateFromInput(form.registration_open_from);
+  const registrationUntil = dateFromInput(form.registration_open_until);
+  const checkinFrom = dateFromInput(form.check_in_from);
+  const checkinUntil = dateFromInput(form.check_in_until);
+
+  if (minParticipants && maxParticipants && minParticipants > maxParticipants) {
+    warnings.push(`${isTeam ? "Min Teams" : "Min Spieler"} ist groesser als ${isTeam ? "Max Teams" : "Max Spieler"}.`);
+  }
+  if (start && end && end < start) warnings.push("Das Ende liegt vor dem Start.");
+  if (registrationFrom && registrationUntil && registrationUntil < registrationFrom) warnings.push("Die Anmeldung endet vor ihrer Oeffnung.");
+  if (checkinFrom && checkinUntil && checkinUntil < checkinFrom) warnings.push("Der Check-in endet vor seiner Oeffnung.");
+  if (registrationUntil && start && registrationUntil > start) warnings.push("Die Anmeldung endet nach dem Turnierstart.");
+  if (checkinUntil && start && checkinUntil > start) warnings.push("Der Check-in endet nach dem Turnierstart.");
+  if (form.status === "scheduled" && !form.start_date) warnings.push("Angekuendigte Turniere sollten eine Startzeit haben.");
+  if (form.twitch_enabled && !String(form.twitch_channel || "").trim()) warnings.push("Twitch ist aktiv, aber kein Kanal ist eingetragen.");
+  return warnings;
+}
 
 export default function AdminTournamentNewPage() {
   const nav = useNavigate();
@@ -58,6 +89,7 @@ export default function AdminTournamentNewPage() {
   });
   const [saving, setSaving] = useState(false);
   const isTeam = form.team_mode === "team";
+  const planningWarnings = buildPlanningWarnings(form, isTeam);
 
   const loadSources = useCallback(() => {
     api.get("/games").then(({ data }) => setGames(data));
@@ -270,6 +302,17 @@ export default function AdminTournamentNewPage() {
             <Field label="Discord-Einladung" value={form.discord_link} onChange={(v) => set("discord_link", v)} testId="new-tr-discord" placeholder="https://discord.com/invite/…" />
           </Row>
         </Details>
+        {planningWarnings.length > 0 && (
+          <div className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 p-4 text-sm text-[#FFD700]" data-testid="new-tr-planning-warnings">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+              <div className="space-y-1">
+                <div className="text-[11px] font-bold uppercase tracking-widest">Planung pruefen</div>
+                {planningWarnings.map((warning) => <div key={warning}>{warning}</div>)}
+              </div>
+            </div>
+          </div>
+        )}
         <button disabled={saving} data-testid="new-tr-submit" className="px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50">
           {saving ? "Erstelle …" : "Turnier erstellen"}
         </button>
