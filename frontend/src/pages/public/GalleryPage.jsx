@@ -61,7 +61,7 @@ export default function GalleryPage() {
 function AlbumCard({ a }) {
   return (
     <Link
-      to={`/gallery/${a.slug}`}
+      to={`/galerie/${a.slug}`}
       data-testid={`album-card-${a.slug}`}
       className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] overflow-hidden block transition"
     >

@@ -39,7 +39,7 @@ export default function GalleryAlbumPage() {
     <PublicLayout>
       <div className="max-w-2xl mx-auto px-6 py-20 text-center">
         <h1 className="font-heading text-3xl font-black">{error}</h1>
-        <Link to="/gallery" className="mt-6 inline-flex items-center gap-2 text-[#29B6E8]"><ArrowLeft className="w-4 h-4" /> Zurück</Link>
+        <Link to="/galerie" className="mt-6 inline-flex items-center gap-2 text-[#29B6E8]"><ArrowLeft className="w-4 h-4" /> Zurück</Link>
       </div>
     </PublicLayout>
   );
@@ -50,7 +50,7 @@ export default function GalleryAlbumPage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link to="/gallery" data-testid="album-back" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
+        <Link to="/galerie" data-testid="album-back" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
           <ArrowLeft className="w-3.5 h-3.5" /> Alle Alben
         </Link>
         <h1 className="mt-6 font-heading text-3xl md:text-5xl font-black uppercase">{a.title}</h1>

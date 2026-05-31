@@ -181,7 +181,7 @@ export default function EventDetailPage() {
             <h2 className="font-heading text-2xl font-black uppercase mb-5 inline-flex items-center gap-2"><ImageIcon className="w-5 h-5 text-[#29B6E8]" /> Galerie</h2>
             <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
               {e.albums.map((a) => (
-                <Link key={a.id} to={`/gallery/${a.slug}`} className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] overflow-hidden">
+                <Link key={a.id} to={`/galerie/${a.slug}`} className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] overflow-hidden">
                   <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
                     {a.cover_url ? <img src={resolveMediaUrl(a.cover_url)} alt={a.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-8 h-8 text-white/15" /></div>}
                   </div>
