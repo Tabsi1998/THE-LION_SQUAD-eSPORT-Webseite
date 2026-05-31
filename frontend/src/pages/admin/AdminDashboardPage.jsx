@@ -69,7 +69,7 @@ export default function AdminDashboardPage() {
     {
       label: "Systemstatus",
       detail: "Mail-Queue, Uploads, Scheduler und Integrationen",
-      to: "/admin/settings",
+      to: "/admin/settings?tab=system",
       icon: Activity,
       tone: "#29B6E8",
     },

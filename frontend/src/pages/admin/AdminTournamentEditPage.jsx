@@ -596,6 +596,15 @@ export default function AdminTournamentEditPage() {
   if (!t) return <AdminLayout><div className="p-10 text-white/40">Lade…</div></AdminLayout>;
   const hasFlexibleStructure = stages.length > 0 || matchesV2.length > 0;
   const canRecordResults = ["live", "paused"].includes(t.status);
+  const availableTabs = [
+    ["participants", "Teilnehmer"],
+    ["bracket", "Turnierbaum"],
+    ["stages", "Matchplan"],
+    ...(t.format === "groups" ? [["groups", "Gruppen"]] : []),
+    ...(isAdmin ? [["staff", "Team"]] : []),
+    ["edit", "Bearbeiten"],
+  ];
+  const activeTab = availableTabs.some(([key]) => key === tab) ? tab : "participants";
 
   return (
     <AdminLayout>
@@ -662,19 +671,19 @@ export default function AdminTournamentEditPage() {
       {isAdmin && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister /></div>}
 
       <div className="flex gap-2 mb-5 border-b border-white/10 overflow-x-auto">
-        {["participants", "bracket", "stages", ...(t.format === "groups" ? ["groups"] : []), ...(isAdmin ? ["staff"] : []), "edit"].map((s) => (
+        {availableTabs.map(([s, label]) => (
           <button
             key={s}
             data-testid={`admin-tr-tab-${s}`}
             onClick={() => selectTab(s)}
-            className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${tab === s ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}
+            className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${activeTab === s ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}
           >
-            {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Turnierbaum" : s === "stages" ? "Matchplan" : s === "groups" ? "Gruppen" : s === "staff" ? "Team" : "Bearbeiten"}
+            {label}
           </button>
         ))}
       </div>
 
-      {tab === "participants" && (
+      {activeTab === "participants" && (
         <div className="space-y-4">
         {isModerator && (
           <ParticipantAddForm
@@ -771,7 +780,7 @@ export default function AdminTournamentEditPage() {
         </div>
       )}
 
-      {tab === "bracket" && bracket && (
+      {activeTab === "bracket" && bracket && (
         <div className="bg-[#0A0A0A] rounded-sm p-4 border border-white/10">
           {(bracket.matches?.length || 0) + (bracket.matches_v2?.length || 0) === 0 ? (
             <div className="text-center py-16 text-white/40 font-display tracking-widest">TURNIERBAUM NICHT GENERIERT</div>
@@ -781,7 +790,7 @@ export default function AdminTournamentEditPage() {
         </div>
       )}
 
-      {tab === "stages" && !hasFlexibleStructure && bracket?.matches && (
+      {activeTab === "stages" && !hasFlexibleStructure && bracket?.matches && (
         <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <div className="lg:hidden divide-y divide-white/5">
             {bracket.matches.map((m) => {
@@ -858,7 +867,7 @@ export default function AdminTournamentEditPage() {
           </div>
         </div>
       )}
-      {tab === "stages" && hasFlexibleStructure && (
+      {activeTab === "stages" && hasFlexibleStructure && (
         <TournamentStagesPanel
           tournamentId={t.id}
           stages={stages}
@@ -874,7 +883,7 @@ export default function AdminTournamentEditPage() {
           canRecordResults={canRecordResults}
         />
       )}
-      {tab === "edit" && (
+      {activeTab === "edit" && (
         <TournamentEditForm
           key={t.updated_at || t.id}
           tournament={t}
@@ -883,10 +892,10 @@ export default function AdminTournamentEditPage() {
           onRebuildFromFormat={rebuildFromFormat}
         />
       )}
-      {tab === "staff" && isAdmin && (
+      {activeTab === "staff" && isAdmin && (
         <TournamentStaffPanel tournamentId={t.id} staff={staff} users={users} onChanged={load} />
       )}
-      {tab === "groups" && (
+      {activeTab === "groups" && (
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {groups.map((g) => (
             <div key={g.id} className="border border-white/10 rounded-sm bg-[#121212] p-4">

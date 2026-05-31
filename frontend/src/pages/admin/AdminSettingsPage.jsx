@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { setCachedBranding } from "@/lib/brandingEvents";
 import { isGoogleMeasurementId, normalizeAnalyticsPayload } from "@/lib/analyticsConfig";
@@ -42,6 +43,22 @@ const STATUS_LABELS = {
   failed: "fehlgeschlagen",
   skipped: "übersprungen",
 };
+
+const SETTINGS_TABS = [
+  ["email", "Resend", Mail],
+  ["smtp", "SMTP", Server],
+  ["newsletter", "Newsletter", Mail],
+  ["queue", "Mail-Queue", Inbox],
+  ["discord", "Discord", MessageSquare],
+  ["twitch", "Twitch", Radio],
+  ["brand", "Branding", Palette],
+  ["socials", "Socials", Share2],
+  ["seo", "SEO & Analytics", Search],
+  ["legal", "Rechtliches", FileText],
+  ["system", "Status", Activity],
+  ["logs", "Versandlogs", Send],
+];
+const SETTINGS_TAB_KEYS = new Set(SETTINGS_TABS.map(([key]) => key));
 
 const BANNER_TEMPLATE_PRESETS = {
   custom: { title: "Eigener Hinweis", text: "", tone: "info", style: "neon", link_label: "Mehr", scope: "all" },
@@ -167,7 +184,9 @@ function mailTemplateLabel(job) {
 }
 
 export default function AdminSettingsPage() {
-  const [tab, setTab] = useState("email");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = SETTINGS_TAB_KEYS.has(searchParams.get("tab")) ? searchParams.get("tab") : "email";
+  const [tab, setTab] = useState(initialTab);
   const [email, setEmail] = useState({ resend_api_key: "", sender_name: "", sender_email: "", reply_to_email: "", enabled: true, resend_api_key_masked: "" });
   const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_auth: "login", smtp_security: "auto", smtp_tls_verify: false, smtp_envelope_from: "", smtp_helo_name: "", sender_name: "", sender_email: "", reply_to_email: "", message_id_domain: "", enabled: true, smtp_pass_masked: "" });
   const [smtpTestEmail, setSmtpTestEmail] = useState("");
@@ -230,6 +249,21 @@ export default function AdminSettingsPage() {
   const loadSeqRef = useRef(0);
   const loadErrorKeyRef = useRef("");
   const confirm = useConfirm();
+
+  useEffect(() => {
+    const nextTab = searchParams.get("tab");
+    if (SETTINGS_TAB_KEYS.has(nextTab) && nextTab !== tab) setTab(nextTab);
+  }, [searchParams, tab]);
+
+  const selectTab = (nextTab) => {
+    setTab(nextTab);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (nextTab === "email") params.delete("tab");
+      else params.set("tab", nextTab);
+      return params;
+    }, { replace: true });
+  };
 
   const load = useCallback(async () => {
     const seq = ++loadSeqRef.current;
@@ -729,8 +763,8 @@ export default function AdminSettingsPage() {
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Einstellungen</h1>
 
       <div className="flex gap-1 mb-6 border-b border-white/10 overflow-x-auto">
-        {[["email", "Resend", Mail], ["smtp", "SMTP", Server], ["newsletter", "Newsletter", Mail], ["queue", "Mail-Queue", Inbox], ["discord", "Discord", MessageSquare], ["twitch", "Twitch", Radio], ["brand", "Branding", Palette], ["socials", "Socials", Share2], ["seo", "SEO & Analytics", Search], ["legal", "Rechtliches", FileText], ["system", "Status", Activity], ["logs", "Versandlogs", Send]].map(([k, l, Icn]) => (
-          <button key={k} onClick={() => setTab(k)} data-testid={`settings-tab-${k}`}
+        {SETTINGS_TABS.map(([k, l, Icn]) => (
+          <button key={k} onClick={() => selectTab(k)} data-testid={`settings-tab-${k}`}
             className={`px-4 py-3 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap ${tab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
             <Icn className="w-3.5 h-3.5" />{l}
           </button>
