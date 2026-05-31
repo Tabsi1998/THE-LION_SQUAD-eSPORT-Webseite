@@ -90,8 +90,8 @@ const AdminCmsPage = lazy(() => import("@/pages/admin/AdminCmsPage"));
 const AdminMediaPage = lazy(() => import("@/pages/admin/AdminMediaPage"));
 const AdminNavPage = lazy(() => import("@/pages/admin/AdminNavPage"));
 import MembershipApplyPage from "@/pages/public/MembershipApplyPage";
-import AdminSponsorsPage from "@/pages/admin/AdminSponsorsPage";
-import AdminPartnersPage from "@/pages/admin/AdminPartnersPage";
+const AdminSponsorsPage = lazy(() => import("@/pages/admin/AdminSponsorsPage"));
+const AdminPartnersPage = lazy(() => import("@/pages/admin/AdminPartnersPage"));
 
 import AboutPage from "@/pages/public/AboutPage";
 import ContactPage from "@/pages/public/ContactPage";

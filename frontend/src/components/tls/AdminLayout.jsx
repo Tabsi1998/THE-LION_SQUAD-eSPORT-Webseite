@@ -8,8 +8,9 @@ import {
   ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon,
   Award, Inbox, UserCheck, Medal,
   FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing,
+  Search, Server,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 // Sidebar-Gruppen für bessere Übersicht
 const ADMIN_GROUPS = [
@@ -39,7 +40,7 @@ const ADMIN_GROUPS = [
       { to: "/admin/seasons", label: "Saisons / Circuit", icon: Trophy },
       { to: "/admin/games", label: "Spiele", icon: Gamepad2 },
       { to: "/admin/stations", label: "Stationen", icon: Building2 },
-      { to: "/admin/game-servers", label: "Game-Server", icon: Building2 },
+      { to: "/admin/game-servers", label: "Game-Server", icon: Server },
       { to: "/admin/prizes", label: "Gewinne", icon: Award },
       { to: "/admin/penalties", label: "Strafen", icon: AlertTriangle },
     ],
@@ -77,9 +78,63 @@ const ADMIN_GROUPS = [
   },
 ];
 
+const ADMIN_SEARCH_TERMS = {
+  "/admin": ["home", "start", "control"],
+  "/admin/members": ["verein", "mitgliedschaft", "beitrag"],
+  "/admin/member-profiles": ["profile", "spielerprofile", "vereinsspieler"],
+  "/admin/membership-applications": ["antraege", "beitritt", "join"],
+  "/admin/benefits": ["vorteile", "rabatte"],
+  "/admin/documents": ["dateien", "downloads"],
+  "/admin/users": ["accounts", "rollen", "user"],
+  "/admin/board": ["vorstand", "rollen"],
+  "/admin/tournaments": ["bracket", "turnierbaum", "matches"],
+  "/admin/f1": ["fastlap", "racing", "challenge"],
+  "/admin/seasons": ["wertung", "jahreswertung", "circuit"],
+  "/admin/games": ["spiele", "games"],
+  "/admin/stations": ["geraete", "setup", "event"],
+  "/admin/game-servers": ["server", "communityserver"],
+  "/admin/prizes": ["preise", "gewinn"],
+  "/admin/penalties": ["strafen", "fairplay"],
+  "/admin/events": ["termine", "lan", "veranstaltungen"],
+  "/admin/news": ["beitraege", "ankuendigungen"],
+  "/admin/gallery": ["bilder", "fotos", "alben"],
+  "/admin/media": ["uploads", "dateien", "bilder"],
+  "/admin/cms": ["seiten", "texte", "email"],
+  "/admin/nav": ["menue", "navigation"],
+  "/admin/achievements": ["badges", "punkte", "level"],
+  "/admin/sponsors": ["unterstuetzer", "partner"],
+  "/admin/partners": ["kooperationen", "netzwerk"],
+  "/admin/references": ["erfolge", "platzierungen", "results"],
+  "/admin/contact": ["kontakt", "inbox", "nachrichten"],
+  "/admin/widgets": ["embed", "anzeigen"],
+  "/admin/audit": ["logs", "aktionen", "sicherheit"],
+  "/admin/mobile-logs": ["app", "fehler", "client"],
+  "/admin/mobile-push": ["push", "notifications", "app"],
+  "/admin/settings": ["einstellungen", "system", "smtp", "branding"],
+};
+
+function normalizeSearch(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[-_/]/g, " ")
+    .trim();
+}
+
+function itemMatchesQuery(item, groupLabel, query) {
+  if (!query) return true;
+  const haystack = normalizeSearch([
+    groupLabel,
+    item.label,
+    item.to,
+    ...(ADMIN_SEARCH_TERMS[item.to] || []),
+  ].join(" "));
+  return haystack.includes(query);
+}
+
 // Moderatoren sehen nur diese Routen
 const MODERATOR_ROUTES = [
-  "/admin",
   "/admin/tournaments",
   "/admin/f1",
   "/admin/stations",
@@ -89,15 +144,22 @@ export function AdminLayout({ children }) {
   const { user, logout, isAdmin } = useAuth();
   const nav = useNavigate();
   const [openMobile, setOpenMobile] = useState(false);
+  const [navQuery, setNavQuery] = useState("");
 
-  const isModerator = !isAdmin && ["moderator"].includes(user?.role);
+  const searchQuery = normalizeSearch(navQuery);
 
-  const visibleGroups = isAdmin
-    ? ADMIN_GROUPS
-    : ADMIN_GROUPS.map((group) => ({
-        ...group,
-        items: group.items.filter((it) => MODERATOR_ROUTES.includes(it.to)),
-      })).filter((group) => group.items.length > 0);
+  const visibleGroups = useMemo(() => {
+    const roleGroups = isAdmin
+      ? ADMIN_GROUPS
+      : ADMIN_GROUPS.map((group) => ({
+          ...group,
+          items: group.items.filter((it) => MODERATOR_ROUTES.includes(it.to)),
+        })).filter((group) => group.items.length > 0);
+    return roleGroups.map((group) => ({
+      ...group,
+      items: group.items.filter((item) => itemMatchesQuery(item, group.label, searchQuery)),
+    })).filter((group) => group.items.length > 0);
+  }, [isAdmin, searchQuery]);
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex">
@@ -108,6 +170,29 @@ export function AdminLayout({ children }) {
           <button className="md:hidden p-1" onClick={() => setOpenMobile(false)}>
             <X className="w-4 h-4" />
           </button>
+        </div>
+
+        <div className="p-3 border-b border-white/10">
+          <label className="relative block">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/35" />
+            <input
+              value={navQuery}
+              onChange={(e) => setNavQuery(e.target.value)}
+              placeholder="Admin suchen..."
+              className="w-full h-10 rounded-sm border border-white/10 bg-black/30 pl-9 pr-9 text-sm text-white placeholder:text-white/30 outline-none focus:border-[#29B6E8]/70"
+              data-testid="admin-nav-search"
+            />
+            {navQuery && (
+              <button
+                type="button"
+                onClick={() => setNavQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-white/35 hover:text-white"
+                aria-label="Suche leeren"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </label>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3 admin-scroll">
@@ -139,6 +224,11 @@ export function AdminLayout({ children }) {
               </div>
             </div>
           ))}
+          {visibleGroups.length === 0 && (
+            <div className="px-3 py-8 text-center text-xs text-white/40">
+              Keine Admin-Seite gefunden.
+            </div>
+          )}
         </nav>
 
         <div className="shrink-0 p-3 border-t border-white/10 space-y-2 bg-[#0A0A0A]">
