@@ -87,7 +87,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/documents": ["dateien", "downloads"],
   "/admin/users": ["accounts", "rollen", "user"],
   "/admin/board": ["vorstand", "rollen"],
-  "/admin/tournaments": ["bracket", "turnierbaum", "matches"],
+  "/admin/tournaments": ["bracket", "turnierbaum", "matches", "anmeldungen", "registrierungen"],
   "/admin/f1": ["fastlap", "racing", "challenge"],
   "/admin/seasons": ["wertung", "jahreswertung", "circuit"],
   "/admin/games": ["spiele", "games"],
@@ -110,7 +110,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/audit": ["logs", "aktionen", "sicherheit"],
   "/admin/mobile-logs": ["app", "fehler", "client"],
   "/admin/mobile-push": ["push", "notifications", "app"],
-  "/admin/settings": ["einstellungen", "system", "smtp", "branding"],
+  "/admin/settings": ["einstellungen", "system", "smtp", "branding", "resend", "mail", "queue", "discord", "twitch", "socials", "seo", "analytics", "indexnow", "recht", "legal"],
 };
 
 function normalizeSearch(value) {

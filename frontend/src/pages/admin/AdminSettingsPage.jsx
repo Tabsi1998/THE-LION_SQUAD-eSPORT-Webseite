@@ -179,6 +179,10 @@ function discordPayload(source) {
   return payload;
 }
 
+function hasOriginalSnapshot(ref) {
+  return Object.keys(ref.current || {}).length > 0;
+}
+
 function mailTemplateLabel(job) {
   return MAIL_TEMPLATE_LABELS[job?.template_key] || job?.template_key || "Mail";
 }
@@ -756,6 +760,20 @@ export default function AdminSettingsPage() {
   const queueCounts = queueStats?.counts || {};
   const newsletterOptions = newsletter.kind === "event" ? newsletterSources.events : newsletterSources.news;
   const selectedNewsletterSource = newsletterOptions.find((item) => item.id === newsletter.id || item.slug === newsletter.id);
+  const emailDirty = hasOriginalSnapshot(originalEmailRef) && hasPayloadChanges(buildDirtyPayload(emailPayload(email), originalEmailRef.current));
+  const smtpDirty = hasOriginalSnapshot(originalSmtpRef) && hasPayloadChanges(buildDirtyPayload(smtpPayload(smtp), originalSmtpRef.current));
+  const brandDirty = hasOriginalSnapshot(originalBrandRef) && hasPayloadChanges(buildDirtyPayload(brandPayload(brand), originalBrandRef.current));
+  const discordDirty = hasOriginalSnapshot(originalDiscordRef) && hasPayloadChanges(buildDirtyPayload(discordPayload(discord), originalDiscordRef.current));
+  const dirtyTabs = new Set([
+    emailDirty && "email",
+    smtpDirty && "smtp",
+    discordDirty && "discord",
+    brandDirty && "twitch",
+    brandDirty && "brand",
+    brandDirty && "socials",
+    brandDirty && "seo",
+    brandDirty && "legal",
+  ].filter(Boolean));
 
   return (
     <AdminLayout>
@@ -763,12 +781,16 @@ export default function AdminSettingsPage() {
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Einstellungen</h1>
 
       <div className="flex gap-1 mb-6 border-b border-white/10 overflow-x-auto">
-        {SETTINGS_TABS.map(([k, l, Icn]) => (
-          <button key={k} onClick={() => selectTab(k)} data-testid={`settings-tab-${k}`}
-            className={`px-4 py-3 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap ${tab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
-            <Icn className="w-3.5 h-3.5" />{l}
-          </button>
-        ))}
+        {SETTINGS_TABS.map(([k, l, Icn]) => {
+          const isDirty = dirtyTabs.has(k);
+          return (
+            <button key={k} onClick={() => selectTab(k)} data-testid={`settings-tab-${k}`}
+              className={`px-4 py-3 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap ${tab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
+              <Icn className="w-3.5 h-3.5" />{l}
+              {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-[#FFD700] shadow-[0_0_8px_rgba(255,215,0,0.8)]" title="Ungespeicherte Aenderungen" />}
+            </button>
+          );
+        })}
       </div>
 
       {tab === "email" && (
