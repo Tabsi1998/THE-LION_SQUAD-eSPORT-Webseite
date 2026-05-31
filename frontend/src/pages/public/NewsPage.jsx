@@ -22,7 +22,7 @@ const CATEGORY_COLORS = {
 const VIS_ICON = { members: Crown, internal: Lock, community: null, public: null };
 
 export default function NewsPage() {
-  useDocumentTitle("News", "Neueste News, Ankündigungen, Events und Turnier-Updates von THE LION SQUAD eSports.");
+  useDocumentTitle("News", "Aktuelle News, Ergebnisse, Ankündigungen, Events und Turnier-Updates von THE LION SQUAD eSports aus Tirol.");
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ categories: [], visibilities: [] });
   const [activeCat, setActiveCat] = useState("");

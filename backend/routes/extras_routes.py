@@ -533,7 +533,7 @@ async def public_settings(response: Response):
         "club_name": b.get("club_name", "THE LION SQUAD"),
         "tagline": tagline,
         "site_title": b.get("site_title") or "THE LION SQUAD - eSPORTS",
-        "site_description": b.get("site_description") or "THE LION SQUAD - eSPORTS: Turniere, Fast Lap Challenges, News, Events und Mitgliederbereich.",
+        "site_description": b.get("site_description") or "Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.",
         "primary_color": b.get("primary_color", "#29B6E8"),
         "logo_url": b.get("logo_url"),
         "mascot_url": b.get("mascot_url"),

@@ -91,7 +91,7 @@ function applyBranding(data) {
 
   const name = data.club_name || "THE LION SQUAD";
   const siteTitle = data.site_title || DEFAULT_TITLE;
-  const description = data.site_description || "THE LION SQUAD - eSPORTS";
+  const description = data.site_description || "Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
   const themeColor = data.primary_color || "#29B6E8";
   const image = resolveMediaUrl(data.logo_url || data.mascot_url || DEFAULT_SHARE_IMAGE);
   const favicon = pickFavicon(data);

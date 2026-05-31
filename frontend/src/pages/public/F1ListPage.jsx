@@ -3,11 +3,17 @@ import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { Flag, Users, Clock, ChevronRight } from "lucide-react";
 import { formatDate, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 
 export default function F1ListPage() {
+  useDocumentTitle(
+    "F1 Fast Lap Challenges",
+    "F1 und Racing Fast-Lap-Challenges von THE LION SQUAD mit Live-Leaderboards, Strecken, Zeiten und Championship-Wertung."
+  );
+
   const [list, setList] = useState([]);
 
   const load = useCallback(async () => {

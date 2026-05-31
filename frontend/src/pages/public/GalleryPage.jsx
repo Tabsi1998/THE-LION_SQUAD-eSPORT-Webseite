@@ -3,9 +3,15 @@ import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Image as ImageIcon, Crown } from "lucide-react";
 
 export default function GalleryPage() {
+  useDocumentTitle(
+    "Galerie",
+    "Fotos und Eindrücke von THE LION SQUAD eSports: Turniere, LAN-Partys, Events und Gaming Community in Tirol."
+  );
+
   const [albums, setAlbums] = useState([]);
   const [loading, setLoading] = useState(true);
 

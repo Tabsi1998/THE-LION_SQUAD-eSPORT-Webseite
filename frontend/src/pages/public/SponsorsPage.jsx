@@ -31,7 +31,7 @@ const tierLogo = {
 };
 
 export default function SponsorsPage() {
-  useDocumentTitle("Sponsoren", "Sponsoren und Unterstützer von THE LION SQUAD eSports.");
+  useDocumentTitle("Sponsoren", "Sponsoren, Hauptsponsoren und Unterstützer von THE LION SQUAD eSports, Turnieren, Events und Vereinsarbeit in Tirol.");
   const [list, setList] = useState([]);
   const load = useCallback(() => {
     api.get("/sponsors").then(({ data }) => setList(data)).catch(() => {});

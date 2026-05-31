@@ -2,9 +2,12 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Logo } from "@/components/tls/Logo";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { toast } from "sonner";
 
 export function ForgotPasswordPage() {
+  useDocumentTitle("Passwort vergessen", "Passwort für deinen THE LION SQUAD Account zurücksetzen.", { robots: "noindex, follow" });
+
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -42,6 +45,8 @@ export function ForgotPasswordPage() {
 }
 
 export function ResetPasswordPage() {
+  useDocumentTitle("Passwort setzen", "Neues Passwort für deinen THE LION SQUAD Account vergeben.", { robots: "noindex, follow" });
+
   const [params] = useSearchParams();
   const nav = useNavigate();
   const token = params.get("token") || "";

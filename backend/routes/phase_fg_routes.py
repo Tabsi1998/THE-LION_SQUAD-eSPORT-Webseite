@@ -512,6 +512,8 @@ async def robots():
         "Allow: /",
         "Allow: /api/static/uploads/",
         "Allow: /api/manifest.webmanifest",
+        "Allow: /api/seo/preview",
+        "Allow: /api/seo/meta",
         "Disallow: /admin/",
         "Disallow: /dashboard",
         "Disallow: /display/",
@@ -527,6 +529,11 @@ async def robots():
         "Disallow: /api/",
         "Disallow: /login",
         "Disallow: /register",
+        "Disallow: /forgot-password",
+        "Disallow: /reset-password",
+        "Disallow: /membership/apply",
+        "Disallow: /matches/",
+        "Disallow: /players",
     ]
     search_agents = [
         "Googlebot",

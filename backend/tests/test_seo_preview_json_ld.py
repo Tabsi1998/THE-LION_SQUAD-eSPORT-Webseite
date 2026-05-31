@@ -11,7 +11,7 @@ from fastapi import HTTPException
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import routes.seo_render_routes as seo_render_routes
-from routes.seo_render_routes import render_preview_html, resolve_meta
+from routes.seo_render_routes import render_preview_html, resolve_meta, resolve_slug_redirect
 
 
 def test_preview_json_ld_is_parseable_script_json():
@@ -119,6 +119,28 @@ class _Db:
     settings = _Settings()
 
 
+class _Seasons:
+    async def find_one(self, *args, **kwargs):
+        return {"slug": "season-2026", "status": "active"}
+
+
+class _DbWithSeason:
+    settings = _Settings()
+    seasons = _Seasons()
+
+
+def test_seo_preview_redirects_legacy_public_routes(monkeypatch):
+    monkeypatch.setattr(seo_render_routes, "get_db", lambda: _DbWithSeason())
+    request = SimpleNamespace(
+        headers={},
+        url=SimpleNamespace(scheme="https", netloc="lionsquad.at"),
+    )
+
+    assert asyncio.run(resolve_slug_redirect("/f1", request)) == "https://lionsquad.at/fastlap"
+    assert asyncio.run(resolve_slug_redirect("/gallery", request)) == "https://lionsquad.at/galerie"
+    assert asyncio.run(resolve_slug_redirect("/seasons/current", request)) == "https://lionsquad.at/seasons/season-2026"
+
+
 def test_seo_preview_unknown_path_returns_404(monkeypatch):
     monkeypatch.setattr(seo_render_routes, "get_db", lambda: _Db())
     request = SimpleNamespace(
@@ -145,7 +167,7 @@ def test_seo_preview_known_static_path_still_resolves(monkeypatch):
     assert meta["favicon"] == ""
     assert meta["image"] == "https://lionsquad.at/api/static/uploads/logo.png"
     graph_types = {item["@type"] for item in meta["json_ld"]["@graph"]}
-    assert graph_types == {"WebPage", "BreadcrumbList"}
+    assert graph_types == {"WebPage", "SportsOrganization", "BreadcrumbList"}
     assert meta["breadcrumbs"] == [
         {"name": "Startseite", "url": "https://lionsquad.at"},
         {"name": "Verein", "url": "https://lionsquad.at/about"},
@@ -161,6 +183,8 @@ def test_seo_preview_legal_and_players_are_noindex(monkeypatch):
 
     privacy = asyncio.run(resolve_meta("/privacy", request))
     players = asyncio.run(resolve_meta("/players", request))
+    membership_apply = asyncio.run(resolve_meta("/membership/apply", request))
 
     assert privacy["robots"] == "noindex, follow"
     assert players["robots"] == "noindex, follow"
+    assert membership_apply["robots"] == "noindex, follow"

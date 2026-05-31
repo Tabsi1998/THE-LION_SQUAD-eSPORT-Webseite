@@ -4,6 +4,7 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Crown, Gamepad2, Monitor, ArrowRight, Users as UsersIcon } from "lucide-react";
 
 function memberGamertag(member) {
@@ -16,6 +17,11 @@ function memberRealName(member) {
 }
 
 export default function MembersDirectoryPage() {
+  useDocumentTitle(
+    "Vereinsmitglieder",
+    "Offizielle Vereinsmitglieder von THE LION SQUAD eSports: Gaming Profile, Rollen, Teams und Community aus Tirol."
+  );
+
   const { isClubMember } = useAuth();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);

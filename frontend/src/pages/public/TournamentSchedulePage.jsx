@@ -7,6 +7,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
+import { seoTextPreview } from "@/lib/textPreview";
 
 function formatDateTime(value) {
   if (!value) return "Termin offen";
@@ -73,7 +74,8 @@ export default function TournamentSchedulePage() {
   }, [data]);
 
   const tournament = data?.tournament || {};
-  useDocumentTitle(`${tournament.title || "Turnier"} Spielplan`, "Runden, Heats, Zeiten und Matchseiten.", {
+  const seoDescription = seoTextPreview(tournament.description, "Spielplan des eSports Turniers mit Runden, Heats, Zeiten und Matchseiten.");
+  useDocumentTitle(`${tournament.title || "Turnier"} Spielplan`, seoDescription, {
     image: tournament.banner_url,
     canonical: tournament.slug ? `${window.location.origin}/tournaments/${tournament.slug}/matches` : undefined,
   });

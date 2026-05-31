@@ -10,6 +10,7 @@ import { AccountLevelPill, AccountLevelProgress, accountLevelFrameClass, account
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameLabel } from "@/lib/gameLabels";
+import { seoTextPreview } from "@/lib/textPreview";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   Trophy, Flag, Users as UsersIcon, Medal, Shield, Calendar,
@@ -231,7 +232,8 @@ export default function PublicProfilePage() {
   const [liveStreams, setLiveStreams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("overview");
-  useDocumentTitle(profile?.display_name || profile?.username || "Community-Profil", profile?.bio || "Community-Profil bei THE LION SQUAD eSports.", {
+  const seoDescription = seoTextPreview(profile?.bio, "Community-Profil bei THE LION SQUAD eSports.");
+  useDocumentTitle(profile?.display_name || profile?.username || "Community-Profil", seoDescription, {
     image: profile?.avatar_url || profile?.banner_url,
     type: "profile",
     robots: "noindex, follow",

@@ -18,3 +18,9 @@ export function plainTextPreview(value) {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+export function seoTextPreview(value, fallback = "", maxLength = 180) {
+  const text = plainTextPreview(value) || fallback;
+  if (!text || text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 3).trim()}...`;
+}

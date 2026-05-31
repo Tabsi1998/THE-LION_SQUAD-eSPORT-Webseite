@@ -8,6 +8,7 @@ import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { toast } from "sonner";
 import { Copy, Edit, MessageSquare, Plus, Search, Send, Shield, Trash2, Users, UserPlus } from "lucide-react";
 
@@ -20,6 +21,11 @@ export default function TeamsPage() {
 }
 
 function TeamList() {
+  useDocumentTitle(
+    "Teams & Clans",
+    "Teams, Squads und Clans der THE LION SQUAD Gaming Community: Profile, Mitglieder, Join-Codes und eSports Organisation."
+  );
+
   const { user } = useAuth();
   const [list, setList] = useState([]);
   const [editing, setEditing] = useState(null);
@@ -89,6 +95,12 @@ function TeamCard({ team: t }) {
 }
 
 function TeamDetail({ id }) {
+  useDocumentTitle(
+    "Teamprofil",
+    "Teamprofil der THE LION SQUAD Gaming Community mit Mitgliedern, Squads und eSports Infos.",
+    { canonical: `${window.location.origin}/teams/${id}` }
+  );
+
   const nav = useNavigate();
   const { user, isAdmin } = useAuth();
   const [team, setTeam] = useState(null);

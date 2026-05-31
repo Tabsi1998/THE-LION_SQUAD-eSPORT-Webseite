@@ -1,8 +1,14 @@
 import { Link } from "react-router-dom";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Heart, Users, Trophy, Gamepad2, Mountain } from "lucide-react";
 
 export default function AboutPage() {
+  useDocumentTitle(
+    "eSports Verein in Tirol",
+    "THE LION SQUAD ist ein österreichischer eSports und Gaming Verein aus Tirol mit Community, Events, Turnieren und echtem Zusammenhalt."
+  );
+
   return (
     <PublicLayout>
       {/* Hero */}

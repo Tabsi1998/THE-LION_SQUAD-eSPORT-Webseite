@@ -102,7 +102,7 @@ async def setup_defaults(me: dict = Depends(require_admin())):
             "club_name": branding.get("club_name") or "THE LION SQUAD",
             "tagline": branding.get("tagline") or "eSports Verein",
             "site_title": branding.get("site_title") or "THE LION SQUAD - eSPORTS",
-            "site_description": branding.get("site_description") or "",
+            "site_description": branding.get("site_description") or "Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.",
             "domain": branding.get("domain") or "lionsquad.at",
             "primary_color": branding.get("primary_color") or "#29B6E8",
             "contact_email": branding.get("contact_email") or "",
@@ -292,8 +292,8 @@ async def sitemap():
     base = _normalise_base_url(branding.get("domain"))
 
     static_paths = [
-        "/", "/about", "/news", "/events", "/tournaments", "/fastlap", "/f1",
-        "/teams", "/servers", "/members", "/membership/join", "/membership/apply",
+        "/", "/about", "/news", "/events", "/tournaments", "/fastlap",
+        "/teams", "/servers", "/members", "/membership/join",
         "/sponsors", "/partners", "/contact", "/board", "/values", "/galerie", "/references",
     ]
     urls: list[dict] = [
@@ -315,6 +315,10 @@ async def sitemap():
     async for f in db.f1_challenges.find({"status": {"$nin": SEO_HIDDEN_STATUSES}, **public_visibility}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if f.get("slug"):
             urls.append({"loc": f"{base}/fastlap/{f['slug']}", "lastmod": f.get("updated_at"), "changefreq": "weekly", "priority": "0.7"})
+    # public seasons / annual standings
+    async for season in db.seasons.find({"status": {"$nin": SEO_HIDDEN_STATUSES}}, {"slug": 1, "updated_at": 1, "_id": 0}):
+        if season.get("slug"):
+            urls.append({"loc": f"{base}/seasons/{season['slug']}", "lastmod": season.get("updated_at"), "changefreq": "weekly", "priority": "0.65"})
     # events
     async for e in db.events.find({"status": {"$nin": SEO_HIDDEN_STATUSES}, **public_visibility}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if e.get("slug"):
@@ -344,9 +348,16 @@ async def sitemap():
     ):
         if team.get("id"):
             urls.append({"loc": f"{base}/teams/{team['id']}", "lastmod": team.get("updated_at"), "changefreq": "monthly", "priority": "0.55"})
+    # public references / external results
+    async for ref in db.references.find(
+        {"is_active": {"$ne": False}, **public_visibility},
+        {"id": 1, "updated_at": 1, "_id": 0},
+    ):
+        if ref.get("id"):
+            urls.append({"loc": f"{base}/references/{ref['id']}", "lastmod": ref.get("updated_at"), "changefreq": "monthly", "priority": "0.55"})
     # public gallery albums
     async for a in db.gallery_albums.find(
-        {"visibility": {"$in": ["public", None]}, "is_public": {"$ne": False}},
+        {"published": {"$ne": False}, "is_public": {"$ne": False}, **public_visibility},
         {"slug": 1, "updated_at": 1, "_id": 0},
     ):
         if a.get("slug"):
@@ -409,7 +420,7 @@ async def web_manifest():
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
     name = branding.get("club_name") or "THE LION SQUAD"
     name = branding.get("site_title") or name
-    description = branding.get("site_description") or "THE LION SQUAD - eSPORTS"
+    description = branding.get("site_description") or "Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben."
     icon = _effective_favicon_url(branding)
     default_screenshot = branding.get("logo_url") or branding.get("mascot_url") or "/assets/brand/tls-wordmark.png"
     manifest = {

@@ -5,6 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { seoTextPreview } from "@/lib/textPreview";
 
 export default function TournamentStandingsPage() {
   const { slug } = useParams();
@@ -12,7 +13,8 @@ export default function TournamentStandingsPage() {
   const accessToken = searchParams.get("access") || "";
   const [t, setT] = useState(null);
   const [rows, setRows] = useState([]);
-  useDocumentTitle(`${t?.title || "Turnier"} Rangliste`, "Rangliste und Ergebnisse des Turniers.", {
+  const seoDescription = seoTextPreview(t?.description, "Rangliste und Ergebnisse des eSports Turniers von THE LION SQUAD.");
+  useDocumentTitle(`${t?.title || "Turnier"} Rangliste`, seoDescription, {
     image: t?.banner_url,
     canonical: t?.slug ? `${window.location.origin}/tournaments/${t.slug}/standings` : undefined,
   });

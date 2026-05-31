@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -20,6 +21,12 @@ function getPasswordStrength(pw) {
 }
 
 export default function RegisterPage() {
+  useDocumentTitle(
+    "Registrieren",
+    "Kostenlosen Community-Account bei THE LION SQUAD eSports erstellen.",
+    { robots: "noindex, follow" }
+  );
+
   const { register } = useAuth();
   const nav = useNavigate();
   const [form, setForm] = useState({

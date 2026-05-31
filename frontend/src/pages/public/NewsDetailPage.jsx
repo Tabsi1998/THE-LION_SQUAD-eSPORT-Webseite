@@ -7,13 +7,15 @@ import { RichContent } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { seoTextPreview } from "@/lib/textPreview";
 import { Pin, ArrowLeft, Calendar, Trophy, Users, Flag } from "lucide-react";
 
 export default function NewsDetailPage() {
   const { slug } = useParams();
   const [post, setPost] = useState(null);
   const [error, setError] = useState(null);
-  useDocumentTitle(post?.title || "News", post?.excerpt || "News von THE LION SQUAD eSports.", {
+  const seoDescription = seoTextPreview(post?.excerpt || post?.content, "News von THE LION SQUAD eSports aus Tirol.");
+  useDocumentTitle(post?.title || "News", seoDescription, {
     image: post?.banner_url,
     type: "article",
     canonical: post?.slug ? `${window.location.origin}/news/${post.slug}` : undefined,

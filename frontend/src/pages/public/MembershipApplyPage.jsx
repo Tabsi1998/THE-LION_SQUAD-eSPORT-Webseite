@@ -9,6 +9,7 @@ import { api, formatApiError } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { toast } from "sonner";
 import { Crown, CheckCircle2, FileText, Mail } from "lucide-react";
 
@@ -20,6 +21,12 @@ const CONTRIB_OPTIONS = [
 ];
 
 export default function MembershipApplyPage() {
+  useDocumentTitle(
+    "Mitgliedschaft beantragen",
+    "Online Mitgliedschaft bei THE LION SQUAD eSports beantragen und Teil der Gaming Community in Tirol werden.",
+    { robots: "noindex, follow" }
+  );
+
   const { user } = useAuth();
   const nav = useNavigate();
   const [existing, setExisting] = useState(null);

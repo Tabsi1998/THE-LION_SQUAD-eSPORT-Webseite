@@ -15,6 +15,7 @@ import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
 import { formatDateTime, getRegistrationState } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
+import { seoTextPreview } from "@/lib/textPreview";
 import { formatTeamMode, formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
@@ -35,7 +36,8 @@ export default function TournamentDetailPage() {
   const [loading, setLoading] = useState(false);
   const [registerModal, setRegisterModal] = useState(false);
   const confirm = useConfirm();
-  useDocumentTitle(t?.title || "Turnier", t?.description || "Turnier von THE LION SQUAD eSports.", {
+  const seoDescription = seoTextPreview(t?.description || t?.rules, "eSports Turnier von THE LION SQUAD mit Anmeldung, Check-in, Bracket und Rangliste.");
+  useDocumentTitle(t?.title || "Turnier", seoDescription, {
     image: t?.banner_url,
     canonical: t?.slug ? `${window.location.origin}/tournaments/${t.slug}` : undefined,
   });

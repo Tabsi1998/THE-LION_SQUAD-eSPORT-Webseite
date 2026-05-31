@@ -5,6 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { seoTextPreview } from "@/lib/textPreview";
 import { ArrowLeft, X, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 
 export default function GalleryAlbumPage() {
@@ -12,7 +13,8 @@ export default function GalleryAlbumPage() {
   const [a, setA] = useState(null);
   const [error, setError] = useState(null);
   const [active, setActive] = useState(null); // index of active photo
-  useDocumentTitle(a?.title || "Galerie", a?.description || "Fotos und Eindrücke von THE LION SQUAD.", {
+  const seoDescription = seoTextPreview(a?.description, "Fotos und Eindrücke von THE LION SQUAD eSports: Turniere, LAN-Partys, Events und Gaming Community.");
+  useDocumentTitle(a?.title || "Galerie", seoDescription, {
     image: a?.cover_url || a?.photos?.[0]?.thumbnail_url || a?.photos?.[0]?.image_url,
     canonical: a?.slug ? `${window.location.origin}/galerie/${a.slug}` : undefined,
   });

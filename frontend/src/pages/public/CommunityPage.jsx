@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Crown, Gamepad2, Server, Shield, Users } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { api, resolveMediaUrl } from "@/lib/api";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 function memberGamertag(member) {
   return member.gamertag || member.linked_account?.username || member.display_name;
@@ -14,6 +15,11 @@ function memberRealName(member) {
 }
 
 export default function CommunityPage() {
+  useDocumentTitle(
+    "Gaming Community",
+    "Community, Teams, Spielerprofile und Vereinsmitglieder von THE LION SQUAD eSports aus Tirol."
+  );
+
   const [players, setPlayers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [clubMembers, setClubMembers] = useState([]);

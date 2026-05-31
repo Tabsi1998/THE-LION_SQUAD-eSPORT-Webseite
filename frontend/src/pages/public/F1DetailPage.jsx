@@ -12,6 +12,7 @@ import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { Tv, Trophy, Flag, Download, FileDown, Calendar, Trash2 } from "lucide-react";
 import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
+import { seoTextPreview } from "@/lib/textPreview";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
@@ -35,7 +36,8 @@ export default function F1DetailPage() {
   const [board, setBoard] = useState(null);
   const [championship, setChampionship] = useState(null);
   const [tab, setTab] = useState("track"); // track | championship
-  useDocumentTitle(challenge?.title || "Fast Lap", challenge?.description || "Fast-Lap-Challenge von THE LION SQUAD eSports.", {
+  const seoDescription = seoTextPreview(challenge?.description || challenge?.rules, "F1 Fast-Lap-Challenge von THE LION SQUAD mit Leaderboard, Strecken und Championship-Wertung.");
+  useDocumentTitle(challenge?.title || "Fast Lap", seoDescription, {
     image: challenge?.banner_url,
     canonical: challenge?.slug ? `${window.location.origin}/fastlap/${challenge.slug}` : undefined,
   });

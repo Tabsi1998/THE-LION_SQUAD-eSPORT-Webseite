@@ -2,10 +2,13 @@ import { useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
+  useDocumentTitle("Login", "Login für Mitglieder und Community-User von THE LION SQUAD eSports.", { robots: "noindex, follow" });
+
   const { login } = useAuth();
   const [params] = useSearchParams();
   const next = params.get("next") || "/dashboard";

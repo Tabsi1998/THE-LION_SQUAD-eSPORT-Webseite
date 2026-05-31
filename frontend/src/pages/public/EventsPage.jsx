@@ -11,7 +11,7 @@ import { Calendar, MapPin, Users as UsersIcon, Crown, Lock } from "lucide-react"
 const VIS_ICON = { members: Crown, internal: Lock };
 
 export default function EventsPage() {
-  useDocumentTitle("Events", "Aktuelle und kommende Events von THE LION SQUAD eSports.");
+  useDocumentTitle("Events", "Gaming Events, Vereinsabende, LAN-Partys, Messen und öffentliche Termine von THE LION SQUAD eSports in Tirol.");
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ types: [], statuses: [] });
   const [typeFilter, setTypeFilter] = useState("");

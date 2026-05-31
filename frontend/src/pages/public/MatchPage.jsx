@@ -110,7 +110,10 @@ export default function MatchPage() {
   useApiInvalidation(load, ["matches", "matches_v2", "tournaments"]);
 
   const title = data?.tournament?.title ? `${data.matchday_label} - ${data.tournament.title}` : "Match";
-  useDocumentTitle(title, "Matchseite mit Terminabstimmung und Matchchat.");
+  const description = data?.tournament?.title
+    ? `Matchseite für ${data.tournament.title} mit Terminabstimmung, Matchchat und Ergebnisstatus.`
+    : "Matchseite mit Terminabstimmung, Matchchat und Ergebnisstatus.";
+  useDocumentTitle(title, description, { robots: "noindex, follow" });
 
   const propose = async (e) => {
     e.preventDefault();

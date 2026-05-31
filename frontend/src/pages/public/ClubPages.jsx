@@ -22,7 +22,7 @@ function personRealName(person) {
 }
 
 export function BoardPage() {
-  useDocumentTitle("Vorstand", "Der Vorstand von THE LION SQUAD eSports.");
+  useDocumentTitle("Vorstand", "Vorstand, Ansprechpartner und Vereinsverantwortliche von THE LION SQUAD eSports in Tirol.");
   const [positions, setPositions] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -195,7 +195,7 @@ function BoardDeputyCard({ position }) {
 }
 
 export function ValuesPage() {
-  useDocumentTitle("Werte & Ziele", "Werte und Ziele des Vereins THE LION SQUAD eSports.");
+  useDocumentTitle("Werte & Ziele", "Fairplay, Zusammenhalt, Gaming-Kultur und Vereinsziele von THE LION SQUAD eSports.");
   return (
     <PublicLayout>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

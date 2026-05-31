@@ -10,6 +10,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { renderMarkdownLite } from "@/lib/markdownLite";
+import { seoTextPreview } from "@/lib/textPreview";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { useAuth } from "@/context/AuthContext";
@@ -61,7 +62,8 @@ export default function EventDetailPage() {
   const [e, setE] = useState(null);
   const [error, setError] = useState(null);
   const { hasConsent, openSettings } = useCookieConsent();
-  useDocumentTitle(e?.name || "Event", e?.description || "Event von THE LION SQUAD eSports.", {
+  const seoDescription = seoTextPreview(e?.description || e?.program, "Gaming Event von THE LION SQUAD eSports in Tirol.");
+  useDocumentTitle(e?.name || "Event", seoDescription, {
     image: e?.banner_url,
     type: "event",
     canonical: e?.slug ? `${window.location.origin}/events/${e.slug}` : undefined,

@@ -8,6 +8,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { seoTextPreview } from "@/lib/textPreview";
 import { Tv } from "lucide-react";
 
 export default function TournamentBracketPage() {
@@ -16,7 +17,8 @@ export default function TournamentBracketPage() {
   const accessToken = searchParams.get("access") || "";
   const [data, setData] = useState(null);
   const tournament = data?.tournament;
-  useDocumentTitle(`${tournament?.title || "Turnier"} Turnierbaum`, tournament?.description || "Live-Turnierbaum von THE LION SQUAD eSports.", {
+  const seoDescription = seoTextPreview(tournament?.description, "Live-Turnierbaum von THE LION SQUAD eSports mit Runden, Matches und Ergebnissen.");
+  useDocumentTitle(`${tournament?.title || "Turnier"} Turnierbaum`, seoDescription, {
     image: tournament?.banner_url,
     canonical: tournament?.slug ? `${window.location.origin}/tournaments/${tournament.slug}/bracket` : undefined,
   });

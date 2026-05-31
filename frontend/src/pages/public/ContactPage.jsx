@@ -5,10 +5,16 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { toast } from "sonner";
 import { Mail, MessageSquare, MapPin, Send, Check } from "lucide-react";
 
 export default function ContactPage() {
+  useDocumentTitle(
+    "Kontakt",
+    "Kontakt zu THE LION SQUAD eSports für Mitgliedschaft, Turniere, Events, Sponsoring, Kooperationen und Gaming-Anfragen in Tirol."
+  );
+
   const { user } = useAuth();
   const [branding, setBranding] = useState(null);
   const [topics, setTopics] = useState([]);

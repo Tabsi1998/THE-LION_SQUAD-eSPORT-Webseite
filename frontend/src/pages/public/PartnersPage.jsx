@@ -2,10 +2,16 @@ import { useCallback, useEffect, useState } from "react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { SmartLogo } from "@/components/tls/SmartLogo";
 import { ExternalLink, Handshake } from "lucide-react";
 
 export default function PartnersPage() {
+  useDocumentTitle(
+    "Partner",
+    "Partner, Vereine, Veranstalter und Communitys im Netzwerk von THE LION SQUAD eSports aus Tirol."
+  );
+
   const [partners, setPartners] = useState([]);
 
   const load = useCallback(() => {
