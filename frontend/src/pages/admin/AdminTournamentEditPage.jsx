@@ -1663,6 +1663,30 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
       return { ...current, stage_type: "single_elimination", match_type: "duel", match_size: 2, min_players: 2, qualifiers_per_match: 1 };
     });
   };
+  const normalizeTournamentPayload = (source) => {
+    const payload = { ...source };
+    if (!payload.event_id) payload.event_id = null;
+    if (!payload.stream_platform) payload.stream_platform = null;
+    if (!payload.result_entry_mode) payload.result_entry_mode = null;
+    if (!payload.schedule_mode) payload.schedule_mode = null;
+    payload.format_label = (payload.format_label || "").trim() || null;
+    if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
+    normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
+    ["team_size", "max_participants", "min_participants", "best_of", "match_duration_minutes"].forEach((key) => {
+      if (payload[key] !== "" && payload[key] != null) payload[key] = Number(payload[key]);
+    });
+    payload.season_weight = Number(payload.season_weight || 0);
+    payload.prize_places = (payload.prize_places || [])
+      .filter((p) => p.value && String(p.value).trim())
+      .map((p) => ({
+        group: p.group || "overall",
+        place: p.place === "last" ? "last" : Number(p.place) || 0,
+        label: p.label || (p.place === "last" ? "Letzter Platz" : `Platz ${p.place}`),
+        value: p.value,
+      }));
+    if (payload.prize_places.length === 0) payload.prize_places = null;
+    return payload;
+  };
   const structurePayload = () => ({
     name: "Turnierbaum",
     stage_type: structure.stage_type,
@@ -1682,34 +1706,11 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     team_mode: value,
     team_size: value === "solo" ? 1 : Math.max(2, Number(current.team_size) || 2),
   }));
+  const dirtyPayload = buildDirtyPayload(normalizeTournamentPayload(f), normalizeTournamentPayload(formFromTournament()));
+  const hasFormChanges = hasPayloadChanges(dirtyPayload);
   const save = async ({ rebuildPreview = false } = {}) => {
     try {
-      const normalizeTournamentPayload = (source) => {
-        const payload = { ...source };
-        if (!payload.event_id) payload.event_id = null;
-        if (!payload.stream_platform) payload.stream_platform = null;
-        if (!payload.result_entry_mode) payload.result_entry_mode = null;
-        if (!payload.schedule_mode) payload.schedule_mode = null;
-        payload.format_label = (payload.format_label || "").trim() || null;
-        if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
-        normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
-        ["team_size", "max_participants", "min_participants", "best_of", "match_duration_minutes"].forEach((key) => {
-          if (payload[key] !== "" && payload[key] != null) payload[key] = Number(payload[key]);
-        });
-        payload.season_weight = Number(payload.season_weight || 0);
-        payload.prize_places = (payload.prize_places || [])
-          .filter((p) => p.value && String(p.value).trim())
-          .map((p) => ({
-            group: p.group || "overall",
-            place: p.place === "last" ? "last" : Number(p.place) || 0,
-            label: p.label || (p.place === "last" ? "Letzter Platz" : `Platz ${p.place}`),
-            value: p.value,
-          }));
-        if (payload.prize_places.length === 0) payload.prize_places = null;
-        return payload;
-      };
-      const payload = normalizeTournamentPayload(f);
-      const patch = buildDirtyPayload(payload, normalizeTournamentPayload(formFromTournament()));
+      const patch = dirtyPayload;
       if (!hasPayloadChanges(patch)) {
         if (rebuildPreview) {
           await onRebuildFromFormat?.({ preview: true, force: true, structure: structurePayload() });
@@ -1834,6 +1835,11 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.show_chat} onChange={(e)=>set("show_chat",e.target.checked)} className="accent-[#9146FF]"/><span>Chat anzeigen</span></label>
         </div>
       </Details>
+      {hasFormChanges && (
+        <div className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-4 py-3 text-sm text-[#FFD700]" data-testid="tr-edit-unsaved">
+          Ungespeicherte Aenderungen im Turnierformular.
+        </div>
+      )}
       <div className="flex flex-wrap gap-3">
         <button onClick={() => save()} data-testid="tr-edit-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
         <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-save-rebuild" className="px-5 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10">
