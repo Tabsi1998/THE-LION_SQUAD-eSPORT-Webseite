@@ -5,7 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { Pin, Newspaper, Crown, Lock } from "lucide-react";
+import { Pin, Newspaper, Crown, Lock, Search, X } from "lucide-react";
 
 const CATEGORY_COLORS = {
   club: "#29B6E8",
@@ -28,6 +28,7 @@ export default function NewsPage() {
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ categories: [], visibilities: [] });
   const [activeCat, setActiveCat] = useState(searchParams.get("category") || "");
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,9 +37,13 @@ export default function NewsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const url = activeCat ? `/news?category=${activeCat}` : "/news";
+    const params = new URLSearchParams();
+    if (activeCat) params.set("category", activeCat);
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
+    const suffix = params.toString();
+    const url = suffix ? `/news?${suffix}` : "/news";
     api.get(url).then(({ data }) => setList(data)).catch(() => {}).finally(() => setLoading(false));
-  }, [activeCat]);
+  }, [activeCat, searchQuery]);
 
   useEffect(() => {
     load();
@@ -48,18 +53,25 @@ export default function NewsPage() {
 
   useEffect(() => {
     const nextCategory = searchParams.get("category") || "";
+    const nextSearch = searchParams.get("q") || "";
     if (nextCategory !== activeCat) setActiveCat(nextCategory);
-  }, [searchParams, activeCat]);
+    if (nextSearch !== searchQuery) setSearchQuery(nextSearch);
+  }, [searchParams, activeCat, searchQuery]);
 
-  const selectCategory = (category) => {
+  const updateNewsFilters = ({ category = activeCat, q = searchQuery } = {}) => {
     setActiveCat(category);
+    setSearchQuery(q);
     setSearchParams((current) => {
       const params = new URLSearchParams(current);
       if (category) params.set("category", category);
       else params.delete("category");
+      if (q.trim()) params.set("q", q.trim());
+      else params.delete("q");
       return params;
     }, { replace: true });
   };
+
+  const hasSearch = Boolean(searchQuery.trim());
 
   const pinned = list.filter((n) => n.pinned);
   const rest = list.filter((n) => !n.pinned);
@@ -73,20 +85,43 @@ export default function NewsPage() {
           Alles was im Rudel passiert — von Turnier-Recaps über Eventankündigungen bis zu Vereinsthemen.
         </p>
 
-        <div className="mt-8 flex flex-wrap gap-2">
-          <button
-            onClick={() => selectCategory("")}
-            data-testid="news-filter-all"
-            className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${!activeCat ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
-          >Alle</button>
-          {meta.categories.map((c) => (
+        <div className="mt-8 space-y-4">
+          <div className="relative max-w-xl">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => updateNewsFilters({ q: e.target.value })}
+              placeholder="News suchen"
+              data-testid="news-search"
+              className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-3 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-[#29B6E8]/60"
+            />
+            {hasSearch && (
+              <button
+                type="button"
+                onClick={() => updateNewsFilters({ q: "" })}
+                aria-label="Suche leeren"
+                className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-sm text-white/45 transition hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
             <button
-              key={c.k}
-              onClick={() => selectCategory(c.k)}
-              data-testid={`news-filter-${c.k}`}
-              className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${activeCat === c.k ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
-            >{c.l}</button>
-          ))}
+              onClick={() => updateNewsFilters({ category: "" })}
+              data-testid="news-filter-all"
+              className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${!activeCat ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
+            >Alle</button>
+            {meta.categories.map((c) => (
+              <button
+                key={c.k}
+                onClick={() => updateNewsFilters({ category: c.k })}
+                data-testid={`news-filter-${c.k}`}
+                className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${activeCat === c.k ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
+              >{c.l}</button>
+            ))}
+          </div>
         </div>
 
         {loading ? (
@@ -95,9 +130,9 @@ export default function NewsPage() {
           <PublicEmptyState
             icon={Newspaper}
             eyebrow="News"
-            title={activeCat ? "Keine News in dieser Kategorie" : "Noch keine News sichtbar"}
-            description={activeCat ? "Waehle eine andere Kategorie oder komm spaeter wieder, sobald neue Updates veroeffentlicht sind." : "Neue Ankuendigungen, Recaps und Vereinsupdates erscheinen hier automatisch."}
-            primaryAction={activeCat ? { label: "Alle News", onClick: () => selectCategory("") } : { to: "/events", label: "Events ansehen" }}
+            title={hasSearch ? "Keine News gefunden" : activeCat ? "Keine News in dieser Kategorie" : "Noch keine News sichtbar"}
+            description={hasSearch ? "Passe deine Suche an oder leere den Suchbegriff, um wieder alle passenden News zu sehen." : activeCat ? "Waehle eine andere Kategorie oder komm spaeter wieder, sobald neue Updates veroeffentlicht sind." : "Neue Ankuendigungen, Recaps und Vereinsupdates erscheinen hier automatisch."}
+            primaryAction={hasSearch ? { label: "Suche leeren", onClick: () => updateNewsFilters({ q: "" }) } : activeCat ? { label: "Alle News", onClick: () => updateNewsFilters({ category: "" }) } : { to: "/events", label: "Events ansehen" }}
             secondaryAction={{ to: "/tournaments", label: "Turniere" }}
             className="mt-10"
           />

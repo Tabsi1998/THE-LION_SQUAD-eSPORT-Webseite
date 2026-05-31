@@ -1,6 +1,6 @@
 """News, Sponsors & Gallery routes — Vereins-CMS Phase 3."""
 import re
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import RedirectResponse
 from typing import Optional
 from datetime import datetime, timezone
@@ -169,6 +169,7 @@ async def _notify_news_mentions(db, post: dict, actor: dict) -> None:
 @router.get("/news")
 async def list_news(
     category: Optional[str] = None,
+    search: Optional[str] = Query(default=None, alias="q"),
     pinned_only: bool = False,
     sort: Optional[str] = None,
     user: dict | None = Depends(get_optional_user),
@@ -178,6 +179,10 @@ async def list_news(
     q: dict = {} if is_admin else {"published": True}
     if category:
         q["category"] = category
+    search_term = (search or "").strip()
+    if search_term:
+        rx = {"$regex": re.escape(search_term), "$options": "i"}
+        q["$or"] = [{"title": rx}, {"excerpt": rx}, {"content": rx}, {"category": rx}]
     if pinned_only:
         q["pinned"] = True
     posts = await db.news_posts.find(q, {"_id": 0}).sort([("published_at", -1), ("created_at", -1)]).to_list(200)
