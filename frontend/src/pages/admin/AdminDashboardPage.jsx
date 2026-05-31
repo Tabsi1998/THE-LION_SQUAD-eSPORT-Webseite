@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug } from "lucide-react";
+import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search } from "lucide-react";
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
@@ -24,10 +24,16 @@ export default function AdminDashboardPage() {
     { label: "Offene Disputes", value: data?.open_disputes, icon: AlertTriangle, color: "#FF3B30" },
     { label: "Fast Lap Live", value: data?.active_f1, icon: Flag, color: "#29B6E8" },
     { label: "Events Gesamt", value: data?.total_events, icon: CalendarDays, color: "#29B6E8" },
+    { label: "Mitgliedsanträge", value: data?.membership_applications?.pending, icon: Inbox, color: "#FFD700" },
+    { label: "Gewinne offen", value: data?.prize_pickups?.pending, icon: Award, color: "#FFD700" },
     { label: "Push aktiv", value: data?.mobile_push?.active_tokens, icon: BellRing, color: "#00FF88" },
     { label: "Offene Logs", value: data?.client_logs?.open, icon: Bug, color: "#FFD700" },
   ];
   const pushErrors = Number(data?.mobile_push?.ticket_errors || 0) + Number(data?.mobile_push?.receipt_errors || 0);
+  const pendingApplications = Number(data?.membership_applications?.pending || 0);
+  const pendingPrizes = Number(data?.prize_pickups?.pending || 0);
+  const readyPrizes = Number(data?.prize_pickups?.ready || 0);
+  const pendingRegistrations = Number(data?.tournament_registrations?.pending || 0);
   const taskItems = [
     {
       label: "Setup prüfen",
@@ -44,6 +50,27 @@ export default function AdminDashboardPage() {
       to: "/admin/tournaments",
       icon: AlertTriangle,
       tone: (data?.open_disputes || 0) > 0 ? "#FF3B30" : "#00FF88",
+    },
+    {
+      label: "Mitgliedsanträge",
+      detail: `${pendingApplications} offene Anträge`,
+      to: "/admin/membership-applications",
+      icon: Inbox,
+      tone: pendingApplications > 0 ? "#FFD700" : "#00FF88",
+    },
+    {
+      label: "Turnier-Anmeldungen",
+      detail: `${pendingRegistrations} warten auf Freigabe`,
+      to: "/admin/tournaments",
+      icon: GamepadIcon,
+      tone: pendingRegistrations > 0 ? "#FFD700" : "#00FF88",
+    },
+    {
+      label: "Gewinne",
+      detail: `${pendingPrizes} offen, ${readyPrizes} abholbereit`,
+      to: "/admin/prizes",
+      icon: Award,
+      tone: pendingPrizes > 0 ? "#FFD700" : readyPrizes > 0 ? "#29B6E8" : "#00FF88",
     },
     {
       label: "Push-Monitoring",
@@ -71,6 +98,20 @@ export default function AdminDashboardPage() {
       detail: "Mail-Queue, Uploads, Scheduler und Integrationen",
       to: "/admin/settings?tab=system",
       icon: Activity,
+      tone: "#29B6E8",
+    },
+    {
+      label: "Mail-Queue",
+      detail: "Fehler, Newsletter und Versandjobs prüfen",
+      to: "/admin/settings?tab=queue",
+      icon: Mail,
+      tone: "#29B6E8",
+    },
+    {
+      label: "SEO & Analytics",
+      detail: "Domain, IndexNow und Tracking-IDs prüfen",
+      to: "/admin/settings?tab=seo",
+      icon: Search,
       tone: "#29B6E8",
     },
   ];

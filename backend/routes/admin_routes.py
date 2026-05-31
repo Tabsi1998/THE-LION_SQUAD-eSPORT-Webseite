@@ -43,6 +43,16 @@ async def dashboard(me: dict = Depends(require_admin())):
         "critical_open": await db.mobile_client_logs.count_documents({"status": "open", "priority": "critical"}),
         "high_open": await db.mobile_client_logs.count_documents({"status": "open", "priority": "high"}),
     }
+    membership_applications = {
+        "pending": await db.membership_applications.count_documents({"status": "pending"}),
+    }
+    prize_pickups = {
+        "pending": await db.prize_pickups.count_documents({"status": "pending"}),
+        "ready": await db.prize_pickups.count_documents({"status": "ready"}),
+    }
+    tournament_registrations = {
+        "pending": await db.tournament_registrations.count_documents({"status": "pending"}),
+    }
     return {
         "player_count": await db.users.count_documents({"is_active": True}),
         "team_count": await db.teams.count_documents({}),
@@ -56,6 +66,9 @@ async def dashboard(me: dict = Depends(require_admin())):
         "total_events": await db.events.count_documents({}),
         "mobile_push": mobile_push,
         "client_logs": client_logs,
+        "membership_applications": membership_applications,
+        "prize_pickups": prize_pickups,
+        "tournament_registrations": tournament_registrations,
         "recent_audit_logs": await db.audit_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(20),
     }
 
