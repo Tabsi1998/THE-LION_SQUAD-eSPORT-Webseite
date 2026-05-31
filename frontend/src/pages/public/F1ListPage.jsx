@@ -62,10 +62,16 @@ function FastLapCard({ challenge: c }) {
     <Link
       to={`/fastlap/${c.slug || c.id}`}
       data-testid={`f1-list-${c.slug}`}
-      className="group block border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-6 bg-[#121212] transition-all"
+      className="group block border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-5 sm:p-6 bg-[#121212] transition-all"
     >
-      <div className="flex items-start gap-5">
-        {c.banner_url && <img src={resolveMediaUrl(c.banner_url)} alt="" className="w-32 h-20 object-cover rounded-sm hidden sm:block" />}
+      <div className="flex items-start gap-4 sm:gap-5 min-w-0">
+        <div className="hidden sm:flex w-32 h-20 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-[#0A0A0A] border border-white/10">
+          {c.banner_url ? (
+            <img src={resolveMediaUrl(c.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+          ) : (
+            <Flag className="w-8 h-8 text-[#29B6E8]/35" />
+          )}
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <PhaseBadge phase={c.public_phase} status={c.status} />
@@ -75,11 +81,11 @@ function FastLapCard({ challenge: c }) {
               <span className="text-[10px] font-bold uppercase tracking-wider text-white/65 border border-white/15 px-2 py-[3px] rounded-sm">Referenzzeiten</span>
             )}
           </div>
-          <h2 className="font-heading text-2xl font-bold group-hover:text-[#29B6E8] transition">{c.title}</h2>
+          <h2 className="font-heading text-2xl font-bold group-hover:text-[#29B6E8] transition break-words">{c.title}</h2>
           {c.description && <p className="mt-1 text-sm text-white/60 line-clamp-2">{c.description}</p>}
           <div className="mt-3 flex flex-wrap gap-5 text-xs text-white/60">
-            <span className="inline-flex items-center gap-1.5"><Flag className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.track_count} Strecken</span>
-            <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.participant_count} Fahrer</span>
+            <span className="inline-flex items-center gap-1.5"><Flag className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.track_count || 0} Strecken</span>
+            <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.participant_count || 0} Fahrer</span>
             {(c.club_reference_count || 0) > 0 && c.allow_club_reference_times !== false && c.show_club_reference_times !== false && (
               <span className="inline-flex items-center gap-1.5"><Flag className="w-3.5 h-3.5 text-[#FFD700]" /> {c.club_reference_count} Referenzen</span>
             )}
@@ -94,7 +100,7 @@ function FastLapCard({ challenge: c }) {
             </div>
           )}
         </div>
-        <ChevronRight className="w-6 h-6 text-white/30 group-hover:text-[#29B6E8] transition" />
+        <ChevronRight className="w-6 h-6 shrink-0 text-white/30 group-hover:text-[#29B6E8] transition" />
       </div>
     </Link>
   );

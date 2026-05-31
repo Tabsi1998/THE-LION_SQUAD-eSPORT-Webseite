@@ -135,11 +135,15 @@ function NewsCard({ n, featured = false }) {
       data-testid={`news-card-${n.slug}`}
       className={`group border border-white/10 hover:border-white/30 rounded-sm bg-[#121212] overflow-hidden flex flex-col transition ${featured ? "lg:col-span-1" : ""}`}
     >
-      {n.banner_url && (
-        <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
+      <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
+        {n.banner_url ? (
           <img src={resolveMediaUrl(n.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${c}33, #0A0A0A 48%, #121212)` }}>
+            <Newspaper className="w-10 h-10 text-white/20" />
+          </div>
+        )}
         </div>
-      )}
       <div className="p-5 flex-1 flex flex-col">
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold">
           <span style={{ color: c }}>{n.category}</span>

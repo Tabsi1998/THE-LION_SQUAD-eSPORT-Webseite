@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Image as ImageIcon, Crown } from "lucide-react";
@@ -38,11 +39,15 @@ export default function GalleryPage() {
         {loading ? (
           <div className="mt-10 text-white/40 text-sm">Lade …</div>
         ) : albums.length === 0 ? (
-          <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
-            <ImageIcon className="w-10 h-10 mx-auto opacity-40 mb-3" />
-            <div className="font-heading font-bold text-lg">Noch keine Alben</div>
-            <div className="text-sm mt-1">Fotos von Events und Turnieren erscheinen hier.</div>
-          </div>
+          <PublicEmptyState
+            icon={ImageIcon}
+            eyebrow="Galerie"
+            title="Noch keine Alben sichtbar"
+            description="Fotos von Events, Turnieren und Vereinsmomenten erscheinen hier automatisch, sobald ein Album veroeffentlicht ist."
+            primaryAction={{ to: "/events", label: "Events ansehen" }}
+            secondaryAction={{ to: "/news", label: "News lesen" }}
+            className="mt-10"
+          />
         ) : (
           <div className="mt-10 grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
             {albums.map((a) => <AlbumCard key={a.id} a={a} />)}
