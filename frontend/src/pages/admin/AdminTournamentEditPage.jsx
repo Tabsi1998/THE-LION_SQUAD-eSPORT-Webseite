@@ -1783,6 +1783,16 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
       }
     } catch (e) { toast.error(formatRequestError(e, "Turnier konnte nicht gespeichert werden.", { title: f.title })); }
   };
+  const createPrizePickups = async () => {
+    try {
+      const { data } = await api.post(`/prizes/auto-create/${tournament.id}`);
+      const created = Number(data?.created || 0);
+      toast.success(created === 1 ? "1 Gewinn angelegt." : `${created} Gewinne angelegt.`);
+      onSaved();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Gewinne konnten nicht erzeugt werden.");
+    }
+  };
   return (
     <div className="max-w-4xl space-y-5">
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
@@ -1872,6 +1882,21 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
       <Details title="Preise">
         <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} />
         <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
+        <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-white/55">
+            Nach veroeffentlichten Ergebnissen erzeugt dieser Button konkrete Eintraege fuer die Gewinnabholung.
+          </p>
+          <button
+            type="button"
+            onClick={createPrizePickups}
+            disabled={!((f.prize_places || []).length)}
+            data-testid="tr-edit-create-prizes"
+            className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Gewinne erzeugen
+          </button>
+        </div>
       </Details>
       <Details title="Streaming und externe Links">
         <div className="text-[11px] font-bold uppercase tracking-widest text-[#9146FF]">Streaming & Verweise</div>

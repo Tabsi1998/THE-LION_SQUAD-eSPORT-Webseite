@@ -34,6 +34,7 @@ export default function AdminPrizesPage() {
   const [filter, setFilter] = useState(searchParams.get("status") || "");
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [loading, setLoading] = useState(true);
+  const [creatingMissing, setCreatingMissing] = useState(false);
   const confirm = useConfirm();
   const prompt = usePrompt();
 
@@ -102,6 +103,17 @@ export default function AdminPrizesPage() {
     await updateStatus(id, "picked_up", notes || "");
   };
 
+  const createMissing = async () => {
+    setCreatingMissing(true);
+    try {
+      const { data } = await api.post("/prizes/auto-create/missing");
+      const created = Number(data?.created || 0);
+      toast.success(created === 1 ? "1 Gewinn erzeugt." : `${created} Gewinne erzeugt.`);
+      await load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    setCreatingMissing(false);
+  };
+
   const normalizedQuery = query.trim().toLowerCase();
   const items = allItems.filter((p) => {
     if (filter && p.status !== filter) return false;
@@ -129,6 +141,22 @@ export default function AdminPrizesPage() {
         anhand der hinterlegten Preisstruktur erstellt. Markiere Preise als <strong>bereit</strong>,
         sobald sie zur Abholung verfügbar sind — der Sieger bekommt automatisch eine E-Mail.
       </p>
+
+      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <p className="text-xs text-white/45 max-w-2xl">
+          Oeffentliche Preise sind die Ausschreibung. Diese Seite zeigt konkrete Abhol-Eintraege, die nach veroeffentlichten Ergebnissen entstehen.
+        </p>
+        <button
+          type="button"
+          onClick={createMissing}
+          disabled={creatingMissing}
+          data-testid="prizes-create-missing"
+          className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 ${creatingMissing ? "animate-spin" : ""}`} />
+          Gewinne neu erzeugen
+        </button>
+      </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         {[["pending", "Offen"], ["ready", "Bereit"], ["picked_up", "Abgeholt"], ["expired", "Verfallen"]].map(([k, label]) => {
@@ -168,8 +196,8 @@ export default function AdminPrizesPage() {
           ) : items.length === 0 ? (
             <div className="text-center py-12 px-4">
               <Award className="w-10 h-10 text-white/30 mx-auto mb-2" />
-              <p className="text-white/50">{allItems.length ? "Keine Gewinne fuer diesen Filter." : "Noch keine Gewinne erfasst."}</p>
-              <p className="text-xs text-white/30 mt-1">Gewinne werden automatisch erstellt, sobald Ergebnisse veroeffentlicht werden.</p>
+              <p className="text-white/50">{allItems.length ? "Keine Gewinne fuer diesen Filter." : "Noch keine Abhol-Eintraege erfasst."}</p>
+              <p className="text-xs text-white/30 mt-1">Preise werden nach veroeffentlichten Ergebnissen oder ueber "Gewinne neu erzeugen" zu Abhol-Eintraegen.</p>
             </div>
           ) : items.map((p) => (
             <PrizeMobileCard key={p.id} p={p} updateStatus={updateStatus} markPickedUp={markPickedUp} remove={remove} />
