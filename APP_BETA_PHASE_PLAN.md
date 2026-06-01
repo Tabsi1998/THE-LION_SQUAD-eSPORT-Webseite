@@ -127,8 +127,8 @@ Profil:
 
 Mehr-Navigation:
 
-- Beim erneuten Tippen auf "Mehr" zurueck zum MoreHub navigieren.
-- Alternativ Stack bei Tabwechsel resetten, damit eine zuvor geoeffnete Unterseite nicht ueberraschend wieder offen ist.
+- [x] Beim erneuten Tippen auf "Mehr" zurueck zum MoreHub navigieren.
+- [x] Stack bei Tabwechsel resetten, damit eine zuvor geoeffnete Unterseite nicht ueberraschend wieder offen ist.
 
 ## Phase 6 - Mobile Design-System und Navigations-Rework
 
