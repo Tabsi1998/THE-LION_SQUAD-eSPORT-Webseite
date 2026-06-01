@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
@@ -31,7 +32,7 @@ export default function F1ListPage() {
   return (
     <PublicLayout>
       <div className="relative border-b border-white/10 bg-grid-dense overflow-hidden">
-        <img src="https://images.unsplash.com/photo-1771440571270-e27b63085a48" className="absolute inset-0 w-full h-full object-cover opacity-20" alt="" loading="lazy" decoding="async" />
+        <LazyImg src="https://images.unsplash.com/photo-1771440571270-e27b63085a48" priority className="absolute inset-0 w-full h-full object-cover opacity-20" alt="" sizes="100vw" />
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/70 to-[#0A0A0A]" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Fast Lap Challenge</span>
@@ -67,7 +68,7 @@ function FastLapCard({ challenge: c }) {
       <div className="flex items-start gap-4 sm:gap-5 min-w-0">
         <div className="hidden sm:flex w-32 h-20 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-[#0A0A0A] border border-white/10">
           {c.banner_url ? (
-            <img src={resolveMediaUrl(c.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+            <LazyImg src={c.banner_url} alt="" sizes="8rem" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
           ) : (
             <Flag className="w-8 h-8 text-[#29B6E8]/35" />
           )}

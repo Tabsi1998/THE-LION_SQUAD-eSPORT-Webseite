@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Image as ImageIcon, Crown } from "lucide-react";
@@ -67,7 +68,7 @@ function AlbumCard({ a }) {
     >
       <div className="aspect-video bg-[#0A0A0A] overflow-hidden relative">
         {a.cover_url ? (
-          <img src={resolveMediaUrl(a.cover_url)} alt={a.title} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+          <LazyImg src={a.cover_url} alt={a.title} sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
         ) : (
           <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-10 h-10 text-white/15" /></div>
         )}

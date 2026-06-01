@@ -2,8 +2,8 @@ import { Link } from "react-router-dom";
 import { PhaseBadge } from "./PhaseBadge";
 import { ArrowRight, Calendar, Users, Trophy } from "lucide-react";
 import { formatDate, getRegistrationState } from "@/lib/datetime";
-import { resolveMediaUrl } from "@/lib/api";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { LazyImg } from "@/components/tls/LazyImg";
 
 export function TournamentCard({ tournament, index = 0 }) {
   const t = tournament;
@@ -18,10 +18,10 @@ export function TournamentCard({ tournament, index = 0 }) {
       className="group relative block overflow-hidden rounded-sm border border-white/10 hover:border-[#29B6E8]/60 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(41,182,232,0.25)] bg-[#18181B]"
     >
       <div className="aspect-[16/9] relative overflow-hidden">
-        <img
-          src={resolveMediaUrl(bg)}
-          loading="lazy"
-          decoding="async"
+        <LazyImg
+          src={bg}
+          priority={index < 2}
+          sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
           alt={t.title}
           className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-60 group-hover:scale-105 transition-all duration-500"
         />

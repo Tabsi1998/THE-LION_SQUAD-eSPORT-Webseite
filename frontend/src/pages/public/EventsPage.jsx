@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { plainTextPreview } from "@/lib/textPreview";
@@ -114,7 +115,7 @@ function EventCard({ e, meta }) {
     >
       {e.banner_url ? (
         <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
-          <img src={resolveMediaUrl(e.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain group-hover:scale-[1.02] transition duration-500" />
+          <LazyImg src={e.banner_url} alt="" sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="w-full h-full object-contain group-hover:scale-[1.02] transition duration-500" />
         </div>
       ) : (
         <div className="aspect-video bg-gradient-to-br from-[#9F7AEA]/20 via-[#0A0A0A] to-[#0A0A0A] flex items-center justify-center">

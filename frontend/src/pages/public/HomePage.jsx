@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { MascotBadge } from "@/components/tls/Logo";
+import { LazyImg } from "@/components/tls/LazyImg";
 import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
@@ -195,7 +196,7 @@ function FeaturedNews({ news }) {
     <Link to={`/news/${news.slug}`} data-testid={`home-featured-news-${news.slug}`} className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#111] overflow-hidden grid lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)] transition min-w-0">
       <div className="aspect-[16/9] lg:aspect-auto bg-[#070707] overflow-hidden">
         {news.banner_url ? (
-          <img src={resolveMediaUrl(news.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover object-center opacity-90 group-hover:scale-105 transition duration-500" />
+          <LazyImg src={news.banner_url} alt="" sizes="(min-width: 1024px) 45vw, 100vw" className="w-full h-full object-cover object-center opacity-90 group-hover:scale-105 transition duration-500" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-[#29B6E8]/20 via-[#101010] to-black" />
         )}
@@ -347,7 +348,7 @@ function NewsCard({ news, featured = false }) {
     >
       {news.banner_url ? (
         <div className={`${featured ? "aspect-[16/8]" : "aspect-video"} bg-[#0A0A0A] overflow-hidden`}>
-          <img src={resolveMediaUrl(news.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+          <LazyImg src={news.banner_url} alt="" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 50vw, 100vw" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
         </div>
       ) : (
         <div className={`${featured ? "aspect-[16/8]" : "aspect-video"} bg-gradient-to-br from-[#29B6E8]/20 via-[#0A0A0A] to-[#0A0A0A]`} />

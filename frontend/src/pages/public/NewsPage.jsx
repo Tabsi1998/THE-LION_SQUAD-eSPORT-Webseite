@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { ArrowRight, Pin, Newspaper, Crown, Lock, Search, X } from "lucide-react";
@@ -172,7 +173,7 @@ function NewsCard({ n, featured = false }) {
     >
       <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
         {n.banner_url ? (
-          <img src={resolveMediaUrl(n.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+          <LazyImg src={n.banner_url} alt="" sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
         ) : (
           <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${c}33, #0A0A0A 48%, #121212)` }}>
             <Newspaper className="w-10 h-10 text-white/20" />
