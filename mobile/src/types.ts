@@ -68,7 +68,7 @@ export type Tournament = {
   standings?: Array<{ rank: number; name: string; points?: number; result?: string }>;
   rules?: string[] | string;
   prize_pool?: string | null;
-  prize_places?: Array<{ place?: number; label?: string; value?: string }> | null;
+  prize_places?: Array<{ group?: string | null; place?: number | string; label?: string; value?: string }> | null;
   prizes?: string[];
   my_registration?: { id?: string; status?: string; display_name?: string | null; ingame_name?: string | null; team_id?: string | null; user_id?: string | null } | null;
 };
@@ -371,6 +371,8 @@ export type F1Challenge = {
   vehicle?: string | null;
   weather?: string | null;
   platform?: string | null;
+  prize_places?: Array<{ group?: string | null; place?: number | string; label?: string; value?: string }> | null;
+  prize_pool?: string | null;
   participant_count?: number;
   track_count?: number;
   tracks?: F1Track[];

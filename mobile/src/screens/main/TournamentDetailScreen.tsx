@@ -230,7 +230,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
       : [];
   const prizes = [
     ...(tournament.prizes || []),
-    ...(tournament.prize_places || []).map((place) => `${place.label || `${place.place}. Platz`}: ${place.value || ""}`.trim()),
+    ...(tournament.prize_places || []).map(formatPrizePlace),
     tournament.prize_pool ? `Preispool: ${tournament.prize_pool}` : "",
   ].filter(Boolean);
 
@@ -401,7 +401,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>Regeln & Preise</Heading>
             {rules.length ? rules.map((rule) => <Bullet key={rule} text={rule} />) : <Muted>Keine Regeln veröffentlicht.</Muted>}
-            {prizes.length ? prizes.map((prize) => <Bullet key={prize} text={prize} accent />) : null}
+            {prizes.length ? prizes.map((prize, index) => <Bullet key={`${prize}-${index}`} text={prize} accent />) : null}
           </Card>
         ) : null}
       </ScrollView>
@@ -417,6 +417,22 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
       />
     </Screen>
   );
+}
+
+function formatPrizePlace(place: { group?: string | null; place?: number | string; label?: string; value?: string }) {
+  const value = String(place.value || "").trim();
+  if (!value) return "";
+  const group = prizeGroupLabel(place.group);
+  const placeLabel = place.label || (place.place ? `${place.place}. Platz` : "Preis");
+  return [group, `${placeLabel}: ${value}`].filter(Boolean).join(" - ");
+}
+
+function prizeGroupLabel(group?: string | null) {
+  if (!group || group === "overall") return "";
+  if (group === "winner") return "Gewinner-Bracket";
+  if (group === "loser") return "Loser-Bracket";
+  if (group === "special") return "Sonderpreis";
+  return group;
 }
 
 function RegistrationModal({

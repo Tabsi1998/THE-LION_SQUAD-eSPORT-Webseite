@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Mobile: Fast-Lap-Details zeigen jetzt hinterlegte Preise an; Turnierpreise beruecksichtigen Gruppierungen wie Gewinner- und Loser-Bracket sauberer.
+
 ## 1.5.0-beta.9 - 2026-05-30
 
 - Backend/Web/Mobile: Jede Benachrichtigungsart kann jetzt getrennt fuer E-Mail, Push und In-App aktiviert oder deaktiviert werden.

@@ -74,6 +74,7 @@ export function FastLapDetailScreen({ route }: Props) {
   const registration = useMemo(() => getRegistrationState(challenge, "Einreichung"), [challenge]);
   const showRegistrationInfo = hasOnlineRegistration(challenge) || challenge?.block_club_member_results || challenge?.allow_club_reference_times !== false;
   const participantCount = challenge?.participant_count || leaderboard?.entries.length || 0;
+  const prizes = useMemo(() => formatPrizeItems(challenge?.prize_places, challenge?.prize_pool), [challenge?.prize_places, challenge?.prize_pool]);
   const selectedUser = managerUsers.find((item) => item.id === selectedUserId);
   const forceReference = Boolean(challenge?.block_club_member_results && selectedUser?.is_club_member);
   const filteredManagerUsers = useMemo(() => {
@@ -206,6 +207,13 @@ export function FastLapDetailScreen({ route }: Props) {
               <Muted>Vereins-Referenzzeiten sind separat möglich und zählen nicht zur offiziellen Rangliste.</Muted>
             ) : null}
             {challenge.show_club_reference_times === false ? <Muted>Referenzzeiten sind aktuell nur intern sichtbar.</Muted> : null}
+          </Card>
+        ) : null}
+
+        {prizes.length ? (
+          <Card style={styles.infoCard}>
+            <Heading>Preise</Heading>
+            {prizes.map((prize) => <PrizeRow key={prize} text={prize} />)}
           </Card>
         ) : null}
 
@@ -352,6 +360,39 @@ function EntryRow({ entry, reference = false }: { entry: F1LeaderboardEntry; ref
       </View>
     </Card>
   );
+}
+
+function PrizeRow({ text }: { text: string }) {
+  return (
+    <View style={styles.prizeRow}>
+      <Ionicons name="trophy-outline" color={colors.gold} size={17} />
+      <Body style={styles.prizeText}>{text}</Body>
+    </View>
+  );
+}
+
+function formatPrizeItems(prizePlaces?: F1Challenge["prize_places"], prizePool?: string | null) {
+  const rows = (prizePlaces || [])
+    .map((place) => {
+      const group = prizeGroupLabel(place.group);
+      const placeLabel = place.label || (place.place ? `${place.place}. Platz` : "Preis");
+      const value = String(place.value || "").trim();
+      if (!value) return "";
+      return [group, `${placeLabel}: ${value}`].filter(Boolean).join(" - ");
+    })
+    .filter(Boolean);
+  if (prizePool) rows.push(`Preispool: ${prizePool}`);
+  return rows;
+}
+
+function prizeGroupLabel(group?: string | null) {
+  if (!group || group === "overall") return "";
+  if (group === "championship") return "Gesamtwertung";
+  if (group === "track") return "Pro Strecke";
+  if (group === "winner") return "Gewinner-Bracket";
+  if (group === "loser") return "Loser-Bracket";
+  if (group === "special") return "Sonderpreis";
+  return group;
 }
 
 function Pill({ label, tone = "cyan" }: { label: string; tone?: "cyan" | "gold" }) {
@@ -569,6 +610,15 @@ const styles = StyleSheet.create({
   },
   warning: {
     color: colors.gold,
+    fontWeight: "800",
+  },
+  prizeRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 9,
+  },
+  prizeText: {
+    flex: 1,
     fontWeight: "800",
   },
   bestTime: {
