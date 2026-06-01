@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, ArrowRight, CheckCircle2, BarChart3, Timer } from "lucide-react";
 
 /**
@@ -93,15 +92,8 @@ export function SeasonPassWidget() {
               <div className="absolute -top-6 -right-6 opacity-5">
                 <Trophy className="w-40 h-40 text-[#FFD700]" />
               </div>
-              <AnimatePresence mode="wait">
-                {spotlight ? (
-                  <motion.div
-                    key={spotlight.user_id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.5 }}
-                  >
+              {spotlight ? (
+                <div key={spotlight.user_id} className="tls-spotlight-enter">
                     <div className="text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: ["#FFD700", "#C0C0C0", "#CD7F32"][spotlightIdx] }}>
                       Position {spotlight.rank}
                     </div>
@@ -118,9 +110,8 @@ export function SeasonPassWidget() {
                         <div className="font-display text-xl font-bold text-white">{spotlight.wins} <span className="text-white/40">/</span> {spotlight.events_count}</div>
                       </div>
                     </div>
-                  </motion.div>
-                ) : null}
-              </AnimatePresence>
+                </div>
+              ) : null}
               {/* Progress dots */}
               <div className="flex gap-1.5 mt-6">
                 {top3.map((_, i) => (

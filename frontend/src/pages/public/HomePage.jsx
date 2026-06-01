@@ -10,7 +10,6 @@ import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { motion } from "framer-motion";
 import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Crown, Pin, Radio, Image as ImageIcon, Gamepad2 } from "lucide-react";
 
 const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
@@ -49,7 +48,7 @@ export default function HomePage() {
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28">
           <div className="grid lg:grid-cols-12 gap-8 items-center min-w-0">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="lg:col-span-7 min-w-0">
+            <div className="lg:col-span-7 min-w-0 tls-hero-enter">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#29B6E8]/10 border border-[#29B6E8]/30 rounded-sm mb-6" data-testid="hero-tag">
                 <span className="w-2 h-2 rounded-full bg-[#29B6E8] animate-pulse" />
                 <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">THE LION SQUAD · eSPORTS</span>
@@ -71,13 +70,13 @@ export default function HomePage() {
                   <Gamepad2 className="w-4 h-4" /> eSports
                 </Link>
               </div>
-            </motion.div>
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.2 }} className="lg:col-span-5 flex items-center justify-center min-w-0">
+            </div>
+            <div className="lg:col-span-5 flex items-center justify-center min-w-0 tls-hero-enter tls-hero-enter-delay">
               <div className="relative">
                 <div className="absolute inset-0 bg-[#29B6E8] blur-[80px] opacity-20" />
                 <MascotBadge className="relative w-64 h-64 md:w-80 md:h-80 drop-shadow-[0_0_40px_rgba(41,182,232,0.3)]" />
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       </section>
