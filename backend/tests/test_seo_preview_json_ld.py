@@ -183,7 +183,7 @@ def test_seo_preview_known_static_path_still_resolves(monkeypatch):
     assert meta["favicon"] == ""
     assert meta["image"] == "https://lionsquad.at/api/static/uploads/logo.png"
     graph_types = {item["@type"] for item in meta["json_ld"]["@graph"]}
-    assert graph_types == {"WebPage", "SportsOrganization", "BreadcrumbList"}
+    assert graph_types == {"WebPage", "SportsOrganization", "BreadcrumbList", "ImageObject"}
     assert meta["breadcrumbs"] == [
         {"name": "Startseite", "url": "https://lionsquad.at"},
         {"name": "Verein", "url": "https://lionsquad.at/about"},
@@ -237,7 +237,9 @@ def test_seo_preview_resolves_key_public_route_types(monkeypatch):
 
         assert meta["canonical"] == canonical
         nodes = meta["json_ld"].get("@graph") or [meta["json_ld"]]
-        assert schema_type in {node.get("@type") for node in nodes}
+        graph_types = {node.get("@type") for node in nodes}
+        assert schema_type in graph_types
+        assert "ImageObject" in graph_types
 
 
 def test_seo_preview_legal_and_players_are_noindex(monkeypatch):

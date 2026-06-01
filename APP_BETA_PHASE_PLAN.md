@@ -208,7 +208,7 @@ SEO, Sharing und Content-Betrieb:
 - [x] SEO-Vorschau im Admin: Titel, Beschreibung, Canonical, OG-Bild und Social Preview vor Veroeffentlichung ansehen.
 - [x] Sitemap und SEO-Preview regelmaessig gegen echte Routen pruefen, inklusive Turnier-Bracket, Standings, Fast-Lap, Galerie und Profilen.
 - [x] Redaktions-Checkliste fuer News/CMS: Titel, Teaser, Banner, Embeds, Sichtbarkeit, SEO, Newsletter, Discord.
-- Strukturierte Daten erweitern: Event, SportsEvent/Competition, Organization, Breadcrumb, Article, ImageObject.
+- [x] Strukturierte Daten erweitern: Event, SportsEvent/Competition, Organization, Breadcrumb, Article, ImageObject.
 - IndexNow/Search-Console-Submit nach wichtigen Veroeffentlichungen automatisieren oder im Admin klarer anzeigen.
 
 Admin und Redaktion:

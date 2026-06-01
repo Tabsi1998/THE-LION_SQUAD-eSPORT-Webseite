@@ -966,6 +966,20 @@ def organization_json_ld(meta: dict) -> dict:
     }
 
 
+def image_object_json_ld(meta: dict) -> dict | None:
+    image = meta.get("image")
+    if not image:
+        return None
+    return {
+        "@context": "https://schema.org",
+        "@type": "ImageObject",
+        "url": image,
+        "contentUrl": image,
+        "caption": title_without_site(meta),
+        "representativeOfPage": True,
+    }
+
+
 def origin_from_meta(meta: dict) -> str:
     url = str(meta.get("canonical") or meta.get("url") or "").strip()
     if url.startswith(("http://", "https://")):
@@ -1002,7 +1016,12 @@ def add_breadcrumbs(meta: dict, origin: str, parents: list[tuple[str, str]] | No
         ],
     }
     meta["breadcrumbs"] = [{"name": label, "url": url} for label, url in trail]
-    meta["json_ld"] = json_ld_graph(meta.get("json_ld") or webpage_json_ld(meta), breadcrumb)
+    image_object = image_object_json_ld(meta)
+    meta["json_ld"] = json_ld_graph(
+        meta.get("json_ld") or webpage_json_ld(meta),
+        breadcrumb,
+        image_object,
+    )
     return meta
 
 
