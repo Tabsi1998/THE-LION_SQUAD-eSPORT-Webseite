@@ -3,6 +3,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { API, api, formatRequestError, parseTimeStr, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { PrizeList } from "@/components/tls/PrizeList";
@@ -81,7 +82,7 @@ export default function F1DetailPage() {
 
   useApiInvalidation(loadBoard, ["f1"]);
 
-  if (!challenge) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE …</div></PublicLayout>;
+  if (!challenge) return <PublicLayout><PublicLoadingState label="Lade Fast Lap" /></PublicLayout>;
 
   const hasOnlineSubmission = hasOnlineRegistration(challenge);
   const registration = hasOnlineSubmission ? getRegistrationState(challenge, "Einreichung") : null;

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -38,7 +39,7 @@ export default function GalleryPage() {
         </p>
 
         {loading ? (
-          <div className="mt-10 text-white/40 text-sm">Lade …</div>
+          <PublicLoadingState cards={4} className="mt-10 lg:grid-cols-4" />
         ) : albums.length === 0 ? (
           <PublicEmptyState
             icon={ImageIcon}

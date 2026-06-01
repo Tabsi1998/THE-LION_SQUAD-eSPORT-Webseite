@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
@@ -117,7 +118,7 @@ function TeamDetail({ id }) {
   useEffect(() => { refresh(); }, [refresh]);
   useApiInvalidation(refresh, ["teams"]);
 
-  if (!team) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE TEAM …</div></PublicLayout>;
+  if (!team) return <PublicLayout><PublicLoadingState label="Lade Team" /></PublicLayout>;
 
   const isMember = !!user && (team.is_member || team.member_ids?.includes(user.id));
   const canEdit = !!user && (team.can_manage || team.leader_id === user.id || team.co_leader_ids?.includes(user.id) || isAdmin);

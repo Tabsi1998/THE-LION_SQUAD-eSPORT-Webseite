@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -44,7 +45,7 @@ export default function GalleryAlbumPage() {
       </div>
     </PublicLayout>
   );
-  if (!a) return <PublicLayout><div className="p-20 text-center text-white/40">LADE …</div></PublicLayout>;
+  if (!a) return <PublicLayout><PublicLoadingState label="Lade Album" /></PublicLayout>;
 
   const photos = a.photos || [];
 

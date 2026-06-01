@@ -3,6 +3,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -38,7 +39,7 @@ export default function TournamentStandingsPage() {
   useApiInvalidation(load, ["tournaments", "matches"]);
   const tournamentUrl = t ? `/tournaments/${t.slug || t.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "/tournaments";
 
-  if (!t) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
+  if (!t) return <PublicLayout><PublicLoadingState label="Lade Rangliste" /></PublicLayout>;
 
   return (
     <PublicLayout>

@@ -201,7 +201,7 @@ Performance und technische Qualitaet:
 - [x] Core-Web-Vitals-Ziele definieren: schnelle Startseite, stabile Layouts ohne Spruenge, schnelle Detailseiten.
 - [x] API-Responses fuer Listen vereinheitlichen: kompakte Karten-Daten statt komplette Detailobjekte, Pagination/Filter sauber.
 - [x] Fehlerseiten modernisieren: 404/403/500 mit klarer Rueckfuehrung zu Start, Events, Turnieren, News und Jahreswertung.
-- Ladezustaende modernisieren und vereinheitlichen.
+- [x] Ladezustaende modernisieren und vereinheitlichen.
 
 SEO, Sharing und Content-Betrieb:
 

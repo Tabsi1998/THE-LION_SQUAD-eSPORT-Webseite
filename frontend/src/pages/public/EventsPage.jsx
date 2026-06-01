@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -19,14 +20,16 @@ export default function EventsPage() {
   const [meta, setMeta] = useState({ types: [], statuses: [] });
   const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "");
   const [tab, setTab] = useState(searchParams.get("view") === "past" ? "past" : "upcoming"); // upcoming | past
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => { api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, []);
 
   const load = useCallback(() => {
+    setLoading(true);
     const params = new URLSearchParams({ compact: "true", limit: "90" });
     if (tab === "upcoming") params.set("upcoming", "true");
     const url = `/events?${params.toString()}`;
-    api.get(url).then(({ data }) => setList(data)).catch(() => {});
+    api.get(url).then(({ data }) => setList(data)).catch(() => {}).finally(() => setLoading(false));
   }, [tab]);
 
   useEffect(() => {
@@ -85,7 +88,9 @@ export default function EventsPage() {
           </select>
         </div>
 
-        {filtered.length === 0 ? (
+        {loading ? (
+          <PublicLoadingState cards={6} className="mt-10" />
+        ) : filtered.length === 0 ? (
           <PublicEmptyState
             icon={Calendar}
             eyebrow="Events"

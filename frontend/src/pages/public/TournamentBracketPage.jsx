@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
@@ -40,7 +41,7 @@ export default function TournamentBracketPage() {
 
   useApiInvalidation(load, ["tournaments", "matches"]);
 
-  if (!data) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE TURNIERBAUM …</div></PublicLayout>;
+  if (!data) return <PublicLayout><PublicLoadingState label="Lade Turnierbaum" /></PublicLayout>;
   const t = data.tournament;
   const tournamentUrl = `/tournaments/${t.slug || t.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
 

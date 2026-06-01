@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { CalendarClock } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
@@ -83,7 +84,7 @@ export default function TournamentSchedulePage() {
   });
   useCanonicalSlugRedirect(slug, tournament.slug, "/tournaments", "/matches");
 
-  if (!data) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE SPIELPLAN …</div></PublicLayout>;
+  if (!data) return <PublicLayout><PublicLoadingState label="Lade Spielplan" /></PublicLayout>;
 
   return (
     <PublicLayout>

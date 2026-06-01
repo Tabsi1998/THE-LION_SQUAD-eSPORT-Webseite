@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -124,7 +125,7 @@ export default function NewsPage() {
         </div>
 
         {loading ? (
-          <div className="mt-10 text-white/40 text-sm">Lade …</div>
+          <PublicLoadingState cards={6} className="mt-10" />
         ) : list.length === 0 ? (
           <PublicEmptyState
             icon={Newspaper}

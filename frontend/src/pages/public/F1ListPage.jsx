@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -17,10 +18,16 @@ export default function F1ListPage() {
   );
 
   const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const { data } = await api.get("/f1/challenges?compact=true&limit=80");
-    setList(data);
+    setLoading(true);
+    try {
+      const { data } = await api.get("/f1/challenges?compact=true&limit=80");
+      setList(data);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -41,8 +48,11 @@ export default function F1ListPage() {
         </div>
       </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5">
-        {list.map((c) => <FastLapCard key={c.id} challenge={c} />)}
-        {list.length === 0 && (
+        {loading ? (
+          <PublicLoadingState cards={3} />
+        ) : list.length ? (
+          list.map((c) => <FastLapCard key={c.id} challenge={c} />)
+        ) : (
           <PublicEmptyState
             icon={Flag}
             eyebrow="Fast Lap"

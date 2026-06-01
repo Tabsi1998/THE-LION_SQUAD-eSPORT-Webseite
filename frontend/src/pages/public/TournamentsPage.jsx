@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentCard } from "@/components/tls/TournamentCard";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Trophy } from "lucide-react";
@@ -91,18 +92,7 @@ export default function TournamentsPage() {
           ))}
         </div>
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden animate-pulse">
-                <div className="aspect-video bg-white/5" />
-                <div className="p-5 space-y-3">
-                  <div className="h-3 bg-white/10 rounded-sm w-1/3" />
-                  <div className="h-5 bg-white/10 rounded-sm w-3/4" />
-                  <div className="h-3 bg-white/5 rounded-sm w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <PublicLoadingState cards={6} />
         ) : error ? (
           <div className="col-span-full text-center py-20">
             <div className="text-[#FF3B30] font-display tracking-widest text-sm">FEHLER BEIM LADEN</div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -46,7 +47,7 @@ export default function NewsDetailPage() {
     </PublicLayout>
   );
 
-  if (!post) return <PublicLayout><div className="max-w-3xl mx-auto px-6 py-20 text-white/40">Lade …</div></PublicLayout>;
+  if (!post) return <PublicLayout><PublicLoadingState label="Lade News" /></PublicLayout>;
 
   return (
     <PublicLayout>

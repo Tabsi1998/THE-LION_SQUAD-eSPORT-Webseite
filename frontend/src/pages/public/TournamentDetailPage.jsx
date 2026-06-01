@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom"
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
@@ -134,7 +135,7 @@ export default function TournamentDetailPage() {
     }
   };
 
-  if (!t) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE …</div></PublicLayout>;
+  if (!t) return <PublicLayout><PublicLoadingState label="Lade Turnier" /></PublicLayout>;
 
   const registration = getRegistrationState(t, "Anmeldung");
   const isTeamTournament = (t.team_mode || "solo") !== "solo";

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
@@ -79,7 +80,7 @@ export default function SeasonPage() {
   }, [slug]);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["seasons", "tournaments", "f1", "users"]);
-  if (!data) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
+  if (!data) return <PublicLayout><PublicLoadingState label="Lade Jahreswertung" /></PublicLayout>;
   const s = data.season;
   const standings = data.standings || [];
   const topThree = standings.slice(0, 3);
