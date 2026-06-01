@@ -81,6 +81,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      {state && <PriorityStrip state={state} timeline={timeline} primaryNews={primaryNews} />}
       <LiveStreamSlider />
       <SponsorTicker placement="home" spotlight />
 
@@ -210,6 +211,66 @@ function FeaturedNews({ news }) {
         </span>
       </div>
     </Link>
+  );
+}
+
+function PriorityStrip({ state, timeline, primaryNews }) {
+  const liveCount = [
+    ...(state.live?.events || []),
+    ...(state.live?.tournaments || []),
+    ...(state.live?.challenges || []),
+  ].length;
+  const next = timeline[0] || null;
+  const cards = [
+    {
+      icon: Radio,
+      label: liveCount ? "Live jetzt" : "Live",
+      title: liveCount ? `${liveCount} aktiv` : "Nichts live",
+      text: liveCount ? "Direkt zu laufenden Events, Turnieren oder Fast Laps." : "Wenn etwas startet, ist es hier sofort sichtbar.",
+      to: liveCount ? next?.url || "/events" : "/events",
+      accent: "#FF3B30",
+    },
+    {
+      icon: Calendar,
+      label: "Naechster Termin",
+      title: next?.label || "Planung folgt",
+      text: next?.start_date ? new Date(next.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" }) : "Aktuelle Termine erscheinen automatisch.",
+      to: next?.url || "/events",
+      accent: "#9F7AEA",
+    },
+    {
+      icon: Newspaper,
+      label: "Aktuelle News",
+      title: primaryNews?.title || "News lesen",
+      text: primaryNews?.excerpt || "Updates, Rueckblicke und Ankuendigungen aus dem Verein.",
+      to: primaryNews?.slug ? `/news/${primaryNews.slug}` : "/news",
+      accent: "#29B6E8",
+    },
+    {
+      icon: Crown,
+      label: "Jahreswertung",
+      title: "Club Championship",
+      text: "Rangliste, Punkte und aktuelle Saisonentwicklung.",
+      to: "/seasons/current",
+      accent: "#FFD700",
+    },
+  ];
+  return (
+    <section className="border-b border-white/10 bg-[#0D0D0D]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {cards.map(({ icon: Icon, label, title, text, to, accent }) => (
+            <Link key={label} to={to} className="group min-w-0 rounded-sm border border-white/10 bg-black/20 p-4 transition hover:border-white/25 hover:bg-white/[0.04]">
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: accent }}>
+                <Icon className="w-3.5 h-3.5" /> {label}
+              </div>
+              <div className="mt-2 font-heading text-lg font-black uppercase leading-tight line-clamp-2 group-hover:text-[#29B6E8] transition">{title}</div>
+              <p className="mt-2 text-xs text-white/55 leading-relaxed line-clamp-2">{text}</p>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
