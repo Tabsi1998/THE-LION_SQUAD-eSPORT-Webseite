@@ -11,6 +11,18 @@
   body:has(nav[aria-label="Mobile Navigation"]) main {
     padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
   }
+
+  body:has(nav[aria-label="Mobile Navigation"]):has(.tls-site-banner--pos-bottom_fixed) main {
+    padding-bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  body:has(nav[aria-label="Mobile Navigation"]) .tls-site-banner--pos-bottom_fixed {
+    bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  body:has(nav[aria-label="Mobile Navigation"]):has(.tls-site-banner--pos-bottom_fixed) [data-testid="scroll-top-btn"] {
+    bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 /* Viewport-Meta für PWA */

@@ -17,10 +17,10 @@ const GUEST_ITEMS = [
 ];
 
 const AUTH_ITEMS = [
-  { to: "/", label: "Home", icon: Home, exact: true },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/tournaments", label: "Turniere", icon: Trophy },
   { to: "/events", label: "Events", icon: Calendar },
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/seasons/current", label: "Wertung", icon: Medal },
   { to: "/profile", label: "Profil", icon: User },
 ];
 

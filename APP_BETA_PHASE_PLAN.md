@@ -158,9 +158,9 @@ Gemeinsame UI-Muster:
 
 Mobile Website:
 
-- Pruefen, ob die BottomNav fuer eingeloggte User "Events" oder "Season/Jahreswertung" sinnvoller priorisiert, weil Events/Turniere/Jahreswertung fuer Vereinsbetrieb wichtiger sind.
-- Mobile Header und BottomNav duerfen sich nicht doppelt anfuehlen: Burger-Menue bleibt fuer tiefe Navigation, BottomNav fuer Hauptwege.
-- Scroll-Top-Button und Bottom-Banner muessen mit BottomNav/Safe-Area sauber zusammenspielen.
+- [x] BottomNav fuer eingeloggte User priorisiert Dashboard, Events/Turniere, Jahreswertung und Profil; News/Home bleiben ueber Hauptnavigation erreichbar.
+- [x] Mobile Header und BottomNav duerfen sich nicht doppelt anfuehlen: Burger-Menue bleibt fuer tiefe Navigation, BottomNav fuer Hauptwege.
+- [x] Scroll-Top-Button und Bottom-Banner spielen mit BottomNav/Safe-Area sauber zusammen.
 - Admin- und Profilseiten mobil weiter verdichten: Tabellenkarten, Sticky-Actions und weniger horizontales Scrollen.
 
 Design-Checks:
