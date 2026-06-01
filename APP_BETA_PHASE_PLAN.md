@@ -184,7 +184,7 @@ Public Website:
 - [x] Turnier-, Event- und Fast-Lap-Listen/Karten angleichen: konsistente Status-, Meta- und CTA-Signale auf Public-Karten.
 - [x] News-Seiten mit besseren Inhaltsbausteinen: Embed-Karten, Autoren-/Kategoriezeile, "Weiterlesen", verwandte Turniere/Events.
 - [x] Community-Bereich klarer strukturieren: Spieler, Teams, Server, Mitglieder, Achievements und Referenzen als zusammenhaengende Community-Welt.
-- Sponsoren/Partner sichtbarer machen: Partnerkarten, Sponsoren-Tiers, Verknuepfung mit Events, Footer/SEO-Daten sauber halten.
+- [x] Sponsoren/Partner sichtbarer machen: Partnerkarten, Sponsoren-Tiers, Verknuepfung mit Events und gegenseitige Einstiege.
 
 Navigation und Informationsarchitektur:
 

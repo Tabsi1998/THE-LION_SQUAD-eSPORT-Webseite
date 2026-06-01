@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { SmartLogo } from "@/components/tls/SmartLogo";
-import { Star } from "lucide-react";
+import { ArrowRight, Calendar, Handshake, Star } from "lucide-react";
 
 const tierLabel = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const tierColor = { main: "#29B6E8", platinum: "#E5E4E2", gold: "#FFD700", silver: "#C0C0C0", bronze: "#CD7F32" };
@@ -60,6 +61,12 @@ export default function SponsorsPage() {
           Diese Marken und Unternehmen unterstützen THE LION SQUAD — eSports. Ohne sie wären viele unserer Events, Turniere und Aktionen nicht möglich. Danke!
         </p>
 
+        <div className="mt-8 grid md:grid-cols-3 gap-3">
+          <SupportLink to="/events" icon={Calendar} label="Event-Sichtbarkeit" text="Sponsoren erscheinen dort, wo Events und Turniere stattfinden." />
+          <SupportLink to="/partners" icon={Handshake} label="Partner-Netzwerk" text="Befreundete Vereine, Veranstalter und Communitys." />
+          <SupportLink to="/contact" icon={ArrowRight} label="Sponsor werden" text="Kontakt fuer Kooperationen, Pakete und gemeinsame Aktionen." />
+        </div>
+
         {publicSponsors.length === 0 && (
           <div className="mt-12 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
             <Star className="w-10 h-10 mx-auto opacity-40 mb-4" />
@@ -102,5 +109,19 @@ export default function SponsorsPage() {
         </div>
       </section>
     </PublicLayout>
+  );
+}
+
+function SupportLink({ to, icon: Icon, label, text }) {
+  return (
+    <Link to={to} className="group rounded-sm border border-white/10 bg-[#101010] p-4 transition hover:border-[#FFD700]/35 hover:bg-white/[0.03]">
+      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">
+        <Icon className="h-3.5 w-3.5" /> {label}
+      </div>
+      <p className="mt-2 text-sm text-white/55 line-clamp-2">{text}</p>
+      <span className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/35 group-hover:text-[#FFD700]">
+        Oeffnen <ArrowRight className="h-3 w-3" />
+      </span>
+    </Link>
   );
 }
