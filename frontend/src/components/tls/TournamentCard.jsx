@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { PhaseBadge } from "./PhaseBadge";
-import { Calendar, Users, Trophy } from "lucide-react";
+import { ArrowRight, Calendar, Users, Trophy } from "lucide-react";
 import { formatDate, getRegistrationState } from "@/lib/datetime";
 import { resolveMediaUrl } from "@/lib/api";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
@@ -45,7 +45,7 @@ export function TournamentCard({ tournament, index = 0 }) {
         <h3 className="font-heading font-bold text-xl text-white group-hover:text-[#29B6E8] transition-colors line-clamp-2">
           {t.title}
         </h3>
-        <div className="mt-3 flex items-center gap-4 text-xs text-white/60">
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/60">
           {t.start_date && (
             <span className="inline-flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
@@ -67,6 +67,14 @@ export function TournamentCard({ tournament, index = 0 }) {
           registration.canRegister ? "text-[#00FF88]" : registration.state === "scheduled" ? "text-[#29B6E8]" : "text-white/45"
         }`}>
           {registration.label}
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
+          <span className="text-[10px] uppercase tracking-widest font-bold text-white/40">
+            {registration.canRegister ? "Anmeldung" : "Turnierdetails"}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
+            {registration.canRegister ? "Mitmachen" : "Ansehen"} <ArrowRight className="w-3 h-3" />
+          </span>
         </div>
       </div>
     </Link>
