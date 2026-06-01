@@ -21,7 +21,7 @@ export function navigateToNotification(item: UserNotification) {
     return true;
   }
   if (target.area === "profile") {
-    navigationRef.navigate("Profile");
+    navigationRef.navigate("Profile", target.params);
     return true;
   }
   if (target.area === "teams") {
@@ -45,7 +45,7 @@ export function flushPendingNotification() {
 
 type NotificationTarget =
   | { area: "dashboard" }
-  | { area: "profile" }
+  | { area: "profile"; params?: { tab?: "overview" | "references" | "prizes" | "edit" | "achievements" | "privacy" | "notifications" } }
   | { area: "teams"; screen: "TeamList"; params?: undefined }
   | { area: "teams"; screen: "TeamDetail" | "TeamChat"; params: { id: string; title?: string } }
   | { area: "tournaments"; screen: "TournamentDetail" | "EventDetail" | "FastLapDetail" | "MatchDetail" | "TournamentChat"; params: { id: string; title?: string } }
@@ -82,12 +82,15 @@ function targetFromNotification(item: UserNotification): NotificationTarget | nu
   if (challengeId && (kind.includes("f1") || kind.includes("fast"))) {
     return { area: "tournaments", screen: "FastLapDetail", params: { id: challengeId } };
   }
+  if (kind.includes("prize")) {
+    return { area: "profile", params: { tab: "prizes" } };
+  }
 
   const tournamentId = stringMeta(meta, "tournament_id");
   if (tournamentId && kind.includes("tournament_chat")) {
     return { area: "tournaments", screen: "TournamentChat", params: { id: tournamentId, title: "Turnier-Chat" } };
   }
-  if (tournamentId && (kind.includes("tournament") || kind.includes("prize"))) {
+  if (tournamentId && kind.includes("tournament")) {
     return { area: "tournaments", screen: "TournamentDetail", params: { id: tournamentId } };
   }
 
@@ -120,7 +123,7 @@ function targetFromUrl(url?: string | null): NotificationTarget | null {
   if (first === "profile" && parsed.query.includes("tab=inbox")) return { area: "more", screen: "DirectMessages" };
   if (first === "profile" && parsed.query.includes("tab=teams")) return { area: "teams", screen: "TeamList" };
   if (first === "profile") return { area: "profile" };
-  if (first === "me" && second === "prizes") return { area: "profile" };
+  if (first === "me" && second === "prizes") return { area: "profile", params: { tab: "prizes" } };
   return null;
 }
 

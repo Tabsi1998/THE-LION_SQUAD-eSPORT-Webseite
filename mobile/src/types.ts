@@ -319,6 +319,30 @@ export type PersonalReferenceData = {
   };
 };
 
+export type PrizePickup = {
+  id: string;
+  status?: string | null;
+  place?: number | string | null;
+  place_label?: string | null;
+  prize_label?: string | null;
+  prize_value?: string | null;
+  pickup_deadline?: string | null;
+  ready_at?: string | null;
+  picked_up_at?: string | null;
+  source_type?: "tournament" | "fastlap" | string | null;
+  source_url?: string | null;
+  tournament_id?: string | null;
+  tournament_title?: string | null;
+  tournament_slug?: string | null;
+  fastlap_challenge_id?: string | null;
+  fastlap_challenge_title?: string | null;
+  fastlap_challenge_slug?: string | null;
+  fastlap_source_label?: string | null;
+  fastlap_track_name?: string | null;
+  recipient_type?: "user" | "team" | string | null;
+  recipient_label?: string | null;
+};
+
 export type F1Track = {
   id: string;
   name?: string;

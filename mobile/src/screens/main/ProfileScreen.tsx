@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { Image, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch, TextInput, View } from "react-native";
 import { ActionRow, ActionTile } from "../../components/ActionRow";
 import { Button } from "../../components/Button";
@@ -14,9 +14,9 @@ import { API_BASE_URL } from "../../config";
 import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import { colors } from "../../theme";
-import type { PersonalReferenceData, PersonalReferenceItem } from "../../types";
+import type { PersonalReferenceData, PersonalReferenceItem, PrizePickup } from "../../types";
 
-type TabKey = "overview" | "references" | "edit" | "achievements" | "privacy" | "notifications";
+type TabKey = "overview" | "references" | "prizes" | "edit" | "achievements" | "privacy" | "notifications";
 type AchievementData = { groups?: AchievementGroup[]; awards?: any[] };
 type AchievementGroup = {
   code: string;
@@ -47,6 +47,7 @@ type AchievementTier = {
 const tabs: Array<{ key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
   { key: "overview", label: "Übersicht", icon: "person-circle-outline" },
   { key: "references", label: "Referenzen", icon: "ribbon-outline" },
+  { key: "prizes", label: "Gewinne", icon: "trophy-outline" },
   { key: "edit", label: "Bearbeiten", icon: "create-outline" },
   { key: "achievements", label: "Erfolge", icon: "trophy-outline" },
   { key: "privacy", label: "Privat", icon: "shield-checkmark-outline" },
@@ -89,10 +90,12 @@ const levelColors: Record<number, string> = {
 
 export function ProfileScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { user, logout, refreshMe } = useAuth();
   const [tab, setTab] = useState<TabKey>("overview");
   const [achievements, setAchievements] = useState<AchievementData>({ groups: [], awards: [] });
   const [references, setReferences] = useState<PersonalReferenceData>({ items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
+  const [prizes, setPrizes] = useState<PrizePickup[]>([]);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [completeness, setCompleteness] = useState<{ score?: number; missing?: string[] }>({});
   const [form, setForm] = useState<Record<string, any>>({});
@@ -148,19 +151,22 @@ export function ProfileScreen() {
   const loadProfileData = useCallback(async () => {
     setProfileError("");
     if (guest) {
+      setPrizes([]);
       setProfileLoading(false);
       setRefreshing(false);
       return;
     }
     try {
-      const [achievementResult, completenessResult, preferenceResult, referenceResult] = await Promise.all([
+      const [achievementResult, completenessResult, preferenceResult, referenceResult, prizeResult] = await Promise.all([
         api.get<AchievementData>("/achievements/me").catch(() => ({ data: { groups: [], awards: [] } })),
         api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness").catch(() => ({ data: {} })),
         api.get<{ preferences?: Record<string, boolean> } | Record<string, boolean>>("/users/me/notification-preferences").catch(() => ({ data: {} })),
         api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } } })),
+        api.get<PrizePickup[]>("/prizes/me").catch(() => ({ data: [] })),
       ]);
       setAchievements(achievementResult.data || { groups: [], awards: [] });
       setReferences(referenceResult.data || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
+      setPrizes(Array.isArray(prizeResult.data) ? prizeResult.data : []);
       setCompleteness(completenessResult.data || {});
       setForm((current) => ({
         ...current,
@@ -186,6 +192,13 @@ export function ProfileScreen() {
   }, [loadProfileData]);
 
   useEffect(() => {
+    const requestedTab = route.params?.tab;
+    if (requestedTab && tabs.some((item) => item.key === requestedTab)) {
+      setTab(requestedTab);
+    }
+  }, [route.params?.tab]);
+
+  useEffect(() => {
     if (tab !== "achievements") setOpenGroups({});
   }, [tab]);
 
@@ -198,6 +211,13 @@ export function ProfileScreen() {
       .sort((a, b) => Number(b.percent || 0) - Number(a.percent || 0))[0];
     return { tiers, earned, points, next };
   }, [achievements]);
+
+  const prizeStats = useMemo(() => {
+    const open = prizes.filter((item) => ["pending", "ready"].includes(String(item.status || "pending")));
+    const ready = prizes.filter((item) => String(item.status || "") === "ready");
+    const pickedUp = prizes.filter((item) => String(item.status || "") === "picked_up");
+    return { open, ready, pickedUp };
+  }, [prizes]);
 
   const save = useCallback(async () => {
     if (guest) return;
@@ -249,6 +269,16 @@ export function ProfileScreen() {
     if (item.kind === "tournament") {
       navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id: item.target_id } });
     }
+  }, [navigation]);
+
+  const openPrize = useCallback((item: PrizePickup) => {
+    const target = prizeTarget(item);
+    if (!target.id) return;
+    if (target.kind === "fastlap") {
+      navigation.navigate("Tournaments", { screen: "FastLapDetail", params: { id: target.id } });
+      return;
+    }
+    navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id: target.id } });
   }, [navigation]);
 
   const refreshProfile = useCallback(async () => {
@@ -311,6 +341,7 @@ export function ProfileScreen() {
                 <Pill label={user?.is_club_member ? "Vereinsmitglied" : "Community"} tone={user?.is_club_member ? "success" : "cyan"} />
                 <Pill label={`${completeness.score ?? 0}% Profil`} tone="gold" />
                 <Pill label={`${insights.earned.length} Erfolge`} />
+                {prizeStats.open.length ? <Pill label={`${prizeStats.open.length} Gewinne`} tone="cyan" /> : null}
               </View>
             </View>
           </View>
@@ -320,6 +351,7 @@ export function ProfileScreen() {
           <ActionTile icon="create-outline" label="Bearbeiten" onPress={() => setTab("edit")} />
           <ActionTile icon="open-outline" label="Öffentlich" onPress={guest ? undefined : openPublicProfile} />
           <ActionTile icon="share-social-outline" label="Teilen" onPress={guest ? undefined : sharePublicProfile} />
+          <ActionTile icon="trophy-outline" label="Gewinne" onPress={guest ? undefined : () => setTab("prizes")} />
           <ActionTile icon="refresh-outline" label={refreshing ? "Lädt" : "Aktualisieren"} onPress={guest || refreshing ? undefined : refreshProfile} />
           <ActionTile icon="shield-checkmark-outline" label="Privat" onPress={() => setTab("privacy")} />
           <ActionTile icon="notifications-outline" label="Benachr." onPress={() => setTab("notifications")} />
@@ -397,6 +429,27 @@ export function ProfileScreen() {
             ) : (
               <Card style={styles.card}>
                 <EmptyState icon="ribbon-outline" title="Noch keine Referenzen" detail="Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier." />
+              </Card>
+            )}
+          </>
+        ) : null}
+
+        {!profileLoading && tab === "prizes" ? (
+          <>
+            <Card style={styles.card}>
+              <Heading>Meine Gewinne</Heading>
+              <Muted>Preise aus Turnieren und Fast-Lap-Challenges, sobald sie fuer dein Konto oder Team hinterlegt sind.</Muted>
+              <View style={styles.statGrid}>
+                <Stat label="Offen" value={String(prizeStats.open.length)} />
+                <Stat label="Bereit" value={String(prizeStats.ready.length)} tone="gold" />
+                <Stat label="Abgeholt" value={String(prizeStats.pickedUp.length)} />
+              </View>
+            </Card>
+            {prizes.length ? (
+              prizes.map((item) => <PrizeCard key={item.id} item={item} onOpen={openPrize} />)
+            ) : (
+              <Card style={styles.card}>
+                <EmptyState icon="trophy-outline" title="Noch keine Gewinne" detail="Sobald ein Preis fuer dich oder dein Team eingetragen wird, erscheint er hier." tone="gold" />
               </Card>
             )}
           </>
@@ -671,6 +724,63 @@ function ReferenceCard({ item, onOpen }: { item: PersonalReferenceItem; onOpen?:
       {content}
     </Pressable>
   );
+}
+
+function PrizeCard({ item, onOpen }: { item: PrizePickup; onOpen?: (item: PrizePickup) => void }) {
+  const target = prizeTarget(item);
+  const isFastlap = target.kind === "fastlap";
+  const status = String(item.status || "pending");
+  const isReady = status === "ready";
+  const sourceTitle = item.fastlap_challenge_title || item.tournament_title || "Gewinn";
+  const prizeText = item.prize_value || item.prize_label || "Preis";
+  const placeText = item.place_label || (item.place ? `Platz ${item.place}` : "Platz");
+  const deadline = item.pickup_deadline ? formatDate(item.pickup_deadline) : "";
+  const pickedUp = item.picked_up_at ? formatDate(item.picked_up_at) : "";
+  const overdue = item.pickup_deadline ? Date.parse(item.pickup_deadline) < Date.now() && status !== "picked_up" : false;
+  const content = (
+    <Card style={[styles.referenceCard, isReady && { borderColor: "rgba(240, 180, 41, 0.48)" }, overdue && { borderColor: "rgba(255, 65, 84, 0.56)" }]}>
+      <View style={styles.referenceTop}>
+        <View style={[styles.referenceIcon, isFastlap ? styles.referenceIconFastlap : styles.referenceIconTournament]}>
+          <Body style={styles.referenceIconText}>{isFastlap ? "FL" : "T"}</Body>
+        </View>
+        <View style={styles.referenceText}>
+          <Body style={styles.strong}>{prizeText}</Body>
+          <Muted>{sourceTitle}</Muted>
+          <Muted>{prizeSourceLabel(item)} - {formatStatus(status)}</Muted>
+        </View>
+        <View style={styles.referenceRank}>
+          <Body style={[styles.referenceRankText, styles.gold]}>{placeText.replace(/^Platz\s*/i, "#")}</Body>
+          <Muted>{item.recipient_type === "team" ? item.recipient_label || "Team" : "Du"}</Muted>
+        </View>
+      </View>
+      <View style={styles.referenceMeta}>
+        {isReady ? <Pill label="Bereit" tone="gold" /> : null}
+        {deadline ? <Pill label={`Frist ${deadline}`} tone={overdue ? "gold" : "default"} /> : null}
+        {pickedUp ? <Pill label={`Abgeholt ${pickedUp}`} tone="success" /> : null}
+        {item.fastlap_track_name ? <Pill label={item.fastlap_track_name} tone="cyan" /> : null}
+        <Pill label={isFastlap ? "Fast Lap" : "Turnier"} />
+      </View>
+    </Card>
+  );
+  if (!target.id || !onOpen) return content;
+  return (
+    <Pressable onPress={() => onOpen(item)} style={({ pressed }) => [pressed && styles.pressed]}>
+      {content}
+    </Pressable>
+  );
+}
+
+function prizeTarget(item: PrizePickup) {
+  if (item.source_type === "fastlap") {
+    return { kind: "fastlap", id: item.fastlap_challenge_slug || item.fastlap_challenge_id || "" };
+  }
+  return { kind: "tournament", id: item.tournament_slug || item.tournament_id || "" };
+}
+
+function prizeSourceLabel(item: PrizePickup) {
+  if (item.fastlap_source_label) return item.fastlap_source_label;
+  if (item.source_type === "fastlap") return "Fast Lap";
+  return "Turnier";
 }
 
 function ProgressBar({ value, color }: { value: number; color: string }) {
