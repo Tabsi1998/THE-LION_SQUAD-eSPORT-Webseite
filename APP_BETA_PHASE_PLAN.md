@@ -192,7 +192,7 @@ Navigation und Informationsarchitektur:
 - [x] "Mein Bereich" klarer als Spieler-Dashboard positionieren, getrennt von oeffentlichem Profil.
 - [x] Mobile BottomNav und Desktop-Nav inhaltlich aufeinander abstimmen.
 - [x] Breadcrumbs/Zurueck-Links auf tiefen Seiten wie Match, Bracket, Standings und Galerie konsequent einsetzen.
-- Interne Suche oder Quick-Jump fuer Turniere, Events, News, Spieler und Teams pruefen.
+- [x] Interne Suche oder Quick-Jump fuer Turniere, Events, News, Spieler und Teams pruefen.
 
 Performance und technische Qualitaet:
 

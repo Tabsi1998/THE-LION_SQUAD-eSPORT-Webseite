@@ -4,6 +4,7 @@ import { Logo } from "@/components/tls/Logo";
 import { MainNav, MobileNav } from "@/components/tls/MainNav";
 import { NotificationBell } from "@/components/tls/NotificationBell";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
+import { GlobalSearch } from "@/components/tls/GlobalSearch";
 import { openCookieSettings } from "@/components/tls/CookieConsent";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
@@ -63,6 +64,7 @@ export function PublicLayout({ children }) {
           <Logo size="md" />
           <MainNav isClubMember={isClubMember} />
           <div className="flex items-center gap-2">
+            <GlobalSearch />
             {user ? (
               <>
                 {isClubMember && (
