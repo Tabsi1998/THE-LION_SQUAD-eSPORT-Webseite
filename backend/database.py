@@ -210,11 +210,14 @@ async def init_indexes():
     # Phase 9: Prize pickups
     await db.prize_pickups.create_index("id", unique=True)
     await db.prize_pickups.create_index("tournament_id")
+    await db.prize_pickups.create_index("source_type")
+    await db.prize_pickups.create_index("fastlap_challenge_id")
     await db.prize_pickups.create_index("user_id")
     await db.prize_pickups.create_index("team_id")
     await db.prize_pickups.create_index("status")
     await db.prize_pickups.create_index([("tournament_id", 1), ("place", 1), ("user_id", 1)])
     await db.prize_pickups.create_index([("tournament_id", 1), ("place", 1), ("team_id", 1)])
+    await db.prize_pickups.create_index([("source_type", 1), ("fastlap_challenge_id", 1), ("fastlap_source_key", 1), ("place", 1), ("user_id", 1)])
     # Phase D refinements
     await db.contact_messages.create_index("id", unique=True)
     await db.contact_messages.create_index([("status", 1), ("created_at", -1)])

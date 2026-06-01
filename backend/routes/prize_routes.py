@@ -211,3 +211,11 @@ async def auto_create(tournament_id: str, me: dict = Depends(require_admin())):
     from services.prize_service import auto_create_for_tournament
     n = await auto_create_for_tournament(tournament_id)
     return {"created": n}
+
+
+@router.post("/auto-create/fastlap/{challenge_id}")
+async def auto_create_fastlap(challenge_id: str, me: dict = Depends(require_admin())):
+    """Manual trigger to create pickups for a Fast-Lap challenge."""
+    from services.prize_service import auto_create_for_f1_challenge
+    n = await auto_create_for_f1_challenge(challenge_id)
+    return {"created": n}

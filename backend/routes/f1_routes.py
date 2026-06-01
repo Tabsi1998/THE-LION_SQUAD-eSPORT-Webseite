@@ -479,7 +479,8 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
         except Exception:
             pass
         try:
-            await _notify_f1_prize_winners(c)
+            from services.prize_service import auto_create_for_f1_challenge
+            await auto_create_for_f1_challenge(c["id"])
         except Exception:
             pass
     return c
@@ -577,6 +578,7 @@ async def delete_challenge(cid: str, me: dict = Depends(require_admin())):
     await db.f1_tracks.delete_many({"challenge_id": cid})
     await db.f1_lap_times.delete_many({"challenge_id": cid})
     await db.f1_staff_assignments.delete_many({"challenge_id": cid})
+    await db.prize_pickups.delete_many({"source_type": "fastlap", "fastlap_challenge_id": cid})
     return {"ok": True}
 
 

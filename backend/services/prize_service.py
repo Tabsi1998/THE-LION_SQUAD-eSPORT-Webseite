@@ -129,6 +129,161 @@ async def auto_create_for_tournament(tid: str) -> int:
     return created
 
 
+def _effective_lap_ms(row: dict) -> int:
+    return int(row.get("time_ms") or 0) + int((row.get("penalty_seconds") or 0) * 1000)
+
+
+def _rank_best_laps(times: list[dict]) -> list[dict]:
+    best_per_user: dict[str, dict] = {}
+    for row in times:
+        uid = row.get("user_id")
+        if not uid:
+            continue
+        effective = _effective_lap_ms(row)
+        if uid not in best_per_user or effective < best_per_user[uid]["effective_ms"]:
+            best_per_user[uid] = {**row, "effective_ms": effective}
+    return sorted(best_per_user.values(), key=lambda row: row["effective_ms"])
+
+
+def _official_f1_time_query(extra: dict | None = None) -> dict:
+    return {
+        **(extra or {}),
+        "is_invalid": {"$ne": True},
+        "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}],
+    }
+
+
+async def _f1_championship_rankings(db, challenge: dict, tracks: list[dict]) -> list[dict]:
+    points_system = challenge.get("points_per_position") or [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
+    totals: dict[str, dict] = {}
+    for track in tracks:
+        times = await db.f1_lap_times.find(
+            _official_f1_time_query({"challenge_id": challenge["id"], "track_id": track["id"]}),
+            {"_id": 0},
+        ).to_list(5000)
+        for pos, row in enumerate(_rank_best_laps(times)):
+            uid = row.get("user_id")
+            if not uid:
+                continue
+            pts = points_system[pos] if pos < len(points_system) else 0
+            totals.setdefault(uid, {"user_id": uid, "points": 0, "wins": 0, "races": 0})
+            totals[uid]["points"] += pts
+            totals[uid]["races"] += 1
+            if pos == 0:
+                totals[uid]["wins"] += 1
+    return sorted(totals.values(), key=lambda row: (row["points"], row["wins"], row["races"]), reverse=True)
+
+
+async def auto_create_for_f1_challenge(challenge_id: str) -> int:
+    """Build PrizePickups for Fast-Lap results when results are published.
+
+    Non-championship challenges create pickups per track. Championship challenges
+    create pickups from the overall championship standings.
+    """
+    db = get_db()
+    challenge = await db.f1_challenges.find_one({"id": challenge_id}, {"_id": 0}) or {}
+    prize_places = challenge.get("prize_places") or []
+    if not challenge or not prize_places:
+        return 0
+
+    prize_ranks: list[tuple[int, dict]] = []
+    for prize in prize_places:
+        try:
+            rank = int(prize.get("place"))
+        except Exception:
+            continue
+        if rank > 0:
+            prize_ranks.append((rank, prize))
+    if not prize_ranks:
+        return 0
+
+    tracks = await db.f1_tracks.find({"challenge_id": challenge_id}, {"_id": 0}).sort("order_index", 1).to_list(100)
+    if not tracks:
+        return 0
+
+    slug_or_id = challenge.get("slug") or challenge_id
+    deadline = (now_utc() + timedelta(days=DEFAULT_PICKUP_WINDOW_DAYS)).isoformat()
+    created = 0
+
+    async def create_pickup(user_id: str, place: int, prize: dict, source_key: str, source_label: str, track: dict | None = None) -> bool:
+        existing = await db.prize_pickups.find_one({
+            "source_type": "fastlap",
+            "fastlap_challenge_id": challenge_id,
+            "fastlap_source_key": source_key,
+            "place": place,
+            "user_id": user_id,
+            "team_id": None,
+        })
+        if existing:
+            return False
+        place_label = prize.get("label") or _ordinal(place)
+        doc = {
+            "id": new_id(),
+            "source_type": "fastlap",
+            "fastlap_challenge_id": challenge_id,
+            "fastlap_challenge_title": challenge.get("title"),
+            "fastlap_challenge_slug": challenge.get("slug"),
+            "fastlap_track_id": track.get("id") if track else None,
+            "fastlap_track_name": track.get("name") if track else None,
+            "fastlap_source_key": source_key,
+            "fastlap_source_label": source_label,
+            "source_url": f"/fastlap/{slug_or_id}",
+            "tournament_id": None,
+            "tournament_title": challenge.get("title"),
+            "tournament_slug": None,
+            "user_id": user_id,
+            "team_id": None,
+            "place": place,
+            "prize_group": prize.get("group") or ("championship" if challenge.get("is_championship") else "track"),
+            "place_label": place_label,
+            "prize_label": place_label,
+            "prize_value": prize.get("value") or "",
+            "status": "pending",
+            "pickup_deadline": deadline,
+            "ready_at": None,
+            "picked_up_at": None,
+            "picked_up_by": None,
+            "notes": "",
+            "created_at": now_utc().isoformat(),
+            "updated_at": now_utc().isoformat(),
+        }
+        await db.prize_pickups.insert_one(doc)
+        try:
+            from services.user_notifications import create_user_notification
+            prize_text = doc.get("prize_value") or doc.get("prize_label") or "ein Preis"
+            await create_user_notification(
+                user_id,
+                "Fast-Lap Gewinn vorgemerkt",
+                f"{source_label}: {place_label} bei {challenge.get('title') or 'Fast Lap'} - {prize_text}. Sobald der Gewinn abholbereit ist, bekommst du die naechste Meldung.",
+                url="/me/prizes",
+                kind="prize_pending",
+                meta={"source_type": "fastlap", "challenge_id": challenge_id, "pickup_id": doc["id"], "place": place, "source_key": source_key},
+            )
+        except Exception:
+            logger.warning("[prizes] f1 notification failed for pickup %s", _log_safe(doc.get("id")), exc_info=True)
+        logger.info("[prizes] created f1 pickup %s place %s challenge %s", _log_safe(doc.get("id")), place, _log_safe(challenge_id))
+        return True
+
+    if challenge.get("is_championship"):
+        ranked = await _f1_championship_rankings(db, challenge, tracks)
+        for place, prize in prize_ranks:
+            if place <= len(ranked) and await create_pickup(ranked[place - 1]["user_id"], place, prize, "championship", "Gesamtwertung"):
+                created += 1
+        return created
+
+    max_rank = max(rank for rank, _ in prize_ranks)
+    for track in tracks:
+        times = await db.f1_lap_times.find(
+            _official_f1_time_query({"challenge_id": challenge_id, "track_id": track["id"]}),
+            {"_id": 0},
+        ).to_list(5000)
+        ranked = _rank_best_laps(times)[:max_rank]
+        for place, prize in prize_ranks:
+            if place <= len(ranked) and await create_pickup(ranked[place - 1]["user_id"], place, prize, f"track:{track['id']}", track.get("name") or "Strecke", track):
+                created += 1
+    return created
+
+
 async def mark_ready(pickup_id: str, actor_id: str) -> Optional[dict]:
     db = get_db()
     p = await db.prize_pickups.find_one({"id": pickup_id})

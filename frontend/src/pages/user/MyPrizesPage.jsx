@@ -35,7 +35,7 @@ export default function MyPrizesPage() {
     api.get("/prizes/me").then(({ data }) => { setItems(data); setLoading(false); }).catch(() => setLoading(false));
   }, []);
   useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["prizes", "tournaments"]);
+  useApiInvalidation(load, ["prizes", "tournaments", "f1"]);
 
   const open = items.filter((p) => ["pending", "ready"].includes(p.status));
   const closed = items.filter((p) => ["picked_up", "expired"].includes(p.status));
@@ -48,7 +48,7 @@ export default function MyPrizesPage() {
         <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Spieler</span>
         <h1 className="font-heading text-3xl md:text-5xl font-black uppercase mt-1 mb-4">Meine Gewinne</h1>
         <p className="text-white/60 max-w-2xl mb-8">
-          Hier siehst du alle Preise, die du in TLS-Turnieren gewonnen hast — und ob sie schon zur Abholung bereit sind.
+          Hier siehst du alle Preise, die du in TLS-Turnieren und Fast-Lap-Challenges gewonnen hast — und ob sie schon zur Abholung bereit sind.
         </p>
 
         {!loading && items.length > 0 && (
@@ -122,11 +122,12 @@ function PrizeCard({ p, highlight }) {
           <Icn className="w-3.5 h-3.5" /> {s.label}
         </span>
       </div>
-      {p.tournament_slug && (
-        <Link to={`/tournaments/${p.tournament_slug}`} className="text-sm text-white/70 hover:text-[#29B6E8] block mb-2">
-          {p.tournament_title}
+      {(p.source_url || p.tournament_slug) && (
+        <Link to={p.source_url || `/tournaments/${p.tournament_slug}`} className="text-sm text-white/70 hover:text-[#29B6E8] block mb-2">
+          {p.fastlap_challenge_title || p.tournament_title}
         </Link>
       )}
+      {p.fastlap_source_label && <div className="text-xs text-[#29B6E8] mb-2">{p.fastlap_source_label}</div>}
       {p.prize_value && <div className="text-xs text-white/40">{p.prize_value}</div>}
       {p.status === "ready" && (
         <div className="mt-3 text-xs text-[#29B6E8] flex items-center gap-1.5 border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm px-3 py-2">

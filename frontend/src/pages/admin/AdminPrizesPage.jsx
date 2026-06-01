@@ -46,7 +46,7 @@ export default function AdminPrizesPage() {
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["prizes", "tournaments"]);
+  useApiInvalidation(load, ["prizes", "tournaments", "f1"]);
 
   useEffect(() => {
     const nextFilter = searchParams.get("status") || "";
@@ -108,6 +108,8 @@ export default function AdminPrizesPage() {
     if (!normalizedQuery) return true;
     return [
       p.tournament_title,
+      p.fastlap_challenge_title,
+      p.fastlap_source_label,
       p.prize_label,
       p.prize_value,
       p.recipient_label,
@@ -123,7 +125,7 @@ export default function AdminPrizesPage() {
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Phase 9</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-2">Preise & Gewinnabholung</h1>
       <p className="text-white/60 text-sm mb-6 max-w-2xl">
-        Bei jedem auf <em>Ergebnisse veröffentlicht</em> gesetzten Turnier werden Gewinne automatisch
+        Bei jedem auf <em>Ergebnisse veröffentlicht</em> gesetzten Turnier oder Fast Lap werden Gewinne automatisch
         anhand der hinterlegten Preisstruktur erstellt. Markiere Preise als <strong>bereit</strong>,
         sobald sie zur Abholung verfügbar sind — der Sieger bekommt automatisch eine E-Mail.
       </p>
@@ -150,7 +152,7 @@ export default function AdminPrizesPage() {
             onChange={(e) => updateFilterParams({ q: e.target.value })}
             data-testid="prizes-search"
             className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm pl-10 pr-3 py-2.5 text-sm focus:outline-none focus:border-[#29B6E8]"
-            placeholder="Suchen nach Turnier, Empfänger oder Preis..."
+            placeholder="Suchen nach Turnier, Fast Lap, Empfänger oder Preis..."
           />
         </label>
         <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm px-4 py-2.5 flex items-center justify-between gap-3">
@@ -164,7 +166,7 @@ export default function AdminPrizesPage() {
           <table className="w-full text-sm min-w-[900px]">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
               <tr>
-                <th className="text-left px-4 py-3">Turnier</th>
+                <th className="text-left px-4 py-3">Quelle</th>
                 <th className="text-left px-4 py-3">Empfänger</th>
                 <th className="text-left px-4 py-3">Platz</th>
                 <th className="text-left px-4 py-3">Gewinn</th>
@@ -180,7 +182,7 @@ export default function AdminPrizesPage() {
                 <tr><td colSpan="7" className="text-center py-12">
                   <Award className="w-10 h-10 text-white/30 mx-auto mb-2" />
                   <p className="text-white/50">{allItems.length ? "Keine Gewinne für diesen Filter." : "Noch keine Gewinne erfasst."}</p>
-                  <p className="text-xs text-white/30 mt-1">Gewinne werden automatisch erstellt, sobald Turniere veröffentlicht werden.</p>
+                  <p className="text-xs text-white/30 mt-1">Gewinne werden automatisch erstellt, sobald Ergebnisse veröffentlicht werden.</p>
                 </td></tr>
               ) : items.map((p) => {
                 const s = STATUS_LABEL[p.status] || STATUS_LABEL.pending;
@@ -190,7 +192,11 @@ export default function AdminPrizesPage() {
                 const isUrgent = ["pending", "ready"].includes(p.status) && due !== null && due <= 14;
                 return (
                   <tr key={p.id} data-testid={`prize-row-${p.id}`}>
-                    <td className="px-4 py-3"><div className="font-semibold">{p.tournament_title || "—"}</div></td>
+                    <td className="px-4 py-3">
+                      <div className="font-semibold">{p.fastlap_challenge_title || p.tournament_title || "—"}</div>
+                      {p.fastlap_source_label && <div className="text-xs text-[#29B6E8]">{p.fastlap_source_label}</div>}
+                      {p.source_type === "fastlap" && <div className="text-[10px] uppercase tracking-widest text-white/35">Fast Lap</div>}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <RecipientIcon className={`w-4 h-4 ${p.recipient_type === "team" ? "text-[#10B981]" : "text-[#29B6E8]"}`} />
