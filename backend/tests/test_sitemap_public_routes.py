@@ -62,6 +62,7 @@ def test_sitemap_lists_public_tournament_subpages(monkeypatch):
     response = asyncio.run(setup_routes.sitemap())
     body = response.body.decode("utf-8")
 
+    assert "<loc>https://example.test/esports</loc>" in body
     assert "<loc>https://example.test/tournaments/summer-cup</loc>" in body
     assert "<loc>https://example.test/tournaments/summer-cup/bracket</loc>" in body
     assert "<loc>https://example.test/tournaments/summer-cup/matches</loc>" in body

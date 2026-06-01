@@ -379,7 +379,8 @@ DEFAULT_NAV = {
             {"key": "gallery", "to": "/galerie", "label": "Galerie", "visible": True},
             {"key": "references", "to": "/references", "label": "Referenzen", "visible": True},
         ]},
-        {"key": "esports", "label": "eSports", "visible": True, "order": 4, "children": [
+        {"key": "esports", "to": "/esports", "label": "eSports", "visible": True, "order": 4, "children": [
+            {"key": "esports_overview", "to": "/esports", "label": "Uebersicht", "visible": True},
             {"key": "tournaments", "to": "/tournaments", "label": "Turniere", "visible": True},
             {"key": "fastlap", "to": "/fastlap", "label": "Fast Lap", "visible": True},
             {"key": "season", "to": "/seasons/current", "label": "Jahreswertung", "visible": True},

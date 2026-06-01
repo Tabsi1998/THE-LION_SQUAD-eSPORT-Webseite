@@ -66,7 +66,7 @@ export default function HomePage() {
                 <Link to="/events" data-testid="hero-cta-events" className="inline-flex items-center gap-2 px-6 py-3 border border-[#9F7AEA]/50 text-[#C4A7FF] hover:bg-[#9F7AEA]/10 font-bold uppercase tracking-wider rounded-sm transition-all">
                   <Calendar className="w-4 h-4" /> Events
                 </Link>
-                <Link to="/tournaments" data-testid="hero-cta-tournaments" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm transition-all">
+                <Link to="/esports" data-testid="hero-cta-tournaments" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm transition-all">
                   <Gamepad2 className="w-4 h-4" /> eSports
                 </Link>
               </div>

@@ -222,8 +222,8 @@ function bannerMatchesPath(banner, pathname) {
   const path = pathname || "/";
   const scope = banner?.scope || "all";
   if (scope === "all") return true;
-  if (scope === "tournaments") return path.startsWith("/tournaments") || path.startsWith("/tournament");
-  if (scope === "fastlap") return path.startsWith("/fastlap") || path.startsWith("/f1");
+  if (scope === "tournaments") return path.startsWith("/esports") || path.startsWith("/tournaments") || path.startsWith("/tournament");
+  if (scope === "fastlap") return path.startsWith("/esports") || path.startsWith("/fastlap") || path.startsWith("/f1");
   if (scope === "events") return path.startsWith("/events") || path.startsWith("/event");
   if (scope === "news") return path.startsWith("/news");
   if (scope === "community") return ["/community", "/players", "/teams", "/servers"].some((prefix) => path.startsWith(prefix));

@@ -43,6 +43,7 @@ import TournamentBracketPage from "@/pages/public/TournamentBracketPage";
 import TournamentStandingsPage from "@/pages/public/TournamentStandingsPage";
 import TournamentSchedulePage from "@/pages/public/TournamentSchedulePage";
 import MatchPage from "@/pages/public/MatchPage";
+import EsportsOverviewPage from "@/pages/public/EsportsOverviewPage";
 import F1ListPage from "@/pages/public/F1ListPage";
 import F1DetailPage from "@/pages/public/F1DetailPage";
 import EventsPage from "@/pages/public/EventsPage";
@@ -162,6 +163,7 @@ function App() {
           <Route path="/membership/apply" element={<MembershipApplyPage />} />
 
           {/* Public — Arena */}
+          <Route path="/esports" element={<EsportsOverviewPage />} />
           <Route path="/tournaments" element={<TournamentsPage />} />
           <Route path="/tournaments/:slug" element={<TournamentDetailPage />} />
           <Route path="/tournaments/:slug/bracket" element={<TournamentBracketPage />} />

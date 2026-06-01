@@ -32,8 +32,10 @@ export const NAV_STRUCTURE = [
     ],
   },
   {
+    to: "/esports",
     label: "eSports",
     children: [
+      { to: "/esports", label: "Uebersicht" },
       { to: "/tournaments", label: "Turniere" },
       { to: "/fastlap", label: "Fast Lap" },
       { to: "/seasons/current", label: "Jahreswertung" },
@@ -102,24 +104,40 @@ function NavDropdown({ item, isClubMember }) {
   const closeTimer = useRef(null);
   const loc = useLocation();
   const visibleChildren = (item.children || []).filter((c) => !c.memberOnly || isClubMember);
-  const isActive = visibleChildren.some((c) => loc.pathname === c.to.split("?")[0] || loc.pathname.startsWith(c.to.split("?")[0] + "/"));
+  const ownPath = item.to?.split("?")[0];
+  const isOwnActive = ownPath && (loc.pathname === ownPath || loc.pathname.startsWith(ownPath + "/"));
+  const isActive = isOwnActive || visibleChildren.some((c) => loc.pathname === c.to.split("?")[0] || loc.pathname.startsWith(c.to.split("?")[0] + "/"));
 
   const onEnter = () => { clearTimeout(closeTimer.current); setOpen(true); };
   const onLeave = () => { closeTimer.current = setTimeout(() => setOpen(false), 120); };
 
   return (
     <div className="relative" onMouseEnter={onEnter} onMouseLeave={onLeave}>
-      <button
-        type="button"
-        data-testid={`nav-${item.label.toLowerCase()}`}
-        aria-expanded={open}
-        className={`px-4 py-2 text-sm font-semibold uppercase tracking-wider transition rounded-sm inline-flex items-center gap-1.5 ${
-          isActive ? "text-[#29B6E8]" : "text-white/70 hover:text-white"
-        }`}
-      >
-        <span>{item.label}</span>
-        <ChevronDown data-testid={`nav-${item.label.toLowerCase()}-chevron`} className={`w-3.5 h-3.5 shrink-0 opacity-80 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
+      {item.to ? (
+        <Link
+          to={item.to}
+          data-testid={`nav-${item.label.toLowerCase()}`}
+          aria-expanded={open}
+          className={`px-4 py-2 text-sm font-semibold uppercase tracking-wider transition rounded-sm inline-flex items-center gap-1.5 ${
+            isActive ? "text-[#29B6E8]" : "text-white/70 hover:text-white"
+          }`}
+        >
+          <span>{item.label}</span>
+          <ChevronDown data-testid={`nav-${item.label.toLowerCase()}-chevron`} className={`w-3.5 h-3.5 shrink-0 opacity-80 transition-transform ${open ? "rotate-180" : ""}`} />
+        </Link>
+      ) : (
+        <button
+          type="button"
+          data-testid={`nav-${item.label.toLowerCase()}`}
+          aria-expanded={open}
+          className={`px-4 py-2 text-sm font-semibold uppercase tracking-wider transition rounded-sm inline-flex items-center gap-1.5 ${
+            isActive ? "text-[#29B6E8]" : "text-white/70 hover:text-white"
+          }`}
+        >
+          <span>{item.label}</span>
+          <ChevronDown data-testid={`nav-${item.label.toLowerCase()}-chevron`} className={`w-3.5 h-3.5 shrink-0 opacity-80 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+      )}
       {open && (
         <div
           className="absolute left-0 top-full pt-2 z-[80] min-w-[220px]"

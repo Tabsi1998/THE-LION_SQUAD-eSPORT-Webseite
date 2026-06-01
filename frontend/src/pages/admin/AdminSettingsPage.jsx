@@ -59,7 +59,7 @@ const SETTINGS_TABS = [
   ["logs", "Versandlogs", Send],
 ];
 const SETTINGS_TAB_KEYS = new Set(SETTINGS_TABS.map(([key]) => key));
-const INDEXNOW_DEFAULT_PATHS = ["/", "/sitemap.xml", "/sitemap-news.xml", "/news", "/events", "/tournaments", "/fastlap", "/galerie", "/members"];
+const INDEXNOW_DEFAULT_PATHS = ["/", "/sitemap.xml", "/sitemap-news.xml", "/news", "/events", "/esports", "/tournaments", "/fastlap", "/galerie", "/members"];
 
 const BANNER_TEMPLATE_PRESETS = {
   custom: { title: "Eigener Hinweis", text: "", tone: "info", style: "neon", link_label: "Mehr", scope: "all" },

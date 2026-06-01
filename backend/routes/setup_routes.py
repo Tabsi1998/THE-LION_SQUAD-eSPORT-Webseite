@@ -305,7 +305,7 @@ async def sitemap():
     base = _normalise_base_url(branding.get("domain"))
 
     static_paths = [
-        "/", "/about", "/news", "/events", "/tournaments", "/fastlap",
+        "/", "/about", "/news", "/events", "/esports", "/tournaments", "/fastlap",
         "/teams", "/servers", "/members", "/membership/join",
         "/sponsors", "/partners", "/contact", "/board", "/values", "/galerie", "/references",
     ]
@@ -314,7 +314,7 @@ async def sitemap():
             "loc": base + p,
             "lastmod": None,
             "changefreq": "daily" if p in ("/", "/news", "/events") else "weekly",
-            "priority": "1.0" if p == "/" else "0.8" if p in ("/news", "/events", "/tournaments", "/fastlap") else "0.6",
+            "priority": "1.0" if p == "/" else "0.8" if p in ("/news", "/events", "/esports", "/tournaments", "/fastlap") else "0.6",
         }
         for p in static_paths
     ]

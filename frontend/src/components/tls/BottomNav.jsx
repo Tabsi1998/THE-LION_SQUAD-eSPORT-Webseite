@@ -10,7 +10,7 @@ import { Home, Trophy, Calendar, User, LayoutDashboard, Newspaper, Medal } from 
 
 const GUEST_ITEMS = [
   { to: "/", label: "Home", icon: Home, exact: true },
-  { to: "/tournaments", label: "Turniere", icon: Trophy },
+  { to: "/esports", label: "eSports", icon: Trophy },
   { to: "/events", label: "Events", icon: Calendar },
   { to: "/news", label: "News", icon: Newspaper },
   { to: "/seasons/current", label: "Wertung", icon: Medal },
@@ -18,7 +18,7 @@ const GUEST_ITEMS = [
 
 const AUTH_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/tournaments", label: "Turniere", icon: Trophy },
+  { to: "/esports", label: "eSports", icon: Trophy },
   { to: "/events", label: "Events", icon: Calendar },
   { to: "/seasons/current", label: "Wertung", icon: Medal },
   { to: "/profile", label: "Profil", icon: User },
@@ -44,6 +44,7 @@ export function BottomNav() {
 
   const isActive = (item) => {
     if (item.exact) return location.pathname === item.to;
+    if (item.to === "/esports") return ["/esports", "/tournaments", "/fastlap", "/f1"].some((prefix) => location.pathname.startsWith(prefix));
     return location.pathname.startsWith(item.to);
   };
 
