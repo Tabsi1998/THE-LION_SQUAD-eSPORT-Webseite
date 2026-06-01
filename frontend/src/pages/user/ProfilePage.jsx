@@ -404,13 +404,13 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="mt-8 flex border-b border-white/10 overflow-x-auto">
+        <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 lg:flex gap-2 border-b border-white/10 pb-2">
           {TABS.map((t) => (
             <button
               key={t.k}
               onClick={() => setTab(t.k)}
               data-testid={`profile-tab-${t.k}`}
-              className={`px-5 py-3 text-xs uppercase tracking-wider font-bold border-b-2 transition flex items-center gap-2 whitespace-nowrap ${tab === t.k ? "border-[#29B6E8] text-[#29B6E8]" : "border-transparent text-white/50 hover:text-white"}`}
+              className={`min-h-11 justify-center rounded-sm border px-3 py-2 text-xs uppercase tracking-wider font-bold transition flex items-center gap-2 ${tab === t.k ? "border-[#29B6E8]/55 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 bg-[#121212] text-white/55 hover:text-white hover:border-white/25"}`}
             >
               <t.icon className="w-3.5 h-3.5" /> {t.label}
             </button>

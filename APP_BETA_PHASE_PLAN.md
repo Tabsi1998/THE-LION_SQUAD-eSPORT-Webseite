@@ -161,7 +161,7 @@ Mobile Website:
 - [x] BottomNav fuer eingeloggte User priorisiert Dashboard, Events/Turniere, Jahreswertung und Profil; News/Home bleiben ueber Hauptnavigation erreichbar.
 - [x] Mobile Header und BottomNav duerfen sich nicht doppelt anfuehlen: Burger-Menue bleibt fuer tiefe Navigation, BottomNav fuer Hauptwege.
 - [x] Scroll-Top-Button und Bottom-Banner spielen mit BottomNav/Safe-Area sauber zusammen.
-- Admin- und Profilseiten mobil weiter verdichten: Tabellenkarten, Sticky-Actions und weniger horizontales Scrollen.
+- [x] Admin- und Profilseiten mobil weiter verdichten: Gewinnabholung nutzt mobile Karten, Profil-Tabs umbrechen ohne horizontales Scrollen.
 
 Design-Checks:
 
