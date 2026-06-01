@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { EditorialChecklist } from "@/components/tls/EditorialChecklist";
@@ -11,12 +11,40 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
-import { AtSign, Flag, Plus, Pin, Trash2, Save, Search, X, Newspaper } from "lucide-react";
+import { AtSign, Download, Flag, Plus, Pin, Trash2, Save, Search, X, Newspaper } from "lucide-react";
+
+function csvCell(value) {
+  const text = String(value ?? "").replace(/\r?\n/g, " ");
+  return /[",;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function exportNewsCsv(rows) {
+  const header = ["Titel", "Slug", "Kategorie", "Sichtbarkeit", "Status", "Datum"];
+  const lines = rows.map((item) => [
+    item.title,
+    item.slug,
+    item.category,
+    item.visibility,
+    item.status_label,
+    item.date_label,
+  ].map(csvCell).join(";"));
+  const blob = new Blob([[header.map(csvCell).join(";"), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tls-news-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function AdminNewsPage() {
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ categories: [], visibilities: [] });
   const [editing, setEditing] = useState(null);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [visibilityFilter, setVisibilityFilter] = useState("");
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
@@ -35,13 +63,47 @@ export default function AdminNewsPage() {
   };
 
   const publicationState = (post) => {
-    if (!post.published) return { label: "Entwurf", detail: "", className: "text-white/40" };
+    if (!post.published) return { key: "draft", label: "Entwurf", detail: "", className: "text-white/40" };
     const date = post.published_at ? new Date(post.published_at) : null;
     if (date && !Number.isNaN(date.getTime()) && date.getTime() > Date.now()) {
-      return { label: "Geplant", detail: `Wird ${formatTimeUntil(date)} veröffentlicht`, className: "text-[#29B6E8]" };
+      return { key: "scheduled", label: "Geplant", detail: `Wird ${formatTimeUntil(date)} veröffentlicht`, className: "text-[#29B6E8]" };
     }
-    return { label: "Veröffentlicht", detail: "", className: "text-[#10B981]" };
+    return { key: "published", label: "Veröffentlicht", detail: "", className: "text-[#10B981]" };
   };
+  const categoryOptions = useMemo(() => {
+    const rows = (meta.categories || []).map((item) => [item.k, item.l || item.k]);
+    const known = new Set(rows.map(([key]) => key));
+    list.forEach((item) => {
+      if (item.category && !known.has(item.category)) rows.push([item.category, item.category]);
+    });
+    return rows;
+  }, [list, meta.categories]);
+  const visibilityOptions = useMemo(() => {
+    const rows = (meta.visibilities || []).map((item) => [item.k, item.l || item.k]);
+    const known = new Set(rows.map(([key]) => key));
+    list.forEach((item) => {
+      if (item.visibility && !known.has(item.visibility)) rows.push([item.visibility, item.visibility]);
+    });
+    return rows;
+  }, [list, meta.visibilities]);
+  const filteredList = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return list.filter((item) => {
+      const state = publicationState(item);
+      if (statusFilter && state.key !== statusFilter) return false;
+      if (categoryFilter && item.category !== categoryFilter) return false;
+      if (visibilityFilter && item.visibility !== visibilityFilter) return false;
+      if (!needle) return true;
+      return [
+        item.title,
+        item.slug,
+        item.excerpt,
+        item.category,
+        item.visibility,
+        state.label,
+      ].filter(Boolean).join(" ").toLowerCase().includes(needle);
+    });
+  }, [categoryFilter, list, query, statusFilter, visibilityFilter]);
 
   return (
     <AdminLayout>
@@ -54,6 +116,53 @@ export default function AdminNewsPage() {
           <Plus className="w-3.5 h-3.5" /> Neuer Beitrag
         </button>
       </div>
+
+      {list.length > 0 && (
+        <div className="mb-4 rounded-sm border border-white/10 bg-[#121212] p-3">
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(16rem,1fr)_10rem_12rem_12rem_auto]">
+            <label className="relative block">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Titel, Slug, Teaser oder Kategorie suchen"
+                data-testid="news-admin-search"
+                className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-2 pl-9 pr-3 text-sm focus:border-[#29B6E8] focus:outline-none"
+              />
+            </label>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} data-testid="news-admin-status-filter" className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
+              <option value="">Alle Status</option>
+              <option value="published">Veröffentlicht</option>
+              <option value="scheduled">Geplant</option>
+              <option value="draft">Entwurf</option>
+            </select>
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} data-testid="news-admin-category-filter" className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
+              <option value="">Alle Kategorien</option>
+              {categoryOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+            <select value={visibilityFilter} onChange={(e) => setVisibilityFilter(e.target.value)} data-testid="news-admin-visibility-filter" className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
+              <option value="">Alle Sichtbarkeiten</option>
+              {visibilityOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+            <button
+              type="button"
+              onClick={() => exportNewsCsv(filteredList.map((item) => {
+                const state = publicationState(item);
+                return {
+                  ...item,
+                  status_label: state.label,
+                  date_label: new Date(item.published_at || item.created_at).toLocaleDateString("de-DE"),
+                };
+              }))}
+              disabled={filteredList.length === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/15 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/65 hover:border-[#29B6E8]/45 hover:text-white disabled:opacity-40"
+            >
+              <Download className="h-3.5 w-3.5" /> CSV
+            </button>
+          </div>
+          <div className="mt-2 text-xs text-white/45">{filteredList.length} / {list.length} Beiträge sichtbar</div>
+        </div>
+      )}
 
       {list.length === 0 ? (
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
@@ -75,7 +184,7 @@ export default function AdminNewsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {list.map((n) => {
+                {filteredList.map((n) => {
                   const state = publicationState(n);
                   return (
                   <tr key={n.id}>
@@ -102,6 +211,11 @@ export default function AdminNewsPage() {
                   </tr>
                   );
                 })}
+                {filteredList.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="px-4 py-10 text-center text-sm text-white/40">Keine News für diesen Filter.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
