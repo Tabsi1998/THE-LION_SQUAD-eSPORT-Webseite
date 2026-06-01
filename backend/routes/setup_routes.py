@@ -267,6 +267,12 @@ async def skip_setup(me: dict = Depends(require_super())):
 # ---------- SEO: sitemap.xml ----------
 sitemap_router = APIRouter(tags=["seo"])
 SEO_HIDDEN_STATUSES = ["draft", "archived", "cancelled"]
+TOURNAMENT_SITEMAP_PATHS = [
+    ("", "0.7"),
+    ("bracket", "0.65"),
+    ("matches", "0.65"),
+    ("standings", "0.65"),
+]
 
 
 def _parse_sitemap_dt(value):
@@ -282,6 +288,13 @@ def _parse_sitemap_dt(value):
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
+
+
+def _format_sitemap_lastmod(value):
+    dt = _parse_sitemap_dt(value)
+    if dt:
+        return dt.date().isoformat()
+    return str(value)[:10] if value else ""
 
 
 @sitemap_router.get("/api/sitemap.xml")
@@ -310,7 +323,9 @@ async def sitemap():
     public_visibility = {"$or": [{"visibility": "public"}, {"visibility": {"$exists": False}}, {"visibility": None}]}
     async for t in db.tournaments.find({"status": {"$nin": SEO_HIDDEN_STATUSES}, "is_public": {"$ne": False}, **public_visibility}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if t.get("slug"):
-            urls.append({"loc": f"{base}/tournaments/{t['slug']}", "lastmod": t.get("updated_at"), "changefreq": "weekly", "priority": "0.7"})
+            for suffix, priority in TOURNAMENT_SITEMAP_PATHS:
+                suffix_path = f"/{suffix}" if suffix else ""
+                urls.append({"loc": f"{base}/tournaments/{t['slug']}{suffix_path}", "lastmod": t.get("updated_at"), "changefreq": "weekly", "priority": priority})
     # f1 challenges
     async for f in db.f1_challenges.find({"status": {"$nin": SEO_HIDDEN_STATUSES}, **public_visibility}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if f.get("slug"):
@@ -370,7 +385,7 @@ async def sitemap():
         xml_lines.append(f"<loc>{escape(entry['loc'])}</loc>")
         lastmod = entry.get("lastmod")
         if lastmod:
-            xml_lines.append(f"<lastmod>{lastmod[:10]}</lastmod>")
+            xml_lines.append(f"<lastmod>{_format_sitemap_lastmod(lastmod)}</lastmod>")
         xml_lines.append(f"<changefreq>{entry['changefreq']}</changefreq>")
         xml_lines.append(f"<priority>{entry['priority']}</priority>")
         xml_lines.append("</url>")
