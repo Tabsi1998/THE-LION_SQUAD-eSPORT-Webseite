@@ -71,6 +71,7 @@ Der Build-Zusatz kommt aus `expo.android.versionCode`. Dadurch ist fuer Tester k
 Historische Einordnung, neueste Version oben:
 
 ```text
+2.0.0-beta.1
 1.5.0-beta.9
 1.5.0-beta.8
 1.5.0-beta.7

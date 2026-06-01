@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## 2.0.0-beta.1 - 2026-06-02
 
+- Backend/Web: Gewinnabholungen koennen fuer veroeffentlichte Turniere und Fast-Lap-Challenges nachtraeglich erzeugt werden; Stage-/Custom-Bracket-Ergebnisse werden dabei korrekt ausgewertet.
+- Web: Die neue eSports-Uebersicht buendelt Turniere, Fast Lap und Jahreswertung dynamisch auf einer gemeinsamen Seite.
 - Mobile: Fast-Lap-Details zeigen jetzt hinterlegte Preise an; Turnierpreise beruecksichtigen Gruppierungen wie Gewinner- und Loser-Bracket sauberer.
 
 ## 1.5.0-beta.9 - 2026-05-30
