@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -50,6 +51,14 @@ export default function GalleryAlbumPage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <Breadcrumbs
+          items={[
+            { label: "Home", to: "/" },
+            { label: "Galerie", to: "/galerie" },
+            { label: a.title },
+          ]}
+          className="mb-3"
+        />
         <Link to="/galerie" data-testid="album-back" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
           <ArrowLeft className="w-3.5 h-3.5" /> Alle Alben
         </Link>

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { CalendarClock, Check, ExternalLink, Flag, MessageSquare, RefreshCw, Send, Trophy, X } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -283,6 +284,7 @@ export default function MatchPage() {
   const reports = Array.isArray(match.reports) ? match.reports : [];
   const resultParticipants = isV2 ? participants : duelParticipants;
   const showFixedScheduleNotice = data.schedule_mode === "fixed_by_staff" && !canProposeSchedule;
+  const tournamentUrl = data.tournament ? `/tournaments/${data.tournament.slug || data.tournament.id}` : "/tournaments";
   const addStaffMention = () => {
     setMessage((current) => {
       const prefix = current.trim() ? `${current.trim()} ` : "";
@@ -293,6 +295,15 @@ export default function MatchPage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+        <Breadcrumbs
+          items={[
+            { label: "Home", to: "/" },
+            { label: "Turniere", to: "/tournaments" },
+            ...(data.tournament ? [{ label: data.tournament.title, to: tournamentUrl }] : []),
+            { label: `Match ${match.match_key || match.id}` },
+          ]}
+          className="mb-5"
+        />
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">{data.matchday_label}</div>

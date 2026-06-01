@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -35,13 +36,23 @@ export default function TournamentStandingsPage() {
   }, [load]);
 
   useApiInvalidation(load, ["tournaments", "matches"]);
+  const tournamentUrl = t ? `/tournaments/${t.slug || t.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "/tournaments";
 
   if (!t) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
 
   return (
     <PublicLayout>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link to={`/tournaments/${t.slug}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← {t.title}</Link>
+        <Breadcrumbs
+          items={[
+            { label: "Home", to: "/" },
+            { label: "Turniere", to: "/tournaments" },
+            { label: t.title, to: tournamentUrl },
+            { label: "Rangliste" },
+          ]}
+          className="mb-3"
+        />
+        <Link to={tournamentUrl} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← {t.title}</Link>
         <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Rangliste</h1>
         <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <table className="w-full text-sm">

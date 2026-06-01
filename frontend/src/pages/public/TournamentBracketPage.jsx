@@ -3,6 +3,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { BracketTree } from "@/components/tls/BracketTree";
+import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
@@ -41,13 +42,23 @@ export default function TournamentBracketPage() {
 
   if (!data) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE TURNIERBAUM …</div></PublicLayout>;
   const t = data.tournament;
+  const tournamentUrl = `/tournaments/${t.slug || t.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
 
   return (
     <PublicLayout>
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div>
-            <Link to={`/tournaments/${t.slug}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
+            <Breadcrumbs
+              items={[
+                { label: "Home", to: "/" },
+                { label: "Turniere", to: "/tournaments" },
+                { label: t.title, to: tournamentUrl },
+                { label: "Turnierbaum" },
+              ]}
+              className="mb-3"
+            />
+            <Link to={tournamentUrl} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
             <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">{t.title}</h1>
             <div className="mt-2 flex gap-2 items-center">
               <PhaseBadge phase={t.public_phase} status={t.status} />
