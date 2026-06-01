@@ -140,7 +140,7 @@ Ziel:
 App-Navigation:
 
 - [x] Bottom-Tabbar optisch an `frontend/src/components/tls/BottomNav.jsx` anlehnen: dunkles halbtransparentes Surface, feiner Border-Top, aktiver Cyan-Indikator, kompakte Labels.
-- Blur/Transparenz in React Native pruefen: Expo `BlurView` nur falls performant und stabil, sonst Fallback mit `rgba(10,10,10,0.94)`.
+- [x] Blur/Transparenz in React Native pruefen: `expo-blur` ist aktuell nicht installiert, daher bleibt der stabile Fallback mit `rgba(10,10,10,0.96)`.
 - [x] Aktiver Tab bekommt klaren oberen Strich oder kleine Glow-Linie, nicht nur andere Textfarbe.
 - [x] Benachrichtigungsglocke integrieren oder an die Tabbar anpassen, damit sie nicht wie ein Fremdkoerper ueber dem UI schwebt.
 - [x] Tab-Reihenfolge pruefen: Event-Hub bleibt Haupttab, Jahreswertung/News werden im Dashboard-Schnellzugriff priorisiert, ohne Teams oder Profil aus der Tabbar zu verdraengen.
@@ -149,7 +149,7 @@ Gemeinsame UI-Muster:
 
 - [x] `StatusBadge` / `PhaseBadge` als App-Komponente nach Web-Vorbild nachziehen: Countdown, Live-Punkt, Statusfarben.
 - [x] `ActionRow`/`ActionTile` fuer kompakte Icon-Actions statt grosser Buttons, z.B. Profil bearbeiten, Aktualisieren, Datenschutz, Logout.
-- `ContentCard` fuer Turnier/Event/Fast-Lap/News vereinheitlichen: Bild, Status, Datum, Primaraktion.
+- [x] `ContentCard` fuer Turnier/Event/Fast-Lap/News vereinheitlichen: Bild, Status, Datum, Primaraktion.
 - [x] `SegmentedTabs` fuer sichtbare Seitenwechsel statt versteckter horizontaler Scroll-Tabs als gemeinsamer Baustein einfuehren.
 - [x] `EmptyState` optisch angleichen: Icons, Akzentfarben und weniger manuelle Sonderlayouts.
 - [x] `SkeletonList` optisch an Karten/Surfaces angleichen.

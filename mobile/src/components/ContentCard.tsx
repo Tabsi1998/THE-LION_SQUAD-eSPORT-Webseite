@@ -10,6 +10,7 @@ import { StatusBadge } from "./StatusBadge";
 export type ContentCardKind = "event" | "fastlap" | "news" | "team" | "tournament";
 
 export function ContentCard({
+  actionLabel,
   compact = false,
   date,
   description,
@@ -22,6 +23,7 @@ export function ContentCard({
   status,
   title,
 }: {
+  actionLabel?: string | null;
   compact?: boolean;
   date?: string | null;
   description?: string | null;
@@ -36,6 +38,7 @@ export function ContentCard({
 }) {
   const accent = accentForKind(kind);
   const body = stripText(description || detail || "");
+  const cta = actionLabel || actionLabelForKind(kind);
   const content = (
     <>
       <MediaImage
@@ -48,14 +51,19 @@ export function ContentCard({
           <Ionicons name={iconForKind(kind)} color={accent} size={13} />
           <Muted style={[styles.kind, { color: accent }]}>{labelForKind(kind)}</Muted>
         </View>
-        <Body style={styles.title}>{title || labelForKind(kind)}</Body>
+        <Body numberOfLines={compact ? 2 : 3} style={styles.title}>{title || labelForKind(kind)}</Body>
         <View style={styles.metaRow}>
           {date ? <Muted>{formatDate(date)}</Muted> : null}
           {label || phase || status ? <StatusBadge label={label} phase={phase} status={status} /> : null}
         </View>
         {body ? <Muted numberOfLines={2}>{body}</Muted> : null}
+        {onPress ? (
+          <View style={styles.actionRow}>
+            <Muted style={styles.actionText}>{cta}</Muted>
+            <Ionicons name="arrow-forward" color={colors.black} size={13} />
+          </View>
+        ) : null}
       </View>
-      {onPress ? <Ionicons name="chevron-forward" color={colors.muted} size={18} /> : null}
     </>
   );
 
@@ -73,6 +81,12 @@ function labelForKind(kind: ContentCardKind) {
   if (kind === "news") return "News";
   if (kind === "team") return "Team";
   return "Turnier";
+}
+
+function actionLabelForKind(kind: ContentCardKind) {
+  if (kind === "news") return "Lesen";
+  if (kind === "team") return "Team ansehen";
+  return "Details";
 }
 
 function iconForKind(kind: ContentCardKind) {
@@ -125,6 +139,24 @@ const styles = StyleSheet.create({
   },
   compactBody: {
     paddingVertical: 8,
+  },
+  actionRow: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: colors.cyan,
+    borderRadius: 6,
+    flexDirection: "row",
+    gap: 5,
+    marginTop: 2,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  actionText: {
+    color: colors.black,
+    fontSize: 11,
+    fontWeight: "900",
+    lineHeight: 14,
+    textTransform: "uppercase",
   },
   kindRow: {
     alignItems: "center",
