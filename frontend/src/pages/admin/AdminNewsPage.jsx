@@ -3,6 +3,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
+import { SeoPreviewPanel } from "@/components/tls/SeoPreviewPanel";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { appendEmbedToken } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -236,6 +237,18 @@ function NewsModal({ post, meta, onClose, onSaved }) {
   const plannedDetail = plannedDate && !Number.isNaN(plannedDate.getTime()) && plannedDate.getTime() > Date.now()
     ? `Dieser Beitrag ist geplant und wird ${formatTimeUntil(plannedDate)} öffentlich angezeigt.`
     : "";
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://lionsquad.at";
+  const publicPath = form.slug ? `/news/${form.slug}` : "";
+  const seoIsIndexable = Boolean(form.published && form.visibility === "public");
+  const seoFallback = {
+    title: form.title || "News-Beitrag",
+    description: form.excerpt || "Kurzbeschreibung fehlt noch.",
+    image: form.banner_url,
+    canonical: publicPath ? `${origin}${publicPath}` : "",
+    url: publicPath ? `${origin}${publicPath}` : "",
+    robots: seoIsIndexable ? "index, follow" : "noindex, follow",
+    published: seoIsIndexable,
+  };
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 overflow-y-auto p-2 sm:p-4">
@@ -303,6 +316,7 @@ function NewsModal({ post, meta, onClose, onSaved }) {
             </div>
           </Field>
           <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="news-banner" variant="wide" allowLibrary /></Field>
+          <SeoPreviewPanel path={publicPath} fallback={seoFallback} />
 
           <Field label="Veröffentlichungsdatum (optional, sonst jetzt)">
             <input
