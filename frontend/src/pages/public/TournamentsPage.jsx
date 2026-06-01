@@ -22,8 +22,9 @@ export default function TournamentsPage() {
 
   const load = useCallback(async () => {
     try {
-      const q = statusFilter !== "all" ? `?status=${statusFilter}` : "";
-      const { data } = await api.get(`/tournaments${q}`);
+      const params = new URLSearchParams({ compact: "true", limit: "60" });
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      const { data } = await api.get(`/tournaments?${params.toString()}`);
       setList(data);
       setError(false);
     } catch {

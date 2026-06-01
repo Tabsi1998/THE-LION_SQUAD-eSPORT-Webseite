@@ -31,7 +31,7 @@ function TeamList() {
   const [editing, setEditing] = useState(null);
 
   const load = useCallback(async () => {
-    const { data } = await api.get("/teams");
+    const { data } = await api.get("/teams?limit=90");
     setList(data);
   }, []);
 

@@ -30,8 +30,8 @@ export default function CommunityPage() {
   useEffect(() => {
     setLoading(true);
     Promise.allSettled([
-      api.get("/users/public-list"),
-      api.get("/teams"),
+      api.get("/users/public-list?limit=24"),
+      api.get("/teams?limit=24"),
       api.get("/membership/profiles"),
       api.get("/game-servers"),
     ]).then(([u, t, m, s]) => {

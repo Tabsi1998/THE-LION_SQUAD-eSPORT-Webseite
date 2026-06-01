@@ -81,6 +81,36 @@ def _published_now(post: dict) -> bool:
     return not published_at or published_at <= now_utc()
 
 
+def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
+    safe_limit = max(1, min(int(limit or 48), 200))
+    safe_offset = max(0, int(offset or 0))
+    page = items[safe_offset:safe_offset + safe_limit]
+    if not paged:
+        return page
+    return {"items": page, "total": len(items), "limit": safe_limit, "offset": safe_offset}
+
+
+def _compact_event(event: dict) -> dict:
+    return {
+        "id": event.get("id"),
+        "name": event.get("name"),
+        "slug": event.get("slug"),
+        "description": event.get("description"),
+        "banner_url": event.get("banner_url"),
+        "event_type": event.get("event_type"),
+        "status": event.get("status"),
+        "visibility": event.get("visibility"),
+        "start_date": event.get("start_date"),
+        "end_date": event.get("end_date"),
+        "location": event.get("location"),
+        "has_registration": bool(event.get("has_registration")),
+        "max_participants": event.get("max_participants"),
+        "registration_summary": event.get("registration_summary"),
+        "public_phase": event.get("public_phase"),
+        "event_phase": event.get("event_phase"),
+    }
+
+
 async def _find_event(slug_or_id: str) -> tuple[dict | None, bool]:
     db = get_db()
     return await find_by_slug_or_history(db.events, slug_or_id, {"_id": 0})
@@ -265,6 +295,10 @@ async def list_events(
     event_type: Optional[str] = None,
     upcoming: bool = False,
     include_drafts: bool = False,
+    compact: bool = False,
+    limit: int = 48,
+    offset: int = 0,
+    paged: bool = False,
     user: dict | None = Depends(get_optional_user),
 ):
     db = get_db()
@@ -283,7 +317,16 @@ async def list_events(
         q["status"] = {"$nin": ["completed", "archived", "cancelled"]}
         if not is_admin:
             q["status"]["$nin"].append("draft")
-    events = await db.events.find(q, {"_id": 0}).sort("start_date", 1 if upcoming else -1).to_list(500)
+    projection = {"_id": 0}
+    if compact:
+        projection = {
+            "_id": 0, "id": 1, "name": 1, "slug": 1, "description": 1,
+            "banner_url": 1, "event_type": 1, "status": 1, "visibility": 1,
+            "start_date": 1, "end_date": 1, "location": 1, "has_registration": 1,
+            "max_participants": 1,
+        }
+    fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))
+    events = await db.events.find(q, projection).sort("start_date", 1 if upcoming else -1).to_list(fetch_limit)
     if upcoming:
         now = datetime.now(timezone.utc)
         fresh = []
@@ -298,6 +341,9 @@ async def list_events(
         if await _user_can_see(user, ev.get("visibility") or "public"):
             await _decorate_event(ev)
             out.append(ev)
+    if compact:
+        out = [_compact_event(ev) for ev in out]
+        return _page_items(out, limit, offset, paged)
     return out
 
 

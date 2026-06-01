@@ -19,7 +19,7 @@ export default function F1ListPage() {
   const [list, setList] = useState([]);
 
   const load = useCallback(async () => {
-    const { data } = await api.get("/f1/challenges");
+    const { data } = await api.get("/f1/challenges?compact=true&limit=80");
     setList(data);
   }, []);
 

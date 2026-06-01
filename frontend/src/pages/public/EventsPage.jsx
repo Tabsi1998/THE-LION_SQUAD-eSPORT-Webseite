@@ -23,7 +23,9 @@ export default function EventsPage() {
   useEffect(() => { api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, []);
 
   const load = useCallback(() => {
-    const url = tab === "upcoming" ? "/events?upcoming=true" : "/events";
+    const params = new URLSearchParams({ compact: "true", limit: "90" });
+    if (tab === "upcoming") params.set("upcoming", "true");
+    const url = `/events?${params.toString()}`;
     api.get(url).then(({ data }) => setList(data)).catch(() => {});
   }, [tab]);
 

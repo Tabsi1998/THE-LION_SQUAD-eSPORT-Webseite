@@ -56,6 +56,41 @@ def _iso(dt):
     return dt
 
 
+def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
+    safe_limit = max(1, min(int(limit or 48), 200))
+    safe_offset = max(0, int(offset or 0))
+    page = items[safe_offset:safe_offset + safe_limit]
+    if not paged:
+        return page
+    return {"items": page, "total": len(items), "limit": safe_limit, "offset": safe_offset}
+
+
+def _compact_challenge(challenge: dict) -> dict:
+    return {
+        "id": challenge.get("id"),
+        "title": challenge.get("title"),
+        "slug": challenge.get("slug"),
+        "description": challenge.get("description"),
+        "banner_url": challenge.get("banner_url"),
+        "status": challenge.get("status"),
+        "visibility": challenge.get("visibility"),
+        "public_phase": challenge.get("public_phase"),
+        "start_date": challenge.get("start_date"),
+        "platform": challenge.get("platform"),
+        "registration_enabled": challenge.get("registration_enabled"),
+        "online_registration_enabled": challenge.get("online_registration_enabled"),
+        "registration_open_from": challenge.get("registration_open_from"),
+        "registration_open_until": challenge.get("registration_open_until"),
+        "is_championship": bool(challenge.get("is_championship")),
+        "block_club_member_results": bool(challenge.get("block_club_member_results")),
+        "allow_club_reference_times": challenge.get("allow_club_reference_times"),
+        "show_club_reference_times": challenge.get("show_club_reference_times"),
+        "club_reference_count": challenge.get("club_reference_count", 0),
+        "track_count": challenge.get("track_count", 0),
+        "participant_count": challenge.get("participant_count", 0),
+    }
+
+
 async def _resolve_cid(slug_or_id: str) -> str:
     db = get_db()
     c, _ = await find_by_slug_or_history(db.f1_challenges, slug_or_id, {"id": 1})
@@ -256,7 +291,15 @@ def _ms_to_time_str(ms: int) -> str:
 
 
 @router.get("/challenges")
-async def list_challenges(status: str | None = None, limit: int = 100, include_drafts: bool = False, user=Depends(get_optional_user)):
+async def list_challenges(
+    status: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    paged: bool = False,
+    compact: bool = False,
+    include_drafts: bool = False,
+    user=Depends(get_optional_user),
+):
     db = get_db()
     is_staff = _is_staff(user)
     q = {}
@@ -267,7 +310,18 @@ async def list_challenges(status: str | None = None, limit: int = 100, include_d
     elif not (include_drafts and is_staff):
         q["status"] = {"$ne": "draft"}
     safe_limit = max(1, min(int(limit or 100), 500))
-    challenges = await db.f1_challenges.find(q, {"_id": 0}).sort("created_at", -1).to_list(safe_limit)
+    projection = {"_id": 0}
+    if compact:
+        projection = {
+            "_id": 0, "id": 1, "title": 1, "slug": 1, "description": 1,
+            "banner_url": 1, "status": 1, "visibility": 1, "start_date": 1,
+            "platform": 1, "registration_enabled": 1, "online_registration_enabled": 1,
+            "registration_open_from": 1, "registration_open_until": 1,
+            "is_championship": 1, "block_club_member_results": 1,
+            "allow_club_reference_times": 1, "show_club_reference_times": 1,
+        }
+    fetch_limit = max(safe_limit, min(safe_limit + max(int(offset or 0), 0) + 80, 500))
+    challenges = await db.f1_challenges.find(q, projection).sort("created_at", -1).to_list(fetch_limit)
     visible = []
     for c in challenges:
         if not await user_can_see(user, c.get("visibility") or "public"):
@@ -277,6 +331,9 @@ async def list_challenges(status: str | None = None, limit: int = 100, include_d
         c["track_count"] = await db.f1_tracks.count_documents({"challenge_id": c["id"]})
         c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", _official_time_query({"challenge_id": c["id"]})))
         visible.append(c)
+    if compact:
+        visible = [_compact_challenge(c) for c in visible]
+        return _page_items(visible, limit, offset, paged)
     return visible
 
 

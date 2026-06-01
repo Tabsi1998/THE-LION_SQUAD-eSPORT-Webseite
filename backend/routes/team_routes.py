@@ -17,6 +17,15 @@ def _safe_regex(value: str | None, max_len: int = 80) -> str:
     return re.escape((value or "").strip()[:max_len])
 
 
+def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
+    safe_limit = max(1, min(int(limit or 48), 200))
+    safe_offset = max(0, int(offset or 0))
+    page = items[safe_offset:safe_offset + safe_limit]
+    if not paged:
+        return page
+    return {"items": page, "total": len(items), "limit": safe_limit, "offset": safe_offset}
+
+
 class TeamSquadCreate(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     description: Optional[str] = None
@@ -270,7 +279,7 @@ def _validate_squad_members(team: dict, member_ids: list[str]) -> list[str]:
 
 
 @router.get("")
-async def list_teams(q: str | None = None):
+async def list_teams(q: str | None = None, limit: int = 100, offset: int = 0, paged: bool = False):
     db = get_db()
     query = {}
     if q:
@@ -280,8 +289,10 @@ async def list_teams(q: str | None = None):
             {"tag": {"$regex": pattern, "$options": "i"}},
         ]
     query["is_public"] = {"$ne": False}
-    teams = await db.teams.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
-    return [_team_summary(team) for team in teams]
+    fetch_limit = max(100, min(max(int(limit or 100), 1) + max(int(offset or 0), 0) + 40, 500))
+    teams = await db.teams.find(query, {"_id": 0}).sort("created_at", -1).to_list(fetch_limit)
+    summaries = [_team_summary(team) for team in teams]
+    return _page_items(summaries, limit, offset, paged)
 
 
 @router.get("/my")

@@ -38,12 +38,10 @@ export default function NewsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ compact: "true", limit: "90" });
     if (activeCat) params.set("category", activeCat);
     if (searchQuery.trim()) params.set("q", searchQuery.trim());
-    const suffix = params.toString();
-    const url = suffix ? `/news?${suffix}` : "/news";
-    api.get(url).then(({ data }) => setList(data)).catch(() => {}).finally(() => setLoading(false));
+    api.get(`/news?${params.toString()}`).then(({ data }) => setList(data)).catch(() => {}).finally(() => setLoading(false));
   }, [activeCat, searchQuery]);
 
   useEffect(() => {

@@ -58,6 +58,46 @@ def _safe_regex(value: str | None, max_len: int = 80) -> str:
     return re.escape((value or "").strip()[:max_len])
 
 
+def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
+    safe_limit = max(1, min(int(limit or 48), 200))
+    safe_offset = max(0, int(offset or 0))
+    page = items[safe_offset:safe_offset + safe_limit]
+    if not paged:
+        return page
+    return {"items": page, "total": len(items), "limit": safe_limit, "offset": safe_offset}
+
+
+def _compact_tournament(t: dict) -> dict:
+    game = t.get("game") or {}
+    return {
+        "id": t.get("id"),
+        "title": t.get("title"),
+        "slug": t.get("slug"),
+        "banner_url": t.get("banner_url"),
+        "status": t.get("status"),
+        "visibility": t.get("visibility"),
+        "is_public": t.get("is_public"),
+        "public_phase": t.get("public_phase"),
+        "platform": t.get("platform"),
+        "start_date": t.get("start_date"),
+        "max_participants": t.get("max_participants"),
+        "participant_count": t.get("participant_count", 0),
+        "prize_pool": t.get("prize_pool"),
+        "registration_enabled": t.get("registration_enabled"),
+        "online_registration_enabled": t.get("online_registration_enabled"),
+        "registration_open_from": t.get("registration_open_from"),
+        "registration_open_until": t.get("registration_open_until"),
+        "is_invite_only": t.get("is_invite_only"),
+        "game": {
+            "id": game.get("id"),
+            "name": game.get("name"),
+            "short_name": game.get("short_name"),
+            "cover_url": game.get("cover_url"),
+            "logo_url": game.get("logo_url"),
+        } if game else None,
+    }
+
+
 class TournamentChatCreate(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
 
@@ -1271,6 +1311,7 @@ async def _resolve_tid(slug_or_id: str) -> str:
 @router.get("")
 async def list_tournaments(status: str | None = None, game_id: str | None = None,
                            event_id: str | None = None, limit: int = 100,
+                           offset: int = 0, paged: bool = False, compact: bool = False,
                            include_drafts: bool = False,
                            user=Depends(get_optional_user)):
     db = get_db()
@@ -1295,7 +1336,17 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     if event_id:
         q["event_id"] = event_id
     safe_limit = max(1, min(int(limit or 100), 500))
-    tournaments = await db.tournaments.find(q, {"_id": 0}).sort("created_at", -1).to_list(safe_limit)
+    projection = {"_id": 0}
+    if compact:
+        projection = {
+            "_id": 0, "id": 1, "title": 1, "slug": 1, "banner_url": 1,
+            "status": 1, "visibility": 1, "is_public": 1, "game_id": 1,
+            "platform": 1, "start_date": 1, "max_participants": 1,
+            "prize_pool": 1, "registration_enabled": 1, "online_registration_enabled": 1,
+            "registration_open_from": 1, "registration_open_until": 1, "is_invite_only": 1,
+        }
+    fetch_limit = max(safe_limit, min(safe_limit + max(int(offset or 0), 0) + 80, 500))
+    tournaments = await db.tournaments.find(q, projection).sort("created_at", -1).to_list(fetch_limit)
     if not is_admin:
         visible = []
         for t in tournaments:
@@ -1310,6 +1361,9 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
         tournaments = visible
     for t in tournaments:
         await _enrich_tournament(t, user)
+    if compact:
+        tournaments = [_compact_tournament(t) for t in tournaments]
+        return _page_items(tournaments, limit, offset, paged)
     return tournaments
 
 

@@ -19,7 +19,7 @@ export default function GalleryPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get("/gallery").then(({ data }) => setAlbums(data)).catch(() => {}).finally(() => setLoading(false));
+    api.get("/gallery?compact=true&limit=80").then(({ data }) => setAlbums(data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
