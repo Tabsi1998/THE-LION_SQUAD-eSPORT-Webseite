@@ -2,7 +2,7 @@
  * BottomNav — Mobile Bottom Navigation Bar (App-Style)
  * Zeigt sich nur auf kleinen Screens (< lg).
  * Gäste sehen: Home, Turniere, Events, News, Wertung
- * Eingeloggte User sehen: Home, Turniere, Events, Dashboard, Profil
+ * Eingeloggte User sehen: Dashboard, Turniere, Events, Wertung, Profil
  */
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";

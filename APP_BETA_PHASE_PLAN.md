@@ -189,8 +189,8 @@ Public Website:
 Navigation und Informationsarchitektur:
 
 - Hauptnavigation pruefen: Besucher brauchen andere Wege als eingeloggte Spieler oder Admins.
-- "Mein Bereich" klarer als Spieler-Dashboard positionieren, getrennt von oeffentlichem Profil.
-- Mobile BottomNav und Desktop-Nav inhaltlich aufeinander abstimmen.
+- [x] "Mein Bereich" klarer als Spieler-Dashboard positionieren, getrennt von oeffentlichem Profil.
+- [x] Mobile BottomNav und Desktop-Nav inhaltlich aufeinander abstimmen.
 - Breadcrumbs/Zurueck-Links auf tiefen Seiten wie Match, Bracket, Standings und Galerie konsequent einsetzen.
 - Interne Suche oder Quick-Jump fuer Turniere, Events, News, Spieler und Teams pruefen.
 

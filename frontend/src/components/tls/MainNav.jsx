@@ -53,9 +53,9 @@ export const NAV_STRUCTURE = [
 
 export const NAV_USER = [
   {
-    label: "Mein Bereich",
+    label: "Spieler-Dashboard",
     children: [
-      { to: "/dashboard", label: "Übersicht" },
+      { to: "/dashboard", label: "Dashboard" },
       { to: "/profile", label: "Profil & Einstellungen" },
       { to: "/profile?tab=teams", label: "Teamverwaltung" },
       { to: "/profile?tab=achievements", label: "Meine Achievements" },
