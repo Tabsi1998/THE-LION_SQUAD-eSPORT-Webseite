@@ -5,7 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { Pin, Newspaper, Crown, Lock, Search, X } from "lucide-react";
+import { ArrowRight, Pin, Newspaper, Crown, Lock, Search, X } from "lucide-react";
 
 const CATEGORY_COLORS = {
   club: "#29B6E8",
@@ -190,6 +190,12 @@ function NewsCard({ n, featured = false }) {
           {n.title}
         </h3>
         {n.excerpt && <p className="mt-2 text-sm text-white/65 line-clamp-3 flex-1">{n.excerpt}</p>}
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
+          <span className="text-[10px] uppercase tracking-widest font-bold text-white/35">Beitrag</span>
+          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
+            Weiterlesen <ArrowRight className="w-3 h-3" />
+          </span>
+        </div>
       </div>
     </Link>
   );

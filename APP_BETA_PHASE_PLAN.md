@@ -182,7 +182,7 @@ Public Website:
 
 - [x] Startseite staerker nach aktuellen Prioritaeten steuern: naechstes Event, laufende Turniere, aktuelle News, Jahreswertung.
 - [x] Turnier-, Event- und Fast-Lap-Listen/Karten angleichen: konsistente Status-, Meta- und CTA-Signale auf Public-Karten.
-- News-Seiten mit besseren Inhaltsbausteinen: Embed-Karten, Autoren-/Kategoriezeile, "Weiterlesen", verwandte Turniere/Events, Rueckblick-Galerien.
+- [x] News-Seiten mit besseren Inhaltsbausteinen: Embed-Karten, Autoren-/Kategoriezeile, "Weiterlesen", verwandte Turniere/Events.
 - Community-Bereich klarer strukturieren: Spieler, Teams, Server, Mitglieder, Achievements und Referenzen als zusammenhaengende Community-Welt.
 - Sponsoren/Partner sichtbarer machen: Partnerkarten, Sponsoren-Tiers, Verknuepfung mit Events, Footer/SEO-Daten sauber halten.
 
