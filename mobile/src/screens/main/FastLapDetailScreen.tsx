@@ -147,7 +147,7 @@ export function FastLapDetailScreen({ route }: Props) {
       >
         <View style={styles.heroWrap}>
           <MediaImage
-            uri={challenge.banner_url}
+            uri={activeTrack?.image_url || challenge.banner_url}
             style={styles.hero}
             fallback={<Ionicons name="speedometer-outline" color={colors.gold} size={42} />}
           />

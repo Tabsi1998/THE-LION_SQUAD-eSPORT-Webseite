@@ -111,9 +111,9 @@ Ziel:
 
 Umsetzung:
 
-- `FastLapDetailScreen` rendert `activeTrack.image_url`.
-- Backend/Admin pruefen: Track-Bild muss im Admin sauber pflegbar sein.
-- Fast-Lap-Embeds nutzen automatisch das erste vorhandene Track-Bild; optional kann spaeter ein spezifisches Track-Token wie `[[fastlap:challenge#track]]` folgen.
+- [x] `FastLapDetailScreen` rendert `activeTrack.image_url` im Hero und in der Track-Karte, mit Challenge-Banner als Fallback.
+- [x] Backend/Admin geprueft: Track-Bild ist ueber `f1_tracks.image_url` und den Admin-Upload pflegbar.
+- [x] Fast-Lap-Embeds nutzen automatisch das erste vorhandene Track-Bild; optional kann spaeter ein spezifisches Track-Token wie `[[fastlap:challenge#track]]` folgen.
 
 ## Phase 5 - Profil und Mehr-Navigation
 
