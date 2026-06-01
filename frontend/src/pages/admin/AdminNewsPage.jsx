@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { EditorialChecklist } from "@/components/tls/EditorialChecklist";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { SeoPreviewPanel } from "@/components/tls/SeoPreviewPanel";
@@ -249,6 +250,19 @@ function NewsModal({ post, meta, onClose, onSaved }) {
     robots: seoIsIndexable ? "index, follow" : "noindex, follow",
     published: seoIsIndexable,
   };
+  const linkedContentCount = linkedT.length + linkedE.length + linkedF.length + mentionedUserIds.length;
+  const hasEmbedToken = /\[\[(fastlap|tournament|event):[^\]]+\]\]/i.test(form.content || "");
+  const newsletterDone = Boolean(post.newsletter_sent_at);
+  const editorialChecklist = [
+    { label: "Titel", done: Boolean(form.title.trim()), description: form.title.trim() ? "Sauber gesetzt." : "Pflichtfeld fuer Listen, SEO und Social Cards." },
+    { label: "Teaser", done: Boolean(form.excerpt.trim()), description: form.excerpt.trim() ? "Kurzbeschreibung vorhanden." : "Hilft auf News-Liste, Google und beim Teilen." },
+    { label: "Banner", done: Boolean(form.banner_url), description: form.banner_url ? "Social-Bild vorhanden." : "Eigenes Bild statt generischem Fallback waehlen." },
+    { label: "Inhalt", done: Boolean(form.content.trim()), description: form.content.trim() ? "Beitragstext vorhanden." : "Markdown-Inhalt fehlt noch." },
+    { label: "Sichtbarkeit", done: Boolean(form.visibility && form.published), description: seoIsIndexable ? "Oeffentlich indexierbar." : "Entwurf, privat oder noindex." },
+    { label: "Embeds", done: linkedContentCount > 0 || hasEmbedToken, tone: linkedContentCount > 0 || hasEmbedToken ? undefined : "note", description: linkedContentCount > 0 || hasEmbedToken ? `${linkedContentCount || 1} Verknuepfung(en) erkannt.` : "Optional: Turnier, Event, Fast-Lap oder Personen verknuepfen." },
+    { label: "SEO", done: Boolean(form.slug && form.excerpt && form.banner_url), description: "Titel, Teaser, Canonical und Social Preview pruefen." },
+    { label: "Newsletter/Discord", done: newsletterDone, tone: newsletterDone ? undefined : "note", description: newsletterDone ? "Newsletter wurde bereits versendet." : "Nach dem Speichern Versand und Discord-Post kontrollieren." },
+  ];
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 overflow-y-auto p-2 sm:p-4">
@@ -316,6 +330,7 @@ function NewsModal({ post, meta, onClose, onSaved }) {
             </div>
           </Field>
           <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="news-banner" variant="wide" allowLibrary /></Field>
+          <EditorialChecklist items={editorialChecklist} />
           <SeoPreviewPanel path={publicPath} fallback={seoFallback} />
 
           <Field label="Veröffentlichungsdatum (optional, sonst jetzt)">

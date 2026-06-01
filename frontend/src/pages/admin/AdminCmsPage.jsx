@@ -6,7 +6,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { EditorialChecklist } from "@/components/tls/EditorialChecklist";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
+import { SeoPreviewPanel } from "@/components/tls/SeoPreviewPanel";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
@@ -114,6 +116,24 @@ function PageEditor({ page, onClose, onSaved }) {
     is_published: page?.is_published ?? true,
   });
   const [saving, setSaving] = useState(false);
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://lionsquad.at";
+  const publicPath = form.slug ? `/${form.slug.replace(/^\/+/, "")}` : "";
+  const pageChecklist = [
+    { label: "Slug", done: Boolean(form.slug.trim()), description: form.slug.trim() ? `URL: ${publicPath}` : "URL-Pfad fuer die Seite fehlt." },
+    { label: "Titel", done: Boolean(form.title.trim()), description: form.title.trim() ? "Seitentitel vorhanden." : "Wichtig fuer Navigation und SEO." },
+    { label: "Meta", done: Boolean(form.meta_description.trim()), description: form.meta_description.trim() ? "Meta-Description gesetzt." : "Kurzer Google-/Teilen-Text fehlt." },
+    { label: "Inhalt", done: Boolean(form.body_md.trim()), description: form.body_md.trim() ? "Markdown-Inhalt vorhanden." : "Seiteninhalt fehlt noch." },
+    { label: "Sichtbarkeit", done: Boolean(form.is_published), description: form.is_published ? "Seite ist nach dem Speichern sichtbar." : "Seite bleibt versteckt." },
+    { label: "Sharing", tone: "note", description: "Bei wichtigen Seiten Banner/Fallback im Branding pruefen." },
+  ];
+  const seoFallback = {
+    title: form.title || "CMS-Seite",
+    description: form.meta_description || form.title || "Beschreibung fehlt noch.",
+    canonical: publicPath ? `${origin}${publicPath}` : "",
+    url: publicPath ? `${origin}${publicPath}` : "",
+    robots: form.is_published ? "index, follow" : "noindex, follow",
+    published: Boolean(form.is_published),
+  };
 
   const save = async () => {
     setSaving(true);
@@ -144,6 +164,8 @@ function PageEditor({ page, onClose, onSaved }) {
               testId="page-body"
             />
           </Field>
+          <EditorialChecklist items={pageChecklist} />
+          <SeoPreviewPanel path={publicPath} fallback={seoFallback} />
           <label className="inline-flex items-center gap-2 text-sm">
             <input type="checkbox" checked={form.is_published} onChange={(e) => setForm({ ...form, is_published: e.target.checked })} className="accent-[#FFD700]" /> Veröffentlicht
           </label>
