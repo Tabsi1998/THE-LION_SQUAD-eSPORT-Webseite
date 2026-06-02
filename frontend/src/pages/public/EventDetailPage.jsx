@@ -16,7 +16,7 @@ import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag, UserPlus, CheckCircle, XCircle } from "lucide-react";
+import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag, UserPlus, CheckCircle, XCircle, Radio } from "lucide-react";
 
 const TYPE_LABELS = {
   club_evening: "Vereinsabend", lan_party: "LAN-Party", public_event: "Public Event",
@@ -98,6 +98,7 @@ export default function EventDetailPage() {
 
   const eventSponsors = uniqueLogoSponsors(e.sponsors || []);
   const organizerName = e.organizer_name || (e.owned_by_club ? "THE LION SQUAD - eSports" : "");
+  const liveUrl = `/events/${e.slug || e.id}/live${accessSuffix(accessToken)}`;
 
   return (
     <PublicLayout>
@@ -128,6 +129,16 @@ export default function EventDetailPage() {
               ) : <span className="inline-flex items-center gap-2">{organizerName}</span>
             )}
           </div>
+          {(e.tournaments?.length || e.f1_challenges?.length) && (
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link to={liveUrl} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:bg-white transition">
+                <Radio className="w-4 h-4" /> Live verfolgen
+              </Link>
+              <Link to={`/display/event/${e.id}`} className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/70 text-xs uppercase tracking-wider font-bold rounded-sm hover:border-[#29B6E8]/45 hover:text-white transition">
+                <ExternalLink className="w-4 h-4" /> Display
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 

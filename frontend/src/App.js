@@ -48,6 +48,7 @@ import F1ListPage from "@/pages/public/F1ListPage";
 import F1DetailPage from "@/pages/public/F1DetailPage";
 import EventsPage from "@/pages/public/EventsPage";
 import EventDetailPage from "@/pages/public/EventDetailPage";
+import EventLivePage from "@/pages/public/EventLivePage";
 import TeamsPage from "@/pages/public/TeamsPage";
 import NewsPage from "@/pages/public/NewsPage";
 import LoginPage from "@/pages/public/LoginPage";
@@ -175,6 +176,7 @@ function App() {
           <Route path="/f1/:slug" element={<FastLapLegacyRedirect />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/events/:slug" element={<EventDetailPage />} />
+          <Route path="/events/:slug/live" element={<EventLivePage />} />
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/teams/:id" element={<TeamsPage />} />
           <Route path="/news" element={<NewsPage />} />
