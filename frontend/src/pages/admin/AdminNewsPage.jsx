@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { EditorialChecklist } from "@/components/tls/EditorialChecklist";
@@ -38,6 +39,7 @@ function exportNewsCsv(rows) {
 }
 
 export default function AdminNewsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ categories: [], visibilities: [] });
   const [editing, setEditing] = useState(null);
@@ -56,6 +58,22 @@ export default function AdminNewsPage() {
     api.get("/news-meta").then(({ data }) => setMeta(data)).catch(() => {});
   }, [load]);
   useApiInvalidation(load, ["news"]);
+
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (!editId || editing || list.length === 0) return;
+    const post = list.find((item) => item.id === editId);
+    if (post) setEditing(post);
+  }, [editing, list, searchParams]);
+
+  const closeEditor = () => {
+    setEditing(null);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      params.delete("edit");
+      return params;
+    }, { replace: true });
+  };
 
   const remove = async (id) => {
     if (!await confirm({ title: "Beitrag löschen?", description: "Der News-Beitrag wird dauerhaft entfernt.", confirmLabel: "Löschen" })) return;
@@ -112,7 +130,7 @@ export default function AdminNewsPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">VEREINS-CMS</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">News</h1>
         </div>
-        <button onClick={() => setEditing({})} data-testid="news-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#1E95C2] transition">
+        <button onClick={() => { closeEditor(); setEditing({}); }} data-testid="news-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#1E95C2] transition">
           <Plus className="w-3.5 h-3.5" /> Neuer Beitrag
         </button>
       </div>
@@ -222,7 +240,7 @@ export default function AdminNewsPage() {
         </div>
       )}
 
-      {editing && <NewsModal post={editing} meta={meta} onClose={() => setEditing(null)} onSaved={load} />}
+      {editing && <NewsModal post={editing} meta={meta} onClose={closeEditor} onSaved={load} />}
     </AdminLayout>
   );
 }

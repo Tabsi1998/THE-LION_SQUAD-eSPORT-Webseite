@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -13,7 +13,7 @@ import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
 import { sortByNearestDate } from "@/lib/contentSort";
 import { toast } from "sonner";
-import { Flag, Plus, Save, X, Trash2, Calendar, Trophy, UserCheck, Search, Download } from "lucide-react";
+import { Flag, Plus, Save, X, Trash2, Calendar, Trophy, UserCheck, Search, Download, FileText } from "lucide-react";
 
 const CREATE_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -21,6 +21,7 @@ const CREATE_STATUS_OPTIONS = [
 ];
 
 export default function AdminEventsPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ types: [], statuses: [], visibilities: [] });
@@ -29,6 +30,7 @@ export default function AdminEventsPage() {
   const [f1Challenges, setF1Challenges] = useState([]);
   const [editing, setEditing] = useState(null);
   const [registrationsEvent, setRegistrationsEvent] = useState(null);
+  const [creatingRecapId, setCreatingRecapId] = useState(null);
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
   const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "");
@@ -102,6 +104,19 @@ export default function AdminEventsPage() {
       confirmLabel: "Löschen",
     })) return;
     try { await api.delete(`/events/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Event konnte nicht gelöscht werden.")); }
+  };
+
+  const createRecapDraft = async (event) => {
+    setCreatingRecapId(event.id);
+    try {
+      const { data } = await api.post(`/events/${event.id}/recap-draft`);
+      toast.success(data.created ? "Rueckblick-Entwurf erstellt." : "Rueckblick-Entwurf war schon vorhanden.");
+      navigate(`/admin/news?edit=${encodeURIComponent(data.post.id)}`);
+    } catch (err) {
+      toast.error(formatRequestError(err, "Rueckblick konnte nicht vorbereitet werden."));
+    } finally {
+      setCreatingRecapId(null);
+    }
   };
 
   const sortedList = useMemo(() => sortByNearestDate(list), [list]);
@@ -264,6 +279,9 @@ export default function AdminEventsPage() {
                           <UserCheck className="w-3 h-3" /> Anm.
                         </button>
                       )}
+                      <button onClick={() => createRecapDraft(e)} disabled={creatingRecapId === e.id} data-testid={`event-recap-${e.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 inline-flex items-center gap-1 disabled:opacity-50">
+                        <FileText className="w-3 h-3" /> {creatingRecapId === e.id ? "..." : "Rueckblick"}
+                      </button>
                       <button onClick={() => setEditing(e)} data-testid={`event-edit-${e.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#9F7AEA]/40 text-[#9F7AEA] hover:bg-[#9F7AEA]/10">Bearbeiten</button>
                       <button onClick={() => remove(e.id)} data-testid={`event-delete-${e.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
                     </td>
