@@ -8,7 +8,8 @@ import { Copy, Eye } from "lucide-react";
 function safeWidgetUrl({ type, id, track, base }) {
   if (!id || !/^[A-Za-z0-9_-]+$/.test(String(id))) return "";
   const path = type === "bracket" ? `/display/bracket/${encodeURIComponent(id)}`
-    : type === "f1" ? `/display/f1/${encodeURIComponent(id)}` : "";
+    : type === "f1" ? `/display/f1/${encodeURIComponent(id)}`
+      : type === "event" ? `/display/event/${encodeURIComponent(id)}` : "";
   if (!path) return "";
   try {
     const next = new URL(path, base);
@@ -32,6 +33,7 @@ function escapeHtmlAttribute(value) {
 export default function AdminWidgetsPage() {
   const [tournaments, setTournaments] = useState([]);
   const [challenges, setChallenges] = useState([]);
+  const [events, setEvents] = useState([]);
   const [selType, setSelType] = useState("bracket");
   const [selId, setSelId] = useState("");
   const [tracks, setTracks] = useState([]);
@@ -41,9 +43,10 @@ export default function AdminWidgetsPage() {
   const loadSources = useCallback(() => {
     api.get("/tournaments?include_drafts=true").then(({ data }) => setTournaments(data));
     api.get("/f1/challenges?include_drafts=true").then(({ data }) => setChallenges(data));
+    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data));
   }, []);
   useEffect(() => { loadSources(); }, [loadSources]);
-  useApiInvalidation(loadSources, ["tournaments", "f1"]);
+  useApiInvalidation(loadSources, ["tournaments", "f1", "events"]);
 
   useEffect(() => {
     setTracks([]);
@@ -61,7 +64,7 @@ export default function AdminWidgetsPage() {
     toast.success("Einbettungscode kopiert.");
   };
 
-  const options = selType === "bracket" ? tournaments : challenges;
+  const options = selType === "bracket" ? tournaments : selType === "event" ? events : challenges;
 
   return (
     <AdminLayout>
@@ -69,8 +72,8 @@ export default function AdminWidgetsPage() {
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Widgets & Einbettungen</h1>
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
-          <Select label="Typ" value={selType} onChange={(v)=>{ setSelType(v); setSelId(""); setSelTrack(""); }} options={[["bracket","Turnierbaum"],["f1","Fast-Lap-Rangliste"]]} testId="widget-type"/>
-          <Select label="Quelle" value={selId} onChange={(v)=>{ setSelId(v); setSelTrack(""); }} options={[["","— auswählen —"],...options.map(o=>[o.id, o.title])]} testId="widget-source"/>
+          <Select label="Typ" value={selType} onChange={(v)=>{ setSelType(v); setSelId(""); setSelTrack(""); }} options={[["bracket","Turnierbaum"],["f1","Fast-Lap-Rangliste"],["event","Event-Live"]]} testId="widget-type"/>
+          <Select label="Quelle" value={selId} onChange={(v)=>{ setSelId(v); setSelTrack(""); }} options={[["","— auswählen —"],...options.map(o=>[o.id, o.title || o.name])]} testId="widget-source"/>
           {selType === "f1" && tracks.length > 0 && (
             <Select label="Strecke" value={selTrack} onChange={setSelTrack} options={[["","Automatisch rotieren"],...tracks.map(t=>[t.id, t.name])]} testId="widget-track"/>
           )}

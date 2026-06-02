@@ -116,6 +116,7 @@ const MyMembershipPage = lazy(() => import("@/pages/user/MyMembershipPage"));
 
 import F1TVPage from "@/pages/display/F1TVPage";
 import BracketTVPage from "@/pages/display/BracketTVPage";
+import EventTVPage from "@/pages/display/EventTVPage";
 const MyPrizesPage = lazy(() => import("@/pages/user/MyPrizesPage"));
 const MyPenaltiesPage = lazy(() => import("@/pages/user/MyPenaltiesPage"));
 const AdminPrizesPage = lazy(() => import("@/pages/admin/AdminPrizesPage"));
@@ -259,6 +260,7 @@ function App() {
 
           {/* Display / TV */}
           <Route path="/display/f1/:id" element={<F1TVPage />} />
+          <Route path="/display/event/:id" element={<EventTVPage />} />
           <Route path="/display/bracket/:id" element={<ProtectedRoute requireModerator><BracketTVPage /></ProtectedRoute>} />
 
           {/* Error pages */}

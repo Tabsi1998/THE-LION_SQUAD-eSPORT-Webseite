@@ -221,7 +221,7 @@ Admin und Redaktion:
 
 Live- und Event-Erlebnis:
 
-- Display-Seiten als eigener Modus ausbauen: Bracket-TV, Fast-Lap-TV, Event-Ticker, Station-Status, Sponsorrotation.
+- [x] Display-Seiten als eigener Modus ausbauen: Bracket-TV, Fast-Lap-TV, Event-Ticker, Station-Status, Sponsorrotation.
 - Oeffentliche Live-Seiten fuer lokale Events: Zeitplan, laufende Matches, naechste Station, Ergebnis-Ticker.
 - Nach dem Event automatisch Rueckblick vorbereiten: Gewinner, Podium, Galerie, News-Entwurf, Social-Share.
 - QR-Codes fuer Vor-Ort-Wege: Check-in, Match, Station, Galerie-Upload, Feedback.
