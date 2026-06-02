@@ -9,6 +9,7 @@ import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatDate } from "@/lib/datetime";
+import { compareByNearestDate, sortByNearestDate } from "@/lib/contentSort";
 import { ArrowRight, CalendarDays, Flag, Medal, Radio, Trophy, Users } from "lucide-react";
 
 const ACTIVE_PHASES = new Set(["registration", "check_in", "live", "upcoming"]);
@@ -32,8 +33,8 @@ export default function EsportsOverviewPage() {
         api.get("/tournaments?compact=true&limit=48"),
         api.get("/f1/challenges?compact=true&limit=48"),
       ]);
-      setTournaments(Array.isArray(tournamentRes.data) ? tournamentRes.data : tournamentRes.data?.items || []);
-      setFastlaps(Array.isArray(fastlapRes.data) ? fastlapRes.data : fastlapRes.data?.items || []);
+      setTournaments(sortByNearestDate(Array.isArray(tournamentRes.data) ? tournamentRes.data : tournamentRes.data?.items || []));
+      setFastlaps(sortByNearestDate(Array.isArray(fastlapRes.data) ? fastlapRes.data : fastlapRes.data?.items || []));
       setError(false);
     } catch {
       setError(true);
@@ -120,15 +121,19 @@ export default function EsportsOverviewPage() {
 }
 
 function isActiveActivity(item) {
-  return ACTIVE_PHASES.has(item.public_phase) || ACTIVE_STATUSES.has(item.status);
+  const phaseState = typeof item.public_phase === "string" ? item.public_phase : item.public_phase?.state;
+  return ACTIVE_PHASES.has(phaseState) || ACTIVE_STATUSES.has(item.status);
 }
 
 function activitySort(a, b) {
-  const activeDelta = Number(isActiveActivity(b)) - Number(isActiveActivity(a));
-  if (activeDelta) return activeDelta;
-  const aTime = new Date(a.start_date || a.created_at || 0).getTime() || 0;
-  const bTime = new Date(b.start_date || b.created_at || 0).getTime() || 0;
-  return bTime - aTime;
+  return compareByNearestDate(
+    a.start_date || a.created_at,
+    b.start_date || b.created_at,
+    a.status,
+    b.status,
+    a.public_phase,
+    b.public_phase,
+  );
 }
 
 function StatCard({ icon: Icon, label, value }) {

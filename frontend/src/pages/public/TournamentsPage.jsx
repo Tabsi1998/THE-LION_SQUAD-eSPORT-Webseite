@@ -7,6 +7,7 @@ import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { sortByNearestDate } from "@/lib/contentSort";
 import { Trophy } from "lucide-react";
 
 export default function TournamentsPage() {
@@ -26,7 +27,7 @@ export default function TournamentsPage() {
       const params = new URLSearchParams({ compact: "true", limit: "60" });
       if (statusFilter !== "all") params.set("status", statusFilter);
       const { data } = await api.get(`/tournaments?${params.toString()}`);
-      setList(data);
+      setList(sortByNearestDate(Array.isArray(data) ? data : data?.items || []));
       setError(false);
     } catch {
       setError(true);

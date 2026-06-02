@@ -9,6 +9,7 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { plainTextPreview } from "@/lib/textPreview";
+import { sortByNearestDate } from "@/lib/contentSort";
 import { Calendar, MapPin, Users as UsersIcon, Crown, Lock } from "lucide-react";
 
 const VIS_ICON = { members: Crown, internal: Lock };
@@ -29,7 +30,10 @@ export default function EventsPage() {
     const params = new URLSearchParams({ compact: "true", limit: "90" });
     if (tab === "upcoming") params.set("upcoming", "true");
     const url = `/events?${params.toString()}`;
-    api.get(url).then(({ data }) => setList(data)).catch(() => {}).finally(() => setLoading(false));
+    api.get(url)
+      .then(({ data }) => setList(sortByNearestDate(Array.isArray(data) ? data : data?.items || [])))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [tab]);
 
   useEffect(() => {

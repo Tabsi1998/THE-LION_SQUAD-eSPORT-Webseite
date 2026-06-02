@@ -10,6 +10,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { Flag, Users, Clock, ChevronRight } from "lucide-react";
 import { formatDate, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
+import { sortByNearestDate } from "@/lib/contentSort";
 
 export default function F1ListPage() {
   useDocumentTitle(
@@ -24,7 +25,7 @@ export default function F1ListPage() {
     setLoading(true);
     try {
       const { data } = await api.get("/f1/challenges?compact=true&limit=80");
-      setList(data);
+      setList(sortByNearestDate(Array.isArray(data) ? data : data?.items || []));
     } finally {
       setLoading(false);
     }
