@@ -180,7 +180,9 @@ def test_seo_preview_known_static_path_still_resolves(monkeypatch):
     meta = asyncio.run(resolve_meta("/about", request))
 
     assert meta["canonical"] == "https://lionsquad.at/about"
-    assert meta["favicon"] == ""
+    assert meta["favicon"] == "https://lionsquad.at/assets/brand/tls-favicon.png"
+    assert meta["favicon_light"] == "https://lionsquad.at/assets/brand/tls-favicon-light.png"
+    assert meta["favicon_dark"] == "https://lionsquad.at/assets/brand/tls-favicon-dark.png"
     assert meta["image"] == "https://lionsquad.at/api/static/uploads/logo.png"
     graph_types = {item["@type"] for item in meta["json_ld"]["@graph"]}
     assert graph_types == {"WebPage", "SportsOrganization", "BreadcrumbList", "ImageObject"}

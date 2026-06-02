@@ -4,7 +4,10 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 
 const DEFAULT_TITLE = "THE LION SQUAD - eSPORTS";
-const DEFAULT_SHARE_IMAGE = "/assets/brand/tls-wordmark.png";
+const DEFAULT_SHARE_IMAGE = "/assets/brand/og-default.png";
+const DEFAULT_FAVICON = "/assets/brand/tls-favicon.png";
+const DEFAULT_FAVICON_LIGHT = "/assets/brand/tls-favicon-light.png";
+const DEFAULT_FAVICON_DARK = "/assets/brand/tls-favicon-dark.png";
 
 function upsertMeta(selector, attrs) {
   let el = document.head.querySelector(selector);
@@ -20,15 +23,14 @@ function upsertMeta(selector, attrs) {
 
 function pickFavicon(data) {
   const custom = data?.favicon_url || data?.favicon_light_url || data?.favicon_dark_url || "";
-  if (custom) return resolveMediaUrl(custom);
-  return "";
+  return resolveMediaUrl(custom || DEFAULT_FAVICON);
 }
 
 function pickThemedFavicons(data) {
   const fallback = pickFavicon(data);
   return {
-    light: data?.favicon_light_url ? resolveMediaUrl(data.favicon_light_url) : fallback,
-    dark: data?.favicon_dark_url ? resolveMediaUrl(data.favicon_dark_url) : fallback,
+    light: data?.favicon_light_url ? resolveMediaUrl(data.favicon_light_url) : resolveMediaUrl(DEFAULT_FAVICON_LIGHT),
+    dark: data?.favicon_dark_url ? resolveMediaUrl(data.favicon_dark_url) : resolveMediaUrl(DEFAULT_FAVICON_DARK),
     fallback,
   };
 }

@@ -45,7 +45,7 @@ def _effective_favicon_url(branding: dict) -> str:
     custom = branding.get("favicon_url") or branding.get("favicon_light_url") or branding.get("favicon_dark_url")
     if custom:
         return custom
-    return ""
+    return "/assets/brand/tls-favicon.png"
 
 
 def _truthy_mail_config(mail: dict, legacy_email: dict) -> bool:
@@ -437,7 +437,7 @@ async def web_manifest():
     name = branding.get("site_title") or name
     description = branding.get("site_description") or "Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben."
     icon = _effective_favicon_url(branding)
-    default_screenshot = branding.get("share_banner_url") or branding.get("logo_url") or branding.get("logo_light_url") or branding.get("logo_dark_url") or branding.get("mascot_url") or "/assets/brand/tls-wordmark.png"
+    default_screenshot = branding.get("share_banner_url") or "/assets/brand/og-default.png"
     manifest = {
         "name": name,
         "short_name": "TLS",
@@ -452,7 +452,7 @@ async def web_manifest():
         ],
     }
     icons = []
-    for src in [branding.get("favicon_light_url"), branding.get("favicon_dark_url"), icon]:
+    for src in [branding.get("favicon_light_url") or "/assets/brand/tls-favicon-light.png", branding.get("favicon_dark_url") or "/assets/brand/tls-favicon-dark.png", icon]:
         if src and src not in [item["src"] for item in icons]:
             icons.extend([
                 {"src": src, "sizes": "192x192", "type": _image_mime_from_url(src), "purpose": "any"},

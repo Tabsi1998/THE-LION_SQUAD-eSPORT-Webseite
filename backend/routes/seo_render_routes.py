@@ -20,7 +20,11 @@ router = APIRouter(prefix="/api/seo", tags=["seo"])
 STAFF_HIDDEN_STATUSES = {"draft", "archived", "cancelled"}
 MARKDOWN_RE = re.compile(r"(!?\[[^\]]*\]\([^)]+\)|[`*_>#~-]+|\r?\n+)")
 HTML_RE = re.compile(r"<[^>]+>")
-DEFAULT_SHARE_IMAGE = "/assets/brand/tls-wordmark.png"
+DEFAULT_SHARE_IMAGE = "/assets/brand/og-default.png"
+DEFAULT_LOGO_IMAGE = "/assets/brand/tls-mascot.png"
+DEFAULT_FAVICON = "/assets/brand/tls-favicon.png"
+DEFAULT_FAVICON_LIGHT = "/assets/brand/tls-favicon-light.png"
+DEFAULT_FAVICON_DARK = "/assets/brand/tls-favicon-dark.png"
 DEFAULT_SITE_DESCRIPTION = (
     "THE LION SQUAD eSports ist ein Gaming und eSports Verein aus Tirol mit "
     "Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben."
@@ -35,14 +39,14 @@ def effective_favicon_url(branding: dict) -> str:
     custom = branding.get("favicon_url") or branding.get("favicon_light_url") or branding.get("favicon_dark_url")
     if custom:
         return custom
-    return ""
+    return DEFAULT_FAVICON
 
 
 def effective_favicon_urls(branding: dict) -> dict:
     fallback = effective_favicon_url(branding)
     return {
-        "light": branding.get("favicon_light_url") or fallback,
-        "dark": branding.get("favicon_dark_url") or fallback,
+        "light": branding.get("favicon_light_url") or DEFAULT_FAVICON_LIGHT,
+        "dark": branding.get("favicon_dark_url") or DEFAULT_FAVICON_DARK,
         "default": fallback,
     }
 
@@ -53,7 +57,7 @@ def effective_logo_url(branding: dict) -> str:
         or branding.get("logo_light_url")
         or branding.get("logo_dark_url")
         or branding.get("mascot_url")
-        or DEFAULT_SHARE_IMAGE
+        or DEFAULT_LOGO_IMAGE
     )
 
 

@@ -596,7 +596,7 @@ async def page_meta(slug: str):
         or branding.get("logo_light_url")
         or branding.get("logo_dark_url")
         or branding.get("mascot_url")
-        or "/assets/brand/tls-wordmark.png"
+        or "/assets/brand/og-default.png"
     )
     if image and not image.startswith(("http://", "https://")) and base:
         image = f"{base}{image if image.startswith('/') else '/' + image}"
