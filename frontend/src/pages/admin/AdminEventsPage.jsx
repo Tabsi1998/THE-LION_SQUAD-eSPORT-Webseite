@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -9,8 +10,10 @@ import { appendEmbedToken } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
+import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
+import { sortByNearestDate } from "@/lib/contentSort";
 import { toast } from "sonner";
-import { Flag, Plus, Save, X, Trash2, Calendar, Trophy, UserCheck } from "lucide-react";
+import { Flag, Plus, Save, X, Trash2, Calendar, Trophy, UserCheck, Search, Download } from "lucide-react";
 
 const CREATE_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -18,6 +21,7 @@ const CREATE_STATUS_OPTIONS = [
 ];
 
 export default function AdminEventsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ types: [], statuses: [], visibilities: [] });
   const [sponsors, setSponsors] = useState([]);
@@ -25,6 +29,10 @@ export default function AdminEventsPage() {
   const [f1Challenges, setF1Challenges] = useState([]);
   const [editing, setEditing] = useState(null);
   const [registrationsEvent, setRegistrationsEvent] = useState(null);
+  const [query, setQuery] = useState(searchParams.get("q") || "");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
+  const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "");
+  const [visibilityFilter, setVisibilityFilter] = useState(searchParams.get("visibility") || "");
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
@@ -53,6 +61,40 @@ export default function AdminEventsPage() {
   }, [load, loadRelations]);
   useApiInvalidation(refreshAll, ["events", "tournaments", "f1"]);
 
+  useEffect(() => {
+    const nextQuery = searchParams.get("q") || "";
+    const nextStatus = searchParams.get("status") || "";
+    const nextType = searchParams.get("type") || "";
+    const nextVisibility = searchParams.get("visibility") || "";
+    if (nextQuery !== query) setQuery(nextQuery);
+    if (nextStatus !== statusFilter) setStatusFilter(nextStatus);
+    if (nextType !== typeFilter) setTypeFilter(nextType);
+    if (nextVisibility !== visibilityFilter) setVisibilityFilter(nextVisibility);
+  }, [query, searchParams, statusFilter, typeFilter, visibilityFilter]);
+
+  const updateFilterParams = (patch) => {
+    const nextQuery = Object.prototype.hasOwnProperty.call(patch, "q") ? patch.q : query;
+    const nextStatus = Object.prototype.hasOwnProperty.call(patch, "status") ? patch.status : statusFilter;
+    const nextType = Object.prototype.hasOwnProperty.call(patch, "type") ? patch.type : typeFilter;
+    const nextVisibility = Object.prototype.hasOwnProperty.call(patch, "visibility") ? patch.visibility : visibilityFilter;
+    setQuery(nextQuery);
+    setStatusFilter(nextStatus);
+    setTypeFilter(nextType);
+    setVisibilityFilter(nextVisibility);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (nextQuery) params.set("q", nextQuery);
+      else params.delete("q");
+      if (nextStatus) params.set("status", nextStatus);
+      else params.delete("status");
+      if (nextType) params.set("type", nextType);
+      else params.delete("type");
+      if (nextVisibility) params.set("visibility", nextVisibility);
+      else params.delete("visibility");
+      return params;
+    }, { replace: true });
+  };
+
   const remove = async (id) => {
     if (!await confirm({
       title: "Event löschen?",
@@ -60,6 +102,71 @@ export default function AdminEventsPage() {
       confirmLabel: "Löschen",
     })) return;
     try { await api.delete(`/events/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Event konnte nicht gelöscht werden.")); }
+  };
+
+  const sortedList = useMemo(() => sortByNearestDate(list), [list]);
+  const filteredList = useMemo(() => {
+    const needle = normalizeSearch(query);
+    return sortedList.filter((event) => {
+      if (statusFilter && event.status !== statusFilter) return false;
+      if (typeFilter && event.event_type !== typeFilter) return false;
+      if (visibilityFilter && event.visibility !== visibilityFilter) return false;
+      if (!needle) return true;
+      const haystack = normalizeSearch([
+        event.name,
+        event.slug,
+        event.description,
+        event.event_type,
+        event.status,
+        event.visibility,
+        event.location,
+        event.city,
+      ].filter(Boolean).join(" "));
+      return haystack.includes(needle);
+    });
+  }, [query, sortedList, statusFilter, typeFilter, visibilityFilter]);
+
+  const statusOptions = useMemo(() => {
+    const rows = (meta.statuses || []).map((item) => [item.k, item.l || item.k]);
+    const known = new Set(rows.map(([key]) => key));
+    list.forEach((event) => {
+      if (event.status && !known.has(event.status)) rows.push([event.status, event.status]);
+    });
+    return rows;
+  }, [list, meta.statuses]);
+  const typeOptions = useMemo(() => {
+    const rows = (meta.types || []).map((item) => [item.k, item.l || item.k]);
+    const known = new Set(rows.map(([key]) => key));
+    list.forEach((event) => {
+      if (event.event_type && !known.has(event.event_type)) rows.push([event.event_type, event.event_type]);
+    });
+    return rows;
+  }, [list, meta.types]);
+  const visibilityOptions = useMemo(() => {
+    const rows = (meta.visibilities || []).map((item) => [item.k, item.l || item.k]);
+    const known = new Set(rows.map(([key]) => key));
+    list.forEach((event) => {
+      if (event.visibility && !known.has(event.visibility)) rows.push([event.visibility, event.visibility]);
+    });
+    return rows;
+  }, [list, meta.visibilities]);
+
+  const exportCsv = () => {
+    downloadCsv(
+      `tls-events-${new Date().toISOString().slice(0, 10)}.csv`,
+      ["Name", "Slug", "Typ", "Status", "Sichtbarkeit", "Start", "Ort", "Anmeldungen", "Plaetze"],
+      filteredList.map((event) => [
+        event.name,
+        event.slug,
+        meta.types.find((type) => type.k === event.event_type)?.l || event.event_type,
+        meta.statuses.find((status) => status.k === event.status)?.l || event.status,
+        event.visibility,
+        formatAdminDate(event.start_date),
+        [event.location, event.city].filter(Boolean).join(", "),
+        event.registration_summary?.registered_count || 0,
+        event.max_participants || "",
+      ]),
+    );
   };
 
   return (
@@ -74,6 +181,44 @@ export default function AdminEventsPage() {
           <Plus className="w-3.5 h-3.5" /> Neues Event
         </button>
       </div>
+
+      {list.length > 0 && (
+        <div className="mb-4 rounded-sm border border-white/10 bg-[#121212] p-3">
+          <div className="grid grid-cols-1 gap-2 xl:grid-cols-[minmax(16rem,1fr)_12rem_12rem_12rem_auto]">
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+              <input
+                value={query}
+                onChange={(event) => updateFilterParams({ q: event.target.value })}
+                placeholder="Event, Slug, Ort oder Beschreibung suchen"
+                data-testid="events-admin-search"
+                className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-2 pl-9 pr-3 text-sm focus:border-[#9F7AEA] focus:outline-none"
+              />
+            </label>
+            <select value={statusFilter} onChange={(event) => updateFilterParams({ status: event.target.value })} data-testid="events-admin-status-filter" className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
+              <option value="">Alle Status</option>
+              {statusOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+            <select value={typeFilter} onChange={(event) => updateFilterParams({ type: event.target.value })} data-testid="events-admin-type-filter" className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
+              <option value="">Alle Typen</option>
+              {typeOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+            <select value={visibilityFilter} onChange={(event) => updateFilterParams({ visibility: event.target.value })} data-testid="events-admin-visibility-filter" className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
+              <option value="">Alle Sichtbarkeiten</option>
+              {visibilityOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+            <button
+              type="button"
+              onClick={exportCsv}
+              disabled={filteredList.length === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/15 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/65 hover:border-[#9F7AEA]/45 hover:text-white disabled:opacity-40"
+            >
+              <Download className="h-3.5 w-3.5" /> CSV
+            </button>
+          </div>
+          <div className="mt-2 text-xs text-white/45">{filteredList.length} / {list.length} Events sichtbar</div>
+        </div>
+      )}
 
       {list.length === 0 ? (
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
@@ -97,7 +242,7 @@ export default function AdminEventsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {list.map((e) => (
+                {filteredList.map((e) => (
                   <tr key={e.id}>
                     <td className="px-4 py-3"><div className="font-bold">{e.name}</div><div className="text-[11px] text-white/50">/{e.slug}</div></td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#9F7AEA] font-bold">{meta.types.find((t) => t.k === e.event_type)?.l || e.event_type}</td>
@@ -124,6 +269,11 @@ export default function AdminEventsPage() {
                     </td>
                   </tr>
                 ))}
+                {filteredList.length === 0 && (
+                  <tr>
+                    <td colSpan="8" className="px-4 py-10 text-center text-sm text-white/40">Keine Events fuer diesen Filter.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

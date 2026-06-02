@@ -3,13 +3,15 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
-import { Plus, Trash2, Play, Pause, Search, Users } from "lucide-react";
+import { Plus, Trash2, Play, Pause, Search, Users, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
+import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
+import { sortByNearestDate } from "@/lib/contentSort";
 
 const EVENT_MODE_LABELS = {
   hybrid: "Hybrid",
@@ -39,14 +41,6 @@ const TOURNAMENT_STATUS_FILTERS = [
   ["archived", "Archiviert"],
   ["cancelled", "Abgesagt"],
 ];
-
-function normalizeSearch(value) {
-  return String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
-}
 
 export default function AdminTournamentsPage() {
   const { isAdmin } = useAuth();
@@ -113,9 +107,10 @@ export default function AdminTournamentsPage() {
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {}), [list]);
+  const sortedList = useMemo(() => sortByNearestDate(list), [list]);
   const filteredList = useMemo(() => {
     const q = normalizeSearch(query);
-    return list.filter((tournament) => {
+    return sortedList.filter((tournament) => {
       if (statusFilter && tournament.status !== statusFilter) return false;
       if (!q) return true;
       const haystack = normalizeSearch([
@@ -129,7 +124,24 @@ export default function AdminTournamentsPage() {
       ].filter(Boolean).join(" "));
       return haystack.includes(q);
     });
-  }, [list, query, statusFilter]);
+  }, [query, sortedList, statusFilter]);
+
+  const exportCsv = () => {
+    downloadCsv(
+      `tls-turniere-${new Date().toISOString().slice(0, 10)}.csv`,
+      ["Titel", "Slug", "Spiel", "Format", "Status", "Start", "Teilnehmer", "Max. Teilnehmer"],
+      filteredList.map((tournament) => [
+        tournament.title,
+        tournament.slug,
+        gameLabel(tournament.game),
+        formatTournamentDisplay(tournament),
+        tournament.status,
+        formatAdminDate(tournament.start_date),
+        tournament.participant_count,
+        tournament.max_participants,
+      ]),
+    );
+  };
 
   return (
     <AdminLayout>
@@ -144,7 +156,7 @@ export default function AdminTournamentsPage() {
           </Link>
         )}
       </div>
-      <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem_auto]">
+      <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem_auto_auto]">
         <label className="relative block">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
             <input
@@ -170,6 +182,14 @@ export default function AdminTournamentsPage() {
         <div className="flex items-center justify-end rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/55">
           {filteredList.length} / {list.length} sichtbar
         </div>
+        <button
+          type="button"
+          onClick={exportCsv}
+          disabled={filteredList.length === 0}
+          className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/15 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/65 hover:border-[#29B6E8]/45 hover:text-white disabled:opacity-40"
+        >
+          <Download className="h-3.5 w-3.5" /> CSV
+        </button>
       </div>
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
         <div className="overflow-x-auto">
