@@ -26,6 +26,7 @@ const MEDIA_SCOPE_LABELS = {
   legacy: "Legacy",
   unused: "Ungenutzt",
   untracked: "Ungetrackt",
+  duplicate: "Duplikate",
 };
 
 const fmtBytes = (n) => {
@@ -95,8 +96,9 @@ export default function AdminMediaPage() {
       if (filter === "files" && IMG_EXT.has(it.ext)) return false;
       if (scopeFilter === "unused" && !it.is_unused) return false;
       else if (scopeFilter === "untracked" && it.tracked) return false;
-      else if (!["all", "unused", "untracked"].includes(scopeFilter) && it.media_scope !== scopeFilter) return false;
-      const search = `${it.filename || ""} ${it.original_filename || ""}`.toLowerCase();
+      else if (scopeFilter === "duplicate" && !(it.duplicate_count > 1)) return false;
+      else if (!["all", "unused", "untracked", "duplicate"].includes(scopeFilter) && it.media_scope !== scopeFilter) return false;
+      const search = `${it.filename || ""} ${it.original_filename || ""} ${(it.duplicate_filenames || []).join(" ")}`.toLowerCase();
       if (q && !search.includes(q.toLowerCase())) return false;
       return true;
     });
@@ -293,11 +295,12 @@ export default function AdminMediaPage() {
       </div>
 
       {mediaAudit && (
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
           {[
             ["Dateien", mediaAudit.total || 0, "text-white"],
             ["Ungenutzt", mediaAudit.unused || 0, mediaAudit.unused ? "text-[#FFD700]" : "text-white"],
             ["Ungetrackt", mediaAudit.untracked || 0, mediaAudit.untracked ? "text-[#FFD700]" : "text-white"],
+            ["Duplikate", mediaAudit.duplicate_files || 0, mediaAudit.duplicate_files ? "text-[#FFD700]" : "text-white"],
             ["Defekte Metadaten", mediaAudit.metadata_missing_files || 0, mediaAudit.metadata_missing_files ? "text-[#FF3B30]" : "text-white"],
             ["Fehlende Referenzen", mediaAudit.reference_summary?.missing_file || 0, mediaAudit.reference_summary?.missing_file ? "text-[#FF3B30]" : "text-white"],
           ].map(([label, value, color]) => (
@@ -307,6 +310,7 @@ export default function AdminMediaPage() {
               onClick={() => {
                 if (label === "Ungenutzt") setScopeFilter("unused");
                 if (label === "Ungetrackt") setScopeFilter("untracked");
+                if (label === "Duplikate") setScopeFilter("duplicate");
               }}
               className="border border-white/10 bg-[#121212] rounded-sm p-3 text-left hover:border-white/25"
             >
@@ -406,6 +410,7 @@ export default function AdminMediaPage() {
                       <span className="text-[9px] uppercase tracking-wider border border-white/10 px-1.5 py-0.5 text-white/45">{MEDIA_SCOPE_LABELS[it.media_scope] || it.media_scope || "Legacy"}</span>
                       {it.is_unused && <span className="text-[9px] uppercase tracking-wider border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">ungenutzt</span>}
                       {!it.tracked && <span className="text-[9px] uppercase tracking-wider border border-[#FF3B30]/30 px-1.5 py-0.5 text-[#FF3B30]">ungetrackt</span>}
+                      {it.duplicate_count > 1 && <span className="text-[9px] uppercase tracking-wider border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">duplikat</span>}
                     </div>
                     <div className="text-[10px] text-white/40 mt-1">{fmtBytes(it.size)} · {it.usage_count || 0}x genutzt</div>
                   </div>
@@ -492,6 +497,16 @@ function MediaDetailModal({ item, onClose, onCopy, onRotateLeft, onRotateRight, 
             <div className="col-span-2">
               <div className="uppercase text-[10px] text-white/40 tracking-widest">Originalname</div>
               <div className="text-white/80 font-mono break-all">{item.original_filename}</div>
+            </div>
+          )}
+          {item.duplicate_count > 1 && (
+            <div className="col-span-2">
+              <div className="uppercase text-[10px] text-white/40 tracking-widest">Duplikate</div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {(item.duplicate_filenames || []).map((name) => (
+                  <span key={name} className="rounded-sm border border-[#FFD700]/25 bg-[#FFD700]/5 px-2 py-1 font-mono text-[10px] text-[#FFD700]">{name}</span>
+                ))}
+              </div>
             </div>
           )}
           <div className="col-span-2">

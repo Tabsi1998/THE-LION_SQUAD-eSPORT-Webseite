@@ -11,6 +11,7 @@ Endpoints:
   GET    /sitemap.xml                           — search-engine sitemap
   GET    /robots.txt                            — search-engine robots
 """
+import hashlib
 import os
 import re
 from pathlib import Path
@@ -107,6 +108,14 @@ def _iter_text_media_values(value: Any) -> list[str]:
     return out
 
 
+def _file_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 async def _collect_media_usage(filenames: set[str]) -> dict[str, list[dict[str, Any]]]:
     if not filenames:
         return {}
@@ -167,6 +176,29 @@ async def _list_media_items(
         p for p in candidates
         if not p.name.startswith(".") and p.suffix.lower() in PUBLIC_IMAGE_EXTS
     ]
+    duplicate_lookup: dict[str, list[str]] = {}
+    if include_usage:
+        by_size: dict[int, list[Path]] = {}
+        for path in candidates:
+            try:
+                by_size.setdefault(path.stat().st_size, []).append(path)
+            except OSError:
+                continue
+        for same_size_paths in by_size.values():
+            if len(same_size_paths) < 2:
+                continue
+            by_digest: dict[str, list[Path]] = {}
+            for path in same_size_paths:
+                try:
+                    by_digest.setdefault(_file_digest(path), []).append(path)
+                except OSError:
+                    continue
+            for same_content_paths in by_digest.values():
+                if len(same_content_paths) < 2:
+                    continue
+                names = sorted({path.name for path in same_content_paths})
+                for name in names:
+                    duplicate_lookup[name] = names
     filenames = [p.name for p in candidates]
     usage = await _collect_media_usage(set(filenames)) if include_usage else {}
     media_meta: dict[str, dict[str, Any]] = {}
@@ -209,6 +241,8 @@ async def _list_media_items(
             "usage_count": len(refs) if include_usage else None,
             "references": refs[:6],
             "is_unused": (len(refs) == 0) if include_usage else None,
+            "duplicate_count": len(duplicate_lookup.get(p.name) or []),
+            "duplicate_filenames": (duplicate_lookup.get(p.name) or [])[:8],
         })
     return items[:500]
 
@@ -235,6 +269,11 @@ async def admin_media_audit(me: dict = Depends(require_admin())):
     for item in items:
         by_scope[item.get("media_scope") or "legacy"] = by_scope.get(item.get("media_scope") or "legacy", 0) + 1
         total_size += int(item.get("size") or 0)
+    duplicate_groups: dict[str, list[str]] = {}
+    for item in items:
+        names = item.get("duplicate_filenames") or []
+        if len(names) > 1:
+            duplicate_groups["|".join(names)] = names
 
     missing_meta_count = 0
     missing_meta: list[dict[str, Any]] = []
@@ -256,6 +295,9 @@ async def admin_media_audit(me: dict = Depends(require_admin())):
         "by_scope": by_scope,
         "unused": sum(1 for item in items if item.get("is_unused")),
         "untracked": sum(1 for item in items if not item.get("tracked")),
+        "duplicate_files": sum(len(names) for names in duplicate_groups.values()),
+        "duplicate_groups": len(duplicate_groups),
+        "duplicate_examples": list(duplicate_groups.values())[:10],
         "metadata_missing_files": missing_meta_count,
         "metadata_missing_examples": missing_meta,
         "reference_summary": reference_audit.get("summary") or {},
