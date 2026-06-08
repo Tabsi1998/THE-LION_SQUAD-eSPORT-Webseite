@@ -122,6 +122,21 @@ export default function AdminDashboardPage() {
       tone: "#29B6E8",
     },
   ];
+  const taskIsActive = (item) => {
+    if (item.to === "/setup") return Boolean(setupStatus && (!setupStatus.completed || (setupStatus.health_score || 0) < 100));
+    if (item.to === "/admin/tournaments?status=live") return Number(data?.open_disputes || 0) > 0;
+    if (item.to === "/admin/membership-applications?status=pending") return pendingApplications > 0;
+    if (item.to === "/admin/tournaments?status=registration_open") return pendingRegistrations > 0;
+    if (item.to.startsWith("/admin/prizes")) return pendingPrizes > 0 || readyPrizes > 0;
+    if (item.to === "/admin/mobile-push") return pushErrors > 0;
+    if (item.to === "/admin/mobile-logs") return Number(data?.client_logs?.open || 0) > 0;
+    return false;
+  };
+  const fallbackTaskRoutes = ["/admin/media", "/admin/audit", "/admin/settings?tab=system", "/admin/settings?tab=seo"];
+  const activeTaskItems = taskItems.filter(taskIsActive);
+  const fallbackTaskItems = taskItems.filter((item) => fallbackTaskRoutes.includes(item.to));
+  const primaryTaskItems = activeTaskItems.length ? activeTaskItems : fallbackTaskItems;
+  const secondaryTaskItems = taskItems.filter((item) => !primaryTaskItems.includes(item));
 
   return (
     <AdminLayout>
@@ -171,8 +186,8 @@ export default function AdminDashboardPage() {
           </div>
           <span className="text-xs text-white/40">{new Date().toLocaleDateString("de-DE")}</span>
         </div>
-        <div className="grid md:grid-cols-3 xl:grid-cols-6 gap-3">
-          {taskItems.map((item) => (
+        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
+          {primaryTaskItems.map((item) => (
             <Link key={item.label} to={item.to} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 hover:border-[#29B6E8]/50 transition group">
               <div className="flex items-center justify-between gap-3">
                 <item.icon className="w-4 h-4" style={{ color: item.tone }} />
@@ -183,6 +198,25 @@ export default function AdminDashboardPage() {
             </Link>
           ))}
         </div>
+        {secondaryTaskItems.length > 0 && (
+          <details className="mt-4 border-t border-white/10 pt-4 group">
+            <summary className="cursor-pointer list-none text-[10px] font-bold uppercase tracking-[0.25em] text-white/45 hover:text-white inline-flex items-center gap-2">
+              Weitere Werkzeuge <span className="text-[#29B6E8] group-open:rotate-90 transition-transform">→</span>
+            </summary>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {secondaryTaskItems.map((item) => (
+                <Link
+                  key={item.label}
+                  to={item.to}
+                  className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-[#29B6E8]/50 hover:text-white"
+                >
+                  <item.icon className="w-3.5 h-3.5" style={{ color: item.tone }} />
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </details>
+        )}
       </div>
 
       <div className="mt-10 grid md:grid-cols-2 gap-6">

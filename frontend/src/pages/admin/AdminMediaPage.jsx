@@ -321,22 +321,6 @@ export default function AdminMediaPage() {
         >
           <RefreshCw className="w-3.5 h-3.5" /> Neu laden
         </button>
-        <button
-          onClick={auditScopes}
-          disabled={auditingScopes}
-          data-testid="media-scope-audit"
-          className="px-3 py-2 border border-white/10 hover:border-[#29B6E8]/60 hover:text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
-        >
-          {auditingScopes ? "Prüfe…" : "Scopes prüfen"}
-        </button>
-        <button
-          onClick={repairScopes}
-          disabled={repairingScopes}
-          data-testid="media-scope-repair"
-          className="px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
-        >
-          {repairingScopes ? "Sortiere…" : "Scopes reparieren"}
-        </button>
         <label className={`px-3 py-2 bg-[#FFD700] text-black rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer ${uploading ? "opacity-60" : ""}`} data-testid="media-upload">
           <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Bilder hochladen"}
           <input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={uploading} className="hidden" onChange={(e) => uploadFiles(e.target.files)} />
@@ -374,37 +358,60 @@ export default function AdminMediaPage() {
       )}
 
       {mediaAudit?.by_scope && (
-        <div className="mt-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-widest font-bold text-white/50">
-          {Object.entries(mediaAudit.by_scope).map(([scope, count]) => (
+        <details className="mt-4 border border-white/10 bg-[#0A0A0A] rounded-sm p-4 group">
+          <summary className="cursor-pointer list-none flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Medienpflege</div>
+              <p className="mt-1 text-xs text-white/45">Kategorien, Einsortierung und Reparatur nur bei Bedarf einblenden.</p>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/45 group-open:text-white">Einblenden</span>
+          </summary>
+          <div className="mt-4 flex flex-wrap gap-2">
             <button
-              key={scope}
-              type="button"
-              onClick={() => setScopeFilter(scope)}
-              className={`border rounded-sm px-2.5 py-1.5 ${scopeFilter === scope ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 hover:border-white/25"}`}
+              onClick={auditScopes}
+              disabled={auditingScopes}
+              data-testid="media-scope-audit"
+              className="px-3 py-2 border border-white/10 hover:border-[#29B6E8]/60 hover:text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
             >
-              {MEDIA_SCOPE_LABELS[scope] || scope}: {count}
+              {auditingScopes ? "Prüfe..." : "Scopes prüfen"}
             </button>
-          ))}
-        </div>
+            <button
+              onClick={repairScopes}
+              disabled={repairingScopes}
+              data-testid="media-scope-repair"
+              className="px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
+            >
+              {repairingScopes ? "Sortiere..." : "Scopes reparieren"}
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-widest font-bold text-white/50">
+            {Object.entries(mediaAudit.by_scope).map(([scope, count]) => (
+              <button
+                key={scope}
+                type="button"
+                onClick={() => setScopeFilter(scope)}
+                className={`border rounded-sm px-2.5 py-1.5 ${scopeFilter === scope ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 hover:border-white/25"}`}
+              >
+                {MEDIA_SCOPE_LABELS[scope] || scope}: {count}
+              </button>
+            ))}
+          </div>
+        </details>
       )}
 
       {mediaAudit && (
-        <section className="mt-4 border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="media-quality-checklist">
-          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <details className="mt-4 border border-white/10 bg-[#121212] rounded-sm p-4 group" data-testid="media-quality-checklist">
+          <summary className="cursor-pointer list-none flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
               <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Medien-Qualitaetscheck</div>
               <p className="mt-1 max-w-3xl text-xs text-white/50">
                 Zeigt technische Medienprobleme sofort sichtbar. Alt-Texte werden am Einsatzort gepflegt, weil ein Bild je nach News, Event, Galerie oder Sponsor unterschiedliche Bedeutung haben kann.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={load}
-              className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:text-white"
-            >
-              <RefreshCw className="h-3.5 w-3.5" /> Check aktualisieren
-            </button>
-          </div>
+            <span className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/60 group-open:text-white">
+              Details einblenden
+            </span>
+          </summary>
           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {qualityChecks.map((check) => {
               const ok = Number(check.value || 0) === 0;
@@ -429,7 +436,7 @@ export default function AdminMediaPage() {
               );
             })}
           </div>
-        </section>
+        </details>
       )}
 
       {scopeAudit?.summary && (
