@@ -3,11 +3,13 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { AuthFormAlert, AuthPasswordField, AuthTextField } from "@/components/tls/AuthFormFields";
 import { toast } from "sonner";
-import { Eye, EyeOff } from "lucide-react";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginPage() {
-  useDocumentTitle("Login", "Login für Mitglieder und Community-User von THE LION SQUAD eSports.", { robots: "noindex, follow" });
+  useDocumentTitle("Login", "Login fuer Mitglieder und Community-User von THE LION SQUAD eSports.", { robots: "noindex, follow" });
 
   const { login } = useAuth();
   const [params] = useSearchParams();
@@ -18,14 +20,41 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
-  const submit = async (e) => {
-    e.preventDefault();
-    setErr(null); setLoading(true);
-    const res = await login(email, pw);
+  const setField = (field, setter) => (value) => {
+    setter(value);
+    setErr(null);
+    setFieldErrors((current) => ({ ...current, [field]: null }));
+  };
+
+  const validate = () => {
+    const errors = {};
+    if (!email.trim()) errors["login-email"] = "Bitte gib deine E-Mail-Adresse ein.";
+    else if (!EMAIL_RE.test(email.trim())) errors["login-email"] = "Bitte gib eine gueltige E-Mail-Adresse ein.";
+    if (!pw) errors["login-password"] = "Bitte gib dein Passwort ein.";
+
+    setFieldErrors(errors);
+    const firstError = ["login-email", "login-password"].find((id) => errors[id]);
+    if (firstError) document.getElementById(firstError)?.focus();
+    return Object.keys(errors).length === 0;
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!validate()) return;
+
+    setErr(null);
+    setLoading(true);
+    const res = await login(email.trim(), pw);
     setLoading(false);
-    if (res.ok) { toast.success("Willkommen zurück!"); nav(next); }
-    else setErr(res.error);
+
+    if (res.ok) {
+      toast.success("Willkommen zurueck!");
+      nav(next);
+    } else {
+      setErr(res.error);
+    }
   };
 
   return (
@@ -35,73 +64,44 @@ export default function LoginPage() {
         <h1 className="font-heading text-2xl font-black uppercase text-center">Login</h1>
         <p className="text-sm text-white/60 text-center mt-1">Willkommen bei THE LION SQUAD.</p>
 
-        <form onSubmit={submit} className="mt-8 space-y-4">
-          <Field label="E-Mail" type="email" value={email} onChange={setEmail} required testId="login-email" />
-          <PasswordField
+        <form onSubmit={submit} className="mt-8 space-y-4" noValidate aria-describedby={err ? "login-error" : undefined}>
+          <AuthTextField
+            id="login-email"
+            label="E-Mail"
+            type="email"
+            value={email}
+            onChange={setField("login-email", setEmail)}
+            required
+            autoComplete="email"
+            error={fieldErrors["login-email"]}
+            testId="login-email"
+          />
+          <AuthPasswordField
+            id="login-password"
             label="Passwort"
             value={pw}
-            onChange={setPw}
+            onChange={setField("login-password", setPw)}
             show={showPw}
-            onToggle={() => setShowPw((v) => !v)}
+            onToggle={() => setShowPw((value) => !value)}
             required
+            autoComplete="current-password"
+            error={fieldErrors["login-password"]}
             testId="login-password"
           />
-          {err && <div data-testid="login-error" className="text-sm text-[#FF3B30] bg-[#FF3B30]/10 border border-[#FF3B30]/30 p-2 rounded-sm">{err}</div>}
+          {err && <AuthFormAlert id="login-error">{err}</AuthFormAlert>}
           <button
             data-testid="login-submit"
             disabled={loading}
             type="submit"
             className="w-full py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition"
           >
-            {loading ? "Login …" : "Einloggen"}
+            {loading ? "Login ..." : "Einloggen"}
           </button>
         </form>
         <div className="mt-6 text-sm text-white/60 text-center space-y-2">
           <div>Kein Account? <Link to="/register" className="text-[#29B6E8] hover:text-white font-bold">Registrieren</Link></div>
-          <div><Link to="/forgot-password" className="text-white/40 hover:text-[#29B6E8]">Passwort vergessen?</Link></div>
+          <div><Link to="/forgot-password" className="text-white/45 hover:text-[#29B6E8]">Passwort vergessen?</Link></div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, value, onChange, type = "text", required, testId }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required={required}
-        data-testid={testId}
-        className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2.5 rounded-sm text-white placeholder:text-white/30 focus:outline-none"
-      />
-    </label>
-  );
-}
-
-function PasswordField({ label, value, onChange, show, onToggle, required, testId }) {
-  return (
-    <div className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <div className="relative">
-        <input
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          required={required}
-          data-testid={testId}
-          className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2.5 pr-10 rounded-sm text-white placeholder:text-white/30 focus:outline-none"
-        />
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={show ? "Passwort verbergen" : "Passwort anzeigen"}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-[#29B6E8] transition"
-        >
-          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-        </button>
       </div>
     </div>
   );

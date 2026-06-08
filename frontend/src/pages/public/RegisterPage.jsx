@@ -3,8 +3,16 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import {
+  AuthCheckboxField,
+  AuthFormAlert,
+  AuthPasswordField,
+  AuthSelectField,
+  AuthTextField,
+} from "@/components/tls/AuthFormFields";
 import { toast } from "sonner";
-import { Eye, EyeOff } from "lucide-react";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function getPasswordStrength(pw) {
   if (!pw) return { score: 0, label: "", color: "" };
@@ -30,8 +38,12 @@ export default function RegisterPage() {
   const { register } = useAuth();
   const nav = useNavigate();
   const [form, setForm] = useState({
-    username: "", email: "", password: "",
-    discord_name: "", birth_date: "", gender: "",
+    username: "",
+    email: "",
+    password: "",
+    discord_name: "",
+    birth_date: "",
+    gender: "",
   });
   const [showPw, setShowPw] = useState(false);
   const [accept, setAccept] = useState(false);
@@ -39,17 +51,52 @@ export default function RegisterPage() {
   const [newsletter, setNewsletter] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const set = (field) => (value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setErr(null);
+    setFieldErrors((current) => ({ ...current, [field]: null }));
+  };
 
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!accept) { setErr("Bitte akzeptiere die Datenschutzbestimmungen."); return; }
-    if (!acceptTerms) { setErr("Bitte akzeptiere die Nutzungsbedingungen."); return; }
-    setErr(null); setLoading(true);
+  const setCheckbox = (field, setter) => (value) => {
+    setter(value);
+    setErr(null);
+    setFieldErrors((current) => ({ ...current, [field]: null }));
+  };
+
+  const validate = () => {
+    const errors = {};
+    if (!form.username.trim()) errors.username = "Bitte gib einen Benutzernamen ein.";
+    if (!form.email.trim()) errors.email = "Bitte gib deine E-Mail-Adresse ein.";
+    else if (!EMAIL_RE.test(form.email.trim())) errors.email = "Bitte gib eine gueltige E-Mail-Adresse ein.";
+    if (!form.password) errors.password = "Bitte vergib ein Passwort.";
+    else if (form.password.length < 10) errors.password = "Das Passwort braucht mindestens 10 Zeichen.";
+    if (!accept) errors.accept = "Bitte akzeptiere die Datenschutzbestimmungen.";
+    if (!acceptTerms) errors.acceptTerms = "Bitte akzeptiere die Nutzungsbedingungen.";
+
+    setFieldErrors(errors);
+    const first = ["username", "email", "password", "accept", "acceptTerms"].find((field) => errors[field]);
+    const idMap = {
+      username: "register-username",
+      email: "register-email",
+      password: "register-password",
+      accept: "register-accept",
+      acceptTerms: "register-accept-terms",
+    };
+    if (first) document.getElementById(idMap[first])?.focus();
+    return Object.keys(errors).length === 0;
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!validate()) return;
+
+    setErr(null);
+    setLoading(true);
     const payload = {
-      username: form.username,
-      email: form.email,
+      username: form.username.trim(),
+      email: form.email.trim(),
       password: form.password,
       discord_name: form.discord_name || null,
       birth_date: form.birth_date || null,
@@ -60,10 +107,13 @@ export default function RegisterPage() {
     };
     const res = await register(payload);
     setLoading(false);
+
     if (res.ok) {
       toast.success("Willkommen in der TLS Community!");
       nav("/dashboard");
-    } else setErr(res.error);
+    } else {
+      setErr(res.error);
+    }
   };
 
   const pwStrength = getPasswordStrength(form.password);
@@ -74,35 +124,46 @@ export default function RegisterPage() {
         <div className="flex justify-center mb-8"><Logo size="md" /></div>
         <h1 className="font-heading text-2xl font-black uppercase text-center">Account erstellen</h1>
         <p className="text-sm text-white/60 text-center mt-1">Werde Teil der THE LION SQUAD Community.</p>
-        <form onSubmit={submit} className="mt-8 space-y-4">
-          <Field label="Benutzername *" value={form.username} onChange={set("username")} required testId="register-username" />
-          <Field label="E-Mail *" type="email" value={form.email} onChange={set("email")} required testId="register-email" />
-
-          {/* Passwort mit Toggle + Stärke-Indikator */}
+        <form onSubmit={submit} className="mt-8 space-y-4" noValidate aria-describedby={err ? "register-error" : undefined}>
+          <AuthTextField
+            id="register-username"
+            label="Benutzername"
+            value={form.username}
+            onChange={set("username")}
+            required
+            autoComplete="username"
+            error={fieldErrors.username}
+            testId="register-username"
+          />
+          <AuthTextField
+            id="register-email"
+            label="E-Mail"
+            type="email"
+            value={form.email}
+            onChange={set("email")}
+            required
+            autoComplete="email"
+            error={fieldErrors.email}
+            testId="register-email"
+          />
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Passwort *</div>
-            <div className="relative">
-              <input
-                type={showPw ? "text" : "password"}
-                value={form.password}
-                onChange={set("password")}
-                required
-                minLength={10}
-                data-testid="register-password"
-                className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2.5 pr-10 rounded-sm text-white placeholder:text-white/30 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPw((v) => !v)}
-                aria-label={showPw ? "Passwort verbergen" : "Passwort anzeigen"}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-[#29B6E8] transition"
-              >
-                {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
+            <AuthPasswordField
+              id="register-password"
+              label="Passwort"
+              value={form.password}
+              onChange={set("password")}
+              show={showPw}
+              onToggle={() => setShowPw((value) => !value)}
+              required
+              minLength={10}
+              autoComplete="new-password"
+              description="Mindestens 10 Zeichen. Gross-/Kleinbuchstaben, Zahlen und Sonderzeichen erhoehen die Sicherheit."
+              error={fieldErrors.password}
+              testId="register-password"
+            />
             {form.password && (
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1 flex gap-1">
+              <div className="mt-2 flex items-center gap-2" aria-live="polite">
+                <div className="flex-1 flex gap-1" aria-hidden="true">
                   {[1, 2, 3, 4].map((i) => (
                     <div
                       key={i}
@@ -116,70 +177,46 @@ export default function RegisterPage() {
                 </span>
               </div>
             )}
-            <div className="mt-1 text-[10px] text-white/35">Mindestens 10 Zeichen. Groß-/Kleinbuchstaben, Zahlen und Sonderzeichen erhöhen die Sicherheit.</div>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
-            <Field label="Discord (optional)" value={form.discord_name} onChange={set("discord_name")} />
-            <Field label="Geburtsdatum (optional)" type="date" value={form.birth_date} onChange={set("birth_date")} />
+            <AuthTextField id="register-discord" label="Discord" value={form.discord_name} onChange={set("discord_name")} autoComplete="off" description="Optional" />
+            <AuthTextField id="register-birth-date" label="Geburtsdatum" type="date" value={form.birth_date} onChange={set("birth_date")} autoComplete="bday" description="Optional" />
           </div>
-          <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Geschlecht (optional)</div>
-            <select value={form.gender} onChange={set("gender")} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2.5 rounded-sm text-white focus:outline-none">
-              <option value="">Keine Angabe</option>
-              <option value="male">Männlich</option>
-              <option value="female">Weiblich</option>
-              <option value="diverse">Divers</option>
-            </select>
-          </label>
+          <AuthSelectField id="register-gender" label="Geschlecht" value={form.gender} onChange={set("gender")} description="Optional">
+            <option value="">Keine Angabe</option>
+            <option value="male">Maennlich</option>
+            <option value="female">Weiblich</option>
+            <option value="diverse">Divers</option>
+          </AuthSelectField>
           <div className="space-y-2.5 pt-2">
-            <label className="flex items-start gap-2 text-sm text-white/70">
-              <input type="checkbox" data-testid="register-accept" checked={accept} onChange={(e) => setAccept(e.target.checked)} className="mt-1 accent-[#29B6E8]" />
-              <span>Ich akzeptiere die <Link to="/privacy" className="text-[#29B6E8] hover:underline">Datenschutzbestimmungen</Link>. *</span>
-            </label>
-            <label className="flex items-start gap-2 text-sm text-white/70">
-              <input type="checkbox" data-testid="register-accept-terms" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} className="mt-1 accent-[#29B6E8]" />
-              <span>Ich akzeptiere die Nutzungsbedingungen und Vereinsregeln. *</span>
-            </label>
-            <label className="flex items-start gap-2 text-sm text-white/70">
-              <input type="checkbox" data-testid="register-newsletter" checked={newsletter} onChange={(e) => setNewsletter(e.target.checked)} className="mt-1 accent-[#29B6E8]" />
-              <span>Newsletter & Vereinsinfos per E-Mail erhalten (optional, jederzeit widerrufbar).</span>
-            </label>
+            <AuthCheckboxField id="register-accept" checked={accept} onChange={setCheckbox("accept", setAccept)} required error={fieldErrors.accept} testId="register-accept">
+              Ich akzeptiere die <Link to="/privacy" className="text-[#29B6E8] hover:underline">Datenschutzbestimmungen</Link>.
+            </AuthCheckboxField>
+            <AuthCheckboxField id="register-accept-terms" checked={acceptTerms} onChange={setCheckbox("acceptTerms", setAcceptTerms)} required error={fieldErrors.acceptTerms} testId="register-accept-terms">
+              Ich akzeptiere die Nutzungsbedingungen und Vereinsregeln.
+            </AuthCheckboxField>
+            <AuthCheckboxField id="register-newsletter" checked={newsletter} onChange={setCheckbox("newsletter", setNewsletter)} testId="register-newsletter">
+              Newsletter & Vereinsinfos per E-Mail erhalten (optional, jederzeit widerrufbar).
+            </AuthCheckboxField>
           </div>
-          {err && <div data-testid="register-error" className="text-sm text-[#FF3B30] bg-[#FF3B30]/10 border border-[#FF3B30]/30 p-2 rounded-sm">{err}</div>}
+          {err && <AuthFormAlert id="register-error">{err}</AuthFormAlert>}
           <button
             data-testid="register-submit"
             disabled={loading}
             type="submit"
             className="w-full py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition"
           >
-            {loading ? "Registriere …" : "Account erstellen"}
+            {loading ? "Registriere ..." : "Account erstellen"}
           </button>
         </form>
         <div className="mt-6 text-sm text-white/60 text-center">
           Bereits registriert? <Link to="/login" className="text-[#29B6E8] hover:text-white font-bold">Login</Link>
         </div>
-        <div className="mt-3 text-[11px] text-white/40 text-center">
-          Du wirst <strong className="text-white/60">Community-Spieler</strong>. Eine offizielle Vereinsmitgliedschaft kann nur durch den Vorstand freigeschaltet werden.
+        <div className="mt-3 text-[11px] text-white/45 text-center">
+          Du wirst <strong className="text-white/65">Community-Spieler</strong>. Eine offizielle Vereinsmitgliedschaft kann nur durch den Vorstand freigeschaltet werden.
         </div>
       </div>
     </div>
-  );
-}
-
-function Field({ label, value, onChange, type = "text", required, minLength, testId }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <input
-        type={type}
-        value={value}
-        onChange={onChange}
-        required={required}
-        minLength={minLength}
-        data-testid={testId}
-        className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2.5 rounded-sm text-white focus:outline-none"
-      />
-    </label>
   );
 }
