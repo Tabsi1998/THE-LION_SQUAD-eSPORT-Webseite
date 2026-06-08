@@ -94,6 +94,13 @@ export default function AdminDashboardPage() {
       tone: "#29B6E8",
     },
     {
+      label: "Audit & Rollen",
+      detail: "Rollenwechsel, Staff-Zuweisungen und Adminaktionen",
+      to: "/admin/audit",
+      icon: ShieldCheck,
+      tone: "#29B6E8",
+    },
+    {
       label: "Systemstatus",
       detail: "Mail-Queue, Uploads, Scheduler und Integrationen",
       to: "/admin/settings?tab=system",
@@ -189,7 +196,10 @@ export default function AdminDashboardPage() {
           </div>
         </div>
         <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
-          <h2 className="font-heading font-bold uppercase text-lg mb-3 flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Letzte Adminaktionen</h2>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="font-heading font-bold uppercase text-lg flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Letzte Adminaktionen</h2>
+            <Link to="/admin/audit" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Logs</Link>
+          </div>
           <div className="space-y-2 text-sm">
             {(data?.recent_audit_logs || []).slice(0, 8).map((l, i) => (
               <div key={i} className="flex items-center justify-between border-b border-white/5 pb-2">

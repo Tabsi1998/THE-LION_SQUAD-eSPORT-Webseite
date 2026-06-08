@@ -217,7 +217,7 @@ Admin und Redaktion:
 - Admin-Listen vereinheitlichen: Filter, Suche, gespeicherte Ansichten, Bulk-Actions und Export pro Bereich.
 - Turnier-Editor entlasten: Setup-Assistent fuer lokales/online/hybrid Turnier, Regeln, Stationen, Ergebnisfluss und Kommunikation.
 - [x] Medienbibliothek erweitern: fehlende Alt-Texte, doppelte Dateien, ungenutzte Dateien, kaputte Referenzen, Bildzuschnitt.
-- Audit- und Rollenansicht besser erreichbar machen: wer darf was, wer hat was geaendert, welche Staff-Zuweisung gilt wo.
+- [x] Audit- und Rollenansicht besser erreichbar machen: wer darf was, wer hat was geaendert, welche Staff-Zuweisung gilt wo.
 
 Live- und Event-Erlebnis:
 
