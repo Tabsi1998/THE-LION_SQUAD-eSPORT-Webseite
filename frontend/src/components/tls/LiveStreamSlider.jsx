@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { openCookieSettings, useCookieConsent } from "@/components/tls/CookieConsent";
+import { useCookieConsent } from "@/components/tls/CookieConsent";
+import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { ExternalLink, MessageSquareText, Radio, Users } from "lucide-react";
 
 function twitchChannel(stream) {
@@ -125,20 +126,13 @@ export function LiveStreamSlider() {
                 />
               </div>
             ) : (
-              <div className="flex aspect-video flex-col items-center justify-center px-6 text-center">
-                <Radio className="mb-3 h-10 w-10 text-[#9146FF]" />
-                <div className="font-display text-xl font-black uppercase text-white">Twitch blockiert</div>
-                <div className="mt-1 max-w-md text-sm text-white/55">
-                  Für Player und Chat brauchen wir deine Zustimmung für externe Medien.
-                </div>
-                <button
-                  type="button"
-                  onClick={openCookieSettings}
-                  className="mt-5 border border-[#9146FF]/60 px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#9146FF] hover:border-[#9146FF] hover:bg-[#9146FF]/10"
-                >
-                  Cookie-Einstellungen
-                </button>
-              </div>
+              <ExternalMediaNotice
+                service="Twitch"
+                reason="Player und Chat werden erst nach Zustimmung zu externen Medien geladen."
+                url={activeStream.stream_url || `https://www.twitch.tv/${channel}`}
+                accent="#9146FF"
+                testId="live-stream-consent-notice"
+              />
             )}
             <div className="border-t border-white/10 bg-[#101010] p-4">
               <div className="line-clamp-2 font-semibold text-white">{activeStream.title || "Live-Stream"}</div>
@@ -172,7 +166,7 @@ export function LiveStreamSlider() {
               />
             ) : (
               <div className="flex h-[360px] items-center justify-center px-5 text-center text-sm text-white/55">
-                Der Chat wird nach Zustimmung für externe Medien geladen.
+                Der Chat wird nach Zustimmung fuer externe Medien geladen.
               </div>
             )}
           </div>

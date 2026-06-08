@@ -231,7 +231,7 @@ Barrierefreiheit und Vertrauen:
 - [x] Tastaturbedienung und Fokus-Stile fuer Navigation, Modals, Editor, Tabellen und Formulare pruefen.
 - [x] Kontraste fuer Cyan/Gold auf dunklem Hintergrund systematisch testen.
 - [x] Formulare mit klaren Fehlermeldungen, Pflichtfeldhinweisen und sinnvoller Tab-Reihenfolge.
-- Datenschutz/Cookie/Analytics sichtbar nachvollziehbar halten, besonders bei Embeds, Twitch und externen Medien.
+- [x] Datenschutz/Cookie/Analytics sichtbar nachvollziehbar halten, besonders bei Embeds, Twitch und externen Medien.
 
 ## Phase 8 - Jahreswertung statt unklarer Season-Pass
 

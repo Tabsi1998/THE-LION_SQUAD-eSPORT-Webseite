@@ -7,6 +7,7 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { RichContent } from "@/components/tls/RichContent";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
+import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -62,7 +63,7 @@ export default function EventDetailPage() {
   const { user } = useAuth();
   const [e, setE] = useState(null);
   const [error, setError] = useState(null);
-  const { hasConsent, openSettings } = useCookieConsent();
+  const { hasConsent } = useCookieConsent();
   const seoDescription = seoTextPreview(e?.description || e?.program, "Gaming Event von THE LION SQUAD eSports in Tirol.");
   useDocumentTitle(e?.name || "Event", seoDescription, {
     image: e?.banner_url,
@@ -154,11 +155,13 @@ export default function EventDetailPage() {
               </div>
             )}
             {e.show_map && mapEmbedUrl(e) && !hasConsent("external_media") && (
-              <div className="border border-white/10 bg-[#121212] rounded-sm p-6 flex flex-col justify-center min-h-72">
-                <div className="text-[11px] uppercase tracking-widest text-[#9F7AEA] font-bold">Karte blockiert</div>
-                <p className="mt-2 text-sm text-white/60">Für Google Maps brauchen wir deine Zustimmung zu externen Medien.</p>
-                <button type="button" onClick={openSettings} className="mt-4 self-start px-4 py-2 border border-[#9F7AEA]/50 text-[#9F7AEA] text-xs uppercase tracking-wider font-bold rounded-sm">Cookie-Einstellungen</button>
-              </div>
+              <ExternalMediaNotice
+                service="Google Maps"
+                reason="Die Karte wird erst nach Zustimmung zu externen Medien geladen, weil dabei Daten an Google uebertragen werden koennen."
+                url={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([e.location, fullAddress(e)].filter(Boolean).join(", "))}`}
+                accent="#9F7AEA"
+                testId="event-map-consent-notice"
+              />
             )}
           </div>
         )}

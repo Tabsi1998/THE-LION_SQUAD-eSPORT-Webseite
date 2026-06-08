@@ -8,6 +8,7 @@ import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { AccountLevelPill, AccountLevelProgress, accountLevelFrameClass, accountLevelAuraClass } from "@/components/tls/AccountLevel";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
+import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameLabel } from "@/lib/gameLabels";
 import { seoTextPreview } from "@/lib/textPreview";
@@ -239,7 +240,7 @@ export default function PublicProfilePage() {
     robots: "noindex, follow",
     canonical: profile?.username ? `${window.location.origin}/u/${profile.username}` : undefined,
   });
-  const { hasConsent, openSettings } = useCookieConsent();
+  const { hasConsent } = useCookieConsent();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -521,11 +522,14 @@ export default function PublicProfilePage() {
                       />
                     </div>
                   ) : (
-                    <div className="border border-[#9146FF]/30 bg-[#121212] rounded-sm p-6">
-                      <div className="font-heading font-black uppercase">Twitch blockiert</div>
-                      <p className="mt-2 text-sm text-white/60">Für Twitch-Einbettungen brauchen wir deine Zustimmung zu externen Medien.</p>
-                      <button type="button" onClick={openSettings} className="mt-4 px-4 py-2 border border-[#9146FF]/50 text-[#b88cff] text-xs uppercase tracking-wider font-bold rounded-sm">Cookie-Einstellungen</button>
-                    </div>
+                    <ExternalMediaNotice
+                      service="Twitch"
+                      reason="Der Twitch-Player wird erst nach Zustimmung zu externen Medien geladen."
+                      url={twitchUrl}
+                      accent="#9146FF"
+                      compact
+                      testId="profile-twitch-consent-notice"
+                    />
                   )}
                   <a href={twitchUrl} target="_blank" rel="noopener noreferrer" aria-label="Twitch öffnen" title="Twitch öffnen" className="mt-2 inline-flex h-9 w-9 items-center justify-center border border-[#9146FF]/40 text-[#9146FF] hover:border-[#9146FF] hover:text-[#b88cff] rounded-sm transition">
                     <SocialIcon kind="twitch" className="w-4 h-4" />
