@@ -229,7 +229,7 @@ Live- und Event-Erlebnis:
 Barrierefreiheit und Vertrauen:
 
 - [x] Tastaturbedienung und Fokus-Stile fuer Navigation, Modals, Editor, Tabellen und Formulare pruefen.
-- Kontraste fuer Cyan/Gold auf dunklem Hintergrund systematisch testen.
+- [x] Kontraste fuer Cyan/Gold auf dunklem Hintergrund systematisch testen.
 - Formulare mit klaren Fehlermeldungen, Pflichtfeldhinweisen und sinnvoller Tab-Reihenfolge.
 - Datenschutz/Cookie/Analytics sichtbar nachvollziehbar halten, besonders bei Embeds, Twitch und externen Medien.
 

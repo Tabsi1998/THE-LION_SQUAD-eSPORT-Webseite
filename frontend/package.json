@@ -76,7 +76,8 @@
     "build": "craco build",
     "test": "craco test",
     "test:e2e": "playwright test",
-    "audit:high": "node scripts/audit-high.js"
+    "audit:high": "node scripts/audit-high.js",
+    "check:contrast": "node scripts/check-contrast.js"
   },
   "resolutions": {
     "@babel/plugin-transform-modules-systemjs": "7.29.4",

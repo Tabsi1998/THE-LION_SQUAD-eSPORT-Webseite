@@ -36,6 +36,46 @@
   box-shadow: 0 0 0 1px rgba(41, 182, 232, 0.45);
 }
 
+@media (prefers-contrast: more) {
+  [class*="text-white/30"],
+  [class*="text-white/35"],
+  [class*="text-white/38"],
+  [class*="text-white/40"],
+  [class*="text-white/42"],
+  [class*="text-white/45"],
+  [class*="text-white/50"],
+  [class*="text-white/55"] {
+    color: rgba(255, 255, 255, 0.78) !important;
+  }
+
+  [class*="text-[#29B6E8]"] {
+    color: #6EDCFF !important;
+  }
+
+  [class*="text-[#FFD700]"],
+  [class*="text-[#FFD600]"] {
+    color: #FFE66B !important;
+  }
+
+  [class*="border-white/5"],
+  [class*="border-white/10"],
+  [class*="border-white/15"],
+  [class*="border-white/20"] {
+    border-color: rgba(255, 255, 255, 0.34) !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .tls-skip-link,
+  :where(a, button, input, select, textarea, summary, [role="button"]) {
+    forced-color-adjust: auto;
+  }
+
+  :where(a, button, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
