@@ -228,7 +228,7 @@ export default function AdminTournamentsPage() {
                 </td>
               </tr>
             ))}
-            {filteredList.length === 0 && <tr><td colSpan="7" className="text-center py-10 text-white/40">{list.length === 0 ? "Keine Turniere" : "Keine Turniere fuer diesen Filter"}</td></tr>}
+            {filteredList.length === 0 && <tr><td colSpan="7" className="text-center py-10 text-white/40">{list.length === 0 ? "Keine Turniere" : "Keine Turniere für diesen Filter"}</td></tr>}
           </tbody>
         </table>
         </div>

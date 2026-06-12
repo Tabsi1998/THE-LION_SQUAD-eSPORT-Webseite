@@ -323,7 +323,7 @@ async def _clear_media_references(url: str) -> int:
 def _media_file_path(filename: str) -> Path:
     safe_name = Path(filename).name
     if safe_name != filename or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,180}", safe_name):
-        raise HTTPException(400, "Ungueltiger Dateiname.")
+        raise HTTPException(400, "Ungültiger Dateiname.")
     if Path(safe_name).suffix.lower() not in PUBLIC_IMAGE_EXTS:
         raise HTTPException(404, "Datei nicht gefunden.")
     for base_dir in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
@@ -369,7 +369,7 @@ async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = De
             save_kwargs = {"quality": 88, "method": 6}
         rotated.save(p, format=image_format, **save_kwargs)
     except UnidentifiedImageError:
-        raise HTTPException(400, "Ungueltige Bilddatei.")
+        raise HTTPException(400, "Ungültige Bilddatei.")
     except OSError as exc:
         raise HTTPException(500, "Drehen fehlgeschlagen.")
 
@@ -422,7 +422,7 @@ DEFAULT_NAV = {
             {"key": "references", "to": "/references", "label": "Referenzen", "visible": True},
         ]},
         {"key": "esports", "to": "/esports", "label": "eSports", "visible": True, "order": 4, "children": [
-            {"key": "esports_overview", "to": "/esports", "label": "Uebersicht", "visible": True},
+            {"key": "esports_overview", "to": "/esports", "label": "Übersicht", "visible": True},
             {"key": "tournaments", "to": "/tournaments", "label": "Turniere", "visible": True},
             {"key": "fastlap", "to": "/fastlap", "label": "Fast Lap", "visible": True},
             {"key": "season", "to": "/seasons/current", "label": "Jahreswertung", "visible": True},

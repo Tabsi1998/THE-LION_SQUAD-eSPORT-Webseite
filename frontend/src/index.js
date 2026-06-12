@@ -16,8 +16,8 @@ root.render(
 
 registerServiceWorker({
   onUpdate: (registration) => {
-    toast.info("Neue Website-Version verfuegbar.", {
-      description: "Aktualisieren laedt die neue Version sofort.",
+    toast.info("Neue Website-Version verfügbar.", {
+      description: "Aktualisieren lädt die neue Version sofort.",
       action: {
         label: "Aktualisieren",
         onClick: () => applyWaitingServiceWorker(registration),

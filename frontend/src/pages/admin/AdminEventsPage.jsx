@@ -110,10 +110,10 @@ export default function AdminEventsPage() {
     setCreatingRecapId(event.id);
     try {
       const { data } = await api.post(`/events/${event.id}/recap-draft`);
-      toast.success(data.created ? "Rueckblick-Entwurf erstellt." : "Rueckblick-Entwurf war schon vorhanden.");
+      toast.success(data.created ? "Rückblick-Entwurf erstellt." : "Rückblick-Entwurf war schon vorhanden.");
       navigate(`/admin/news?edit=${encodeURIComponent(data.post.id)}`);
     } catch (err) {
-      toast.error(formatRequestError(err, "Rueckblick konnte nicht vorbereitet werden."));
+      toast.error(formatRequestError(err, "Rückblick konnte nicht vorbereitet werden."));
     } finally {
       setCreatingRecapId(null);
     }
@@ -280,7 +280,7 @@ export default function AdminEventsPage() {
                         </button>
                       )}
                       <button onClick={() => createRecapDraft(e)} disabled={creatingRecapId === e.id} data-testid={`event-recap-${e.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 inline-flex items-center gap-1 disabled:opacity-50">
-                        <FileText className="w-3 h-3" /> {creatingRecapId === e.id ? "..." : "Rueckblick"}
+                        <FileText className="w-3 h-3" /> {creatingRecapId === e.id ? "..." : "Rückblick"}
                       </button>
                       <button onClick={() => setEditing(e)} data-testid={`event-edit-${e.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#9F7AEA]/40 text-[#9F7AEA] hover:bg-[#9F7AEA]/10">Bearbeiten</button>
                       <button onClick={() => remove(e.id)} data-testid={`event-delete-${e.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
@@ -289,7 +289,7 @@ export default function AdminEventsPage() {
                 ))}
                 {filteredList.length === 0 && (
                   <tr>
-                    <td colSpan="8" className="px-4 py-10 text-center text-sm text-white/40">Keine Events fuer diesen Filter.</td>
+                    <td colSpan="8" className="px-4 py-10 text-center text-sm text-white/40">Keine Events für diesen Filter.</td>
                   </tr>
                 )}
               </tbody>

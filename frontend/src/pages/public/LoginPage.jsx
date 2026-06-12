@@ -9,7 +9,7 @@ import { toast } from "sonner";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginPage() {
-  useDocumentTitle("Login", "Login fuer Mitglieder und Community-User von THE LION SQUAD eSports.", { robots: "noindex, follow" });
+  useDocumentTitle("Login", "Login für Mitglieder und Community-User von THE LION SQUAD eSports.", { robots: "noindex, follow" });
 
   const { login } = useAuth();
   const [params] = useSearchParams();
@@ -31,7 +31,7 @@ export default function LoginPage() {
   const validate = () => {
     const errors = {};
     if (!email.trim()) errors["login-email"] = "Bitte gib deine E-Mail-Adresse ein.";
-    else if (!EMAIL_RE.test(email.trim())) errors["login-email"] = "Bitte gib eine gueltige E-Mail-Adresse ein.";
+    else if (!EMAIL_RE.test(email.trim())) errors["login-email"] = "Bitte gib eine gültige E-Mail-Adresse ein.";
     if (!pw) errors["login-password"] = "Bitte gib dein Passwort ein.";
 
     setFieldErrors(errors);
@@ -50,7 +50,7 @@ export default function LoginPage() {
     setLoading(false);
 
     if (res.ok) {
-      toast.success("Willkommen zurueck!");
+      toast.success("Willkommen zurück!");
       nav(next);
     } else {
       setErr(res.error);

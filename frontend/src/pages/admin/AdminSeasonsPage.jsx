@@ -361,7 +361,7 @@ function SeasonModal({ season, tournaments, challenges, onClose, onSaved }) {
         <div className="flex items-center justify-between p-5 border-b border-white/10">
           <div>
             <h2 className="font-heading text-2xl font-black uppercase">{isNew ? "Neue Jahreswertung" : "Jahreswertung bearbeiten"}</h2>
-            <p className="text-xs text-white/45 mt-1">Alles, was die spaetere Punktetabelle beeinflusst, ist hier sichtbar gebuendelt.</p>
+            <p className="text-xs text-white/45 mt-1">Alles, was die spätere Punktetabelle beeinflusst, ist hier sichtbar gebündelt.</p>
           </div>
           <button type="button" onClick={onClose} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
@@ -475,7 +475,7 @@ function RuleSummary({ form, fallbackPoints, selectedTournaments, selectedChalle
           Neue Wertungen entstehen mit: Basispunkte x Quellen-Gewicht x Teilnehmerfaktor + Bonuspunkte.
         </p>
         <p className="text-xs text-white/45 mt-2">
-          Major, Normal, Mini usw. stellst du direkt beim jeweiligen Turnier oder bei der Fast-Lap Challenge ein. Diese Jahreswertung waehlt nur aus, welche Quellen zaehlen.
+          Major, Normal, Mini usw. stellst du direkt beim jeweiligen Turnier oder bei der Fast-Lap Challenge ein. Diese Jahreswertung wählt nur aus, welche Quellen zählen.
         </p>
       </div>
 
@@ -555,7 +555,7 @@ function SourcePicker({ label, helper, items, selected, onToggle, onSetSelected,
 
       <div className="flex gap-2 flex-wrap">
         <button type="button" onClick={() => onSetSelected(Array.from(new Set([...selected, ...filtered.map((item) => item.id)])))} className="px-2 py-1 border border-white/10 text-white/60 hover:text-white text-[10px] uppercase tracking-widest rounded-sm">
-          Sichtbare waehlen
+          Sichtbare wählen
         </button>
         <button type="button" onClick={() => onSetSelected(selected.filter((id) => !filtered.some((item) => item.id === id)))} className="px-2 py-1 border border-white/10 text-white/60 hover:text-white text-[10px] uppercase tracking-widest rounded-sm">
           Sichtbare loesen
@@ -573,7 +573,7 @@ function SourcePicker({ label, helper, items, selected, onToggle, onSetSelected,
             </span>
           </label>
         ))}
-        {filtered.length === 0 && <div className="text-xs text-white/35 p-2">Keine passenden Eintraege vorhanden.</div>}
+        {filtered.length === 0 && <div className="text-xs text-white/35 p-2">Keine passenden Einträge vorhanden.</div>}
       </div>
     </div>
   );

@@ -45,7 +45,7 @@ export default function PartnersPage() {
             <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">
               <Handshake className="h-3.5 w-3.5" /> Kooperation
             </div>
-            <p className="mt-2 text-sm text-white/55">Kontakt fuer gemeinsame Events, Community-Projekte und langfristige Partnerschaften.</p>
+            <p className="mt-2 text-sm text-white/55">Kontakt für gemeinsame Events, Community-Projekte und langfristige Partnerschaften.</p>
             <span className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/35 group-hover:text-[#29B6E8]">
               Kontakt aufnehmen <ArrowRight className="h-3 w-3" />
             </span>

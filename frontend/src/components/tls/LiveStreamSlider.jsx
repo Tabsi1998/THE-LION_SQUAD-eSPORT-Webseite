@@ -166,7 +166,7 @@ export function LiveStreamSlider() {
               />
             ) : (
               <div className="flex h-[360px] items-center justify-center px-5 text-center text-sm text-white/55">
-                Der Chat wird nach Zustimmung fuer externe Medien geladen.
+                Der Chat wird nach Zustimmung für externe Medien geladen.
               </div>
             )}
           </div>

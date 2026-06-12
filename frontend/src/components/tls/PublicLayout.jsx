@@ -126,7 +126,7 @@ export function PublicLayout({ children }) {
               data-testid="nav-mobile-toggle"
               className="lg:hidden p-2 text-white"
               onClick={() => setMobileOpen((v) => !v)}
-              aria-label={mobileOpen ? "Menue schliessen" : "Menue oeffnen"}
+              aria-label={mobileOpen ? "Menü schließen" : "Menü öffnen"}
               aria-expanded={mobileOpen}
               aria-controls="mobile-navigation"
             >

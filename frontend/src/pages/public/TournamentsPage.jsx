@@ -13,7 +13,7 @@ import { Trophy } from "lucide-react";
 export default function TournamentsPage() {
   useDocumentTitle(
     "eSports Turniere",
-    "Aktuelle eSports Turniere von THE LION SQUAD: Anmeldung, Check-in, Brackets, Spielplaene und Ranglisten fuer Gaming Events in Tirol."
+    "Aktuelle eSports Turniere von THE LION SQUAD: Anmeldung, Check-in, Brackets, Spielpläne und Ranglisten für Gaming Events in Tirol."
   );
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -110,7 +110,7 @@ export default function TournamentsPage() {
                 icon={Trophy}
                 eyebrow="Turniere"
                 title={statusFilter === "all" ? "Noch keine Turniere sichtbar" : "Keine Turniere in diesem Filter"}
-                description={statusFilter === "all" ? "Sobald neue Cups, Ligen oder Community-Turniere angelegt sind, erscheinen sie hier automatisch." : "Wechsle auf alle Turniere oder schau spaeter wieder rein, wenn sich der Status aendert."}
+                description={statusFilter === "all" ? "Sobald neue Cups, Ligen oder Community-Turniere angelegt sind, erscheinen sie hier automatisch." : "Wechsle auf alle Turniere oder schau später wieder rein, wenn sich der Status ändert."}
                 primaryAction={statusFilter === "all" ? { to: "/events", label: "Events ansehen" } : { to: "/tournaments", label: "Alle Turniere" }}
                 secondaryAction={{ to: "/fastlap", label: "Fast Lap" }}
                 className="col-span-full"

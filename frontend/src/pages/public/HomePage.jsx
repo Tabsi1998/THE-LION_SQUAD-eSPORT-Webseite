@@ -10,7 +10,7 @@ import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Crown, Pin, Radio, Image as ImageIcon, Gamepad2 } from "lucide-react";
+import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio } from "lucide-react";
 
 const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
 
@@ -63,11 +63,8 @@ export default function HomePage() {
                 <Link to="/about" data-testid="hero-cta-about" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] hover:shadow-[0_0_24px_rgba(41,182,232,0.6)] transition-all">
                   Über den Verein <ArrowRight className="w-4 h-4" />
                 </Link>
-                <Link to="/events" data-testid="hero-cta-events" className="inline-flex items-center gap-2 px-6 py-3 border border-[#9F7AEA]/50 text-[#C4A7FF] hover:bg-[#9F7AEA]/10 font-bold uppercase tracking-wider rounded-sm transition-all">
-                  <Calendar className="w-4 h-4" /> Events
-                </Link>
-                <Link to="/esports" data-testid="hero-cta-tournaments" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm transition-all">
-                  <Gamepad2 className="w-4 h-4" /> eSports
+                <Link to="/events" data-testid="hero-cta-events" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm transition-all">
+                  <Calendar className="w-4 h-4" /> Termine
                 </Link>
               </div>
             </div>
@@ -81,7 +78,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {state && <PriorityStrip state={state} timeline={timeline} primaryNews={primaryNews} />}
       <LiveStreamSlider />
       <SponsorTicker placement="home" spotlight />
 
@@ -124,7 +120,6 @@ export default function HomePage() {
           </div>
         </section>
       )}
-      <HomeExplore />
 
     </PublicLayout>
   );
@@ -211,66 +206,6 @@ function FeaturedNews({ news }) {
         </span>
       </div>
     </Link>
-  );
-}
-
-function PriorityStrip({ state, timeline, primaryNews }) {
-  const liveCount = [
-    ...(state.live?.events || []),
-    ...(state.live?.tournaments || []),
-    ...(state.live?.challenges || []),
-  ].length;
-  const next = timeline[0] || null;
-  const cards = [
-    {
-      icon: Radio,
-      label: liveCount ? "Live jetzt" : "Live",
-      title: liveCount ? `${liveCount} aktiv` : "Nichts live",
-      text: liveCount ? "Direkt zu laufenden Events, Turnieren oder Fast Laps." : "Wenn etwas startet, ist es hier sofort sichtbar.",
-      to: liveCount ? next?.url || "/events" : "/events",
-      accent: "#FF3B30",
-    },
-    {
-      icon: Calendar,
-      label: "Naechster Termin",
-      title: next?.label || "Planung folgt",
-      text: next?.start_date ? new Date(next.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" }) : "Aktuelle Termine erscheinen automatisch.",
-      to: next?.url || "/events",
-      accent: "#9F7AEA",
-    },
-    {
-      icon: Newspaper,
-      label: "Aktuelle News",
-      title: primaryNews?.title || "News lesen",
-      text: primaryNews?.excerpt || "Updates, Rueckblicke und Ankuendigungen aus dem Verein.",
-      to: primaryNews?.slug ? `/news/${primaryNews.slug}` : "/news",
-      accent: "#29B6E8",
-    },
-    {
-      icon: Crown,
-      label: "Jahreswertung",
-      title: "Club Championship",
-      text: "Rangliste, Punkte und aktuelle Saisonentwicklung.",
-      to: "/seasons/current",
-      accent: "#FFD700",
-    },
-  ];
-  return (
-    <section className="border-b border-white/10 bg-[#0D0D0D]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {cards.map(({ icon: Icon, label, title, text, to, accent }) => (
-            <Link key={label} to={to} className="group min-w-0 rounded-sm border border-white/10 bg-black/20 p-4 transition hover:border-white/25 hover:bg-white/[0.04]">
-              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: accent }}>
-                <Icon className="w-3.5 h-3.5" /> {label}
-              </div>
-              <div className="mt-2 font-heading text-lg font-black uppercase leading-tight line-clamp-2 group-hover:text-[#29B6E8] transition">{title}</div>
-              <p className="mt-2 text-xs text-white/55 leading-relaxed line-clamp-2">{text}</p>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -362,33 +297,6 @@ function NewsCard({ news, featured = false }) {
         {news.excerpt && <p className="mt-2 text-xs text-white/60 line-clamp-3">{news.excerpt}</p>}
       </div>
     </Link>
-  );
-}
-
-function HomeExplore() {
-  const links = [
-    { to: "/about", icon: Crown, label: "Verein", text: "Wer wir sind, wofür wir stehen und was THE LION SQUAD ausmacht.", accent: "#FFD700" },
-    { to: "/galerie", icon: ImageIcon, label: "Galerie", text: "Fotos und Eindrücke von Events, LANs und Community-Abenden.", accent: "#29B6E8" },
-    { to: "/sponsors", icon: Trophy, label: "Sponsoren", text: "Partner und Unterstützer, die unsere Events möglich machen.", accent: "#FFD700" },
-    { to: "/contact", icon: ArrowRight, label: "Kontakt", text: "Anfragen, Kooperationen, Sponsoring und allgemeine Nachrichten.", accent: "#9F7AEA" },
-  ];
-  return (
-    <section className="border-y border-white/10 bg-[#080808]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {links.map(({ to, icon: Icon, label, text, accent }) => (
-            <Link key={to} to={to} className="group border border-white/10 hover:border-white/25 rounded-sm bg-[#111] p-5 transition min-h-40 flex flex-col">
-              <Icon className="w-5 h-5" style={{ color: accent }} />
-              <div className="mt-4 font-heading text-xl font-black uppercase group-hover:text-[#29B6E8] transition">{label}</div>
-              <p className="mt-2 text-sm text-white/55 leading-relaxed">{text}</p>
-              <span className="mt-auto pt-4 inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-white/45 group-hover:text-[#29B6E8]">
-                Öffnen <ArrowRight className="w-3 h-3" />
-              </span>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </section>
   );
 }
 

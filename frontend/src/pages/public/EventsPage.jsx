@@ -99,7 +99,7 @@ export default function EventsPage() {
             icon={Calendar}
             eyebrow="Events"
             title={tab === "upcoming" ? "Aktuell keine kommenden Events" : "Keine vergangenen Events in dieser Auswahl"}
-            description={tab === "upcoming" ? "Sobald neue Vereinsabende, LANs oder Messe-Termine geplant sind, landen sie hier automatisch." : "Aendere den Event-Typ oder wechsle zur kommenden Ansicht."}
+            description={tab === "upcoming" ? "Sobald neue Vereinsabende, LANs oder Messe-Termine geplant sind, landen sie hier automatisch." : "Ändere den Event-Typ oder wechsle zur kommenden Ansicht."}
             primaryAction={tab === "upcoming" ? { to: "/tournaments", label: "Turniere ansehen" } : { label: "Kommende Events", onClick: () => updateEventFilters({ view: "upcoming" }) }}
             secondaryAction={{ to: "/news", label: "News lesen" }}
             className="mt-10"

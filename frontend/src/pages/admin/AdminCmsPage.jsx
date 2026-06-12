@@ -119,12 +119,12 @@ function PageEditor({ page, onClose, onSaved }) {
   const origin = typeof window !== "undefined" ? window.location.origin : "https://lionsquad.at";
   const publicPath = form.slug ? `/${form.slug.replace(/^\/+/, "")}` : "";
   const pageChecklist = [
-    { label: "Slug", done: Boolean(form.slug.trim()), description: form.slug.trim() ? `URL: ${publicPath}` : "URL-Pfad fuer die Seite fehlt." },
-    { label: "Titel", done: Boolean(form.title.trim()), description: form.title.trim() ? "Seitentitel vorhanden." : "Wichtig fuer Navigation und SEO." },
+    { label: "Slug", done: Boolean(form.slug.trim()), description: form.slug.trim() ? `URL: ${publicPath}` : "URL-Pfad für die Seite fehlt." },
+    { label: "Titel", done: Boolean(form.title.trim()), description: form.title.trim() ? "Seitentitel vorhanden." : "Wichtig für Navigation und SEO." },
     { label: "Meta", done: Boolean(form.meta_description.trim()), description: form.meta_description.trim() ? "Meta-Description gesetzt." : "Kurzer Google-/Teilen-Text fehlt." },
     { label: "Inhalt", done: Boolean(form.body_md.trim()), description: form.body_md.trim() ? "Markdown-Inhalt vorhanden." : "Seiteninhalt fehlt noch." },
     { label: "Sichtbarkeit", done: Boolean(form.is_published), description: form.is_published ? "Seite ist nach dem Speichern sichtbar." : "Seite bleibt versteckt." },
-    { label: "Sharing", tone: "note", description: "Bei wichtigen Seiten Banner/Fallback im Branding pruefen." },
+    { label: "Sharing", tone: "note", description: "Bei wichtigen Seiten Banner/Fallback im Branding prüfen." },
   ];
   const seoFallback = {
     title: form.title || "CMS-Seite",

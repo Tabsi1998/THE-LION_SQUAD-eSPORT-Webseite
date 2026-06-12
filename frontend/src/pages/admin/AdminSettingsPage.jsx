@@ -804,7 +804,7 @@ export default function AdminSettingsPage() {
             <button key={k} onClick={() => selectTab(k)} data-testid={`settings-tab-${k}`}
               className={`px-4 py-3 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap ${tab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
               <Icn className="w-3.5 h-3.5" />{l}
-              {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-[#FFD700] shadow-[0_0_8px_rgba(255,215,0,0.8)]" title="Ungespeicherte Aenderungen" />}
+              {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-[#FFD700] shadow-[0_0_8px_rgba(255,215,0,0.8)]" title="Ungespeicherte Änderungen" />}
             </button>
           );
         })}
@@ -1503,17 +1503,17 @@ export default function AdminSettingsPage() {
               <BrandField label="Kontakt E-Mail" value={brand.contact_email} onChange={(v) => setBrandField("contact_email", v)} testId="brand-contact-email" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ImageUpload value={brand.logo_url} onChange={(v) => setBrandField("logo_url", v)} label="Logo Fallback" testId="brand-logo" variant="square" allowLibrary />
+              <ImageUpload value={brand.logo_url} onChange={(v) => setBrandField("logo_url", v)} label="Standard-Logo" testId="brand-logo" variant="square" allowLibrary />
               <ImageUpload value={brand.logo_dark_url} onChange={(v) => setBrandField("logo_dark_url", v)} label="Logo auf dunklem Hintergrund" testId="brand-logo-dark" variant="square" allowLibrary />
               <ImageUpload value={brand.logo_light_url} onChange={(v) => setBrandField("logo_light_url", v)} label="Logo auf hellem Hintergrund" testId="brand-logo-light" variant="square" allowLibrary />
-              <ImageUpload value={brand.share_banner_url} onChange={(v) => setBrandField("share_banner_url", v)} label="SEO-/Teilen-Banner Fallback" testId="brand-share-banner" variant="wide" allowLibrary />
-              <ImageUpload value={brand.mascot_url} onChange={(v) => setBrandField("mascot_url", v)} label="Maskottchen Fallback" testId="brand-mascot" variant="square" allowLibrary />
-              <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Favicon Fallback" testId="brand-favicon" variant="square" allowLibrary />
-              <ImageUpload value={brand.favicon_light_url} onChange={(v) => setBrandField("favicon_light_url", v)} label="Favicon fuer hellen Modus" testId="brand-favicon-light" variant="square" allowLibrary />
-              <ImageUpload value={brand.favicon_dark_url} onChange={(v) => setBrandField("favicon_dark_url", v)} label="Favicon fuer dunklen Modus" testId="brand-favicon-dark" variant="square" allowLibrary />
+              <ImageUpload value={brand.share_banner_url} onChange={(v) => setBrandField("share_banner_url", v)} label="Standard SEO-/Teilen-Banner" testId="brand-share-banner" variant="wide" allowLibrary />
+              <ImageUpload value={brand.mascot_url} onChange={(v) => setBrandField("mascot_url", v)} label="Maskottchen / QR-Logo" testId="brand-mascot" variant="square" allowLibrary />
+              <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Standard-Favicon" testId="brand-favicon" variant="square" allowLibrary />
+              <ImageUpload value={brand.favicon_light_url} onChange={(v) => setBrandField("favicon_light_url", v)} label="Favicon für hellen Modus" testId="brand-favicon-light" variant="square" allowLibrary />
+              <ImageUpload value={brand.favicon_dark_url} onChange={(v) => setBrandField("favicon_dark_url", v)} label="Favicon für dunklen Modus" testId="brand-favicon-dark" variant="square" allowLibrary />
             </div>
             <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/60">
-              SEO-Bilder werden automatisch priorisiert: Beitrags-/Event-/Turnierbild zuerst, danach der SEO-/Teilen-Banner, danach Logo oder Maskottchen. Das Favicon kann je nach Browser-Farbmodus hell/dunkel ausgeliefert werden.
+              Standardbilder werden verwendet, wenn eine Seite kein eigenes Bild hat. SEO nutzt Beitrags-/Event-/Turnierbild zuerst, danach den Teilen-Banner, danach Logo oder Maskottchen. QR-Codes verwenden das Maskottchen/QR-Logo in der Mitte.
             </div>
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">

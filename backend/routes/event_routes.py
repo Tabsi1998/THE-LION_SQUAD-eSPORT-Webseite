@@ -316,7 +316,7 @@ async def _build_event_recap_payload(db, event: dict) -> dict:
     if parsed_start:
         event_date = parsed_start.strftime("%d.%m.%Y")
     lines = [
-        f"## Rueckblick {event.get('name') or 'Event'}",
+        f"## Rückblick {event.get('name') or 'Event'}",
         "",
         "Kurzes Fazit hier ergaenzen: Stimmung, Highlights, Besonderheiten und Danke an alle Beteiligten.",
         "",
@@ -341,7 +341,7 @@ async def _build_event_recap_payload(db, event: dict) -> dict:
         lines.extend(["## Fast-Lap-Ergebnisse", ""])
         for challenge in challenges:
             lines.append(f"### {challenge.get('title') or 'Fast Lap'}")
-            lines.extend(_format_podium(await _fastlap_recap_podium(db, challenge), empty="Noch keine gueltigen Zeiten eingetragen."))
+            lines.extend(_format_podium(await _fastlap_recap_podium(db, challenge), empty="Noch keine gültigen Zeiten eingetragen."))
             if challenge.get("slug"):
                 lines.append(f"[[fastlap:{challenge['slug']}]]")
             lines.append("")
@@ -356,7 +356,7 @@ async def _build_event_recap_payload(db, event: dict) -> dict:
     lines.extend([
         "## Danke",
         "",
-        "Danke an alle Spieler, Besucher, Helfer, Partner und Sponsoren. Wir sehen uns beim naechsten Event.",
+        "Danke an alle Spieler, Besucher, Helfer, Partner und Sponsoren. Wir sehen uns beim nächsten Event.",
     ])
     return {
         "content": "\n".join(lines).strip(),
@@ -652,8 +652,8 @@ async def create_event_recap_draft(event_id: str, me: dict = Depends(require_adm
     if existing:
         return {"created": False, "post": existing}
     recap = await _build_event_recap_payload(db, event)
-    title = f"Rueckblick: {event.get('name') or 'Event'}"
-    excerpt = f"Rueckblick auf {event.get('name') or 'das Event'} mit Ergebnissen, Highlights und Galerie."
+    title = f"Rückblick: {event.get('name') or 'Event'}"
+    excerpt = f"Rückblick auf {event.get('name') or 'das Event'} mit Ergebnissen, Highlights und Galerie."
     now_iso = now_utc().isoformat()
     doc = {
         "id": new_id(),
@@ -734,7 +734,7 @@ async def register_for_event(event_id: str, body: EventRegistrationCreate,
         {"_id": 0},
     )
     if existing and existing.get("status") not in {"cancelled", "no_show"}:
-        raise HTTPException(status_code=409, detail="Du bist fuer dieses Event bereits angemeldet")
+        raise HTTPException(status_code=409, detail="Du bist für dieses Event bereits angemeldet")
 
     summary = await _event_registration_summary(event, exclude_registration_id=existing.get("id") if existing else None)
     status = "registered"

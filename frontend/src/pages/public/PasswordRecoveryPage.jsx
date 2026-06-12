@@ -9,7 +9,7 @@ import { toast } from "sonner";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function ForgotPasswordPage() {
-  useDocumentTitle("Passwort vergessen", "Passwort fuer deinen THE LION SQUAD Account zuruecksetzen.", { robots: "noindex, follow" });
+  useDocumentTitle("Passwort vergessen", "Passwort für deinen THE LION SQUAD Account zurücksetzen.", { robots: "noindex, follow" });
 
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
@@ -24,7 +24,7 @@ export function ForgotPasswordPage() {
   const validate = () => {
     const errors = {};
     if (!email.trim()) errors["forgot-email"] = "Bitte gib deine E-Mail-Adresse ein.";
-    else if (!EMAIL_RE.test(email.trim())) errors["forgot-email"] = "Bitte gib eine gueltige E-Mail-Adresse ein.";
+    else if (!EMAIL_RE.test(email.trim())) errors["forgot-email"] = "Bitte gib eine gültige E-Mail-Adresse ein.";
 
     setFieldErrors(errors);
     if (errors["forgot-email"]) document.getElementById("forgot-email")?.focus();
@@ -47,10 +47,10 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <AuthShell title="Passwort vergessen" subtitle="Wir senden dir einen sicheren Link zum Zuruecksetzen.">
+    <AuthShell title="Passwort vergessen" subtitle="Wir senden dir einen sicheren Link zum Zurücksetzen.">
       {sent ? (
         <AuthFormAlert id="forgot-success" tone="success">
-          Bitte pruefe dein Postfach. Der Link ist zeitlich begrenzt gueltig.
+          Bitte prüfe dein Postfach. Der Link ist zeitlich begrenzt gültig.
         </AuthFormAlert>
       ) : (
         <form onSubmit={submit} className="space-y-4" noValidate>
@@ -70,13 +70,13 @@ export function ForgotPasswordPage() {
           </button>
         </form>
       )}
-      <div className="mt-6 text-sm text-center"><Link to="/login" className="text-white/50 hover:text-[#29B6E8]">Zurueck zum Login</Link></div>
+      <div className="mt-6 text-sm text-center"><Link to="/login" className="text-white/50 hover:text-[#29B6E8]">Zurück zum Login</Link></div>
     </AuthShell>
   );
 }
 
 export function ResetPasswordPage() {
-  useDocumentTitle("Passwort setzen", "Neues Passwort fuer deinen THE LION SQUAD Account vergeben.", { robots: "noindex, follow" });
+  useDocumentTitle("Passwort setzen", "Neues Passwort für deinen THE LION SQUAD Account vergeben.", { robots: "noindex, follow" });
 
   const [params] = useSearchParams();
   const nav = useNavigate();
@@ -117,13 +117,13 @@ export function ResetPasswordPage() {
       toast.success(isInvite ? "Account aktiviert. Du kannst dich jetzt einloggen." : "Passwort aktualisiert.");
       nav("/login");
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Link ungueltig oder abgelaufen.");
+      toast.error(err.response?.data?.detail || "Link ungültig oder abgelaufen.");
     }
     setLoading(false);
   };
 
   return (
-    <AuthShell title={isInvite ? "Account aktivieren" : "Passwort setzen"} subtitle="Vergib ein neues Passwort fuer deinen Account.">
+    <AuthShell title={isInvite ? "Account aktivieren" : "Passwort setzen"} subtitle="Vergib ein neues Passwort für deinen Account.">
       {!token ? (
         <AuthFormAlert id="reset-token-error">
           Der Link ist unvollstaendig. Bitte fordere einen neuen Link an.

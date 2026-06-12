@@ -37,7 +37,7 @@ export function ExternalMediaNotice({
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-4 py-2 border border-white/15 text-white/70 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm"
           >
-            <ExternalLink className="h-3.5 w-3.5" /> Direkt oeffnen
+            <ExternalLink className="h-3.5 w-3.5" /> Direkt öffnen
           </a>
         )}
       </div>

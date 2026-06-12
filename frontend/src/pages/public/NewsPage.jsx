@@ -131,7 +131,7 @@ export default function NewsPage() {
             icon={Newspaper}
             eyebrow="News"
             title={hasSearch ? "Keine News gefunden" : activeCat ? "Keine News in dieser Kategorie" : "Noch keine News sichtbar"}
-            description={hasSearch ? "Passe deine Suche an oder leere den Suchbegriff, um wieder alle passenden News zu sehen." : activeCat ? "Waehle eine andere Kategorie oder komm spaeter wieder, sobald neue Updates veroeffentlicht sind." : "Neue Ankuendigungen, Recaps und Vereinsupdates erscheinen hier automatisch."}
+            description={hasSearch ? "Passe deine Suche an oder leere den Suchbegriff, um wieder alle passenden News zu sehen." : activeCat ? "Wähle eine andere Kategorie oder komm später wieder, sobald neue Updates veröffentlicht sind." : "Neue Ankündigungen, Recaps und Vereinsupdates erscheinen hier automatisch."}
             primaryAction={hasSearch ? { label: "Suche leeren", onClick: () => updateNewsFilters({ q: "" }) } : activeCat ? { label: "Alle News", onClick: () => updateNewsFilters({ category: "" }) } : { to: "/events", label: "Events ansehen" }}
             secondaryAction={{ to: "/tournaments", label: "Turniere" }}
             className="mt-10"

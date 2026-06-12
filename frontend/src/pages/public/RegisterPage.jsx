@@ -69,7 +69,7 @@ export default function RegisterPage() {
     const errors = {};
     if (!form.username.trim()) errors.username = "Bitte gib einen Benutzernamen ein.";
     if (!form.email.trim()) errors.email = "Bitte gib deine E-Mail-Adresse ein.";
-    else if (!EMAIL_RE.test(form.email.trim())) errors.email = "Bitte gib eine gueltige E-Mail-Adresse ein.";
+    else if (!EMAIL_RE.test(form.email.trim())) errors.email = "Bitte gib eine gültige E-Mail-Adresse ein.";
     if (!form.password) errors.password = "Bitte vergib ein Passwort.";
     else if (form.password.length < 10) errors.password = "Das Passwort braucht mindestens 10 Zeichen.";
     if (!accept) errors.accept = "Bitte akzeptiere die Datenschutzbestimmungen.";

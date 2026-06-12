@@ -711,8 +711,8 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
                     {"track_id": tid, "is_invalid": {"$ne": True}, "user_id": {"$ne": user_id}},
                     {"_id": 0, "user_id": 1, "time_ms": 1, "penalty_seconds": 1}).to_list(5000)
                 for ol in other_best:
-                    oeff = ol["time_ms"] + int(ol.get("penalty_seconds", 0) * 1000)
-                    if oeff < entry["time_ms"]:
+                    effective_ms = ol["time_ms"] + int(ol.get("penalty_seconds", 0) * 1000)
+                    if effective_ms < entry["time_ms"]:
                         is_p1 = False
                         break
                 if is_p1:

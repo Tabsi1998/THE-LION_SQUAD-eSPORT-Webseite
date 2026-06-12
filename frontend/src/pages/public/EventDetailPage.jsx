@@ -157,7 +157,7 @@ export default function EventDetailPage() {
             {e.show_map && mapEmbedUrl(e) && !hasConsent("external_media") && (
               <ExternalMediaNotice
                 service="Google Maps"
-                reason="Die Karte wird erst nach Zustimmung zu externen Medien geladen, weil dabei Daten an Google uebertragen werden koennen."
+                reason="Die Karte wird erst nach Zustimmung zu externen Medien geladen, weil dabei Daten an Google übertragen werden können."
                 url={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([e.location, fullAddress(e)].filter(Boolean).join(", "))}`}
                 accent="#9F7AEA"
                 testId="event-map-consent-notice"

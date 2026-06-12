@@ -166,7 +166,7 @@ export default function EventLivePage() {
   const freeStations = stations.filter((station) => !BUSY_STATION_STATUSES.has(station.status) && station.status !== "broken");
   const brokenStations = stations.filter((station) => station.status === "broken");
 
-  const seoDescription = seoTextPreview(event?.description || event?.program, "Live-Uebersicht mit Zeitplan, Matches, Stationen und Ergebnissen fuer lokale THE LION SQUAD Events.");
+  const seoDescription = seoTextPreview(event?.description || event?.program, "Live-Übersicht mit Zeitplan, Matches, Stationen und Ergebnissen für lokale THE LION SQUAD Events.");
   useDocumentTitle(`${event?.name || "Event"} Live`, seoDescription, {
     image: event?.banner_url,
     canonical: event?.slug ? `${window.location.origin}/events/${event.slug}/live` : undefined,
@@ -182,8 +182,8 @@ export default function EventLivePage() {
         <PublicEmptyState
           icon={Radio}
           eyebrow="Event Live"
-          title="Live-Seite nicht verfuegbar"
-          description="Das Event konnte nicht geladen werden oder ist nicht oeffentlich sichtbar."
+          title="Live-Seite nicht verfügbar"
+          description="Das Event konnte nicht geladen werden oder ist nicht öffentlich sichtbar."
           primaryAction={{ to: "/events", label: "Events ansehen" }}
           className="my-16"
         />
@@ -232,14 +232,14 @@ export default function EventLivePage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <LiveStat icon={Radio} label="Jetzt live" value={liveMatches.length} tone="cyan" />
-          <LiveStat icon={CalendarClock} label="Als naechstes" value={nextMatches.length} tone="gold" />
+          <LiveStat icon={CalendarClock} label="Als nächstes" value={nextMatches.length} tone="gold" />
           <LiveStat icon={CheckCircle2} label="Ergebnisse" value={resultMatches.length} tone="green" />
           <LiveStat icon={Monitor} label="Freie Stationen" value={freeStations.length} tone="white" />
         </div>
 
         <div className="grid lg:grid-cols-12 gap-6">
           <section className="lg:col-span-7 space-y-6 min-w-0">
-            <LivePanel icon={Radio} title="Jetzt laeuft" count={liveMatches.length}>
+            <LivePanel icon={Radio} title="Jetzt läuft" count={liveMatches.length}>
               {liveMatches.length ? liveMatches.map((match) => (
                 <MatchCard key={match.id} match={match} stationMap={stationMap} featured />
               )) : (
@@ -247,7 +247,7 @@ export default function EventLivePage() {
               )}
             </LivePanel>
 
-            <LivePanel icon={CalendarClock} title="Als naechstes" count={nextMatches.length}>
+            <LivePanel icon={CalendarClock} title="Als nächstes" count={nextMatches.length}>
               {nextMatches.length ? nextMatches.map((match) => (
                 <MatchCard key={match.id} match={match} stationMap={stationMap} />
               )) : (

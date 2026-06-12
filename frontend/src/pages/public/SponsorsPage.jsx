@@ -64,7 +64,7 @@ export default function SponsorsPage() {
         <div className="mt-8 grid md:grid-cols-3 gap-3">
           <SupportLink to="/events" icon={Calendar} label="Event-Sichtbarkeit" text="Sponsoren erscheinen dort, wo Events und Turniere stattfinden." />
           <SupportLink to="/partners" icon={Handshake} label="Partner-Netzwerk" text="Befreundete Vereine, Veranstalter und Communitys." />
-          <SupportLink to="/contact" icon={ArrowRight} label="Sponsor werden" text="Kontakt fuer Kooperationen, Pakete und gemeinsame Aktionen." />
+          <SupportLink to="/contact" icon={ArrowRight} label="Sponsor werden" text="Kontakt für Kooperationen, Pakete und gemeinsame Aktionen." />
         </div>
 
         {publicSponsors.length === 0 && (
@@ -120,7 +120,7 @@ function SupportLink({ to, icon: Icon, label, text }) {
       </div>
       <p className="mt-2 text-sm text-white/55 line-clamp-2">{text}</p>
       <span className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/35 group-hover:text-[#FFD700]">
-        Oeffnen <ArrowRight className="h-3 w-3" />
+        Öffnen <ArrowRight className="h-3 w-3" />
       </span>
     </Link>
   );

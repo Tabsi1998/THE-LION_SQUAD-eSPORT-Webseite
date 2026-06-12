@@ -70,7 +70,7 @@ export default function EsportsOverviewPage() {
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">THE LION SQUAD</span>
             <h1 className="mt-3 font-heading text-5xl font-black uppercase leading-none md:text-7xl">eSports</h1>
             <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/70">
-              Turniere, Fast-Lap-Challenges und Jahreswertung an einem Ort. Alles, was aktiv ist oder als Naechstes kommt, findest du hier.
+              Turniere, Fast-Lap-Challenges und Jahreswertung an einem Ort. Alles, was aktiv ist oder als Nächstes kommt, findest du hier.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link to="/tournaments" className="inline-flex items-center gap-2 rounded-sm bg-[#29B6E8] px-5 py-3 text-xs font-bold uppercase tracking-wider text-black hover:bg-[#1E95C2]">
@@ -101,19 +101,19 @@ export default function EsportsOverviewPage() {
           {loading ? (
             <PublicLoadingState cards={3} />
           ) : error ? (
-            <PublicEmptyState icon={Radio} eyebrow="eSports" title="Aktivitaeten konnten nicht geladen werden" description="Bitte lade die Seite neu oder pruefe spaeter noch einmal." primaryAction={{ label: "Erneut laden", onClick: load }} />
+            <PublicEmptyState icon={Radio} eyebrow="eSports" title="Aktivitäten konnten nicht geladen werden" description="Bitte lade die Seite neu oder prüfe später noch einmal." primaryAction={{ label: "Erneut laden", onClick: load }} />
           ) : spotlight.length ? (
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {spotlight.map((item, index) => <ActivityCard key={`${item.kind}-${item.id}`} item={item} index={index} />)}
             </div>
           ) : (
-            <PublicEmptyState icon={Trophy} eyebrow="eSports" title="Noch keine Aktivitaeten sichtbar" description="Sobald Turniere oder Fast-Lap-Challenges oeffentlich sind, erscheint hier automatisch die Uebersicht." primaryAction={{ to: "/events", label: "Events ansehen" }} />
+            <PublicEmptyState icon={Trophy} eyebrow="eSports" title="Noch keine Aktivitäten sichtbar" description="Sobald Turniere oder Fast-Lap-Challenges öffentlich sind, erscheint hier automatisch die Übersicht." primaryAction={{ to: "/events", label: "Events ansehen" }} />
           )}
         </section>
 
         <section className="mt-12 grid gap-8 lg:grid-cols-2">
-          <CompactList title="Turniere" items={latestTournaments.map((item) => ({ ...item, kind: "tournament", label: "Turnier", href: `/tournaments/${item.slug || item.id}` }))} empty="Keine Turniere sichtbar" action={{ to: "/tournaments", label: "Turniere oeffnen" }} />
-          <CompactList title="Fast Lap" items={latestFastlaps.map((item) => ({ ...item, kind: "fastlap", label: "Fast Lap", href: `/fastlap/${item.slug || item.id}` }))} empty="Keine Fast-Lap-Challenges sichtbar" action={{ to: "/fastlap", label: "Fast Lap oeffnen" }} />
+          <CompactList title="Turniere" items={latestTournaments.map((item) => ({ ...item, kind: "tournament", label: "Turnier", href: `/tournaments/${item.slug || item.id}` }))} empty="Keine Turniere sichtbar" action={{ to: "/tournaments", label: "Turniere öffnen" }} />
+          <CompactList title="Fast Lap" items={latestFastlaps.map((item) => ({ ...item, kind: "fastlap", label: "Fast Lap", href: `/fastlap/${item.slug || item.id}` }))} empty="Keine Fast-Lap-Challenges sichtbar" action={{ to: "/fastlap", label: "Fast Lap öffnen" }} />
         </section>
       </main>
     </PublicLayout>

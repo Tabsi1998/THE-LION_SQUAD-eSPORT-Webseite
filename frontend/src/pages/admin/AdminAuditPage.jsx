@@ -89,7 +89,7 @@ export default function AdminAuditPage() {
           Settings-Logs anzeigen
         </label>
         {!showSettings && logs.length !== visibleLogs.length && (
-          <span className="text-xs text-white/40">{logs.length - visibleLogs.length} Settings-Eintraege ausgeblendet</span>
+          <span className="text-xs text-white/40">{logs.length - visibleLogs.length} Settings-Einträge ausgeblendet</span>
         )}
       </div>
 
@@ -135,7 +135,7 @@ export default function AdminAuditPage() {
               ))}
               {visibleLogs.length === 0 && (
                 <tr>
-                  <td colSpan="4" className="text-center py-10 text-white/40">Keine Eintraege</td>
+                  <td colSpan="4" className="text-center py-10 text-white/40">Keine Einträge</td>
                 </tr>
               )}
             </tbody>

@@ -374,7 +374,7 @@ async def upload_document(request: Request, file: UploadFile = File(...), me: di
         path.write_bytes(data)
     except OSError as exc:
         logger.error("[uploads] failed to write document %s: %s", path, exc)
-        raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR pruefen.")
+        raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR prüfen.")
     return {
         "url": "",
         "storage_key": filename,

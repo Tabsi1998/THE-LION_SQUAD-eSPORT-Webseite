@@ -47,11 +47,11 @@ function buildPlanningWarnings(form, isTeam) {
   const checkinUntil = dateFromInput(form.check_in_until);
 
   if (minParticipants && maxParticipants && minParticipants > maxParticipants) {
-    warnings.push(`${isTeam ? "Min Teams" : "Min Spieler"} ist groesser als ${isTeam ? "Max Teams" : "Max Spieler"}.`);
+    warnings.push(`${isTeam ? "Min Teams" : "Min Spieler"} ist größer als ${isTeam ? "Max Teams" : "Max Spieler"}.`);
   }
   if (start && end && end < start) warnings.push("Das Ende liegt vor dem Start.");
-  if (registrationFrom && registrationUntil && registrationUntil < registrationFrom) warnings.push("Die Anmeldung endet vor ihrer Oeffnung.");
-  if (checkinFrom && checkinUntil && checkinUntil < checkinFrom) warnings.push("Der Check-in endet vor seiner Oeffnung.");
+  if (registrationFrom && registrationUntil && registrationUntil < registrationFrom) warnings.push("Die Anmeldung endet vor ihrer Öffnung.");
+  if (checkinFrom && checkinUntil && checkinUntil < checkinFrom) warnings.push("Der Check-in endet vor seiner Öffnung.");
   if (registrationUntil && start && registrationUntil > start) warnings.push("Die Anmeldung endet nach dem Turnierstart.");
   if (checkinUntil && start && checkinUntil > start) warnings.push("Der Check-in endet nach dem Turnierstart.");
   if (form.status === "scheduled" && !form.start_date) warnings.push("Angekuendigte Turniere sollten eine Startzeit haben.");
@@ -178,7 +178,7 @@ export default function AdminTournamentNewPage() {
             <Field label="Anmeldung endet" type="datetime-local" value={form.registration_open_until} onChange={(v) => set("registration_open_until", v)} testId="new-tr-reg-until" />
           </Row>
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
-            Anmeldung und Check-in koennen zeitgesteuert wechseln. Live-Start und echte Matchstarts bleiben standardmaessig bei der Turnierleitung.
+            Anmeldung und Check-in können zeitgesteuert wechseln. Live-Start und echte Matchstarts bleiben standardmäßig bei der Turnierleitung.
           </div>
           <Row>
             <Select label="Austragung" value={form.event_mode} onChange={(v) => set("event_mode", v)} options={EVENT_MODE_OPTIONS} testId="new-tr-event-mode" />
@@ -187,7 +187,7 @@ export default function AdminTournamentNewPage() {
           </Row>
           <RulePresetPicker form={form} onApply={applyRulePreset} />
           <div className="border border-white/10 bg-black/20 rounded-sm p-3 text-xs text-white/55">
-            Vor-Ort-Turniere werden standardmaessig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmaessig Ergebnisberichte beider Parteien und Terminvorschlaege.
+            Vor-Ort-Turniere werden standardmäßig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmäßig Ergebnisberichte beider Parteien und Terminvorschläge.
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="flex items-start gap-2 text-sm text-white/75">
@@ -307,7 +307,7 @@ export default function AdminTournamentNewPage() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
               <div className="space-y-1">
-                <div className="text-[11px] font-bold uppercase tracking-widest">Planung pruefen</div>
+                <div className="text-[11px] font-bold uppercase tracking-widest">Planung prüfen</div>
                 {planningWarnings.map((warning) => <div key={warning}>{warning}</div>)}
               </div>
             </div>

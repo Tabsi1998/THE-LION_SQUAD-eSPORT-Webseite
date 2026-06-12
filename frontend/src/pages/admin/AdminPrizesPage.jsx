@@ -144,7 +144,7 @@ export default function AdminPrizesPage() {
 
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <p className="text-xs text-white/45 max-w-2xl">
-          Oeffentliche Preise sind die Ausschreibung. Diese Seite zeigt konkrete Abhol-Eintraege, die nach veroeffentlichten Ergebnissen entstehen.
+          Öffentliche Preise sind die Ausschreibung. Diese Seite zeigt konkrete Abhol-Einträge, die nach veröffentlichten Ergebnissen entstehen.
         </p>
         <button
           type="button"
@@ -196,8 +196,8 @@ export default function AdminPrizesPage() {
           ) : items.length === 0 ? (
             <div className="text-center py-12 px-4">
               <Award className="w-10 h-10 text-white/30 mx-auto mb-2" />
-              <p className="text-white/50">{allItems.length ? "Keine Gewinne fuer diesen Filter." : "Noch keine Abhol-Eintraege erfasst."}</p>
-              <p className="text-xs text-white/30 mt-1">Preise werden nach veroeffentlichten Ergebnissen oder ueber "Gewinne neu erzeugen" zu Abhol-Eintraegen.</p>
+              <p className="text-white/50">{allItems.length ? "Keine Gewinne für diesen Filter." : "Noch keine Abhol-Einträge erfasst."}</p>
+              <p className="text-xs text-white/30 mt-1">Preise werden nach veröffentlichten Ergebnissen oder über "Gewinne neu erzeugen" zu Abhol-Einträgen.</p>
             </div>
           ) : items.map((p) => (
             <PrizeMobileCard key={p.id} p={p} updateStatus={updateStatus} markPickedUp={markPickedUp} remove={remove} />
@@ -345,7 +345,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove }) {
           <button onClick={() => markPickedUp(p.id)} data-testid={`prize-mobile-pickup-${p.id}`} className="px-3 py-2 border border-[#00FF88]/40 text-[#00FF88] rounded-sm text-xs font-bold uppercase tracking-wider">Abgeholt</button>
         )}
         {p.status === "picked_up" && (
-          <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-mobile-revert-${p.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider">Zurueck</button>
+          <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-mobile-revert-${p.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider">Zurück</button>
         )}
         <button onClick={() => remove(p.id)} className="px-3 py-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm text-xs font-bold uppercase tracking-wider">Loeschen</button>
       </div>

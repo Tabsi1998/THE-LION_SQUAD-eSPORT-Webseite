@@ -370,7 +370,7 @@ async def auto_create_for_f1_challenge(challenge_id: str) -> int:
             await create_user_notification(
                 user_id,
                 "Fast-Lap Gewinn vorgemerkt",
-                f"{source_label}: {place_label} bei {challenge.get('title') or 'Fast Lap'} - {prize_text}. Sobald der Gewinn abholbereit ist, bekommst du die naechste Meldung.",
+                f"{source_label}: {place_label} bei {challenge.get('title') or 'Fast Lap'} - {prize_text}. Sobald der Gewinn abholbereit ist, bekommst du die nächste Meldung.",
                 url="/me/prizes",
                 kind="prize_pending",
                 meta={"source_type": "fastlap", "challenge_id": challenge_id, "pickup_id": doc["id"], "place": place, "source_key": source_key},

@@ -45,7 +45,7 @@ export default function GalleryPage() {
             icon={ImageIcon}
             eyebrow="Galerie"
             title="Noch keine Alben sichtbar"
-            description="Fotos von Events, Turnieren und Vereinsmomenten erscheinen hier automatisch, sobald ein Album veroeffentlicht ist."
+            description="Fotos von Events, Turnieren und Vereinsmomenten erscheinen hier automatisch, sobald ein Album veröffentlicht ist."
             primaryAction={{ to: "/events", label: "Events ansehen" }}
             secondaryAction={{ to: "/news", label: "News lesen" }}
             className="mt-10"
