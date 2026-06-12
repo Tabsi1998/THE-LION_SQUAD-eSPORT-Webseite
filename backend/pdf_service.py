@@ -309,6 +309,61 @@ def _fit_font_size(text: str, max_width: float, font_name: str = "Helvetica-Bold
     return size
 
 
+def _truncate_to_width(text: str, max_width: float, font_name: str, font_size: int) -> str:
+    value = str(text or "").strip()
+    if stringWidth(value, font_name, font_size) <= max_width:
+        return value
+    suffix = "..."
+    while value and stringWidth(value + suffix, font_name, font_size) > max_width:
+        value = value[:-1].rstrip()
+    return (value + suffix) if value else suffix
+
+
+def _wrap_to_width(text: str, max_width: float, font_name: str, font_size: int, max_lines: int) -> list[str]:
+    words = str(text or "").strip().split()
+    if not words:
+        return [""]
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if not current or stringWidth(candidate, font_name, font_size) <= max_width:
+            current = candidate
+            continue
+        lines.append(current)
+        current = word
+        if len(lines) >= max_lines:
+            break
+    if current and len(lines) < max_lines:
+        lines.append(current)
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+    if lines:
+        lines[-1] = _truncate_to_width(lines[-1], max_width, font_name, font_size)
+    return lines
+
+
+def _draw_centered_wrapped(canvas, text: str, center_x: float, first_baseline_y: float, max_width: float,
+                           font_name: str = "Helvetica-Bold", start_size: int = 30, min_size: int = 15,
+                           max_lines: int = 2, leading_factor: float = 1.18) -> float:
+    value = str(text or "").strip()
+    size = start_size
+    lines = [value]
+    while size > min_size:
+        lines = _wrap_to_width(value, max_width, font_name, size, max_lines)
+        if len(lines) <= max_lines and all(stringWidth(line, font_name, size) <= max_width for line in lines):
+            break
+        size -= 1
+    lines = _wrap_to_width(value, max_width, font_name, size, max_lines)
+    canvas.setFont(font_name, size)
+    y = first_baseline_y
+    leading = size * leading_factor
+    for line in lines:
+        canvas.drawCentredString(center_x, y, line)
+        y -= leading
+    return y
+
+
 def pdf_station_signs(
     tournament: dict,
     stations: list,
@@ -419,11 +474,14 @@ def _draw_qr_code(canvas, value: str, x: float, y: float, size: float, branding:
         or _brand_asset_path((branding or {}).get("logo_url"))
         or _brand_asset_path("/assets/brand/tls-mascot.png")
     )
-    logo_size = size * 0.23
+    logo_size = size * 0.19
     logo_x = x + (size - logo_size) / 2
     logo_y = y + (size - logo_size) / 2
     canvas.setFillColor(WHITE)
-    canvas.roundRect(logo_x - 2.2 * mm, logo_y - 2.2 * mm, logo_size + 4.4 * mm, logo_size + 4.4 * mm, 6, fill=1, stroke=0)
+    canvas.roundRect(logo_x - 1.6 * mm, logo_y - 1.6 * mm, logo_size + 3.2 * mm, logo_size + 3.2 * mm, 6, fill=1, stroke=0)
+    canvas.setStrokeColor(colors.HexColor("#E5E7EB"))
+    canvas.setLineWidth(0.35)
+    canvas.roundRect(logo_x - 1.6 * mm, logo_y - 1.6 * mm, logo_size + 3.2 * mm, logo_size + 3.2 * mm, 6, fill=0, stroke=1)
     if logo_path:
         _draw_logo(canvas, logo_path, logo_x, logo_y, logo_size, logo_size)
 
@@ -459,30 +517,46 @@ def pdf_qr_sign(
     c.setFont("Helvetica-Bold", 10)
     c.drawCentredString(page_w / 2, page_h - 4.45 * cm, str(eyebrow or "QR CODE").upper()[:64])
 
-    display_title = str(title or "THE LION SQUAD").strip()
-    title_font = _fit_font_size(display_title.upper(), page_w - 3.6 * cm, start=42, minimum=20)
+    display_title = str(title or "THE LION SQUAD").strip().upper()
     c.setFillColor(WHITE)
-    c.setFont("Helvetica-Bold", title_font)
-    c.drawCentredString(page_w / 2, page_h - 5.55 * cm, display_title.upper()[:96])
+    title_bottom = _draw_centered_wrapped(
+        c,
+        display_title,
+        page_w / 2,
+        page_h - 5.35 * cm,
+        page_w - 4.0 * cm,
+        start_size=30,
+        min_size=15,
+        max_lines=2,
+    )
 
     if subtitle:
         c.setFillColor(colors.HexColor("#CBD5E1"))
-        c.setFont("Helvetica-Bold", 13)
-        c.drawCentredString(page_w / 2, page_h - 6.35 * cm, str(subtitle).strip()[:110])
+        _draw_centered_wrapped(
+            c,
+            str(subtitle).strip(),
+            page_w / 2,
+            min(title_bottom - 0.20 * cm, page_h - 6.45 * cm),
+            page_w - 4.6 * cm,
+            start_size=13,
+            min_size=10,
+            max_lines=2,
+            leading_factor=1.15,
+        )
 
-    qr_size = 11.2 * cm
+    qr_size = 10.35 * cm
     qr_x = (page_w - qr_size) / 2
-    qr_y = 7.05 * cm
+    qr_y = 7.35 * cm
     _draw_qr_code(c, str(url or "https://lionsquad.at"), qr_x, qr_y, qr_size, branding)
 
     c.setFillColor(CYAN)
     c.setFont("Helvetica-Bold", 15)
-    c.drawCentredString(page_w / 2, 5.6 * cm, "SCANNEN UND ÖFFNEN")
+    c.drawCentredString(page_w / 2, 5.72 * cm, "SCANNEN UND ÖFFNEN")
 
     c.setFillColor(colors.HexColor("#CBD5E1"))
-    c.setFont("Helvetica", 9)
+    c.setFont("Helvetica", 8.4)
     url_text = str(url or "").strip()
-    c.drawCentredString(page_w / 2, 4.95 * cm, url_text[:118])
+    c.drawCentredString(page_w / 2, 5.08 * cm, _truncate_to_width(url_text, page_w - 4.2 * cm, "Helvetica", 8.4))
 
     _draw_sponsor_footer(c, doc, pdf_sponsors or [])
     c.setFillColor(MUTED)

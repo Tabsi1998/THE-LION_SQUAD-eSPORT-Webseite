@@ -31,8 +31,22 @@ export default function EventTVPage() {
         .filter((result) => result.status === "fulfilled")
         .flatMap((result) => result.value.data || []);
       const uniqueStations = Array.from(new Map(stationRows.map((station) => [station.id, station])).values());
+      const bracketResponses = await Promise.allSettled(
+        tournaments.map((tournament) => loadTournamentBracketForDisplay(tournament.id))
+      );
+      const stationMatches = buildStationMatchLookup(
+        bracketResponses
+          .filter((result) => result.status === "fulfilled")
+          .map((result) => result.value.data)
+      );
+      const enrichedStations = uniqueStations.map((station) => ({
+        ...station,
+        current_match: (station.current_match_id && stationMatches.byId.get(station.current_match_id))
+          || stationMatches.byStation.get(station.id)
+          || null,
+      }));
       setEvent({ ...data, tournaments });
-      setStations(uniqueStations);
+      setStations(enrichedStations);
       setLoadError(null);
       setLastUpdated(Date.now());
     } catch (error) {
@@ -133,6 +147,15 @@ export default function EventTVPage() {
   );
 }
 
+async function loadTournamentBracketForDisplay(tournamentId) {
+  const encoded = encodeURIComponent(tournamentId);
+  try {
+    return await api.get(`/tournaments/${encoded}/bracket/display`);
+  } catch {
+    return api.get(`/tournaments/${encoded}/bracket`);
+  }
+}
+
 function ActivityCard({ item }) {
   const isFastLap = item.kind === "fastlap";
   const Icon = isFastLap ? Flag : Trophy;
@@ -162,14 +185,30 @@ function ActivityCard({ item }) {
 function StationRow({ station }) {
   const busy = BUSY_STATION_STATUSES.has(station.status);
   const broken = station.status === "broken";
+  const assignedMatch = station.current_match;
+  const stateLabel = broken ? "Defekt" : busy ? "Belegt" : assignedMatch ? "Geplant" : "Frei";
+  const stateClass = broken
+    ? "border-[#FF3B30]/45 text-[#FF3B30]"
+    : busy
+      ? "border-[#29B6E8]/45 text-[#29B6E8]"
+      : assignedMatch
+        ? "border-[#FFD700]/45 text-[#FFD700]"
+        : "border-[#00FF88]/35 text-[#00FF88]";
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-sm border border-white/10 bg-black/30 px-3 py-2">
       <div className="min-w-0">
         <div className="truncate font-heading text-lg font-bold uppercase">{station.name || station.label || station.id}</div>
-        <div className="truncate text-[11px] text-white/38">{station.notes || station.device_type || "Station"}</div>
+        {assignedMatch ? (
+          <>
+            <div className="truncate text-[11px] font-bold uppercase tracking-wider text-[#29B6E8]">{assignedMatch.key} · {assignedMatch.kind}</div>
+            <div className="truncate text-[11px] text-white/58">{assignedMatch.participants}</div>
+          </>
+        ) : (
+          <div className="truncate text-[11px] text-white/38">{station.notes || station.device_type || "Station"}</div>
+        )}
       </div>
-      <div className={`rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${broken ? "border-[#FF3B30]/45 text-[#FF3B30]" : busy ? "border-[#29B6E8]/45 text-[#29B6E8]" : "border-[#00FF88]/35 text-[#00FF88]"}`}>
-        {broken ? "Defekt" : busy ? "Belegt" : "Frei"}
+      <div className={`rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${stateClass}`}>
+        {stateLabel}
       </div>
     </div>
   );
@@ -224,4 +263,68 @@ function statusLabel(status) {
     archived: "Archiv",
     cancelled: "Abgesagt",
   }[status] || status || "Offen";
+}
+
+function buildStationMatchLookup(bracketPayloads) {
+  const entries = [];
+  for (const payload of bracketPayloads || []) {
+    const registrations = new Map((payload?.registrations || []).map((registration) => [registration.id, registration]));
+    const tournamentTitle = payload?.tournament?.title || "Turnier";
+    for (const match of [...(payload?.matches_v2 || []), ...(payload?.matches || [])]) {
+      if (!match?.id || isDoneMatch(match)) continue;
+      const detail = stationMatchDetail(match, registrations, tournamentTitle);
+      entries.push(detail);
+    }
+  }
+  entries.sort((a, b) => stationMatchSort(a.match, b.match));
+  const byId = new Map();
+  const byStation = new Map();
+  for (const detail of entries) {
+    byId.set(detail.id, detail);
+    if (detail.stationId && !byStation.has(detail.stationId)) byStation.set(detail.stationId, detail);
+  }
+  return { byId, byStation };
+}
+
+function stationMatchDetail(match, registrations, tournamentTitle) {
+  const labels = Array.isArray(match.slots)
+    ? (match.slots || []).map((slot) => participantName(slot.registration_id, registrations, slot.source?.raw))
+    : [
+        participantName(match.participant_a_id, registrations),
+        participantName(match.participant_b_id, registrations),
+      ];
+  const participants = labels.filter(Boolean).slice(0, 4).join(" vs. ") || "Teilnehmer offen";
+  return {
+    id: match.id,
+    stationId: match.station_id || "",
+    key: match.match_key || match.round_name || matchLabel(match),
+    kind: tournamentTitle,
+    participants,
+    match,
+  };
+}
+
+function participantName(registrationId, registrations, fallback = "") {
+  const registration = registrations.get(registrationId) || {};
+  return registration.display_name || registration.ingame_name || registration.user?.display_name || fallback || "Offen";
+}
+
+function isDoneMatch(match) {
+  return ["completed", "forfeit", "archived"].includes(match.status) || Boolean(match.winner_id);
+}
+
+function stationMatchSort(a, b) {
+  const statusRank = { in_progress: 0, live: 0, ready: 1, scheduled: 2, pending: 3, preview: 4 };
+  const aTime = Date.parse(a.scheduled_at || "") || Number.MAX_SAFE_INTEGER;
+  const bTime = Date.parse(b.scheduled_at || "") || Number.MAX_SAFE_INTEGER;
+  return (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9)
+    || aTime - bTime
+    || (Number(a.round || 0) - Number(b.round || 0))
+    || ((a.order ?? a.match_index ?? 0) - (b.order ?? b.match_index ?? 0));
+}
+
+function matchLabel(match) {
+  if (Number.isInteger(match.match_index)) return `Spiel ${match.match_index + 1}`;
+  if (match.order != null) return `Spiel ${Number(match.order) + 1}`;
+  return "Match";
 }
