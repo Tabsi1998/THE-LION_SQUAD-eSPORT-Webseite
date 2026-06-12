@@ -95,7 +95,7 @@ export default function EventTVPage() {
 
       <main className="grid min-h-0 flex-1 grid-cols-12 gap-4 p-5">
         <section className="col-span-12 flex min-h-0 flex-col rounded-sm border border-white/10 bg-[#0A0A0A]/78 xl:col-span-7">
-          <PanelHeader icon={Trophy} label="Live-Aktivitaeten" value={`${activity.length}`} />
+          <PanelHeader icon={Trophy} label="Live-Aktivitäten" value={`${activity.length}`} />
           <div className="grid min-h-0 flex-1 content-start gap-3 overflow-hidden p-4">
             {activity.length ? activity.map((item) => <ActivityCard key={`${item.kind}-${item.id}`} item={item} />) : (
               <EmptyState>Keine verknuepften Turniere oder Fast-Laps</EmptyState>

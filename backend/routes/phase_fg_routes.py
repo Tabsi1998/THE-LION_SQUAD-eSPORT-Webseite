@@ -33,7 +33,7 @@ PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
 PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 ADMIN_MEDIA_OWNER_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
 IMAGE_REFERENCE_FIELDS = [
-    ("settings", {"id": "branding"}, ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "favicon_url", "favicon_light_url", "favicon_dark_url"]),
+    ("settings", {"id": "branding"}, ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "qr_logo_url", "favicon_url", "favicon_light_url", "favicon_dark_url"]),
     ("settings", {"id": "discord"}, ["avatar_url"]),
     ("users", {}, ["avatar_url", "banner_url"]),
     ("teams", {}, ["logo_url", "banner_url"]),

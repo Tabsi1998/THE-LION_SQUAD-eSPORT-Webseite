@@ -412,7 +412,8 @@ def _draw_qr_code(canvas, value: str, x: float, y: float, size: float, branding:
     renderPDF.draw(drawing, canvas, x, y)
 
     logo_path = (
-        _brand_asset_path((branding or {}).get("mascot_url"))
+        _brand_asset_path((branding or {}).get("qr_logo_url"))
+        or _brand_asset_path((branding or {}).get("mascot_url"))
         or _brand_asset_path((branding or {}).get("favicon_dark_url"))
         or _brand_asset_path((branding or {}).get("logo_dark_url"))
         or _brand_asset_path((branding or {}).get("logo_url"))

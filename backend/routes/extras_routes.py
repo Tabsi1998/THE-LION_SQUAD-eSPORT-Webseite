@@ -77,6 +77,7 @@ class BrandingSettings(BaseModel):
     logo_dark_url: Optional[str] = None
     share_banner_url: Optional[str] = None
     mascot_url: Optional[str] = None
+    qr_logo_url: Optional[str] = None
     favicon_url: Optional[str] = None
     favicon_light_url: Optional[str] = None
     favicon_dark_url: Optional[str] = None
@@ -548,6 +549,7 @@ async def public_settings(response: Response):
         "logo_dark_url": b.get("logo_dark_url"),
         "share_banner_url": b.get("share_banner_url"),
         "mascot_url": b.get("mascot_url"),
+        "qr_logo_url": b.get("qr_logo_url"),
         "favicon_url": b.get("favicon_url"),
         "favicon_light_url": b.get("favicon_light_url"),
         "favicon_dark_url": b.get("favicon_dark_url"),
@@ -1733,6 +1735,7 @@ async def _pdf_branding(db):
             "logo_light_url": 1,
             "logo_dark_url": 1,
             "mascot_url": 1,
+            "qr_logo_url": 1,
             "favicon_url": 1,
             "favicon_light_url": 1,
             "favicon_dark_url": 1,

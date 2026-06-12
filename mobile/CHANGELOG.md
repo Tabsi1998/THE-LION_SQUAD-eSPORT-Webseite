@@ -3,7 +3,7 @@
 ## 2.0.0-beta.1 - 2026-06-02
 
 - Backend/Web: Gewinnabholungen koennen fuer veroeffentlichte Turniere und Fast-Lap-Challenges nachtraeglich erzeugt werden; Stage-/Custom-Bracket-Ergebnisse werden dabei korrekt ausgewertet.
-- Web: Die neue eSports-Uebersicht buendelt Turniere, Fast Lap und Jahreswertung dynamisch auf einer gemeinsamen Seite.
+- Web: Die neue eSports-Übersicht bündelt Turniere, Fast Lap und Jahreswertung dynamisch auf einer gemeinsamen Seite.
 - Mobile: Fast-Lap-Details zeigen jetzt hinterlegte Preise an; Turnierpreise beruecksichtigen Gruppierungen wie Gewinner- und Loser-Bracket sauberer.
 
 ## 1.5.0-beta.9 - 2026-05-30
@@ -223,7 +223,7 @@
 - Web-Frontend: Neue BottomNav-Komponente fuer Mobile (Home, Turniere, Events, Dashboard, Profil)
 - Web-Frontend: PWA manifest.json mit standalone Display, App-Shortcuts und deutschen Metadaten
 - Web-Frontend: iOS Safe-Area (env(safe-area-inset-bottom)) fuer Notch-Geraete
-- Web-Frontend: AdminLayout Sidebar in 6 Gruppen unterteilt (Uebersicht, Mitglieder, eSports, Content, Verein, System)
+- Web-Frontend: AdminLayout Sidebar in 6 Gruppen unterteilt (Übersicht, Mitglieder, eSports, Content, Verein, System)
 - Web-Frontend: Moderator-Sidebar-Fix: /admin/stations jetzt korrekt sichtbar
 
 ## 0.8.0-alpha.1 - 2026-05-20

@@ -18,7 +18,7 @@ const ACTIVE_STATUSES = new Set(["scheduled", "registration_open", "registration
 export default function EsportsOverviewPage() {
   useDocumentTitle(
     "eSports",
-    "Alle eSports-Aktivitaeten von THE LION SQUAD: Turniere, Fast-Lap-Challenges, Jahreswertung, Live-Brackets und Leaderboards."
+    "Alle eSports-Aktivitäten von THE LION SQUAD: Turniere, Fast-Lap-Challenges, Jahreswertung, Live-Brackets und Leaderboards."
   );
 
   const [tournaments, setTournaments] = useState([]);
@@ -97,7 +97,7 @@ export default function EsportsOverviewPage() {
         </div>
 
         <section className="mt-12">
-          <SectionHeader eyebrow="Aktuell" title="Aktive eSports-Aktivitaeten" action={{ to: "/tournaments", label: "Alle Turniere" }} />
+          <SectionHeader eyebrow="Aktuell" title="Aktive eSports-Aktivitäten" action={{ to: "/tournaments", label: "Alle Turniere" }} />
           {loading ? (
             <PublicLoadingState cards={3} />
           ) : error ? (

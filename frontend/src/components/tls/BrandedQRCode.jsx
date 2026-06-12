@@ -11,7 +11,7 @@ export function BrandedQRCode({
   logoRatio = 0.22,
 }) {
   const branding = useBrandingAssets();
-  const logo = resolveMediaUrl(branding.mascot_url || branding.favicon_dark_url || branding.logo_dark_url || branding.logo_url || TLS_MASCOT);
+  const logo = resolveMediaUrl(branding.qr_logo_url || branding.mascot_url || branding.favicon_dark_url || branding.logo_dark_url || branding.logo_url || TLS_MASCOT);
   const logoSize = Math.max(18, Math.round(size * logoRatio));
 
   return (

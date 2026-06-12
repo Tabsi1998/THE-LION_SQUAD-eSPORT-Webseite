@@ -207,7 +207,7 @@ export default function AdminSettingsPage() {
   const [sendingNewsletter, setSendingNewsletter] = useState(false);
   const [brand, setBrand] = useState({
     club_name: "", tagline: "", site_title: "THE LION SQUAD - eSPORTS", site_description: "", primary_color: "#29B6E8",
-    logo_url: "", logo_light_url: "", logo_dark_url: "", share_banner_url: "", mascot_url: "",
+    logo_url: "", logo_light_url: "", logo_dark_url: "", share_banner_url: "", mascot_url: "", qr_logo_url: "",
     favicon_url: "", favicon_light_url: "", favicon_dark_url: "", contact_email: "", domain: "", timezone: "Europe/Vienna",
     legal_name: "", legal_form: "eingetragener Verein nach österreichischem Vereinsrecht", zvr_number: "",
     street_address: "", address_extra: "", postal_code: "", city: "", state: "Tirol", country: "Oesterreich",
@@ -1507,13 +1507,14 @@ export default function AdminSettingsPage() {
               <ImageUpload value={brand.logo_dark_url} onChange={(v) => setBrandField("logo_dark_url", v)} label="Logo auf dunklem Hintergrund" testId="brand-logo-dark" variant="square" allowLibrary />
               <ImageUpload value={brand.logo_light_url} onChange={(v) => setBrandField("logo_light_url", v)} label="Logo auf hellem Hintergrund" testId="brand-logo-light" variant="square" allowLibrary />
               <ImageUpload value={brand.share_banner_url} onChange={(v) => setBrandField("share_banner_url", v)} label="Standard SEO-/Teilen-Banner" testId="brand-share-banner" variant="wide" allowLibrary />
-              <ImageUpload value={brand.mascot_url} onChange={(v) => setBrandField("mascot_url", v)} label="Maskottchen / QR-Logo" testId="brand-mascot" variant="square" allowLibrary />
+              <ImageUpload value={brand.mascot_url} onChange={(v) => setBrandField("mascot_url", v)} label="Maskottchen" testId="brand-mascot" variant="square" allowLibrary />
+              <ImageUpload value={brand.qr_logo_url} onChange={(v) => setBrandField("qr_logo_url", v)} label="QR-Logo" testId="brand-qr-logo" variant="square" allowLibrary />
               <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Standard-Favicon" testId="brand-favicon" variant="square" allowLibrary />
               <ImageUpload value={brand.favicon_light_url} onChange={(v) => setBrandField("favicon_light_url", v)} label="Favicon für hellen Modus" testId="brand-favicon-light" variant="square" allowLibrary />
               <ImageUpload value={brand.favicon_dark_url} onChange={(v) => setBrandField("favicon_dark_url", v)} label="Favicon für dunklen Modus" testId="brand-favicon-dark" variant="square" allowLibrary />
             </div>
             <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/60">
-              Standardbilder werden verwendet, wenn eine Seite kein eigenes Bild hat. SEO nutzt Beitrags-/Event-/Turnierbild zuerst, danach den Teilen-Banner, danach Logo oder Maskottchen. QR-Codes verwenden das Maskottchen/QR-Logo in der Mitte.
+              Standardbilder werden verwendet, wenn eine Seite kein eigenes Bild hat. SEO nutzt Beitrags-/Event-/Turnierbild zuerst, danach den Teilen-Banner, danach Logo oder Maskottchen. QR-Codes verwenden das QR-Logo in der Mitte, mit Maskottchen als Fallback.
             </div>
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
@@ -1652,7 +1653,7 @@ export default function AdminSettingsPage() {
               <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Indexierung</span>
               <h2 className="font-heading text-2xl font-black uppercase mt-1">SEO & Analytics</h2>
               <p className="text-sm text-white/55 mt-2 max-w-2xl">
-                Analytics, Google Search Console, Bing Webmaster Tools und IndexNow liegen hier gebuendelt. Social-Share-Bilder kommen automatisch aus dem jeweiligen Seitenbild oder aus Logo/Maskottchen.
+                Analytics, Google Search Console, Bing Webmaster Tools und IndexNow liegen hier gebündelt. Social-Share-Bilder kommen automatisch aus dem jeweiligen Seitenbild oder aus Logo/Maskottchen.
               </p>
             </div>
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">

@@ -277,7 +277,7 @@ export default function EventLivePage() {
               )}
             </LivePanel>
 
-            <LivePanel icon={Activity} title="Aktivitaeten" count={activityItems.length}>
+            <LivePanel icon={Activity} title="Aktivitäten" count={activityItems.length}>
               {activityItems.length ? activityItems.map((item) => <ActivityRow key={`${item.kind}-${item.id}`} item={item} accessToken={accessToken} />) : (
                 <InlineEmpty text="Keine Turniere oder Fast-Laps verknuepft." />
               )}

@@ -598,7 +598,7 @@ async def reference_meta(db, rid: str, base: dict, origin: str) -> dict:
 
 def static_page_meta(slug: str, base: dict) -> dict | None:
     labels = {
-        "esports": ("eSports", "Alle eSports-Aktivitaeten von THE LION SQUAD: Turniere, Fast-Lap-Challenges, Jahreswertung, Live-Brackets und Leaderboards."),
+        "esports": ("eSports", "Alle eSports-Aktivitäten von THE LION SQUAD: Turniere, Fast-Lap-Challenges, Jahreswertung, Live-Brackets und Leaderboards."),
         "news": ("News", "Aktuelle News, Ergebnisse, Ankündigungen, Events und Turnier-Updates von THE LION SQUAD eSports aus Tirol."),
         "events": ("Events", "Gaming Events, Vereinsabende, LAN-Partys, Messen und öffentliche Termine von THE LION SQUAD eSports in Tirol."),
         "tournaments": ("eSports Turniere", "Aktuelle eSports Turniere von THE LION SQUAD: Anmeldung, Check-in, Brackets, Spielpläne und Ranglisten für Gaming Events in Tirol."),
