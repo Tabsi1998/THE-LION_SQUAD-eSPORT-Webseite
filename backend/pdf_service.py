@@ -11,6 +11,9 @@ from reportlab.lib.units import cm, mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas as pdf_canvas
 from reportlab.pdfbase.pdfmetrics import stringWidth
+from reportlab.graphics import renderPDF
+from reportlab.graphics.barcode import qr
+from reportlab.graphics.shapes import Drawing
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak,
 )
@@ -393,5 +396,98 @@ def pdf_station_signs(
         c.drawRightString(page_w - 2 * cm, 0.72 * cm, f"Station {page}/{len(rows)}")
         c.showPage()
 
+    c.save()
+    return buf.getvalue()
+
+
+def _draw_qr_code(canvas, value: str, x: float, y: float, size: float, branding: dict | None = None) -> None:
+    widget = qr.QrCodeWidget(value)
+    bounds = widget.getBounds()
+    width = bounds[2] - bounds[0]
+    height = bounds[3] - bounds[1]
+    drawing = Drawing(size, size, transform=[size / width, 0, 0, size / height, 0, 0])
+    drawing.add(widget)
+    canvas.setFillColor(WHITE)
+    canvas.roundRect(x - 4 * mm, y - 4 * mm, size + 8 * mm, size + 8 * mm, 8, fill=1, stroke=0)
+    renderPDF.draw(drawing, canvas, x, y)
+
+    logo_path = (
+        _brand_asset_path((branding or {}).get("mascot_url"))
+        or _brand_asset_path((branding or {}).get("favicon_dark_url"))
+        or _brand_asset_path((branding or {}).get("logo_dark_url"))
+        or _brand_asset_path((branding or {}).get("logo_url"))
+        or _brand_asset_path("/assets/brand/tls-mascot.png")
+    )
+    logo_size = size * 0.23
+    logo_x = x + (size - logo_size) / 2
+    logo_y = y + (size - logo_size) / 2
+    canvas.setFillColor(WHITE)
+    canvas.roundRect(logo_x - 2.2 * mm, logo_y - 2.2 * mm, logo_size + 4.4 * mm, logo_size + 4.4 * mm, 6, fill=1, stroke=0)
+    if logo_path:
+        _draw_logo(canvas, logo_path, logo_x, logo_y, logo_size, logo_size)
+
+
+def pdf_qr_sign(
+    title: str,
+    url: str,
+    subtitle: str = "",
+    eyebrow: str = "QR CODE",
+    pdf_sponsors: list | None = None,
+    pdf_branding: dict | None = None,
+) -> bytes:
+    """A4 QR sign for registration, check-in, displays, and event wayfinding."""
+    buf = io.BytesIO()
+    page_size = A4
+    c = pdf_canvas.Canvas(buf, pagesize=page_size, pageCompression=1)
+    page_w, page_h = page_size
+
+    class _Doc:
+        pagesize = page_size
+        page = 1
+
+    doc = _Doc()
+    branding = pdf_branding or {}
+
+    c.setFillColor(BLACK)
+    c.rect(0, 0, page_w, page_h, fill=1, stroke=0)
+    c.setFillColor(CYAN)
+    c.rect(0, page_h - 4, page_w, 4, fill=1, stroke=0)
+    _draw_brand_header(c, doc, branding)
+
+    c.setFillColor(CYAN)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawCentredString(page_w / 2, page_h - 4.45 * cm, str(eyebrow or "QR CODE").upper()[:64])
+
+    display_title = str(title or "THE LION SQUAD").strip()
+    title_font = _fit_font_size(display_title.upper(), page_w - 3.6 * cm, start=42, minimum=20)
+    c.setFillColor(WHITE)
+    c.setFont("Helvetica-Bold", title_font)
+    c.drawCentredString(page_w / 2, page_h - 5.55 * cm, display_title.upper()[:96])
+
+    if subtitle:
+        c.setFillColor(colors.HexColor("#CBD5E1"))
+        c.setFont("Helvetica-Bold", 13)
+        c.drawCentredString(page_w / 2, page_h - 6.35 * cm, str(subtitle).strip()[:110])
+
+    qr_size = 11.2 * cm
+    qr_x = (page_w - qr_size) / 2
+    qr_y = 7.05 * cm
+    _draw_qr_code(c, str(url or "https://lionsquad.at"), qr_x, qr_y, qr_size, branding)
+
+    c.setFillColor(CYAN)
+    c.setFont("Helvetica-Bold", 15)
+    c.drawCentredString(page_w / 2, 5.6 * cm, "SCANNEN UND ÖFFNEN")
+
+    c.setFillColor(colors.HexColor("#CBD5E1"))
+    c.setFont("Helvetica", 9)
+    url_text = str(url or "").strip()
+    c.drawCentredString(page_w / 2, 4.95 * cm, url_text[:118])
+
+    _draw_sponsor_footer(c, doc, pdf_sponsors or [])
+    c.setFillColor(MUTED)
+    c.setFont("Helvetica", 7)
+    c.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
+    c.drawRightString(page_w - 2 * cm, 0.72 * cm, "QR-Schild")
+    c.showPage()
     c.save()
     return buf.getvalue()

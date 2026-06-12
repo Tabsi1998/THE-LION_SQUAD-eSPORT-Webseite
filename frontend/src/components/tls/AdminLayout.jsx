@@ -8,7 +8,7 @@ import {
   ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon,
   Award, Inbox, UserCheck, Medal,
   FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing,
-  Search, Server,
+  Search, Server, QrCode,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -69,7 +69,7 @@ const ADMIN_GROUPS = [
   {
     label: "System",
     items: [
-      { to: "/admin/widgets", label: "Widgets", icon: Code2 },
+      { to: "/admin/downloads", label: "Downloads & QR", icon: QrCode },
       { to: "/admin/audit", label: "Audit Logs", icon: ShieldCheck },
       { to: "/admin/mobile-logs", label: "App-Logs", icon: Bug },
       { to: "/admin/mobile-push", label: "Push-Tests", icon: BellRing },
@@ -106,7 +106,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/partners": ["kooperationen", "netzwerk"],
   "/admin/references": ["erfolge", "platzierungen", "results"],
   "/admin/contact": ["kontakt", "inbox", "nachrichten"],
-  "/admin/widgets": ["embed", "anzeigen"],
+  "/admin/downloads": ["downloads", "qr", "pdf", "stationen", "turnier qr", "fastlap qr", "embed", "anzeigen"],
   "/admin/audit": ["logs", "aktionen", "sicherheit"],
   "/admin/mobile-logs": ["app", "fehler", "client"],
   "/admin/mobile-push": ["push", "notifications", "app"],
@@ -168,7 +168,7 @@ export function AdminLayout({ children }) {
       <aside className={`fixed md:sticky top-0 left-0 h-screen w-64 bg-[#0A0A0A] border-r border-white/10 z-40 transform transition-transform flex flex-col ${openMobile ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
         <div className="p-5 border-b border-white/10 flex items-center justify-between shrink-0">
           <Logo size="sm" />
-          <button className="md:hidden p-1" onClick={() => setOpenMobile(false)} aria-label="Admin-Menue schliessen">
+          <button className="md:hidden p-1" onClick={() => setOpenMobile(false)} aria-label="Admin-Menü schließen">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -270,7 +270,7 @@ export function AdminLayout({ children }) {
       {/* Main */}
       <div className="flex-1 min-w-0">
         <div className="md:hidden sticky top-0 z-30 bg-[#0A0A0A] border-b border-white/10 p-3 flex items-center justify-between">
-          <button onClick={() => setOpenMobile(true)} className="p-2" data-testid="admin-menu-open" aria-label="Admin-Menue oeffnen" aria-expanded={openMobile}>
+          <button onClick={() => setOpenMobile(true)} className="p-2" data-testid="admin-menu-open" aria-label="Admin-Menü öffnen" aria-expanded={openMobile}>
             <Menu className="w-5 h-5" />
           </button>
           <Logo size="sm" />

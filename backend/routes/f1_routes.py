@@ -6,7 +6,7 @@ from urllib.parse import quote, urlencode
 from fastapi import APIRouter, HTTPException, Depends, Response
 from fastapi.responses import RedirectResponse, StreamingResponse
 from database import get_db
-from auth import get_current_user, require_admin, get_optional_user
+from auth import get_current_user, require_admin, require_role, get_optional_user
 from services.visibility import user_can_see
 from services.access_links import public_access_link_payload, touch_access_link, validate_access_link
 from services.public_phase import derive_public_phase
@@ -132,7 +132,7 @@ async def _has_f1_staff_permission(
 async def _require_f1_result_permission(user: dict | None, challenge_id: str) -> None:
     if await _has_f1_staff_permission(user, challenge_id, F1_RESULT_STAFF_ROLES):
         return
-    raise HTTPException(status_code=403, detail="Keine Fast-Lap-Berechtigung fuer diese Aktion")
+    raise HTTPException(status_code=403, detail="Keine Fast-Lap-Berechtigung für diese Aktion")
 
 
 async def _enrich_f1_staff_assignments(assignments: list[dict]) -> list[dict]:
@@ -391,7 +391,7 @@ async def create_challenge_staff(cid: str, body: dict, me: dict = Depends(requir
     user_id = body.get("user_id")
     role = body.get("role") or "scorekeeper"
     if role not in F1_RESULT_STAFF_ROLES:
-        raise HTTPException(status_code=400, detail="Ungueltige Fast-Lap-Rolle")
+        raise HTTPException(status_code=400, detail="Ungültige Fast-Lap-Rolle")
     if not user_id or not await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1}):
         raise HTTPException(status_code=400, detail="Nutzer nicht gefunden")
     existing = await db.f1_staff_assignments.find_one({
@@ -432,7 +432,7 @@ async def update_challenge_staff(cid: str, assignment_id: str, body: dict, me: d
     if "role" in body:
         role = body.get("role")
         if role not in F1_RESULT_STAFF_ROLES:
-            raise HTTPException(status_code=400, detail="Ungueltige Fast-Lap-Rolle")
+            raise HTTPException(status_code=400, detail="Ungültige Fast-Lap-Rolle")
         updates["role"] = role
     if not updates:
         return current
@@ -804,7 +804,7 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(get_curre
         scope_label = "Referenzzeiten" if score_scope == "club_reference" else "offizielle Zeiten"
         raise HTTPException(
             status_code=400,
-            detail=f"Maximale Anzahl Versuche erreicht ({max_attempts}) fuer {scope_label}.",
+            detail=f"Maximale Anzahl Versuche erreicht ({max_attempts}) für {scope_label}.",
         )
     doc = {
         "id": new_id(),
@@ -947,9 +947,9 @@ async def delete_time(time_id: str, me: dict = Depends(get_current_user)):
 
 
 @router.get("/challenges/{cid}/export.csv")
-async def export_csv(cid: str, track_id: str | None = None, access: str | None = None, user=Depends(get_optional_user)):
+async def export_csv(cid: str, track_id: str | None = None, me: dict = Depends(require_role("moderator"))):
     db = get_db()
-    c = await _get_visible_challenge(cid, user, access=access)
+    c = await _get_visible_challenge(cid, me)
     cid = c["id"]
     output = io.StringIO()
     w = csv.writer(output, delimiter=";")
@@ -958,7 +958,7 @@ async def export_csv(cid: str, track_id: str | None = None, access: str | None =
     if track_id:
         tracks = [t for t in tracks if t["id"] == track_id]
     for tr in tracks:
-        lb = await leaderboard(cid, tr["id"], access, user)
+        lb = await leaderboard(cid, tr["id"], None, me)
         for entry in lb["entries"]:
             w.writerow([
                 entry["rank"], entry["display_name"], "",

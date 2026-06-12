@@ -224,6 +224,7 @@ function App() {
           <Route path="/admin/audit" element={<ProtectedRoute requireAdmin><AdminAuditPage /></ProtectedRoute>} />
           <Route path="/admin/mobile-logs" element={<ProtectedRoute requireAdmin><AdminMobileLogsPage /></ProtectedRoute>} />
           <Route path="/admin/mobile-push" element={<ProtectedRoute requireAdmin><AdminMobilePushPage /></ProtectedRoute>} />
+          <Route path="/admin/downloads" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
           <Route path="/admin/widgets" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
 
           <Route path="/seasons/current" element={<CurrentSeasonRedirect />} />

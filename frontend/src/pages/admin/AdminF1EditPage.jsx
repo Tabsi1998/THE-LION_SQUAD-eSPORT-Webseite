@@ -488,7 +488,7 @@ function F1StaffPanel({ challengeId, staff, users, onChanged }) {
           <label className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Nutzer</div>
             <select value={form.user_id} onChange={(e) => set("user_id", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-              <option value="">- auswaehlen -</option>
+              <option value="">- auswählen -</option>
               {users.map((u) => <option key={u.id} value={u.id}>{userLabel(u)}</option>)}
             </select>
           </label>
@@ -667,7 +667,7 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
         <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Gewinnabholung</div>
-            <div className="text-xs text-white/55 mt-0.5">Erzeugt fehlende Gewinn-Eintraege aus der aktuellen Fast-Lap-Wertung.</div>
+            <div className="text-xs text-white/55 mt-0.5">Erzeugt fehlende Gewinn-Einträge aus der aktuellen Fast-Lap-Wertung.</div>
           </div>
           <button type="button" disabled={creatingPrizes} onClick={createPrizePickups} className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">
             {creatingPrizes ? "Erzeuge..." : "Gewinne erzeugen"}
@@ -745,7 +745,7 @@ function FastLapPrizeEditor({ value, onChange }) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Preise</div>
-          <div className="text-xs text-white/50 mt-0.5">Wird bei Ergebnisveroeffentlichung als Gewinnabholung angelegt.</div>
+          <div className="text-xs text-white/50 mt-0.5">Wird bei Ergebnisveröffentlichung als Gewinnabholung angelegt.</div>
         </div>
         <button
           type="button"

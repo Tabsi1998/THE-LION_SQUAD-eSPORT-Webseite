@@ -4,9 +4,9 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
 import { MascotBadge } from "@/components/tls/Logo";
 import { SponsorGrid } from "@/components/tls/SponsorTicker";
+import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
 import { formatDateTime } from "@/lib/datetime";
 import { sortByNearestDate } from "@/lib/contentSort";
-import { QRCodeSVG } from "qrcode.react";
 import { CalendarDays, Flag, MapPin, Monitor, Trophy, Users } from "lucide-react";
 
 const ACTIVE_STATUSES = new Set(["live", "check_in", "checkin_open", "registration_open", "paused"]);
@@ -112,7 +112,7 @@ export default function EventTVPage() {
           </div>
           <div className="min-h-0 flex-1 space-y-2 overflow-hidden p-4">
             {stations.slice(0, 9).map((station) => <StationRow key={station.id} station={station} />)}
-            {!stations.length && <EmptyState>Keine Stationen fuer dieses Event</EmptyState>}
+            {!stations.length && <EmptyState>Keine Stationen für dieses Event</EmptyState>}
           </div>
         </section>
       </main>
@@ -120,11 +120,11 @@ export default function EventTVPage() {
       <footer className="shrink-0 border-t border-white/10 bg-[#0A0A0A]/92 px-8 py-4 flex items-center justify-between gap-6">
         <div className="flex min-w-0 items-center gap-4">
           <div className="shrink-0 rounded-sm bg-white p-1.5">
-            <QRCodeSVG value={publicUrl} size={92} bgColor="#ffffff" fgColor="#0A0A0A" />
+            <BrandedQRCode value={publicUrl} size={92} />
           </div>
           <div className="min-w-0">
             <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Event verfolgen</div>
-            <div className="truncate text-sm text-white/70">QR scannen und Details oeffnen</div>
+            <div className="truncate text-sm text-white/70">QR scannen und Details öffnen</div>
           </div>
         </div>
         <SponsorGrid max={5} marquee className="flex-1 max-w-[58vw]" />

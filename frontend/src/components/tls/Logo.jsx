@@ -7,11 +7,18 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 export const TLS_MASCOT = "/assets/brand/tls-mascot.png";
 export const TLS_WORDMARK = "/assets/brand/tls-wordmark.png";
 
-function useBrandingAssets() {
+let brandingLoadPromise = null;
+
+export function useBrandingAssets() {
   const [branding, setBranding] = useState(getCachedBranding());
   const loadBranding = useCallback(async () => {
     try {
-      const { data } = await api.get("/settings/public");
+      if (!brandingLoadPromise) {
+        brandingLoadPromise = api.get("/settings/public").finally(() => {
+          brandingLoadPromise = null;
+        });
+      }
+      const { data } = await brandingLoadPromise;
       setCachedBranding(data || {});
       setBranding(data || {});
     } catch {}
