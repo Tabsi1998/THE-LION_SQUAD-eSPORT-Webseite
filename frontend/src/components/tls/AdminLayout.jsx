@@ -1,4 +1,4 @@
-import { NavLink, useNavigate, Link } from "react-router-dom";
+import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
 import {
@@ -10,7 +10,7 @@ import {
   FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing,
   Search, Server, QrCode,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 // Sidebar-Gruppen für bessere Übersicht
 const ADMIN_GROUPS = [
@@ -143,10 +143,21 @@ const MODERATOR_ROUTES = [
 export function AdminLayout({ children }) {
   const { user, logout, isAdmin } = useAuth();
   const nav = useNavigate();
+  const location = useLocation();
   const [openMobile, setOpenMobile] = useState(false);
   const [navQuery, setNavQuery] = useState("");
 
   const searchQuery = normalizeSearch(navQuery);
+
+  useEffect(() => {
+    setNavQuery("");
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (/@|https?:\/\//i.test(navQuery)) {
+      setNavQuery("");
+    }
+  }, [navQuery]);
 
   const visibleGroups = useMemo(() => {
     const roleGroups = isAdmin
@@ -179,6 +190,12 @@ export function AdminLayout({ children }) {
             <input
               value={navQuery}
               onChange={(e) => setNavQuery(e.target.value)}
+              type="search"
+              name="tls-admin-navigation-search"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               placeholder="Admin suchen..."
               className="w-full h-10 rounded-sm border border-white/10 bg-black/30 pl-9 pr-9 text-sm text-white placeholder:text-white/30 outline-none focus:border-[#29B6E8]/70"
               data-testid="admin-nav-search"
@@ -227,7 +244,14 @@ export function AdminLayout({ children }) {
           ))}
           {visibleGroups.length === 0 && (
             <div className="px-3 py-8 text-center text-xs text-white/40">
-              Keine Admin-Seite gefunden.
+              <div>Keine Admin-Seite gefunden.</div>
+              <button
+                type="button"
+                onClick={() => setNavQuery("")}
+                className="mt-3 rounded-sm border border-[#29B6E8]/40 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8] hover:bg-[#29B6E8]/10"
+              >
+                Suche leeren
+              </button>
             </div>
           )}
         </nav>

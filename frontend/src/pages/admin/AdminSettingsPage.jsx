@@ -797,12 +797,12 @@ export default function AdminSettingsPage() {
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">System</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Einstellungen</h1>
 
-      <div className="flex gap-1 mb-6 border-b border-white/10 overflow-x-auto">
+      <div className="flex flex-wrap gap-2 mb-6 border-b border-white/10 pb-3">
         {SETTINGS_TABS.map(([k, l, Icn]) => {
           const isDirty = dirtyTabs.has(k);
           return (
             <button key={k} onClick={() => selectTab(k)} data-testid={`settings-tab-${k}`}
-              className={`px-4 py-3 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap ${tab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
+              className={`px-3 py-2 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap rounded-sm border transition ${tab === k ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/60 hover:border-white/25 hover:text-white"}`}>
               <Icn className="w-3.5 h-3.5" />{l}
               {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-[#FFD700] shadow-[0_0_8px_rgba(255,215,0,0.8)]" title="Ungespeicherte Änderungen" />}
             </button>
