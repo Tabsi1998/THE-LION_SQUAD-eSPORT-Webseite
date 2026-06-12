@@ -29,7 +29,7 @@ async def _require_station_permission(user: dict, tournament_id: str, station_id
         or (station_id and await has_tournament_staff_permission(user, tournament_id, STATION_ASSIGN_ROLES, "station", station_id))
     )
     if not allowed:
-        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Station")
+        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
 
 
 async def _find_match_for_station(db, match_id: str) -> tuple[str, dict | None]:
@@ -334,11 +334,11 @@ async def clear_station(sid: str, me: dict = Depends(get_current_user)):
             await _ensure_tournament_unlocked(db, match["tournament_id"])
             await _require_station_permission(me, match["tournament_id"], sid)
         elif not is_global_tournament_admin(me):
-            raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Station")
+            raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
         if collection_name:
             await db[collection_name].update_one({"id": s["current_match_id"]}, {"$set": {"station_id": None, "updated_at": now_utc().isoformat()}})
     elif not is_global_tournament_admin(me):
-        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Station")
+        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
     await db.stations.update_one({"id": sid}, {"$set": {
         "current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()}})
     return {"ok": True}

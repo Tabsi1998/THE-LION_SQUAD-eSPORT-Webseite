@@ -136,6 +136,65 @@ def test_v2_generator_can_build_preview_without_registrations():
     assert {slot["status"] for slot in matches[0]["slots"]} == {"preview"}
 
 
+def test_v2_custom_duel_uses_default_schema_without_saved_schema():
+    tournament = {"id": "t1", "seeding_mode": "manual", "max_participants": 4}
+    stage = {
+        "id": "s1",
+        "number": 1,
+        "stage_type": "custom_bracket",
+        "match_type": "duel",
+        "settings": {},
+    }
+
+    matches = build_matches_v2_from_schema(tournament, stage, [], preview=True)
+
+    assert len(matches) == 3
+    assert all(match["is_preview"] for match in matches)
+    assert [match["match_key"] for match in matches] == ["A", "B", "C"]
+
+
+def test_v2_ffa_custom_uses_default_schema_without_saved_schema():
+    tournament = {"id": "t1", "seeding_mode": "manual", "max_participants": 8}
+    stage = {
+        "id": "s1",
+        "number": 1,
+        "stage_type": "ffa_custom_bracket",
+        "match_type": "ffa",
+        "settings": {"match_size": 4, "qualifiers_per_match": 2},
+    }
+
+    matches = build_matches_v2_from_schema(tournament, stage, [], preview=True)
+    by_key = {match["match_key"]: match for match in matches}
+
+    assert len(matches) == 3
+    assert [slot["source"]["seed"] for slot in by_key["A"]["slots"]] == [1, 2, 3, 4]
+    assert [slot["source"]["seed"] for slot in by_key["B"]["slots"]] == [5, 6, 7, 8]
+    assert [slot["source"]["match_key"] for slot in by_key["C"]["slots"]] == ["A", "A", "B", "B"]
+
+
+def test_v2_simple_ffa_uses_default_single_heat_schema():
+    tournament = {"id": "t1", "seeding_mode": "manual", "max_participants": 6}
+    stage = {
+        "id": "s1",
+        "number": 1,
+        "stage_type": "simple",
+        "match_type": "ffa",
+        "settings": {"min_players": 2, "qualifiers_per_match": 1},
+    }
+    registrations = [
+        {"id": f"r{i}", "user_id": f"u{i}", "status": "approved", "seed": i}
+        for i in range(1, 5)
+    ]
+
+    matches = build_matches_v2_from_schema(tournament, stage, registrations, preview=True)
+
+    assert len(matches) == 1
+    assert matches[0]["section"] == "MAIN"
+    assert matches[0]["match_type"] == "ffa"
+    assert [slot.get("registration_id") for slot in matches[0]["slots"][:4]] == ["r1", "r2", "r3", "r4"]
+    assert {slot["status"] for slot in matches[0]["slots"][4:]} == {"preview"}
+
+
 def test_v2_preview_fills_registered_players_and_keeps_free_slots():
     tournament = {"id": "t1", "seeding_mode": "manual", "max_participants": 4}
     stage = {

@@ -200,7 +200,7 @@ async def _require_v2_result_permission(user: dict, match: dict) -> None:
         or await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "station", match.get("station_id"))
     )
     if not allowed:
-        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Aktion")
+        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")
 
 
 async def _can_submit_result_for_match(match: dict, user: dict | None) -> bool:
@@ -355,7 +355,7 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
     stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
     policy = _match_policy(match, tournament, stage)
     if not _schedule_proposals_enabled(policy):
-        raise HTTPException(status_code=403, detail="Terminabstimmung ist fuer dieses Match nicht aktiviert")
+        raise HTTPException(status_code=403, detail="Terminabstimmung ist für dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen Termine vorschlagen")
     acting_reg = await _acting_registration_for_match(match, me)
@@ -396,9 +396,9 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
     policy = _match_policy(match, tournament, stage)
     if not _schedule_proposals_enabled(policy):
-        raise HTTPException(status_code=403, detail="Terminabstimmung ist fuer dieses Match nicht aktiviert")
+        raise HTTPException(status_code=403, detail="Terminabstimmung ist für dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung fuer diesen Termin")
+        raise HTTPException(status_code=403, detail="Keine Berechtigung für diesen Termin")
     acting_reg = await _acting_registration_for_match(match, me)
     if acting_reg and proposal.get("actor_registration_id") == acting_reg.get("id") and body.action in {"accept", "decline"}:
         raise HTTPException(status_code=400, detail="Der eigene Vorschlag muss von der Gegenseite bestaetigt werden")

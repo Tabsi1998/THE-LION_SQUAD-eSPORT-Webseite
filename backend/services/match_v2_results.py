@@ -37,7 +37,7 @@ def _as_number(value: Any) -> int | float | None:
     try:
         number = float(value)
     except (TypeError, ValueError):
-        raise MatchV2ResultError(f"Ungueltiger Zahlenwert: {value}")
+        raise MatchV2ResultError(f"Ungültiger Zahlenwert: {value}")
     if number < 0:
         raise MatchV2ResultError("Score/Punkte duerfen nicht negativ sein")
     return int(number) if number.is_integer() else number
@@ -59,7 +59,7 @@ def _time_for_ranking(entry: dict) -> int | float | None:
     try:
         number = float(value)
     except (TypeError, ValueError):
-        raise MatchV2ResultError(f"Ungueltiger Zeitwert: {value}")
+        raise MatchV2ResultError(f"Ungültiger Zeitwert: {value}")
     if number < 0:
         raise MatchV2ResultError("time_ms darf nicht negativ sein")
     return number
@@ -141,7 +141,7 @@ def normalize_v2_results(match: dict, raw_results: list[dict]) -> list[dict]:
         except (TypeError, ValueError):
             raise MatchV2ResultError("Rank muss eine Zahl sein")
         if rank < 1:
-            raise MatchV2ResultError("Rank muss groesser 0 sein")
+            raise MatchV2ResultError("Rank muss größer 0 sein")
         if rank in seen_ranks:
             raise MatchV2ResultError(f"Rank {rank} ist mehrfach vergeben")
         seen_ranks.add(rank)
@@ -277,9 +277,9 @@ def build_v2_result_application(
     force: bool = False,
 ) -> dict:
     if match.get("status") in {"cancelled"}:
-        raise MatchV2ResultError("Abgebrochene Matches koennen kein Ergebnis erhalten")
+        raise MatchV2ResultError("Abgebrochene Matches können kein Ergebnis erhalten")
     if match.get("status") in {"completed", "forfeit"} and not force:
-        raise MatchV2ResultError("Match ist bereits abgeschlossen. Fuer Korrektur force=true nutzen.", 409)
+        raise MatchV2ResultError("Match ist bereits abgeschlossen. Für Korrektur force=true nutzen.", 409)
 
     results = normalize_v2_results(match, raw_results)
     result_by_rank = {entry["rank"]: entry for entry in results}
@@ -297,13 +297,13 @@ def build_v2_result_application(
             raise MatchV2ResultError(f"Zielslot {advancement.get('to_slot')} in {target.get('match_key')} nicht gefunden")
         result = result_by_rank.get(int(advancement.get("rank") or 0))
         if not result:
-            raise MatchV2ResultError(f"Rank {advancement.get('rank')} fehlt fuer Advancement")
+            raise MatchV2ResultError(f"Rank {advancement.get('rank')} fehlt für Advancement")
 
         existing_reg = target_slot.get("registration_id")
         if existing_reg and existing_reg != result["registration_id"]:
             if not force:
                 raise MatchV2ResultError(
-                    f"Zielslot {target.get('match_key')}:{target_slot.get('slot')} ist bereits belegt. Fuer Korrektur force=true nutzen.",
+                    f"Zielslot {target.get('match_key')}:{target_slot.get('slot')} ist bereits belegt. Für Korrektur force=true nutzen.",
                     409,
                 )
             overwritten_targets.add(target["id"])

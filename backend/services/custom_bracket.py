@@ -61,11 +61,11 @@ def _parse_source(raw: str) -> dict[str, Any]:
     if token.isdigit():
         seed = int(token)
         if seed <= 0:
-            raise BracketSchemaError(f"Setzplatz muss groesser 0 sein: {token}")
+            raise BracketSchemaError(f"Setzplatz muss größer 0 sein: {token}")
         return {"type": "seed", "seed": seed, "raw": token}
     match = SOURCE_RE.match(token)
     if not match:
-        raise BracketSchemaError(f"Ungueltiger Slot-Ausdruck: {token}")
+        raise BracketSchemaError(f"Ungültiger Slot-Ausdruck: {token}")
     return {
         "type": "rank",
         "flow": match.group("flow"),
@@ -320,6 +320,39 @@ def _auto_double_elim_schema(slot_count: int) -> str:
     return "\n".join(lines)
 
 
+def _auto_ffa_custom_schema(slot_count: int, match_size: int, qualifiers_per_match: int) -> str:
+    bracket_size = max(2, slot_count)
+    match_size = max(2, int(match_size or 4))
+    qualifiers_per_match = max(1, min(int(qualifiers_per_match or 2), match_size))
+    sources = [str(seed) for seed in range(1, bracket_size + 1)]
+    lines = ["[WB]", "# Runde 1"]
+    next_key_index = 0
+    heat_keys: list[str] = []
+    for idx in range(0, len(sources), match_size):
+        key = _match_key(next_key_index)
+        next_key_index += 1
+        heat_keys.append(key)
+        lines.append(f"{key}=[{','.join(sources[idx:idx + match_size])}]")
+
+    if len(heat_keys) > 1:
+        final_sources = [
+            f"W:{key}:{rank}"
+            for key in heat_keys
+            for rank in range(1, qualifiers_per_match + 1)
+        ]
+        key = _match_key(next_key_index)
+        lines.append("")
+        lines.append("# Finale")
+        lines.append(f"{key}=[{','.join(final_sources)}]")
+    return "\n".join(lines)
+
+
+def _auto_ffa_single_match_schema(slot_count: int) -> str:
+    size = max(2, int(slot_count or 2))
+    sources = ",".join(str(seed) for seed in range(1, size + 1))
+    return f"[MAIN]\n# Heat\nA=[{sources}]"
+
+
 def _with_custom_bronze_match(schema: str) -> str:
     specs = parse_custom_bracket_schema(schema)
     if any((spec.section or "").strip().lower() in {"bronze", "spiel um platz 3", "platz 3"} for spec in specs):
@@ -373,6 +406,19 @@ def _resolve_schema(tournament: dict, stage: dict, registrations: list[dict], pr
     if (stage.get("stage_type") or "") == "double_elimination":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
         return _auto_double_elim_schema(size)
+    if (stage.get("stage_type") or "") == "custom_bracket":
+        size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
+        return _auto_single_elim_schema(size, bool(tournament.get("bronze_match")))
+    if (stage.get("stage_type") or "") == "ffa_custom_bracket":
+        size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
+        return _auto_ffa_custom_schema(
+            size,
+            int(settings.get("match_size") or 4),
+            int(settings.get("qualifiers_per_match") or 2),
+        )
+    if (stage.get("stage_type") or "") == "simple":
+        size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
+        return _auto_ffa_single_match_schema(size)
     return None
 
 

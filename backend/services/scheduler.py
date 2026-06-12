@@ -174,6 +174,17 @@ def _next_status(doc: dict, now: datetime, kind: str = "tournament") -> str | No
     return None
 
 
+async def _apply_tournament_transition_effects(db, doc: dict, next_status: str) -> None:
+    if next_status not in {"check_in", "live"}:
+        return
+    try:
+        from routes.tournament_routes import _finalize_bracket_for_checkin
+        tournament = {**doc, "status": next_status}
+        await _finalize_bracket_for_checkin(db, tournament, None)
+    except Exception as exc:
+        logger.warning("[scheduler] tournament bracket finalize skipped for %s: %s", doc.get("id"), exc)
+
+
 async def _safe_status_transitions():
     try:
         from database import get_db
@@ -194,6 +205,8 @@ async def _safe_status_transitions():
                         {"id": doc["id"]},
                         {"$set": {"status": nxt, "updated_at": now_iso}},
                     )
+                    if kind == "tournament":
+                        await _apply_tournament_transition_effects(db, doc, nxt)
                     changed += 1
         if changed:
             logger.info(f"[scheduler] status_transitions changed={changed}")

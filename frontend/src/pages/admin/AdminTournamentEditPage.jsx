@@ -184,6 +184,19 @@ function applyStageType(current, stageType) {
   };
 }
 
+function primaryTournamentAction(status) {
+  if (["draft", "scheduled", "registration_open", "registration_closed"].includes(status)) {
+    return { status: "check_in", label: "Check-in starten" };
+  }
+  if (status === "check_in") {
+    return { status: "live", label: "Turnier starten" };
+  }
+  if (status === "paused") {
+    return { status: "live", label: "Fortsetzen" };
+  }
+  return null;
+}
+
 export default function AdminTournamentEditPage() {
   const { isAdmin, isModerator } = useAuth();
   const { id } = useParams();
@@ -298,29 +311,6 @@ export default function AdminTournamentEditPage() {
     }
   };
 
-  const generateLegacyBracket = async ({ preview = false, force = false } = {}) => {
-    try {
-      const params = new URLSearchParams();
-      if (preview) params.set("preview", "true");
-      if (force) params.set("force", "true");
-      const suffix = params.toString() ? `?${params.toString()}` : "";
-      const { data } = await api.post(`/tournaments/${id}/generate-bracket${suffix}`);
-      toast.success(data.preview ? `Vorschau mit ${data.match_count} Spielen generiert.` : `Turnierbaum mit ${data.match_count} Spielen generiert.`);
-      if (!data.preview) await autoAssignStations({ silent: true, reload: false });
-      load();
-    } catch (e) {
-      if (e.response?.status === 409 && !force) {
-        const ok = await confirm({
-          title: "Turnierbaum neu generieren?",
-          description: "Vorhandene echte Spiele werden ersetzt. Eine reine Vorschau kann direkt überschrieben werden.",
-          confirmLabel: "Neu generieren",
-          tone: "danger",
-        });
-        if (ok) return generateLegacyBracket({ preview, force: true });
-      }
-      toast.error(formatApiError(e.response?.data?.detail));
-    }
-  };
   const reset = async () => {
     if (!await confirm({
       title: "Turnierbaum zurücksetzen?",
@@ -486,7 +476,7 @@ export default function AdminTournamentEditPage() {
         }
       }
       const { data } = await api.post(`/tournaments/${id}/status`, { status });
-      if (status === "check_in" && data?.auto_generated_bracket && data.auto_generated_bracket.ok !== false) {
+      if (["check_in", "live"].includes(status) && data?.auto_generated_bracket && data.auto_generated_bracket.ok !== false) {
         await autoAssignStations({ silent: true, reload: false });
       }
       toast.success(`Status: ${TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status}`);
@@ -500,7 +490,7 @@ export default function AdminTournamentEditPage() {
       title: locked ? "Turnier sperren?" : "Turnier entsperren?",
       description: locked
         ? "Danach sind Ergebnisse, Teilnehmer, Spielzeiten und Stationen nur noch lesbar. Löschen bleibt möglich."
-        : "Danach kann die Turnierleitung wieder Aenderungen vornehmen.",
+        : "Danach kann die Turnierleitung wieder Änderungen vornehmen.",
       confirmLabel: locked ? "Sperren" : "Entsperren",
       tone: locked ? "danger" : "info",
     });
@@ -634,6 +624,7 @@ export default function AdminTournamentEditPage() {
     ].filter(Boolean).join(" "));
     return haystack.includes(participantSearch);
   });
+  const primaryAction = primaryTournamentAction(t.status);
 
   return (
     <AdminLayout>
@@ -649,6 +640,16 @@ export default function AdminTournamentEditPage() {
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
+          {isAdmin && primaryAction && (
+            <button
+              type="button"
+              onClick={() => setTournStatus(primaryAction.status)}
+              data-testid="admin-tr-primary-action"
+              className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2"
+            >
+              <Zap className="w-3.5 h-3.5" /> {primaryAction.label}
+            </button>
+          )}
           {isAdmin && (
             <div>
               <select value={t.status} onChange={(e) => setTournStatus(e.target.value)} data-testid="admin-tr-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
@@ -667,12 +668,6 @@ export default function AdminTournamentEditPage() {
               {t.locked_at ? "Entsperren" : "Sperren"}
             </button>
           )}
-          {isModerator && <button onClick={() => rebuildFromFormat({ preview: true })} data-testid="admin-tr-preview" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
-            <Eye className="w-3.5 h-3.5" /> Vorschau
-          </button>}
-          {isModerator && <button onClick={() => rebuildFromFormat({ preview: false })} data-testid="admin-tr-generate" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2">
-            <Zap className="w-3.5 h-3.5" /> Turnierbaum generieren
-          </button>}
           {isModerator && stations.length > 0 && <button onClick={() => autoAssignStations()} data-testid="admin-tr-auto-stations" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
             <Zap className="w-3.5 h-3.5" /> Stationen automatisch
           </button>}
@@ -691,6 +686,7 @@ export default function AdminTournamentEditPage() {
           <div className="grid grid-cols-2 sm:flex gap-1 w-full sm:w-auto">
             <a href={`${API}/exports/tournaments/${t.id}/participants.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">PDF Teilnehmer</a>
             <a href={`${API}/exports/tournaments/${t.id}/checkin.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">PDF Check-in</a>
+            <a href={`${API}/exports/tournaments/${t.id}/registration-qr.pdf`} className="px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] text-xs uppercase font-bold rounded-sm hover:bg-[#FFD700]/10 text-center" target="_blank" rel="noreferrer">PDF Anmeldung QR</a>
             <a href={`${API}/exports/tournaments/${t.id}/matches.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">PDF Spiele</a>
             {isModerator && <a href={`${API}/tournaments/${t.id}/match-plan.csv`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">CSV Matchplan</a>}
           </div>
@@ -784,7 +780,7 @@ export default function AdminTournamentEditPage() {
                 </div>
               </div>
             ))}
-            {filteredRegistrations.length === 0 && <div className="text-center py-10 text-white/40">{regs.length === 0 ? "Keine Anmeldungen" : "Keine Anmeldungen fuer diesen Filter"}</div>}
+            {filteredRegistrations.length === 0 && <div className="text-center py-10 text-white/40">{regs.length === 0 ? "Keine Anmeldungen" : "Keine Anmeldungen für diesen Filter"}</div>}
           </div>
           <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
@@ -827,7 +823,7 @@ export default function AdminTournamentEditPage() {
                   </td>
                 </tr>
               ))}
-              {filteredRegistrations.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-white/40">{regs.length === 0 ? "Keine Anmeldungen" : "Keine Anmeldungen fuer diesen Filter"}</td></tr>}
+              {filteredRegistrations.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-white/40">{regs.length === 0 ? "Keine Anmeldungen" : "Keine Anmeldungen für diesen Filter"}</td></tr>}
             </tbody>
           </table>
           </div>
@@ -1097,7 +1093,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spieltyp</div>
                 <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{formatMatchType(form.match_type)}</div>
               </div>
-              {config.showMatchSize && <Fld label="Spielgroesse" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />}
+              {config.showMatchSize && <Fld label="Spielgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />}
               {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId="stage-new-min" />}
               {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId="stage-new-qualifiers" />}
               <Fld label="Spieldauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId="stage-new-duration" />
@@ -1105,7 +1101,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
               <SelectField label="Ergebniserfassung" value={form.result_entry_mode} onChange={(v)=>set("result_entry_mode", v)} options={[["", "Vom Turnier erben"], ...RESULT_ENTRY_MODE_OPTIONS.filter(([value]) => value)]} />
               <SelectField label="Terminplanung" value={form.schedule_mode} onChange={(v)=>set("schedule_mode", v)} options={[["", "Vom Turnier erben"], ...SCHEDULE_MODE_OPTIONS.filter(([value]) => value)]} />
               <div className="md:col-span-3 text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-                Leer lassen, wenn diese Phase die Turnier-Regeln nutzt. Overrides sind sinnvoll, wenn z.B. Gruppen online gespielt werden, das Finale aber vor Ort mit Staff-Erfassung laeuft.
+                Leer lassen, wenn diese Phase die Turnier-Regeln nutzt. Overrides sind sinnvoll, wenn z.B. Gruppen online gespielt werden, das Finale aber vor Ort mit Staff-Erfassung läuft.
               </div>
               {config.showSchema ? (
                 <label className="md:col-span-3 block">
@@ -1306,7 +1302,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spieltyp</div>
                 <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{formatMatchType(form.match_type)}</div>
               </div>
-              {config.showMatchSize && <Fld label="Spielgroesse" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId={`stage-size-${stage.id}`} />}
+              {config.showMatchSize && <Fld label="Spielgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId={`stage-size-${stage.id}`} />}
               {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId={`stage-min-${stage.id}`} />}
               {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId={`stage-qualifiers-${stage.id}`} />}
               <Fld label="Spieldauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId={`stage-duration-${stage.id}`} />
@@ -1830,7 +1826,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
         </div>
         <RulePresetPicker form={f} onApply={applyRulePreset} />
         <div className="border border-white/10 bg-black/20 rounded-sm p-3 text-xs text-white/55">
-          Vor-Ort-Turniere werden standardmaessig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmaessig Ergebnisberichte beider Parteien und Terminvorschlaege.
+          Vor-Ort-Turniere werden standardmäßig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmäßig Ergebnisberichte beider Parteien und Terminvorschläge.
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.registration_enabled} onChange={(e)=>set("registration_enabled",e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Öffentliche Anmeldung erlauben</span></label>
@@ -1869,7 +1865,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
             <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Freier Turnierbaum</div>
             <div className="grid md:grid-cols-3 gap-3">
-              {f.format === "ffa_custom_bracket" && <Fld label="Spielgroesse" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size" />}
+              {f.format === "ffa_custom_bracket" && <Fld label="Spielgröße" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size" />}
               {f.format === "ffa_custom_bracket" && <Fld label="Qualifizierte" type="number" value={structure.qualifiers_per_match} onChange={(v)=>setStructureField("qualifiers_per_match", v)} testId="tr-edit-stage-qualifiers" />}
             </div>
             <label className="block">
@@ -1884,7 +1880,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
         <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
         <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-white/55">
-            Nach veroeffentlichten Ergebnissen erzeugt dieser Button konkrete Eintraege fuer die Gewinnabholung.
+            Nach veröffentlichten Ergebnissen erzeugt dieser Button konkrete Einträge für die Gewinnabholung.
           </p>
           <button
             type="button"
@@ -1917,7 +1913,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
       </Details>
       {hasFormChanges && (
         <div className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-4 py-3 text-sm text-[#FFD700]" data-testid="tr-edit-unsaved">
-          Ungespeicherte Aenderungen im Turnierformular.
+          Ungespeicherte Änderungen im Turnierformular.
         </div>
       )}
       <div className="flex flex-wrap gap-3">

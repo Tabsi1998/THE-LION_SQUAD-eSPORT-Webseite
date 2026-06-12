@@ -185,7 +185,7 @@ def _score_report_resolution(match: dict, reports: list[dict]) -> dict | None:
     if first.get("score_a") != score_a or first.get("score_b") != score_b:
         return {
             "status": "disputed",
-            "admin_note": match.get("admin_note") or "Abweichende Ergebnisberichte; bitte durch Turnierleitung pruefen.",
+            "admin_note": match.get("admin_note") or "Abweichende Ergebnisberichte; bitte durch Turnierleitung prüfen.",
             "updated_at": now_utc().isoformat(),
         }
     winner = None
@@ -514,7 +514,7 @@ async def _require_result_permission(user: dict, match: dict) -> None:
         or (match.get("station_id") and await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "station", match.get("station_id")))
     )
     if not allowed:
-        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Aktion")
+        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")
 
 
 async def _assert_match_visible(match: dict, user: dict | None) -> None:
@@ -736,7 +736,7 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
     stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
     policy = _match_policy(match, collection, tournament, stage)
     if not _schedule_proposals_enabled(policy):
-        raise HTTPException(status_code=403, detail="Terminvorschlaege sind fuer dieses Match nicht aktiviert")
+        raise HTTPException(status_code=403, detail="Terminvorschläge sind für dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen Termine vorschlagen")
     now_iso = now_utc().isoformat()
@@ -778,9 +778,9 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
     policy = _match_policy(match, collection, tournament, stage)
     if not _schedule_proposals_enabled(policy):
-        raise HTTPException(status_code=403, detail="Terminabstimmung ist fuer dieses Match nicht aktiviert")
+        raise HTTPException(status_code=403, detail="Terminabstimmung ist für dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung fuer diesen Termin")
+        raise HTTPException(status_code=403, detail="Keine Berechtigung für diesen Termin")
     acting_reg = await _acting_registration_for_match(match, me)
     if (
         not _is_staff(me)
@@ -917,7 +917,7 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
     db = get_db()
     match, collection = await _find_match_any(match_id)
     if collection != "matches_v2":
-        raise HTTPException(status_code=400, detail="Dieses Ergebnisformular ist fuer Mehrspieler-Heats vorgesehen")
+        raise HTTPException(status_code=400, detail="Dieses Ergebnisformular ist für Mehrspieler-Heats vorgesehen")
     await _ensure_match_tournament_unlocked(db, match)
     await ensure_tournament_accepts_results(db, match["tournament_id"])
     await _require_result_permission(me, match)
@@ -1028,7 +1028,7 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         or (m.get("station_id") and await has_tournament_staff_permission(me, m["tournament_id"], RESULT_STAFF_ROLES, "station", m.get("station_id")))
     )
     if not allowed:
-        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Aktion")
+        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")
     nullable_fields = {"winner_id", "scheduled_at", "station_id", "admin_note", "map", "best_of", "duration_minutes"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
@@ -1144,7 +1144,7 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
     stage = await db.tournament_stages.find_one({"id": m.get("stage_id")}, {"_id": 0}) if m.get("stage_id") else None
     policy = _match_policy(m, "matches", tournament, stage)
     if not _players_can_report(policy):
-        raise HTTPException(status_code=403, detail="Ergebnisse werden fuer dieses Match durch die Turnierleitung eingetragen")
+        raise HTTPException(status_code=403, detail="Ergebnisse werden für dieses Match durch die Turnierleitung eingetragen")
     # Verify user is participant
     reg_ids = [m.get("participant_a_id"), m.get("participant_b_id")]
     my_reg = await db.tournament_registrations.find_one(
