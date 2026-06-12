@@ -17,6 +17,7 @@ from reportlab.graphics.shapes import Drawing
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak,
 )
+from PIL import Image
 
 CYAN = colors.HexColor("#29B6E8")
 BLACK = colors.HexColor("#0A0A0A")
@@ -93,9 +94,25 @@ def _brand_asset_path(url: str | None) -> Path | None:
     return _local_upload_path(raw)
 
 
-def _draw_logo(canvas, path: Path, x: float, y: float, max_w: float, max_h: float) -> bool:
+def _draw_logo(canvas, path: Path, x: float, y: float, max_w: float, max_h: float, crop_transparent: bool = False) -> bool:
     try:
-        img = ImageReader(str(path))
+        if crop_transparent:
+            with Image.open(str(path)).convert("RGBA") as source:
+                bbox = source.getchannel("A").getbbox()
+                if bbox:
+                    left, top, right, bottom = bbox
+                    pad = max(2, int(max(right - left, bottom - top) * 0.03))
+                    crop_box = (
+                        max(0, left - pad),
+                        max(0, top - pad),
+                        min(source.width, right + pad),
+                        min(source.height, bottom + pad),
+                    )
+                    img = ImageReader(source.crop(crop_box))
+                else:
+                    img = ImageReader(source)
+        else:
+            img = ImageReader(str(path))
         width, height = img.getSize()
         if not width or not height:
             return False
@@ -456,14 +473,14 @@ def pdf_station_signs(
 
 
 def _draw_qr_code(canvas, value: str, x: float, y: float, size: float, branding: dict | None = None) -> None:
-    widget = qr.QrCodeWidget(value)
+    widget = qr.QrCodeWidget(value, barLevel="H", barBorder=4)
     bounds = widget.getBounds()
     width = bounds[2] - bounds[0]
     height = bounds[3] - bounds[1]
     drawing = Drawing(size, size, transform=[size / width, 0, 0, size / height, 0, 0])
     drawing.add(widget)
     canvas.setFillColor(WHITE)
-    canvas.roundRect(x - 4 * mm, y - 4 * mm, size + 8 * mm, size + 8 * mm, 8, fill=1, stroke=0)
+    canvas.roundRect(x - 1.2 * mm, y - 1.2 * mm, size + 2.4 * mm, size + 2.4 * mm, 7, fill=1, stroke=0)
     renderPDF.draw(drawing, canvas, x, y)
 
     logo_path = (
@@ -474,16 +491,16 @@ def _draw_qr_code(canvas, value: str, x: float, y: float, size: float, branding:
         or _brand_asset_path((branding or {}).get("logo_url"))
         or _brand_asset_path("/assets/brand/tls-mascot.png")
     )
-    logo_size = size * 0.19
+    logo_size = size * 0.145
     logo_x = x + (size - logo_size) / 2
     logo_y = y + (size - logo_size) / 2
     canvas.setFillColor(WHITE)
-    canvas.roundRect(logo_x - 1.6 * mm, logo_y - 1.6 * mm, logo_size + 3.2 * mm, logo_size + 3.2 * mm, 6, fill=1, stroke=0)
+    canvas.roundRect(logo_x - 0.9 * mm, logo_y - 0.9 * mm, logo_size + 1.8 * mm, logo_size + 1.8 * mm, 5, fill=1, stroke=0)
     canvas.setStrokeColor(colors.HexColor("#E5E7EB"))
-    canvas.setLineWidth(0.35)
-    canvas.roundRect(logo_x - 1.6 * mm, logo_y - 1.6 * mm, logo_size + 3.2 * mm, logo_size + 3.2 * mm, 6, fill=0, stroke=1)
+    canvas.setLineWidth(0.25)
+    canvas.roundRect(logo_x - 0.9 * mm, logo_y - 0.9 * mm, logo_size + 1.8 * mm, logo_size + 1.8 * mm, 5, fill=0, stroke=1)
     if logo_path:
-        _draw_logo(canvas, logo_path, logo_x, logo_y, logo_size, logo_size)
+        _draw_logo(canvas, logo_path, logo_x, logo_y, logo_size, logo_size, crop_transparent=True)
 
 
 def pdf_qr_sign(
@@ -544,9 +561,9 @@ def pdf_qr_sign(
             leading_factor=1.15,
         )
 
-    qr_size = 10.35 * cm
+    qr_size = 11.05 * cm
     qr_x = (page_w - qr_size) / 2
-    qr_y = 7.35 * cm
+    qr_y = 7.10 * cm
     _draw_qr_code(c, str(url or "https://lionsquad.at"), qr_x, qr_y, qr_size, branding)
 
     c.setFillColor(CYAN)

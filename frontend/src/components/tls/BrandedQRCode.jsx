@@ -8,7 +8,7 @@ export function BrandedQRCode({
   bgColor = "#ffffff",
   fgColor = "#0A0A0A",
   className = "",
-  logoRatio = 0.22,
+  logoRatio = 0.16,
 }) {
   const branding = useBrandingAssets();
   const logo = resolveMediaUrl(branding.qr_logo_url || branding.mascot_url || branding.favicon_dark_url || branding.logo_dark_url || branding.logo_url || TLS_MASCOT);
