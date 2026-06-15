@@ -1,9 +1,11 @@
 """PDF export service using reportlab. Brand-consistent THE LION SQUAD PDFs."""
 import io
 import os
+import re
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import urlparse
+from xml.sax.saxutils import escape
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -32,10 +34,10 @@ FRONTEND_BRAND_DIR = REPO_ROOT / "frontend" / "public" / "assets" / "brand"
 
 def _base_styles():
     s = getSampleStyleSheet()
-    s.add(ParagraphStyle(name="TLSTitle", fontName="Helvetica-Bold", fontSize=22,
-                          textColor=WHITE, leading=26, spaceAfter=4))
-    s.add(ParagraphStyle(name="TLSSubtitle", fontName="Helvetica-Bold", fontSize=9,
-                          textColor=CYAN, leading=12, letterSpacing=1, spaceAfter=14))
+    s.add(ParagraphStyle(name="TLSTitle", fontName="Helvetica-Bold", fontSize=20,
+                          textColor=WHITE, leading=24, spaceAfter=8))
+    s.add(ParagraphStyle(name="TLSSubtitle", fontName="Helvetica-Bold", fontSize=8.5,
+                          textColor=CYAN, leading=12, letterSpacing=1, spaceAfter=10))
     s.add(ParagraphStyle(name="TLSSection", fontName="Helvetica-Bold", fontSize=12,
                           textColor=CYAN, leading=16, spaceBefore=12, spaceAfter=6))
     s.add(ParagraphStyle(name="TLSBody", fontName="Helvetica", fontSize=9,
@@ -46,9 +48,19 @@ def _base_styles():
 
 
 def _header(story, styles, subtitle: str, title: str):
-    story.append(Paragraph(f"THE LION SQUAD eSports · {subtitle}", styles["TLSSubtitle"]))
-    story.append(Paragraph(title, styles["TLSTitle"]))
-    story.append(Spacer(1, 12))
+    story.append(Paragraph(escape(_normalize_pdf_text(f"THE LION SQUAD eSports · {subtitle}")), styles["TLSSubtitle"]))
+    story.append(Paragraph(escape(_normalize_pdf_text(title)), styles["TLSTitle"]))
+    story.append(Spacer(1, 10))
+
+
+def _normalize_pdf_text(text: str | None, *, strip_trailing_separator: bool = True) -> str:
+    value = str(text or "").replace("\u00a0", " ").strip()
+    value = re.sub(r"\s*•\s*", " • ", value)
+    value = re.sub(r"\s*\|\s*", " | ", value)
+    value = re.sub(r"\s+", " ", value).strip()
+    if strip_trailing_separator:
+        value = re.sub(r"(?:[•|]\s*)+$", "", value).strip()
+    return value
 
 
 def _page_bg(canvas, doc):
@@ -186,9 +198,9 @@ def _draw_sponsor_footer(canvas, doc, sponsors: list | None):
 
 def _doc(buffer, title: str, orientation="portrait", sponsors: list | None = None, branding: dict | None = None):
     size = landscape(A4) if orientation == "landscape" else A4
-    doc = SimpleDocTemplate(buffer, pagesize=size, title=title,
+    doc = SimpleDocTemplate(buffer, pagesize=size, title=_normalize_pdf_text(title),
                               leftMargin=2 * cm, rightMargin=2 * cm,
-                              topMargin=2.75 * cm, bottomMargin=3.35 * cm)
+                              topMargin=3.0 * cm, bottomMargin=3.35 * cm)
     doc.tls_pdf_sponsors = sponsors or []
     doc.tls_pdf_branding = branding or {}
     return doc
@@ -207,9 +219,11 @@ def _table_style():
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#121212"), colors.HexColor("#161616")]),
         ("LINEBELOW", (0, 0), (-1, 0), 1, CYAN),
         ("GRID", (0, 1), (-1, -1), 0.25, colors.HexColor("#222")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
         ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
     ])
 
 
@@ -228,7 +242,7 @@ def pdf_participants(tournament: dict, registrations: list, pdf_sponsors: list |
             r.get("team", {}).get("tag") if r.get("team") else "—",
             r.get("status", "—"),
         ])
-    t = Table(data, colWidths=[1.2 * cm, 7 * cm, 4 * cm, 2.5 * cm, 3 * cm])
+    t = Table(data, colWidths=[1.2 * cm, 7 * cm, 4 * cm, 2.5 * cm, 3 * cm], repeatRows=1)
     t.setStyle(_table_style())
     story.append(t)
     doc.build(story, onFirstPage=_page_bg, onLaterPages=_page_bg)
@@ -248,7 +262,7 @@ def pdf_f1_leaderboard(challenge: dict, track: dict, entries: list, pdf_sponsors
                      e.get("time_str", "—"),
                      e.get("gap_str") or ("Leader" if e.get("rank") == 1 else ""),
                      str(e.get("attempts", ""))])
-    t = Table(data, colWidths=[1.5 * cm, 7 * cm, 3.5 * cm, 3 * cm, 2.5 * cm])
+    t = Table(data, colWidths=[1.5 * cm, 7 * cm, 3.5 * cm, 3 * cm, 2.5 * cm], repeatRows=1)
     t.setStyle(_table_style())
     story.append(t)
     doc.build(story, onFirstPage=_page_bg, onLaterPages=_page_bg)
@@ -274,7 +288,7 @@ def pdf_matches(tournament: dict, matches: list, reg_map: dict, pdf_sponsors: li
             m.get("station_id", "") or "—",
             m.get("status", "—"),
         ])
-    t = Table(data, colWidths=[3.5 * cm, 6 * cm, 2.5 * cm, 6 * cm, 3 * cm, 2.5 * cm, 3 * cm])
+    t = Table(data, colWidths=[3.5 * cm, 6 * cm, 2.5 * cm, 6 * cm, 3 * cm, 2.5 * cm, 3 * cm], repeatRows=1)
     t.setStyle(_table_style())
     story.append(t)
     doc.build(story, onFirstPage=_page_bg, onLaterPages=_page_bg)
@@ -294,7 +308,7 @@ def pdf_standings(tournament: dict, rows: list, pdf_sponsors: list | None = None
                      str(r.get("won") or r.get("wins") or 0),
                      str(r.get("lost") or r.get("losses") or 0),
                      str(r.get("points") or r.get("furthest_round") or 0)])
-    t = Table(data, colWidths=[1.5 * cm, 8 * cm, 2.5 * cm, 3 * cm, 2.5 * cm])
+    t = Table(data, colWidths=[1.5 * cm, 8 * cm, 2.5 * cm, 3 * cm, 2.5 * cm], repeatRows=1)
     t.setStyle(_table_style())
     story.append(t)
     doc.build(story, onFirstPage=_page_bg, onLaterPages=_page_bg)
@@ -311,7 +325,7 @@ def pdf_checkin(tournament: dict, registrations: list, pdf_sponsors: list | None
     for i, r in enumerate(registrations, 1):
         checked = "☑" if r.get("status") == "checked_in" else "☐"
         data.append([str(i), r.get("display_name", "—"), r.get("discord") or "—", checked, "________________"])
-    t = Table(data, colWidths=[1.2 * cm, 6 * cm, 4 * cm, 2 * cm, 5 * cm])
+    t = Table(data, colWidths=[1.2 * cm, 6 * cm, 4 * cm, 2 * cm, 5 * cm], repeatRows=1)
     t.setStyle(_table_style())
     story.append(t)
     doc.build(story, onFirstPage=_page_bg, onLaterPages=_page_bg)
@@ -411,51 +425,64 @@ def pdf_station_signs(
         c.rect(0, page_h - 4, page_w, 4, fill=1, stroke=0)
         _draw_brand_header(c, doc, branding)
 
-        content_top = page_h - 2.65 * cm
-        content_bottom = 3.25 * cm
+        content_top = page_h - 2.90 * cm
+        content_bottom = 3.35 * cm
         content_h = content_top - content_bottom
-        center_y = content_bottom + content_h * (0.53 if orientation == "landscape" else 0.50)
+        center_y = content_bottom + content_h * (0.54 if orientation == "landscape" else 0.52)
 
         c.setStrokeColor(colors.HexColor("#1F2937"))
         c.setLineWidth(1.2)
-        c.roundRect(1.55 * cm, content_bottom, page_w - 3.1 * cm, content_h, 8, stroke=1, fill=0)
+        c.roundRect(1.65 * cm, content_bottom, page_w - 3.3 * cm, content_h, 8, stroke=1, fill=0)
 
-        station_name = str(station.get("name") or station.get("label") or station.get("id") or "Station").strip()
-        device = str(station.get("device_type") or "").strip()
-        notes = str(station.get("notes") or "").strip()
-        tournament_title = str(tournament.get("title") or "THE LION SQUAD Event").strip()
+        station_name = _normalize_pdf_text(station.get("name") or station.get("label") or station.get("id") or "Station")
+        device = _normalize_pdf_text(station.get("device_type") or "")
+        notes = _normalize_pdf_text(station.get("notes") or "")
+        tournament_title = _normalize_pdf_text(tournament.get("title") or "THE LION SQUAD Event")
 
         c.setFillColor(CYAN)
         c.setFont("Helvetica-Bold", 13 if orientation == "landscape" else 11)
-        c.drawCentredString(page_w / 2, content_top - 1.0 * cm, "SPIELSTATION")
+        c.drawCentredString(page_w / 2, content_top - 1.05 * cm, "SPIELSTATION")
 
         c.setFillColor(WHITE)
         name_font_size = _fit_font_size(
             station_name.upper(),
-            page_w - 3.6 * cm,
-            start=112 if orientation == "landscape" else 88,
-            minimum=42 if orientation == "landscape" else 34,
+            page_w - 4.2 * cm,
+            start=104 if orientation == "landscape" else 82,
+            minimum=40 if orientation == "landscape" else 32,
         )
         c.setFont("Helvetica-Bold", name_font_size)
-        c.drawCentredString(page_w / 2, center_y + (0.55 * cm if orientation == "landscape" else 1.65 * cm), station_name.upper())
+        c.drawCentredString(page_w / 2, center_y + (0.95 * cm if orientation == "landscape" else 1.90 * cm), station_name.upper())
 
         if device:
             c.setFillColor(CYAN)
-            c.setFont("Helvetica-Bold", 30 if orientation == "landscape" else 24)
-            c.drawCentredString(page_w / 2, center_y - (1.05 * cm if orientation == "landscape" else 0.25 * cm), device.upper())
+            c.setFont("Helvetica-Bold", 28 if orientation == "landscape" else 23)
+            c.drawCentredString(page_w / 2, center_y - (0.75 * cm if orientation == "landscape" else 0.05 * cm), device.upper())
 
         c.setFillColor(colors.HexColor("#E5E7EB"))
-        c.setFont("Helvetica-Bold", 16 if orientation == "landscape" else 15)
-        c.drawCentredString(page_w / 2, center_y - (2.25 * cm if orientation == "landscape" else 1.55 * cm), tournament_title[:86])
+        _draw_centered_wrapped(
+            c,
+            tournament_title,
+            page_w / 2,
+            center_y - (1.88 * cm if orientation == "landscape" else 1.32 * cm),
+            page_w - 5.2 * cm,
+            start_size=16 if orientation == "landscape" else 15,
+            min_size=10,
+            max_lines=2,
+            leading_factor=1.16,
+        )
 
         if notes:
             c.setFillColor(MUTED)
             c.setFont("Helvetica", 12)
-            c.drawCentredString(page_w / 2, center_y - (3.1 * cm if orientation == "landscape" else 2.45 * cm), notes[:96])
+            c.drawCentredString(
+                page_w / 2,
+                center_y - (3.05 * cm if orientation == "landscape" else 2.52 * cm),
+                _truncate_to_width(notes, page_w - 5.6 * cm, "Helvetica", 12),
+            )
 
         c.setStrokeColor(CYAN)
         c.setLineWidth(1.5)
-        c.line(3.4 * cm, content_bottom + 1.55 * cm, page_w - 3.4 * cm, content_bottom + 1.55 * cm)
+        c.line(3.8 * cm, content_bottom + 1.55 * cm, page_w - 3.8 * cm, content_bottom + 1.55 * cm)
 
         c.setFillColor(colors.HexColor("#64748B"))
         c.setFont("Helvetica-Bold", 8)
@@ -535,49 +562,50 @@ def pdf_qr_sign(
     _draw_brand_header(c, doc, branding)
 
     c.setFillColor(CYAN)
-    c.setFont("Helvetica-Bold", 10)
-    c.drawCentredString(page_w / 2, page_h - 4.45 * cm, str(eyebrow or "QR CODE").upper()[:64])
+    c.setFont("Helvetica-Bold", 9.5)
+    c.drawCentredString(page_w / 2, page_h - 4.25 * cm, _normalize_pdf_text(eyebrow or "QR CODE").upper()[:64])
 
-    display_title = str(title or "THE LION SQUAD").strip().upper()
+    display_title = _normalize_pdf_text(title or "THE LION SQUAD").upper()
     c.setFillColor(WHITE)
     title_bottom = _draw_centered_wrapped(
         c,
         display_title,
         page_w / 2,
-        page_h - 5.35 * cm,
-        page_w - 4.0 * cm,
-        start_size=30,
-        min_size=15,
-        max_lines=2,
+        page_h - 5.28 * cm,
+        page_w - 4.8 * cm,
+        start_size=27,
+        min_size=14,
+        max_lines=3,
+        leading_factor=1.13,
     )
 
     if subtitle:
         c.setFillColor(colors.HexColor("#CBD5E1"))
         _draw_centered_wrapped(
             c,
-            str(subtitle).strip(),
+            _normalize_pdf_text(subtitle),
             page_w / 2,
-            min(title_bottom - 0.20 * cm, page_h - 6.45 * cm),
+            min(title_bottom - 0.42 * cm, page_h - 7.05 * cm),
             page_w - 4.6 * cm,
-            start_size=13,
+            start_size=12.5,
             min_size=10,
             max_lines=2,
             leading_factor=1.15,
         )
 
-    qr_size = 11.05 * cm
+    qr_size = 10.65 * cm
     qr_x = (page_w - qr_size) / 2
-    qr_y = 7.10 * cm
+    qr_y = 7.95 * cm
     _draw_qr_code(c, str(url or "https://lionsquad.at"), qr_x, qr_y, qr_size, branding)
 
     c.setFillColor(CYAN)
-    c.setFont("Helvetica-Bold", 15)
-    c.drawCentredString(page_w / 2, 5.72 * cm, "SCANNEN UND ÖFFNEN")
+    c.setFont("Helvetica-Bold", 14.5)
+    c.drawCentredString(page_w / 2, 6.58 * cm, "SCANNEN UND ÖFFNEN")
 
     c.setFillColor(colors.HexColor("#CBD5E1"))
     c.setFont("Helvetica", 8.4)
     url_text = str(url or "").strip()
-    c.drawCentredString(page_w / 2, 5.08 * cm, _truncate_to_width(url_text, page_w - 4.2 * cm, "Helvetica", 8.4))
+    c.drawCentredString(page_w / 2, 5.96 * cm, _truncate_to_width(url_text, page_w - 4.6 * cm, "Helvetica", 8.4))
 
     _draw_sponsor_footer(c, doc, pdf_sponsors or [])
     c.setFillColor(MUTED)
