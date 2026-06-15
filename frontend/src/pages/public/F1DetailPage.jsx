@@ -10,7 +10,7 @@ import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
-import { Tv, Trophy, Flag, Calendar, Trash2, FileDown } from "lucide-react";
+import { Award, Tv, Trophy, Flag, Calendar, Trash2, FileDown } from "lucide-react";
 import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
@@ -151,6 +151,16 @@ export default function F1DetailPage() {
                 <FileDown className="w-4 h-4" /> Ergebnis-PDF
               </a>
             )}
+            {showResultPdf && (
+              <a
+                href={`${API}/exports/f1/${challenge.slug || challenge.id}/certificates.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition"
+              >
+                <Award className="w-4 h-4" /> Urkunden
+              </a>
+            )}
             {showResultPdf && challenge.is_championship && (
               <a
                 href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship.pdf${f1ResultQuery({ access: accessToken })}`}
@@ -159,6 +169,16 @@ export default function F1DetailPage() {
                 className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition"
               >
                 <Trophy className="w-4 h-4" /> Gesamtwertung-PDF
+              </a>
+            )}
+            {showResultPdf && challenge.is_championship && (
+              <a
+                href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship-certificates.pdf${f1ResultQuery({ access: accessToken })}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition"
+              >
+                <Award className="w-4 h-4" /> Gesamtwertungs-Urkunden
               </a>
             )}
           </div>
@@ -248,6 +268,7 @@ export default function F1DetailPage() {
                       <th className="text-right px-4 py-3 font-display">Beste Zeit</th>
                       <th className="text-right px-4 py-3">Abstand</th>
                       <th className="text-right px-4 py-3">Versuche</th>
+                      {showResultPdf && <th className="text-right px-4 py-3">Urkunde</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
@@ -276,9 +297,18 @@ export default function F1DetailPage() {
                         </td>
                         <td className="px-4 py-3 text-right text-white/60 tabular-nums">{e.gap_str || "—"}</td>
                         <td className="px-4 py-3 text-right text-white/50">{e.attempts}</td>
+                        {showResultPdf && (
+                          <td className="px-4 py-3 text-right">
+                            {e.rank <= 4 ? (
+                              <a href={`${API}/exports/f1/${challenge.slug || challenge.id}/certificates/${e.user_id}.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">
+                                <Award className="w-3 h-3" /> PDF
+                              </a>
+                            ) : <span className="text-white/25">—</span>}
+                          </td>
+                        )}
                       </tr>
                     ))}
-                    {(!board || board.entries?.length === 0) && <tr><td colSpan="5" className="text-center py-10 text-white/40">Noch keine Zeiten</td></tr>}
+                    {(!board || board.entries?.length === 0) && <tr><td colSpan={showResultPdf ? 6 : 5} className="text-center py-10 text-white/40">Noch keine Zeiten</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -301,6 +331,7 @@ export default function F1DetailPage() {
                   <th className="text-right px-4 py-3">Siege</th>
                   <th className="text-right px-4 py-3">Rennen</th>
                   <th className="text-right px-4 py-3 font-display">Punkte</th>
+                  {showResultPdf && <th className="text-right px-4 py-3">Urkunde</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -311,6 +342,15 @@ export default function F1DetailPage() {
                     <td className="px-4 py-3 text-right">{s.wins}</td>
                     <td className="px-4 py-3 text-right">{s.races}</td>
                     <td className="px-4 py-3 text-right font-display font-bold text-[#29B6E8] text-lg">{s.points}</td>
+                    {showResultPdf && (
+                      <td className="px-4 py-3 text-right">
+                        {s.rank <= 4 ? (
+                          <a href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship-certificates/${s.user_id}.pdf${f1ResultQuery({ access: accessToken })}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">
+                            <Award className="w-3 h-3" /> PDF
+                          </a>
+                        ) : <span className="text-white/25">—</span>}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

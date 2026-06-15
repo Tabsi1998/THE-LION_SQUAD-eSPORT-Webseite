@@ -18,7 +18,7 @@ from models import now_utc, new_id
 from email_service import send_template, _get_email_config
 from pdf_service import (
     pdf_participants, pdf_f1_leaderboard, pdf_matches, pdf_standings, pdf_checkin,
-    pdf_station_signs, pdf_qr_sign,
+    pdf_station_signs, pdf_qr_sign, pdf_certificate, pdf_certificates,
 )
 
 RESULT_EXPORT_STATUSES = {"completed", "results_published", "archived"}
@@ -1798,6 +1798,58 @@ async def _result_export_allowed(item: dict, user: dict | None) -> bool:
     return await user_can_see(user, item.get("visibility") or "public")
 
 
+def _certificate_source_from_item(item: dict, subtitle: str) -> dict:
+    return {
+        "title": item.get("title") or item.get("name") or "THE LION SQUAD",
+        "subtitle": subtitle,
+        "certificate_image_url": item.get("certificate_image_url"),
+        "banner_url": item.get("banner_url") or item.get("share_banner_url"),
+        "image_url": item.get("image_url"),
+        "seo_image_url": item.get("seo_image_url") or item.get("seo_banner_url"),
+    }
+
+
+def _top_certificate_rows(rows: list[dict], limit: int = 4) -> list[dict]:
+    result = []
+    for row in rows or []:
+        try:
+            rank = int(row.get("rank") or 0)
+        except (TypeError, ValueError):
+            rank = 0
+        if 1 <= rank <= limit:
+            result.append(row)
+    return sorted(result, key=lambda row: int(row.get("rank") or 999))
+
+
+def _tournament_certificate_metrics(row: dict) -> list[dict]:
+    metrics = [
+        {"label": "Siege", "value": row.get("won", row.get("wins", 0))},
+        {"label": "Niederlagen", "value": row.get("lost", row.get("losses", 0))},
+    ]
+    if row.get("points") is not None:
+        metrics.append({"label": "Punkte", "value": row.get("points")})
+    elif row.get("furthest_round") is not None:
+        metrics.append({"label": "Runde", "value": row.get("furthest_round")})
+    return metrics
+
+
+def _f1_track_certificate_metrics(row: dict, track: dict | None) -> list[dict]:
+    return [
+        {"label": "Strecke", "value": (track or {}).get("name") or "Fast Lap"},
+        {"label": "Beste Zeit", "value": row.get("time_str") or "—"},
+        {"label": "Abstand", "value": row.get("gap_str") or ("Führender" if row.get("rank") == 1 else "—")},
+        {"label": "Versuche", "value": row.get("attempts", 0)},
+    ]
+
+
+def _f1_championship_certificate_metrics(row: dict) -> list[dict]:
+    return [
+        {"label": "Punkte", "value": row.get("points", 0)},
+        {"label": "Siege", "value": row.get("wins", 0)},
+        {"label": "Rennen", "value": row.get("races", 0)},
+    ]
+
+
 @pdf_router.get("/qr/sign.pdf")
 async def pdf_qr_sign_export(
     url: str,
@@ -1916,6 +1968,69 @@ async def pdf_tournament_standings(slug_or_id: str, user: dict | None = Depends(
     return _pdf_response(pdf_standings(t, rows, pdf_sponsors=sponsors, pdf_branding=branding), f"standings_{file_id}.pdf")
 
 
+@pdf_router.get("/tournaments/{slug_or_id}/certificates.pdf")
+async def pdf_tournament_certificates(slug_or_id: str, user: dict | None = Depends(get_optional_user)):
+    db = get_db()
+    t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    if not t:
+        raise HTTPException(status_code=404)
+    if not await _result_export_allowed(t, user):
+        raise HTTPException(status_code=403, detail="Urkunden sind erst nach Turnierende öffentlich.")
+    from routes.tournament_routes import standings as st_fn
+    rows = _top_certificate_rows(await st_fn(t["id"]))
+    if not rows:
+        raise HTTPException(status_code=404, detail="Keine Top-4-Platzierungen für Urkunden gefunden.")
+    sponsors = await _pdf_sponsors(db)
+    branding = await _pdf_branding(db)
+    source = _certificate_source_from_item(t, "Turnier")
+    certificates = [
+        {
+            "source": source,
+            "row": row,
+            "category": "Gesamtwertung",
+            "metrics": _tournament_certificate_metrics(row),
+        }
+        for row in rows
+    ]
+    file_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
+    return _pdf_response(
+        pdf_certificates(certificates, pdf_sponsors=sponsors, pdf_branding=branding),
+        f"urkunden_{file_id}.pdf",
+    )
+
+
+@pdf_router.get("/tournaments/{slug_or_id}/certificates/{registration_id}.pdf")
+async def pdf_tournament_certificate(slug_or_id: str, registration_id: str, user: dict | None = Depends(get_optional_user)):
+    db = get_db()
+    t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    if not t:
+        raise HTTPException(status_code=404)
+    if not await _result_export_allowed(t, user):
+        raise HTTPException(status_code=403, detail="Urkunden sind erst nach Turnierende öffentlich.")
+    from routes.tournament_routes import standings as st_fn
+    rows = await st_fn(t["id"])
+    row = next((item for item in rows if item.get("registration_id") == registration_id), None)
+    if not row:
+        raise HTTPException(status_code=404, detail="Platzierung nicht gefunden.")
+    if row not in _top_certificate_rows(rows):
+        raise HTTPException(status_code=404, detail="Urkunden werden für die ersten vier Plätze erzeugt.")
+    sponsors = await _pdf_sponsors(db)
+    branding = await _pdf_branding(db)
+    file_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
+    player_id = _pdf_filename_part(row.get("display_name"), registration_id, fallback="spieler")
+    return _pdf_response(
+        pdf_certificate(
+            _certificate_source_from_item(t, "Turnier"),
+            row,
+            category="Gesamtwertung",
+            metrics=_tournament_certificate_metrics(row),
+            pdf_sponsors=sponsors,
+            pdf_branding=branding,
+        ),
+        f"urkunde_{file_id}_{player_id}.pdf",
+    )
+
+
 @pdf_router.get("/f1/{slug_or_id}/leaderboard.pdf")
 async def pdf_f1_lb(slug_or_id: str, track_id: Optional[str] = None, access: Optional[str] = None, user: dict | None = Depends(get_optional_user)):
     db = get_db()
@@ -1929,6 +2044,69 @@ async def pdf_f1_lb(slug_or_id: str, track_id: Optional[str] = None, access: Opt
     file_id = _pdf_filename_part(c.get("slug"), c.get("id"), slug_or_id, fallback="f1")
     return _pdf_response(pdf_f1_leaderboard(c, lb.get("track"), lb.get("entries", []), pdf_sponsors=sponsors, pdf_branding=branding),
                           f"f1_{file_id}.pdf")
+
+
+@pdf_router.get("/f1/{slug_or_id}/certificates.pdf")
+async def pdf_f1_certificates(slug_or_id: str, track_id: Optional[str] = None, access: Optional[str] = None, user: dict | None = Depends(get_optional_user)):
+    db = get_db()
+    from routes.f1_routes import _get_visible_challenge, leaderboard as f1_lb
+    c = await _get_visible_challenge(slug_or_id, user, access=access)
+    if not await _result_export_allowed(c, user):
+        raise HTTPException(status_code=403, detail="Urkunden sind erst nach Challenge-Ende öffentlich.")
+    lb = await f1_lb(c["id"], track_id, access, user)
+    rows = _top_certificate_rows(lb.get("entries") or [])
+    if not rows:
+        raise HTTPException(status_code=404, detail="Keine Top-4-Platzierungen für Urkunden gefunden.")
+    sponsors = await _pdf_sponsors(db)
+    branding = await _pdf_branding(db)
+    track = lb.get("track") or {}
+    source = _certificate_source_from_item({**c, "image_url": track.get("image_url") or c.get("banner_url")}, "Fast Lap")
+    certificates = [
+        {
+            "source": source,
+            "row": row,
+            "category": f"Streckenwertung · {track.get('name') or 'Fast Lap'}",
+            "metrics": _f1_track_certificate_metrics(row, track),
+        }
+        for row in rows
+    ]
+    file_id = _pdf_filename_part(c.get("slug"), c.get("id"), slug_or_id, fallback="f1")
+    return _pdf_response(
+        pdf_certificates(certificates, pdf_sponsors=sponsors, pdf_branding=branding),
+        f"urkunden_f1_{file_id}.pdf",
+    )
+
+
+@pdf_router.get("/f1/{slug_or_id}/certificates/{user_id}.pdf")
+async def pdf_f1_certificate(slug_or_id: str, user_id: str, track_id: Optional[str] = None, access: Optional[str] = None, user: dict | None = Depends(get_optional_user)):
+    db = get_db()
+    from routes.f1_routes import _get_visible_challenge, leaderboard as f1_lb
+    c = await _get_visible_challenge(slug_or_id, user, access=access)
+    if not await _result_export_allowed(c, user):
+        raise HTTPException(status_code=403, detail="Urkunden sind erst nach Challenge-Ende öffentlich.")
+    lb = await f1_lb(c["id"], track_id, access, user)
+    rows = lb.get("entries") or []
+    row = next((item for item in rows if item.get("user_id") == user_id), None)
+    if not row:
+        raise HTTPException(status_code=404, detail="Platzierung nicht gefunden.")
+    if row not in _top_certificate_rows(rows):
+        raise HTTPException(status_code=404, detail="Urkunden werden für die ersten vier Plätze erzeugt.")
+    sponsors = await _pdf_sponsors(db)
+    branding = await _pdf_branding(db)
+    track = lb.get("track") or {}
+    file_id = _pdf_filename_part(c.get("slug"), c.get("id"), slug_or_id, fallback="f1")
+    player_id = _pdf_filename_part(row.get("display_name"), user_id, fallback="fahrer")
+    return _pdf_response(
+        pdf_certificate(
+            _certificate_source_from_item({**c, "image_url": track.get("image_url") or c.get("banner_url")}, "Fast Lap"),
+            row,
+            category=f"Streckenwertung · {track.get('name') or 'Fast Lap'}",
+            metrics=_f1_track_certificate_metrics(row, track),
+            pdf_sponsors=sponsors,
+            pdf_branding=branding,
+        ),
+        f"urkunde_f1_{file_id}_{player_id}.pdf",
+    )
 
 
 @pdf_router.get("/f1/{slug_or_id}/championship.pdf")
@@ -1949,6 +2127,67 @@ async def pdf_f1_championship(slug_or_id: str, access: Optional[str] = None, use
     branding = await _pdf_branding(db)
     return _pdf_response(pdf_standings(fake_tournament, rows, pdf_sponsors=sponsors, pdf_branding=branding),
                           f"f1_championship_{file_id}.pdf")
+
+
+@pdf_router.get("/f1/{slug_or_id}/championship-certificates.pdf")
+async def pdf_f1_championship_certificates(slug_or_id: str, access: Optional[str] = None, user: dict | None = Depends(get_optional_user)):
+    db = get_db()
+    from routes.f1_routes import _get_visible_challenge, championship_standings as f1_champ
+    c = await _get_visible_challenge(slug_or_id, user, access=access)
+    if not await _result_export_allowed(c, user):
+        raise HTTPException(status_code=403, detail="Urkunden sind erst nach Challenge-Ende öffentlich.")
+    cs = await f1_champ(c["id"], access, user)
+    rows = _top_certificate_rows(cs.get("standings") or [])
+    if not rows:
+        raise HTTPException(status_code=404, detail="Keine Top-4-Platzierungen für Urkunden gefunden.")
+    sponsors = await _pdf_sponsors(db)
+    branding = await _pdf_branding(db)
+    source = _certificate_source_from_item(c, "Fast Lap Championship")
+    certificates = [
+        {
+            "source": source,
+            "row": row,
+            "category": "Gesamtwertung",
+            "metrics": _f1_championship_certificate_metrics(row),
+        }
+        for row in rows
+    ]
+    file_id = _pdf_filename_part(c.get("slug"), c.get("id"), slug_or_id, fallback="f1")
+    return _pdf_response(
+        pdf_certificates(certificates, pdf_sponsors=sponsors, pdf_branding=branding),
+        f"urkunden_f1_championship_{file_id}.pdf",
+    )
+
+
+@pdf_router.get("/f1/{slug_or_id}/championship-certificates/{user_id}.pdf")
+async def pdf_f1_championship_certificate(slug_or_id: str, user_id: str, access: Optional[str] = None, user: dict | None = Depends(get_optional_user)):
+    db = get_db()
+    from routes.f1_routes import _get_visible_challenge, championship_standings as f1_champ
+    c = await _get_visible_challenge(slug_or_id, user, access=access)
+    if not await _result_export_allowed(c, user):
+        raise HTTPException(status_code=403, detail="Urkunden sind erst nach Challenge-Ende öffentlich.")
+    cs = await f1_champ(c["id"], access, user)
+    rows = cs.get("standings") or []
+    row = next((item for item in rows if item.get("user_id") == user_id), None)
+    if not row:
+        raise HTTPException(status_code=404, detail="Platzierung nicht gefunden.")
+    if row not in _top_certificate_rows(rows):
+        raise HTTPException(status_code=404, detail="Urkunden werden für die ersten vier Plätze erzeugt.")
+    sponsors = await _pdf_sponsors(db)
+    branding = await _pdf_branding(db)
+    file_id = _pdf_filename_part(c.get("slug"), c.get("id"), slug_or_id, fallback="f1")
+    player_id = _pdf_filename_part(row.get("display_name"), user_id, fallback="fahrer")
+    return _pdf_response(
+        pdf_certificate(
+            _certificate_source_from_item(c, "Fast Lap Championship"),
+            row,
+            category="Gesamtwertung",
+            metrics=_f1_championship_certificate_metrics(row),
+            pdf_sponsors=sponsors,
+            pdf_branding=branding,
+        ),
+        f"urkunde_f1_championship_{file_id}_{player_id}.pdf",
+    )
 
 
 # ---------- Audit ----------

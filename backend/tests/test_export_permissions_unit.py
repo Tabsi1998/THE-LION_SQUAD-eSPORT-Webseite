@@ -17,8 +17,14 @@ STAFF_ONLY_EXPORTS = [
 
 PUBLIC_RESULT_EXPORTS = [
     extras_routes.pdf_tournament_standings,
+    extras_routes.pdf_tournament_certificates,
+    extras_routes.pdf_tournament_certificate,
     extras_routes.pdf_f1_lb,
+    extras_routes.pdf_f1_certificates,
+    extras_routes.pdf_f1_certificate,
     extras_routes.pdf_f1_championship,
+    extras_routes.pdf_f1_championship_certificates,
+    extras_routes.pdf_f1_championship_certificate,
 ]
 
 

@@ -164,6 +164,25 @@ def _draw_brand_header(canvas, doc, branding: dict | None):
     canvas.line(2 * cm, page_h - 2.08 * cm, page_w - 2 * cm, page_h - 2.08 * cm)
 
 
+def _draw_cover_image(canvas, path: Path, page_w: float, page_h: float, opacity: float = 0.13) -> bool:
+    try:
+        img = ImageReader(str(path))
+        width, height = img.getSize()
+        if not width or not height:
+            return False
+        scale = max(page_w / width, page_h / height)
+        draw_w = width * scale
+        draw_h = height * scale
+        canvas.saveState()
+        if hasattr(canvas, "setFillAlpha"):
+            canvas.setFillAlpha(opacity)
+        canvas.drawImage(img, (page_w - draw_w) / 2, (page_h - draw_h) / 2, draw_w, draw_h, mask="auto")
+        canvas.restoreState()
+        return True
+    except Exception:
+        return False
+
+
 def _draw_sponsor_footer(canvas, doc, sponsors: list | None):
     sponsors = [s for s in (sponsors or []) if s.get("name") or s.get("logo_url")]
     if not sponsors:
@@ -194,6 +213,32 @@ def _draw_sponsor_footer(canvas, doc, sponsors: list | None):
             canvas.setFillColor(WHITE)
             canvas.setFont("Helvetica-Bold", 6.5)
             canvas.drawCentredString(x + slot_w / 2, y + 3.5 * mm, str(sponsor.get("name") or "")[:28])
+
+
+def _placement_label(rank: int | str | None) -> str:
+    try:
+        value = int(rank or 0)
+    except (TypeError, ValueError):
+        value = 0
+    return {
+        1: "1. Platz",
+        2: "2. Platz",
+        3: "3. Platz",
+        4: "4. Platz",
+    }.get(value, f"{value}. Platz" if value else "Platzierung")
+
+
+def _certificate_title(rank: int | str | None) -> str:
+    try:
+        value = int(rank or 0)
+    except (TypeError, ValueError):
+        value = 0
+    return {
+        1: "Siegerurkunde",
+        2: "Urkunde zum 2. Platz",
+        3: "Urkunde zum 3. Platz",
+        4: "Urkunde zum 4. Platz",
+    }.get(value, "Teilnahmeurkunde")
 
 
 def _doc(buffer, title: str, orientation="portrait", sponsors: list | None = None, branding: dict | None = None):
@@ -497,6 +542,187 @@ def pdf_station_signs(
 
     c.save()
     return buf.getvalue()
+
+
+def _certificate_page(canvas, doc, certificate: dict, branding: dict | None, sponsors: list | None) -> None:
+    page_w, page_h = doc.pagesize
+    branding = branding or {}
+    source = certificate.get("source") or {}
+    row = certificate.get("row") or {}
+    rank = row.get("rank") or certificate.get("rank")
+    title = _normalize_pdf_text(source.get("title") or "THE LION SQUAD")
+    recipient = _normalize_pdf_text(row.get("display_name") or certificate.get("display_name") or "Teilnehmer")
+    category = _normalize_pdf_text(certificate.get("category") or "Gesamtwertung")
+    subtitle = _normalize_pdf_text(certificate.get("subtitle") or source.get("subtitle") or "eSports")
+    background_path = (
+        _brand_asset_path(source.get("certificate_image_url"))
+        or _brand_asset_path(source.get("banner_url"))
+        or _brand_asset_path(source.get("image_url"))
+        or _brand_asset_path(source.get("seo_image_url"))
+        or _brand_asset_path((branding or {}).get("share_banner_url"))
+    )
+
+    canvas.setFillColor(BLACK)
+    canvas.rect(0, 0, page_w, page_h, fill=1, stroke=0)
+    if background_path:
+        _draw_cover_image(canvas, background_path, page_w, page_h, opacity=0.15)
+    canvas.setFillColor(colors.Color(0, 0, 0, alpha=0.74))
+    canvas.rect(0, 0, page_w, page_h, fill=1, stroke=0)
+    canvas.setFillColor(CYAN)
+    canvas.rect(0, page_h - 5, page_w, 5, fill=1, stroke=0)
+    _draw_brand_header(canvas, doc, branding)
+
+    canvas.setStrokeColor(colors.HexColor("#1F2937"))
+    canvas.setLineWidth(1.0)
+    canvas.roundRect(1.45 * cm, 3.25 * cm, page_w - 2.9 * cm, page_h - 6.25 * cm, 10, stroke=1, fill=0)
+    canvas.setStrokeColor(CYAN)
+    canvas.setLineWidth(1.4)
+    canvas.roundRect(1.82 * cm, 3.62 * cm, page_w - 3.64 * cm, page_h - 7.0 * cm, 7, stroke=1, fill=0)
+
+    y = page_h - 4.28 * cm
+    canvas.setFillColor(CYAN)
+    canvas.setFont("Helvetica-Bold", 10)
+    canvas.drawCentredString(page_w / 2, y, _normalize_pdf_text(subtitle).upper()[:72])
+
+    canvas.setFillColor(WHITE)
+    y -= 0.80 * cm
+    _draw_centered_wrapped(
+        canvas,
+        _certificate_title(rank).upper(),
+        page_w / 2,
+        y,
+        page_w - 5.0 * cm,
+        start_size=31,
+        min_size=18,
+        max_lines=2,
+        leading_factor=1.10,
+    )
+
+    y -= 2.10 * cm
+    canvas.setFillColor(colors.HexColor("#CBD5E1"))
+    canvas.setFont("Helvetica-Bold", 11)
+    canvas.drawCentredString(page_w / 2, y, "VERLIEHEN AN")
+
+    y -= 1.05 * cm
+    canvas.setFillColor(WHITE)
+    recipient_bottom = _draw_centered_wrapped(
+        canvas,
+        recipient,
+        page_w / 2,
+        y,
+        page_w - 4.5 * cm,
+        start_size=36,
+        min_size=20,
+        max_lines=2,
+        leading_factor=1.05,
+    )
+
+    y = recipient_bottom - 0.85 * cm
+    canvas.setFillColor(CYAN)
+    canvas.setFont("Helvetica-Bold", 22)
+    canvas.drawCentredString(page_w / 2, y, _placement_label(rank).upper())
+
+    y -= 1.00 * cm
+    canvas.setFillColor(colors.HexColor("#E5E7EB"))
+    _draw_centered_wrapped(
+        canvas,
+        title,
+        page_w / 2,
+        y,
+        page_w - 4.8 * cm,
+        start_size=18,
+        min_size=11,
+        max_lines=3,
+        leading_factor=1.14,
+    )
+
+    y -= 2.05 * cm
+    canvas.setFillColor(colors.HexColor("#CBD5E1"))
+    canvas.setFont("Helvetica-Bold", 12)
+    canvas.drawCentredString(page_w / 2, y, category.upper())
+
+    metrics = [m for m in (certificate.get("metrics") or []) if m and (m.get("value") not in (None, ""))]
+    if metrics:
+        slot_w = min(4.6 * cm, (page_w - 5.2 * cm) / max(1, len(metrics)))
+        gap = 0.28 * cm
+        total_w = slot_w * len(metrics) + gap * (len(metrics) - 1)
+        start_x = (page_w - total_w) / 2
+        metric_y = 6.20 * cm
+        for index, metric in enumerate(metrics[:4]):
+            x = start_x + index * (slot_w + gap)
+            canvas.setStrokeColor(colors.HexColor("#1F2937"))
+            canvas.setFillColor(colors.HexColor("#0B1115"))
+            canvas.roundRect(x, metric_y, slot_w, 1.45 * cm, 5, fill=1, stroke=1)
+            canvas.setFillColor(CYAN)
+            canvas.setFont("Helvetica-Bold", 6.8)
+            canvas.drawCentredString(x + slot_w / 2, metric_y + 0.95 * cm, str(metric.get("label") or "").upper()[:22])
+            canvas.setFillColor(WHITE)
+            canvas.setFont("Helvetica-Bold", 12.5)
+            canvas.drawCentredString(x + slot_w / 2, metric_y + 0.38 * cm, _truncate_to_width(str(metric.get("value")), slot_w - 0.35 * cm, "Helvetica-Bold", 12.5))
+
+    issued = _normalize_pdf_text(certificate.get("issued_label") or datetime.now().strftime("%d.%m.%Y"))
+    canvas.setStrokeColor(colors.HexColor("#64748B"))
+    canvas.setLineWidth(0.6)
+    canvas.line(4.2 * cm, 4.55 * cm, 9.0 * cm, 4.55 * cm)
+    canvas.line(page_w - 9.0 * cm, 4.55 * cm, page_w - 4.2 * cm, 4.55 * cm)
+    canvas.setFillColor(MUTED)
+    canvas.setFont("Helvetica-Bold", 7)
+    canvas.drawCentredString(6.6 * cm, 4.18 * cm, issued.upper())
+    canvas.drawCentredString(page_w - 6.6 * cm, 4.18 * cm, "THE LION SQUAD")
+
+    mascot_path = (
+        _brand_asset_path((branding or {}).get("mascot_url"))
+        or _brand_asset_path("/assets/brand/tls-mascot.png")
+    )
+    if mascot_path:
+        _draw_logo(canvas, mascot_path, (page_w - 2.1 * cm) / 2, 3.68 * cm, 2.1 * cm, 2.1 * cm, crop_transparent=True)
+
+    _draw_sponsor_footer(canvas, doc, sponsors or [])
+    canvas.setFillColor(MUTED)
+    canvas.setFont("Helvetica", 7)
+    canvas.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
+    canvas.drawRightString(page_w - 2 * cm, 0.72 * cm, "Urkunde")
+
+
+def pdf_certificates(
+    certificates: list,
+    pdf_sponsors: list | None = None,
+    pdf_branding: dict | None = None,
+) -> bytes:
+    """A4 certificate pages for tournament and Fast-Lap placements."""
+    buf = io.BytesIO()
+    page_size = landscape(A4)
+    c = pdf_canvas.Canvas(buf, pagesize=page_size, pageCompression=1)
+
+    class _Doc:
+        pagesize = page_size
+        page = 1
+
+    doc = _Doc()
+    rows = certificates or []
+    if not rows:
+        rows = [{"source": {"title": "THE LION SQUAD"}, "row": {"display_name": "Teilnehmer", "rank": None}}]
+    for page, certificate in enumerate(rows, 1):
+        doc.page = page
+        _certificate_page(c, doc, certificate, pdf_branding or {}, pdf_sponsors or [])
+        c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
+def pdf_certificate(
+    source: dict,
+    row: dict,
+    category: str = "Gesamtwertung",
+    metrics: list | None = None,
+    pdf_sponsors: list | None = None,
+    pdf_branding: dict | None = None,
+) -> bytes:
+    return pdf_certificates(
+        [{"source": source, "row": row, "category": category, "metrics": metrics or []}],
+        pdf_sponsors=pdf_sponsors,
+        pdf_branding=pdf_branding,
+    )
 
 
 def _draw_qr_code(canvas, value: str, x: float, y: float, size: float, branding: dict | None = None) -> None:

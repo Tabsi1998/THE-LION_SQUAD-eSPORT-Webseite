@@ -1,5 +1,7 @@
 from pdf_service import (
     pdf_checkin,
+    pdf_certificate,
+    pdf_certificates,
     pdf_f1_leaderboard,
     pdf_matches,
     pdf_participants,
@@ -60,6 +62,30 @@ def test_station_signs_generate_portrait_and_landscape_pages():
 
     assert_pdf_bytes(pdf_station_signs(TOURNAMENT, stations, SPONSORS, BRANDING, orientation="portrait"), minimum_size=40_000)
     assert_pdf_bytes(pdf_station_signs(TOURNAMENT, stations, SPONSORS, BRANDING, orientation="landscape"), minimum_size=40_000)
+
+
+def test_certificates_generate_valid_branded_pdfs():
+    row = {"rank": 1, "display_name": "Koblauchgeist", "won": 4, "lost": 0, "points": 12}
+    metrics = [
+        {"label": "Siege", "value": row["won"]},
+        {"label": "Niederlagen", "value": row["lost"]},
+        {"label": "Punkte", "value": row["points"]},
+    ]
+    payload = pdf_certificate(
+        {**TOURNAMENT, "subtitle": "Turnier"},
+        row,
+        category="Gesamtwertung",
+        metrics=metrics,
+        pdf_sponsors=SPONSORS,
+        pdf_branding=BRANDING,
+    )
+    assert_pdf_bytes(payload, minimum_size=35_000)
+
+    multi = pdf_certificates([
+        {"source": {**TOURNAMENT, "subtitle": "Turnier"}, "row": row, "category": "Gesamtwertung", "metrics": metrics},
+        {"source": {**TOURNAMENT, "subtitle": "Turnier"}, "row": {**row, "rank": 2, "display_name": "DerSushi"}, "category": "Gesamtwertung", "metrics": metrics},
+    ], SPONSORS, BRANDING)
+    assert_pdf_bytes(multi, minimum_size=55_000)
 
 
 def test_table_exports_generate_valid_pdfs():
