@@ -372,7 +372,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
     }
     const penalty = Number(form.penalty_seconds) || 0;
     if (penalty > 0 && (form.admin_note || "").trim().length < 5) {
-      toast.error("Bei Strafzeit ist eine Begruendung Pflicht.");
+      toast.error("Bei Strafzeit ist eine Begründung Pflicht.");
       return;
     }
     setSaving(true);

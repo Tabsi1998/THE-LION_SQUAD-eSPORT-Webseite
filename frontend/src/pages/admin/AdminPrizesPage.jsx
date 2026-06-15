@@ -334,7 +334,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove }) {
 
       <div className={`mt-3 text-xs inline-flex items-center gap-1.5 ${isUrgent ? "text-[#FFD700]" : "text-white/50"}`}>
         <CalendarDays className="w-3 h-3" /> Frist: {formatDate(p.pickup_deadline)}
-        {isUrgent && <span className="font-bold uppercase tracking-widest">{due < 0 ? "ueberfaellig" : `${due} Tage`}</span>}
+        {isUrgent && <span className="font-bold uppercase tracking-widest">{due < 0 ? "überfällig" : `${due} Tage`}</span>}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -347,7 +347,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove }) {
         {p.status === "picked_up" && (
           <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-mobile-revert-${p.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider">Zurück</button>
         )}
-        <button onClick={() => remove(p.id)} className="px-3 py-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm text-xs font-bold uppercase tracking-wider">Loeschen</button>
+        <button onClick={() => remove(p.id)} className="px-3 py-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm text-xs font-bold uppercase tracking-wider">Löschen</button>
       </div>
     </article>
   );

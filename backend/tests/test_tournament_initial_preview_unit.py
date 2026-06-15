@@ -12,6 +12,7 @@ from routes.tournament_routes import (
     _can_create_initial_legacy_preview,
     _estimate_legacy_preview_matches,
     _mixed_preview_registrations_for_tournament,
+    _refresh_tournament_previews_after_registration,
 )
 from bracket_engine import generate_bracket
 
@@ -209,5 +210,122 @@ def test_finalize_creates_stage_for_existing_custom_tournament_without_preview()
         assert len(db.tournament_stages.rows) == 1
         assert len(db.matches_v2.rows) == 3
         assert all(not match["is_preview"] for match in db.matches_v2.rows)
+
+    anyio.run(run)
+
+
+def test_registration_refresh_replaces_legacy_preview_with_real_players():
+    async def run():
+        tournament = {
+            "id": "t1",
+            "format": "single_elim",
+            "max_participants": 4,
+            "seeding_mode": "manual",
+            "status": "registration_open",
+        }
+        db = FakeDb()
+
+        preview = await _create_initial_bracket_preview(db, tournament, "admin-1")
+        assert preview["preview"] is True
+        assert all(match["is_preview"] for match in db.matches.rows)
+
+        db.tournament_registrations.rows.extend([
+            {"id": "r1", "user_id": "u1", "tournament_id": "t1", "status": "approved", "seed": 1},
+            {"id": "r2", "user_id": "u2", "tournament_id": "t1", "status": "approved", "seed": 2},
+            {"id": "wait", "user_id": "u-wait", "tournament_id": "t1", "status": "waitlist", "seed": 3},
+        ])
+
+        refreshed = await _refresh_tournament_previews_after_registration(db, tournament, "admin-1")
+        participant_ids = {
+            pid
+            for match in db.matches.rows
+            for pid in (match.get("participant_a_id"), match.get("participant_b_id"))
+            if pid
+        }
+
+        assert refreshed["engine"] == "legacy"
+        assert refreshed["preview"] is True
+        assert refreshed["participant_count"] == 2
+        assert {"r1", "r2", "preview-seed-3", "preview-seed-4"} <= participant_ids
+        assert "wait" not in participant_ids
+        assert all(match["is_preview"] for match in db.matches.rows)
+
+    anyio.run(run)
+
+
+def test_checkin_finalization_turns_preview_into_fixed_legacy_matches():
+    async def run():
+        tournament = {
+            "id": "t1",
+            "format": "single_elim",
+            "max_participants": 4,
+            "seeding_mode": "manual",
+            "status": "check_in",
+        }
+        db = FakeDb()
+        await _create_initial_bracket_preview(db, tournament, "admin-1")
+        db.tournament_registrations.rows.extend([
+            {"id": "r1", "user_id": "u1", "tournament_id": "t1", "status": "checked_in", "seed": 1},
+            {"id": "r2", "user_id": "u2", "tournament_id": "t1", "status": "checked_in", "seed": 2},
+            {"id": "r3", "user_id": "u3", "tournament_id": "t1", "status": "approved", "seed": 3},
+            {"id": "r4", "user_id": "u4", "tournament_id": "t1", "status": "approved", "seed": 4},
+        ])
+
+        finalized = await _finalize_bracket_for_checkin(db, tournament, "admin-1")
+        participant_ids = {
+            pid
+            for match in db.matches.rows
+            for pid in (match.get("participant_a_id"), match.get("participant_b_id"))
+            if pid
+        }
+
+        assert finalized["engine"] == "legacy"
+        assert finalized["participant_count"] == 4
+        assert finalized["preview"] is False
+        assert {"r1", "r2", "r3", "r4"} <= participant_ids
+        assert not any(str(pid).startswith("preview-seed-") for pid in participant_ids)
+        assert all(not match["is_preview"] for match in db.matches.rows)
+
+    anyio.run(run)
+
+
+def test_checkin_registration_change_rebuilds_until_real_match_started():
+    async def run():
+        tournament = {
+            "id": "t1",
+            "format": "single_elim",
+            "max_participants": 4,
+            "seeding_mode": "manual",
+            "status": "check_in",
+        }
+        db = FakeDb([
+            {"id": "r1", "user_id": "u1", "tournament_id": "t1", "status": "checked_in", "seed": 1},
+            {"id": "r2", "user_id": "u2", "tournament_id": "t1", "status": "checked_in", "seed": 2},
+        ])
+        await _finalize_bracket_for_checkin(db, tournament, "admin-1")
+
+        db.tournament_registrations.rows.extend([
+            {"id": "r3", "user_id": "u3", "tournament_id": "t1", "status": "approved", "seed": 3},
+            {"id": "r4", "user_id": "u4", "tournament_id": "t1", "status": "approved", "seed": 4},
+        ])
+
+        rebuilt = await _refresh_tournament_previews_after_registration(db, tournament, "admin-1")
+        participant_ids = {
+            pid
+            for match in db.matches.rows
+            for pid in (match.get("participant_a_id"), match.get("participant_b_id"))
+            if pid
+        }
+
+        assert rebuilt["reason"] == "checkin_rebuild"
+        assert rebuilt["participant_count"] == 4
+        assert {"r1", "r2", "r3", "r4"} <= participant_ids
+
+        db.matches.rows[0]["status"] = "in_progress"
+        blocked = await _refresh_tournament_previews_after_registration(db, tournament, "admin-1")
+
+        assert blocked["ok"] is False
+        assert blocked["reason"] == "matches_started"
+        assert blocked["locked_match_count"] == 1
 
     anyio.run(run)
