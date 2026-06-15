@@ -23,6 +23,7 @@ export function BrandedQRCode({
       className={`relative inline-block overflow-hidden align-middle ${className}`}
       style={{ width: size, height: size, backgroundColor: bgColor }}
       aria-label="QR-Code"
+      data-testid="branded-qr-code"
     >
       <QRCodeSVG
         value={value || "https://lionsquad.at"}
