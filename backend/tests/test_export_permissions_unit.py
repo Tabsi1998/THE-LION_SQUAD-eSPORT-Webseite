@@ -40,3 +40,10 @@ def test_result_pdf_exports_are_optional_but_status_gated():
     for endpoint in PUBLIC_RESULT_EXPORTS:
         assert _depends_parameter(endpoint, "user") is get_optional_user
         assert "_result_export_allowed" in inspect.getsource(endpoint)
+
+
+def test_pdf_filenames_use_safe_fallbacks():
+    assert extras_routes._pdf_filename_part("gamers-heaven", "t1") == "gamers-heaven"
+    assert extras_routes._pdf_filename_part("", "t1") == "t1"
+    assert extras_routes._pdf_filename_part(None, "", fallback="turnier") == "turnier"
+    assert extras_routes._pdf_filename("matches Gamers Heaven • Sonntag.pdf") == "matches_Gamers_Heaven_Sonntag.pdf"

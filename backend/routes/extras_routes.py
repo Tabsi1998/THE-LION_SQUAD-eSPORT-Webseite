@@ -1688,11 +1688,29 @@ pdf_router = APIRouter(prefix="/api/exports", tags=["exports"])
 
 
 def _pdf_response(data: bytes, filename: str):
+    safe_filename = _pdf_filename(filename)
     return StreamingResponse(
         io.BytesIO(data),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
     )
+
+
+def _pdf_filename_part(*values: str | None, fallback: str = "export") -> str:
+    for value in values:
+        raw = str(value or "").strip()
+        if not raw:
+            continue
+        safe = re.sub(r"[^A-Za-z0-9._-]+", "_", raw).strip("._-")
+        if safe:
+            return safe[:90]
+    return fallback
+
+
+def _pdf_filename(filename: str) -> str:
+    raw = str(filename or "").strip()
+    stem = raw[:-4] if raw.lower().endswith(".pdf") else raw
+    return _pdf_filename_part(stem, fallback="export") + ".pdf"
 
 
 _PDF_SPONSOR_TIER_ORDER = {"main": 0, "platinum": 1, "gold": 2, "silver": 3, "bronze": 4}
@@ -1813,7 +1831,8 @@ async def pdf_tournament_participants(slug_or_id: str, me: dict = Depends(requir
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
     data = pdf_participants(t, regs, pdf_sponsors=sponsors, pdf_branding=branding)
-    return _pdf_response(data, f"teilnehmer_{t['slug']}.pdf")
+    file_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
+    return _pdf_response(data, f"teilnehmer_{file_id}.pdf")
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/checkin.pdf")
@@ -1825,7 +1844,8 @@ async def pdf_tournament_checkin(slug_or_id: str, me: dict = Depends(require_rol
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
-    return _pdf_response(pdf_checkin(t, regs, pdf_sponsors=sponsors, pdf_branding=branding), f"checkin_{t['slug']}.pdf")
+    file_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
+    return _pdf_response(pdf_checkin(t, regs, pdf_sponsors=sponsors, pdf_branding=branding), f"checkin_{file_id}.pdf")
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/registration-qr.pdf")
@@ -1836,7 +1856,7 @@ async def pdf_tournament_registration_qr(slug_or_id: str, me: dict = Depends(req
         raise HTTPException(status_code=404)
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
-    public_id = t.get("slug") or t["id"]
+    public_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
     url = _pdf_absolute_url(f"/tournaments/{public_id}", branding)
     subtitle = "Anmeldung, Check-in und Turnierinfos"
     return _pdf_response(
@@ -1856,7 +1876,8 @@ async def pdf_tournament_matches(slug_or_id: str, me: dict = Depends(require_rol
     reg_map = {r["id"]: r for r in regs}
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
-    return _pdf_response(pdf_matches(t, matches, reg_map, pdf_sponsors=sponsors, pdf_branding=branding), f"matches_{t['slug']}.pdf")
+    file_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
+    return _pdf_response(pdf_matches(t, matches, reg_map, pdf_sponsors=sponsors, pdf_branding=branding), f"matches_{file_id}.pdf")
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/stations.pdf")
@@ -1874,7 +1895,7 @@ async def pdf_tournament_station_signs(
     branding = await _pdf_branding(db)
     return _pdf_response(
         pdf_station_signs(t, stations, pdf_sponsors=sponsors, pdf_branding=branding, orientation=orientation),
-        f"stationen_{orientation}_{t['slug']}.pdf",
+        f"stationen_{orientation}_{_pdf_filename_part(t.get('slug'), t.get('id'), slug_or_id, fallback='turnier')}.pdf",
     )
 
 
@@ -1891,7 +1912,8 @@ async def pdf_tournament_standings(slug_or_id: str, user: dict | None = Depends(
     rows = await st_fn(t["id"])
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
-    return _pdf_response(pdf_standings(t, rows, pdf_sponsors=sponsors, pdf_branding=branding), f"standings_{t['slug']}.pdf")
+    file_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
+    return _pdf_response(pdf_standings(t, rows, pdf_sponsors=sponsors, pdf_branding=branding), f"standings_{file_id}.pdf")
 
 
 @pdf_router.get("/f1/{slug_or_id}/leaderboard.pdf")
@@ -1904,8 +1926,9 @@ async def pdf_f1_lb(slug_or_id: str, track_id: Optional[str] = None, access: Opt
     lb = await f1_lb(c["id"], track_id, access, user)
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
+    file_id = _pdf_filename_part(c.get("slug"), c.get("id"), slug_or_id, fallback="f1")
     return _pdf_response(pdf_f1_leaderboard(c, lb.get("track"), lb.get("entries", []), pdf_sponsors=sponsors, pdf_branding=branding),
-                          f"f1_{c['slug']}.pdf")
+                          f"f1_{file_id}.pdf")
 
 
 @pdf_router.get("/f1/{slug_or_id}/championship.pdf")
@@ -1920,11 +1943,12 @@ async def pdf_f1_championship(slug_or_id: str, access: Optional[str] = None, use
     rows = [{"rank": r["rank"], "display_name": r["display_name"],
              "won": r.get("wins", 0), "lost": (r.get("races", 0) - r.get("wins", 0)),
              "points": r.get("points", 0)} for r in (cs.get("standings") or [])]
-    fake_tournament = {"title": (c.get("title") or "F1") + " · Championship", "slug": c.get("slug")}
+    file_id = _pdf_filename_part(c.get("slug"), c.get("id"), slug_or_id, fallback="f1")
+    fake_tournament = {"title": (c.get("title") or "F1") + " · Championship", "slug": file_id}
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
     return _pdf_response(pdf_standings(fake_tournament, rows, pdf_sponsors=sponsors, pdf_branding=branding),
-                          f"f1_championship_{c.get('slug') or slug_or_id}.pdf")
+                          f"f1_championship_{file_id}.pdf")
 
 
 # ---------- Audit ----------
