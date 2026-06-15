@@ -38,7 +38,13 @@ async function mockAdminSession(page) {
   });
 }
 
-async function mockDownloadsData(page) {
+async function mockDownloadsData(page, options = {}) {
+  const {
+    failTournaments = false,
+    failChallenges = false,
+    failEvents = false,
+    failGallery = false,
+  } = options;
   const tournament = {
     id: "t1",
     slug: "gamers-heaven-super-smash-bros-kleines-turnier-sonntag",
@@ -59,9 +65,17 @@ async function mockDownloadsData(page) {
   };
 
   await page.route("**/api/tournaments?include_drafts=true", async (route) => {
+    if (failTournaments) {
+      await route.fulfill({ status: 500, body: "tournament source failed" });
+      return;
+    }
     await route.fulfill({ contentType: "application/json", body: JSON.stringify([tournament]) });
   });
   await page.route("**/api/f1/challenges?include_drafts=true", async (route) => {
+    if (failChallenges) {
+      await route.fulfill({ status: 500, body: "challenge source failed" });
+      return;
+    }
     await route.fulfill({ contentType: "application/json", body: JSON.stringify([challenge]) });
   });
   await page.route("**/api/f1/challenges/f1-1?include_draft=true", async (route) => {
@@ -71,9 +85,17 @@ async function mockDownloadsData(page) {
     });
   });
   await page.route("**/api/events?include_drafts=true", async (route) => {
+    if (failEvents) {
+      await route.fulfill({ status: 500, body: "event source failed" });
+      return;
+    }
     await route.fulfill({ contentType: "application/json", body: JSON.stringify([event]) });
   });
   await page.route("**/api/admin/gallery", async (route) => {
+    if (failGallery) {
+      await route.fulfill({ status: 500, body: "gallery source failed" });
+      return;
+    }
     await route.fulfill({ contentType: "application/json", body: JSON.stringify([]) });
   });
   await page.route("**/api/events/event-1", async (route) => {
@@ -133,5 +155,26 @@ test("admin downloads page renders QR previews and PDF links", async ({ page }) 
   await expect(page.getByText("Eventdetails")).toBeVisible();
   await expect(page.getByText("Station A", { exact: true })).toBeVisible();
   await expect(page.getByText(/Koblauchgeist vs\. DerSushi/)).toBeVisible();
+  await expectNoPageXOverflow(page);
+});
+
+test("admin downloads keep working when optional source lists fail", async ({ page }) => {
+  await mockAdminSession(page);
+  await mockDownloadsData(page, { failTournaments: true, failGallery: true });
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/admin/downloads");
+
+  await expect(page.getByRole("heading", { name: /downloads & qr/i })).toBeVisible();
+  await page.getByRole("button", { name: /vor-ort qr/i }).click();
+
+  await page.getByTestId("single-qr-type").selectOption("fastlap");
+  await page.getByTestId("single-qr-source").selectOption("f1-1");
+  await expect(page.locator(".font-heading", { hasText: "Gamers Heaven • F1 25 • Fastest Lap Challenge | Samstag" })).toBeVisible();
+  await expect(page.getByTestId("branded-qr-code").first()).toBeVisible();
+
+  await page.getByTestId("qr-event").selectOption("event-1");
+  await expect(page.getByText("Eventdetails")).toBeVisible();
+  await expect(page.getByText("Station A", { exact: true })).toBeVisible();
   await expectNoPageXOverflow(page);
 });

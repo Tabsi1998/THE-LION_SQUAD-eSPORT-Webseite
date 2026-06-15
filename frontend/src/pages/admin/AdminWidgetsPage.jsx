@@ -50,11 +50,17 @@ export default function AdminWidgetsPage() {
   const [selTrack, setSelTrack] = useState("");
   const [height, setHeight] = useState(600);
 
-  const loadSources = useCallback(() => {
-    api.get("/tournaments?include_drafts=true").then(({ data }) => setTournaments(data));
-    api.get("/f1/challenges?include_drafts=true").then(({ data }) => setChallenges(data));
-    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data));
-    api.get("/admin/gallery").then(({ data }) => setAlbums(data || [])).catch(() => setAlbums([]));
+  const loadSources = useCallback(async () => {
+    const [tournamentResult, challengeResult, eventResult, albumResult] = await Promise.allSettled([
+      api.get("/tournaments?include_drafts=true"),
+      api.get("/f1/challenges?include_drafts=true"),
+      api.get("/events?include_drafts=true"),
+      api.get("/admin/gallery"),
+    ]);
+    setTournaments(tournamentResult.status === "fulfilled" ? tournamentResult.value.data || [] : []);
+    setChallenges(challengeResult.status === "fulfilled" ? challengeResult.value.data || [] : []);
+    setEvents(eventResult.status === "fulfilled" ? eventResult.value.data || [] : []);
+    setAlbums(albumResult.status === "fulfilled" ? albumResult.value.data || [] : []);
   }, []);
   useEffect(() => { loadSources(); }, [loadSources]);
   useApiInvalidation(loadSources, ["tournaments", "f1", "events", "gallery"]);
