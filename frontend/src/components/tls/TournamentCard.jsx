@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import { PhaseBadge } from "./PhaseBadge";
-import { Calendar, Users, Trophy } from "lucide-react";
+import { ArrowRight, Calendar, Users, Trophy } from "lucide-react";
 import { formatDate, getRegistrationState } from "@/lib/datetime";
-import { resolveMediaUrl } from "@/lib/api";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { LazyImg } from "@/components/tls/LazyImg";
 
 export function TournamentCard({ tournament, index = 0 }) {
   const t = tournament;
@@ -18,10 +18,10 @@ export function TournamentCard({ tournament, index = 0 }) {
       className="group relative block overflow-hidden rounded-sm border border-white/10 hover:border-[#29B6E8]/60 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(41,182,232,0.25)] bg-[#18181B]"
     >
       <div className="aspect-[16/9] relative overflow-hidden">
-        <img
-          src={resolveMediaUrl(bg)}
-          loading="lazy"
-          decoding="async"
+        <LazyImg
+          src={bg}
+          priority={index < 2}
+          sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
           alt={t.title}
           className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-60 group-hover:scale-105 transition-all duration-500"
         />
@@ -45,7 +45,7 @@ export function TournamentCard({ tournament, index = 0 }) {
         <h3 className="font-heading font-bold text-xl text-white group-hover:text-[#29B6E8] transition-colors line-clamp-2">
           {t.title}
         </h3>
-        <div className="mt-3 flex items-center gap-4 text-xs text-white/60">
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/60">
           {t.start_date && (
             <span className="inline-flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
@@ -67,6 +67,14 @@ export function TournamentCard({ tournament, index = 0 }) {
           registration.canRegister ? "text-[#00FF88]" : registration.state === "scheduled" ? "text-[#29B6E8]" : "text-white/45"
         }`}>
           {registration.label}
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
+          <span className="text-[10px] uppercase tracking-widest font-bold text-white/40">
+            {registration.canRegister ? "Anmeldung" : "Turnierdetails"}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
+            {registration.canRegister ? "Mitmachen" : "Ansehen"} <ArrowRight className="w-3 h-3" />
+          </span>
         </div>
       </div>
     </Link>

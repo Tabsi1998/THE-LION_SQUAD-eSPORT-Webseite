@@ -68,7 +68,7 @@ function maintenanceLabel(server, now) {
 }
 
 export default function ServersPage() {
-  useDocumentTitle("Server", "Öffentliche und geschützte Community-Gameserver von THE LION SQUAD.");
+  useDocumentTitle("Community Server", "Öffentliche und geschützte Community-Gameserver von THE LION SQUAD für Gaming, Training und Vereinsmitglieder.");
   const { user, isClubMember } = useAuth();
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState({});

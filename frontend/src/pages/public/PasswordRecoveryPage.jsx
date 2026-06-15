@@ -2,18 +2,42 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Logo } from "@/components/tls/Logo";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { AuthFormAlert, AuthPasswordField, AuthTextField } from "@/components/tls/AuthFormFields";
 import { toast } from "sonner";
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function ForgotPasswordPage() {
+  useDocumentTitle("Passwort vergessen", "Passwort für deinen THE LION SQUAD Account zurücksetzen.", { robots: "noindex, follow" });
+
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
-  const submit = async (e) => {
-    e.preventDefault();
+  const setEmailValue = (value) => {
+    setEmail(value);
+    setFieldErrors({});
+  };
+
+  const validate = () => {
+    const errors = {};
+    if (!email.trim()) errors["forgot-email"] = "Bitte gib deine E-Mail-Adresse ein.";
+    else if (!EMAIL_RE.test(email.trim())) errors["forgot-email"] = "Bitte gib eine gültige E-Mail-Adresse ein.";
+
+    setFieldErrors(errors);
+    if (errors["forgot-email"]) document.getElementById("forgot-email")?.focus();
+    return Object.keys(errors).length === 0;
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!validate()) return;
+
     setLoading(true);
     try {
-      await api.post("/auth/forgot-password", { email });
+      await api.post("/auth/forgot-password", { email: email.trim() });
       setSent(true);
       toast.success("Wenn die E-Mail existiert, wurde ein Link gesendet.");
     } catch (err) {
@@ -23,43 +47,70 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <AuthShell title="Passwort vergessen" subtitle="Wir senden dir einen sicheren Link zum Zuruecksetzen.">
+    <AuthShell title="Passwort vergessen" subtitle="Wir senden dir einen sicheren Link zum Zurücksetzen.">
       {sent ? (
-        <div className="text-sm text-white/70 border border-[#00FF88]/30 bg-[#00FF88]/10 p-4 rounded-sm">
+        <AuthFormAlert id="forgot-success" tone="success">
           Bitte prüfe dein Postfach. Der Link ist zeitlich begrenzt gültig.
-        </div>
+        </AuthFormAlert>
       ) : (
-        <form onSubmit={submit} className="space-y-4">
-          <Field label="E-Mail" type="email" value={email} onChange={setEmail} required testId="forgot-email" />
+        <form onSubmit={submit} className="space-y-4" noValidate>
+          <AuthTextField
+            id="forgot-email"
+            label="E-Mail"
+            type="email"
+            value={email}
+            onChange={setEmailValue}
+            required
+            autoComplete="email"
+            error={fieldErrors["forgot-email"]}
+            testId="forgot-email"
+          />
           <button disabled={loading} data-testid="forgot-submit" className="w-full py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition">
-            {loading ? "Sende..." : "Link senden"}
+            {loading ? "Sende ..." : "Link senden"}
           </button>
         </form>
       )}
-      <div className="mt-6 text-sm text-center"><Link to="/login" className="text-white/50 hover:text-[#29B6E8]">Zurueck zum Login</Link></div>
+      <div className="mt-6 text-sm text-center"><Link to="/login" className="text-white/50 hover:text-[#29B6E8]">Zurück zum Login</Link></div>
     </AuthShell>
   );
 }
 
 export function ResetPasswordPage() {
+  useDocumentTitle("Passwort setzen", "Neues Passwort für deinen THE LION SQUAD Account vergeben.", { robots: "noindex, follow" });
+
   const [params] = useSearchParams();
   const nav = useNavigate();
   const token = params.get("token") || "";
   const isInvite = params.get("invite") === "1";
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
-  const submit = async (e) => {
-    e.preventDefault();
-    if (password.length < 10) {
-      toast.error("Passwort muss mindestens 10 Zeichen haben.");
-      return;
-    }
-    if (password !== confirm) {
-      toast.error("Passwörter stimmen nicht überein.");
-      return;
-    }
+  const setField = (field, setter) => (value) => {
+    setter(value);
+    setFieldErrors((current) => ({ ...current, [field]: null }));
+  };
+
+  const validate = () => {
+    const errors = {};
+    if (!password) errors.password = "Bitte vergib ein neues Passwort.";
+    else if (password.length < 10) errors.password = "Das Passwort braucht mindestens 10 Zeichen.";
+    if (!confirm) errors.confirm = "Bitte wiederhole dein Passwort.";
+    else if (password !== confirm) errors.confirm = "Die Passwoerter stimmen nicht ueberein.";
+
+    setFieldErrors(errors);
+    const first = errors.password ? "reset-password" : errors.confirm ? "reset-password-confirm" : null;
+    if (first) document.getElementById(first)?.focus();
+    return Object.keys(errors).length === 0;
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!validate()) return;
+
     setLoading(true);
     try {
       await api.post("/auth/reset-password", { token, new_password: password });
@@ -74,15 +125,39 @@ export function ResetPasswordPage() {
   return (
     <AuthShell title={isInvite ? "Account aktivieren" : "Passwort setzen"} subtitle="Vergib ein neues Passwort für deinen Account.">
       {!token ? (
-        <div className="text-sm text-[#FF3B30] border border-[#FF3B30]/30 bg-[#FF3B30]/10 p-4 rounded-sm">
-          Der Link ist unvollständig. Bitte fordere einen neuen Link an.
-        </div>
+        <AuthFormAlert id="reset-token-error">
+          Der Link ist unvollstaendig. Bitte fordere einen neuen Link an.
+        </AuthFormAlert>
       ) : (
-        <form onSubmit={submit} className="space-y-4">
-          <Field label="Neues Passwort" type="password" value={password} onChange={setPassword} required minLength={10} testId="reset-password" />
-          <Field label="Passwort wiederholen" type="password" value={confirm} onChange={setConfirm} required testId="reset-password-confirm" />
+        <form onSubmit={submit} className="space-y-4" noValidate>
+          <AuthPasswordField
+            id="reset-password"
+            label="Neues Passwort"
+            value={password}
+            onChange={setField("password", setPassword)}
+            show={showPassword}
+            onToggle={() => setShowPassword((value) => !value)}
+            required
+            minLength={10}
+            autoComplete="new-password"
+            description="Mindestens 10 Zeichen."
+            error={fieldErrors.password}
+            testId="reset-password"
+          />
+          <AuthPasswordField
+            id="reset-password-confirm"
+            label="Passwort wiederholen"
+            value={confirm}
+            onChange={setField("confirm", setConfirm)}
+            show={showConfirm}
+            onToggle={() => setShowConfirm((value) => !value)}
+            required
+            autoComplete="new-password"
+            error={fieldErrors.confirm}
+            testId="reset-password-confirm"
+          />
           <button disabled={loading} data-testid="reset-submit" className="w-full py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition">
-            {loading ? "Speichere..." : "Passwort speichern"}
+            {loading ? "Speichere ..." : "Passwort speichern"}
           </button>
         </form>
       )}
@@ -100,22 +175,5 @@ function AuthShell({ title, subtitle, children }) {
         {children}
       </div>
     </div>
-  );
-}
-
-function Field({ label, value, onChange, type = "text", required, minLength, testId }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required={required}
-        minLength={minLength}
-        data-testid={testId}
-        className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2.5 rounded-sm text-white placeholder:text-white/30 focus:outline-none"
-      />
-    </label>
   );
 }

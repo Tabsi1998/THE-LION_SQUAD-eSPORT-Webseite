@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigation } from "@react-navigation/native";
-import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import { Image, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch, TextInput, View } from "react-native";
 import { ActionRow, ActionTile } from "../../components/ActionRow";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -10,12 +10,13 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
+import { API_BASE_URL } from "../../config";
 import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import { colors } from "../../theme";
-import type { PersonalReferenceData, PersonalReferenceItem } from "../../types";
+import type { PersonalReferenceData, PersonalReferenceItem, PrizePickup } from "../../types";
 
-type TabKey = "overview" | "references" | "edit" | "achievements" | "privacy" | "notifications";
+type TabKey = "overview" | "references" | "prizes" | "edit" | "achievements" | "privacy" | "notifications";
 type AchievementData = { groups?: AchievementGroup[]; awards?: any[] };
 type AchievementGroup = {
   code: string;
@@ -46,10 +47,17 @@ type AchievementTier = {
 const tabs: Array<{ key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
   { key: "overview", label: "Übersicht", icon: "person-circle-outline" },
   { key: "references", label: "Referenzen", icon: "ribbon-outline" },
+  { key: "prizes", label: "Gewinne", icon: "trophy-outline" },
   { key: "edit", label: "Bearbeiten", icon: "create-outline" },
   { key: "achievements", label: "Erfolge", icon: "trophy-outline" },
   { key: "privacy", label: "Privat", icon: "shield-checkmark-outline" },
-  { key: "notifications", label: "Mails", icon: "notifications-outline" },
+  { key: "notifications", label: "Benachr.", icon: "notifications-outline" },
+];
+
+const notificationChannels: Array<{ key: string; label: string; detail: string }> = [
+  { key: "email", label: "E-Mail", detail: "Nur wichtige optionale Hinweise per Mail." },
+  { key: "push", label: "Push", detail: "System-Benachrichtigungen am Handy." },
+  { key: "in_app", label: "In-App", detail: "Hinweise in App, Web und Notification-Center." },
 ];
 
 const notificationLabels: Array<{ key: string; label: string; detail: string }> = [
@@ -61,6 +69,7 @@ const notificationLabels: Array<{ key: string; label: string; detail: string }> 
   { key: "community_messages", label: "Community", detail: "Direktnachrichten und Erwähnungen." },
   { key: "news_events", label: "News & Events", detail: "Vereinsnews, Events und Ankündigungen." },
 ];
+const notificationPreferenceKey = (channel: string, topic: string) => `${channel}:${topic}`;
 
 const dmOptions = [
   ["everyone", "Alle"],
@@ -81,10 +90,12 @@ const levelColors: Record<number, string> = {
 
 export function ProfileScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { user, logout, refreshMe } = useAuth();
   const [tab, setTab] = useState<TabKey>("overview");
   const [achievements, setAchievements] = useState<AchievementData>({ groups: [], awards: [] });
-  const [references, setReferences] = useState<PersonalReferenceData>({ items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } });
+  const [references, setReferences] = useState<PersonalReferenceData>({ items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
+  const [prizes, setPrizes] = useState<PrizePickup[]>([]);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [completeness, setCompleteness] = useState<{ score?: number; missing?: string[] }>({});
   const [form, setForm] = useState<Record<string, any>>({});
@@ -140,25 +151,28 @@ export function ProfileScreen() {
   const loadProfileData = useCallback(async () => {
     setProfileError("");
     if (guest) {
+      setPrizes([]);
       setProfileLoading(false);
       setRefreshing(false);
       return;
     }
     try {
-      const [achievementResult, completenessResult, preferenceResult, referenceResult] = await Promise.all([
+      const [achievementResult, completenessResult, preferenceResult, referenceResult, prizeResult] = await Promise.all([
         api.get<AchievementData>("/achievements/me").catch(() => ({ data: { groups: [], awards: [] } })),
         api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness").catch(() => ({ data: {} })),
-        api.get<Record<string, boolean>>("/users/me/notification-preferences").catch(() => ({ data: {} })),
-        api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } } })),
+        api.get<{ preferences?: Record<string, boolean> } | Record<string, boolean>>("/users/me/notification-preferences").catch(() => ({ data: {} })),
+        api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } } })),
+        api.get<PrizePickup[]>("/prizes/me").catch(() => ({ data: [] })),
       ]);
       setAchievements(achievementResult.data || { groups: [], awards: [] });
-      setReferences(referenceResult.data || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } });
+      setReferences(referenceResult.data || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
+      setPrizes(Array.isArray(prizeResult.data) ? prizeResult.data : []);
       setCompleteness(completenessResult.data || {});
       setForm((current) => ({
         ...current,
         notification_preferences: {
           ...(current.notification_preferences || {}),
-          ...(preferenceResult.data || {}),
+          ...(((preferenceResult.data as any)?.preferences || preferenceResult.data || {}) as Record<string, boolean>),
         },
       }));
     } catch (err) {
@@ -178,6 +192,13 @@ export function ProfileScreen() {
   }, [loadProfileData]);
 
   useEffect(() => {
+    const requestedTab = route.params?.tab;
+    if (requestedTab && tabs.some((item) => item.key === requestedTab)) {
+      setTab(requestedTab);
+    }
+  }, [route.params?.tab]);
+
+  useEffect(() => {
     if (tab !== "achievements") setOpenGroups({});
   }, [tab]);
 
@@ -190,6 +211,13 @@ export function ProfileScreen() {
       .sort((a, b) => Number(b.percent || 0) - Number(a.percent || 0))[0];
     return { tiers, earned, points, next };
   }, [achievements]);
+
+  const prizeStats = useMemo(() => {
+    const open = prizes.filter((item) => ["pending", "ready"].includes(String(item.status || "pending")));
+    const ready = prizes.filter((item) => String(item.status || "") === "ready");
+    const pickedUp = prizes.filter((item) => String(item.status || "") === "picked_up");
+    return { open, ready, pickedUp };
+  }, [prizes]);
 
   const save = useCallback(async () => {
     if (guest) return;
@@ -234,9 +262,23 @@ export function ProfileScreen() {
       navigation.navigate("Tournaments", { screen: "FastLapDetail", params: { id: item.target_id } });
       return;
     }
+    if (item.kind === "season") {
+      navigation.navigate("More", { screen: "SeasonPass" });
+      return;
+    }
     if (item.kind === "tournament") {
       navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id: item.target_id } });
     }
+  }, [navigation]);
+
+  const openPrize = useCallback((item: PrizePickup) => {
+    const target = prizeTarget(item);
+    if (!target.id) return;
+    if (target.kind === "fastlap") {
+      navigation.navigate("Tournaments", { screen: "FastLapDetail", params: { id: target.id } });
+      return;
+    }
+    navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id: target.id } });
   }, [navigation]);
 
   const refreshProfile = useCallback(async () => {
@@ -248,8 +290,36 @@ export function ProfileScreen() {
     await loadProfileData();
   }, [guest, loadProfileData, refreshMe]);
 
+  const openPublicProfile = useCallback(() => {
+    const username = user?.username;
+    if (!username) return;
+    navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username } });
+  }, [navigation, user?.username]);
+
+  const sharePublicProfile = useCallback(() => {
+    const username = user?.username;
+    if (!username) return;
+    Share.share({ message: `${API_BASE_URL}/u/${username}` }).catch(() => {});
+  }, [user?.username]);
+
   const avatar = resolveMediaUrl(form.avatar_url || user?.avatar_url);
   const banner = resolveMediaUrl(form.banner_url || (user as any)?.banner_url);
+  const notificationEnabled = useCallback((key: string) => {
+    if (key === "news_events" && !form.newsletter_consent) return false;
+    const pref = form.notification_preferences || {};
+    if (Object.prototype.hasOwnProperty.call(pref, key)) return Boolean(pref[key]);
+    if (key === "news_events") return Boolean(form.newsletter_consent);
+    return true;
+  }, [form.newsletter_consent, form.notification_preferences]);
+  const notificationTopicEnabled = useCallback((channel: string, topic: string) => {
+    if (channel === "email" && topic === "news_events" && !form.newsletter_consent) return false;
+    const pref = form.notification_preferences || {};
+    const key = notificationPreferenceKey(channel, topic);
+    if (Object.prototype.hasOwnProperty.call(pref, key)) return Boolean(pref[key]);
+    if (Object.prototype.hasOwnProperty.call(pref, topic)) return Boolean(pref[topic]);
+    if (topic === "news_events") return Boolean(form.newsletter_consent);
+    return true;
+  }, [form.newsletter_consent, form.notification_preferences]);
 
   return (
     <Screen padded={false}>
@@ -271,6 +341,7 @@ export function ProfileScreen() {
                 <Pill label={user?.is_club_member ? "Vereinsmitglied" : "Community"} tone={user?.is_club_member ? "success" : "cyan"} />
                 <Pill label={`${completeness.score ?? 0}% Profil`} tone="gold" />
                 <Pill label={`${insights.earned.length} Erfolge`} />
+                {prizeStats.open.length ? <Pill label={`${prizeStats.open.length} Gewinne`} tone="cyan" /> : null}
               </View>
             </View>
           </View>
@@ -278,9 +349,12 @@ export function ProfileScreen() {
 
         <View style={styles.quickActions}>
           <ActionTile icon="create-outline" label="Bearbeiten" onPress={() => setTab("edit")} />
+          <ActionTile icon="open-outline" label="Öffentlich" onPress={guest ? undefined : openPublicProfile} />
+          <ActionTile icon="share-social-outline" label="Teilen" onPress={guest ? undefined : sharePublicProfile} />
+          <ActionTile icon="trophy-outline" label="Gewinne" onPress={guest ? undefined : () => setTab("prizes")} />
           <ActionTile icon="refresh-outline" label={refreshing ? "Lädt" : "Aktualisieren"} onPress={guest || refreshing ? undefined : refreshProfile} />
           <ActionTile icon="shield-checkmark-outline" label="Privat" onPress={() => setTab("privacy")} />
-          <ActionTile icon="notifications-outline" label="Mails" onPress={() => setTab("notifications")} />
+          <ActionTile icon="notifications-outline" label="Benachr." onPress={() => setTab("notifications")} />
         </View>
 
         <View style={styles.tabs}>
@@ -343,12 +417,11 @@ export function ProfileScreen() {
               <View style={styles.statGrid}>
                 <Stat label="Gesamt" value={String(references.stats.total)} />
                 <Stat label="Podien" value={String(references.stats.podiums)} tone="gold" />
-                <Stat label="Jahrespkt." value={String(references.stats.season_points || 0)} />
+                <Stat label="Siege" value={String(references.stats.wins)} />
               </View>
               <View style={styles.statGrid}>
                 <Stat label="Turniere" value={String(references.stats.tournaments)} />
                 <Stat label="Fast Laps" value={String(references.stats.fastlaps)} tone="gold" />
-                <Stat label="Siege" value={String(references.stats.wins)} />
               </View>
             </Card>
             {references.items.length ? (
@@ -356,6 +429,27 @@ export function ProfileScreen() {
             ) : (
               <Card style={styles.card}>
                 <EmptyState icon="ribbon-outline" title="Noch keine Referenzen" detail="Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier." />
+              </Card>
+            )}
+          </>
+        ) : null}
+
+        {!profileLoading && tab === "prizes" ? (
+          <>
+            <Card style={styles.card}>
+              <Heading>Meine Gewinne</Heading>
+              <Muted>Preise aus Turnieren und Fast-Lap-Challenges, sobald sie fuer dein Konto oder Team hinterlegt sind.</Muted>
+              <View style={styles.statGrid}>
+                <Stat label="Offen" value={String(prizeStats.open.length)} />
+                <Stat label="Bereit" value={String(prizeStats.ready.length)} tone="gold" />
+                <Stat label="Abgeholt" value={String(prizeStats.pickedUp.length)} />
+              </View>
+            </Card>
+            {prizes.length ? (
+              prizes.map((item) => <PrizeCard key={item.id} item={item} onOpen={openPrize} />)
+            ) : (
+              <Card style={styles.card}>
+                <EmptyState icon="trophy-outline" title="Noch keine Gewinne" detail="Sobald ein Preis fuer dich oder dein Team eingetragen wird, erscheint er hier." tone="gold" />
               </Card>
             )}
           </>
@@ -435,12 +529,13 @@ export function ProfileScreen() {
           <Card style={styles.card}>
             <Heading>Benachrichtigungen</Heading>
             <Toggle label="Newsletter" detail="Grundsätzliche Zustimmung für News und Events." value={Boolean(form.newsletter_consent)} onValueChange={(v) => setField(setForm, "newsletter_consent", v)} />
-            {notificationLabels.map((item) => (
+            <Muted style={styles.sectionText}>Kanäle</Muted>
+            {notificationChannels.map((item) => (
               <Toggle
                 key={item.key}
                 label={item.label}
                 detail={item.detail}
-                value={form.notification_preferences?.[item.key] ?? true}
+                value={notificationEnabled(item.key)}
                 onValueChange={(v) =>
                   setForm((current) => ({
                     ...current,
@@ -448,6 +543,36 @@ export function ProfileScreen() {
                   }))
                 }
               />
+            ))}
+            <Muted style={styles.sectionText}>Jede Benachrichtigung pro Kanal</Muted>
+            {notificationLabels.map((item) => (
+              <View key={item.key} style={styles.notificationTopic}>
+                <Body style={styles.strong}>{item.label}</Body>
+                <Muted>{item.detail}</Muted>
+                {item.key === "news_events" && !form.newsletter_consent ? <Muted style={styles.warningText}>E-Mail benötigt Newsletter-Zustimmung.</Muted> : null}
+                <View style={styles.notificationMatrix}>
+                  {notificationChannels.map((channel) => {
+                    const key = notificationPreferenceKey(channel.key, item.key);
+                    const channelEnabled = notificationEnabled(channel.key);
+                    const disabled = !channelEnabled || (channel.key === "email" && item.key === "news_events" && !form.newsletter_consent);
+                    const enabled = channelEnabled && notificationTopicEnabled(channel.key, item.key);
+                    return (
+                      <MatrixToggle
+                        key={key}
+                        label={channel.label}
+                        value={enabled}
+                        disabled={disabled}
+                        onValueChange={(v) =>
+                          setForm((current) => ({
+                            ...current,
+                            notification_preferences: { ...(current.notification_preferences || {}), [key]: v },
+                          }))
+                        }
+                      />
+                    );
+                  })}
+                </View>
+              </View>
             ))}
             <Button label="Benachrichtigungen speichern" onPress={save} disabled={guest || saving} />
           </Card>
@@ -508,6 +633,21 @@ function Toggle({ label, detail, value, onValueChange }: { label: string; detail
   );
 }
 
+function MatrixToggle({ label, value, disabled, onValueChange }: { label: string; value: boolean; disabled?: boolean; onValueChange: (value: boolean) => void }) {
+  return (
+    <View style={[styles.matrixToggle, value && styles.matrixToggleActive, disabled && styles.matrixToggleDisabled]}>
+      <Muted style={[styles.matrixLabel, value && styles.matrixLabelActive]}>{label}</Muted>
+      <Switch
+        value={value}
+        disabled={disabled}
+        onValueChange={onValueChange}
+        trackColor={{ false: "rgba(255,255,255,0.16)", true: "rgba(41,182,232,0.45)" }}
+        thumbColor={value ? colors.cyan : colors.muted}
+      />
+    </View>
+  );
+}
+
 function AchievementGroupCard({ group, open, onToggle }: { group: AchievementGroup; open: boolean; onToggle: () => void }) {
   const tiers = group.tiers || [];
   const earned = tiers.filter((tier) => tier.earned);
@@ -552,15 +692,16 @@ function TierRow({ tier, accent }: { tier: AchievementTier; accent: string }) {
 
 function ReferenceCard({ item, onOpen }: { item: PersonalReferenceItem; onOpen?: (item: PersonalReferenceItem) => void }) {
   const isFastlap = item.kind === "fastlap";
+  const isSeason = item.kind === "season";
   const content = (
     <Card style={styles.referenceCard}>
       <View style={styles.referenceTop}>
-        <View style={[styles.referenceIcon, isFastlap ? styles.referenceIconFastlap : styles.referenceIconTournament]}>
-          <Body style={styles.referenceIconText}>{isFastlap ? "FL" : "T"}</Body>
+        <View style={[styles.referenceIcon, isFastlap || isSeason ? styles.referenceIconFastlap : styles.referenceIconTournament]}>
+          <Body style={styles.referenceIconText}>{isFastlap ? "FL" : isSeason ? "JW" : "T"}</Body>
         </View>
         <View style={styles.referenceText}>
           <Body style={styles.strong}>{item.title}</Body>
-          <Muted>{item.subtitle || (isFastlap ? "Fast Lap" : "Turnier")}</Muted>
+          <Muted>{item.subtitle || (isFastlap ? "Fast Lap" : isSeason ? "Jahreswertung" : "Turnier")}</Muted>
           <Muted>{formatDate(item.date)} · {formatStatus(item.status)}</Muted>
         </View>
         <View style={styles.referenceRank}>
@@ -572,8 +713,8 @@ function ReferenceCard({ item, onOpen }: { item: PersonalReferenceItem; onOpen?:
       </View>
       <View style={styles.referenceMeta}>
         {item.time_str ? <Pill label={item.time_str} tone="cyan" /> : null}
-        {item.points != null ? <Pill label={`${item.points} Punkte`} tone="gold" /> : null}
-        <Pill label={isFastlap ? "Fast Lap" : "Turnier"} />
+        {isSeason && item.points != null ? <Pill label={`${item.points} Jahrespunkte`} tone="gold" /> : null}
+        <Pill label={isFastlap ? "Fast Lap" : isSeason ? "Jahreswertung" : "Turnier"} />
       </View>
     </Card>
   );
@@ -583,6 +724,63 @@ function ReferenceCard({ item, onOpen }: { item: PersonalReferenceItem; onOpen?:
       {content}
     </Pressable>
   );
+}
+
+function PrizeCard({ item, onOpen }: { item: PrizePickup; onOpen?: (item: PrizePickup) => void }) {
+  const target = prizeTarget(item);
+  const isFastlap = target.kind === "fastlap";
+  const status = String(item.status || "pending");
+  const isReady = status === "ready";
+  const sourceTitle = item.fastlap_challenge_title || item.tournament_title || "Gewinn";
+  const prizeText = item.prize_value || item.prize_label || "Preis";
+  const placeText = item.place_label || (item.place ? `Platz ${item.place}` : "Platz");
+  const deadline = item.pickup_deadline ? formatDate(item.pickup_deadline) : "";
+  const pickedUp = item.picked_up_at ? formatDate(item.picked_up_at) : "";
+  const overdue = item.pickup_deadline ? Date.parse(item.pickup_deadline) < Date.now() && status !== "picked_up" : false;
+  const content = (
+    <Card style={[styles.referenceCard, isReady && { borderColor: "rgba(240, 180, 41, 0.48)" }, overdue && { borderColor: "rgba(255, 65, 84, 0.56)" }]}>
+      <View style={styles.referenceTop}>
+        <View style={[styles.referenceIcon, isFastlap ? styles.referenceIconFastlap : styles.referenceIconTournament]}>
+          <Body style={styles.referenceIconText}>{isFastlap ? "FL" : "T"}</Body>
+        </View>
+        <View style={styles.referenceText}>
+          <Body style={styles.strong}>{prizeText}</Body>
+          <Muted>{sourceTitle}</Muted>
+          <Muted>{prizeSourceLabel(item)} - {formatStatus(status)}</Muted>
+        </View>
+        <View style={styles.referenceRank}>
+          <Body style={[styles.referenceRankText, styles.gold]}>{placeText.replace(/^Platz\s*/i, "#")}</Body>
+          <Muted>{item.recipient_type === "team" ? item.recipient_label || "Team" : "Du"}</Muted>
+        </View>
+      </View>
+      <View style={styles.referenceMeta}>
+        {isReady ? <Pill label="Bereit" tone="gold" /> : null}
+        {deadline ? <Pill label={`Frist ${deadline}`} tone={overdue ? "gold" : "default"} /> : null}
+        {pickedUp ? <Pill label={`Abgeholt ${pickedUp}`} tone="success" /> : null}
+        {item.fastlap_track_name ? <Pill label={item.fastlap_track_name} tone="cyan" /> : null}
+        <Pill label={isFastlap ? "Fast Lap" : "Turnier"} />
+      </View>
+    </Card>
+  );
+  if (!target.id || !onOpen) return content;
+  return (
+    <Pressable onPress={() => onOpen(item)} style={({ pressed }) => [pressed && styles.pressed]}>
+      {content}
+    </Pressable>
+  );
+}
+
+function prizeTarget(item: PrizePickup) {
+  if (item.source_type === "fastlap") {
+    return { kind: "fastlap", id: item.fastlap_challenge_slug || item.fastlap_challenge_id || "" };
+  }
+  return { kind: "tournament", id: item.tournament_slug || item.tournament_id || "" };
+}
+
+function prizeSourceLabel(item: PrizePickup) {
+  if (item.fastlap_source_label) return item.fastlap_source_label;
+  if (item.source_type === "fastlap") return "Fast Lap";
+  return "Turnier";
 }
 
 function ProgressBar({ value, color }: { value: number; color: string }) {
@@ -792,6 +990,15 @@ const styles = StyleSheet.create({
   strong: {
     fontWeight: "900",
   },
+  sectionText: {
+    color: colors.cyan,
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  warningText: {
+    color: colors.gold,
+  },
   field: {
     gap: 7,
   },
@@ -824,6 +1031,45 @@ const styles = StyleSheet.create({
   toggleText: {
     flex: 1,
     gap: 3,
+  },
+  notificationTopic: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    gap: 8,
+    paddingTop: 12,
+  },
+  notificationMatrix: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  matrixToggle: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: colors.border,
+    borderRadius: 6,
+    borderWidth: 1,
+    flexBasis: "31%",
+    flexDirection: "row",
+    flexGrow: 1,
+    justifyContent: "space-between",
+    minHeight: 42,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  matrixToggleActive: {
+    backgroundColor: "rgba(41,182,232,0.12)",
+    borderColor: "rgba(41,182,232,0.42)",
+  },
+  matrixToggleDisabled: {
+    opacity: 0.45,
+  },
+  matrixLabel: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  matrixLabelActive: {
+    color: colors.cyan,
   },
   optionGrid: {
     flexDirection: "row",

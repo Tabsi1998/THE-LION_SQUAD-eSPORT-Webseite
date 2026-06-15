@@ -1,6 +1,6 @@
 """Match/Score/Dispute routes."""
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from database import get_db
@@ -28,6 +28,7 @@ from match_rules import loser_for_winner, match_allows_draw, validate_winner_id
 from services.match_notifications import notify_match_result_confirmed
 from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
 from services.match_v2_results import MatchV2ResultError, build_v2_result_application
+from services.station_runtime import release_station_for_match
 from services.rate_limit import enforce_rate_limit
 from services.station_labels import attach_station_info
 from services.user_notifications import create_user_notification
@@ -37,6 +38,8 @@ STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 EVENT_MODES = {"local", "online", "hybrid"}
 RESULT_ENTRY_MODES = {"staff_only", "player_confirmed", "hybrid"}
 SCHEDULE_MODES = {"fixed_by_staff", "player_proposal", "hybrid"}
+OPEN_MATCH_STATUSES = {"ready", "scheduled", "in_progress", "waiting_result"}
+ACTIVE_MATCH_REGISTRATION_STATUSES = {"registered", "approved", "checked_in"}
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 STAFF_MENTION_HANDLES = {"leitung", "turnierleitung", "orga", "organizer", "staff", "admin", "referee", "schiri", "scorekeeper"}
 USER_PUBLIC_PROJECTION = {
@@ -57,6 +60,28 @@ async def _ensure_match_tournament_unlocked(db, match: dict) -> None:
 
 def _is_staff(user: dict | None) -> bool:
     return bool(user and user.get("role") in STAFF_ROLES)
+
+
+def _upcoming_sort_key(match: dict) -> tuple:
+    scheduled = match.get("scheduled_at")
+    if scheduled:
+        try:
+            parsed = datetime.fromisoformat(str(scheduled).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return (0, parsed.astimezone(timezone.utc))
+        except (TypeError, ValueError):
+            pass
+    return (1, int(match.get("round") or 9999), str(match.get("match_key") or match.get("id") or ""))
+
+
+async def _team_ids_for_user(user_id: str) -> list[str]:
+    db = get_db()
+    memberships = await db.team_members.find(
+        {"user_id": user_id},
+        {"_id": 0, "team_id": 1},
+    ).to_list(200)
+    return [row["team_id"] for row in memberships if row.get("team_id")]
 
 
 def _mode_value(value: object, allowed: set[str]) -> str | None:
@@ -160,7 +185,7 @@ def _score_report_resolution(match: dict, reports: list[dict]) -> dict | None:
     if first.get("score_a") != score_a or first.get("score_b") != score_b:
         return {
             "status": "disputed",
-            "admin_note": match.get("admin_note") or "Abweichende Ergebnisberichte; bitte durch Turnierleitung pruefen.",
+            "admin_note": match.get("admin_note") or "Abweichende Ergebnisberichte; bitte durch Turnierleitung prüfen.",
             "updated_at": now_utc().isoformat(),
         }
     winner = None
@@ -489,7 +514,7 @@ async def _require_result_permission(user: dict, match: dict) -> None:
         or (match.get("station_id") and await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "station", match.get("station_id")))
     )
     if not allowed:
-        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Aktion")
+        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")
 
 
 async def _assert_match_visible(match: dict, user: dict | None) -> None:
@@ -651,15 +676,38 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
 @router.get("/upcoming")
 async def my_upcoming(me: dict = Depends(get_current_user)):
     db = get_db()
+    team_ids = await _team_ids_for_user(me["id"])
+    reg_query = {"user_id": me["id"]}
+    if team_ids:
+        reg_query = {"$or": [{"user_id": me["id"]}, {"team_id": {"$in": team_ids}}]}
     regs = await db.tournament_registrations.find(
-        {"user_id": me["id"]}, {"_id": 0, "id": 1, "tournament_id": 1}
+        {**reg_query, "status": {"$in": list(ACTIVE_MATCH_REGISTRATION_STATUSES)}},
+        {"_id": 0, "id": 1, "tournament_id": 1},
     ).to_list(200)
     reg_ids = [r["id"] for r in regs]
-    matches = await db.matches.find({
+    if not reg_ids:
+        return []
+    match_query = {
         "$or": [{"participant_a_id": {"$in": reg_ids}},
-                {"participant_b_id": {"$in": reg_ids}}],
-        "status": {"$in": ["ready", "scheduled", "in_progress", "waiting_result"]},
-    }, {"_id": 0}).to_list(200)
+                {"participant_b_id": {"$in": reg_ids}},
+                {"slots.registration_id": {"$in": reg_ids}}],
+        "status": {"$in": list(OPEN_MATCH_STATUSES)},
+    }
+    legacy = await db.matches.find(match_query, {"_id": 0}).to_list(200)
+    v2 = await db.matches_v2.find(match_query, {"_id": 0}).to_list(200)
+    matches = sorted([{**m, "collection": "matches"} for m in legacy] + [{**m, "collection": "matches_v2"} for m in v2], key=_upcoming_sort_key)[:12]
+    tournament_ids = list({match.get("tournament_id") for match in matches if match.get("tournament_id")})
+    tournaments = {
+        tournament["id"]: tournament
+        for tournament in await db.tournaments.find(
+            {"id": {"$in": tournament_ids}},
+            {"_id": 0, "id": 1, "title": 1, "slug": 1},
+        ).to_list(100)
+    }
+    for match in matches:
+        tournament = tournaments.get(match.get("tournament_id") or "") or {}
+        match["tournament_title"] = tournament.get("title")
+        match["tournament_slug"] = tournament.get("slug")
     return matches
 
 
@@ -688,7 +736,7 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
     stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
     policy = _match_policy(match, collection, tournament, stage)
     if not _schedule_proposals_enabled(policy):
-        raise HTTPException(status_code=403, detail="Terminvorschlaege sind fuer dieses Match nicht aktiviert")
+        raise HTTPException(status_code=403, detail="Terminvorschläge sind für dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen Termine vorschlagen")
     now_iso = now_utc().isoformat()
@@ -730,9 +778,9 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
     policy = _match_policy(match, collection, tournament, stage)
     if not _schedule_proposals_enabled(policy):
-        raise HTTPException(status_code=403, detail="Terminabstimmung ist fuer dieses Match nicht aktiviert")
+        raise HTTPException(status_code=403, detail="Terminabstimmung ist für dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung fuer diesen Termin")
+        raise HTTPException(status_code=403, detail="Keine Berechtigung für diesen Termin")
     acting_reg = await _acting_registration_for_match(match, me)
     if (
         not _is_staff(me)
@@ -869,7 +917,7 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
     db = get_db()
     match, collection = await _find_match_any(match_id)
     if collection != "matches_v2":
-        raise HTTPException(status_code=400, detail="Dieses Ergebnisformular ist fuer Mehrspieler-Heats vorgesehen")
+        raise HTTPException(status_code=400, detail="Dieses Ergebnisformular ist für Mehrspieler-Heats vorgesehen")
     await _ensure_match_tournament_unlocked(db, match)
     await ensure_tournament_accepts_results(db, match["tournament_id"])
     await _require_result_permission(me, match)
@@ -929,6 +977,10 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
         await notify_match_result_confirmed(db, updated, "matches_v2", force=force)
     except Exception:
         pass
+    try:
+        await release_station_for_match(db, updated, "matches_v2")
+    except Exception:
+        pass
     return {
         "ok": True,
         "match": updated,
@@ -976,7 +1028,7 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         or (m.get("station_id") and await has_tournament_staff_permission(me, m["tournament_id"], RESULT_STAFF_ROLES, "station", m.get("station_id")))
     )
     if not allowed:
-        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Aktion")
+        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")
     nullable_fields = {"winner_id", "scheduled_at", "station_id", "admin_note", "map", "best_of", "duration_minutes"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
@@ -1072,6 +1124,10 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
                 await notify_match_result_confirmed(db, m, "matches")
             except Exception:
                 pass
+            try:
+                await release_station_for_match(db, m, "matches")
+            except Exception:
+                pass
     m.pop("_id", None)
     return m
 
@@ -1088,7 +1144,7 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
     stage = await db.tournament_stages.find_one({"id": m.get("stage_id")}, {"_id": 0}) if m.get("stage_id") else None
     policy = _match_policy(m, "matches", tournament, stage)
     if not _players_can_report(policy):
-        raise HTTPException(status_code=403, detail="Ergebnisse werden fuer dieses Match durch die Turnierleitung eingetragen")
+        raise HTTPException(status_code=403, detail="Ergebnisse werden für dieses Match durch die Turnierleitung eingetragen")
     # Verify user is participant
     reg_ids = [m.get("participant_a_id"), m.get("participant_b_id")]
     my_reg = await db.tournament_registrations.find_one(
@@ -1136,6 +1192,10 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
                 await db.matches.update_one({"id": um["id"]}, {"$set": um})
             try:
                 await notify_match_result_confirmed(db, m, "matches")
+            except Exception:
+                pass
+            try:
+                await release_station_for_match(db, m, "matches")
             except Exception:
                 pass
     m = await db.matches.find_one({"id": match_id}, {"_id": 0})
@@ -1211,6 +1271,10 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(get_current_user
         await db.matches.update_one({"id": um["id"]}, {"$set": um})
     try:
         await notify_match_result_confirmed(db, m, "matches")
+    except Exception:
+        pass
+    try:
+        await release_station_for_match(db, m, "matches")
     except Exception:
         pass
     m.pop("_id", None)

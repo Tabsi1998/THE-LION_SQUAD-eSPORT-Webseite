@@ -194,7 +194,7 @@ export default function AdminF1NewPage() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Preise (strukturiert)</div>
-              <div className="text-xs text-white/50 mt-0.5">z.B. Tagessieger Samstag / Sonntag</div>
+              <div className="text-xs text-white/50 mt-0.5">Wird bei Ergebnisveröffentlichung als Gewinnabholung angelegt.</div>
             </div>
             <button type="button" onClick={() => set("prize_places", [...(form.prize_places || []), { place: (form.prize_places?.length || 0) + 1, label: "", value: "" }])} data-testid="f1-new-prize-add" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
           </div>

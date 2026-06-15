@@ -171,7 +171,7 @@ async def update_document(doc_id: str, body: DocumentUpdate, me: dict = Depends(
     raw = body.model_dump(exclude_unset=True)
     update = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if not update:
-        raise HTTPException(400, "Keine Aenderungen.")
+        raise HTTPException(400, "Keine Änderungen.")
     if "visibility" in update:
         update["visibility"] = _normalise_visibility(update.get("visibility"))
     if update.get("storage_key"):
@@ -208,7 +208,7 @@ async def download_document(doc_id: str, user: dict | None = Depends(get_optiona
     db = get_db()
     doc, path = await _load_authorized_doc(doc_id, user)
     if not doc.get("allow_download") and not _is_admin(user):
-        raise HTTPException(403, "Download ist fuer dieses Dokument deaktiviert.")
+        raise HTTPException(403, "Download ist für dieses Dokument deaktiviert.")
     await db.documents.update_one({"id": doc_id}, {"$inc": {"download_count": 1}})
     return _file_response(doc, path, "attachment")
 
@@ -223,6 +223,6 @@ async def track_download(doc_id: str, user: dict | None = Depends(get_optional_u
     if not await _user_can_see(user, doc.get("visibility") or "members"):
         raise HTTPException(403, "Kein Zugriff.")
     if not doc.get("allow_download") and not _is_admin(user):
-        raise HTTPException(403, "Download ist fuer dieses Dokument deaktiviert.")
+        raise HTTPException(403, "Download ist für dieses Dokument deaktiviert.")
     await db.documents.update_one({"id": doc_id}, {"$inc": {"download_count": 1}})
     return {"ok": True, "url": _document_url(doc_id)}

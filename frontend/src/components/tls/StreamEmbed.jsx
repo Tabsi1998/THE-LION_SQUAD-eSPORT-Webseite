@@ -1,11 +1,6 @@
-/**
- * Phase 5 — Unified stream embed.
- * Only renders a stream block when the parent object explicitly enables it
- * via `has_live_stream`. Falls back to the legacy `twitch_*` fields for
- * backwards compatibility.
- */
 import { Radio, ExternalLink } from "lucide-react";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
+import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 
 const YOUTUBE_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]);
 const KICK_HOSTS = new Set(["kick.com", "www.kick.com"]);
@@ -65,7 +60,7 @@ function kickChannel(value) {
 }
 
 export function StreamEmbed({ source, compact = false, showExternalLink = true }) {
-  const { hasConsent, openSettings } = useCookieConsent();
+  const { hasConsent } = useCookieConsent();
   if (!source) return null;
   const enabled = source.has_live_stream === true || (source.twitch_enabled && source.twitch_channel);
   if (!enabled) return null;
@@ -100,21 +95,27 @@ export function StreamEmbed({ source, compact = false, showExternalLink = true }
         <Radio className={`${compact ? "w-3.5 h-3.5" : "w-4 h-4"} text-[#FF3B30] animate-pulse`} />
         <span className={`${compact ? "text-xs" : "text-sm"} font-display tracking-widest font-bold text-[#FF3B30] truncate`}>{source.stream_title || "LIVE STREAM"}</span>
         <span className="ml-auto text-[10px] uppercase tracking-widest text-white/50">{platform.toUpperCase()}</span>
-        {showExternalLink && url && <a href={url} target="_blank" rel="noreferrer" data-testid="stream-open-external" className="text-[10px] uppercase tracking-widest text-white/70 hover:text-white inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Öffnen</a>}
+        {showExternalLink && url && (
+          <a href={url} target="_blank" rel="noopener noreferrer" data-testid="stream-open-external" className="text-[10px] uppercase tracking-widest text-white/70 hover:text-white inline-flex items-center gap-1">
+            <ExternalLink className="w-3 h-3" /> Öffnen
+          </a>
+        )}
       </div>
       {embedSrc && hasConsent("external_media") ? (
         <div className={`aspect-video ${compact ? "min-h-[10rem]" : "min-h-[180px]"} sm:min-h-0`}>
           <iframe src={embedSrc} className="block w-full h-full border-0" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen frameBorder={0} title="Live Stream" />
         </div>
       ) : embedSrc ? (
-        <div className="p-8 text-center">
-          <Radio className="w-10 h-10 mx-auto text-[#FF3B30] mb-3" />
-          <div className="font-heading font-black uppercase">Stream-Einbettung blockiert</div>
-          <div className="text-xs text-white/50 mt-1">Für externe Medien brauchen wir deine Zustimmung.</div>
-          <button type="button" onClick={openSettings} className="mt-4 px-4 py-2 border border-[#FF3B30]/50 text-[#FF3B30] text-xs uppercase tracking-wider font-bold rounded-sm">Cookie-Einstellungen</button>
-        </div>
+        <ExternalMediaNotice
+          service={`${platform.toUpperCase()} Stream`}
+          reason="Player, Chat und Tracking des externen Anbieters werden erst nach Zustimmung zu externen Medien geladen."
+          url={url}
+          accent="#FF3B30"
+          compact={compact}
+          testId="stream-consent-notice"
+        />
       ) : url ? (
-        <a href={url} target="_blank" rel="noreferrer" data-testid="stream-fallback-link" className="block p-8 text-center">
+        <a href={url} target="_blank" rel="noopener noreferrer" data-testid="stream-fallback-link" className="block p-8 text-center">
           <Radio className="w-10 h-10 mx-auto text-[#FF3B30] mb-3" />
           <div className="font-heading font-black uppercase">Stream auf {platform} öffnen</div>
           <div className="text-xs text-white/50 mt-1 break-all">{url}</div>

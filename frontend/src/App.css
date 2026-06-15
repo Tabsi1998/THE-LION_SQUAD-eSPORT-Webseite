@@ -1,6 +1,92 @@
 /* Minimal app-level overrides */
 .App { min-height: 100vh; background: #0A0A0A; color: #fff; }
 
+.tls-skip-link {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  z-index: 9999;
+  transform: translateY(-160%);
+  border: 1px solid rgba(41, 182, 232, 0.8);
+  border-radius: 2px;
+  background: #0A0A0A;
+  color: #FFFFFF;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: transform 140ms ease;
+}
+
+.tls-skip-link:focus,
+.tls-skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 3px solid rgba(255, 215, 0, 0.9);
+  outline-offset: 3px;
+}
+
+:where(a, button, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 3px solid rgba(41, 182, 232, 0.9);
+  outline-offset: 3px;
+}
+
+:where(input, select, textarea):focus-visible {
+  border-color: rgba(41, 182, 232, 0.85) !important;
+  box-shadow: 0 0 0 1px rgba(41, 182, 232, 0.45);
+}
+
+@media (prefers-contrast: more) {
+  [class*="text-white/30"],
+  [class*="text-white/35"],
+  [class*="text-white/38"],
+  [class*="text-white/40"],
+  [class*="text-white/42"],
+  [class*="text-white/45"],
+  [class*="text-white/50"],
+  [class*="text-white/55"] {
+    color: rgba(255, 255, 255, 0.78) !important;
+  }
+
+  [class*="text-[#29B6E8]"] {
+    color: #6EDCFF !important;
+  }
+
+  [class*="text-[#FFD700]"],
+  [class*="text-[#FFD600]"] {
+    color: #FFE66B !important;
+  }
+
+  [class*="border-white/5"],
+  [class*="border-white/10"],
+  [class*="border-white/15"],
+  [class*="border-white/20"] {
+    border-color: rgba(255, 255, 255, 0.34) !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .tls-skip-link,
+  :where(a, button, input, select, textarea, summary, [role="button"]) {
+    forced-color-adjust: auto;
+  }
+
+  :where(a, button, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* iOS Safe Area für Bottom Navigation */
 .safe-area-pb {
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -10,6 +96,18 @@
 @media (max-width: 1023px) {
   body:has(nav[aria-label="Mobile Navigation"]) main {
     padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  body:has(nav[aria-label="Mobile Navigation"]):has(.tls-site-banner--pos-bottom_fixed) main {
+    padding-bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  body:has(nav[aria-label="Mobile Navigation"]) .tls-site-banner--pos-bottom_fixed {
+    bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  body:has(nav[aria-label="Mobile Navigation"]):has(.tls-site-banner--pos-bottom_fixed) [data-testid="scroll-top-btn"] {
+    bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
   }
 }
 

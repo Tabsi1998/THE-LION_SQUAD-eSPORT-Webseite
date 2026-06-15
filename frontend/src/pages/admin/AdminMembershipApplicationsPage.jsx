@@ -2,6 +2,7 @@
  * Phase C — Admin Mitgliedsbewerbungen Inbox.
  */
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
@@ -14,14 +15,31 @@ const TABS = [
   { key: "approved", label: "Akzeptiert", color: "#00FF88" },
   { key: "rejected", label: "Abgelehnt",  color: "#FF3B30" },
 ];
+const TAB_KEYS = new Set(TABS.map((tab) => tab.key));
 
 const PREF_LABEL = { full: "Vollmitglied", supporter: "Unterstützer", youth: "Jugend", honorary: "Ehren" };
 
 export default function AdminMembershipApplicationsPage() {
-  const [tab, setTab] = useState("pending");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [tab, setTab] = useState(TAB_KEYS.has(searchParams.get("status")) ? searchParams.get("status") : "pending");
   const [list, setList] = useState([]);
   const [selected, setSelected] = useState(null);
   const prompt = usePrompt();
+
+  useEffect(() => {
+    const nextTab = searchParams.get("status");
+    if (TAB_KEYS.has(nextTab) && nextTab !== tab) setTab(nextTab);
+  }, [searchParams, tab]);
+
+  const selectTab = (nextTab) => {
+    setTab(nextTab);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (nextTab === "pending") params.delete("status");
+      else params.set("status", nextTab);
+      return params;
+    }, { replace: true });
+  };
 
   const load = useCallback(() => api.get(`/membership/applications?status=${tab}`).then(({ data }) => setList(data)), [tab]);
   useEffect(() => { load(); }, [load]);
@@ -52,7 +70,7 @@ export default function AdminMembershipApplicationsPage() {
 
       <div className="mt-6 flex gap-1 border-b border-white/10">
         {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} data-testid={`apps-tab-${t.key}`} className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition ${tab === t.key ? "" : "border-transparent text-white/50 hover:text-white"}`} style={tab === t.key ? { borderColor: t.color, color: t.color } : {}}>{t.label}</button>
+          <button key={t.key} onClick={() => selectTab(t.key)} data-testid={`apps-tab-${t.key}`} className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition ${tab === t.key ? "" : "border-transparent text-white/50 hover:text-white"}`} style={tab === t.key ? { borderColor: t.color, color: t.color } : {}}>{t.label}</button>
         ))}
       </div>
 

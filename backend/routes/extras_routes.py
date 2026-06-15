@@ -10,7 +10,7 @@ import io
 import httpx
 
 from database import get_db
-from auth import require_admin, require_super, get_current_user, get_optional_user
+from auth import require_admin, require_role, require_super, get_current_user, get_optional_user
 from services.visibility import user_can_see
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services.access_links import validate_access_link
@@ -18,8 +18,11 @@ from models import now_utc, new_id
 from email_service import send_template, _get_email_config
 from pdf_service import (
     pdf_participants, pdf_f1_leaderboard, pdf_matches, pdf_standings, pdf_checkin,
-    pdf_station_signs,
+    pdf_station_signs, pdf_qr_sign,
 )
+
+RESULT_EXPORT_STATUSES = {"completed", "results_published", "archived"}
+STAFF_EXPORT_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 
 # ---------- Settings ----------
 settings_router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -70,8 +73,14 @@ class BrandingSettings(BaseModel):
     site_description: Optional[str] = None
     primary_color: Optional[str] = None
     logo_url: Optional[str] = None
+    logo_light_url: Optional[str] = None
+    logo_dark_url: Optional[str] = None
+    share_banner_url: Optional[str] = None
     mascot_url: Optional[str] = None
+    qr_logo_url: Optional[str] = None
     favicon_url: Optional[str] = None
+    favicon_light_url: Optional[str] = None
+    favicon_dark_url: Optional[str] = None
     domain: Optional[str] = None
     timezone: Optional[str] = None
     contact_email: Optional[str] = None
@@ -533,11 +542,17 @@ async def public_settings(response: Response):
         "club_name": b.get("club_name", "THE LION SQUAD"),
         "tagline": tagline,
         "site_title": b.get("site_title") or "THE LION SQUAD - eSPORTS",
-        "site_description": b.get("site_description") or "THE LION SQUAD - eSPORTS: Turniere, Fast Lap Challenges, News, Events und Mitgliederbereich.",
+        "site_description": b.get("site_description") or "Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.",
         "primary_color": b.get("primary_color", "#29B6E8"),
         "logo_url": b.get("logo_url"),
+        "logo_light_url": b.get("logo_light_url"),
+        "logo_dark_url": b.get("logo_dark_url"),
+        "share_banner_url": b.get("share_banner_url"),
         "mascot_url": b.get("mascot_url"),
+        "qr_logo_url": b.get("qr_logo_url"),
         "favicon_url": b.get("favicon_url"),
+        "favicon_light_url": b.get("favicon_light_url"),
+        "favicon_dark_url": b.get("favicon_dark_url"),
         "domain": domain,
         "timezone": b.get("timezone") or "Europe/Vienna",
         "contact_email": contact_email,
@@ -1326,6 +1341,62 @@ async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
     return (explicit_t or auto_t), (explicit_f or auto_f)
 
 
+def _season_v2_standings(matches_v2: list[dict], regs: list[dict]) -> list[dict]:
+    rank_map = {
+        r["id"]: {
+            "registration_id": r["id"],
+            "played": 0,
+            "won": 0,
+            "top2": 0,
+            "points": 0,
+            "rank_sum": 0,
+            "furthest_round": 0,
+        }
+        for r in regs
+        if r.get("id")
+    }
+    for match in matches_v2:
+        if match.get("status") not in {"completed", "forfeit"}:
+            continue
+        for result in match.get("results") or []:
+            rid = result.get("registration_id")
+            if rid not in rank_map:
+                continue
+            try:
+                rank = int(result.get("rank") or 999)
+            except (TypeError, ValueError):
+                rank = 999
+            row = rank_map[rid]
+            row["played"] += 1
+            row["rank_sum"] += rank
+            row["furthest_round"] = max(row["furthest_round"], int(match.get("round") or 0))
+            if rank == 1:
+                row["won"] += 1
+            if rank <= 2:
+                row["top2"] += 1
+            score = result.get("points")
+            if score is None:
+                score = result.get("score")
+            if isinstance(score, (int, float)):
+                row["points"] += score
+    rows = list(rank_map.values())
+    for row in rows:
+        row["avg_rank"] = round(row["rank_sum"] / row["played"], 2) if row["played"] else None
+    rows.sort(
+        key=lambda row: (
+            row["furthest_round"],
+            row["won"],
+            row["top2"],
+            row["points"],
+            -(row["avg_rank"] or 999),
+        ),
+        reverse=True,
+    )
+    for index, row in enumerate(rows, start=1):
+        row["rank"] = index
+    return rows
+
+
 @season_router.get("/{slug_or_id}/standings")
 async def season_standings(slug_or_id: str):
     """Aggregate standings over all season point sources."""
@@ -1364,8 +1435,21 @@ async def season_standings(slug_or_id: str):
     # Tournaments: use standings endpoint results (rank -> points)
     for tid in tournament_ids:
         matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(2000)
-        regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+        regs = await db.tournament_registrations.find(
+            {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+            {"_id": 0},
+        ).to_list(500)
         reg_user_map = {r["id"]: r.get("user_id") for r in regs}
+        matches_v2 = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+        if matches_v2:
+            for row in _season_v2_standings(matches_v2, regs):
+                uid = reg_user_map.get(row.get("registration_id"))
+                if not uid or not row.get("played"):
+                    continue
+                pos = int(row.get("rank") or 999) - 1
+                pts = points_system[pos] if 0 <= pos < len(points_system) else 0
+                add_points(uid, pts, pos == 0)
+            continue
         # compute rank via furthest round + wins
         rank_map = {}
         for r in regs:
@@ -1391,7 +1475,12 @@ async def season_standings(slug_or_id: str):
         tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).to_list(100)
         for tr in tracks:
             times = await db.f1_lap_times.find(
-                {"challenge_id": cid, "track_id": tr["id"], "is_invalid": {"$ne": True}},
+                {
+                    "challenge_id": cid,
+                    "track_id": tr["id"],
+                    "is_invalid": {"$ne": True},
+                    "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}],
+                },
                 {"_id": 0},
             ).to_list(5000)
             best_per_user: dict = {}
@@ -1599,11 +1688,29 @@ pdf_router = APIRouter(prefix="/api/exports", tags=["exports"])
 
 
 def _pdf_response(data: bytes, filename: str):
+    safe_filename = _pdf_filename(filename)
     return StreamingResponse(
         io.BytesIO(data),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
     )
+
+
+def _pdf_filename_part(*values: str | None, fallback: str = "export") -> str:
+    for value in values:
+        raw = str(value or "").strip()
+        if not raw:
+            continue
+        safe = re.sub(r"[^A-Za-z0-9._-]+", "_", raw).strip("._-")
+        if safe:
+            return safe[:90]
+    return fallback
+
+
+def _pdf_filename(filename: str) -> str:
+    raw = str(filename or "").strip()
+    stem = raw[:-4] if raw.lower().endswith(".pdf") else raw
+    return _pdf_filename_part(stem, fallback="export") + ".pdf"
 
 
 _PDF_SPONSOR_TIER_ORDER = {"main": 0, "platinum": 1, "gold": 2, "silver": 3, "bronze": 4}
@@ -1638,14 +1745,79 @@ async def _pdf_sponsors(db):
 
 
 async def _pdf_branding(db):
-    return await db.settings.find_one(
+    branding = await db.settings.find_one(
         {"id": "branding"},
-        {"_id": 0, "logo_url": 1, "mascot_url": 1, "domain": 1, "site_title": 1, "club_name": 1},
+        {
+            "_id": 0,
+            "logo_url": 1,
+            "logo_light_url": 1,
+            "logo_dark_url": 1,
+            "mascot_url": 1,
+            "qr_logo_url": 1,
+            "favicon_url": 1,
+            "favicon_light_url": 1,
+            "favicon_dark_url": 1,
+            "domain": 1,
+            "site_title": 1,
+            "club_name": 1,
+        },
     ) or {}
+    if not branding.get("logo_url"):
+        branding["logo_url"] = branding.get("logo_dark_url") or branding.get("logo_light_url")
+    return branding
+
+
+def _pdf_public_base(branding: dict) -> str:
+    base = str((branding or {}).get("domain") or "https://lionsquad.at").strip().rstrip("/")
+    if base and not base.startswith(("http://", "https://")):
+        base = "https://" + base
+    return base or "https://lionsquad.at"
+
+
+def _pdf_absolute_url(path_or_url: str, branding: dict) -> str:
+    raw = str(path_or_url or "").strip()
+    if raw.startswith(("http://", "https://")):
+        return raw
+    base = _pdf_public_base(branding)
+    if not raw.startswith("/"):
+        raw = "/" + raw
+    return base + raw
+
+
+def _is_export_staff(user: dict | None) -> bool:
+    return bool(user and user.get("role") in STAFF_EXPORT_ROLES)
+
+
+async def _result_export_allowed(item: dict, user: dict | None) -> bool:
+    if _is_export_staff(user):
+        return True
+    if item.get("status") not in RESULT_EXPORT_STATUSES:
+        return False
+    if item.get("is_public") is False:
+        return False
+    return await user_can_see(user, item.get("visibility") or "public")
+
+
+@pdf_router.get("/qr/sign.pdf")
+async def pdf_qr_sign_export(
+    url: str,
+    title: str = "THE LION SQUAD",
+    subtitle: str = "",
+    eyebrow: str = "QR CODE",
+    me: dict = Depends(require_role("moderator")),
+):
+    db = get_db()
+    sponsors = await _pdf_sponsors(db)
+    branding = await _pdf_branding(db)
+    target_url = _pdf_absolute_url(url, branding)
+    return _pdf_response(
+        pdf_qr_sign(title, target_url, subtitle=subtitle, eyebrow=eyebrow, pdf_sponsors=sponsors, pdf_branding=branding),
+        "qr_schild.pdf",
+    )
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/participants.pdf")
-async def pdf_tournament_participants(slug_or_id: str, me: dict = Depends(require_admin())):
+async def pdf_tournament_participants(slug_or_id: str, me: dict = Depends(require_role("moderator"))):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
@@ -1659,11 +1831,12 @@ async def pdf_tournament_participants(slug_or_id: str, me: dict = Depends(requir
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
     data = pdf_participants(t, regs, pdf_sponsors=sponsors, pdf_branding=branding)
-    return _pdf_response(data, f"teilnehmer_{t['slug']}.pdf")
+    file_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
+    return _pdf_response(data, f"teilnehmer_{file_id}.pdf")
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/checkin.pdf")
-async def pdf_tournament_checkin(slug_or_id: str, me: dict = Depends(require_admin())):
+async def pdf_tournament_checkin(slug_or_id: str, me: dict = Depends(require_role("moderator"))):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
@@ -1671,11 +1844,29 @@ async def pdf_tournament_checkin(slug_or_id: str, me: dict = Depends(require_adm
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
-    return _pdf_response(pdf_checkin(t, regs, pdf_sponsors=sponsors, pdf_branding=branding), f"checkin_{t['slug']}.pdf")
+    file_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
+    return _pdf_response(pdf_checkin(t, regs, pdf_sponsors=sponsors, pdf_branding=branding), f"checkin_{file_id}.pdf")
+
+
+@pdf_router.get("/tournaments/{slug_or_id}/registration-qr.pdf")
+async def pdf_tournament_registration_qr(slug_or_id: str, me: dict = Depends(require_role("moderator"))):
+    db = get_db()
+    t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
+    if not t:
+        raise HTTPException(status_code=404)
+    sponsors = await _pdf_sponsors(db)
+    branding = await _pdf_branding(db)
+    public_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
+    url = _pdf_absolute_url(f"/tournaments/{public_id}", branding)
+    subtitle = "Anmeldung, Check-in und Turnierinfos"
+    return _pdf_response(
+        pdf_qr_sign(t.get("title") or "Turnier", url, subtitle=subtitle, eyebrow="Turnier-Anmeldung", pdf_sponsors=sponsors, pdf_branding=branding),
+        f"anmeldung_qr_{public_id}.pdf",
+    )
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/matches.pdf")
-async def pdf_tournament_matches(slug_or_id: str, me: dict = Depends(require_admin())):
+async def pdf_tournament_matches(slug_or_id: str, me: dict = Depends(require_role("moderator"))):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
@@ -1685,14 +1876,15 @@ async def pdf_tournament_matches(slug_or_id: str, me: dict = Depends(require_adm
     reg_map = {r["id"]: r for r in regs}
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
-    return _pdf_response(pdf_matches(t, matches, reg_map, pdf_sponsors=sponsors, pdf_branding=branding), f"matches_{t['slug']}.pdf")
+    file_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
+    return _pdf_response(pdf_matches(t, matches, reg_map, pdf_sponsors=sponsors, pdf_branding=branding), f"matches_{file_id}.pdf")
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/stations.pdf")
 async def pdf_tournament_station_signs(
     slug_or_id: str,
     orientation: Literal["portrait", "landscape"] = "portrait",
-    me: dict = Depends(require_admin()),
+    me: dict = Depends(require_role("moderator")),
 ):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
@@ -1703,51 +1895,60 @@ async def pdf_tournament_station_signs(
     branding = await _pdf_branding(db)
     return _pdf_response(
         pdf_station_signs(t, stations, pdf_sponsors=sponsors, pdf_branding=branding, orientation=orientation),
-        f"stationen_{orientation}_{t['slug']}.pdf",
+        f"stationen_{orientation}_{_pdf_filename_part(t.get('slug'), t.get('id'), slug_or_id, fallback='turnier')}.pdf",
     )
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/standings.pdf")
-async def pdf_tournament_standings(slug_or_id: str):
+async def pdf_tournament_standings(slug_or_id: str, user: dict | None = Depends(get_optional_user)):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404)
+    if not await _result_export_allowed(t, user):
+        raise HTTPException(status_code=403, detail="Ergebnis-PDF ist erst nach Turnierende öffentlich.")
     # Reuse standings logic
     from routes.tournament_routes import standings as st_fn
     rows = await st_fn(t["id"])
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
-    return _pdf_response(pdf_standings(t, rows, pdf_sponsors=sponsors, pdf_branding=branding), f"standings_{t['slug']}.pdf")
+    file_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
+    return _pdf_response(pdf_standings(t, rows, pdf_sponsors=sponsors, pdf_branding=branding), f"standings_{file_id}.pdf")
 
 
 @pdf_router.get("/f1/{slug_or_id}/leaderboard.pdf")
-async def pdf_f1_lb(slug_or_id: str, track_id: Optional[str] = None, access: Optional[str] = None):
+async def pdf_f1_lb(slug_or_id: str, track_id: Optional[str] = None, access: Optional[str] = None, user: dict | None = Depends(get_optional_user)):
     db = get_db()
-    c = await _public_f1_challenge_or_404(slug_or_id, access)
-    from routes.f1_routes import leaderboard as f1_lb
-    lb = await f1_lb(c["id"], track_id, access)
+    from routes.f1_routes import _get_visible_challenge, leaderboard as f1_lb
+    c = await _get_visible_challenge(slug_or_id, user, access=access)
+    if not await _result_export_allowed(c, user):
+        raise HTTPException(status_code=403, detail="Ergebnis-PDF ist erst nach Challenge-Ende öffentlich.")
+    lb = await f1_lb(c["id"], track_id, access, user)
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
+    file_id = _pdf_filename_part(c.get("slug"), c.get("id"), slug_or_id, fallback="f1")
     return _pdf_response(pdf_f1_leaderboard(c, lb.get("track"), lb.get("entries", []), pdf_sponsors=sponsors, pdf_branding=branding),
-                          f"f1_{c['slug']}.pdf")
+                          f"f1_{file_id}.pdf")
 
 
 @pdf_router.get("/f1/{slug_or_id}/championship.pdf")
-async def pdf_f1_championship(slug_or_id: str, access: Optional[str] = None):
+async def pdf_f1_championship(slug_or_id: str, access: Optional[str] = None, user: dict | None = Depends(get_optional_user)):
     db = get_db()
-    c = await _public_f1_challenge_or_404(slug_or_id, access)
-    from routes.f1_routes import championship_standings as f1_champ
-    cs = await f1_champ(c["id"], access)
+    from routes.f1_routes import _get_visible_challenge, championship_standings as f1_champ
+    c = await _get_visible_challenge(slug_or_id, user, access=access)
+    if not await _result_export_allowed(c, user):
+        raise HTTPException(status_code=403, detail="Ergebnis-PDF ist erst nach Challenge-Ende öffentlich.")
+    cs = await f1_champ(c["id"], access, user)
     # Reuse standings PDF shape
     rows = [{"rank": r["rank"], "display_name": r["display_name"],
              "won": r.get("wins", 0), "lost": (r.get("races", 0) - r.get("wins", 0)),
              "points": r.get("points", 0)} for r in (cs.get("standings") or [])]
-    fake_tournament = {"title": (c.get("title") or "F1") + " · Championship", "slug": c.get("slug")}
+    file_id = _pdf_filename_part(c.get("slug"), c.get("id"), slug_or_id, fallback="f1")
+    fake_tournament = {"title": (c.get("title") or "F1") + " · Championship", "slug": file_id}
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
     return _pdf_response(pdf_standings(fake_tournament, rows, pdf_sponsors=sponsors, pdf_branding=branding),
-                          f"f1_championship_{c.get('slug') or slug_or_id}.pdf")
+                          f"f1_championship_{file_id}.pdf")
 
 
 # ---------- Audit ----------

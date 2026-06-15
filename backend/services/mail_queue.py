@@ -43,21 +43,21 @@ def explain_smtp_error(exc: Exception) -> str:
     if "AUTH extension is not supported" in raw:
         return (
             "Der SMTP-Server bietet auf diesem Host/Port keine Anmeldung an. "
-            "Fuer normalen E-Mail-Versand ohne Relay brauchst du den Submission-Port "
+            "Für normalen E-Mail-Versand ohne Relay brauchst du den Submission-Port "
             "mit SMTP AUTH, meistens 587 mit STARTTLS und Login."
         )
     if "Relay access denied" in raw:
         return (
             "Relay access denied: Der Mailserver erlaubt dem Backend nicht, an externe "
             "Empfaenger zu senden. Loesung: SMTP AUTH auf dem Submission-Port verwenden "
-            "oder die exakte Docker-/Server-IP im Mailserver als vertrauenswuerdiges Relay "
-            "eintragen. Port 25 ohne AUTH funktioniert nur fuer vertrauenswuerdige interne "
+            "oder die exakte Docker-/Server-IP im Mailserver als vertrauenswürdiges Relay "
+            "eintragen. Port 25 ohne AUTH funktioniert nur für vertrauenswürdige interne "
             "Hosts und darf nie als offenes Relay konfiguriert werden."
         )
     if "CERTIFICATE_VERIFY_FAILED" in raw or "self-signed certificate" in raw:
         return (
-            "TLS-Zertifikat konnte nicht verifiziert werden. Fuer lokale/self-signed Server "
-            "im Admin 'TLS Zertifikat pruefen' deaktivieren oder ein vertrauenswuerdiges Zertifikat installieren."
+            "TLS-Zertifikat konnte nicht verifiziert werden. Für lokale/self-signed Server "
+            "im Admin 'TLS Zertifikat prüfen' deaktivieren oder ein vertrauenswürdiges Zertifikat installieren."
         )
     return raw
 
@@ -152,29 +152,29 @@ def _deliverability_sync(cfg: dict) -> dict:
         result["checks"].append({"ok": ok, "label": label, "detail": detail, "severity": severity})
 
     spf_records = [r for r in _dns_txt(from_domain) if r.lower().startswith("v=spf1")]
-    add(bool(spf_records), "SPF fuer From-Domain", spf_records[0] if spf_records else f"Kein SPF TXT fuer {from_domain} gefunden.")
+    add(bool(spf_records), "SPF für From-Domain", spf_records[0] if spf_records else f"Kein SPF TXT für {from_domain} gefunden.")
 
     if envelope_domain != from_domain:
         env_spf = [r for r in _dns_txt(envelope_domain) if r.lower().startswith("v=spf1")]
-        add(bool(env_spf), "SPF fuer Envelope-Domain", env_spf[0] if env_spf else f"Kein SPF TXT fuer {envelope_domain} gefunden.")
+        add(bool(env_spf), "SPF für Envelope-Domain", env_spf[0] if env_spf else f"Kein SPF TXT für {envelope_domain} gefunden.")
     else:
         env_spf = spf_records
 
     dmarc_records = [r for r in _dns_txt(f"_dmarc.{from_domain}") if r.lower().startswith("v=dmarc1")]
-    add(bool(dmarc_records), "DMARC fuer From-Domain", dmarc_records[0] if dmarc_records else f"Kein DMARC TXT fuer _dmarc.{from_domain} gefunden.")
+    add(bool(dmarc_records), "DMARC für From-Domain", dmarc_records[0] if dmarc_records else f"Kein DMARC TXT für _dmarc.{from_domain} gefunden.")
 
     mx_records = _dns_mx(from_domain)
-    add(bool(mx_records), "MX fuer From-Domain", ", ".join(mx_records[:5]) if mx_records else f"Keine MX Records fuer {from_domain} gefunden.", "warning")
+    add(bool(mx_records), "MX für From-Domain", ", ".join(mx_records[:5]) if mx_records else f"Keine MX Records für {from_domain} gefunden.", "warning")
 
     aligned = envelope_domain == from_domain or message_id_domain == from_domain
     add(aligned, "Domain Alignment", f"From={from_domain}, Envelope={envelope_domain}, Message-ID={message_id_domain}", "warning")
 
     if _is_ip_literal(smtp_host):
         if _is_private_ip(smtp_host):
-            add(True, "Lokaler SMTP Host", f"{smtp_host} ist eine private IP. Fuer Gmail zaehlt die oeffentliche Ausgangs-IP deines Mailservers, nicht die Backend-IP.", "info")
+            add(True, "Lokaler SMTP Host", f"{smtp_host} ist eine private IP. Für Gmail zählt die öffentliche Ausgangs-IP deines Mailservers, nicht die Backend-IP.", "info")
         else:
             ptr_records = _dns_ptr(smtp_host)
-            add(bool(ptr_records), "PTR/rDNS fuer SMTP Host", ", ".join(ptr_records) if ptr_records else f"Kein PTR fuer {smtp_host} gefunden.", "warning")
+            add(bool(ptr_records), "PTR/rDNS für SMTP Host", ", ".join(ptr_records) if ptr_records else f"Kein PTR für {smtp_host} gefunden.", "warning")
     elif smtp_host:
         add(True, "SMTP Host", smtp_host, "info")
 
@@ -186,18 +186,18 @@ def _deliverability_sync(cfg: dict) -> dict:
     dkim_records = _find_dkim_records(from_domain)
     if dkim_records:
         selectors = ", ".join(r["selector"] for r in dkim_records)
-        add(True, "DKIM DNS", f"DKIM Record gefunden fuer Selector: {selectors}", "info")
+        add(True, "DKIM DNS", f"DKIM Record gefunden für Selector: {selectors}", "info")
     else:
-        add(False, "DKIM DNS", "Kein DKIM Record mit typischen Selectors gefunden. Wenn dein Selector anders heisst, pruefe ihn manuell. Der Mailserver sollte ausgehende Mails fuer die From-Domain DKIM-signieren.", "warning")
+        add(False, "DKIM DNS", "Kein DKIM Record mit typischen Selectors gefunden. Wenn dein Selector anders heißt, prüfe ihn manuell. Der Mailserver sollte ausgehende Mails für die From-Domain DKIM-signieren.", "warning")
 
     if not spf_records:
-        result["recommendations"].append(f"SPF fuer {from_domain} setzen und die oeffentliche sendende Mailserver-IP erlauben.")
+        result["recommendations"].append(f"SPF für {from_domain} setzen und die öffentliche sendende Mailserver-IP erlauben.")
     if not dmarc_records:
-        result["recommendations"].append(f"DMARC fuer {from_domain} setzen, z.B. _dmarc.{from_domain} TXT mit p=none zum Start.")
+        result["recommendations"].append(f"DMARC für {from_domain} setzen, z.B. _dmarc.{from_domain} TXT mit p=none zum Start.")
     if not dkim_records:
-        result["recommendations"].append(f"DKIM fuer {from_domain} aktivieren. Gmail empfiehlt SPF, DKIM und DMARC; ohne DKIM landen neue oder kleine Domains schneller im Spam.")
-    result["recommendations"].append("Pruefe am Mailserver die Queue und Logs: App 'sent' bedeutet nur, dass dein SMTP-Server die Mail angenommen hat.")
-    result["recommendations"].append("Wenn eine Mail bei Gmail ankommt, dort 'Original anzeigen' oeffnen und SPF/DKIM/DMARC Ergebnisse pruefen.")
+        result["recommendations"].append(f"DKIM für {from_domain} aktivieren. Gmail empfiehlt SPF, DKIM und DMARC; ohne DKIM landen neue oder kleine Domains schneller im Spam.")
+    result["recommendations"].append("Prüfe am Mailserver die Queue und Logs: App 'sent' bedeutet nur, dass dein SMTP-Server die Mail angenommen hat.")
+    result["recommendations"].append("Wenn eine Mail bei Gmail ankommt, dort 'Original anzeigen' öffnen und SPF/DKIM/DMARC Ergebnisse prüfen.")
 
     blocking = [c for c in result["checks"] if not c["ok"] and c.get("severity") == "error"]
     result["ok"] = not blocking
@@ -310,7 +310,7 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
     try:
         context = _smtp_tls_context(validate_certs)
         if _is_ip_literal(host) and security in {"starttls", "tls"} and validate_certs:
-            result["recommendations"].append("Du verbindest per IP. Falls das Zertifikat auf einen DNS-Namen ausgestellt ist, deaktiviere TLS-Zertifikat pruefen oder nutze den Zertifikatsnamen als Host.")
+            result["recommendations"].append("Du verbindest per IP. Falls das Zertifikat auf einen DNS-Namen ausgestellt ist, deaktiviere TLS-Zertifikat prüfen oder nutze den Zertifikatsnamen als Host.")
         if security == "tls":
             smtp = smtplib.SMTP_SSL(host=host, port=port, timeout=15, context=context, local_hostname=helo_name)
             result["steps"].append({"ok": True, "label": f"SSL/TLS Verbindung zu {host}:{port} hergestellt."})
@@ -338,7 +338,7 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
         should_login = auth_mode == "login" or (auth_mode == "auto" and username and password and auth_supported)
         if auth_mode == "login" and not auth_supported:
             result["recommendations"].append("Dieser Host/Port bietet kein SMTP AUTH. Die IP ist okay, aber du brauchst auf dieser IP einen Submission-Port mit AUTH, meistens 587 STARTTLS oder 465 SSL/TLS.")
-            result["recommendations"].append("Port 25 ist fuer Server-zu-Server-Transport gedacht und ist ohne Relay-Regel kein normaler Client-Versand.")
+            result["recommendations"].append("Port 25 ist für Server-zu-Server-Transport gedacht und ist ohne Relay-Regel kein normaler Client-Versand.")
             result["port_checks"] = _probe_common_smtp_ports(host, validate_certs, helo_name)
             _append_port_probe_recommendations(result)
             return result
@@ -353,7 +353,7 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
             result["steps"].append({"ok": True, "label": "SMTP Login bewusst uebersprungen (lokaler Relay-Modus)."})
         else:
             result["steps"].append({"ok": False, "label": "Auto-Modus konnte keinen Login durchfuehren. Stelle auf 'Mit Benutzer/Passwort' und nutze Port 587 STARTTLS."})
-            result["recommendations"].append("Auto-Modus ist nur fuer Altbestand gedacht. Empfohlen ist 'Mit Benutzer/Passwort'.")
+            result["recommendations"].append("Auto-Modus ist nur für Altbestand gedacht. Empfohlen ist 'Mit Benutzer/Passwort'.")
             return result
 
         mail_code, mail_msg = smtp.mail(envelope_from)
@@ -372,12 +372,12 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
         elif "Relay access denied" in rcpt_text:
             result["recommendations"].append("Relay fehlt: Der Mailserver akzeptiert den Absender, erlaubt diesem Backend aber keine externen Empfaenger.")
             result["recommendations"].append("Wenn du per lokaler IP verbinden musst, ist das okay: auf dieser IP muss aber Port 587 oder 465 mit SMTP AUTH aktiv sein.")
-            result["recommendations"].append("Alternative fuer lokalen Relay-Betrieb: Port 25 ohne Anmeldung lassen, aber nur die exakte Webserver-/Docker-IP in mynetworks/permit_mynetworks erlauben. Nicht 0.0.0.0/0 freigeben.")
-            result["recommendations"].append("Pruefe im Mailserver-Log, welche Quell-IP beim RCPT-Versuch ankommt; genau diese IP muss erlaubt werden.")
+            result["recommendations"].append("Alternative für lokalen Relay-Betrieb: Port 25 ohne Anmeldung lassen, aber nur die exakte Webserver-/Docker-IP in mynetworks/permit_mynetworks erlauben. Nicht 0.0.0.0/0 freigeben.")
+            result["recommendations"].append("Prüfe im Mailserver-Log, welche Quell-IP beim RCPT-Versuch ankommt; genau diese IP muss erlaubt werden.")
             result["port_checks"] = _probe_common_smtp_ports(host, validate_certs, helo_name)
             _append_port_probe_recommendations(result)
         else:
-            result["recommendations"].append("Empfaenger wurde vor DATA abgelehnt. Pruefe Mailserver-Logs fuer die genaue Regel.")
+            result["recommendations"].append("Empfänger wurde vor DATA abgelehnt. Prüfe Mailserver-Logs für die genaue Regel.")
         return result
     except Exception as exc:
         result["steps"].append({"ok": False, "label": explain_smtp_error(exc)})

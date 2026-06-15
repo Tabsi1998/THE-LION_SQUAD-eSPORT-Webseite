@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug } from "lucide-react";
+import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search } from "lucide-react";
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
@@ -24,10 +24,16 @@ export default function AdminDashboardPage() {
     { label: "Offene Disputes", value: data?.open_disputes, icon: AlertTriangle, color: "#FF3B30" },
     { label: "Fast Lap Live", value: data?.active_f1, icon: Flag, color: "#29B6E8" },
     { label: "Events Gesamt", value: data?.total_events, icon: CalendarDays, color: "#29B6E8" },
+    { label: "Mitgliedsanträge", value: data?.membership_applications?.pending, icon: Inbox, color: "#FFD700" },
+    { label: "Gewinne offen", value: data?.prize_pickups?.pending, icon: Award, color: "#FFD700" },
     { label: "Push aktiv", value: data?.mobile_push?.active_tokens, icon: BellRing, color: "#00FF88" },
     { label: "Offene Logs", value: data?.client_logs?.open, icon: Bug, color: "#FFD700" },
   ];
   const pushErrors = Number(data?.mobile_push?.ticket_errors || 0) + Number(data?.mobile_push?.receipt_errors || 0);
+  const pendingApplications = Number(data?.membership_applications?.pending || 0);
+  const pendingPrizes = Number(data?.prize_pickups?.pending || 0);
+  const readyPrizes = Number(data?.prize_pickups?.ready || 0);
+  const pendingRegistrations = Number(data?.tournament_registrations?.pending || 0);
   const taskItems = [
     {
       label: "Setup prüfen",
@@ -41,9 +47,30 @@ export default function AdminDashboardPage() {
     {
       label: "Ergebnis-Konflikte",
       detail: `${data?.open_disputes ?? 0} offene Disputes`,
-      to: "/admin/tournaments",
+      to: "/admin/tournaments?status=live",
       icon: AlertTriangle,
       tone: (data?.open_disputes || 0) > 0 ? "#FF3B30" : "#00FF88",
+    },
+    {
+      label: "Mitgliedsanträge",
+      detail: `${pendingApplications} offene Anträge`,
+      to: "/admin/membership-applications?status=pending",
+      icon: Inbox,
+      tone: pendingApplications > 0 ? "#FFD700" : "#00FF88",
+    },
+    {
+      label: "Turnier-Anmeldungen",
+      detail: `${pendingRegistrations} warten auf Freigabe`,
+      to: "/admin/tournaments?status=registration_open",
+      icon: GamepadIcon,
+      tone: pendingRegistrations > 0 ? "#FFD700" : "#00FF88",
+    },
+    {
+      label: "Gewinne",
+      detail: `${pendingPrizes} offen, ${readyPrizes} abholbereit`,
+      to: pendingPrizes > 0 ? "/admin/prizes?status=pending" : readyPrizes > 0 ? "/admin/prizes?status=ready" : "/admin/prizes",
+      icon: Award,
+      tone: pendingPrizes > 0 ? "#FFD700" : readyPrizes > 0 ? "#29B6E8" : "#00FF88",
     },
     {
       label: "Push-Monitoring",
@@ -67,13 +94,49 @@ export default function AdminDashboardPage() {
       tone: "#29B6E8",
     },
     {
+      label: "Audit & Rollen",
+      detail: "Rollenwechsel, Staff-Zuweisungen und Adminaktionen",
+      to: "/admin/audit",
+      icon: ShieldCheck,
+      tone: "#29B6E8",
+    },
+    {
       label: "Systemstatus",
       detail: "Mail-Queue, Uploads, Scheduler und Integrationen",
-      to: "/admin/settings",
+      to: "/admin/settings?tab=system",
       icon: Activity,
       tone: "#29B6E8",
     },
+    {
+      label: "Mail-Queue",
+      detail: "Fehler, Newsletter und Versandjobs prüfen",
+      to: "/admin/settings?tab=queue",
+      icon: Mail,
+      tone: "#29B6E8",
+    },
+    {
+      label: "SEO & Analytics",
+      detail: "Domain, IndexNow und Tracking-IDs prüfen",
+      to: "/admin/settings?tab=seo",
+      icon: Search,
+      tone: "#29B6E8",
+    },
   ];
+  const taskIsActive = (item) => {
+    if (item.to === "/setup") return Boolean(setupStatus && (!setupStatus.completed || (setupStatus.health_score || 0) < 100));
+    if (item.to === "/admin/tournaments?status=live") return Number(data?.open_disputes || 0) > 0;
+    if (item.to === "/admin/membership-applications?status=pending") return pendingApplications > 0;
+    if (item.to === "/admin/tournaments?status=registration_open") return pendingRegistrations > 0;
+    if (item.to.startsWith("/admin/prizes")) return pendingPrizes > 0 || readyPrizes > 0;
+    if (item.to === "/admin/mobile-push") return pushErrors > 0;
+    if (item.to === "/admin/mobile-logs") return Number(data?.client_logs?.open || 0) > 0;
+    return false;
+  };
+  const fallbackTaskRoutes = ["/admin/media", "/admin/audit", "/admin/settings?tab=system", "/admin/settings?tab=seo"];
+  const activeTaskItems = taskItems.filter(taskIsActive);
+  const fallbackTaskItems = taskItems.filter((item) => fallbackTaskRoutes.includes(item.to));
+  const primaryTaskItems = activeTaskItems.length ? activeTaskItems : fallbackTaskItems;
+  const secondaryTaskItems = taskItems.filter((item) => !primaryTaskItems.includes(item));
 
   return (
     <AdminLayout>
@@ -123,8 +186,8 @@ export default function AdminDashboardPage() {
           </div>
           <span className="text-xs text-white/40">{new Date().toLocaleDateString("de-DE")}</span>
         </div>
-        <div className="grid md:grid-cols-3 xl:grid-cols-6 gap-3">
-          {taskItems.map((item) => (
+        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
+          {primaryTaskItems.map((item) => (
             <Link key={item.label} to={item.to} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 hover:border-[#29B6E8]/50 transition group">
               <div className="flex items-center justify-between gap-3">
                 <item.icon className="w-4 h-4" style={{ color: item.tone }} />
@@ -135,6 +198,25 @@ export default function AdminDashboardPage() {
             </Link>
           ))}
         </div>
+        {secondaryTaskItems.length > 0 && (
+          <details className="mt-4 border-t border-white/10 pt-4 group">
+            <summary className="cursor-pointer list-none text-[10px] font-bold uppercase tracking-[0.25em] text-white/45 hover:text-white inline-flex items-center gap-2">
+              Weitere Werkzeuge <span className="text-[#29B6E8] group-open:rotate-90 transition-transform">→</span>
+            </summary>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {secondaryTaskItems.map((item) => (
+                <Link
+                  key={item.label}
+                  to={item.to}
+                  className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-[#29B6E8]/50 hover:text-white"
+                >
+                  <item.icon className="w-3.5 h-3.5" style={{ color: item.tone }} />
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </details>
+        )}
       </div>
 
       <div className="mt-10 grid md:grid-cols-2 gap-6">
@@ -148,7 +230,10 @@ export default function AdminDashboardPage() {
           </div>
         </div>
         <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
-          <h2 className="font-heading font-bold uppercase text-lg mb-3 flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Letzte Adminaktionen</h2>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="font-heading font-bold uppercase text-lg flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Letzte Adminaktionen</h2>
+            <Link to="/admin/audit" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Logs</Link>
+          </div>
           <div className="space-y-2 text-sm">
             {(data?.recent_audit_logs || []).slice(0, 8).map((l, i) => (
               <div key={i} className="flex items-center justify-between border-b border-white/5 pb-2">

@@ -1,17 +1,26 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
+import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Image as ImageIcon, Crown } from "lucide-react";
 
 export default function GalleryPage() {
+  useDocumentTitle(
+    "Galerie",
+    "Fotos und Eindrücke von THE LION SQUAD eSports: Turniere, LAN-Partys, Events und Gaming Community in Tirol."
+  );
+
   const [albums, setAlbums] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get("/gallery").then(({ data }) => setAlbums(data)).catch(() => {}).finally(() => setLoading(false));
+    api.get("/gallery?compact=true&limit=80").then(({ data }) => setAlbums(data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -30,13 +39,17 @@ export default function GalleryPage() {
         </p>
 
         {loading ? (
-          <div className="mt-10 text-white/40 text-sm">Lade …</div>
+          <PublicLoadingState cards={4} className="mt-10 lg:grid-cols-4" />
         ) : albums.length === 0 ? (
-          <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
-            <ImageIcon className="w-10 h-10 mx-auto opacity-40 mb-3" />
-            <div className="font-heading font-bold text-lg">Noch keine Alben</div>
-            <div className="text-sm mt-1">Fotos von Events und Turnieren erscheinen hier.</div>
-          </div>
+          <PublicEmptyState
+            icon={ImageIcon}
+            eyebrow="Galerie"
+            title="Noch keine Alben sichtbar"
+            description="Fotos von Events, Turnieren und Vereinsmomenten erscheinen hier automatisch, sobald ein Album veröffentlicht ist."
+            primaryAction={{ to: "/events", label: "Events ansehen" }}
+            secondaryAction={{ to: "/news", label: "News lesen" }}
+            className="mt-10"
+          />
         ) : (
           <div className="mt-10 grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
             {albums.map((a) => <AlbumCard key={a.id} a={a} />)}
@@ -50,13 +63,13 @@ export default function GalleryPage() {
 function AlbumCard({ a }) {
   return (
     <Link
-      to={`/gallery/${a.slug}`}
+      to={`/galerie/${a.slug}`}
       data-testid={`album-card-${a.slug}`}
       className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] overflow-hidden block transition"
     >
       <div className="aspect-video bg-[#0A0A0A] overflow-hidden relative">
         {a.cover_url ? (
-          <img src={resolveMediaUrl(a.cover_url)} alt={a.title} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+          <LazyImg src={a.cover_url} alt={a.title} sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
         ) : (
           <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-10 h-10 text-white/15" /></div>
         )}

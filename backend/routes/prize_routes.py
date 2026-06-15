@@ -204,10 +204,77 @@ async def create_prize_manually(body: PrizeCreate, me: dict = Depends(require_ad
     return {k: v for k, v in doc.items() if k != "_id"}
 
 
+@router.post("/auto-create/missing")
+async def auto_create_missing(me: dict = Depends(require_admin())):
+    """Backfill pickups for all published tournaments and Fast-Lap challenges.
+
+    Useful after older events were published before prize automation understood a
+    result source, or after prize definitions were corrected later.
+    """
+    from services.prize_service import auto_create_for_f1_challenge, auto_create_for_tournament
+
+    db = get_db()
+    tournaments = await db.tournaments.find(
+        {
+            "status": {"$in": ["results_published", "archived"]},
+            "prize_places": {"$type": "array", "$ne": []},
+        },
+        {"_id": 0, "id": 1, "title": 1},
+    ).to_list(500)
+    fastlaps = await db.f1_challenges.find(
+        {
+            "status": {"$in": ["results_published", "archived"]},
+            "prize_places": {"$type": "array", "$ne": []},
+        },
+        {"_id": 0, "id": 1, "title": 1},
+    ).to_list(500)
+
+    tournament_results = []
+    fastlap_results = []
+    created_total = 0
+    for tournament in tournaments:
+        created = await auto_create_for_tournament(tournament["id"])
+        created_total += created
+        tournament_results.append({
+            "id": tournament["id"],
+            "title": tournament.get("title"),
+            "created": created,
+        })
+    for challenge in fastlaps:
+        created = await auto_create_for_f1_challenge(challenge["id"])
+        created_total += created
+        fastlap_results.append({
+            "id": challenge["id"],
+            "title": challenge.get("title"),
+            "created": created,
+        })
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "actor_id": me["id"],
+        "action": "prizes.auto_create_missing",
+        "entity_id": "prize_pickups",
+        "details": {
+            "created": created_total,
+            "tournaments": len(tournament_results),
+            "fastlaps": len(fastlap_results),
+        },
+        "created_at": now_utc().isoformat(),
+    })
+    return {"created": created_total, "tournaments": tournament_results, "fastlaps": fastlap_results}
+
+
 @router.post("/auto-create/{tournament_id}")
 async def auto_create(tournament_id: str, me: dict = Depends(require_admin())):
     """Manual trigger to (re)create pickups for a tournament — useful when
     results were corrected after publishing."""
     from services.prize_service import auto_create_for_tournament
     n = await auto_create_for_tournament(tournament_id)
+    return {"created": n}
+
+
+@router.post("/auto-create/fastlap/{challenge_id}")
+async def auto_create_fastlap(challenge_id: str, me: dict = Depends(require_admin())):
+    """Manual trigger to create pickups for a Fast-Lap challenge."""
+    from services.prize_service import auto_create_for_f1_challenge
+    n = await auto_create_for_f1_challenge(challenge_id)
     return {"created": n}

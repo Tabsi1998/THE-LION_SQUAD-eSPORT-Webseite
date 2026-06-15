@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom"
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
@@ -15,6 +16,7 @@ import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
 import { formatDateTime, getRegistrationState } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
+import { seoTextPreview } from "@/lib/textPreview";
 import { formatTeamMode, formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
@@ -35,7 +37,8 @@ export default function TournamentDetailPage() {
   const [loading, setLoading] = useState(false);
   const [registerModal, setRegisterModal] = useState(false);
   const confirm = useConfirm();
-  useDocumentTitle(t?.title || "Turnier", t?.description || "Turnier von THE LION SQUAD eSports.", {
+  const seoDescription = seoTextPreview(t?.description || t?.rules, "eSports Turnier von THE LION SQUAD mit Anmeldung, Check-in, Bracket und Rangliste.");
+  useDocumentTitle(t?.title || "Turnier", seoDescription, {
     image: t?.banner_url,
     canonical: t?.slug ? `${window.location.origin}/tournaments/${t.slug}` : undefined,
   });
@@ -132,7 +135,7 @@ export default function TournamentDetailPage() {
     }
   };
 
-  if (!t) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE …</div></PublicLayout>;
+  if (!t) return <PublicLayout><PublicLoadingState label="Lade Turnier" /></PublicLayout>;
 
   const registration = getRegistrationState(t, "Anmeldung");
   const isTeamTournament = (t.team_mode || "solo") !== "solo";
@@ -157,7 +160,7 @@ export default function TournamentDetailPage() {
           </div>
         )}
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-          <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "eSports", to: "/tournaments" }, { label: "Turniere", to: "/tournaments" }, { label: t.title }]} className="mb-4" />
+          <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "eSports", to: "/esports" }, { label: "Turniere", to: "/tournaments" }, { label: t.title }]} className="mb-4" />
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <PhaseBadge phase={t.public_phase} status={t.status} size="lg" />
             <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1">{formatTournamentDisplay(t)}</span>

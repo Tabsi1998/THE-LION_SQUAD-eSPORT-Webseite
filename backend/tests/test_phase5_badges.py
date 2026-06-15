@@ -87,10 +87,13 @@ class TestPublicProfile:
         p = r.json()
         assert p["username"] == "pixelhawk"
         # required fields
-        for k in ["badges", "stats", "tournaments", "f1_bests", "teams"]:
+        for k in ["badges", "stats", "tournaments", "f1_bests", "teams", "references"]:
             assert k in p, f"missing {k}"
         assert isinstance(p["badges"], list)
         assert isinstance(p["stats"], dict)
+        assert isinstance(p["references"], dict)
+        assert isinstance(p["references"].get("items"), list)
+        assert isinstance(p["references"].get("stats"), dict)
         # has 8 badges per spec
         assert len(p["badges"]) >= 1, "PixelHawk should have badges"
         # stats keys

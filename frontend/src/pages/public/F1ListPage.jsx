@@ -1,18 +1,34 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
+import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { Flag, Users, Clock, ChevronRight } from "lucide-react";
 import { formatDate, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
+import { sortByNearestDate } from "@/lib/contentSort";
 
 export default function F1ListPage() {
+  useDocumentTitle(
+    "F1 Fast Lap Challenges",
+    "F1 und Racing Fast-Lap-Challenges von THE LION SQUAD mit Live-Leaderboards, Strecken, Zeiten und Championship-Wertung."
+  );
+
   const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const { data } = await api.get("/f1/challenges");
-    setList(data);
+    setLoading(true);
+    try {
+      const { data } = await api.get("/f1/challenges?compact=true&limit=80");
+      setList(sortByNearestDate(Array.isArray(data) ? data : data?.items || []));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -24,7 +40,7 @@ export default function F1ListPage() {
   return (
     <PublicLayout>
       <div className="relative border-b border-white/10 bg-grid-dense overflow-hidden">
-        <img src="https://images.unsplash.com/photo-1771440571270-e27b63085a48" className="absolute inset-0 w-full h-full object-cover opacity-20" alt="" loading="lazy" decoding="async" />
+        <LazyImg src="https://images.unsplash.com/photo-1771440571270-e27b63085a48" priority className="absolute inset-0 w-full h-full object-cover opacity-20" alt="" sizes="100vw" />
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/70 to-[#0A0A0A]" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Fast Lap Challenge</span>
@@ -33,8 +49,20 @@ export default function F1ListPage() {
         </div>
       </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5">
-        {list.map((c) => <FastLapCard key={c.id} challenge={c} />)}
-        {list.length === 0 && <div className="text-center py-16 text-white/40 font-display tracking-widest">KEINE CHALLENGES VORHANDEN</div>}
+        {loading ? (
+          <PublicLoadingState cards={3} />
+        ) : list.length ? (
+          list.map((c) => <FastLapCard key={c.id} challenge={c} />)
+        ) : (
+          <PublicEmptyState
+            icon={Flag}
+            eyebrow="Fast Lap"
+            title="Noch keine Challenges sichtbar"
+            description="Sobald eine Fast-Lap-Challenge aktiv oder angekuendigt ist, findest du hier Strecken, Leaderboards und Teilnahmeinfos."
+            primaryAction={{ to: "/tournaments", label: "Turniere ansehen" }}
+            secondaryAction={{ to: "/news", label: "News lesen" }}
+          />
+        )}
       </div>
     </PublicLayout>
   );
@@ -46,10 +74,16 @@ function FastLapCard({ challenge: c }) {
     <Link
       to={`/fastlap/${c.slug || c.id}`}
       data-testid={`f1-list-${c.slug}`}
-      className="group block border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-6 bg-[#121212] transition-all"
+      className="group block border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-5 sm:p-6 bg-[#121212] transition-all"
     >
-      <div className="flex items-start gap-5">
-        {c.banner_url && <img src={resolveMediaUrl(c.banner_url)} alt="" className="w-32 h-20 object-cover rounded-sm hidden sm:block" />}
+      <div className="flex items-start gap-4 sm:gap-5 min-w-0">
+        <div className="hidden sm:flex w-32 h-20 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-[#0A0A0A] border border-white/10">
+          {c.banner_url ? (
+            <LazyImg src={c.banner_url} alt="" sizes="8rem" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+          ) : (
+            <Flag className="w-8 h-8 text-[#29B6E8]/35" />
+          )}
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <PhaseBadge phase={c.public_phase} status={c.status} />
@@ -59,11 +93,11 @@ function FastLapCard({ challenge: c }) {
               <span className="text-[10px] font-bold uppercase tracking-wider text-white/65 border border-white/15 px-2 py-[3px] rounded-sm">Referenzzeiten</span>
             )}
           </div>
-          <h2 className="font-heading text-2xl font-bold group-hover:text-[#29B6E8] transition">{c.title}</h2>
+          <h2 className="font-heading text-2xl font-bold group-hover:text-[#29B6E8] transition break-words">{c.title}</h2>
           {c.description && <p className="mt-1 text-sm text-white/60 line-clamp-2">{c.description}</p>}
           <div className="mt-3 flex flex-wrap gap-5 text-xs text-white/60">
-            <span className="inline-flex items-center gap-1.5"><Flag className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.track_count} Strecken</span>
-            <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.participant_count} Fahrer</span>
+            <span className="inline-flex items-center gap-1.5"><Flag className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.track_count || 0} Strecken</span>
+            <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.participant_count || 0} Fahrer</span>
             {(c.club_reference_count || 0) > 0 && c.allow_club_reference_times !== false && c.show_club_reference_times !== false && (
               <span className="inline-flex items-center gap-1.5"><Flag className="w-3.5 h-3.5 text-[#FFD700]" /> {c.club_reference_count} Referenzen</span>
             )}
@@ -78,7 +112,7 @@ function FastLapCard({ challenge: c }) {
             </div>
           )}
         </div>
-        <ChevronRight className="w-6 h-6 text-white/30 group-hover:text-[#29B6E8] transition" />
+        <ChevronRight className="w-6 h-6 shrink-0 text-white/30 group-hover:text-[#29B6E8] transition" />
       </div>
     </Link>
   );

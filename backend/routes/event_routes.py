@@ -81,6 +81,80 @@ def _published_now(post: dict) -> bool:
     return not published_at or published_at <= now_utc()
 
 
+def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
+    safe_limit = max(1, min(int(limit or 48), 200))
+    safe_offset = max(0, int(offset or 0))
+    page = items[safe_offset:safe_offset + safe_limit]
+    if not paged:
+        return page
+    return {"items": page, "total": len(items), "limit": safe_limit, "offset": safe_offset}
+
+
+def _compact_event(event: dict) -> dict:
+    return {
+        "id": event.get("id"),
+        "name": event.get("name"),
+        "slug": event.get("slug"),
+        "description": event.get("description"),
+        "banner_url": event.get("banner_url"),
+        "event_type": event.get("event_type"),
+        "status": event.get("status"),
+        "visibility": event.get("visibility"),
+        "start_date": event.get("start_date"),
+        "end_date": event.get("end_date"),
+        "location": event.get("location"),
+        "has_registration": bool(event.get("has_registration")),
+        "max_participants": event.get("max_participants"),
+        "registration_summary": event.get("registration_summary"),
+        "public_phase": event.get("public_phase"),
+        "event_phase": event.get("event_phase"),
+    }
+
+
+def _safe_news_slug(text: str | None) -> str:
+    value = (text or "event-rueckblick").lower()
+    replacements = {
+        "ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss",
+        "Ä": "ae", "Ö": "oe", "Ü": "ue",
+    }
+    for source, target in replacements.items():
+        value = value.replace(source, target)
+    chars = []
+    dash = False
+    for char in value:
+        if char.isalnum():
+            chars.append(char)
+            dash = False
+        elif not dash:
+            chars.append("-")
+            dash = True
+    return "".join(chars).strip("-")[:80] or "event-rueckblick"
+
+
+def _registration_name(registration: dict | None) -> str:
+    if not registration:
+        return "Offen"
+    user = registration.get("user") or {}
+    return (
+        registration.get("display_name")
+        or registration.get("ingame_name")
+        or user.get("display_name")
+        or user.get("username")
+        or "Teilnehmer"
+    )
+
+
+def _format_podium(rows: list[dict], empty: str = "Noch kein Podium eingetragen.") -> list[str]:
+    if not rows:
+        return [f"- {empty}"]
+    lines = []
+    for row in rows[:3]:
+        detail = row.get("detail")
+        suffix = f" - {detail}" if detail else ""
+        lines.append(f"- Platz {row['rank']}: {row['name']}{suffix}")
+    return lines
+
+
 async def _find_event(slug_or_id: str) -> tuple[dict | None, bool]:
     db = get_db()
     return await find_by_slug_or_history(db.events, slug_or_id, {"_id": 0})
@@ -137,6 +211,158 @@ async def _event_registration_summary(event: dict, exclude_registration_id: str 
         "companion_count": companion_count,
         "spots_left": spots_left,
         "max_participants": max_participants,
+    }
+
+
+async def _tournament_recap_podium(db, tournament: dict) -> list[dict]:
+    regs = await db.tournament_registrations.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(1000)
+    reg_map = {reg["id"]: reg for reg in regs}
+    matches_v2 = await db.matches_v2.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(3000)
+    scores: dict[str, dict] = {}
+    if matches_v2:
+        for match in matches_v2:
+            if match.get("status") not in {"completed", "forfeit"}:
+                continue
+            for result in match.get("results") or []:
+                reg_id = result.get("registration_id")
+                if not reg_id:
+                    continue
+                row = scores.setdefault(reg_id, {"registration_id": reg_id, "wins": 0, "top2": 0, "points": 0, "played": 0, "rank_sum": 0})
+                rank = int(result.get("rank") or 999)
+                row["played"] += 1
+                row["rank_sum"] += rank
+                row["wins"] += 1 if rank == 1 else 0
+                row["top2"] += 1 if rank <= 2 else 0
+                points = result.get("points")
+                if points is None:
+                    points = result.get("score")
+                if isinstance(points, (int, float)):
+                    row["points"] += points
+        rows = list(scores.values())
+        rows.sort(key=lambda row: (row["wins"], row["top2"], row["points"], -row["rank_sum"]), reverse=True)
+    else:
+        matches = await db.matches.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(1000)
+        for match in matches:
+            for reg_id in (match.get("participant_a_id"), match.get("participant_b_id")):
+                if reg_id:
+                    scores.setdefault(reg_id, {"registration_id": reg_id, "wins": 0, "losses": 0, "furthest_round": 0})
+                    scores[reg_id]["furthest_round"] = max(scores[reg_id]["furthest_round"], int(match.get("round") or 0))
+            if match.get("status") in {"completed", "forfeit"} and match.get("winner_id"):
+                winner_id = match.get("winner_id")
+                loser_id = match.get("participant_a_id") if winner_id == match.get("participant_b_id") else match.get("participant_b_id")
+                scores.setdefault(winner_id, {"registration_id": winner_id, "wins": 0, "losses": 0, "furthest_round": 0})
+                scores[winner_id]["wins"] += 1
+                if loser_id:
+                    scores.setdefault(loser_id, {"registration_id": loser_id, "wins": 0, "losses": 0, "furthest_round": 0})
+                    scores[loser_id]["losses"] += 1
+        rows = list(scores.values())
+        rows.sort(key=lambda row: (row.get("furthest_round") or 0, row.get("wins") or 0, -(row.get("losses") or 0)), reverse=True)
+    podium = []
+    for index, row in enumerate(rows[:3], start=1):
+        reg = reg_map.get(row.get("registration_id"))
+        if not reg:
+            continue
+        detail_bits = []
+        if row.get("wins"):
+            detail_bits.append(f"{row['wins']} Siege")
+        if row.get("points"):
+            detail_bits.append(f"{row['points']} Punkte")
+        podium.append({"rank": index, "name": _registration_name(reg), "detail": ", ".join(detail_bits)})
+    return podium
+
+
+async def _fastlap_recap_podium(db, challenge: dict) -> list[dict]:
+    tracks = await db.f1_tracks.find({"challenge_id": challenge["id"]}, {"_id": 0}).sort("order_index", 1).to_list(100)
+    if not tracks:
+        return []
+    track = tracks[0]
+    times = await db.f1_lap_times.find(
+        {"challenge_id": challenge["id"], "track_id": track["id"], "score_scope": {"$ne": "reference"}},
+        {"_id": 0},
+    ).to_list(2000)
+    best: dict[str, dict] = {}
+    for row in times:
+        user_id = row.get("user_id")
+        if not user_id or row.get("time_ms") is None:
+            continue
+        effective = int(row.get("time_ms") or 0) + int(float(row.get("penalty_seconds") or 0) * 1000)
+        if user_id not in best or effective < best[user_id]["effective_ms"]:
+            best[user_id] = {**row, "effective_ms": effective}
+    if not best:
+        return []
+    users = {
+        user["id"]: user for user in await db.users.find(
+            {"id": {"$in": list(best.keys())}},
+            {"_id": 0, "id": 1, "username": 1, "display_name": 1},
+        ).to_list(500)
+    }
+    rows = sorted(best.items(), key=lambda item: item[1]["effective_ms"])[:3]
+    return [
+        {
+            "rank": index,
+            "name": users.get(user_id, {}).get("display_name") or users.get(user_id, {}).get("username") or "Teilnehmer",
+            "detail": f"{lap['effective_ms'] / 1000:.3f}s auf {track.get('name') or 'Strecke'}",
+        }
+        for index, (user_id, lap) in enumerate(rows, start=1)
+    ]
+
+
+async def _build_event_recap_payload(db, event: dict) -> dict:
+    tournaments = await db.tournaments.find({"event_id": event["id"]}, {"_id": 0}).sort("start_date", 1).to_list(200)
+    challenges = await db.f1_challenges.find({"event_id": event["id"]}, {"_id": 0}).sort("start_date", 1).to_list(200)
+    albums = await db.gallery_albums.find({"event_id": event["id"]}, {"_id": 0}).sort("order_index", 1).to_list(50)
+    event_date = ""
+    parsed_start = _parse_dt(event.get("start_date"))
+    if parsed_start:
+        event_date = parsed_start.strftime("%d.%m.%Y")
+    lines = [
+        f"## Rückblick {event.get('name') or 'Event'}",
+        "",
+        "Kurzes Fazit hier ergaenzen: Stimmung, Highlights, Besonderheiten und Danke an alle Beteiligten.",
+        "",
+    ]
+    if event_date or event.get("location"):
+        lines.extend([
+            "## Eckdaten",
+            "",
+            f"- Datum: {event_date or 'Noch ergaenzen'}",
+            f"- Ort: {event.get('location') or event.get('city') or 'Noch ergaenzen'}",
+            "",
+        ])
+    if tournaments:
+        lines.extend(["## Turnier-Ergebnisse", ""])
+        for tournament in tournaments:
+            lines.append(f"### {tournament.get('title') or 'Turnier'}")
+            lines.extend(_format_podium(await _tournament_recap_podium(db, tournament)))
+            if tournament.get("slug"):
+                lines.append(f"[[tournament:{tournament['slug']}]]")
+            lines.append("")
+    if challenges:
+        lines.extend(["## Fast-Lap-Ergebnisse", ""])
+        for challenge in challenges:
+            lines.append(f"### {challenge.get('title') or 'Fast Lap'}")
+            lines.extend(_format_podium(await _fastlap_recap_podium(db, challenge), empty="Noch keine gültigen Zeiten eingetragen."))
+            if challenge.get("slug"):
+                lines.append(f"[[fastlap:{challenge['slug']}]]")
+            lines.append("")
+    if albums:
+        lines.extend(["## Galerie", ""])
+        for album in albums[:5]:
+            if album.get("slug"):
+                lines.append(f"- [{album.get('title') or 'Album'}](/galerie/{album['slug']})")
+            else:
+                lines.append(f"- {album.get('title') or 'Album'}")
+        lines.append("")
+    lines.extend([
+        "## Danke",
+        "",
+        "Danke an alle Spieler, Besucher, Helfer, Partner und Sponsoren. Wir sehen uns beim nächsten Event.",
+    ])
+    return {
+        "content": "\n".join(lines).strip(),
+        "linked_tournament_ids": [t["id"] for t in tournaments],
+        "linked_f1_challenge_ids": [c["id"] for c in challenges],
+        "albums": albums,
     }
 
 
@@ -265,6 +491,10 @@ async def list_events(
     event_type: Optional[str] = None,
     upcoming: bool = False,
     include_drafts: bool = False,
+    compact: bool = False,
+    limit: int = 48,
+    offset: int = 0,
+    paged: bool = False,
     user: dict | None = Depends(get_optional_user),
 ):
     db = get_db()
@@ -283,7 +513,16 @@ async def list_events(
         q["status"] = {"$nin": ["completed", "archived", "cancelled"]}
         if not is_admin:
             q["status"]["$nin"].append("draft")
-    events = await db.events.find(q, {"_id": 0}).sort("start_date", 1 if upcoming else -1).to_list(500)
+    projection = {"_id": 0}
+    if compact:
+        projection = {
+            "_id": 0, "id": 1, "name": 1, "slug": 1, "description": 1,
+            "banner_url": 1, "event_type": 1, "status": 1, "visibility": 1,
+            "start_date": 1, "end_date": 1, "location": 1, "has_registration": 1,
+            "max_participants": 1,
+        }
+    fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))
+    events = await db.events.find(q, projection).sort("start_date", 1 if upcoming else -1).to_list(fetch_limit)
     if upcoming:
         now = datetime.now(timezone.utc)
         fresh = []
@@ -298,6 +537,9 @@ async def list_events(
         if await _user_can_see(user, ev.get("visibility") or "public"):
             await _decorate_event(ev)
             out.append(ev)
+    if compact:
+        out = [_compact_event(ev) for ev in out]
+        return _page_items(out, limit, offset, paged)
     return out
 
 
@@ -397,6 +639,57 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     return event
 
 
+@router.post("/{event_id}/recap-draft")
+async def create_event_recap_draft(event_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    event, _ = await _find_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    existing = await db.news_posts.find_one(
+        {"linked_event_ids": event["id"], "category": "recap", "recap_source_event_id": event["id"]},
+        {"_id": 0},
+    )
+    if existing:
+        return {"created": False, "post": existing}
+    recap = await _build_event_recap_payload(db, event)
+    title = f"Rückblick: {event.get('name') or 'Event'}"
+    excerpt = f"Rückblick auf {event.get('name') or 'das Event'} mit Ergebnissen, Highlights und Galerie."
+    now_iso = now_utc().isoformat()
+    doc = {
+        "id": new_id(),
+        "title": title,
+        "slug": await unique_slug(db.news_posts, _safe_news_slug(title), fallback="rueckblick"),
+        "excerpt": excerpt,
+        "content": recap["content"],
+        "banner_url": event.get("banner_url"),
+        "category": "recap",
+        "visibility": event.get("visibility") if event.get("visibility") in {"public", "community", "members", "internal"} else "public",
+        "published": False,
+        "pinned": False,
+        "linked_event_ids": [event["id"]],
+        "linked_tournament_ids": recap["linked_tournament_ids"],
+        "linked_f1_challenge_ids": recap["linked_f1_challenge_ids"],
+        "linked_team_ids": [],
+        "mentioned_user_ids": [],
+        "recap_source_event_id": event["id"],
+        "created_at": now_iso,
+        "updated_at": now_iso,
+        "author_id": me["id"],
+        "author_name": me.get("display_name") or me.get("username"),
+    }
+    await db.news_posts.insert_one(doc)
+    doc.pop("_id", None)
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "event.recap_draft.create",
+        "target_id": event["id"],
+        "actor_id": me["id"],
+        "data": {"news_id": doc["id"], "tournaments": len(recap["linked_tournament_ids"]), "fastlaps": len(recap["linked_f1_challenge_ids"]), "albums": len(recap["albums"])},
+        "created_at": now_iso,
+    })
+    return {"created": True, "post": doc}
+
+
 @router.get("/{event_id}/registrations")
 async def list_event_registrations(event_id: str, me: dict = Depends(require_admin())):
     db = get_db()
@@ -441,7 +734,7 @@ async def register_for_event(event_id: str, body: EventRegistrationCreate,
         {"_id": 0},
     )
     if existing and existing.get("status") not in {"cancelled", "no_show"}:
-        raise HTTPException(status_code=409, detail="Du bist fuer dieses Event bereits angemeldet")
+        raise HTTPException(status_code=409, detail="Du bist für dieses Event bereits angemeldet")
 
     summary = await _event_registration_summary(event, exclude_registration_id=existing.get("id") if existing else None)
     status = "registered"

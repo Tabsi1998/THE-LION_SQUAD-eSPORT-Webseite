@@ -74,4 +74,4 @@ async def require_tournament_staff_permission(
 ) -> None:
     if await has_tournament_staff_permission(user, tournament_id, allowed_roles, scope, scope_id):
         return
-    raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Aktion")
+    raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")

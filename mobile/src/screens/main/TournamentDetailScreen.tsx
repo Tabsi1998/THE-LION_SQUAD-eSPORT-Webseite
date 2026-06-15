@@ -41,6 +41,9 @@ const tabs: Array<{ key: TabKey; label: string }> = [
   { key: "participants", label: "Spieler" },
   { key: "rules", label: "Regeln" },
 ];
+const OPEN_MATCH_STATUSES = new Set(["ready", "scheduled", "in_progress", "waiting_result"]);
+const FINISHED_TOURNAMENT_STATUSES = new Set(["completed", "results_published", "archived"]);
+const CLOSED_MATCH_STATUSES = new Set(["completed", "forfeit", "closed"]);
 
 export function TournamentDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
@@ -78,6 +81,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     load();
+    const timer = setInterval(load, 10000);
+    return () => clearInterval(timer);
   }, [load]);
 
   const registrations = bracket.registrations || [];
@@ -116,6 +121,23 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const legacyMatches = bracket.matches || tournament?.matches || [];
   const v2Matches = bracket.matches_v2 || [];
   const allMatches = v2Matches.length ? v2Matches : legacyMatches;
+  const upcomingMatches = useMemo(() => {
+    const open = allMatches.filter((match) => OPEN_MATCH_STATUSES.has(String(match.status || "")));
+    if (!ownRegistration?.id) return open.slice(0, 5);
+    const ownOpen = open.filter((match) => matchIncludesRegistration(match, ownRegistration.id));
+    return (ownOpen.length ? ownOpen : open).slice(0, 5);
+  }, [allMatches, ownRegistration?.id]);
+  const finalStandings = useMemo(() => {
+    const rows = standings.length ? standings : tournament?.standings || [];
+    return [...rows].sort((a, b) => standingRank(a, 999) - standingRank(b, 999));
+  }, [standings, tournament?.standings]);
+  const completedMatches = useMemo(
+    () => allMatches.filter((match) => CLOSED_MATCH_STATUSES.has(String(match.status || ""))),
+    [allMatches],
+  );
+  const recentCompletedMatches = useMemo(() => completedMatches.slice(-4).reverse(), [completedMatches]);
+  const isFinished = FINISHED_TOURNAMENT_STATUSES.has(String(tournament?.status || ""));
+  const completedAt = tournament?.results_published_at || tournament?.completed_at || tournament?.end_date || tournament?.updated_at;
 
   const register = useCallback(async (payload: RegistrationPayload = {}) => {
     if (!tournament || busy) return;
@@ -208,7 +230,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
       : [];
   const prizes = [
     ...(tournament.prizes || []),
-    ...(tournament.prize_places || []).map((place) => `${place.label || `${place.place}. Platz`}: ${place.value || ""}`.trim()),
+    ...(tournament.prize_places || []).map(formatPrizePlace),
     tournament.prize_pool ? `Preispool: ${tournament.prize_pool}` : "",
   ].filter(Boolean);
 
@@ -233,6 +255,16 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
 
         {tab === "overview" ? (
           <>
+            {isFinished ? (
+              <CompletedTournamentSummary
+                completedAt={completedAt}
+                participantCount={registrations.length || tournament.participant_count || 0}
+                playedMatches={completedMatches.length}
+                standings={finalStandings}
+                totalMatches={allMatches.length}
+                onOpenStandings={() => setTab("standings")}
+              />
+            ) : null}
             <Card style={styles.card}>
               <Heading>Turnierstatus</Heading>
               <View style={styles.registrationBox}>
@@ -292,12 +324,31 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 />
               ) : null}
             </Card>
-            <Card style={styles.card}>
-              <Heading>Nächste Matches</Heading>
-              {allMatches.length ? allMatches.slice(0, 5).map((match) => (
-                <MatchCard key={match.id} match={match} regMap={regMap} compact onPress={() => navigation.navigate("MatchDetail", { id: match.id })} />
-              )) : <Muted>Noch keine Matches generiert.</Muted>}
-            </Card>
+            {isFinished ? (
+              <>
+                <Card style={styles.card}>
+                  <Heading>Finale Rangliste</Heading>
+                  {finalStandings.length ? finalStandings.slice(0, 6).map((standing, index) => (
+                    <StandingRow key={`${standing.registration_id || standing.name || standing.display_name || index}`} standing={standing} index={index} />
+                  )) : <Muted>Finale Platzierungen wurden noch nicht veröffentlicht.</Muted>}
+                  {finalStandings.length > 6 ? <Button label="Komplette Rangliste anzeigen" variant="secondary" onPress={() => setTab("standings")} /> : null}
+                </Card>
+                <Card style={styles.card}>
+                  <Heading>Match-Historie</Heading>
+                  {recentCompletedMatches.length ? recentCompletedMatches.map((match) => (
+                    <MatchCard key={match.id} match={match} regMap={regMap} compact onPress={() => navigation.navigate("MatchDetail", { id: match.id })} />
+                  )) : <Muted>Keine abgeschlossenen Matches vorhanden.</Muted>}
+                  {allMatches.length > recentCompletedMatches.length ? <Button label="Alle Matches anzeigen" variant="secondary" onPress={() => setTab("matches")} /> : null}
+                </Card>
+              </>
+            ) : (
+              <Card style={styles.card}>
+                <Heading>Nächste Matches</Heading>
+                {upcomingMatches.length ? upcomingMatches.map((match) => (
+                  <MatchCard key={match.id} match={match} regMap={regMap} compact onPress={() => navigation.navigate("MatchDetail", { id: match.id })} />
+                )) : <Muted>Keine offenen Matches.</Muted>}
+              </Card>
+            )}
           </>
         ) : null}
 
@@ -310,22 +361,16 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
 
         {tab === "matches" ? (
           <Card style={styles.card}>
-            <Heading>Matchplan</Heading>
+            <Heading>{isFinished ? "Match-Historie" : "Matchplan"}</Heading>
             {allMatches.length ? allMatches.map((match) => <MatchCard key={match.id} match={match} regMap={regMap} onPress={() => navigation.navigate("MatchDetail", { id: match.id })} />) : <Muted>Noch keine Matches veröffentlicht.</Muted>}
           </Card>
         ) : null}
 
         {tab === "standings" ? (
           <Card style={styles.card}>
-            <Heading>Rangliste</Heading>
-            {standings.length ? standings.map((standing, index) => (
-              <View key={`${standing.registration_id || standing.name || standing.display_name || index}`} style={styles.row}>
-                <Body style={styles.rank}>#{standing.rank || index + 1}</Body>
-                <View style={styles.rowMain}>
-                  <Body style={styles.rowTitle}>{standing.display_name || standing.name || "Teilnehmer"}</Body>
-                  <Muted>{standing.result || `${standing.points || 0} Punkte · ${standing.won || standing.wins || 0} Siege`}</Muted>
-                </View>
-              </View>
+            <Heading>{isFinished ? "Finale Rangliste" : "Rangliste"}</Heading>
+            {finalStandings.length ? finalStandings.map((standing, index) => (
+              <StandingRow key={`${standing.registration_id || standing.name || standing.display_name || index}`} standing={standing} index={index} />
             )) : <Muted>Rangliste wird angezeigt, sobald Ergebnisse vorhanden sind.</Muted>}
           </Card>
         ) : null}
@@ -356,7 +401,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>Regeln & Preise</Heading>
             {rules.length ? rules.map((rule) => <Bullet key={rule} text={rule} />) : <Muted>Keine Regeln veröffentlicht.</Muted>}
-            {prizes.length ? prizes.map((prize) => <Bullet key={prize} text={prize} accent />) : null}
+            {prizes.length ? prizes.map((prize, index) => <Bullet key={`${prize}-${index}`} text={prize} accent />) : null}
           </Card>
         ) : null}
       </ScrollView>
@@ -372,6 +417,22 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
       />
     </Screen>
   );
+}
+
+function formatPrizePlace(place: { group?: string | null; place?: number | string; label?: string; value?: string }) {
+  const value = String(place.value || "").trim();
+  if (!value) return "";
+  const group = prizeGroupLabel(place.group);
+  const placeLabel = place.label || (place.place ? `${place.place}. Platz` : "Preis");
+  return [group, `${placeLabel}: ${value}`].filter(Boolean).join(" - ");
+}
+
+function prizeGroupLabel(group?: string | null) {
+  if (!group || group === "overall") return "";
+  if (group === "winner") return "Gewinner-Bracket";
+  if (group === "loser") return "Loser-Bracket";
+  if (group === "special") return "Sonderpreis";
+  return group;
 }
 
 function RegistrationModal({
@@ -511,6 +572,84 @@ function BracketView({ payload, regMap, onOpenMatch }: { payload: BracketPayload
   );
 }
 
+function CompletedTournamentSummary({
+  completedAt,
+  participantCount,
+  playedMatches,
+  standings,
+  totalMatches,
+  onOpenStandings,
+}: {
+  completedAt?: string | null;
+  participantCount: number;
+  playedMatches: number;
+  standings: any[];
+  totalMatches: number;
+  onOpenStandings: () => void;
+}) {
+  const winner = standings[0];
+  const podium = standings.slice(0, 3);
+
+  return (
+    <Card style={[styles.card, styles.completedCard]}>
+      <View style={styles.completedHeader}>
+        <Pill label="Turnier beendet" accent="cyan" />
+        <Heading>Finale Ergebnisse</Heading>
+        {completedAt ? <Muted>Abgeschlossen am {formatDateTime(completedAt)}</Muted> : <Muted>Die Ergebnisse sind veröffentlicht.</Muted>}
+      </View>
+
+      {winner ? (
+        <View style={styles.winnerBox}>
+          <Muted style={styles.winnerLabel}>Champion</Muted>
+          <Body style={styles.winnerName}>{standingName(winner)}</Body>
+          <Muted>{standingSummary(winner)}</Muted>
+        </View>
+      ) : (
+        <View style={styles.winnerBox}>
+          <Muted style={styles.winnerLabel}>Champion</Muted>
+          <Body style={styles.winnerName}>Noch nicht veröffentlicht</Body>
+          <Muted>Finale Platzierungen werden angezeigt, sobald sie im Backend vorhanden sind.</Muted>
+        </View>
+      )}
+
+      {podium.length ? (
+        <View style={styles.podiumGrid}>
+          {podium.map((standing, index) => (
+            <View key={`${standing.registration_id || standing.name || standing.display_name || index}`} style={[styles.podiumCard, index === 0 && styles.podiumFirst]}>
+              <Body style={styles.podiumRank}>{placementLabel(standingRank(standing, index + 1))}</Body>
+              <Body style={styles.podiumName} numberOfLines={2}>{standingName(standing)}</Body>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      <View style={styles.statGrid}>
+        <Stat label="Teilnehmer" value={String(participantCount)} tone="gold" />
+        <Stat label="Gespielt" value={String(playedMatches)} />
+        <Stat label="Matches" value={String(totalMatches)} />
+      </View>
+
+      <Button label="Finale Rangliste öffnen" variant="secondary" onPress={onOpenStandings} />
+    </Card>
+  );
+}
+
+function StandingRow({ standing, index }: { standing: any; index: number }) {
+  const rank = standingRank(standing, index + 1);
+  return (
+    <View style={[styles.row, rank <= 3 && styles.placementRow]}>
+      <Body style={[styles.rank, rank === 1 && styles.rankFirst, rank === 2 && styles.rankSecond, rank === 3 && styles.rankThird]}>
+        #{rank}
+      </Body>
+      <View style={styles.rowMain}>
+        <Body style={styles.rowTitle}>{standingName(standing)}</Body>
+        <Muted>{standingSummary(standing)}</Muted>
+      </View>
+      {rank <= 3 ? <Pill label={placementLabel(rank)} accent={rank === 1 ? "cyan" : undefined} /> : null}
+    </View>
+  );
+}
+
 function MatchCard({ match, regMap, compact = false, onPress }: { match: any; regMap: Map<string, any>; compact?: boolean; onPress?: () => void }) {
   const rows = match.slots?.length
     ? match.slots.map((slot: any) => {
@@ -548,9 +687,43 @@ function MatchCard({ match, regMap, compact = false, onPress }: { match: any; re
   );
 }
 
+function standingName(standing: any) {
+  return standing?.display_name || standing?.name || standing?.team_name || standing?.registration_name || "Teilnehmer";
+}
+
+function standingRank(standing: any, fallback: number) {
+  const rank = Number(standing?.rank ?? standing?.final_position ?? standing?.place);
+  return Number.isFinite(rank) && rank > 0 ? rank : fallback;
+}
+
+function standingSummary(standing: any) {
+  if (standing?.result) return String(standing.result);
+  const parts = [];
+  const points = standing?.points ?? standing?.score;
+  const wins = standing?.wins ?? standing?.won;
+  if (points !== undefined && points !== null) parts.push(`${points} Punkte`);
+  if (wins !== undefined && wins !== null) parts.push(`${wins} Siege`);
+  if (standing?.best_rank !== undefined && standing?.best_rank !== null) parts.push(`Bestes Match #${standing.best_rank}`);
+  if (standing?.played !== undefined && standing?.played !== null) parts.push(`${standing.played} gespielt`);
+  return parts.length ? parts.join(" · ") : "Finale Platzierung";
+}
+
+function placementLabel(rank: number) {
+  if (rank === 1) return "1. Platz";
+  if (rank === 2) return "2. Platz";
+  if (rank === 3) return "3. Platz";
+  return `${rank}. Platz`;
+}
+
 function participantLabel(registration: any) {
   if (!registration) return "";
   return registration.display_name || registration.ingame_name || registration.user?.display_name || registration.user?.username || registration.name || "";
+}
+
+function matchIncludesRegistration(match: any, registrationId: string) {
+  if (!registrationId) return false;
+  if (match.participant_a_id === registrationId || match.participant_b_id === registrationId) return true;
+  return Boolean((match.slots || []).some((slot: any) => slot.registration_id === registrationId));
 }
 
 function formatSection(value: string) {
@@ -656,6 +829,59 @@ const styles = StyleSheet.create({
   card: {
     gap: 12,
   },
+  completedCard: {
+    backgroundColor: "rgba(41,182,232,0.08)",
+    borderColor: "rgba(41,182,232,0.34)",
+  },
+  completedHeader: {
+    alignItems: "flex-start",
+    gap: 7,
+  },
+  winnerBox: {
+    backgroundColor: colors.black,
+    borderColor: "rgba(247,199,68,0.45)",
+    borderRadius: 7,
+    borderWidth: 1,
+    gap: 5,
+    padding: 12,
+  },
+  winnerLabel: {
+    color: colors.gold,
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  winnerName: {
+    color: colors.gold,
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  podiumGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  podiumCard: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: colors.border,
+    borderRadius: 7,
+    borderWidth: 1,
+    flex: 1,
+    gap: 5,
+    minHeight: 78,
+    padding: 10,
+  },
+  podiumFirst: {
+    backgroundColor: "rgba(247,199,68,0.12)",
+    borderColor: "rgba(247,199,68,0.45)",
+  },
+  podiumRank: {
+    color: colors.gold,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  podiumName: {
+    fontWeight: "900",
+  },
   statGrid: {
     flexDirection: "row",
     gap: 10,
@@ -716,6 +942,7 @@ const styles = StyleSheet.create({
   rowMain: {
     flex: 1,
     gap: 2,
+    minWidth: 0,
   },
   rowTitle: {
     fontWeight: "900",
@@ -724,6 +951,22 @@ const styles = StyleSheet.create({
     color: colors.gold,
     fontWeight: "900",
     minWidth: 34,
+  },
+  placementRow: {
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: colors.border,
+    borderRadius: 7,
+    borderWidth: 1,
+    padding: 10,
+  },
+  rankFirst: {
+    color: colors.gold,
+  },
+  rankSecond: {
+    color: colors.cyan,
+  },
+  rankThird: {
+    color: colors.success,
   },
   avatar: {
     alignItems: "center",

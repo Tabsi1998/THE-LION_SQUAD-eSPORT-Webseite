@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { CalendarClock } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
+import { seoTextPreview } from "@/lib/textPreview";
 
 function formatDateTime(value) {
   if (!value) return "Termin offen";
@@ -73,18 +76,29 @@ export default function TournamentSchedulePage() {
   }, [data]);
 
   const tournament = data?.tournament || {};
-  useDocumentTitle(`${tournament.title || "Turnier"} Spielplan`, "Runden, Heats, Zeiten und Matchseiten.", {
+  const tournamentUrl = `/tournaments/${tournament.slug || tournament.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
+  const seoDescription = seoTextPreview(tournament.description, "Spielplan des eSports Turniers mit Runden, Heats, Zeiten und Matchseiten.");
+  useDocumentTitle(`${tournament.title || "Turnier"} Spielplan`, seoDescription, {
     image: tournament.banner_url,
     canonical: tournament.slug ? `${window.location.origin}/tournaments/${tournament.slug}/matches` : undefined,
   });
   useCanonicalSlugRedirect(slug, tournament.slug, "/tournaments", "/matches");
 
-  if (!data) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE SPIELPLAN …</div></PublicLayout>;
+  if (!data) return <PublicLayout><PublicLoadingState label="Lade Spielplan" /></PublicLayout>;
 
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link to={`/tournaments/${tournament.slug || tournament.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
+        <Breadcrumbs
+          items={[
+            { label: "Home", to: "/" },
+            { label: "Turniere", to: "/tournaments" },
+            { label: tournament.title, to: tournamentUrl },
+            { label: "Spielplan" },
+          ]}
+          className="mb-3"
+        />
+        <Link to={tournamentUrl} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
         <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase">Spielplan</h1>
         <p className="mt-3 text-white/60 max-w-2xl">Alle Runden, Heats, Zeiten und öffentlichen Matchseiten für Terminabstimmung, Chat und Ergebnisstatus.</p>
 

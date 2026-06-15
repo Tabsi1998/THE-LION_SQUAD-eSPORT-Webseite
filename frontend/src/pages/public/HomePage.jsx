@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { MascotBadge } from "@/components/tls/Logo";
+import { LazyImg } from "@/components/tls/LazyImg";
 import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { motion } from "framer-motion";
-import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Crown, Pin, Radio, Image as ImageIcon, Gamepad2 } from "lucide-react";
+import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio } from "lucide-react";
 
-const HOME_DESCRIPTION = "THE LION SQUAD eSports: News, Events, Turniere, Fast-Lap-Challenges, Galerie und Vereinsinfos aus Tirol.";
+const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
 
 export default function HomePage() {
   const [state, setState] = useState(null);
@@ -48,7 +48,7 @@ export default function HomePage() {
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28">
           <div className="grid lg:grid-cols-12 gap-8 items-center min-w-0">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="lg:col-span-7 min-w-0">
+            <div className="lg:col-span-7 min-w-0 tls-hero-enter">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#29B6E8]/10 border border-[#29B6E8]/30 rounded-sm mb-6" data-testid="hero-tag">
                 <span className="w-2 h-2 rounded-full bg-[#29B6E8] animate-pulse" />
                 <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">THE LION SQUAD · eSPORTS</span>
@@ -63,20 +63,17 @@ export default function HomePage() {
                 <Link to="/about" data-testid="hero-cta-about" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] hover:shadow-[0_0_24px_rgba(41,182,232,0.6)] transition-all">
                   Über den Verein <ArrowRight className="w-4 h-4" />
                 </Link>
-                <Link to="/events" data-testid="hero-cta-events" className="inline-flex items-center gap-2 px-6 py-3 border border-[#9F7AEA]/50 text-[#C4A7FF] hover:bg-[#9F7AEA]/10 font-bold uppercase tracking-wider rounded-sm transition-all">
-                  <Calendar className="w-4 h-4" /> Events
-                </Link>
-                <Link to="/tournaments" data-testid="hero-cta-tournaments" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm transition-all">
-                  <Gamepad2 className="w-4 h-4" /> eSports
+                <Link to="/events" data-testid="hero-cta-events" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm transition-all">
+                  <Calendar className="w-4 h-4" /> Termine
                 </Link>
               </div>
-            </motion.div>
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.2 }} className="lg:col-span-5 flex items-center justify-center min-w-0">
+            </div>
+            <div className="lg:col-span-5 flex items-center justify-center min-w-0 tls-hero-enter tls-hero-enter-delay">
               <div className="relative">
                 <div className="absolute inset-0 bg-[#29B6E8] blur-[80px] opacity-20" />
                 <MascotBadge className="relative w-64 h-64 md:w-80 md:h-80 drop-shadow-[0_0_40px_rgba(41,182,232,0.3)]" />
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       </section>
@@ -123,7 +120,6 @@ export default function HomePage() {
           </div>
         </section>
       )}
-      <HomeExplore />
 
     </PublicLayout>
   );
@@ -194,7 +190,7 @@ function FeaturedNews({ news }) {
     <Link to={`/news/${news.slug}`} data-testid={`home-featured-news-${news.slug}`} className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#111] overflow-hidden grid lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)] transition min-w-0">
       <div className="aspect-[16/9] lg:aspect-auto bg-[#070707] overflow-hidden">
         {news.banner_url ? (
-          <img src={resolveMediaUrl(news.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover object-center opacity-90 group-hover:scale-105 transition duration-500" />
+          <LazyImg src={news.banner_url} alt="" sizes="(min-width: 1024px) 45vw, 100vw" className="w-full h-full object-cover object-center opacity-90 group-hover:scale-105 transition duration-500" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-[#29B6E8]/20 via-[#101010] to-black" />
         )}
@@ -286,7 +282,7 @@ function NewsCard({ news, featured = false }) {
     >
       {news.banner_url ? (
         <div className={`${featured ? "aspect-[16/8]" : "aspect-video"} bg-[#0A0A0A] overflow-hidden`}>
-          <img src={resolveMediaUrl(news.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+          <LazyImg src={news.banner_url} alt="" sizes="(min-width: 1024px) 25vw, (min-width: 768px) 50vw, 100vw" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
         </div>
       ) : (
         <div className={`${featured ? "aspect-[16/8]" : "aspect-video"} bg-gradient-to-br from-[#29B6E8]/20 via-[#0A0A0A] to-[#0A0A0A]`} />
@@ -301,33 +297,6 @@ function NewsCard({ news, featured = false }) {
         {news.excerpt && <p className="mt-2 text-xs text-white/60 line-clamp-3">{news.excerpt}</p>}
       </div>
     </Link>
-  );
-}
-
-function HomeExplore() {
-  const links = [
-    { to: "/about", icon: Crown, label: "Verein", text: "Wer wir sind, wofür wir stehen und was THE LION SQUAD ausmacht.", accent: "#FFD700" },
-    { to: "/galerie", icon: ImageIcon, label: "Galerie", text: "Fotos und Eindrücke von Events, LANs und Community-Abenden.", accent: "#29B6E8" },
-    { to: "/sponsors", icon: Trophy, label: "Sponsoren", text: "Partner und Unterstützer, die unsere Events möglich machen.", accent: "#FFD700" },
-    { to: "/contact", icon: ArrowRight, label: "Kontakt", text: "Anfragen, Kooperationen, Sponsoring und allgemeine Nachrichten.", accent: "#9F7AEA" },
-  ];
-  return (
-    <section className="border-y border-white/10 bg-[#080808]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {links.map(({ to, icon: Icon, label, text, accent }) => (
-            <Link key={to} to={to} className="group border border-white/10 hover:border-white/25 rounded-sm bg-[#111] p-5 transition min-h-40 flex flex-col">
-              <Icon className="w-5 h-5" style={{ color: accent }} />
-              <div className="mt-4 font-heading text-xl font-black uppercase group-hover:text-[#29B6E8] transition">{label}</div>
-              <p className="mt-2 text-sm text-white/55 leading-relaxed">{text}</p>
-              <span className="mt-auto pt-4 inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-white/45 group-hover:text-[#29B6E8]">
-                Öffnen <ArrowRight className="w-3 h-3" />
-              </span>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </section>
   );
 }
 

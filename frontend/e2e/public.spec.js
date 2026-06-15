@@ -110,6 +110,7 @@ test("public profile social links render as icons without raw values", async ({ 
         tournaments: [],
         f1_bests: [],
         teams: [],
+        references: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } },
       }),
     });
   });
@@ -129,6 +130,71 @@ test("public profile social links render as icons without raw values", async ({ 
     await expect(socials.getByTestId(`profile-social-${key}`)).toBeVisible();
   }
   await expect(socials).not.toContainText(/twitch\.tv|youtube\.com|instagram\.com|tiktok\.com|lionsquad\.at|tabsi98#1234/i);
+});
+
+test("public profile renders references from profile payload", async ({ page }) => {
+  await mockPublicChrome(page);
+  await page.route("**/api/users/public/tabsi98", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: "user-1",
+        username: "tabsi98",
+        display_name: "Tabsi98",
+        bio: "",
+        created_at: "2025-01-01T00:00:00Z",
+        privacy_public_profile: true,
+        stats: {},
+        achievement_level: { level: 4, points: 320, next_level_points: 500, progress: 64 },
+        tournaments: [],
+        f1_bests: [],
+        teams: [],
+        references: {
+          stats: { total: 2, tournaments: 1, fastlaps: 1, wins: 1, podiums: 2, season_points: 42 },
+          items: [
+            {
+              id: "season:tournament:t1",
+              kind: "tournament",
+              title: "Winter Cup",
+              subtitle: "Mario Kart",
+              rank: 1,
+              points: 30,
+              status: "results_published",
+              date: "2026-02-01T12:00:00Z",
+              target_id: "winter-cup",
+              participant_count: 16,
+            },
+            {
+              id: "fastlap:c1:track1",
+              kind: "fastlap",
+              title: "F1 Hotlap",
+              subtitle: "Spielberg",
+              rank: 2,
+              time_str: "1:22.123",
+              date: "2026-01-15T12:00:00Z",
+              target_id: "f1-hotlap",
+              participant_count: 8,
+            },
+          ],
+        },
+      }),
+    });
+  });
+  await page.route("**/api/streams/live", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify([]) });
+  });
+  await page.route("**/api/achievements/user/user-1", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ groups: [], awards: [] }) });
+  });
+
+  await page.goto("/u/tabsi98");
+  await acceptCookies(page);
+
+  await expect(page.getByTestId("profile-tab-references")).toContainText("Referenzen (2)");
+  await page.getByTestId("profile-tab-references").click();
+  await expect(page.getByTestId("public-profile-references")).toBeVisible();
+  await expect(page.getByTestId("profile-reference-season:tournament:t1")).toContainText("Winter Cup");
+  await expect(page.getByTestId("profile-reference-fastlap:c1:track1")).toContainText("1:22.123");
 });
 
 test("public pages do not create horizontal page scroll on mobile and tablet", async ({ page }) => {

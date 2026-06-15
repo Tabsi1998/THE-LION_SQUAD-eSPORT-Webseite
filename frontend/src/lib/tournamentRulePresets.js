@@ -2,7 +2,7 @@ export const RULE_PRESETS = [
   {
     key: "online",
     label: "Online",
-    description: "Spieler melden Ergebnisse, Termine koennen vorgeschlagen werden.",
+    description: "Spieler melden Ergebnisse, Termine können vorgeschlagen werden.",
     values: { event_mode: "online", result_entry_mode: "player_confirmed", schedule_mode: "player_proposal" },
   },
   {

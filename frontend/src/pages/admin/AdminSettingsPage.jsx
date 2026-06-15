@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { setCachedBranding } from "@/lib/brandingEvents";
 import { isGoogleMeasurementId, normalizeAnalyticsPayload } from "@/lib/analyticsConfig";
@@ -42,6 +43,23 @@ const STATUS_LABELS = {
   failed: "fehlgeschlagen",
   skipped: "übersprungen",
 };
+
+const SETTINGS_TABS = [
+  ["email", "Resend", Mail],
+  ["smtp", "SMTP", Server],
+  ["newsletter", "Newsletter", Mail],
+  ["queue", "Mail-Queue", Inbox],
+  ["discord", "Discord", MessageSquare],
+  ["twitch", "Twitch", Radio],
+  ["brand", "Branding", Palette],
+  ["socials", "Socials", Share2],
+  ["seo", "SEO & Analytics", Search],
+  ["legal", "Rechtliches", FileText],
+  ["system", "Status", Activity],
+  ["logs", "Versandlogs", Send],
+];
+const SETTINGS_TAB_KEYS = new Set(SETTINGS_TABS.map(([key]) => key));
+const INDEXNOW_DEFAULT_PATHS = ["/", "/sitemap.xml", "/sitemap-news.xml", "/news", "/events", "/esports", "/tournaments", "/fastlap", "/galerie", "/members"];
 
 const BANNER_TEMPLATE_PRESETS = {
   custom: { title: "Eigener Hinweis", text: "", tone: "info", style: "neon", link_label: "Mehr", scope: "all" },
@@ -162,12 +180,18 @@ function discordPayload(source) {
   return payload;
 }
 
+function hasOriginalSnapshot(ref) {
+  return Object.keys(ref.current || {}).length > 0;
+}
+
 function mailTemplateLabel(job) {
   return MAIL_TEMPLATE_LABELS[job?.template_key] || job?.template_key || "Mail";
 }
 
 export default function AdminSettingsPage() {
-  const [tab, setTab] = useState("email");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = SETTINGS_TAB_KEYS.has(searchParams.get("tab")) ? searchParams.get("tab") : "email";
+  const [tab, setTab] = useState(initialTab);
   const [email, setEmail] = useState({ resend_api_key: "", sender_name: "", sender_email: "", reply_to_email: "", enabled: true, resend_api_key_masked: "" });
   const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_auth: "login", smtp_security: "auto", smtp_tls_verify: false, smtp_envelope_from: "", smtp_helo_name: "", sender_name: "", sender_email: "", reply_to_email: "", message_id_domain: "", enabled: true, smtp_pass_masked: "" });
   const [smtpTestEmail, setSmtpTestEmail] = useState("");
@@ -183,7 +207,8 @@ export default function AdminSettingsPage() {
   const [sendingNewsletter, setSendingNewsletter] = useState(false);
   const [brand, setBrand] = useState({
     club_name: "", tagline: "", site_title: "THE LION SQUAD - eSPORTS", site_description: "", primary_color: "#29B6E8",
-    logo_url: "", mascot_url: "", favicon_url: "", contact_email: "", domain: "", timezone: "Europe/Vienna",
+    logo_url: "", logo_light_url: "", logo_dark_url: "", share_banner_url: "", mascot_url: "", qr_logo_url: "",
+    favicon_url: "", favicon_light_url: "", favicon_dark_url: "", contact_email: "", domain: "", timezone: "Europe/Vienna",
     legal_name: "", legal_form: "eingetragener Verein nach österreichischem Vereinsrecht", zvr_number: "",
     street_address: "", address_extra: "", postal_code: "", city: "", state: "Tirol", country: "Oesterreich",
     registered_seat: "", register_authority: "", representative_name: "", representative_role: "",
@@ -220,6 +245,8 @@ export default function AdminSettingsPage() {
   const [savingDiscord, setSavingDiscord] = useState(false);
   const [savingTwitch, setSavingTwitch] = useState(false);
   const [refreshingTwitch, setRefreshingTwitch] = useState(false);
+  const [submittingIndexNow, setSubmittingIndexNow] = useState(false);
+  const [indexNowResult, setIndexNowResult] = useState(null);
   const imageUploadBusy = useImageUploadBusy();
   const brandDirtyRef = useRef(false);
   const discordDirtyRef = useRef(false);
@@ -230,6 +257,21 @@ export default function AdminSettingsPage() {
   const loadSeqRef = useRef(0);
   const loadErrorKeyRef = useRef("");
   const confirm = useConfirm();
+
+  useEffect(() => {
+    const nextTab = searchParams.get("tab");
+    if (SETTINGS_TAB_KEYS.has(nextTab) && nextTab !== tab) setTab(nextTab);
+  }, [searchParams, tab]);
+
+  const selectTab = (nextTab) => {
+    setTab(nextTab);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (nextTab === "email") params.delete("tab");
+      else params.set("tab", nextTab);
+      return params;
+    }, { replace: true });
+  };
 
   const load = useCallback(async () => {
     const seq = ++loadSeqRef.current;
@@ -419,11 +461,18 @@ export default function AdminSettingsPage() {
     finally { setSavingBrand(false); }
   };
   const submitIndexNow = async () => {
+    setSubmittingIndexNow(true);
+    setIndexNowResult(null);
     try {
-      const { data } = await api.post("/settings/indexnow/submit", { urls: ["/", "/sitemap.xml"] });
+      const { data } = await api.post("/settings/indexnow/submit", { urls: INDEXNOW_DEFAULT_PATHS });
+      setIndexNowResult({ ok: true, ...data, submitted_at: new Date().toISOString() });
       toast.success(`IndexNow gesendet (${data.submitted || 0} URLs).`);
     } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail) || "IndexNow konnte nicht gesendet werden.");
+      const message = formatApiError(e.response?.data?.detail) || "IndexNow konnte nicht gesendet werden.";
+      setIndexNowResult({ ok: false, error: message, submitted_at: new Date().toISOString() });
+      toast.error(message);
+    } finally {
+      setSubmittingIndexNow(false);
     }
   };
   const setBannerField = (key, value) => setBannerForm((prev) => ({ ...prev, [key]: value }));
@@ -722,19 +771,43 @@ export default function AdminSettingsPage() {
   const queueCounts = queueStats?.counts || {};
   const newsletterOptions = newsletter.kind === "event" ? newsletterSources.events : newsletterSources.news;
   const selectedNewsletterSource = newsletterOptions.find((item) => item.id === newsletter.id || item.slug === newsletter.id);
+  const publicDomain = (() => {
+    const raw = String(brand.domain || "https://lionsquad.at").trim().replace(/\/+$/, "");
+    if (!raw) return "https://lionsquad.at";
+    return raw.startsWith("http://") || raw.startsWith("https://") ? raw : `https://${raw}`;
+  })();
+  const indexNowKeyUrl = `${publicDomain}/indexnow-key.txt`;
+  const emailDirty = hasOriginalSnapshot(originalEmailRef) && hasPayloadChanges(buildDirtyPayload(emailPayload(email), originalEmailRef.current));
+  const smtpDirty = hasOriginalSnapshot(originalSmtpRef) && hasPayloadChanges(buildDirtyPayload(smtpPayload(smtp), originalSmtpRef.current));
+  const brandDirty = hasOriginalSnapshot(originalBrandRef) && hasPayloadChanges(buildDirtyPayload(brandPayload(brand), originalBrandRef.current));
+  const discordDirty = hasOriginalSnapshot(originalDiscordRef) && hasPayloadChanges(buildDirtyPayload(discordPayload(discord), originalDiscordRef.current));
+  const dirtyTabs = new Set([
+    emailDirty && "email",
+    smtpDirty && "smtp",
+    discordDirty && "discord",
+    brandDirty && "twitch",
+    brandDirty && "brand",
+    brandDirty && "socials",
+    brandDirty && "seo",
+    brandDirty && "legal",
+  ].filter(Boolean));
 
   return (
     <AdminLayout>
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">System</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Einstellungen</h1>
 
-      <div className="flex gap-1 mb-6 border-b border-white/10 overflow-x-auto">
-        {[["email", "Resend", Mail], ["smtp", "SMTP", Server], ["newsletter", "Newsletter", Mail], ["queue", "Mail-Queue", Inbox], ["discord", "Discord", MessageSquare], ["twitch", "Twitch", Radio], ["brand", "Branding", Palette], ["socials", "Socials", Share2], ["seo", "SEO & Analytics", Search], ["legal", "Rechtliches", FileText], ["system", "Status", Activity], ["logs", "Versandlogs", Send]].map(([k, l, Icn]) => (
-          <button key={k} onClick={() => setTab(k)} data-testid={`settings-tab-${k}`}
-            className={`px-4 py-3 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap ${tab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
-            <Icn className="w-3.5 h-3.5" />{l}
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-2 mb-6 border-b border-white/10 pb-3">
+        {SETTINGS_TABS.map(([k, l, Icn]) => {
+          const isDirty = dirtyTabs.has(k);
+          return (
+            <button key={k} onClick={() => selectTab(k)} data-testid={`settings-tab-${k}`}
+              className={`px-3 py-2 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap rounded-sm border transition ${tab === k ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/60 hover:border-white/25 hover:text-white"}`}>
+              <Icn className="w-3.5 h-3.5" />{l}
+              {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-[#FFD700] shadow-[0_0_8px_rgba(255,215,0,0.8)]" title="Ungespeicherte Änderungen" />}
+            </button>
+          );
+        })}
       </div>
 
       {tab === "email" && (
@@ -1430,9 +1503,18 @@ export default function AdminSettingsPage() {
               <BrandField label="Kontakt E-Mail" value={brand.contact_email} onChange={(v) => setBrandField("contact_email", v)} testId="brand-contact-email" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ImageUpload value={brand.logo_url} onChange={(v) => setBrandField("logo_url", v)} label="Vereinslogo" testId="brand-logo" variant="square" allowLibrary />
+              <ImageUpload value={brand.logo_url} onChange={(v) => setBrandField("logo_url", v)} label="Standard-Logo" testId="brand-logo" variant="square" allowLibrary />
+              <ImageUpload value={brand.logo_dark_url} onChange={(v) => setBrandField("logo_dark_url", v)} label="Logo auf dunklem Hintergrund" testId="brand-logo-dark" variant="square" allowLibrary />
+              <ImageUpload value={brand.logo_light_url} onChange={(v) => setBrandField("logo_light_url", v)} label="Logo auf hellem Hintergrund" testId="brand-logo-light" variant="square" allowLibrary />
+              <ImageUpload value={brand.share_banner_url} onChange={(v) => setBrandField("share_banner_url", v)} label="Standard SEO-/Teilen-Banner" testId="brand-share-banner" variant="wide" allowLibrary />
               <ImageUpload value={brand.mascot_url} onChange={(v) => setBrandField("mascot_url", v)} label="Maskottchen" testId="brand-mascot" variant="square" allowLibrary />
-              <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Favicon / Browser Icon" testId="brand-favicon" variant="square" allowLibrary />
+              <ImageUpload value={brand.qr_logo_url} onChange={(v) => setBrandField("qr_logo_url", v)} label="QR-Logo" testId="brand-qr-logo" variant="square" allowLibrary />
+              <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Standard-Favicon" testId="brand-favicon" variant="square" allowLibrary />
+              <ImageUpload value={brand.favicon_light_url} onChange={(v) => setBrandField("favicon_light_url", v)} label="Favicon für hellen Modus" testId="brand-favicon-light" variant="square" allowLibrary />
+              <ImageUpload value={brand.favicon_dark_url} onChange={(v) => setBrandField("favicon_dark_url", v)} label="Favicon für dunklen Modus" testId="brand-favicon-dark" variant="square" allowLibrary />
+            </div>
+            <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/60">
+              Standardbilder werden verwendet, wenn eine Seite kein eigenes Bild hat. SEO nutzt Beitrags-/Event-/Turnierbild zuerst, danach den Teilen-Banner, danach Logo oder Maskottchen. QR-Codes verwenden das QR-Logo in der Mitte, mit Maskottchen als Fallback.
             </div>
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
@@ -1571,7 +1653,7 @@ export default function AdminSettingsPage() {
               <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Indexierung</span>
               <h2 className="font-heading text-2xl font-black uppercase mt-1">SEO & Analytics</h2>
               <p className="text-sm text-white/55 mt-2 max-w-2xl">
-                Analytics, Google Search Console, Bing Webmaster Tools und IndexNow liegen hier gebuendelt. Social-Share-Bilder kommen automatisch aus dem jeweiligen Seitenbild oder aus Logo/Maskottchen.
+                Analytics, Google Search Console, Bing Webmaster Tools und IndexNow liegen hier gebündelt. Social-Share-Bilder kommen automatisch aus dem jeweiligen Seitenbild oder aus Logo/Maskottchen.
               </p>
             </div>
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
@@ -1595,8 +1677,28 @@ export default function AdminSettingsPage() {
                 <BrandField label="Bing msvalidate.01" value={brand.msvalidate_01} onChange={(v) => setBrandField("msvalidate_01", v)} testId="brand-bing-verification" />
                 <BrandField label="IndexNow Key" value={brand.indexnow_key} onChange={(v) => setBrandField("indexnow_key", v)} testId="brand-indexnow-key" />
               </div>
-              <button type="button" onClick={submitIndexNow} disabled={!brand.indexnow_key} className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
-                IndexNow senden
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <SeoStatusCard ok={!!brand.google_site_verification} title="Google" detail={brand.google_site_verification ? "Search Console Verification gesetzt" : "Verification-Content fehlt"} />
+                <SeoStatusCard ok={!!brand.msvalidate_01} title="Bing" detail={brand.msvalidate_01 ? "Bing Verification gesetzt" : "msvalidate.01 fehlt"} />
+                <SeoStatusCard ok={!!brand.indexnow_key} title="IndexNow" detail={brand.indexnow_key ? `Key-Datei: ${indexNowKeyUrl}` : "Key fehlt, Submit deaktiviert"} />
+              </div>
+              <div className="rounded-sm border border-white/10 bg-[#121212] p-3 text-xs text-white/50">
+                <div className="font-bold uppercase tracking-widest text-white/70">Gesendete IndexNow-URLs</div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {INDEXNOW_DEFAULT_PATHS.map((path) => (
+                    <span key={path} className="rounded-sm border border-white/10 bg-black/20 px-2 py-1 font-mono text-[11px] text-white/55">{path}</span>
+                  ))}
+                </div>
+                {indexNowResult && (
+                  <div className={`mt-3 rounded-sm border px-3 py-2 ${indexNowResult.ok ? "border-[#10B981]/25 text-[#10B981]" : "border-[#FF3B30]/25 text-[#FF3B30]"}`}>
+                    {indexNowResult.ok ? `${indexNowResult.submitted || 0} URLs gesendet` : indexNowResult.error}
+                    {indexNowResult.submitted_at && <span className="text-white/35"> - {new Date(indexNowResult.submitted_at).toLocaleString("de-DE")}</span>}
+                  </div>
+                )}
+              </div>
+              <button type="button" onClick={submitIndexNow} disabled={!brand.indexnow_key || submittingIndexNow} className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+                {submittingIndexNow ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                {submittingIndexNow ? "Sende..." : "IndexNow senden"}
               </button>
             </div>
             <button onClick={saveBrand} disabled={imageUploadBusy || savingBrand} data-testid="seo-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingBrand ? "Speichere..." : "SEO & Analytics speichern"}</button>
@@ -1812,6 +1914,18 @@ function BrandDateTimeField({ label, value, onChange, testId }) {
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
       <input type="datetime-local" value={toDateTimeInput(value)} onChange={(e) => onChange(fromDateTimeInput(e.target.value))} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
     </label>
+  );
+}
+
+function SeoStatusCard({ title, ok, detail }) {
+  return (
+    <div className={`rounded-sm border bg-[#121212] p-3 ${ok ? "border-[#10B981]/25" : "border-[#FFD700]/25"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[11px] font-bold uppercase tracking-widest text-white/65">{title}</div>
+        {ok ? <CheckCircle2 className="h-4 w-4 text-[#10B981]" /> : <AlertTriangle className="h-4 w-4 text-[#FFD700]" />}
+      </div>
+      <div className="mt-2 break-words text-xs leading-relaxed text-white/45">{detail}</div>
+    </div>
   );
 }
 

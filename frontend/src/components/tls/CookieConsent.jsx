@@ -89,23 +89,32 @@ export function CookieConsentProvider({ children }) {
     <CookieConsentContext.Provider value={value}>
       {children}
       {open && (
-        <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-end md:items-center justify-center p-4">
-          <div className="w-full max-w-3xl border border-[#29B6E8]/40 bg-[#050505] rounded-sm shadow-2xl shadow-black/60">
-            <div className="p-5 md:p-7">
+        <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-start md:items-center justify-center overflow-y-auto p-3 sm:p-4">
+          <div className="w-full max-w-3xl max-h-[calc(100vh-1.5rem)] md:max-h-[calc(100vh-2rem)] overflow-y-auto border border-[#29B6E8]/40 bg-[#050505] rounded-sm shadow-2xl shadow-black/60">
+            <div className="p-4 sm:p-5 md:p-7">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#29B6E8]">Datenschutz</div>
-                  <h2 className="mt-2 font-heading text-3xl md:text-4xl font-black uppercase">Cookie-Einstellungen</h2>
+                  <h2 className="mt-2 font-heading text-xl sm:text-3xl md:text-4xl font-black uppercase">Cookie-Einstellungen</h2>
                 </div>
                 {stored && (
                   <button type="button" onClick={() => setOpen(false)} className="text-white/45 hover:text-white"><X className="w-5 h-5" /></button>
                 )}
               </div>
-              <p className="mt-4 text-sm md:text-base text-white/70 leading-relaxed">
+              <p className="mt-3 md:mt-4 text-sm md:text-base text-white/70 leading-relaxed">
                 Wir verwenden notwendige Speicherungen für Login, Sicherheit und deine Cookie-Auswahl. Optionale Dienste wie eingebettete Karten, Streams, Statistik oder Social-/Marketing-Dienste aktivieren wir erst nach deiner Zustimmung. Du kannst die Auswahl jederzeit im Footer ändern.
               </p>
-              <div className="mt-6 divide-y divide-white/10 border-y border-white/10">
+              <div className="mt-4 md:mt-6 divide-y divide-white/10 border-y border-white/10">
                 <ConsentRow title="Essentiell" text="Login, CSRF-Schutz, Warenkorb-/Formularstatus und diese Einwilligungsinfo." locked checked />
+                <details className="group">
+                  <summary className="cursor-pointer list-none py-3 md:py-4 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="font-heading font-black uppercase text-base md:text-lg">Optionale Dienste</div>
+                      <div className="mt-1 text-xs text-white/50 max-w-xl">Externe Medien, Statistik und Social-/Marketing-Dienste einzeln einstellen.</div>
+                    </div>
+                    <span className="rounded-sm border border-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/55 group-open:text-white">Einblenden</span>
+                  </summary>
+                  <div className="divide-y divide-white/10 border-t border-white/10">
                 <ConsentRow
                   title="Externe Medien"
                   text="Google Maps, Twitch, YouTube oder ähnliche Einbettungen direkt auf der Seite."
@@ -130,8 +139,10 @@ export function CookieConsentProvider({ children }) {
                   checked={draft.tiktok}
                   onChange={(v) => setDraft((cur) => ({ ...cur, tiktok: v }))}
                 />
+                  </div>
+                </details>
               </div>
-              <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:justify-between">
+              <div className="mt-4 md:mt-6 grid gap-2 sm:grid-cols-3">
                 <button type="button" onClick={() => save(DEFAULT_CONSENT)} className="px-4 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-white/5">
                   Alle ablehnen
                 </button>
@@ -155,9 +166,9 @@ export function CookieConsentProvider({ children }) {
 
 function ConsentRow({ title, text, checked, locked = false, onChange }) {
   return (
-    <div className="py-4 flex items-center justify-between gap-5">
+    <div className="py-3 md:py-4 flex items-center justify-between gap-4 md:gap-5">
       <div>
-        <div className="font-heading font-black uppercase text-lg">{title}</div>
+        <div className="font-heading font-black uppercase text-base md:text-lg">{title}</div>
         <div className="mt-1 text-xs text-white/50 max-w-xl">{text}</div>
       </div>
       <button

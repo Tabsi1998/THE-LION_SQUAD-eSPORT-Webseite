@@ -104,7 +104,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const [forfeitWinnerId, setForfeitWinnerId] = useState("");
   const [v2Rows, setV2Rows] = useState<V2ResultRow[]>([]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { preserveDrafts?: boolean }) => {
+    const preserveDrafts = options?.preserveDrafts !== false;
     setError("");
     try {
       const [pageResult, chatResult] = await Promise.all([
@@ -115,11 +116,19 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       const match = nextPage?.match || {};
       setPage(nextPage);
       setChat(Array.isArray(chatResult.data) ? chatResult.data : []);
-      setProposalAt((current) => current || formatDateInput(match.scheduled_at));
-      setScoreA((current) => current || String(match.score_a ?? 0));
-      setScoreB((current) => current || String(match.score_b ?? 0));
-      setForfeitWinnerId((current) => current || firstRegistrationId(nextPage?.participants));
-      setV2Rows((current) => current.length ? current : buildV2Rows(nextPage));
+      if (preserveDrafts) {
+        setProposalAt((current) => current || formatDateInput(match.scheduled_at));
+        setScoreA((current) => current || String(match.score_a ?? 0));
+        setScoreB((current) => current || String(match.score_b ?? 0));
+        setForfeitWinnerId((current) => current || firstRegistrationId(nextPage?.participants));
+        setV2Rows((current) => current.length ? current : buildV2Rows(nextPage));
+      } else {
+        setProposalAt(formatDateInput(match.scheduled_at));
+        setScoreA(String(match.score_a ?? 0));
+        setScoreB(String(match.score_b ?? 0));
+        setForfeitWinnerId(firstRegistrationId(nextPage?.participants));
+        setV2Rows(buildV2Rows(nextPage));
+      }
     } catch (err) {
       setError(errorMessage(err, "Match konnte nicht geladen werden."));
       setPage(null);
@@ -146,8 +155,10 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   }, [route.params.id]);
 
   useEffect(() => {
-    load();
-    const timer = setInterval(load, 15000);
+    load({ preserveDrafts: false });
+    const timer = setInterval(() => {
+      void load();
+    }, 10000);
     return () => clearInterval(timer);
   }, [load]);
 
@@ -156,12 +167,13 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const pendingProposals = (page?.schedule_proposals || []).filter((proposal) => proposal.status === "pending");
   const isV2 = page?.collection === "matches_v2" || Boolean(match.slots?.length);
   const v2Mode = rankingMode(match);
+  const isCompleted = ["completed", "forfeit"].includes(String(match.status));
   const duelParticipants = participants.slice(0, 2);
   const canUseChat = Boolean(page?.can_act);
   const canPlayerReportResult = Boolean(page?.can_player_report_result ?? page?.can_report_score);
   const canStaffSubmitResult = Boolean(page?.can_staff_submit_result ?? page?.can_submit_result);
-  const canSubmitLegacyResult = Boolean(!isV2 && duelParticipants.length >= 2 && (canPlayerReportResult || canStaffSubmitResult));
-  const canSubmitV2Result = Boolean(isV2 && canStaffSubmitResult && v2Rows.length);
+  const canSubmitLegacyResult = Boolean(!isV2 && !isCompleted && duelParticipants.length >= 2 && (canPlayerReportResult || canStaffSubmitResult));
+  const canSubmitV2Result = Boolean(isV2 && !isCompleted && canStaffSubmitResult && v2Rows.length);
   const canProposeSchedule = Boolean(page?.can_propose_schedule);
   const canManageSchedule = Boolean(page?.can_manage_schedule);
   const hasScheduleProposals = pendingProposals.length > 0;
@@ -170,7 +182,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const eventModeLabel = formatEventMode(page?.event_mode);
   const resultModeLabel = formatResultEntryMode(page?.result_entry_mode);
   const scheduleModeLabel = formatScheduleMode(page?.schedule_mode);
-  const hasResultActions = Boolean(canSubmitLegacyResult || canSubmitV2Result || page?.can_dispute || page?.can_forfeit);
+  const hasResultActions = Boolean(canSubmitLegacyResult || canSubmitV2Result || (!isCompleted && page?.can_dispute) || (!isCompleted && page?.can_forfeit));
   const showFlowNotice = Boolean(!hasResultActions && (page?.result_entry_mode || page?.schedule_mode));
 
   const propose = useCallback(async () => {
@@ -184,7 +196,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     try {
       await api.post(`/matches/${route.params.id}/schedule-proposals`, { scheduled_at: scheduledAt, note: proposalNote.trim() || null });
       setProposalNote("");
-      await load();
+      await load({ preserveDrafts: false });
     } catch (err) {
       setError(errorMessage(err, "Terminvorschlag konnte nicht gesendet werden."));
     } finally {
@@ -209,7 +221,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       await api.post(`/matches/${route.params.id}/schedule-proposals/${proposal.id}/decision`, payload);
       setCounterAt("");
       setDecisionNote("");
-      await load();
+      await load({ preserveDrafts: false });
     } catch (err) {
       setError(errorMessage(err, "Antwort konnte nicht gespeichert werden."));
     } finally {
@@ -263,7 +275,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           note: resultNote.trim() || null,
         });
       }
-      await load();
+      setProofUrl("");
+      setResultNote("");
+      await load({ preserveDrafts: false });
     } catch (err) {
       setError(errorMessage(err, "Ergebnis konnte nicht gemeldet werden."));
     } finally {
@@ -288,7 +302,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           time_ms: numberOrNull(row.time_ms),
         })),
       });
-      await load();
+      setProofUrl("");
+      setResultNote("");
+      await load({ preserveDrafts: false });
     } catch (err) {
       setError(errorMessage(err, "Heat-Ergebnis konnte nicht gespeichert werden."));
     } finally {
@@ -304,7 +320,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     try {
       await api.post(`/matches/${route.params.id}/dispute`, { reason });
       setDisputeReason("");
-      await load();
+      await load({ preserveDrafts: false });
     } catch (err) {
       setError(errorMessage(err, "Dispute konnte nicht gemeldet werden."));
     } finally {
@@ -326,7 +342,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           try {
             await api.post(`/matches/${route.params.id}/forfeit`, { winner_id: forfeitWinnerId, note });
             setForfeitReason("");
-            await load();
+            await load({ preserveDrafts: false });
           } catch (err) {
             setError(errorMessage(err, "Forfeit konnte nicht gespeichert werden."));
           } finally {
@@ -363,7 +379,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load({ preserveDrafts: false }); }} tintColor={colors.cyan} />}
       >
         <View style={styles.header}>
           <Muted>{page.matchday_label || match.round_name || "Match"}</Muted>
@@ -402,59 +418,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           )) : <Muted>Noch keine Teilnehmer zugewiesen.</Muted>}
         </Card>
 
-        {showScheduleCard ? (
-        <Card style={styles.card}>
-          <Heading>{canProposeSchedule || hasScheduleProposals ? "Terminabstimmung" : "Termin"}</Heading>
-          <Muted>{formatDateTime(match.scheduled_at)}{stationLabel(match) ? ` · Station ${stationLabel(match)}` : ""}</Muted>
-          {canProposeSchedule ? (
-            <>
-              <FormInput label="Vorschlag" value={proposalAt} onChangeText={setProposalAt} placeholder="2026-05-19 20:00" />
-              <FormInput label="Notiz optional" value={proposalNote} onChangeText={setProposalNote} placeholder="z.B. nach 20:00 Uhr möglich" />
-              <Button label={busy ? "Sendet ..." : "Termin vorschlagen"} onPress={propose} disabled={busy} />
-            </>
-          ) : page?.schedule_mode === "fixed_by_staff" ? (
-            <Muted>Termin und Station werden durch die Turnierleitung festgelegt.</Muted>
-          ) : (
-            <Muted>Termine können Teilnehmer, Team-Captains oder Turnierleitung vorschlagen.</Muted>
-          )}
-          {pendingProposals.length ? (
-            <View style={styles.stack}>
-              {pendingProposals.map((proposal) => (
-                <View key={proposal.id} style={styles.proposal}>
-                  <Body style={styles.strong}>{formatDateTime(proposal.scheduled_at)}</Body>
-                  <Muted>{proposal.actor?.display_name || proposal.actor?.username || "Teilnehmer"}{proposal.note ? ` · ${proposal.note}` : ""}</Muted>
-                  {canManageSchedule && canDecideScheduleProposal(page, proposal) ? (
-                    <>
-                      <View style={styles.buttonRow}>
-                        <Button label="Annehmen" onPress={() => decide(proposal, "accept")} disabled={busy} />
-                        <Button label="Ablehnen" variant="secondary" onPress={() => decide(proposal, "decline")} disabled={busy} />
-                      </View>
-                      <FormInput label="Gegenvorschlag" value={counterAt} onChangeText={setCounterAt} placeholder="2026-05-19 21:00" />
-                      <FormInput label="Antwort optional" value={decisionNote} onChangeText={setDecisionNote} placeholder="Grund oder Hinweis" />
-                      <Button label="Gegenvorschlag senden" variant="secondary" onPress={() => decide(proposal, "counter")} disabled={busy} />
-                    </>
-                  ) : canManageSchedule ? (
-                    <Muted>Wartet auf Bestätigung durch Gegenseite oder Turnierleitung.</Muted>
-                  ) : null}
-                </View>
-              ))}
-            </View>
-          ) : (
-            canProposeSchedule ? <Muted>Kein offener Terminvorschlag.</Muted> : null
-          )}
-        </Card>
-        ) : null}
-
-        {showFlowNotice ? (
-          <Card style={styles.card}>
-            <Heading>Ablauf</Heading>
-            <FlowNotice page={page} canUseChat={canUseChat} />
-          </Card>
-        ) : null}
-
         {hasResultActions ? (
           <Card style={styles.card}>
-            <Heading>Match-Aktionen</Heading>
+            <Heading>Ergebnis eintragen</Heading>
             {canSubmitLegacyResult ? (
               <>
                 <View style={styles.scoreRow}>
@@ -515,6 +481,56 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                 <Button label="Forfeit speichern" variant="danger" onPress={submitForfeit} disabled={busy || forfeitReason.trim().length < 5 || !forfeitWinnerId} />
               </>
             ) : null}
+          </Card>
+        ) : null}
+
+        {showScheduleCard ? (
+        <Card style={styles.card}>
+          <Heading>{canProposeSchedule || hasScheduleProposals ? "Terminabstimmung" : "Termin"}</Heading>
+          <Muted>{formatDateTime(match.scheduled_at)}{stationLabel(match) ? ` · Station ${stationLabel(match)}` : ""}</Muted>
+          {canProposeSchedule ? (
+            <>
+              <FormInput label="Vorschlag" value={proposalAt} onChangeText={setProposalAt} placeholder="2026-05-19 20:00" />
+              <FormInput label="Notiz optional" value={proposalNote} onChangeText={setProposalNote} placeholder="z.B. nach 20:00 Uhr möglich" />
+              <Button label={busy ? "Sendet ..." : "Termin vorschlagen"} onPress={propose} disabled={busy} />
+            </>
+          ) : page?.schedule_mode === "fixed_by_staff" ? (
+            <Muted>Termin und Station werden durch die Turnierleitung festgelegt.</Muted>
+          ) : (
+            <Muted>Termine können Teilnehmer, Team-Captains oder Turnierleitung vorschlagen.</Muted>
+          )}
+          {pendingProposals.length ? (
+            <View style={styles.stack}>
+              {pendingProposals.map((proposal) => (
+                <View key={proposal.id} style={styles.proposal}>
+                  <Body style={styles.strong}>{formatDateTime(proposal.scheduled_at)}</Body>
+                  <Muted>{proposal.actor?.display_name || proposal.actor?.username || "Teilnehmer"}{proposal.note ? ` · ${proposal.note}` : ""}</Muted>
+                  {canManageSchedule && canDecideScheduleProposal(page, proposal) ? (
+                    <>
+                      <View style={styles.buttonRow}>
+                        <Button label="Annehmen" onPress={() => decide(proposal, "accept")} disabled={busy} />
+                        <Button label="Ablehnen" variant="secondary" onPress={() => decide(proposal, "decline")} disabled={busy} />
+                      </View>
+                      <FormInput label="Gegenvorschlag" value={counterAt} onChangeText={setCounterAt} placeholder="2026-05-19 21:00" />
+                      <FormInput label="Antwort optional" value={decisionNote} onChangeText={setDecisionNote} placeholder="Grund oder Hinweis" />
+                      <Button label="Gegenvorschlag senden" variant="secondary" onPress={() => decide(proposal, "counter")} disabled={busy} />
+                    </>
+                  ) : canManageSchedule ? (
+                    <Muted>Wartet auf Bestätigung durch Gegenseite oder Turnierleitung.</Muted>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          ) : (
+            canProposeSchedule ? <Muted>Kein offener Terminvorschlag.</Muted> : null
+          )}
+        </Card>
+        ) : null}
+
+        {showFlowNotice ? (
+          <Card style={styles.card}>
+            <Heading>Ablauf</Heading>
+            <FlowNotice page={page} canUseChat={canUseChat} />
           </Card>
         ) : null}
 

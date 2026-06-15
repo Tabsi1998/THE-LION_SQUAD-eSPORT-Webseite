@@ -5,7 +5,9 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Trophy, Bell, Crown, Gift, Award, UserCheck, AlertTriangle, Medal, Users } from "lucide-react";
+import { Trophy, Bell, Crown, Gift, Award, UserCheck, AlertTriangle, Medal, Users, Eye } from "lucide-react";
+
+const OPEN_MATCH_STATUSES = new Set(["ready", "scheduled", "in_progress", "waiting_result"]);
 
 function DashboardAvatar({ user, isClubMember }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -55,13 +57,22 @@ export default function DashboardPage() {
       api.get("/users/me/profile-completeness"),
       api.get("/penalties/me"),
     ]);
-    if (m.status === "fulfilled") setMatches(m.value.data);
+    if (m.status === "fulfilled") {
+      const rows = Array.isArray(m.value.data) ? m.value.data : [];
+      setMatches(rows.filter((match) => OPEN_MATCH_STATUSES.has(String(match.status || ""))));
+    }
     if (n.status === "fulfilled") setNotifications(Array.isArray(n.value.data) ? n.value.data : (n.value.data?.items || []));
     if (p.status === "fulfilled") setOpenPrizes(p.value.data?.count || 0);
     if (c.status === "fulfilled") setCompleteness(c.value.data);
     if (pen.status === "fulfilled") setPenaltyCount(pen.value.data?.count || 0);
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const timer = window.setInterval(() => {
+      load().catch(() => {});
+    }, 10000);
+    return () => window.clearInterval(timer);
+  }, [load]);
   useApiInvalidation(load, ["matches", "prizes", "users", "penalties", "achievements", "membership", "tournaments", "f1", "admin/notifications"]);
 
   return (
@@ -115,10 +126,12 @@ export default function DashboardPage() {
                   className="block border border-white/10 rounded-sm p-3 hover:border-[#29B6E8]/60 transition"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="text-sm text-white">{m.round_name || `Runde ${m.round}`}</div>
+                    <div className="text-sm text-white">{m.tournament_title || m.round_name || `Runde ${m.round}`}</div>
                     <StatusBadge status={m.status} />
                   </div>
+                  {m.tournament_title && <div className="text-xs text-white/45 mt-1">{m.round_name || `Runde ${m.round || "-"}`}</div>}
                   {m.scheduled_at && <div className="text-xs text-white/50 mt-1">{new Date(m.scheduled_at).toLocaleString("de-DE")}</div>}
+                  <div className="mt-2 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]">Match öffnen · Ergebnis direkt erfassen</div>
                 </Link>
               ))}
             </div>
@@ -167,6 +180,15 @@ export default function DashboardPage() {
             <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Profil</div>
             <div className="mt-2 font-heading text-lg font-bold">Einstellungen</div>
           </Link>
+          {user?.username && (
+            <Link to={`/u/${user.username}`} data-testid="dashboard-public-profile-link" className="border border-[#29B6E8]/35 hover:border-[#29B6E8]/80 rounded-sm p-5 bg-[#121212] transition">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Öffentlich</div>
+                <Eye className="w-4 h-4 text-[#29B6E8]" />
+              </div>
+              <div className="mt-2 font-heading text-lg font-bold">Öffentliches Profil</div>
+            </Link>
+          )}
           <Link to="/profile?tab=teams" data-testid="dashboard-teams-link" className="border border-[#10B981]/30 hover:border-[#10B981]/70 rounded-sm p-5 bg-[#121212] transition">
             <div className="flex items-center justify-between">
               <div className="text-[11px] uppercase tracking-widest text-[#10B981] font-bold">Teams</div>

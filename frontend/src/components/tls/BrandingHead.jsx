@@ -4,7 +4,10 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 
 const DEFAULT_TITLE = "THE LION SQUAD - eSPORTS";
-const DEFAULT_SHARE_IMAGE = "/assets/brand/tls-wordmark.png";
+const DEFAULT_SHARE_IMAGE = "/assets/brand/og-default.png";
+const DEFAULT_FAVICON = "/assets/brand/tls-favicon.png";
+const DEFAULT_FAVICON_LIGHT = "/assets/brand/tls-favicon-light.png";
+const DEFAULT_FAVICON_DARK = "/assets/brand/tls-favicon-dark.png";
 
 function upsertMeta(selector, attrs) {
   let el = document.head.querySelector(selector);
@@ -19,9 +22,17 @@ function upsertMeta(selector, attrs) {
 }
 
 function pickFavicon(data) {
-  const custom = data?.favicon_url || "";
-  if (custom) return resolveMediaUrl(custom);
-  return "";
+  const custom = data?.favicon_url || data?.favicon_light_url || data?.favicon_dark_url || "";
+  return resolveMediaUrl(custom || DEFAULT_FAVICON);
+}
+
+function pickThemedFavicons(data) {
+  const fallback = pickFavicon(data);
+  return {
+    light: data?.favicon_light_url ? resolveMediaUrl(data.favicon_light_url) : resolveMediaUrl(DEFAULT_FAVICON_LIGHT),
+    dark: data?.favicon_dark_url ? resolveMediaUrl(data.favicon_dark_url) : resolveMediaUrl(DEFAULT_FAVICON_DARK),
+    fallback,
+  };
 }
 
 function removeLinks(rel) {
@@ -51,25 +62,41 @@ function upsertLink(rel, href, attrs = {}) {
   });
 }
 
-function ensureSingleIconLink(rel, href, attrs = {}) {
-  if (!href) {
-    removeLinks(rel);
-    return;
-  }
-  const existing = [...document.head.querySelectorAll(`link[rel="${rel}"]`)]
-    .filter((node) => node.getAttribute("data-tls-route-meta") !== "true");
-  let el = existing[0];
-  if (!el) {
-    el = document.createElement("link");
-    el.setAttribute("rel", rel);
-    document.head.appendChild(el);
-  }
-  existing.slice(1).forEach((node) => node.remove());
+function appendLink(rel, href, attrs = {}) {
+  if (!href) return;
+  const el = document.createElement("link");
+  el.setAttribute("rel", rel);
   Object.entries(attrs).forEach(([key, value]) => {
     if (value != null && value !== "") el.setAttribute(key, value);
-    else el.removeAttribute(key);
   });
   el.setAttribute("href", href);
+  document.head.appendChild(el);
+}
+
+function applyIconLinks(data) {
+  const favicons = pickThemedFavicons(data);
+  removeLinks("icon");
+  if (favicons.light && favicons.light !== favicons.fallback) {
+    appendLink("icon", favicons.light, {
+      type: imageMimeType(favicons.light) || "image/png",
+      sizes: "512x512",
+      media: "(prefers-color-scheme: light)",
+    });
+  }
+  if (favicons.dark && favicons.dark !== favicons.light) {
+    appendLink("icon", favicons.dark, {
+      type: imageMimeType(favicons.dark) || "image/png",
+      sizes: "512x512",
+      media: "(prefers-color-scheme: dark)",
+    });
+  }
+  if (favicons.fallback) {
+    appendLink("icon", favicons.fallback, {
+      type: imageMimeType(favicons.fallback) || "image/png",
+      sizes: "512x512",
+    });
+  }
+  upsertLink("apple-touch-icon", favicons.fallback, favicons.fallback ? { sizes: "512x512" } : {});
 }
 
 function removeMeta(selector) {
@@ -91,18 +118,16 @@ function applyBranding(data) {
 
   const name = data.club_name || "THE LION SQUAD";
   const siteTitle = data.site_title || DEFAULT_TITLE;
-  const description = data.site_description || "THE LION SQUAD - eSPORTS";
+  const description = data.site_description || "Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
   const themeColor = data.primary_color || "#29B6E8";
-  const image = resolveMediaUrl(data.logo_url || data.mascot_url || DEFAULT_SHARE_IMAGE);
-  const favicon = pickFavicon(data);
+  const image = resolveMediaUrl(data.share_banner_url || data.logo_url || data.logo_light_url || data.logo_dark_url || data.mascot_url || DEFAULT_SHARE_IMAGE);
   const origin = data.domain || (typeof window !== "undefined" ? window.location.origin : "");
 
   if (!document.title || document.title === DEFAULT_TITLE || /React App|Vereinsplattform/i.test(document.title)) {
     document.title = siteTitle;
   }
 
-  ensureSingleIconLink("icon", favicon, favicon ? { type: imageMimeType(favicon) || "image/png", sizes: "512x512" } : {});
-  upsertLink("apple-touch-icon", favicon, favicon ? { sizes: "512x512" } : {});
+  applyIconLinks(data);
   upsertLink("manifest", "/api/manifest.webmanifest");
 
   upsertMeta('meta[name="application-name"]', { name: "application-name", content: name });

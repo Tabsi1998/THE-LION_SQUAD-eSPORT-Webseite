@@ -34,6 +34,7 @@ CHECKIN_REMINDERS = [
     ReminderSpec("checkin_reminder", "open_now", "check_in_from", 0, 3),
     ReminderSpec("checkin_closes_soon", "closes_10m", "check_in_until", 10, 3),
 ]
+EMAIL_CHECKIN_REMINDER_LABELS = {"closes_10m"}
 
 
 def _parse_dt(value: Any) -> datetime | None:
@@ -133,9 +134,10 @@ async def schedule_checkin_reminders(now: datetime | None = None) -> dict:
                     kwargs["until"] = _format_de_time(tournament.get("check_in_until"))
                 else:
                     kwargs["when"] = _format_de_time(target)
-                result = await send_user_template(user, spec.template_key, **kwargs)
-                if result.get("ok") and not result.get("skipped") and not result.get("deduped"):
-                    queued += 1
+                if spec.label in EMAIL_CHECKIN_REMINDER_LABELS:
+                    result = await send_user_template(user, spec.template_key, **kwargs)
+                    if result.get("ok") and not result.get("skipped") and not result.get("deduped"):
+                        queued += 1
                 existing_notification = await db.notifications.find_one(
                     {
                         "user_id": user["id"],

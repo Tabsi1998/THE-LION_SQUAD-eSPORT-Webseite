@@ -17,6 +17,7 @@ from services.match_v2_results import MatchV2ResultError, build_v2_result_applic
 from services.match_notifications import notify_match_result_confirmed
 from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
 from services.rate_limit import enforce_rate_limit
+from services.station_runtime import release_station_for_match
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     READ_STAFF_ROLES,
@@ -199,7 +200,7 @@ async def _require_v2_result_permission(user: dict, match: dict) -> None:
         or await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "station", match.get("station_id"))
     )
     if not allowed:
-        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung fuer diese Aktion")
+        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")
 
 
 async def _can_submit_result_for_match(match: dict, user: dict | None) -> bool:
@@ -354,7 +355,7 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
     stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
     policy = _match_policy(match, tournament, stage)
     if not _schedule_proposals_enabled(policy):
-        raise HTTPException(status_code=403, detail="Terminabstimmung ist fuer dieses Match nicht aktiviert")
+        raise HTTPException(status_code=403, detail="Terminabstimmung ist für dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen Termine vorschlagen")
     acting_reg = await _acting_registration_for_match(match, me)
@@ -395,9 +396,9 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
     policy = _match_policy(match, tournament, stage)
     if not _schedule_proposals_enabled(policy):
-        raise HTTPException(status_code=403, detail="Terminabstimmung ist fuer dieses Match nicht aktiviert")
+        raise HTTPException(status_code=403, detail="Terminabstimmung ist für dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung fuer diesen Termin")
+        raise HTTPException(status_code=403, detail="Keine Berechtigung für diesen Termin")
     acting_reg = await _acting_registration_for_match(match, me)
     if acting_reg and proposal.get("actor_registration_id") == acting_reg.get("id") and body.action in {"accept", "decline"}:
         raise HTTPException(status_code=400, detail="Der eigene Vorschlag muss von der Gegenseite bestaetigt werden")
@@ -601,6 +602,10 @@ async def submit_match_v2_result(match_id: str, body: MatchV2ResultSubmit,
     updated = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
     try:
         await notify_match_result_confirmed(db, updated, "matches_v2", force=force)
+    except Exception:
+        pass
+    try:
+        await release_station_for_match(db, updated, "matches_v2")
     except Exception:
         pass
     return {

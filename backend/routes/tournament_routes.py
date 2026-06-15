@@ -45,6 +45,7 @@ STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 REGISTRATION_CHECKIN_STATUSES = {"approved", "checked_in", "no_show"}
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 LEGACY_AUTO_PREVIEW_FORMATS = {"single_elim", "double_elim", "round_robin", "league"}
+STAGE_AUTO_PREVIEW_FORMATS = {"ffa", "battle_royale", "custom_bracket", "ffa_custom_bracket"}
 MAX_INITIAL_PREVIEW_MATCHES = 512
 BRACKET_REFRESH_LOCKED_STATUSES = {"check_in", "live", "paused", "completed", "results_published", "archived", "cancelled"}
 TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
@@ -56,6 +57,46 @@ MATCH_PLAN_DONE_STATUSES = {"completed", "forfeit", "cancelled", "archived", "by
 
 def _safe_regex(value: str | None, max_len: int = 80) -> str:
     return re.escape((value or "").strip()[:max_len])
+
+
+def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
+    safe_limit = max(1, min(int(limit or 48), 200))
+    safe_offset = max(0, int(offset or 0))
+    page = items[safe_offset:safe_offset + safe_limit]
+    if not paged:
+        return page
+    return {"items": page, "total": len(items), "limit": safe_limit, "offset": safe_offset}
+
+
+def _compact_tournament(t: dict) -> dict:
+    game = t.get("game") or {}
+    return {
+        "id": t.get("id"),
+        "title": t.get("title"),
+        "slug": t.get("slug"),
+        "banner_url": t.get("banner_url"),
+        "status": t.get("status"),
+        "visibility": t.get("visibility"),
+        "is_public": t.get("is_public"),
+        "public_phase": t.get("public_phase"),
+        "platform": t.get("platform"),
+        "start_date": t.get("start_date"),
+        "max_participants": t.get("max_participants"),
+        "participant_count": t.get("participant_count", 0),
+        "prize_pool": t.get("prize_pool"),
+        "registration_enabled": t.get("registration_enabled"),
+        "online_registration_enabled": t.get("online_registration_enabled"),
+        "registration_open_from": t.get("registration_open_from"),
+        "registration_open_until": t.get("registration_open_until"),
+        "is_invite_only": t.get("is_invite_only"),
+        "game": {
+            "id": game.get("id"),
+            "name": game.get("name"),
+            "short_name": game.get("short_name"),
+            "cover_url": game.get("cover_url"),
+            "logo_url": game.get("logo_url"),
+        } if game else None,
+    }
 
 
 class TournamentChatCreate(BaseModel):
@@ -130,11 +171,13 @@ def _estimate_legacy_preview_matches(tournament: dict) -> int:
 
 
 def _can_create_initial_legacy_preview(tournament: dict) -> bool:
-    if (tournament.get("format") or "single_elim") in {"custom_bracket", "ffa_custom_bracket"}:
-        return True
     if (tournament.get("format") or "single_elim") not in LEGACY_AUTO_PREVIEW_FORMATS:
         return False
     return 0 < _estimate_legacy_preview_matches(tournament) <= MAX_INITIAL_PREVIEW_MATCHES
+
+
+def _can_create_initial_stage_preview(tournament: dict) -> bool:
+    return (tournament.get("format") or "single_elim") in STAGE_AUTO_PREVIEW_FORMATS
 
 
 def _legacy_plan_key(match: dict) -> tuple:
@@ -258,19 +301,19 @@ def _planning_report(matches: list[dict], tournament: dict | None = None) -> dic
         warnings.append({
             "type": "rule_mode_conflict",
             "severity": "warning",
-            "message": "Vor-Ort-Turnier erlaubt Spieler-Ergebnismeldungen. Fuer lokale Events ist meist 'Nur Turnierleitung' sinnvoll.",
+            "message": "Vor-Ort-Turnier erlaubt Spieler-Ergebnismeldungen. Für lokale Events ist meist 'Nur Turnierleitung' sinnvoll.",
         })
     if event_mode == "local" and schedule_mode != "fixed_by_staff":
         warnings.append({
             "type": "rule_mode_conflict",
             "severity": "warning",
-            "message": "Vor-Ort-Turnier erlaubt Terminabstimmung. Fuer lokale Events ist meist 'Fix durch Turnierleitung' sinnvoll.",
+            "message": "Vor-Ort-Turnier erlaubt Terminabstimmung. Für lokale Events ist meist 'Fix durch Turnierleitung' sinnvoll.",
         })
     if event_mode == "online" and result_entry_mode == "staff_only":
         warnings.append({
             "type": "rule_mode_conflict",
             "severity": "warning",
-            "message": "Online-Turnier ist auf Staff-Erfassung gesetzt. Teilnehmer koennen keine Ergebnisse melden.",
+            "message": "Online-Turnier ist auf Staff-Erfassung gesetzt. Teilnehmer können keine Ergebnisse melden.",
         })
     planned_by_station: dict[str, list[dict]] = {}
     active_matches = [
@@ -331,12 +374,15 @@ def _stage_defaults_for_tournament_format(tournament: dict, body: TournamentBrac
     stage_type = (body.stage_type if body else None) or {
         "single_elim": "single_elimination",
         "double_elim": "double_elimination",
+        "ffa": "simple",
+        "battle_royale": "simple",
         "custom_bracket": "custom_bracket",
         "ffa_custom_bracket": "ffa_custom_bracket",
     }.get(fmt)
     if not stage_type:
         return None
-    match_type = (body.match_type if body else None) or ("ffa" if stage_type.startswith("ffa_") else "duel")
+    default_match_type = "ffa" if stage_type.startswith("ffa_") or stage_type == "simple" or fmt in {"ffa", "battle_royale"} else "duel"
+    match_type = (body.match_type if body else None) or default_match_type
     settings.setdefault("match_size", 4 if match_type == "ffa" else 2)
     settings.setdefault("min_players", 2)
     settings.setdefault("qualifiers_per_match", 2 if match_type == "ffa" else 1)
@@ -748,8 +794,67 @@ async def _generate_legacy_bracket_docs(db, tournament: dict, actor_id: str | No
     return {"ok": True, "match_count": len(matches), "preview": preview}
 
 
+async def _create_initial_stage_bracket_preview(db, tournament: dict, actor_id: str | None) -> dict | None:
+    """Create a V2 preview stage for free/custom bracket formats."""
+    if not _can_create_initial_stage_preview(tournament):
+        return None
+    tid = tournament["id"]
+    if await db.tournament_stages.count_documents({"tournament_id": tid}):
+        return None
+    if await db.matches_v2.count_documents({"tournament_id": tid}):
+        return None
+
+    stage_defaults = _stage_defaults_for_tournament_format(tournament, None)
+    if not stage_defaults:
+        return None
+    stage = {
+        **stage_defaults,
+        "id": new_id(),
+        "tournament_id": tid,
+        "created_at": now_utc().isoformat(),
+        "updated_at": now_utc().isoformat(),
+        "created_by": actor_id,
+    }
+    registrations = await db.tournament_registrations.find(
+        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+        {"_id": 0},
+    ).to_list(5000)
+    try:
+        matches = build_matches_v2_from_schema(tournament, stage, registrations, preview=True)
+    except BracketSchemaError:
+        return None
+    if not matches:
+        return None
+
+    await db.tournament_stages.insert_one(stage)
+    await db.matches_v2.insert_many(matches)
+    await _audit_tournament_action(
+        db,
+        "tournament.stage.preview_create",
+        actor_id,
+        tid,
+        {
+            "stage_id": stage["id"],
+            "stage_type": stage.get("stage_type"),
+            "match_type": stage.get("match_type"),
+            "match_count": len(matches),
+            "participant_count": len(registrations),
+        },
+    )
+    return {
+        "ok": True,
+        "engine": "stages",
+        "stage_id": stage["id"],
+        "match_count": len(matches),
+        "preview": True,
+        "participant_count": len(registrations),
+    }
+
+
 async def _create_initial_bracket_preview(db, tournament: dict, actor_id: str | None) -> dict | None:
     """Create a non-destructive empty bracket preview right after tournament creation."""
+    if _can_create_initial_stage_preview(tournament):
+        return await _create_initial_stage_bracket_preview(db, tournament, actor_id)
     if not _can_create_initial_legacy_preview(tournament):
         return None
     try:
@@ -892,6 +997,10 @@ async def _refresh_tournament_previews_after_registration(db, tournament: dict, 
                 await db.matches.delete_many({"tournament_id": tid})
         return stage_update
 
+    stage_preview = await _create_initial_stage_bracket_preview(db, tournament, actor_id)
+    if stage_preview:
+        return stage_preview
+
     legacy_update = await _refresh_preview_bracket_after_registration(db, tournament, actor_id)
     if legacy_update:
         return {**legacy_update, "engine": legacy_update.get("engine") or "legacy"}
@@ -970,6 +1079,10 @@ async def _finalize_bracket_for_checkin(db, tournament: dict, actor_id: str | No
     """Run the final bracket mix once when tournament check-in opens."""
     tid = tournament["id"]
     stage_count = await db.tournament_stages.count_documents({"tournament_id": tid})
+    if not stage_count:
+        stage_preview = await _create_initial_stage_bracket_preview(db, tournament, actor_id)
+        if stage_preview:
+            stage_count = await db.tournament_stages.count_documents({"tournament_id": tid})
     if stage_count:
         finalized = await _finalize_stage_previews_for_checkin(db, tournament, actor_id)
         if finalized:
@@ -1271,6 +1384,7 @@ async def _resolve_tid(slug_or_id: str) -> str:
 @router.get("")
 async def list_tournaments(status: str | None = None, game_id: str | None = None,
                            event_id: str | None = None, limit: int = 100,
+                           offset: int = 0, paged: bool = False, compact: bool = False,
                            include_drafts: bool = False,
                            user=Depends(get_optional_user)):
     db = get_db()
@@ -1295,7 +1409,17 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     if event_id:
         q["event_id"] = event_id
     safe_limit = max(1, min(int(limit or 100), 500))
-    tournaments = await db.tournaments.find(q, {"_id": 0}).sort("created_at", -1).to_list(safe_limit)
+    projection = {"_id": 0}
+    if compact:
+        projection = {
+            "_id": 0, "id": 1, "title": 1, "slug": 1, "banner_url": 1,
+            "status": 1, "visibility": 1, "is_public": 1, "game_id": 1,
+            "platform": 1, "start_date": 1, "max_participants": 1,
+            "prize_pool": 1, "registration_enabled": 1, "online_registration_enabled": 1,
+            "registration_open_from": 1, "registration_open_until": 1, "is_invite_only": 1,
+        }
+    fetch_limit = max(safe_limit, min(safe_limit + max(int(offset or 0), 0) + 80, 500))
+    tournaments = await db.tournaments.find(q, projection).sort("created_at", -1).to_list(fetch_limit)
     if not is_admin:
         visible = []
         for t in tournaments:
@@ -1310,6 +1434,9 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
         tournaments = visible
     for t in tournaments:
         await _enrich_tournament(t, user)
+    if compact:
+        tournaments = [_compact_tournament(t) for t in tournaments]
+        return _page_items(tournaments, limit, offset, paged)
     return tournaments
 
 
@@ -1510,7 +1637,7 @@ async def lock_tournament(tid: str, me: dict = Depends(require_admin())):
     tid = await _resolve_tid(tid)
     tournament = await _ensure_tournament_unlocked(db, tid)
     if tournament.get("status") not in LOCKABLE_TOURNAMENT_STATUSES:
-        raise HTTPException(status_code=400, detail="Nur beendete, veroeffentlichte, archivierte oder abgesagte Turniere koennen gesperrt werden.")
+        raise HTTPException(status_code=400, detail="Nur beendete, veröffentlichte, archivierte oder abgesagte Turniere können gesperrt werden.")
     now = now_utc().isoformat()
     await db.tournaments.update_one(
         {"id": tid},
@@ -2399,7 +2526,7 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
     if t.get("status") in ("live", "completed", "results_published") and not force:
         raise HTTPException(
             status_code=409,
-            detail="Bracket-Reset fuer laufende oder beendete Turniere braucht force=true",
+            detail="Bracket-Reset für laufende oder beendete Turniere braucht force=true",
         )
     match_count = await db.matches.count_documents({"tournament_id": tid})
     v2_match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
@@ -2440,20 +2567,23 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
         auto_generated_bracket = await _finalize_bracket_for_checkin(db, fresh_t, me.get("id"))
     if status == "live":
         try:
-            stage_count = await db.tournament_stages.count_documents({"tournament_id": tid})
-            v2_count = await db.matches_v2.count_documents({"tournament_id": tid})
-            legacy_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
-            can_auto_replace = bool(legacy_matches) and all(m.get("is_preview") for m in legacy_matches)
-            if stage_count == 0 and v2_count == 0 and (not legacy_matches or can_auto_replace):
-                fresh_t = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or t
-                auto_generated_bracket = await _generate_legacy_bracket_docs(
-                    db,
-                    fresh_t,
-                    me.get("id"),
-                    preview=False,
-                    force=can_auto_replace,
-                    set_live=False,
-                )
+            fresh_t = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or t
+            if prev != status:
+                auto_generated_bracket = await _finalize_bracket_for_checkin(db, fresh_t, me.get("id"))
+            if not auto_generated_bracket:
+                stage_count = await db.tournament_stages.count_documents({"tournament_id": tid})
+                v2_count = await db.matches_v2.count_documents({"tournament_id": tid})
+                legacy_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+                can_auto_replace = bool(legacy_matches) and all(m.get("is_preview") for m in legacy_matches)
+                if stage_count == 0 and v2_count == 0 and (not legacy_matches or can_auto_replace):
+                    auto_generated_bracket = await _generate_legacy_bracket_docs(
+                        db,
+                        fresh_t,
+                        me.get("id"),
+                        preview=False,
+                        force=can_auto_replace,
+                        set_live=False,
+                    )
         except HTTPException:
             auto_generated_bracket = None
 
@@ -2462,23 +2592,40 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
         try:
             from services.season_service import award_points
             from badges import on_tournament_completed
-            # Build placements from matches.final_position
-            regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+            # Build placements from published legacy finals or stage-engine results.
+            regs = await db.tournament_registrations.find(
+                {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+                {"_id": 0},
+            ).to_list(500)
             reg_map = {r["id"]: r for r in regs}
             num_participants = len(regs)
             matches = await db.matches.find({"tournament_id": tid, "final_position": {"$ne": None}}, {"_id": 0}).to_list(200)
             placements = []
-            seen = set()
+            placed_reg_ids = set()
             for m in matches:
                 rid = m.get("winner_id")
-                if rid and rid in reg_map and rid not in seen:
+                if rid and rid in reg_map and rid not in placed_reg_ids:
                     reg = reg_map[rid]
                     placements.append({
                         "user_id": reg.get("user_id"),
                         "team_id": reg.get("team_id"),
                         "rank": m["final_position"],
                     })
-                    seen.add(rid)
+                    placed_reg_ids.add(rid)
+            if not placements:
+                matches_v2 = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+                if matches_v2:
+                    for row in _v2_standings(matches_v2, regs):
+                        rid = row.get("registration_id")
+                        if not rid or rid not in reg_map or rid in placed_reg_ids or not row.get("played"):
+                            continue
+                        reg = reg_map[rid]
+                        placements.append({
+                            "user_id": reg.get("user_id"),
+                            "team_id": reg.get("team_id"),
+                            "rank": row.get("rank"),
+                        })
+                        placed_reg_ids.add(rid)
             # Source type by season weight: <=1.5 mini, <=2.5 normal, else major
             weight = float(t.get("season_weight") or 2.0)
             source_type = "mini" if weight < 1.5 else ("major" if weight >= 2.5 else "tournament")
@@ -2496,12 +2643,10 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
                     weight=weight,
                 )
             # Participation points for everyone else
-            placed_user_ids = {p.get("user_id") for p in placements}
             for r in regs:
-                uid = r.get("user_id")
-                if uid and uid not in placed_user_ids:
+                if r.get("id") not in placed_reg_ids and (r.get("user_id") or r.get("team_id")):
                     await award_points(
-                        user_id=uid, source_type=source_type, source_id=tid,
+                        user_id=r.get("user_id"), team_id=r.get("team_id"), source_type=source_type, source_id=tid,
                         source_name=t.get("title"), rank=None,
                         num_participants=num_participants, weight=weight,
                     )

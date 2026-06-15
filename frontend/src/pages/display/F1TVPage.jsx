@@ -4,8 +4,8 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { MascotBadge } from "@/components/tls/Logo";
 import { SponsorGrid } from "@/components/tls/SponsorTicker";
 import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
+import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
 import { motion, AnimatePresence } from "framer-motion";
-import { QRCodeSVG } from "qrcode.react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
@@ -212,7 +212,7 @@ export default function F1TVPage() {
       <footer className="absolute bottom-0 left-0 right-0 px-8 py-4 border-t border-white/5 flex items-center justify-between gap-6 bg-[#0A0A0A]/80 backdrop-blur-sm">
         <div className="flex items-center gap-4 min-w-0">
           <div className="bg-white p-1.5 rounded-sm shrink-0">
-            <QRCodeSVG value={publicUrl} size={92} bgColor="#ffffff" fgColor="#0A0A0A" />
+            <BrandedQRCode value={publicUrl} size={92} />
           </div>
           <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">Join The Race</div>

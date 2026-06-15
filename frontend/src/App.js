@@ -43,10 +43,12 @@ import TournamentBracketPage from "@/pages/public/TournamentBracketPage";
 import TournamentStandingsPage from "@/pages/public/TournamentStandingsPage";
 import TournamentSchedulePage from "@/pages/public/TournamentSchedulePage";
 import MatchPage from "@/pages/public/MatchPage";
+import EsportsOverviewPage from "@/pages/public/EsportsOverviewPage";
 import F1ListPage from "@/pages/public/F1ListPage";
 import F1DetailPage from "@/pages/public/F1DetailPage";
 import EventsPage from "@/pages/public/EventsPage";
 import EventDetailPage from "@/pages/public/EventDetailPage";
+import EventLivePage from "@/pages/public/EventLivePage";
 import TeamsPage from "@/pages/public/TeamsPage";
 import NewsPage from "@/pages/public/NewsPage";
 import LoginPage from "@/pages/public/LoginPage";
@@ -90,8 +92,8 @@ const AdminCmsPage = lazy(() => import("@/pages/admin/AdminCmsPage"));
 const AdminMediaPage = lazy(() => import("@/pages/admin/AdminMediaPage"));
 const AdminNavPage = lazy(() => import("@/pages/admin/AdminNavPage"));
 import MembershipApplyPage from "@/pages/public/MembershipApplyPage";
-import AdminSponsorsPage from "@/pages/admin/AdminSponsorsPage";
-import AdminPartnersPage from "@/pages/admin/AdminPartnersPage";
+const AdminSponsorsPage = lazy(() => import("@/pages/admin/AdminSponsorsPage"));
+const AdminPartnersPage = lazy(() => import("@/pages/admin/AdminPartnersPage"));
 
 import AboutPage from "@/pages/public/AboutPage";
 import ContactPage from "@/pages/public/ContactPage";
@@ -115,6 +117,7 @@ const MyMembershipPage = lazy(() => import("@/pages/user/MyMembershipPage"));
 
 import F1TVPage from "@/pages/display/F1TVPage";
 import BracketTVPage from "@/pages/display/BracketTVPage";
+import EventTVPage from "@/pages/display/EventTVPage";
 const MyPrizesPage = lazy(() => import("@/pages/user/MyPrizesPage"));
 const MyPenaltiesPage = lazy(() => import("@/pages/user/MyPenaltiesPage"));
 const AdminPrizesPage = lazy(() => import("@/pages/admin/AdminPrizesPage"));
@@ -162,6 +165,7 @@ function App() {
           <Route path="/membership/apply" element={<MembershipApplyPage />} />
 
           {/* Public — Arena */}
+          <Route path="/esports" element={<EsportsOverviewPage />} />
           <Route path="/tournaments" element={<TournamentsPage />} />
           <Route path="/tournaments/:slug" element={<TournamentDetailPage />} />
           <Route path="/tournaments/:slug/bracket" element={<TournamentBracketPage />} />
@@ -172,6 +176,7 @@ function App() {
           <Route path="/f1/:slug" element={<FastLapLegacyRedirect />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/events/:slug" element={<EventDetailPage />} />
+          <Route path="/events/:slug/live" element={<EventLivePage />} />
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/teams/:id" element={<TeamsPage />} />
           <Route path="/news" element={<NewsPage />} />
@@ -219,6 +224,7 @@ function App() {
           <Route path="/admin/audit" element={<ProtectedRoute requireAdmin><AdminAuditPage /></ProtectedRoute>} />
           <Route path="/admin/mobile-logs" element={<ProtectedRoute requireAdmin><AdminMobileLogsPage /></ProtectedRoute>} />
           <Route path="/admin/mobile-push" element={<ProtectedRoute requireAdmin><AdminMobilePushPage /></ProtectedRoute>} />
+          <Route path="/admin/downloads" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
           <Route path="/admin/widgets" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
 
           <Route path="/seasons/current" element={<CurrentSeasonRedirect />} />
@@ -257,6 +263,7 @@ function App() {
 
           {/* Display / TV */}
           <Route path="/display/f1/:id" element={<F1TVPage />} />
+          <Route path="/display/event/:id" element={<EventTVPage />} />
           <Route path="/display/bracket/:id" element={<ProtectedRoute requireModerator><BracketTVPage /></ProtectedRoute>} />
 
           {/* Error pages */}

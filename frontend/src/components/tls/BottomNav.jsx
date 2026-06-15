@@ -2,7 +2,7 @@
  * BottomNav — Mobile Bottom Navigation Bar (App-Style)
  * Zeigt sich nur auf kleinen Screens (< lg).
  * Gäste sehen: Home, Turniere, Events, News, Wertung
- * Eingeloggte User sehen: Home, Turniere, Events, Dashboard, Profil
+ * Eingeloggte User sehen: Dashboard, Turniere, Events, Wertung, Profil
  */
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -10,17 +10,17 @@ import { Home, Trophy, Calendar, User, LayoutDashboard, Newspaper, Medal } from 
 
 const GUEST_ITEMS = [
   { to: "/", label: "Home", icon: Home, exact: true },
-  { to: "/tournaments", label: "Turniere", icon: Trophy },
+  { to: "/esports", label: "eSports", icon: Trophy },
   { to: "/events", label: "Events", icon: Calendar },
   { to: "/news", label: "News", icon: Newspaper },
   { to: "/seasons/current", label: "Wertung", icon: Medal },
 ];
 
 const AUTH_ITEMS = [
-  { to: "/", label: "Home", icon: Home, exact: true },
-  { to: "/tournaments", label: "Turniere", icon: Trophy },
-  { to: "/events", label: "Events", icon: Calendar },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/esports", label: "eSports", icon: Trophy },
+  { to: "/events", label: "Events", icon: Calendar },
+  { to: "/seasons/current", label: "Wertung", icon: Medal },
   { to: "/profile", label: "Profil", icon: User },
 ];
 
@@ -44,6 +44,7 @@ export function BottomNav() {
 
   const isActive = (item) => {
     if (item.exact) return location.pathname === item.to;
+    if (item.to === "/esports") return ["/esports", "/tournaments", "/fastlap", "/f1"].some((prefix) => location.pathname.startsWith(prefix));
     return location.pathname.startsWith(item.to);
   };
 

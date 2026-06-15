@@ -1,5 +1,61 @@
 # Changelog
 
+## 2.0.0-beta.1 - 2026-06-02
+
+- Backend/Web: Gewinnabholungen koennen fuer veroeffentlichte Turniere und Fast-Lap-Challenges nachtraeglich erzeugt werden; Stage-/Custom-Bracket-Ergebnisse werden dabei korrekt ausgewertet.
+- Web: Die neue eSports-Übersicht bündelt Turniere, Fast Lap und Jahreswertung dynamisch auf einer gemeinsamen Seite.
+- Mobile: Fast-Lap-Details zeigen jetzt hinterlegte Preise an; Turnierpreise beruecksichtigen Gruppierungen wie Gewinner- und Loser-Bracket sauberer.
+
+## 1.5.0-beta.9 - 2026-05-30
+
+- Backend/Web/Mobile: Jede Benachrichtigungsart kann jetzt getrennt fuer E-Mail, Push und In-App aktiviert oder deaktiviert werden.
+- Backend: Alte globale Kanal- und Themen-Schalter bleiben kompatibel, neue Kanal-Themen-Schalter steuern die tatsaechliche Zustellung genauer.
+- Web/Mobile: Die Privatsphaere-/Benachrichtigungs-Einstellungen zeigen jetzt eine Kanal-Matrix fuer Match-Erinnerungen, Turnier-Updates, Gewinne, Mitgliedschaft, Geburtstag, Community und News/Events.
+
+## 1.5.0-beta.8 - 2026-05-30
+
+- Mobile: Das eigene oeffentliche Profil ist jetzt direkt im Mehr-Hub neben Mitgliedervorteilen, Spielerprofilen und Referenzen erreichbar.
+- Backend: Push-Benachrichtigungen koennen weiterhin zugestellt werden, auch wenn Nutzer den In-App-Kanal deaktiviert haben.
+- Backend/Mobile: Ausgeblendete In-App-Benachrichtigungen erscheinen nicht mehr in den Benachrichtigungslisten oder Zaehlern.
+
+## 1.5.0-beta.7 - 2026-05-30
+
+- Backend/Web/Mobile: Benachrichtigungen haben jetzt getrennte Schalter fuer E-Mail, Push und In-App sowie eigene Kategorien fuer Match-Erinnerungen, Turnier-Updates und News/Events.
+- Backend: Wiederholte In-App-/Push-Benachrichtigungen werden dedupliziert und per Cooldown begrenzt, damit kurze Notification-Spitzen nicht mehr spamartig wirken.
+- Backend: Geplante Match- und Check-in-Erinnerungen verschicken deutlich weniger E-Mails; Push/In-App bleiben fuer operative Hinweise im Vordergrund.
+
+## 1.5.0-beta.6 - 2026-05-30
+
+- Mobile: Abgeschlossene Turniere zeigen in der Detailansicht jetzt prominent "Turnier beendet", Abschlusszeit, Champion, Top-3-Platzierungen und Turnierstatistiken.
+- Mobile: Die Übersicht abgeschlossener Turniere priorisiert finale Rangliste und Match-Historie, statt alte offene Matchbereiche in den Vordergrund zu stellen.
+- Mobile: Ranglisten heben die ersten drei Plätze klarer hervor und nutzen dieselbe Standings-Quelle wie die Turnierauswertung.
+
+## 1.5.0-beta.5 - 2026-05-30
+
+- Backend/Web/Mobile: Eigene offene Matches werden jetzt aus Legacy- und V2-Matches sauber zusammengefuehrt und abgeschlossene Matches fallen direkt aus der Liste.
+- Mobile: Turnierdetails aktualisieren die naechsten Matches automatisch und priorisieren die offenen Matches der eigenen Anmeldung.
+- Web/Mobile: Dashboard-Matchlisten pollen schneller und filtern erledigte Matches zusaetzlich clientseitig aus.
+
+## 1.5.0-beta.4 - 2026-05-30
+
+- Backend: Jahreswertungs-Top-3 erscheinen als eigene Referenz, ohne normale Season-Punkte mit Turnier- und Fast-Lap-Referenzen zu vermischen.
+- Backend: V2/Heat-Turniere vergeben beim Veröffentlichen jetzt Jahreswertungspunkte aus den Stage-Ergebnissen.
+- Web/Mobile: Jahreswertungs-Referenzen öffnen die Jahreswertung und zeigen Rang sowie Jahrespunkte getrennt von normalen Turnier-/Fast-Lap-Referenzen.
+
+## 1.5.0-beta.3 - 2026-05-30
+
+- Mobile: Referenzen zeigen keine Jahreswertungs-/Season-Punkte mehr, sondern nur Turnier- und Fast-Lap-Historie.
+- Backend/Web/Mobile: Profil-Referenzen werden aus echten Turnierplatzierungen und Fast-Lap-Zeiten aufgebaut, damit Rangwerte nicht als `-` stehen bleiben.
+- Web: Der Referenzbereich im oeffentlichen Profil blendet Jahreswertungspunkte aus und bleibt auf mobilen Layouts kompakt lesbar.
+- Mobile/CI: Expo-SDK-56-Patch-Abhaengigkeiten fuer den APK-Release-Check aktualisiert.
+
+## 1.5.0-beta.2 - 2026-05-26
+
+- Mobile: Match-Ergebnisaktionen stehen in der Matchdetail-Ansicht weiter oben und sind auf dem Handy schneller erreichbar.
+- Mobile: Matchdetails aktualisieren Ergebnis-, Dispute- und Forfeit-Aenderungen nach dem Speichern sofort mit einem frischen Backend-Reload.
+- Mobile/Web: Matchansichten aktualisieren laufende Matchdaten automatisch, damit Ergebnisstatus ohne manuelles Neuladen sichtbar werden.
+- Mobile/CI: Expo-SDK-56-Patch-Abhaengigkeiten fuer den Android-Release-Check aktualisiert.
+
 ## 1.5.0-beta.1 - 2026-05-22
 
 - Mobile: Finaler Beta-Build 45 nach Expo-SDK-56-Upgrade, Firebase/FCM-Push-Einrichtung und Android-Notification-Icon.
@@ -167,7 +223,7 @@
 - Web-Frontend: Neue BottomNav-Komponente fuer Mobile (Home, Turniere, Events, Dashboard, Profil)
 - Web-Frontend: PWA manifest.json mit standalone Display, App-Shortcuts und deutschen Metadaten
 - Web-Frontend: iOS Safe-Area (env(safe-area-inset-bottom)) fuer Notch-Geraete
-- Web-Frontend: AdminLayout Sidebar in 6 Gruppen unterteilt (Uebersicht, Mitglieder, eSports, Content, Verein, System)
+- Web-Frontend: AdminLayout Sidebar in 6 Gruppen unterteilt (Übersicht, Mitglieder, eSports, Content, Verein, System)
 - Web-Frontend: Moderator-Sidebar-Fix: /admin/stations jetzt korrekt sichtbar
 
 ## 0.8.0-alpha.1 - 2026-05-20

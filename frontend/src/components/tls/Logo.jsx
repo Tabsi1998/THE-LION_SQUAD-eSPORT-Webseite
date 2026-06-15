@@ -7,11 +7,18 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 export const TLS_MASCOT = "/assets/brand/tls-mascot.png";
 export const TLS_WORDMARK = "/assets/brand/tls-wordmark.png";
 
-function useBrandingAssets() {
+let brandingLoadPromise = null;
+
+export function useBrandingAssets() {
   const [branding, setBranding] = useState(getCachedBranding());
   const loadBranding = useCallback(async () => {
     try {
-      const { data } = await api.get("/settings/public");
+      if (!brandingLoadPromise) {
+        brandingLoadPromise = api.get("/settings/public").finally(() => {
+          brandingLoadPromise = null;
+        });
+      }
+      const { data } = await brandingLoadPromise;
       setCachedBranding(data || {});
       setBranding(data || {});
     } catch {}
@@ -41,8 +48,8 @@ export function Logo({ variant = "wordmark", size = "md", asLink = true, classNa
     xl: "h-20",
   };
   const src = variant === "mascot"
-    ? (branding.mascot_url || branding.logo_url || TLS_MASCOT)
-    : (branding.logo_url || TLS_WORDMARK);
+    ? (branding.mascot_url || branding.logo_dark_url || branding.logo_url || TLS_MASCOT)
+    : (branding.logo_dark_url || branding.logo_url || TLS_WORDMARK);
   const img = (
     <img
       src={resolveMediaUrl(src)}
@@ -60,7 +67,7 @@ export function MascotBadge({ className = "" }) {
   const branding = useBrandingAssets();
   return (
     <img
-      src={resolveMediaUrl(branding.mascot_url || branding.logo_url || TLS_MASCOT)}
+      src={resolveMediaUrl(branding.mascot_url || branding.logo_dark_url || branding.logo_url || TLS_MASCOT)}
       alt={branding.club_name || "TLS"}
       className={`object-contain ${className}`}
       draggable="false"

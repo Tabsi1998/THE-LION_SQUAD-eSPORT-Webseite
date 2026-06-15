@@ -488,7 +488,7 @@ function F1StaffPanel({ challengeId, staff, users, onChanged }) {
           <label className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Nutzer</div>
             <select value={form.user_id} onChange={(e) => set("user_id", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-              <option value="">- auswaehlen -</option>
+              <option value="">- auswählen -</option>
               {users.map((u) => <option key={u.id} value={u.id}>{userLabel(u)}</option>)}
             </select>
           </label>
@@ -569,9 +569,11 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
     max_attempts: source.max_attempts || 0,
     site_banner_enabled: !!source.site_banner_enabled,
     season_weight: source.season_weight ?? 1,
+    prize_places: source.prize_places || [],
   });
   const [form, setForm] = useState(formFromChallenge());
   const [events, setEvents] = useState([]);
+  const [creatingPrizes, setCreatingPrizes] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
@@ -590,6 +592,10 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
           payload.registration_open_until = null;
         }
         payload.season_weight = Number(payload.season_weight || 0);
+        payload.prize_places = (payload.prize_places || [])
+          .filter((p) => p.value && p.value.trim())
+          .map((p) => ({ place: Number(p.place) || 0, label: p.label || `Platz ${p.place}`, value: p.value }));
+        if (payload.prize_places.length === 0) payload.prize_places = null;
         normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
         return payload;
       };
@@ -603,6 +609,18 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
       toast.success("Challenge gespeichert.");
       onSaved();
     } catch (e) { toast.error(formatRequestError(e, "Challenge konnte nicht gespeichert werden.", { title: form.title })); }
+  };
+
+  const createPrizePickups = async () => {
+    setCreatingPrizes(true);
+    try {
+      const { data } = await api.post(`/prizes/auto-create/fastlap/${challenge.id}`);
+      toast.success(`${data.created || 0} Fast-Lap-Gewinne angelegt.`);
+    } catch (e) {
+      toast.error(formatRequestError(e, "Fast-Lap-Gewinne konnten nicht angelegt werden."));
+    } finally {
+      setCreatingPrizes(false);
+    }
   };
   return (
     <div className="mb-6 border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
@@ -644,6 +662,18 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
         <SmallField label="Controller-Typ" value={form.controller_type} onChange={(v)=>set("controller_type", v)} />
       </div>
       <FastLapSeasonWeightField value={form.season_weight} onChange={(v)=>set("season_weight", v)} />
+      <FastLapPrizeEditor value={form.prize_places} onChange={(v)=>set("prize_places", v)} />
+      {challenge.status === "results_published" && (
+        <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Gewinnabholung</div>
+            <div className="text-xs text-white/55 mt-0.5">Erzeugt fehlende Gewinn-Einträge aus der aktuellen Fast-Lap-Wertung.</div>
+          </div>
+          <button type="button" disabled={creatingPrizes} onClick={createPrizePickups} className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">
+            {creatingPrizes ? "Erzeuge..." : "Gewinne erzeugen"}
+          </button>
+        </div>
+      )}
       <MarkdownEditor value={form.description} onChange={(v)=>set("description", v)} rows={5} testId="f1-edit-description" placeholder="Beschreibung" />
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.registration_enabled} onChange={(e)=>set("registration_enabled", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Online-Einreichung öffentlich anzeigen</span></label>
@@ -700,6 +730,69 @@ function SmallField({ label, value, onChange, type = "text" }) {
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
       <input type={type} value={value ?? ""} onChange={(e)=>onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
     </label>
+  );
+}
+
+function FastLapPrizeEditor({ value, onChange }) {
+  const prizes = value || [];
+  const update = (index, patch) => {
+    const next = [...prizes];
+    next[index] = { ...next[index], ...patch };
+    onChange(next);
+  };
+  return (
+    <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Preise</div>
+          <div className="text-xs text-white/50 mt-0.5">Wird bei Ergebnisveröffentlichung als Gewinnabholung angelegt.</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => onChange([...prizes, { place: prizes.length + 1, label: "", value: "" }])}
+          data-testid="f1-edit-prize-add"
+          className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white"
+        >
+          + Platz hinzufuegen
+        </button>
+      </div>
+      {prizes.map((p, i) => (
+        <div key={i} className="grid grid-cols-12 gap-2">
+          <input
+            type="number"
+            min="1"
+            value={p.place}
+            onChange={(e) => update(i, { place: Number(e.target.value) || 1 })}
+            data-testid={`f1-edit-prize-place-${i}`}
+            className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm tabular-nums"
+            placeholder="#"
+          />
+          <input
+            value={p.label || ""}
+            onChange={(e) => update(i, { label: e.target.value })}
+            data-testid={`f1-edit-prize-label-${i}`}
+            className="col-span-4 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm"
+            placeholder="Label"
+          />
+          <input
+            value={p.value || ""}
+            onChange={(e) => update(i, { value: e.target.value })}
+            data-testid={`f1-edit-prize-value-${i}`}
+            className="col-span-5 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm"
+            placeholder="Preis"
+          />
+          <button
+            type="button"
+            onClick={() => onChange(prizes.filter((_, j) => j !== i))}
+            data-testid={`f1-edit-prize-remove-${i}`}
+            className="col-span-1 text-white/40 hover:text-[#FF3B30] text-center py-2"
+          >
+            x
+          </button>
+        </div>
+      ))}
+      {prizes.length === 0 && <div className="text-xs text-white/40">Noch keine Preise hinterlegt.</div>}
+    </div>
   );
 }
 

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { gameLabel } from "@/lib/gameLabels";
+import { seoTextPreview } from "@/lib/textPreview";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Award, ExternalLink, Medal, Trophy, Users } from "lucide-react";
@@ -113,7 +114,7 @@ function groupReferences(items) {
 }
 
 export default function ReferencesPage() {
-  useDocumentTitle("Referenzen", "Externe Turniere, Ligen und Ergebnisse von THE LION SQUAD eSports.");
+  useDocumentTitle("Referenzen", "Externe Turniere, Ligen, Platzierungen, Podien und Erfolge von THE LION SQUAD eSports.");
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState({});
   const [filter, setFilter] = useState("all");
@@ -224,7 +225,15 @@ export function ReferenceDetailPage() {
   const { id } = useParams();
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
-  useDocumentTitle(item?.title || "Referenz", item?.description || "Referenz von THE LION SQUAD eSports.");
+  const seoTitle = item ? titleParts(item).title : "Referenz";
+  const seoDescription = seoTextPreview(
+    item?.description || item?.highlights,
+    `${referenceGameName(item || {})} Referenz von THE LION SQUAD eSports mit Platzierung, Lineup und Ergebnis.`
+  );
+  useDocumentTitle(seoTitle, seoDescription, {
+    image: item?.game?.logo_url,
+    canonical: item?.id ? `${window.location.origin}/references/${item.id}` : undefined,
+  });
 
   useEffect(() => {
     setLoading(true);

@@ -147,7 +147,7 @@ async def _with_email_sponsors(html: str) -> str:
 def tpl_registration(display_name: str) -> tuple[str, str]:
     return "Willkommen in der Community", _wrap(
         "Willkommen in der Community, " + (display_name or "Community-Mitglied"),
-        "<p>Dein Account auf der Website von THE LION SQUAD eSports ist bereit. Ab jetzt kannst du dich fuer Turniere anmelden, Teams gruenden und die F1 Fast Lap Challenge mitfahren.</p>"
+        "<p>Dein Account auf der Website von THE LION SQUAD eSports ist bereit. Ab jetzt kannst du dich für Turniere anmelden, Teams gründen und die F1 Fast Lap Challenge mitfahren.</p>"
         "<p>Die offizielle Aufnahme in den Verein ist davon getrennt und erfolgt erst nach einer freigeschalteten Mitgliedschaft.</p>"
         "<p>Viel Erfolg!</p>",
     )
@@ -167,9 +167,9 @@ def tpl_user_invite(display_name: str, invite_url: str, invited_by: str = "") ->
     return "Einladung zu THE LION SQUAD", _wrap(
         "Account aktivieren",
         f"<p>Hallo {display_name or 'Lion'},</p>"
-        "<p>fuer dich wurde ein Account auf der Website von <strong>THE LION SQUAD eSports</strong> angelegt.</p>"
+        "<p>für dich wurde ein Account auf der Website von <strong>THE LION SQUAD eSports</strong> angelegt.</p>"
         f"{byline}"
-        "<p>Klicke auf den Button, vergib dein eigenes Passwort und schliesse die Einrichtung ab. Der Link ist 7 Tage gueltig.</p>",
+        "<p>Klicke auf den Button, vergib dein eigenes Passwort und schließe die Einrichtung ab. Der Link ist 7 Tage gültig.</p>",
         "Passwort erstellen", invite_url,
     )
 
@@ -201,7 +201,7 @@ def tpl_registration_rejected(tournament_title: str, reason: str = "") -> tuple[
 def tpl_checkin_opens_soon(tournament_title: str, when: str, url: str) -> tuple[str, str]:
     return f"Check-in startet bald: {tournament_title}", _wrap(
         "Check-in startet bald",
-        f"<p>Der Check-in fuer <strong>{tournament_title}</strong> startet um <strong>{when}</strong>. Bitte halte dich bereit und checke rechtzeitig ein.</p>",
+        f"<p>Der Check-in für <strong>{tournament_title}</strong> startet um <strong>{when}</strong>. Bitte halte dich bereit und checke rechtzeitig ein.</p>",
         "Zum Turnier", url,
     )
 
@@ -218,7 +218,7 @@ def tpl_checkin_reminder(tournament_title: str, url: str, until: str = "") -> tu
 def tpl_checkin_closes_soon(tournament_title: str, when: str, url: str) -> tuple[str, str]:
     return f"Check-in endet bald: {tournament_title}", _wrap(
         "Check-in endet bald",
-        f"<p>Du bist fuer <strong>{tournament_title}</strong> noch nicht eingecheckt. Der Check-in endet um <strong>{when}</strong>.</p>"
+        f"<p>Du bist für <strong>{tournament_title}</strong> noch nicht eingecheckt. Der Check-in endet um <strong>{when}</strong>.</p>"
         "<p>Bitte checke jetzt ein, wenn du wirklich mitspielst.</p>",
         "Jetzt einchecken", url,
     )
@@ -497,7 +497,7 @@ def tpl_test(branding: str = "THE LION SQUAD") -> tuple[str, str]:
     return "Testmail von THE LION SQUAD", _wrap(
         "E-Mail-Test",
         "<p>Diese Nachricht wurde ueber die Website von THE LION SQUAD eSports versendet.</p>"
-        "<p>Sie dient nur zur Pruefung der SMTP-Konfiguration.</p>",
+        "<p>Sie dient nur zur Prüfung der SMTP-Konfiguration.</p>",
     )
 
 

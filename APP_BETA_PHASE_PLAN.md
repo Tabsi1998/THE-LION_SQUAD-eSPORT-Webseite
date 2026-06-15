@@ -111,9 +111,9 @@ Ziel:
 
 Umsetzung:
 
-- `FastLapDetailScreen` rendert `activeTrack.image_url`.
-- Backend/Admin pruefen: Track-Bild muss im Admin sauber pflegbar sein.
-- Fast-Lap-Embeds nutzen automatisch das erste vorhandene Track-Bild; optional kann spaeter ein spezifisches Track-Token wie `[[fastlap:challenge#track]]` folgen.
+- [x] `FastLapDetailScreen` rendert `activeTrack.image_url` im Hero und in der Track-Karte, mit Challenge-Banner als Fallback.
+- [x] Backend/Admin geprueft: Track-Bild ist ueber `f1_tracks.image_url` und den Admin-Upload pflegbar.
+- [x] Fast-Lap-Embeds nutzen automatisch das erste vorhandene Track-Bild; optional kann spaeter ein spezifisches Track-Token wie `[[fastlap:challenge#track]]` folgen.
 
 ## Phase 5 - Profil und Mehr-Navigation
 
@@ -127,8 +127,8 @@ Profil:
 
 Mehr-Navigation:
 
-- Beim erneuten Tippen auf "Mehr" zurueck zum MoreHub navigieren.
-- Alternativ Stack bei Tabwechsel resetten, damit eine zuvor geoeffnete Unterseite nicht ueberraschend wieder offen ist.
+- [x] Beim erneuten Tippen auf "Mehr" zurueck zum MoreHub navigieren.
+- [x] Stack bei Tabwechsel resetten, damit eine zuvor geoeffnete Unterseite nicht ueberraschend wieder offen ist.
 
 ## Phase 6 - Mobile Design-System und Navigations-Rework
 
@@ -140,7 +140,7 @@ Ziel:
 App-Navigation:
 
 - [x] Bottom-Tabbar optisch an `frontend/src/components/tls/BottomNav.jsx` anlehnen: dunkles halbtransparentes Surface, feiner Border-Top, aktiver Cyan-Indikator, kompakte Labels.
-- Blur/Transparenz in React Native pruefen: Expo `BlurView` nur falls performant und stabil, sonst Fallback mit `rgba(10,10,10,0.94)`.
+- [x] Blur/Transparenz in React Native pruefen: `expo-blur` ist aktuell nicht installiert, daher bleibt der stabile Fallback mit `rgba(10,10,10,0.96)`.
 - [x] Aktiver Tab bekommt klaren oberen Strich oder kleine Glow-Linie, nicht nur andere Textfarbe.
 - [x] Benachrichtigungsglocke integrieren oder an die Tabbar anpassen, damit sie nicht wie ein Fremdkoerper ueber dem UI schwebt.
 - [x] Tab-Reihenfolge pruefen: Event-Hub bleibt Haupttab, Jahreswertung/News werden im Dashboard-Schnellzugriff priorisiert, ohne Teams oder Profil aus der Tabbar zu verdraengen.
@@ -149,7 +149,7 @@ Gemeinsame UI-Muster:
 
 - [x] `StatusBadge` / `PhaseBadge` als App-Komponente nach Web-Vorbild nachziehen: Countdown, Live-Punkt, Statusfarben.
 - [x] `ActionRow`/`ActionTile` fuer kompakte Icon-Actions statt grosser Buttons, z.B. Profil bearbeiten, Aktualisieren, Datenschutz, Logout.
-- `ContentCard` fuer Turnier/Event/Fast-Lap/News vereinheitlichen: Bild, Status, Datum, Primaraktion.
+- [x] `ContentCard` fuer Turnier/Event/Fast-Lap/News vereinheitlichen: Bild, Status, Datum, Primaraktion.
 - [x] `SegmentedTabs` fuer sichtbare Seitenwechsel statt versteckter horizontaler Scroll-Tabs als gemeinsamer Baustein einfuehren.
 - [x] `EmptyState` optisch angleichen: Icons, Akzentfarben und weniger manuelle Sonderlayouts.
 - [x] `SkeletonList` optisch an Karten/Surfaces angleichen.
@@ -158,10 +158,10 @@ Gemeinsame UI-Muster:
 
 Mobile Website:
 
-- Pruefen, ob die BottomNav fuer eingeloggte User "Events" oder "Season/Jahreswertung" sinnvoller priorisiert, weil Events/Turniere/Jahreswertung fuer Vereinsbetrieb wichtiger sind.
-- Mobile Header und BottomNav duerfen sich nicht doppelt anfuehlen: Burger-Menue bleibt fuer tiefe Navigation, BottomNav fuer Hauptwege.
-- Scroll-Top-Button und Bottom-Banner muessen mit BottomNav/Safe-Area sauber zusammenspielen.
-- Admin- und Profilseiten mobil weiter verdichten: Tabellenkarten, Sticky-Actions und weniger horizontales Scrollen.
+- [x] BottomNav fuer eingeloggte User priorisiert Dashboard, Events/Turniere, Jahreswertung und Profil; News/Home bleiben ueber Hauptnavigation erreichbar.
+- [x] Mobile Header und BottomNav duerfen sich nicht doppelt anfuehlen: Burger-Menue bleibt fuer tiefe Navigation, BottomNav fuer Hauptwege.
+- [x] Scroll-Top-Button und Bottom-Banner spielen mit BottomNav/Safe-Area sauber zusammen.
+- [x] Admin- und Profilseiten mobil weiter verdichten: Gewinnabholung nutzt mobile Karten, Profil-Tabs umbrechen ohne horizontales Scrollen.
 
 Design-Checks:
 
@@ -180,58 +180,58 @@ Ziel:
 
 Public Website:
 
-- Startseite staerker nach aktuellen Prioritaeten steuern: naechstes Event, laufende Turniere, aktuelle News, Jahreswertung.
-- Turnier-, Event- und Fast-Lap-Seiten angleichen: konsistente Hero-Infos, Status, Anmeldung, Zeitplan, Regeln, Preise, Galerie/Rueckblick.
-- News-Seiten mit besseren Inhaltsbausteinen: Embed-Karten, Autoren-/Kategoriezeile, "Weiterlesen", verwandte Turniere/Events, Rueckblick-Galerien.
-- Community-Bereich klarer strukturieren: Spieler, Teams, Server, Mitglieder, Achievements und Referenzen als zusammenhaengende Community-Welt.
-- Sponsoren/Partner sichtbarer machen: Partnerkarten, Sponsoren-Tiers, Verknuepfung mit Events, Footer/SEO-Daten sauber halten.
+- [x] Startseite staerker nach aktuellen Prioritaeten steuern: naechstes Event, laufende Turniere, aktuelle News, Jahreswertung.
+- [x] Turnier-, Event- und Fast-Lap-Listen/Karten angleichen: konsistente Status-, Meta- und CTA-Signale auf Public-Karten.
+- [x] News-Seiten mit besseren Inhaltsbausteinen: Embed-Karten, Autoren-/Kategoriezeile, "Weiterlesen", verwandte Turniere/Events.
+- [x] Community-Bereich klarer strukturieren: Spieler, Teams, Server, Mitglieder, Achievements und Referenzen als zusammenhaengende Community-Welt.
+- [x] Sponsoren/Partner sichtbarer machen: Partnerkarten, Sponsoren-Tiers, Verknuepfung mit Events und gegenseitige Einstiege.
 
 Navigation und Informationsarchitektur:
 
 - Hauptnavigation pruefen: Besucher brauchen andere Wege als eingeloggte Spieler oder Admins.
-- "Mein Bereich" klarer als Spieler-Dashboard positionieren, getrennt von oeffentlichem Profil.
-- Mobile BottomNav und Desktop-Nav inhaltlich aufeinander abstimmen.
-- Breadcrumbs/Zurueck-Links auf tiefen Seiten wie Match, Bracket, Standings und Galerie konsequent einsetzen.
-- Interne Suche oder Quick-Jump fuer Turniere, Events, News, Spieler und Teams pruefen.
+- [x] "Mein Bereich" klarer als Spieler-Dashboard positionieren, getrennt von oeffentlichem Profil.
+- [x] Mobile BottomNav und Desktop-Nav inhaltlich aufeinander abstimmen.
+- [x] Breadcrumbs/Zurueck-Links auf tiefen Seiten wie Match, Bracket, Standings und Galerie konsequent einsetzen.
+- [x] Interne Suche oder Quick-Jump fuer Turniere, Events, News, Spieler und Teams pruefen.
 
 Performance und technische Qualitaet:
 
-- Bildstrategie haerten: responsive Bildgroessen, Lazy Loading, feste Aspect Ratios, saubere Fallbacks, WebP/AVIF wo sinnvoll.
-- Bundle pruefen: Admin-Schwergewichte lazy laden, Display-Seiten separat halten, Editor/Charts nur bei Bedarf laden.
-- Core-Web-Vitals-Ziele definieren: schnelle Startseite, stabile Layouts ohne Spruenge, schnelle Detailseiten.
-- API-Responses fuer Listen vereinheitlichen: kompakte Karten-Daten statt komplette Detailobjekte, Pagination/Filter sauber.
+- [x] Bildstrategie haerten: responsive Bildgroessen, Lazy Loading, feste Aspect Ratios, saubere Fallbacks, WebP/AVIF wo sinnvoll.
+- [x] Bundle pruefen: Admin-Schwergewichte lazy laden, Display-Seiten separat halten, Editor/Charts nur bei Bedarf laden.
+- [x] Core-Web-Vitals-Ziele definieren: schnelle Startseite, stabile Layouts ohne Spruenge, schnelle Detailseiten.
+- [x] API-Responses fuer Listen vereinheitlichen: kompakte Karten-Daten statt komplette Detailobjekte, Pagination/Filter sauber.
 - [x] Fehlerseiten modernisieren: 404/403/500 mit klarer Rueckfuehrung zu Start, Events, Turnieren, News und Jahreswertung.
-- Ladezustaende modernisieren und vereinheitlichen.
+- [x] Ladezustaende modernisieren und vereinheitlichen.
 
 SEO, Sharing und Content-Betrieb:
 
-- SEO-Vorschau im Admin: Titel, Beschreibung, Canonical, OG-Bild und Social Preview vor Veroeffentlichung ansehen.
-- Sitemap und SEO-Preview regelmaessig gegen echte Routen pruefen, inklusive Turnier-Bracket, Standings, Fast-Lap, Galerie und Profilen.
-- Redaktions-Checkliste fuer News/CMS: Titel, Teaser, Banner, Embeds, Sichtbarkeit, SEO, Newsletter, Discord.
-- Strukturierte Daten erweitern: Event, SportsEvent/Competition, Organization, Breadcrumb, Article, ImageObject.
-- IndexNow/Search-Console-Submit nach wichtigen Veroeffentlichungen automatisieren oder im Admin klarer anzeigen.
+- [x] SEO-Vorschau im Admin: Titel, Beschreibung, Canonical, OG-Bild und Social Preview vor Veroeffentlichung ansehen.
+- [x] Sitemap und SEO-Preview regelmaessig gegen echte Routen pruefen, inklusive Turnier-Bracket, Standings, Fast-Lap, Galerie und Profilen.
+- [x] Redaktions-Checkliste fuer News/CMS: Titel, Teaser, Banner, Embeds, Sichtbarkeit, SEO, Newsletter, Discord.
+- [x] Strukturierte Daten erweitern: Event, SportsEvent/Competition, Organization, Breadcrumb, Article, ImageObject.
+- [x] IndexNow/Search-Console-Submit nach wichtigen Veroeffentlichungen automatisieren oder im Admin klarer anzeigen.
 
 Admin und Redaktion:
 
 - [x] Admin-Dashboard als Beta-Tageszentrale: Setup, Ergebnis-Konflikte, Medien-Check und Systemstatus direkt erreichbar.
 - Admin-Listen vereinheitlichen: Filter, Suche, gespeicherte Ansichten, Bulk-Actions und Export pro Bereich.
 - Turnier-Editor entlasten: Setup-Assistent fuer lokales/online/hybrid Turnier, Regeln, Stationen, Ergebnisfluss und Kommunikation.
-- Medienbibliothek erweitern: fehlende Alt-Texte, doppelte Dateien, ungenutzte Dateien, kaputte Referenzen, Bildzuschnitt.
-- Audit- und Rollenansicht besser erreichbar machen: wer darf was, wer hat was geaendert, welche Staff-Zuweisung gilt wo.
+- [x] Medienbibliothek erweitern: fehlende Alt-Texte, doppelte Dateien, ungenutzte Dateien, kaputte Referenzen, Bildzuschnitt.
+- [x] Audit- und Rollenansicht besser erreichbar machen: wer darf was, wer hat was geaendert, welche Staff-Zuweisung gilt wo.
 
 Live- und Event-Erlebnis:
 
-- Display-Seiten als eigener Modus ausbauen: Bracket-TV, Fast-Lap-TV, Event-Ticker, Station-Status, Sponsorrotation.
-- Oeffentliche Live-Seiten fuer lokale Events: Zeitplan, laufende Matches, naechste Station, Ergebnis-Ticker.
-- Nach dem Event automatisch Rueckblick vorbereiten: Gewinner, Podium, Galerie, News-Entwurf, Social-Share.
-- QR-Codes fuer Vor-Ort-Wege: Check-in, Match, Station, Galerie-Upload, Feedback.
+- [x] Display-Seiten als eigener Modus ausbauen: Bracket-TV, Fast-Lap-TV, Event-Ticker, Station-Status, Sponsorrotation.
+- [x] Oeffentliche Live-Seiten fuer lokale Events: Zeitplan, laufende Matches, naechste Station, Ergebnis-Ticker.
+- [x] Nach dem Event automatisch Rueckblick vorbereiten: Gewinner, Podium, Galerie, News-Entwurf, Social-Share.
+- [x] QR-Codes fuer Vor-Ort-Wege: Check-in, Match, Station, Galerie-Upload, Feedback.
 
 Barrierefreiheit und Vertrauen:
 
-- Tastaturbedienung und Fokus-Stile fuer Navigation, Modals, Editor, Tabellen und Formulare pruefen.
-- Kontraste fuer Cyan/Gold auf dunklem Hintergrund systematisch testen.
-- Formulare mit klaren Fehlermeldungen, Pflichtfeldhinweisen und sinnvoller Tab-Reihenfolge.
-- Datenschutz/Cookie/Analytics sichtbar nachvollziehbar halten, besonders bei Embeds, Twitch und externen Medien.
+- [x] Tastaturbedienung und Fokus-Stile fuer Navigation, Modals, Editor, Tabellen und Formulare pruefen.
+- [x] Kontraste fuer Cyan/Gold auf dunklem Hintergrund systematisch testen.
+- [x] Formulare mit klaren Fehlermeldungen, Pflichtfeldhinweisen und sinnvoller Tab-Reihenfolge.
+- [x] Datenschutz/Cookie/Analytics sichtbar nachvollziehbar halten, besonders bei Embeds, Twitch und externen Medien.
 
 ## Phase 8 - Jahreswertung statt unklarer Season-Pass
 

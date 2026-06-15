@@ -42,6 +42,7 @@ const emptyDashboard: MobileDashboardData = {
   streams: [],
   stats: { my_tournaments: 0, my_events: 0, open_matches: 0, open_actions: 0, news: 0, public_tournaments: 0, public_events: 0, live_streams: 0 },
 };
+const OPEN_MATCH_STATUSES = new Set(["ready", "scheduled", "in_progress", "waiting_result"]);
 
 function normalizeDashboard(payload?: Partial<MobileDashboardData> | null): MobileDashboardData {
   return {
@@ -87,7 +88,9 @@ export function DashboardScreen({ navigation }: Props) {
     setError("");
     try {
       const response = await api.get<MobileDashboardData>("/mobile/dashboard");
-      setData(normalizeDashboard(response.data));
+      const nextData = normalizeDashboard(response.data);
+      nextData.me.matches = nextData.me.matches.filter((match: any) => OPEN_MATCH_STATUSES.has(String(match.status || "")));
+      setData(nextData);
       setOffline(responseFromCache(response));
       if (!isGuest) {
         await refreshMe().catch(() => {});
@@ -102,7 +105,7 @@ export function DashboardScreen({ navigation }: Props) {
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 30000);
+    const timer = setInterval(load, 10000);
     return () => clearInterval(timer);
   }, [load]);
 

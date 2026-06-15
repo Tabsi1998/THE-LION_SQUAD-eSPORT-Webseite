@@ -11,6 +11,8 @@ export type User = {
   is_club_member?: boolean;
   is_tournament_staff?: boolean;
   membership?: Record<string, unknown> | null;
+  newsletter_consent?: boolean;
+  notification_preferences?: Record<string, boolean>;
 };
 
 export type AuthResponse = {
@@ -46,6 +48,9 @@ export type Tournament = {
   public_phase?: { countdown_kind?: string | null; label?: string; state?: string; target_at?: string | null };
   start_date?: string | null;
   end_date?: string | null;
+  completed_at?: string | null;
+  results_published_at?: string | null;
+  updated_at?: string | null;
   registration_enabled?: boolean;
   registration_open_from?: string | null;
   registration_open_until?: string | null;
@@ -63,7 +68,7 @@ export type Tournament = {
   standings?: Array<{ rank: number; name: string; points?: number; result?: string }>;
   rules?: string[] | string;
   prize_pool?: string | null;
-  prize_places?: Array<{ place?: number; label?: string; value?: string }> | null;
+  prize_places?: Array<{ group?: string | null; place?: number | string; label?: string; value?: string }> | null;
   prizes?: string[];
   my_registration?: { id?: string; status?: string; display_name?: string | null; ingame_name?: string | null; team_id?: string | null; user_id?: string | null } | null;
 };
@@ -311,8 +316,31 @@ export type PersonalReferenceData = {
     fastlaps: number;
     wins: number;
     podiums: number;
-    season_points: number;
   };
+};
+
+export type PrizePickup = {
+  id: string;
+  status?: string | null;
+  place?: number | string | null;
+  place_label?: string | null;
+  prize_label?: string | null;
+  prize_value?: string | null;
+  pickup_deadline?: string | null;
+  ready_at?: string | null;
+  picked_up_at?: string | null;
+  source_type?: "tournament" | "fastlap" | string | null;
+  source_url?: string | null;
+  tournament_id?: string | null;
+  tournament_title?: string | null;
+  tournament_slug?: string | null;
+  fastlap_challenge_id?: string | null;
+  fastlap_challenge_title?: string | null;
+  fastlap_challenge_slug?: string | null;
+  fastlap_source_label?: string | null;
+  fastlap_track_name?: string | null;
+  recipient_type?: "user" | "team" | string | null;
+  recipient_label?: string | null;
 };
 
 export type F1Track = {
@@ -343,6 +371,8 @@ export type F1Challenge = {
   vehicle?: string | null;
   weather?: string | null;
   platform?: string | null;
+  prize_places?: Array<{ group?: string | null; place?: number | string; label?: string; value?: string }> | null;
+  prize_pool?: string | null;
   participant_count?: number;
   track_count?: number;
   tracks?: F1Track[];

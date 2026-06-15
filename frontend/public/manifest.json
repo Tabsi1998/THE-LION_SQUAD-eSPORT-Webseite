@@ -1,33 +1,22 @@
 {
   "short_name": "TLS eSports",
   "name": "THE LION SQUAD eSports",
-  "description": "Vereinsplattform, Turnierarena, Fast-Lap-Championship und Mitgliederportal von THE LION SQUAD eSports.",
+  "description": "Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.",
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
-    },
-    {
-      "src": "/logo192.png",
-      "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "any"
-    },
-    {
-      "src": "/logo192.png",
-      "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/logo512.png",
+      "src": "/assets/brand/tls-favicon-light.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any"
     },
     {
-      "src": "/logo512.png",
+      "src": "/assets/brand/tls-favicon-dark.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/brand/tls-favicon.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "maskable"
@@ -51,34 +40,34 @@
       "short_name": "Turniere",
       "description": "Alle aktuellen Turniere",
       "url": "/tournaments?source=pwa-shortcut",
-      "icons": [{ "src": "/logo192.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "/assets/brand/tls-favicon.png", "sizes": "512x512", "type": "image/png" }]
     },
     {
       "name": "Season Pass",
       "short_name": "Season",
       "description": "Aktuelle Season-Rangliste",
       "url": "/seasons/current?source=pwa-shortcut",
-      "icons": [{ "src": "/logo192.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "/assets/brand/tls-favicon.png", "sizes": "512x512", "type": "image/png" }]
     },
     {
       "name": "Events",
       "short_name": "Events",
       "description": "Kommende Events",
       "url": "/events?source=pwa-shortcut",
-      "icons": [{ "src": "/logo192.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "/assets/brand/tls-favicon.png", "sizes": "512x512", "type": "image/png" }]
     },
     {
       "name": "Dashboard",
       "short_name": "Dashboard",
       "description": "Mein Bereich",
       "url": "/dashboard?source=pwa-shortcut",
-      "icons": [{ "src": "/logo192.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "/assets/brand/tls-favicon.png", "sizes": "512x512", "type": "image/png" }]
     }
   ],
   "screenshots": [
     {
-      "src": "/logo512.png",
-      "sizes": "512x512",
+      "src": "/assets/brand/og-default.png",
+      "sizes": "1200x630",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "THE LION SQUAD eSports App"

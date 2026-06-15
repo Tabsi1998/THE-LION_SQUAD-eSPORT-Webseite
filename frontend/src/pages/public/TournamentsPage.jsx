@@ -1,20 +1,33 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentCard } from "@/components/tls/TournamentCard";
+import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { sortByNearestDate } from "@/lib/contentSort";
+import { Trophy } from "lucide-react";
 
 export default function TournamentsPage() {
+  useDocumentTitle(
+    "eSports Turniere",
+    "Aktuelle eSports Turniere von THE LION SQUAD: Anmeldung, Check-in, Brackets, Spielpläne und Ranglisten für Gaming Events in Tirol."
+  );
+
+  const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
 
   const load = useCallback(async () => {
     try {
-      const q = statusFilter !== "all" ? `?status=${statusFilter}` : "";
-      const { data } = await api.get(`/tournaments${q}`);
-      setList(data);
+      const params = new URLSearchParams({ compact: "true", limit: "60" });
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      const { data } = await api.get(`/tournaments?${params.toString()}`);
+      setList(sortByNearestDate(Array.isArray(data) ? data : data?.items || []));
       setError(false);
     } catch {
       setError(true);
@@ -31,6 +44,21 @@ export default function TournamentsPage() {
   }, [load]);
 
   useApiInvalidation(load, ["tournaments"]);
+
+  useEffect(() => {
+    const nextStatus = searchParams.get("status") || "all";
+    if (nextStatus !== statusFilter) setStatusFilter(nextStatus);
+  }, [searchParams, statusFilter]);
+
+  const selectStatusFilter = (value) => {
+    setStatusFilter(value);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (value && value !== "all") params.set("status", value);
+      else params.delete("status");
+      return params;
+    }, { replace: true });
+  };
 
   const filters = [
     { v: "all", label: "Alle" },
@@ -53,7 +81,7 @@ export default function TournamentsPage() {
             <button
               key={f.v}
               data-testid={`tournament-filter-${f.v}`}
-              onClick={() => setStatusFilter(f.v)}
+              onClick={() => selectStatusFilter(f.v)}
               className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm border transition ${
                 statusFilter === f.v
                   ? "bg-[#29B6E8] text-black border-[#29B6E8]"
@@ -65,18 +93,7 @@ export default function TournamentsPage() {
           ))}
         </div>
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden animate-pulse">
-                <div className="aspect-video bg-white/5" />
-                <div className="p-5 space-y-3">
-                  <div className="h-3 bg-white/10 rounded-sm w-1/3" />
-                  <div className="h-5 bg-white/10 rounded-sm w-3/4" />
-                  <div className="h-3 bg-white/5 rounded-sm w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <PublicLoadingState cards={6} />
         ) : error ? (
           <div className="col-span-full text-center py-20">
             <div className="text-[#FF3B30] font-display tracking-widest text-sm">FEHLER BEIM LADEN</div>
@@ -89,10 +106,15 @@ export default function TournamentsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {list.map((t, i) => <TournamentCard key={t.id} tournament={t} index={i} />)}
             {list.length === 0 && (
-              <div className="col-span-full text-center py-20">
-                <div className="text-white/20 font-display tracking-widest text-sm mb-2">KEINE TURNIERE GEFUNDEN</div>
-                <p className="text-white/40 text-sm">Für diesen Filter gibt es aktuell keine Turniere.</p>
-              </div>
+              <PublicEmptyState
+                icon={Trophy}
+                eyebrow="Turniere"
+                title={statusFilter === "all" ? "Noch keine Turniere sichtbar" : "Keine Turniere in diesem Filter"}
+                description={statusFilter === "all" ? "Sobald neue Cups, Ligen oder Community-Turniere angelegt sind, erscheinen sie hier automatisch." : "Wechsle auf alle Turniere oder schau später wieder rein, wenn sich der Status ändert."}
+                primaryAction={statusFilter === "all" ? { to: "/events", label: "Events ansehen" } : { to: "/tournaments", label: "Alle Turniere" }}
+                secondaryAction={{ to: "/fastlap", label: "Fast Lap" }}
+                className="col-span-full"
+              />
             )}
           </div>
         )}

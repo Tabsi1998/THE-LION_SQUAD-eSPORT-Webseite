@@ -2,9 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { seoTextPreview } from "@/lib/textPreview";
 import { ArrowLeft, X, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 
 export default function GalleryAlbumPage() {
@@ -12,7 +15,8 @@ export default function GalleryAlbumPage() {
   const [a, setA] = useState(null);
   const [error, setError] = useState(null);
   const [active, setActive] = useState(null); // index of active photo
-  useDocumentTitle(a?.title || "Galerie", a?.description || "Fotos und Eindrücke von THE LION SQUAD.", {
+  const seoDescription = seoTextPreview(a?.description, "Fotos und Eindrücke von THE LION SQUAD eSports: Turniere, LAN-Partys, Events und Gaming Community.");
+  useDocumentTitle(a?.title || "Galerie", seoDescription, {
     image: a?.cover_url || a?.photos?.[0]?.thumbnail_url || a?.photos?.[0]?.image_url,
     canonical: a?.slug ? `${window.location.origin}/galerie/${a.slug}` : undefined,
   });
@@ -37,18 +41,26 @@ export default function GalleryAlbumPage() {
     <PublicLayout>
       <div className="max-w-2xl mx-auto px-6 py-20 text-center">
         <h1 className="font-heading text-3xl font-black">{error}</h1>
-        <Link to="/gallery" className="mt-6 inline-flex items-center gap-2 text-[#29B6E8]"><ArrowLeft className="w-4 h-4" /> Zurück</Link>
+        <Link to="/galerie" className="mt-6 inline-flex items-center gap-2 text-[#29B6E8]"><ArrowLeft className="w-4 h-4" /> Zurück</Link>
       </div>
     </PublicLayout>
   );
-  if (!a) return <PublicLayout><div className="p-20 text-center text-white/40">LADE …</div></PublicLayout>;
+  if (!a) return <PublicLayout><PublicLoadingState label="Lade Album" /></PublicLayout>;
 
   const photos = a.photos || [];
 
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link to="/gallery" data-testid="album-back" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
+        <Breadcrumbs
+          items={[
+            { label: "Home", to: "/" },
+            { label: "Galerie", to: "/galerie" },
+            { label: a.title },
+          ]}
+          className="mb-3"
+        />
+        <Link to="/galerie" data-testid="album-back" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
           <ArrowLeft className="w-3.5 h-3.5" /> Alle Alben
         </Link>
         <h1 className="mt-6 font-heading text-3xl md:text-5xl font-black uppercase">{a.title}</h1>

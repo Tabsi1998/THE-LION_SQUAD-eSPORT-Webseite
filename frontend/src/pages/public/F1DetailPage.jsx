@@ -3,20 +3,24 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { API, api, formatRequestError, parseTimeStr, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
-import { Tv, Trophy, Flag, Download, FileDown, Calendar, Trash2 } from "lucide-react";
+import { Tv, Trophy, Flag, Calendar, Trash2, FileDown } from "lucide-react";
 import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
+import { seoTextPreview } from "@/lib/textPreview";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 
-function f1Query(values = {}) {
+const PUBLIC_RESULT_STATUSES = new Set(["completed", "results_published", "archived"]);
+
+function f1ResultQuery(values = {}) {
   const params = new URLSearchParams();
   Object.entries(values).forEach(([key, value]) => {
     if (value) params.set(key, value);
@@ -35,7 +39,8 @@ export default function F1DetailPage() {
   const [board, setBoard] = useState(null);
   const [championship, setChampionship] = useState(null);
   const [tab, setTab] = useState("track"); // track | championship
-  useDocumentTitle(challenge?.title || "Fast Lap", challenge?.description || "Fast-Lap-Challenge von THE LION SQUAD eSports.", {
+  const seoDescription = seoTextPreview(challenge?.description || challenge?.rules, "F1 Fast-Lap-Challenge von THE LION SQUAD mit Leaderboard, Strecken und Championship-Wertung.");
+  useDocumentTitle(challenge?.title || "Fast Lap", seoDescription, {
     image: challenge?.banner_url,
     canonical: challenge?.slug ? `${window.location.origin}/fastlap/${challenge.slug}` : undefined,
   });
@@ -79,10 +84,11 @@ export default function F1DetailPage() {
 
   useApiInvalidation(loadBoard, ["f1"]);
 
-  if (!challenge) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE …</div></PublicLayout>;
+  if (!challenge) return <PublicLayout><PublicLoadingState label="Lade Fast Lap" /></PublicLayout>;
 
   const hasOnlineSubmission = hasOnlineRegistration(challenge);
   const registration = hasOnlineSubmission ? getRegistrationState(challenge, "Einreichung") : null;
+  const showResultPdf = PUBLIC_RESULT_STATUSES.has(challenge.status);
 
   return (
     <PublicLayout>
@@ -90,7 +96,7 @@ export default function F1DetailPage() {
         {challenge.banner_url && <img src={resolveMediaUrl(challenge.banner_url)} className="absolute inset-0 w-full h-full object-cover opacity-25" alt="" />}
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/70 to-[#0A0A0A]" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-          <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "eSports", to: "/fastlap" }, { label: "Fast Lap", to: "/fastlap" }, { label: challenge.title }]} className="mb-3" />
+          <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "eSports", to: "/esports" }, { label: "Fast Lap", to: "/fastlap" }, { label: challenge.title }]} className="mb-3" />
           <Link to="/fastlap" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Fast Lap Challenges</Link>
           <div className="mt-2 flex flex-wrap items-center gap-3 mb-3">
             <PhaseBadge phase={challenge.public_phase} status={challenge.status} size="lg" />
@@ -135,31 +141,26 @@ export default function F1DetailPage() {
             <Link to={`/display/f1/${challenge.id}${activeTrack ? `?track=${activeTrack}` : ""}`} target="_blank" data-testid="f1-tv-link" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
               <Tv className="w-4 h-4" /> TV / Beamer Modus
             </Link>
-            <a
-              href={`${API}/exports/f1/${challenge.slug || challenge.id}/leaderboard.pdf${f1Query({ track_id: activeTrack, access: accessToken })}`}
-              target="_blank" rel="noreferrer"
-              data-testid="f1-export-pdf-track"
-              className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition"
-            >
-              <FileDown className="w-4 h-4" /> PDF (aktuelle Strecke)
-            </a>
-            {challenge.is_championship && (
+            {showResultPdf && (
               <a
-                href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship.pdf${f1Query({ access: accessToken })}`}
-                target="_blank" rel="noreferrer"
-                data-testid="f1-export-pdf-championship"
-                className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition"
+                href={`${API}/exports/f1/${challenge.slug || challenge.id}/leaderboard.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#29B6E8]/45 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10 transition"
               >
-                <Trophy className="w-4 h-4" /> Championship PDF
+                <FileDown className="w-4 h-4" /> Ergebnis-PDF
               </a>
             )}
-            <a
-              href={`${API}/f1/challenges/${challenge.id}/export.csv${f1Query({ access: accessToken })}`}
-              data-testid="f1-export-csv"
-              className="inline-flex items-center gap-2 px-5 py-2.5 border border-white/10 text-white/60 font-bold uppercase tracking-wider rounded-sm hover:border-white/20 hover:text-white transition text-sm"
-            >
-              <Download className="w-3.5 h-3.5" /> CSV
-            </a>
+            {showResultPdf && challenge.is_championship && (
+              <a
+                href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship.pdf${f1ResultQuery({ access: accessToken })}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition"
+              >
+                <Trophy className="w-4 h-4" /> Gesamtwertung-PDF
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -371,7 +372,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
     }
     const penalty = Number(form.penalty_seconds) || 0;
     if (penalty > 0 && (form.admin_note || "").trim().length < 5) {
-      toast.error("Bei Strafzeit ist eine Begruendung Pflicht.");
+      toast.error("Bei Strafzeit ist eine Begründung Pflicht.");
       return;
     }
     setSaving(true);
@@ -431,7 +432,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
           <label className="block">
             <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Fahrer</span>
             <select value={form.user_id} onChange={(e) => set("user_id", e.target.value)} required className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-              <option value="">- auswaehlen -</option>
+              <option value="">- auswählen -</option>
               {users.map((item) => <option key={item.id} value={item.id}>{item.display_name || item.username || item.email}</option>)}
             </select>
           </label>
@@ -462,7 +463,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
       <div className="mt-4 border-t border-white/10 pt-3">
         <div className="mb-2 flex items-center justify-between gap-3">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/55">Letzte Zeiten</div>
-          <div className="text-[10px] uppercase tracking-widest text-white/35">{times.length} Eintraege</div>
+          <div className="text-[10px] uppercase tracking-widest text-white/35">{times.length} Einträge</div>
         </div>
         <div className="grid md:grid-cols-2 gap-2">
           {times.slice(0, 8).map((time) => (

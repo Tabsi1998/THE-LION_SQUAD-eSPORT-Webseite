@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { SmartLogo } from "@/components/tls/SmartLogo";
-import { ExternalLink, Handshake } from "lucide-react";
+import { ArrowRight, ExternalLink, Handshake, Star } from "lucide-react";
 
 export default function PartnersPage() {
+  useDocumentTitle(
+    "Partner",
+    "Partner, Vereine, Veranstalter und Communitys im Netzwerk von THE LION SQUAD eSports aus Tirol."
+  );
+
   const [partners, setPartners] = useState([]);
 
   const load = useCallback(() => {
@@ -23,6 +30,27 @@ export default function PartnersPage() {
         <p className="mt-4 text-white/70 max-w-2xl">
           Befreundete Vereine, Veranstalter und Communitys, mit denen wir zusammenarbeiten.
         </p>
+
+        <div className="mt-8 grid md:grid-cols-2 gap-3">
+          <Link to="/sponsors" className="group rounded-sm border border-white/10 bg-[#101010] p-4 transition hover:border-[#FFD700]/35 hover:bg-white/[0.03]">
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">
+              <Star className="h-3.5 w-3.5" /> Sponsoren
+            </div>
+            <p className="mt-2 text-sm text-white/55">Unterstuetzer, Tiers und Marken, die Events und Turniere mitmoeglich machen.</p>
+            <span className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/35 group-hover:text-[#FFD700]">
+              Sponsoren ansehen <ArrowRight className="h-3 w-3" />
+            </span>
+          </Link>
+          <Link to="/contact" className="group rounded-sm border border-white/10 bg-[#101010] p-4 transition hover:border-[#29B6E8]/35 hover:bg-white/[0.03]">
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">
+              <Handshake className="h-3.5 w-3.5" /> Kooperation
+            </div>
+            <p className="mt-2 text-sm text-white/55">Kontakt für gemeinsame Events, Community-Projekte und langfristige Partnerschaften.</p>
+            <span className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/35 group-hover:text-[#29B6E8]">
+              Kontakt aufnehmen <ArrowRight className="h-3 w-3" />
+            </span>
+          </Link>
+        </div>
 
         {partners.length === 0 ? (
           <div className="mt-12 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">

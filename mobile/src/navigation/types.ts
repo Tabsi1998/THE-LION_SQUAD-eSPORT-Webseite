@@ -9,7 +9,7 @@ export type MainTabParamList = {
   Dashboard: undefined;
   Tournaments: NavigatorScreenParams<TournamentStackParamList> | undefined;
   Teams: NavigatorScreenParams<TeamStackParamList> | undefined;
-  Profile: undefined;
+  Profile: { tab?: "overview" | "references" | "prizes" | "edit" | "achievements" | "privacy" | "notifications" } | undefined;
   More: NavigatorScreenParams<MoreStackParamList> | undefined;
 };
 

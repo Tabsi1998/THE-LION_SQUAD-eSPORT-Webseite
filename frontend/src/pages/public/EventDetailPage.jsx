@@ -2,19 +2,22 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { RichContent } from "@/components/tls/RichContent";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
+import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { renderMarkdownLite } from "@/lib/markdownLite";
+import { seoTextPreview } from "@/lib/textPreview";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag, UserPlus, CheckCircle, XCircle } from "lucide-react";
+import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag, UserPlus, CheckCircle, XCircle, Radio } from "lucide-react";
 
 const TYPE_LABELS = {
   club_evening: "Vereinsabend", lan_party: "LAN-Party", public_event: "Public Event",
@@ -60,8 +63,9 @@ export default function EventDetailPage() {
   const { user } = useAuth();
   const [e, setE] = useState(null);
   const [error, setError] = useState(null);
-  const { hasConsent, openSettings } = useCookieConsent();
-  useDocumentTitle(e?.name || "Event", e?.description || "Event von THE LION SQUAD eSports.", {
+  const { hasConsent } = useCookieConsent();
+  const seoDescription = seoTextPreview(e?.description || e?.program, "Gaming Event von THE LION SQUAD eSports in Tirol.");
+  useDocumentTitle(e?.name || "Event", seoDescription, {
     image: e?.banner_url,
     type: "event",
     canonical: e?.slug ? `${window.location.origin}/events/${e.slug}` : undefined,
@@ -91,10 +95,11 @@ export default function EventDetailPage() {
       </div>
     </PublicLayout>
   );
-  if (!e) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
+  if (!e) return <PublicLayout><PublicLoadingState label="Lade Event" /></PublicLayout>;
 
   const eventSponsors = uniqueLogoSponsors(e.sponsors || []);
   const organizerName = e.organizer_name || (e.owned_by_club ? "THE LION SQUAD - eSports" : "");
+  const liveUrl = `/events/${e.slug || e.id}/live${accessSuffix(accessToken)}`;
 
   return (
     <PublicLayout>
@@ -125,6 +130,16 @@ export default function EventDetailPage() {
               ) : <span className="inline-flex items-center gap-2">{organizerName}</span>
             )}
           </div>
+          {(e.tournaments?.length || e.f1_challenges?.length) && (
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link to={liveUrl} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:bg-white transition">
+                <Radio className="w-4 h-4" /> Live verfolgen
+              </Link>
+              <Link to={`/display/event/${e.id}`} className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/70 text-xs uppercase tracking-wider font-bold rounded-sm hover:border-[#29B6E8]/45 hover:text-white transition">
+                <ExternalLink className="w-4 h-4" /> Display
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 
@@ -140,11 +155,13 @@ export default function EventDetailPage() {
               </div>
             )}
             {e.show_map && mapEmbedUrl(e) && !hasConsent("external_media") && (
-              <div className="border border-white/10 bg-[#121212] rounded-sm p-6 flex flex-col justify-center min-h-72">
-                <div className="text-[11px] uppercase tracking-widest text-[#9F7AEA] font-bold">Karte blockiert</div>
-                <p className="mt-2 text-sm text-white/60">Für Google Maps brauchen wir deine Zustimmung zu externen Medien.</p>
-                <button type="button" onClick={openSettings} className="mt-4 self-start px-4 py-2 border border-[#9F7AEA]/50 text-[#9F7AEA] text-xs uppercase tracking-wider font-bold rounded-sm">Cookie-Einstellungen</button>
-              </div>
+              <ExternalMediaNotice
+                service="Google Maps"
+                reason="Die Karte wird erst nach Zustimmung zu externen Medien geladen, weil dabei Daten an Google übertragen werden können."
+                url={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([e.location, fullAddress(e)].filter(Boolean).join(", "))}`}
+                accent="#9F7AEA"
+                testId="event-map-consent-notice"
+              />
             )}
           </div>
         )}
@@ -179,7 +196,7 @@ export default function EventDetailPage() {
             <h2 className="font-heading text-2xl font-black uppercase mb-5 inline-flex items-center gap-2"><ImageIcon className="w-5 h-5 text-[#29B6E8]" /> Galerie</h2>
             <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
               {e.albums.map((a) => (
-                <Link key={a.id} to={`/gallery/${a.slug}`} className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] overflow-hidden">
+                <Link key={a.id} to={`/galerie/${a.slug}`} className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] overflow-hidden">
                   <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
                     {a.cover_url ? <img src={resolveMediaUrl(a.cover_url)} alt={a.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-8 h-8 text-white/15" /></div>}
                   </div>

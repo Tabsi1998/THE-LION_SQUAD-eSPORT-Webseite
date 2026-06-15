@@ -22,6 +22,7 @@ LEAD_TIMES = [
     ("match_lead_10m", "10m", 10, 5),
     ("match_lead_5m", "5m", 5, 3),
 ]
+EMAIL_LEAD_LABELS = {"10m"}
 
 
 async def _participants_for_match(match: dict) -> list[dict]:
@@ -150,6 +151,7 @@ async def schedule_match_reminders() -> dict:
                                 url=url,
                                 kind="match_reminder",
                                 meta={
+                                    "category": "match_reminders",
                                     "dedupe_key": dedupe_notification,
                                     "match_id": m.get("id"),
                                     "tournament_id": m.get("tournament_id"),
@@ -158,11 +160,13 @@ async def schedule_match_reminders() -> dict:
                                 },
                             )
                             notifications += 1
+                    if label not in EMAIL_LEAD_LABELS:
+                        continue
                     if not p.get("email"):
                         continue
                     from services.notification_preferences import send_user_template
                     dedupe = f"match_reminder:{m.get('id')}:{p.get('id')}:{label}"
-                    await send_user_template(
+                    result = await send_user_template(
                         p, tpl_key,
                         tournament_title=t.get("title", "Turnier"),
                         opponent=opp_name,
@@ -171,7 +175,8 @@ async def schedule_match_reminders() -> dict:
                         station=station,
                         dedupe_key=dedupe,
                     )
-                    queued += 1
+                    if result.get("ok") and not result.get("skipped") and not result.get("deduped"):
+                        queued += 1
     if queued or notifications:
         logger.info(f"[match-reminders] queued {queued} mails, created {notifications} web notifications")
     return {"queued": queued, "notifications": notifications}

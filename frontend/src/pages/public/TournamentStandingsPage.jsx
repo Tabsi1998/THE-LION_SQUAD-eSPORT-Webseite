@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { api } from "@/lib/api";
+import { API, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { seoTextPreview } from "@/lib/textPreview";
+import { FileDown } from "lucide-react";
+
+const PUBLIC_RESULT_STATUSES = new Set(["completed", "results_published", "archived"]);
 
 export default function TournamentStandingsPage() {
   const { slug } = useParams();
@@ -12,7 +18,8 @@ export default function TournamentStandingsPage() {
   const accessToken = searchParams.get("access") || "";
   const [t, setT] = useState(null);
   const [rows, setRows] = useState([]);
-  useDocumentTitle(`${t?.title || "Turnier"} Rangliste`, "Rangliste und Ergebnisse des Turniers.", {
+  const seoDescription = seoTextPreview(t?.description, "Rangliste und Ergebnisse des eSports Turniers von THE LION SQUAD.");
+  useDocumentTitle(`${t?.title || "Turnier"} Rangliste`, seoDescription, {
     image: t?.banner_url,
     canonical: t?.slug ? `${window.location.origin}/tournaments/${t.slug}/standings` : undefined,
   });
@@ -33,14 +40,32 @@ export default function TournamentStandingsPage() {
   }, [load]);
 
   useApiInvalidation(load, ["tournaments", "matches"]);
+  const tournamentUrl = t ? `/tournaments/${t.slug || t.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "/tournaments";
+  const resultPdfUrl = t ? `${API}/exports/tournaments/${t.slug || t.id}/standings.pdf${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "";
 
-  if (!t) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
+  if (!t) return <PublicLayout><PublicLoadingState label="Lade Rangliste" /></PublicLayout>;
 
   return (
     <PublicLayout>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link to={`/tournaments/${t.slug}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← {t.title}</Link>
-        <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Rangliste</h1>
+        <Breadcrumbs
+          items={[
+            { label: "Home", to: "/" },
+            { label: "Turniere", to: "/tournaments" },
+            { label: t.title, to: tournamentUrl },
+            { label: "Rangliste" },
+          ]}
+          className="mb-3"
+        />
+        <Link to={tournamentUrl} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← {t.title}</Link>
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+          <h1 className="font-heading text-3xl md:text-5xl font-black uppercase">Rangliste</h1>
+          {PUBLIC_RESULT_STATUSES.has(t.status) && (
+            <a href={resultPdfUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10">
+              <FileDown className="w-3.5 h-3.5" /> Ergebnis-PDF
+            </a>
+          )}
+        </div>
         <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">

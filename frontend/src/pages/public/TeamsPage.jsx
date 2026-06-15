@@ -3,11 +3,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { toast } from "sonner";
 import { Copy, Edit, MessageSquare, Plus, Search, Send, Shield, Trash2, Users, UserPlus } from "lucide-react";
 
@@ -20,12 +22,17 @@ export default function TeamsPage() {
 }
 
 function TeamList() {
+  useDocumentTitle(
+    "Teams & Clans",
+    "Teams, Squads und Clans der THE LION SQUAD Gaming Community: Profile, Mitglieder, Join-Codes und eSports Organisation."
+  );
+
   const { user } = useAuth();
   const [list, setList] = useState([]);
   const [editing, setEditing] = useState(null);
 
   const load = useCallback(async () => {
-    const { data } = await api.get("/teams");
+    const { data } = await api.get("/teams?limit=90");
     setList(data);
   }, []);
 
@@ -89,6 +96,12 @@ function TeamCard({ team: t }) {
 }
 
 function TeamDetail({ id }) {
+  useDocumentTitle(
+    "Teamprofil",
+    "Teamprofil der THE LION SQUAD Gaming Community mit Mitgliedern, Squads und eSports Infos.",
+    { canonical: `${window.location.origin}/teams/${id}` }
+  );
+
   const nav = useNavigate();
   const { user, isAdmin } = useAuth();
   const [team, setTeam] = useState(null);
@@ -105,7 +118,7 @@ function TeamDetail({ id }) {
   useEffect(() => { refresh(); }, [refresh]);
   useApiInvalidation(refresh, ["teams"]);
 
-  if (!team) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE TEAM …</div></PublicLayout>;
+  if (!team) return <PublicLayout><PublicLoadingState label="Lade Team" /></PublicLayout>;
 
   const isMember = !!user && (team.is_member || team.member_ids?.includes(user.id));
   const canEdit = !!user && (team.can_manage || team.leader_id === user.id || team.co_leader_ids?.includes(user.id) || isAdmin);

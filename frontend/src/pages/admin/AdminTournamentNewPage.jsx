@@ -10,6 +10,7 @@ import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
 import { toast } from "sonner";
+import { AlertTriangle } from "lucide-react";
 
 const CREATE_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -28,6 +29,36 @@ const PRIZE_GROUP_OPTIONS = [
 ];
 const BRONZE_FORMATS = new Set(["single_elim"]);
 
+function dateFromInput(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function buildPlanningWarnings(form, isTeam) {
+  const warnings = [];
+  const minParticipants = Number(form.min_participants || 0);
+  const maxParticipants = Number(form.max_participants || 0);
+  const start = dateFromInput(form.start_date);
+  const end = dateFromInput(form.end_date);
+  const registrationFrom = dateFromInput(form.registration_open_from);
+  const registrationUntil = dateFromInput(form.registration_open_until);
+  const checkinFrom = dateFromInput(form.check_in_from);
+  const checkinUntil = dateFromInput(form.check_in_until);
+
+  if (minParticipants && maxParticipants && minParticipants > maxParticipants) {
+    warnings.push(`${isTeam ? "Min Teams" : "Min Spieler"} ist größer als ${isTeam ? "Max Teams" : "Max Spieler"}.`);
+  }
+  if (start && end && end < start) warnings.push("Das Ende liegt vor dem Start.");
+  if (registrationFrom && registrationUntil && registrationUntil < registrationFrom) warnings.push("Die Anmeldung endet vor ihrer Öffnung.");
+  if (checkinFrom && checkinUntil && checkinUntil < checkinFrom) warnings.push("Der Check-in endet vor seiner Öffnung.");
+  if (registrationUntil && start && registrationUntil > start) warnings.push("Die Anmeldung endet nach dem Turnierstart.");
+  if (checkinUntil && start && checkinUntil > start) warnings.push("Der Check-in endet nach dem Turnierstart.");
+  if (form.status === "scheduled" && !form.start_date) warnings.push("Angekuendigte Turniere sollten eine Startzeit haben.");
+  if (form.twitch_enabled && !String(form.twitch_channel || "").trim()) warnings.push("Twitch ist aktiv, aber kein Kanal ist eingetragen.");
+  return warnings;
+}
+
 export default function AdminTournamentNewPage() {
   const nav = useNavigate();
   const [games, setGames] = useState([]);
@@ -43,6 +74,7 @@ export default function AdminTournamentNewPage() {
     start_date: "", end_date: "",
     status: "draft",
     site_banner_enabled: false,
+    auto_start_enabled: false,
     event_mode: "online", result_entry_mode: "", schedule_mode: "",
     best_of: 1, bronze_match: false, seeding_mode: "random",
     is_public: true, rules: "", prize_pool: "",
@@ -57,6 +89,7 @@ export default function AdminTournamentNewPage() {
   });
   const [saving, setSaving] = useState(false);
   const isTeam = form.team_mode === "team";
+  const planningWarnings = buildPlanningWarnings(form, isTeam);
 
   const loadSources = useCallback(() => {
     api.get("/games").then(({ data }) => setGames(data));
@@ -145,7 +178,7 @@ export default function AdminTournamentNewPage() {
             <Field label="Anmeldung endet" type="datetime-local" value={form.registration_open_until} onChange={(v) => set("registration_open_until", v)} testId="new-tr-reg-until" />
           </Row>
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
-            Anmeldung, Check-in, Live und Beendet werden anhand dieser Zeiten automatisch geschaltet. Manuelle Sonderstatus setzt du später in der Bearbeitung.
+            Anmeldung und Check-in können zeitgesteuert wechseln. Live-Start und echte Matchstarts bleiben standardmäßig bei der Turnierleitung.
           </div>
           <Row>
             <Select label="Austragung" value={form.event_mode} onChange={(v) => set("event_mode", v)} options={EVENT_MODE_OPTIONS} testId="new-tr-event-mode" />
@@ -154,7 +187,7 @@ export default function AdminTournamentNewPage() {
           </Row>
           <RulePresetPicker form={form} onApply={applyRulePreset} />
           <div className="border border-white/10 bg-black/20 rounded-sm p-3 text-xs text-white/55">
-            Vor-Ort-Turniere werden standardmaessig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmaessig Ergebnisberichte beider Parteien und Terminvorschlaege.
+            Vor-Ort-Turniere werden standardmäßig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmäßig Ergebnisberichte beider Parteien und Terminvorschläge.
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="flex items-start gap-2 text-sm text-white/75">
@@ -164,6 +197,10 @@ export default function AdminTournamentNewPage() {
             <label className="flex items-start gap-2 text-sm text-white/75">
               <input type="checkbox" checked={form.site_banner_enabled} onChange={(e) => set("site_banner_enabled", e.target.checked)} data-testid="new-tr-site-banner" className="accent-[#FFD700] mt-1" />
               <span>Automatisches Turnier-Hinweisbanner für dieses Turnier anzeigen</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-white/75 sm:col-span-2">
+              <input type="checkbox" checked={form.auto_start_enabled} onChange={(e) => set("auto_start_enabled", e.target.checked)} data-testid="new-tr-auto-start" className="accent-[#29B6E8] mt-1" />
+              <span>Turnier anhand Start-/Endzeit automatisch live/beendet schalten. Für Vor-Ort-Turniere ausgeschaltet lassen.</span>
             </label>
           </div>
           <Details title="Weitere Zeiten und Sonderfälle">
@@ -265,6 +302,17 @@ export default function AdminTournamentNewPage() {
             <Field label="Discord-Einladung" value={form.discord_link} onChange={(v) => set("discord_link", v)} testId="new-tr-discord" placeholder="https://discord.com/invite/…" />
           </Row>
         </Details>
+        {planningWarnings.length > 0 && (
+          <div className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 p-4 text-sm text-[#FFD700]" data-testid="new-tr-planning-warnings">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+              <div className="space-y-1">
+                <div className="text-[11px] font-bold uppercase tracking-widest">Planung prüfen</div>
+                {planningWarnings.map((warning) => <div key={warning}>{warning}</div>)}
+              </div>
+            </div>
+          </div>
+        )}
         <button disabled={saving} data-testid="new-tr-submit" className="px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50">
           {saving ? "Erstelle …" : "Turnier erstellen"}
         </button>

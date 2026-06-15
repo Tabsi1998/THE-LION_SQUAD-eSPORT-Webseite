@@ -1,27 +1,39 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { Link, useSearchParams } from "react-router-dom";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
+import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
+import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { plainTextPreview } from "@/lib/textPreview";
+import { sortByNearestDate } from "@/lib/contentSort";
 import { Calendar, MapPin, Users as UsersIcon, Crown, Lock } from "lucide-react";
 
 const VIS_ICON = { members: Crown, internal: Lock };
 
 export default function EventsPage() {
-  useDocumentTitle("Events", "Aktuelle und kommende Events von THE LION SQUAD eSports.");
+  useDocumentTitle("Events", "Gaming Events, Vereinsabende, LAN-Partys, Messen und öffentliche Termine von THE LION SQUAD eSports in Tirol.");
+  const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ types: [], statuses: [] });
-  const [typeFilter, setTypeFilter] = useState("");
-  const [tab, setTab] = useState("upcoming"); // upcoming | past
+  const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "");
+  const [tab, setTab] = useState(searchParams.get("view") === "past" ? "past" : "upcoming"); // upcoming | past
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => { api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, []);
 
   const load = useCallback(() => {
-    const url = tab === "upcoming" ? "/events?upcoming=true" : "/events";
-    api.get(url).then(({ data }) => setList(data)).catch(() => {});
+    setLoading(true);
+    const params = new URLSearchParams({ compact: "true", limit: "90" });
+    if (tab === "upcoming") params.set("upcoming", "true");
+    const url = `/events?${params.toString()}`;
+    api.get(url)
+      .then(({ data }) => setList(sortByNearestDate(Array.isArray(data) ? data : data?.items || [])))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [tab]);
 
   useEffect(() => {
@@ -29,6 +41,28 @@ export default function EventsPage() {
   }, [load]);
 
   useApiInvalidation(load, ["events"]);
+
+  useEffect(() => {
+    const nextTab = searchParams.get("view") === "past" ? "past" : "upcoming";
+    const nextType = searchParams.get("type") || "";
+    if (nextTab !== tab) setTab(nextTab);
+    if (nextType !== typeFilter) setTypeFilter(nextType);
+  }, [searchParams, tab, typeFilter]);
+
+  const updateEventFilters = (patch) => {
+    const nextTab = Object.prototype.hasOwnProperty.call(patch, "view") ? patch.view : tab;
+    const nextType = Object.prototype.hasOwnProperty.call(patch, "type") ? patch.type : typeFilter;
+    setTab(nextTab);
+    setTypeFilter(nextType);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (nextTab === "past") params.set("view", "past");
+      else params.delete("view");
+      if (nextType) params.set("type", nextType);
+      else params.delete("type");
+      return params;
+    }, { replace: true });
+  };
 
   const filtered = list.filter((e) => {
     if (typeFilter && e.event_type !== typeFilter) return false;
@@ -49,21 +83,27 @@ export default function EventsPage() {
 
         <div className="mt-8 flex flex-col md:flex-row gap-3 md:items-center md:justify-between min-w-0">
           <div className="flex flex-wrap gap-2 min-w-0">
-            <button onClick={() => setTab("upcoming")} data-testid="events-tab-upcoming" className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${tab === "upcoming" ? "bg-[#9F7AEA] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}>Kommend</button>
-            <button onClick={() => setTab("past")} data-testid="events-tab-past" className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${tab === "past" ? "bg-white/15 text-white" : "border border-white/10 text-white/60 hover:text-white"}`}>Vergangen</button>
+            <button onClick={() => updateEventFilters({ view: "upcoming" })} data-testid="events-tab-upcoming" className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${tab === "upcoming" ? "bg-[#9F7AEA] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}>Kommend</button>
+            <button onClick={() => updateEventFilters({ view: "past" })} data-testid="events-tab-past" className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${tab === "past" ? "bg-white/15 text-white" : "border border-white/10 text-white/60 hover:text-white"}`}>Vergangen</button>
           </div>
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} data-testid="events-type-filter" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm max-w-full">
+          <select value={typeFilter} onChange={(e) => updateEventFilters({ type: e.target.value })} data-testid="events-type-filter" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm max-w-full">
             <option value="">Alle Typen</option>
             {filterTypes.map((t) => <option key={t.k} value={t.k}>{t.l}</option>)}
           </select>
         </div>
 
-        {filtered.length === 0 ? (
-          <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
-            <Calendar className="w-10 h-10 mx-auto opacity-40 mb-3" />
-            <div className="font-heading font-bold text-lg">Keine Events</div>
-            <div className="text-sm mt-1">{tab === "upcoming" ? "Aktuell sind keine Events geplant. Schau bald wieder vorbei." : "Keine vergangenen Events in dieser Auswahl."}</div>
-          </div>
+        {loading ? (
+          <PublicLoadingState cards={6} className="mt-10" />
+        ) : filtered.length === 0 ? (
+          <PublicEmptyState
+            icon={Calendar}
+            eyebrow="Events"
+            title={tab === "upcoming" ? "Aktuell keine kommenden Events" : "Keine vergangenen Events in dieser Auswahl"}
+            description={tab === "upcoming" ? "Sobald neue Vereinsabende, LANs oder Messe-Termine geplant sind, landen sie hier automatisch." : "Ändere den Event-Typ oder wechsle zur kommenden Ansicht."}
+            primaryAction={tab === "upcoming" ? { to: "/tournaments", label: "Turniere ansehen" } : { label: "Kommende Events", onClick: () => updateEventFilters({ view: "upcoming" }) }}
+            secondaryAction={{ to: "/news", label: "News lesen" }}
+            className="mt-10"
+          />
         ) : (
           <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-5 min-w-0">
             {filtered.map((e) => <EventCard key={e.id} e={e} meta={meta} />)}
@@ -86,7 +126,7 @@ function EventCard({ e, meta }) {
     >
       {e.banner_url ? (
         <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
-          <img src={resolveMediaUrl(e.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain group-hover:scale-[1.02] transition duration-500" />
+          <LazyImg src={e.banner_url} alt="" sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="w-full h-full object-contain group-hover:scale-[1.02] transition duration-500" />
         </div>
       ) : (
         <div className="aspect-video bg-gradient-to-br from-[#9F7AEA]/20 via-[#0A0A0A] to-[#0A0A0A] flex items-center justify-center">

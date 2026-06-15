@@ -4,6 +4,7 @@ import { Logo } from "@/components/tls/Logo";
 import { MainNav, MobileNav } from "@/components/tls/MainNav";
 import { NotificationBell } from "@/components/tls/NotificationBell";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
+import { GlobalSearch } from "@/components/tls/GlobalSearch";
 import { openCookieSettings } from "@/components/tls/CookieConsent";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
@@ -58,11 +59,13 @@ export function PublicLayout({ children }) {
 
   return (
     <div className="min-h-screen max-w-full overflow-x-clip bg-[#0A0A0A] text-white flex flex-col">
+      <a href="#main-content" className="tls-skip-link">Zum Inhalt springen</a>
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#0A0A0A]/80 border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between gap-4">
           <Logo size="md" />
           <MainNav isClubMember={isClubMember} />
           <div className="flex items-center gap-2">
+            <GlobalSearch />
             {user ? (
               <>
                 {isClubMember && (
@@ -123,14 +126,16 @@ export function PublicLayout({ children }) {
               data-testid="nav-mobile-toggle"
               className="lg:hidden p-2 text-white"
               onClick={() => setMobileOpen((v) => !v)}
-              aria-label="Menu"
+              aria-label={mobileOpen ? "Menü schließen" : "Menü öffnen"}
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-navigation"
             >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
         {mobileOpen && (
-          <div className="lg:hidden border-t border-white/10 bg-[#0A0A0A] max-h-[calc(100vh-4rem)] overflow-y-auto">
+          <div id="mobile-navigation" className="lg:hidden border-t border-white/10 bg-[#0A0A0A] max-h-[calc(100vh-4rem)] overflow-y-auto">
             <div className="px-4 py-4 flex flex-col gap-1">
               <MobileNav isClubMember={isClubMember} onClose={closeMobile} />
               <div className="border-t border-white/10 mt-3 pt-3 space-y-0.5">
@@ -170,7 +175,7 @@ export function PublicLayout({ children }) {
         )}
       </header>
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="below_nav" />
-      <main className="flex-1 min-w-0 max-w-full overflow-x-clip">{children}</main>
+      <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 max-w-full overflow-x-clip">{children}</main>
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="above_footer" />
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="bottom_fixed" />
       <footer className="border-t border-white/10 bg-[#0A0A0A] mt-24 min-w-0 max-w-full overflow-x-clip pb-16 lg:pb-0">
@@ -220,8 +225,8 @@ function bannerMatchesPath(banner, pathname) {
   const path = pathname || "/";
   const scope = banner?.scope || "all";
   if (scope === "all") return true;
-  if (scope === "tournaments") return path.startsWith("/tournaments") || path.startsWith("/tournament");
-  if (scope === "fastlap") return path.startsWith("/fastlap") || path.startsWith("/f1");
+  if (scope === "tournaments") return path.startsWith("/esports") || path.startsWith("/tournaments") || path.startsWith("/tournament");
+  if (scope === "fastlap") return path.startsWith("/esports") || path.startsWith("/fastlap") || path.startsWith("/f1");
   if (scope === "events") return path.startsWith("/events") || path.startsWith("/event");
   if (scope === "news") return path.startsWith("/news");
   if (scope === "community") return ["/community", "/players", "/teams", "/servers"].some((prefix) => path.startsWith(prefix));

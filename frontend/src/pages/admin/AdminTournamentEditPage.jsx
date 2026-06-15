@@ -10,7 +10,7 @@ import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { formatDateTime, fromDateTimeLocal, normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
-import { Zap, RefreshCw, Eye } from "lucide-react";
+import { Zap, RefreshCw, Eye, Search } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
@@ -123,6 +123,14 @@ function matchSortValue(match) {
   ];
 }
 
+function normalizeSearch(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
 function sortMatchesForPlan(a, b) {
   const av = matchSortValue(a);
   const bv = matchSortValue(b);
@@ -176,6 +184,19 @@ function applyStageType(current, stageType) {
   };
 }
 
+function primaryTournamentAction(status) {
+  if (["draft", "scheduled", "registration_open", "registration_closed"].includes(status)) {
+    return { status: "check_in", label: "Check-in starten" };
+  }
+  if (status === "check_in") {
+    return { status: "live", label: "Turnier starten" };
+  }
+  if (status === "paused") {
+    return { status: "live", label: "Fortsetzen" };
+  }
+  return null;
+}
+
 export default function AdminTournamentEditPage() {
   const { isAdmin, isModerator } = useAuth();
   const { id } = useParams();
@@ -191,6 +212,8 @@ export default function AdminTournamentEditPage() {
   const [matchesV2, setMatchesV2] = useState([]);
   const [stations, setStations] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [participantQuery, setParticipantQuery] = useState("");
+  const [participantStatusFilter, setParticipantStatusFilter] = useState("");
   const [participantForm, setParticipantForm] = useState({
     user_id: "",
     team_id: "",
@@ -288,29 +311,6 @@ export default function AdminTournamentEditPage() {
     }
   };
 
-  const generateLegacyBracket = async ({ preview = false, force = false } = {}) => {
-    try {
-      const params = new URLSearchParams();
-      if (preview) params.set("preview", "true");
-      if (force) params.set("force", "true");
-      const suffix = params.toString() ? `?${params.toString()}` : "";
-      const { data } = await api.post(`/tournaments/${id}/generate-bracket${suffix}`);
-      toast.success(data.preview ? `Vorschau mit ${data.match_count} Spielen generiert.` : `Turnierbaum mit ${data.match_count} Spielen generiert.`);
-      if (!data.preview) await autoAssignStations({ silent: true, reload: false });
-      load();
-    } catch (e) {
-      if (e.response?.status === 409 && !force) {
-        const ok = await confirm({
-          title: "Turnierbaum neu generieren?",
-          description: "Vorhandene echte Spiele werden ersetzt. Eine reine Vorschau kann direkt überschrieben werden.",
-          confirmLabel: "Neu generieren",
-          tone: "danger",
-        });
-        if (ok) return generateLegacyBracket({ preview, force: true });
-      }
-      toast.error(formatApiError(e.response?.data?.detail));
-    }
-  };
   const reset = async () => {
     if (!await confirm({
       title: "Turnierbaum zurücksetzen?",
@@ -476,7 +476,7 @@ export default function AdminTournamentEditPage() {
         }
       }
       const { data } = await api.post(`/tournaments/${id}/status`, { status });
-      if (status === "check_in" && data?.auto_generated_bracket && data.auto_generated_bracket.ok !== false) {
+      if (["check_in", "live"].includes(status) && data?.auto_generated_bracket && data.auto_generated_bracket.ok !== false) {
         await autoAssignStations({ silent: true, reload: false });
       }
       toast.success(`Status: ${TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status}`);
@@ -490,7 +490,7 @@ export default function AdminTournamentEditPage() {
       title: locked ? "Turnier sperren?" : "Turnier entsperren?",
       description: locked
         ? "Danach sind Ergebnisse, Teilnehmer, Spielzeiten und Stationen nur noch lesbar. Löschen bleibt möglich."
-        : "Danach kann die Turnierleitung wieder Aenderungen vornehmen.",
+        : "Danach kann die Turnierleitung wieder Änderungen vornehmen.",
       confirmLabel: locked ? "Sperren" : "Entsperren",
       tone: locked ? "danger" : "info",
     });
@@ -596,6 +596,35 @@ export default function AdminTournamentEditPage() {
   if (!t) return <AdminLayout><div className="p-10 text-white/40">Lade…</div></AdminLayout>;
   const hasFlexibleStructure = stages.length > 0 || matchesV2.length > 0;
   const canRecordResults = ["live", "paused"].includes(t.status);
+  const availableTabs = [
+    ["participants", "Teilnehmer"],
+    ["bracket", "Turnierbaum"],
+    ["stages", "Matchplan"],
+    ...(t.format === "groups" ? [["groups", "Gruppen"]] : []),
+    ...(isAdmin ? [["staff", "Team"]] : []),
+    ["edit", "Bearbeiten"],
+  ];
+  const activeTab = availableTabs.some(([key]) => key === tab) ? tab : "participants";
+  const registrationCounts = regs.reduce((acc, registration) => {
+    const key = registration.status || "pending";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const participantSearch = normalizeSearch(participantQuery);
+  const filteredRegistrations = regs.filter((registration) => {
+    if (participantStatusFilter && registration.status !== participantStatusFilter) return false;
+    if (!participantSearch) return true;
+    const haystack = normalizeSearch([
+      registration.display_name,
+      registration.ingame_name,
+      registration.discord,
+      registration.user?.display_name,
+      registration.user?.email,
+      registration.team?.name,
+    ].filter(Boolean).join(" "));
+    return haystack.includes(participantSearch);
+  });
+  const primaryAction = primaryTournamentAction(t.status);
 
   return (
     <AdminLayout>
@@ -611,6 +640,16 @@ export default function AdminTournamentEditPage() {
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
+          {isAdmin && primaryAction && (
+            <button
+              type="button"
+              onClick={() => setTournStatus(primaryAction.status)}
+              data-testid="admin-tr-primary-action"
+              className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2"
+            >
+              <Zap className="w-3.5 h-3.5" /> {primaryAction.label}
+            </button>
+          )}
           {isAdmin && (
             <div>
               <select value={t.status} onChange={(e) => setTournStatus(e.target.value)} data-testid="admin-tr-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
@@ -629,12 +668,6 @@ export default function AdminTournamentEditPage() {
               {t.locked_at ? "Entsperren" : "Sperren"}
             </button>
           )}
-          {isModerator && <button onClick={() => rebuildFromFormat({ preview: true })} data-testid="admin-tr-preview" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
-            <Eye className="w-3.5 h-3.5" /> Vorschau
-          </button>}
-          {isModerator && <button onClick={() => rebuildFromFormat({ preview: false })} data-testid="admin-tr-generate" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2">
-            <Zap className="w-3.5 h-3.5" /> Turnierbaum generieren
-          </button>}
           {isModerator && stations.length > 0 && <button onClick={() => autoAssignStations()} data-testid="admin-tr-auto-stations" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
             <Zap className="w-3.5 h-3.5" /> Stationen automatisch
           </button>}
@@ -653,6 +686,7 @@ export default function AdminTournamentEditPage() {
           <div className="grid grid-cols-2 sm:flex gap-1 w-full sm:w-auto">
             <a href={`${API}/exports/tournaments/${t.id}/participants.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">PDF Teilnehmer</a>
             <a href={`${API}/exports/tournaments/${t.id}/checkin.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">PDF Check-in</a>
+            <a href={`${API}/exports/tournaments/${t.id}/registration-qr.pdf`} className="px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] text-xs uppercase font-bold rounded-sm hover:bg-[#FFD700]/10 text-center" target="_blank" rel="noreferrer">PDF Anmeldung QR</a>
             <a href={`${API}/exports/tournaments/${t.id}/matches.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">PDF Spiele</a>
             {isModerator && <a href={`${API}/tournaments/${t.id}/match-plan.csv`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">CSV Matchplan</a>}
           </div>
@@ -662,19 +696,19 @@ export default function AdminTournamentEditPage() {
       {isAdmin && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister /></div>}
 
       <div className="flex gap-2 mb-5 border-b border-white/10 overflow-x-auto">
-        {["participants", "bracket", "stages", ...(t.format === "groups" ? ["groups"] : []), ...(isAdmin ? ["staff"] : []), "edit"].map((s) => (
+        {availableTabs.map(([s, label]) => (
           <button
             key={s}
             data-testid={`admin-tr-tab-${s}`}
             onClick={() => selectTab(s)}
-            className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${tab === s ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}
+            className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${activeTab === s ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}
           >
-            {s === "participants" ? "Teilnehmer" : s === "bracket" ? "Turnierbaum" : s === "stages" ? "Matchplan" : s === "groups" ? "Gruppen" : s === "staff" ? "Team" : "Bearbeiten"}
+            {label}
           </button>
         ))}
       </div>
 
-      {tab === "participants" && (
+      {activeTab === "participants" && (
         <div className="space-y-4">
         {isModerator && (
           <ParticipantAddForm
@@ -687,9 +721,35 @@ export default function AdminTournamentEditPage() {
             onSubmit={addParticipant}
           />
         )}
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem_auto]">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+            <input
+              value={participantQuery}
+              onChange={(event) => setParticipantQuery(event.target.value)}
+              data-testid="admin-reg-search"
+              className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/35 focus:border-[#29B6E8]/60 focus:outline-none"
+              placeholder="Name, Discord, E-Mail oder Team suchen"
+            />
+          </label>
+          <select
+            value={participantStatusFilter}
+            onChange={(event) => setParticipantStatusFilter(event.target.value)}
+            data-testid="admin-reg-status-filter"
+            className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5 text-sm text-white focus:border-[#29B6E8]/60 focus:outline-none"
+          >
+            <option value="">Alle Status ({regs.length})</option>
+            {REGISTRATION_STATUS_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>{label} ({registrationCounts[value] || 0})</option>
+            ))}
+          </select>
+          <div className="flex items-center justify-end rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/55">
+            {filteredRegistrations.length} / {regs.length} sichtbar
+          </div>
+        </div>
         <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <div className="md:hidden divide-y divide-white/5">
-            {regs.map((r, i) => (
+            {filteredRegistrations.map((r, i) => (
               <div key={r.id} className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -720,7 +780,7 @@ export default function AdminTournamentEditPage() {
                 </div>
               </div>
             ))}
-            {regs.length === 0 && <div className="text-center py-10 text-white/40">Keine Anmeldungen</div>}
+            {filteredRegistrations.length === 0 && <div className="text-center py-10 text-white/40">{regs.length === 0 ? "Keine Anmeldungen" : "Keine Anmeldungen für diesen Filter"}</div>}
           </div>
           <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
@@ -734,7 +794,7 @@ export default function AdminTournamentEditPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {regs.map((r, i) => (
+              {filteredRegistrations.map((r, i) => (
                 <tr key={r.id}>
                   <td className="px-4 py-3 text-white/50">{i + 1}</td>
                   <td className="px-4 py-3">{r.display_name || r.user?.display_name || r.ingame_name}</td>
@@ -763,7 +823,7 @@ export default function AdminTournamentEditPage() {
                   </td>
                 </tr>
               ))}
-              {regs.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-white/40">Keine Anmeldungen</td></tr>}
+              {filteredRegistrations.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-white/40">{regs.length === 0 ? "Keine Anmeldungen" : "Keine Anmeldungen für diesen Filter"}</td></tr>}
             </tbody>
           </table>
           </div>
@@ -771,7 +831,7 @@ export default function AdminTournamentEditPage() {
         </div>
       )}
 
-      {tab === "bracket" && bracket && (
+      {activeTab === "bracket" && bracket && (
         <div className="bg-[#0A0A0A] rounded-sm p-4 border border-white/10">
           {(bracket.matches?.length || 0) + (bracket.matches_v2?.length || 0) === 0 ? (
             <div className="text-center py-16 text-white/40 font-display tracking-widest">TURNIERBAUM NICHT GENERIERT</div>
@@ -781,7 +841,7 @@ export default function AdminTournamentEditPage() {
         </div>
       )}
 
-      {tab === "stages" && !hasFlexibleStructure && bracket?.matches && (
+      {activeTab === "stages" && !hasFlexibleStructure && bracket?.matches && (
         <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <div className="lg:hidden divide-y divide-white/5">
             {bracket.matches.map((m) => {
@@ -858,7 +918,7 @@ export default function AdminTournamentEditPage() {
           </div>
         </div>
       )}
-      {tab === "stages" && hasFlexibleStructure && (
+      {activeTab === "stages" && hasFlexibleStructure && (
         <TournamentStagesPanel
           tournamentId={t.id}
           stages={stages}
@@ -874,7 +934,7 @@ export default function AdminTournamentEditPage() {
           canRecordResults={canRecordResults}
         />
       )}
-      {tab === "edit" && (
+      {activeTab === "edit" && (
         <TournamentEditForm
           key={t.updated_at || t.id}
           tournament={t}
@@ -883,10 +943,10 @@ export default function AdminTournamentEditPage() {
           onRebuildFromFormat={rebuildFromFormat}
         />
       )}
-      {tab === "staff" && isAdmin && (
+      {activeTab === "staff" && isAdmin && (
         <TournamentStaffPanel tournamentId={t.id} staff={staff} users={users} onChanged={load} />
       )}
-      {tab === "groups" && (
+      {activeTab === "groups" && (
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {groups.map((g) => (
             <div key={g.id} className="border border-white/10 rounded-sm bg-[#121212] p-4">
@@ -1033,7 +1093,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spieltyp</div>
                 <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{formatMatchType(form.match_type)}</div>
               </div>
-              {config.showMatchSize && <Fld label="Spielgroesse" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />}
+              {config.showMatchSize && <Fld label="Spielgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />}
               {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId="stage-new-min" />}
               {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId="stage-new-qualifiers" />}
               <Fld label="Spieldauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId="stage-new-duration" />
@@ -1041,7 +1101,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
               <SelectField label="Ergebniserfassung" value={form.result_entry_mode} onChange={(v)=>set("result_entry_mode", v)} options={[["", "Vom Turnier erben"], ...RESULT_ENTRY_MODE_OPTIONS.filter(([value]) => value)]} />
               <SelectField label="Terminplanung" value={form.schedule_mode} onChange={(v)=>set("schedule_mode", v)} options={[["", "Vom Turnier erben"], ...SCHEDULE_MODE_OPTIONS.filter(([value]) => value)]} />
               <div className="md:col-span-3 text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-                Leer lassen, wenn diese Phase die Turnier-Regeln nutzt. Overrides sind sinnvoll, wenn z.B. Gruppen online gespielt werden, das Finale aber vor Ort mit Staff-Erfassung laeuft.
+                Leer lassen, wenn diese Phase die Turnier-Regeln nutzt. Overrides sind sinnvoll, wenn z.B. Gruppen online gespielt werden, das Finale aber vor Ort mit Staff-Erfassung läuft.
               </div>
               {config.showSchema ? (
                 <label className="md:col-span-3 block">
@@ -1242,7 +1302,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spieltyp</div>
                 <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{formatMatchType(form.match_type)}</div>
               </div>
-              {config.showMatchSize && <Fld label="Spielgroesse" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId={`stage-size-${stage.id}`} />}
+              {config.showMatchSize && <Fld label="Spielgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId={`stage-size-${stage.id}`} />}
               {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId={`stage-min-${stage.id}`} />}
               {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId={`stage-qualifiers-${stage.id}`} />}
               <Fld label="Spieldauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId={`stage-duration-${stage.id}`} />
@@ -1563,6 +1623,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     is_public: source.is_public !== false,
     visibility: source.visibility || "public",
     site_banner_enabled: !!source.site_banner_enabled,
+    auto_start_enabled: !!source.auto_start_enabled,
     event_mode: source.event_mode || "online",
     result_entry_mode: source.result_entry_mode || "",
     schedule_mode: source.schedule_mode || "",
@@ -1613,6 +1674,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     is_public: tournament.is_public !== false,
     visibility: tournament.visibility || "public",
     site_banner_enabled: !!tournament.site_banner_enabled,
+    auto_start_enabled: !!tournament.auto_start_enabled,
     event_mode: tournament.event_mode || "online",
     result_entry_mode: tournament.result_entry_mode || "",
     schedule_mode: tournament.schedule_mode || "",
@@ -1652,6 +1714,30 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
       return { ...current, stage_type: "single_elimination", match_type: "duel", match_size: 2, min_players: 2, qualifiers_per_match: 1 };
     });
   };
+  const normalizeTournamentPayload = (source) => {
+    const payload = { ...source };
+    if (!payload.event_id) payload.event_id = null;
+    if (!payload.stream_platform) payload.stream_platform = null;
+    if (!payload.result_entry_mode) payload.result_entry_mode = null;
+    if (!payload.schedule_mode) payload.schedule_mode = null;
+    payload.format_label = (payload.format_label || "").trim() || null;
+    if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
+    normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
+    ["team_size", "max_participants", "min_participants", "best_of", "match_duration_minutes"].forEach((key) => {
+      if (payload[key] !== "" && payload[key] != null) payload[key] = Number(payload[key]);
+    });
+    payload.season_weight = Number(payload.season_weight || 0);
+    payload.prize_places = (payload.prize_places || [])
+      .filter((p) => p.value && String(p.value).trim())
+      .map((p) => ({
+        group: p.group || "overall",
+        place: p.place === "last" ? "last" : Number(p.place) || 0,
+        label: p.label || (p.place === "last" ? "Letzter Platz" : `Platz ${p.place}`),
+        value: p.value,
+      }));
+    if (payload.prize_places.length === 0) payload.prize_places = null;
+    return payload;
+  };
   const structurePayload = () => ({
     name: "Turnierbaum",
     stage_type: structure.stage_type,
@@ -1671,34 +1757,11 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     team_mode: value,
     team_size: value === "solo" ? 1 : Math.max(2, Number(current.team_size) || 2),
   }));
+  const dirtyPayload = buildDirtyPayload(normalizeTournamentPayload(f), normalizeTournamentPayload(formFromTournament()));
+  const hasFormChanges = hasPayloadChanges(dirtyPayload);
   const save = async ({ rebuildPreview = false } = {}) => {
     try {
-      const normalizeTournamentPayload = (source) => {
-        const payload = { ...source };
-        if (!payload.event_id) payload.event_id = null;
-        if (!payload.stream_platform) payload.stream_platform = null;
-        if (!payload.result_entry_mode) payload.result_entry_mode = null;
-        if (!payload.schedule_mode) payload.schedule_mode = null;
-        payload.format_label = (payload.format_label || "").trim() || null;
-        if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
-        normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
-        ["team_size", "max_participants", "min_participants", "best_of", "match_duration_minutes"].forEach((key) => {
-          if (payload[key] !== "" && payload[key] != null) payload[key] = Number(payload[key]);
-        });
-        payload.season_weight = Number(payload.season_weight || 0);
-        payload.prize_places = (payload.prize_places || [])
-          .filter((p) => p.value && String(p.value).trim())
-          .map((p) => ({
-            group: p.group || "overall",
-            place: p.place === "last" ? "last" : Number(p.place) || 0,
-            label: p.label || (p.place === "last" ? "Letzter Platz" : `Platz ${p.place}`),
-            value: p.value,
-          }));
-        if (payload.prize_places.length === 0) payload.prize_places = null;
-        return payload;
-      };
-      const payload = normalizeTournamentPayload(f);
-      const patch = buildDirtyPayload(payload, normalizeTournamentPayload(formFromTournament()));
+      const patch = dirtyPayload;
       if (!hasPayloadChanges(patch)) {
         if (rebuildPreview) {
           await onRebuildFromFormat?.({ preview: true, force: true, structure: structurePayload() });
@@ -1715,6 +1778,16 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
         onSaved();
       }
     } catch (e) { toast.error(formatRequestError(e, "Turnier konnte nicht gespeichert werden.", { title: f.title })); }
+  };
+  const createPrizePickups = async () => {
+    try {
+      const { data } = await api.post(`/prizes/auto-create/${tournament.id}`);
+      const created = Number(data?.created || 0);
+      toast.success(created === 1 ? "1 Gewinn angelegt." : `${created} Gewinne angelegt.`);
+      onSaved();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Gewinne konnten nicht erzeugt werden.");
+    }
   };
   return (
     <div className="max-w-4xl space-y-5">
@@ -1753,12 +1826,13 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
         </div>
         <RulePresetPicker form={f} onApply={applyRulePreset} />
         <div className="border border-white/10 bg-black/20 rounded-sm p-3 text-xs text-white/55">
-          Vor-Ort-Turniere werden standardmaessig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmaessig Ergebnisberichte beider Parteien und Terminvorschlaege.
+          Vor-Ort-Turniere werden standardmäßig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmäßig Ergebnisberichte beider Parteien und Terminvorschläge.
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.registration_enabled} onChange={(e)=>set("registration_enabled",e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Öffentliche Anmeldung erlauben</span></label>
           <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.is_invite_only} onChange={(e)=>set("is_invite_only",e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Nur Einladung/manuelle Teilnehmer</span></label>
           <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.site_banner_enabled} onChange={(e)=>set("site_banner_enabled",e.target.checked)} className="accent-[#FFD700] mt-1"/><span>Automatisches Turnier-Hinweisbanner anzeigen</span></label>
+          <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.auto_start_enabled} onChange={(e)=>set("auto_start_enabled",e.target.checked)} data-testid="tr-edit-auto-start" className="accent-[#29B6E8] mt-1"/><span>Start-/Endzeit darf Turnier automatisch live/beendet schalten</span></label>
           <label className="flex items-start gap-2 text-sm text-white/75 sm:col-span-2"><input type="checkbox" checked={f.block_club_member_registration} onChange={(e)=>set("block_club_member_registration",e.target.checked)} className="accent-[#FFD700] mt-1"/><span>Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten</span></label>
         </div>
       </div>
@@ -1791,7 +1865,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
             <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Freier Turnierbaum</div>
             <div className="grid md:grid-cols-3 gap-3">
-              {f.format === "ffa_custom_bracket" && <Fld label="Spielgroesse" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size" />}
+              {f.format === "ffa_custom_bracket" && <Fld label="Spielgröße" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size" />}
               {f.format === "ffa_custom_bracket" && <Fld label="Qualifizierte" type="number" value={structure.qualifiers_per_match} onChange={(v)=>setStructureField("qualifiers_per_match", v)} testId="tr-edit-stage-qualifiers" />}
             </div>
             <label className="block">
@@ -1804,6 +1878,21 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
       <Details title="Preise">
         <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} />
         <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
+        <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-white/55">
+            Nach veröffentlichten Ergebnissen erzeugt dieser Button konkrete Einträge für die Gewinnabholung.
+          </p>
+          <button
+            type="button"
+            onClick={createPrizePickups}
+            disabled={!((f.prize_places || []).length)}
+            data-testid="tr-edit-create-prizes"
+            className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Gewinne erzeugen
+          </button>
+        </div>
       </Details>
       <Details title="Streaming und externe Links">
         <div className="text-[11px] font-bold uppercase tracking-widest text-[#9146FF]">Streaming & Verweise</div>
@@ -1822,6 +1911,11 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.show_chat} onChange={(e)=>set("show_chat",e.target.checked)} className="accent-[#9146FF]"/><span>Chat anzeigen</span></label>
         </div>
       </Details>
+      {hasFormChanges && (
+        <div className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-4 py-3 text-sm text-[#FFD700]" data-testid="tr-edit-unsaved">
+          Ungespeicherte Änderungen im Turnierformular.
+        </div>
+      )}
       <div className="flex flex-wrap gap-3">
         <button onClick={() => save()} data-testid="tr-edit-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
         <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-save-rebuild" className="px-5 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10">

@@ -1,6 +1,6 @@
 """News, Sponsors & Gallery routes — Vereins-CMS Phase 3."""
 import re
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import RedirectResponse
 from typing import Optional
 from datetime import datetime, timezone
@@ -81,6 +81,44 @@ def _parse_dt(value):
 def _published_now(post: dict) -> bool:
     published_at = _parse_dt(post.get("published_at"))
     return not published_at or published_at <= now_utc()
+
+
+def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
+    safe_limit = max(1, min(int(limit or 48), 200))
+    safe_offset = max(0, int(offset or 0))
+    page = items[safe_offset:safe_offset + safe_limit]
+    if not paged:
+        return page
+    return {"items": page, "total": len(items), "limit": safe_limit, "offset": safe_offset}
+
+
+def _compact_news(post: dict) -> dict:
+    return {
+        "id": post.get("id"),
+        "title": post.get("title"),
+        "slug": post.get("slug"),
+        "excerpt": post.get("excerpt"),
+        "banner_url": post.get("banner_url"),
+        "category": post.get("category"),
+        "visibility": post.get("visibility"),
+        "pinned": bool(post.get("pinned")),
+        "published_at": post.get("published_at"),
+        "created_at": post.get("created_at"),
+    }
+
+
+def _compact_album(album: dict) -> dict:
+    return {
+        "id": album.get("id"),
+        "title": album.get("title"),
+        "slug": album.get("slug"),
+        "description": album.get("description"),
+        "cover_url": album.get("cover_url"),
+        "taken_at": album.get("taken_at"),
+        "visibility": album.get("visibility"),
+        "event_id": album.get("event_id"),
+        "photo_count": album.get("photo_count", 0),
+    }
 
 
 async def _mentioned_user_ids_from_content(content: str | None, explicit_ids: list[str] | None = None) -> list[str]:
@@ -169,8 +207,13 @@ async def _notify_news_mentions(db, post: dict, actor: dict) -> None:
 @router.get("/news")
 async def list_news(
     category: Optional[str] = None,
+    search: Optional[str] = Query(default=None, alias="q"),
     pinned_only: bool = False,
     sort: Optional[str] = None,
+    compact: bool = False,
+    limit: int = 48,
+    offset: int = 0,
+    paged: bool = False,
     user: dict | None = Depends(get_optional_user),
 ):
     db = get_db()
@@ -178,9 +221,21 @@ async def list_news(
     q: dict = {} if is_admin else {"published": True}
     if category:
         q["category"] = category
+    search_term = (search or "").strip()
+    if search_term:
+        rx = {"$regex": re.escape(search_term), "$options": "i"}
+        q["$or"] = [{"title": rx}, {"excerpt": rx}, {"content": rx}, {"category": rx}]
     if pinned_only:
         q["pinned"] = True
-    posts = await db.news_posts.find(q, {"_id": 0}).sort([("published_at", -1), ("created_at", -1)]).to_list(200)
+    projection = {"_id": 0}
+    if compact:
+        projection = {
+            "_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1,
+            "category": 1, "visibility": 1, "pinned": 1, "published": 1,
+            "published_at": 1, "created_at": 1,
+        }
+    fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))
+    posts = await db.news_posts.find(q, projection).sort([("published_at", -1), ("created_at", -1)]).to_list(fetch_limit)
     if not is_admin:
         posts = [p for p in posts if _published_now(p)]
     posts = await _filter_visible(posts, user)
@@ -194,6 +249,9 @@ async def list_news(
             key=lambda p: (bool(p.get("pinned")), _parse_dt(p.get("published_at") or p.get("created_at")) or datetime.min.replace(tzinfo=timezone.utc)),
             reverse=True,
         )
+    if compact:
+        posts = [_compact_news(p) for p in posts]
+        return _page_items(posts, limit, offset, paged)
     return posts
 
 
@@ -987,17 +1045,30 @@ async def delete_reference(rid: str, me: dict = Depends(require_admin())):
 @router.get("/gallery")
 async def list_albums(
     event_id: Optional[str] = None,
+    compact: bool = False,
+    limit: int = 48,
+    offset: int = 0,
+    paged: bool = False,
     user: dict | None = Depends(get_optional_user),
 ):
     db = get_db()
     q: dict = {"published": True}
     if event_id:
         q["event_id"] = event_id
-    albums = await db.gallery_albums.find(q, {"_id": 0}).sort([("order_index", 1), ("taken_at", -1)]).to_list(500)
+    projection = {"_id": 0}
+    if compact:
+        projection = {
+            "_id": 0, "id": 1, "title": 1, "slug": 1, "description": 1,
+            "cover_url": 1, "taken_at": 1, "visibility": 1, "event_id": 1,
+        }
+    albums = await db.gallery_albums.find(q, projection).sort([("order_index", 1), ("taken_at", -1)]).to_list(500)
     visible = await _filter_visible(albums, user)
     # attach photo count
     for a in visible:
         a["photo_count"] = await db.gallery_photos.count_documents({"album_id": a["id"]})
+    if compact:
+        visible = [_compact_album(a) for a in visible]
+        return _page_items(visible, limit, offset, paged)
     return visible
 
 

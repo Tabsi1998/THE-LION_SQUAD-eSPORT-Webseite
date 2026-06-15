@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Crown, Gamepad2, Server, Shield, Users } from "lucide-react";
+import { ArrowRight, Crown, Gamepad2, Medal, Server, Shield, Trophy, Users } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { api, resolveMediaUrl } from "@/lib/api";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 function memberGamertag(member) {
   return member.gamertag || member.linked_account?.username || member.display_name;
@@ -14,6 +15,11 @@ function memberRealName(member) {
 }
 
 export default function CommunityPage() {
+  useDocumentTitle(
+    "Gaming Community",
+    "Community, Teams, Spielerprofile und Vereinsmitglieder von THE LION SQUAD eSports aus Tirol."
+  );
+
   const [players, setPlayers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [clubMembers, setClubMembers] = useState([]);
@@ -24,8 +30,8 @@ export default function CommunityPage() {
   useEffect(() => {
     setLoading(true);
     Promise.allSettled([
-      api.get("/users/public-list"),
-      api.get("/teams"),
+      api.get("/users/public-list?limit=24"),
+      api.get("/teams?limit=24"),
       api.get("/membership/profiles"),
       api.get("/game-servers"),
     ]).then(([u, t, m, s]) => {
@@ -64,6 +70,8 @@ export default function CommunityPage() {
             </div>
           ))}
         </div>
+
+        <CommunityPaths />
 
         <div className="mt-10 grid md:grid-cols-2 xl:grid-cols-4 gap-6">
           <CommunityBlock
@@ -124,6 +132,44 @@ export default function CommunityPage() {
         </div>
       </section>
     </PublicLayout>
+  );
+}
+
+function CommunityPaths() {
+  const paths = [
+    { to: "/players", label: "Spieler", text: "Profile, Level und sichtbare Achievement-Signale.", icon: Users, color: "#29B6E8" },
+    { to: "/teams", label: "Teams", text: "Squads, Clans und gemeinsame Teamseiten.", icon: Shield, color: "#00FF88" },
+    { to: "/servers", label: "Server", text: "Aktive Community- und Vereinsserver.", icon: Server, color: "#9F7AEA" },
+    { to: "/members", label: "Mitglieder", text: "Offizielle Vereinsprofile und Rollen.", icon: Crown, color: "#FFD700" },
+    { to: "/references", label: "Referenzen", text: "Turnier-, Event- und Community-Historie.", icon: Trophy, color: "#FFD700" },
+    { to: "/players", label: "Achievements", text: "Erfolge erscheinen direkt an den Spielerprofilen.", icon: Medal, color: "#29B6E8" },
+  ];
+  return (
+    <section className="mt-10 rounded-sm border border-white/10 bg-[#0D0D0D] p-4 md:p-5">
+      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Community-Welt</div>
+          <h2 className="mt-2 font-heading text-2xl font-black uppercase">Alles verbunden</h2>
+        </div>
+        <p className="max-w-xl text-sm text-white/55">
+          Profile, Teams, Server, Referenzen und Achievements greifen ineinander, damit Besucher schneller verstehen, was in der TLS-Community passiert.
+        </p>
+      </div>
+      <div className="mt-5 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {paths.map(({ to, label, text, icon: Icon, color }) => (
+          <Link key={label} to={to} className="group flex min-w-0 items-center gap-3 rounded-sm border border-white/10 bg-black/20 p-3 transition hover:border-white/25 hover:bg-white/[0.04]">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-white/10 bg-[#121212]">
+              <Icon className="h-4 w-4" style={{ color }} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-heading font-bold uppercase leading-tight group-hover:text-[#29B6E8]">{label}</span>
+              <span className="mt-1 block text-xs text-white/45 line-clamp-2">{text}</span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-white/25 transition group-hover:text-[#29B6E8]" />
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 

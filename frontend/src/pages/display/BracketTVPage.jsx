@@ -6,7 +6,7 @@ import { MascotBadge } from "@/components/tls/Logo";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { SponsorGrid } from "@/components/tls/SponsorTicker";
 import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
-import { QRCodeSVG } from "qrcode.react";
+import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
 import { formatDateTime } from "@/lib/datetime";
 import {
   formatBracketSection,
@@ -17,9 +17,9 @@ import {
 } from "@/lib/tournamentLabels";
 
 const MAX_COLUMNS_PER_VIEW = 4;
-const MAX_DUEL_MATCHES_PER_COLUMN = 8;
-const MAX_HEAT_MATCHES_PER_COLUMN = 5;
-const MAX_LARGE_HEAT_MATCHES_PER_COLUMN = 3;
+const MAX_DUEL_MATCHES_PER_COLUMN = 6;
+const MAX_HEAT_MATCHES_PER_COLUMN = 4;
+const MAX_LARGE_HEAT_MATCHES_PER_COLUMN = 2;
 const DONE_STATUSES = new Set(["completed", "archived", "forfeit", "bye", "cancelled"]);
 
 export default function BracketTVPage() {
@@ -88,7 +88,7 @@ export default function BracketTVPage() {
           <div className="hidden lg:flex items-center gap-1 border border-white/10 bg-[#0A0A0A]/80 rounded-sm p-1">
             {[
               ["active", "Aktuell"],
-              ["upcoming", "Naechste"],
+              ["upcoming", "Nächste"],
               ["tree", "Baum"],
             ].map(([mode, label]) => (
               <button
@@ -106,7 +106,7 @@ export default function BracketTVPage() {
       </header>
       <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label="Turnierbaum" onRetry={load} compact />
 
-      <main className="flex-1 min-h-0 p-4 overflow-hidden">
+      <main className="flex-1 min-h-0 p-3 lg:p-4 overflow-hidden">
         {!hasMatches ? (
           <div className="h-full border border-white/10 bg-[#0A0A0A]/75 rounded-sm flex items-center justify-center text-white/45 font-display uppercase tracking-[0.25em]">
             Turnierbaum wurde noch nicht generiert
@@ -116,10 +116,10 @@ export default function BracketTVPage() {
         )}
       </main>
 
-      <footer className="shrink-0 px-8 py-3 border-t border-white/10 flex items-center justify-between gap-4 bg-[#0A0A0A]/90 backdrop-blur-sm z-10">
-        <div className="flex items-center gap-4 min-w-0">
+      <footer className="shrink-0 px-5 lg:px-8 py-2.5 border-t border-white/10 flex items-center justify-between gap-4 bg-[#0A0A0A]/90 backdrop-blur-sm z-10">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="bg-white p-1.5 rounded-sm shrink-0">
-            <QRCodeSVG value={publicUrl} size={92} bgColor="#ffffff" fgColor="#0A0A0A" />
+            <BrandedQRCode value={publicUrl} size={82} />
           </div>
           <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">Jetzt mitfiebern</div>
@@ -156,7 +156,7 @@ function TvMatchBoard({ view }) {
   }
 
   return (
-    <div className="h-full grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+    <div className="h-full grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2.5 2xl:gap-3">
       {(view.columns || []).map((column) => (
         <RoundColumn key={column.key} column={column} regMap={regMap} />
       ))}
@@ -174,13 +174,13 @@ function RoundColumn({ column, regMap }) {
       <div className="shrink-0 px-3 py-2 border-b border-white/10 bg-white/[0.03] flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[10px] uppercase tracking-[0.22em] text-[#29B6E8] font-bold truncate">{column.sectionLabel}</div>
-          <h2 className="font-heading text-xl font-black uppercase leading-none truncate">{column.roundLabel}</h2>
+          <h2 className="font-heading text-lg 2xl:text-xl font-black uppercase leading-none truncate">{column.roundLabel}</h2>
         </div>
         <div className={`shrink-0 border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${column.isFallback ? "border-[#FFD600]/50 text-[#FFD600]" : "border-white/15 text-white/55"}`}>
           {column.isFallback ? "Fertig" : progress}
         </div>
       </div>
-      <div className="flex-1 min-h-0 p-2.5 grid content-start gap-2 overflow-hidden">
+      <div className="flex-1 min-h-0 p-2 grid content-start gap-1.5 2xl:gap-2 overflow-hidden">
         {shown.map((match) => (
           <TvMatchCard key={match.id} match={match} regMap={regMap} />
         ))}
@@ -255,9 +255,9 @@ function ParticipantRow({ participant, result, score, isWinner, position, side }
       <div className="flex items-center gap-2 min-w-0">
         <div className="relative shrink-0">
           {avatar ? (
-            <img src={avatar} alt="" className="w-8 h-8 rounded-sm object-cover border border-white/10 bg-white/5" />
+            <img src={avatar} alt="" className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-sm object-cover border border-white/10 bg-white/5" />
           ) : (
-            <div className="w-8 h-8 rounded-sm border border-white/10 bg-white/5 flex items-center justify-center text-[11px] font-bold text-white/60">
+            <div className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-sm border border-white/10 bg-white/5 flex items-center justify-center text-[11px] font-bold text-white/60">
               {initial}
             </div>
           )}
@@ -266,7 +266,7 @@ function ParticipantRow({ participant, result, score, isWinner, position, side }
           </span>
         </div>
         <div className="min-w-0">
-          <div className={`truncate text-sm leading-tight ${isWinner || result?.qualified ? "text-[#29B6E8] font-semibold" : "text-white/84"}`}>{label}</div>
+          <div className={`truncate text-xs 2xl:text-sm leading-tight ${isWinner || result?.qualified ? "text-[#29B6E8] font-semibold" : "text-white/84"}`}>{label}</div>
           {subtitle && <div className="truncate text-[10px] uppercase tracking-wider text-white/35">{subtitle}</div>}
         </div>
       </div>
@@ -448,7 +448,7 @@ function buildUpcomingViews(data, registrations) {
         || ((a.order ?? a.match_index ?? 0) - (b.order ?? b.match_index ?? 0));
     });
   if (!matches.length) {
-    return [{ key: "tv-upcoming-empty", title: "Naechste Spiele", columns: [], registrations }];
+    return [{ key: "tv-upcoming-empty", title: "Nächste Spiele", columns: [], registrations }];
   }
   const matchChunks = chunk(matches, MAX_DUEL_MATCHES_PER_COLUMN);
   const columns = matchChunks.map((items, index) => makeColumn({
@@ -457,13 +457,13 @@ function buildUpcomingViews(data, registrations) {
     section: "upcoming",
     round: index + 1,
     sectionLabel: "Matchplan",
-    roundLabel: `Naechste Spiele ${index + 1}`,
+    roundLabel: `Nächste Spiele ${index + 1}`,
     matches: items,
   }));
   const pages = chunk(columns, MAX_COLUMNS_PER_VIEW);
   return pages.map((page, index) => ({
     key: `tv-upcoming-${index}`,
-    title: pages.length > 1 ? `Naechste Spiele - Seite ${index + 1}/${pages.length}` : "Naechste Spiele",
+    title: pages.length > 1 ? `Nächste Spiele - Seite ${index + 1}/${pages.length}` : "Nächste Spiele",
     columns: page,
     registrations,
   }));

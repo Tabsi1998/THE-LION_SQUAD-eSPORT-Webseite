@@ -6,7 +6,7 @@ from urllib.parse import quote, urlencode
 from fastapi import APIRouter, HTTPException, Depends, Response
 from fastapi.responses import RedirectResponse, StreamingResponse
 from database import get_db
-from auth import get_current_user, require_admin, get_optional_user
+from auth import get_current_user, require_admin, require_role, get_optional_user
 from services.visibility import user_can_see
 from services.access_links import public_access_link_payload, touch_access_link, validate_access_link
 from services.public_phase import derive_public_phase
@@ -56,6 +56,41 @@ def _iso(dt):
     return dt
 
 
+def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
+    safe_limit = max(1, min(int(limit or 48), 200))
+    safe_offset = max(0, int(offset or 0))
+    page = items[safe_offset:safe_offset + safe_limit]
+    if not paged:
+        return page
+    return {"items": page, "total": len(items), "limit": safe_limit, "offset": safe_offset}
+
+
+def _compact_challenge(challenge: dict) -> dict:
+    return {
+        "id": challenge.get("id"),
+        "title": challenge.get("title"),
+        "slug": challenge.get("slug"),
+        "description": challenge.get("description"),
+        "banner_url": challenge.get("banner_url"),
+        "status": challenge.get("status"),
+        "visibility": challenge.get("visibility"),
+        "public_phase": challenge.get("public_phase"),
+        "start_date": challenge.get("start_date"),
+        "platform": challenge.get("platform"),
+        "registration_enabled": challenge.get("registration_enabled"),
+        "online_registration_enabled": challenge.get("online_registration_enabled"),
+        "registration_open_from": challenge.get("registration_open_from"),
+        "registration_open_until": challenge.get("registration_open_until"),
+        "is_championship": bool(challenge.get("is_championship")),
+        "block_club_member_results": bool(challenge.get("block_club_member_results")),
+        "allow_club_reference_times": challenge.get("allow_club_reference_times"),
+        "show_club_reference_times": challenge.get("show_club_reference_times"),
+        "club_reference_count": challenge.get("club_reference_count", 0),
+        "track_count": challenge.get("track_count", 0),
+        "participant_count": challenge.get("participant_count", 0),
+    }
+
+
 async def _resolve_cid(slug_or_id: str) -> str:
     db = get_db()
     c, _ = await find_by_slug_or_history(db.f1_challenges, slug_or_id, {"id": 1})
@@ -97,7 +132,7 @@ async def _has_f1_staff_permission(
 async def _require_f1_result_permission(user: dict | None, challenge_id: str) -> None:
     if await _has_f1_staff_permission(user, challenge_id, F1_RESULT_STAFF_ROLES):
         return
-    raise HTTPException(status_code=403, detail="Keine Fast-Lap-Berechtigung fuer diese Aktion")
+    raise HTTPException(status_code=403, detail="Keine Fast-Lap-Berechtigung für diese Aktion")
 
 
 async def _enrich_f1_staff_assignments(assignments: list[dict]) -> list[dict]:
@@ -256,7 +291,15 @@ def _ms_to_time_str(ms: int) -> str:
 
 
 @router.get("/challenges")
-async def list_challenges(status: str | None = None, limit: int = 100, include_drafts: bool = False, user=Depends(get_optional_user)):
+async def list_challenges(
+    status: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    paged: bool = False,
+    compact: bool = False,
+    include_drafts: bool = False,
+    user=Depends(get_optional_user),
+):
     db = get_db()
     is_staff = _is_staff(user)
     q = {}
@@ -267,7 +310,18 @@ async def list_challenges(status: str | None = None, limit: int = 100, include_d
     elif not (include_drafts and is_staff):
         q["status"] = {"$ne": "draft"}
     safe_limit = max(1, min(int(limit or 100), 500))
-    challenges = await db.f1_challenges.find(q, {"_id": 0}).sort("created_at", -1).to_list(safe_limit)
+    projection = {"_id": 0}
+    if compact:
+        projection = {
+            "_id": 0, "id": 1, "title": 1, "slug": 1, "description": 1,
+            "banner_url": 1, "status": 1, "visibility": 1, "start_date": 1,
+            "platform": 1, "registration_enabled": 1, "online_registration_enabled": 1,
+            "registration_open_from": 1, "registration_open_until": 1,
+            "is_championship": 1, "block_club_member_results": 1,
+            "allow_club_reference_times": 1, "show_club_reference_times": 1,
+        }
+    fetch_limit = max(safe_limit, min(safe_limit + max(int(offset or 0), 0) + 80, 500))
+    challenges = await db.f1_challenges.find(q, projection).sort("created_at", -1).to_list(fetch_limit)
     visible = []
     for c in challenges:
         if not await user_can_see(user, c.get("visibility") or "public"):
@@ -277,6 +331,9 @@ async def list_challenges(status: str | None = None, limit: int = 100, include_d
         c["track_count"] = await db.f1_tracks.count_documents({"challenge_id": c["id"]})
         c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", _official_time_query({"challenge_id": c["id"]})))
         visible.append(c)
+    if compact:
+        visible = [_compact_challenge(c) for c in visible]
+        return _page_items(visible, limit, offset, paged)
     return visible
 
 
@@ -334,7 +391,7 @@ async def create_challenge_staff(cid: str, body: dict, me: dict = Depends(requir
     user_id = body.get("user_id")
     role = body.get("role") or "scorekeeper"
     if role not in F1_RESULT_STAFF_ROLES:
-        raise HTTPException(status_code=400, detail="Ungueltige Fast-Lap-Rolle")
+        raise HTTPException(status_code=400, detail="Ungültige Fast-Lap-Rolle")
     if not user_id or not await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1}):
         raise HTTPException(status_code=400, detail="Nutzer nicht gefunden")
     existing = await db.f1_staff_assignments.find_one({
@@ -375,7 +432,7 @@ async def update_challenge_staff(cid: str, assignment_id: str, body: dict, me: d
     if "role" in body:
         role = body.get("role")
         if role not in F1_RESULT_STAFF_ROLES:
-            raise HTTPException(status_code=400, detail="Ungueltige Fast-Lap-Rolle")
+            raise HTTPException(status_code=400, detail="Ungültige Fast-Lap-Rolle")
         updates["role"] = role
     if not updates:
         return current
@@ -479,7 +536,8 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
         except Exception:
             pass
         try:
-            await _notify_f1_prize_winners(c)
+            from services.prize_service import auto_create_for_f1_challenge
+            await auto_create_for_f1_challenge(c["id"])
         except Exception:
             pass
     return c
@@ -577,6 +635,7 @@ async def delete_challenge(cid: str, me: dict = Depends(require_admin())):
     await db.f1_tracks.delete_many({"challenge_id": cid})
     await db.f1_lap_times.delete_many({"challenge_id": cid})
     await db.f1_staff_assignments.delete_many({"challenge_id": cid})
+    await db.prize_pickups.delete_many({"source_type": "fastlap", "fastlap_challenge_id": cid})
     return {"ok": True}
 
 
@@ -745,7 +804,7 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(get_curre
         scope_label = "Referenzzeiten" if score_scope == "club_reference" else "offizielle Zeiten"
         raise HTTPException(
             status_code=400,
-            detail=f"Maximale Anzahl Versuche erreicht ({max_attempts}) fuer {scope_label}.",
+            detail=f"Maximale Anzahl Versuche erreicht ({max_attempts}) für {scope_label}.",
         )
     doc = {
         "id": new_id(),
@@ -888,9 +947,9 @@ async def delete_time(time_id: str, me: dict = Depends(get_current_user)):
 
 
 @router.get("/challenges/{cid}/export.csv")
-async def export_csv(cid: str, track_id: str | None = None, access: str | None = None, user=Depends(get_optional_user)):
+async def export_csv(cid: str, track_id: str | None = None, me: dict = Depends(require_role("moderator"))):
     db = get_db()
-    c = await _get_visible_challenge(cid, user, access=access)
+    c = await _get_visible_challenge(cid, me)
     cid = c["id"]
     output = io.StringIO()
     w = csv.writer(output, delimiter=";")
@@ -899,7 +958,7 @@ async def export_csv(cid: str, track_id: str | None = None, access: str | None =
     if track_id:
         tracks = [t for t in tracks if t["id"] == track_id]
     for tr in tracks:
-        lb = await leaderboard(cid, tr["id"], access, user)
+        lb = await leaderboard(cid, tr["id"], None, me)
         for entry in lb["entries"]:
             w.writerow([
                 entry["rank"], entry["display_name"], "",

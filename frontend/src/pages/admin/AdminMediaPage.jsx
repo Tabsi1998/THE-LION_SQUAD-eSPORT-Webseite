@@ -11,7 +11,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import {
   Image as ImageIcon, FileText, Trash2, Copy, ExternalLink, Search, RefreshCw, Upload,
-  RotateCcw, RotateCw,
+  RotateCcw, RotateCw, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 
 const BACKEND = API_BASE;
@@ -26,6 +26,7 @@ const MEDIA_SCOPE_LABELS = {
   legacy: "Legacy",
   unused: "Ungenutzt",
   untracked: "Ungetrackt",
+  duplicate: "Duplikate",
 };
 
 const fmtBytes = (n) => {
@@ -95,8 +96,9 @@ export default function AdminMediaPage() {
       if (filter === "files" && IMG_EXT.has(it.ext)) return false;
       if (scopeFilter === "unused" && !it.is_unused) return false;
       else if (scopeFilter === "untracked" && it.tracked) return false;
-      else if (!["all", "unused", "untracked"].includes(scopeFilter) && it.media_scope !== scopeFilter) return false;
-      const search = `${it.filename || ""} ${it.original_filename || ""}`.toLowerCase();
+      else if (scopeFilter === "duplicate" && !(it.duplicate_count > 1)) return false;
+      else if (!["all", "unused", "untracked", "duplicate"].includes(scopeFilter) && it.media_scope !== scopeFilter) return false;
+      const search = `${it.filename || ""} ${it.original_filename || ""} ${(it.duplicate_filenames || []).join(" ")}`.toLowerCase();
       if (q && !search.includes(q.toLowerCase())) return false;
       return true;
     });
@@ -106,6 +108,58 @@ export default function AdminMediaPage() {
     () => items.reduce((s, it) => s + (it.size || 0), 0),
     [items],
   );
+
+  const qualityChecks = useMemo(() => {
+    if (!mediaAudit) return [];
+    return [
+      {
+        key: "missing",
+        label: "Kaputte Referenzen",
+        value: mediaAudit.reference_summary?.missing_file || 0,
+        detail: "Bildfelder zeigen auf Dateien, die nicht mehr existieren.",
+        tone: "danger",
+      },
+      {
+        key: "metadata",
+        label: "Defekte Metadaten",
+        value: mediaAudit.metadata_missing_files || 0,
+        detail: "Upload-Metadaten existieren, aber die Datei fehlt.",
+        tone: "danger",
+      },
+      {
+        key: "duplicate",
+        label: "Duplikate",
+        value: mediaAudit.duplicate_files || 0,
+        detail: "Mehrere Dateien haben identische Inhalte.",
+        tone: "warn",
+        filter: "duplicate",
+      },
+      {
+        key: "unused",
+        label: "Ungenutzt",
+        value: mediaAudit.unused || 0,
+        detail: "Dateien ohne erkannte CMS-, Event-, Profil- oder Galerie-Referenz.",
+        tone: "warn",
+        filter: "unused",
+      },
+      {
+        key: "untracked",
+        label: "Ungetrackt",
+        value: mediaAudit.untracked || 0,
+        detail: "Dateien ohne Upload-Metadaten oder klare Zuordnung.",
+        tone: "warn",
+        filter: "untracked",
+      },
+      {
+        key: "legacy",
+        label: "Legacy-Scope",
+        value: mediaAudit.by_scope?.legacy || 0,
+        detail: "Alte Uploads ohne saubere Medienkategorie.",
+        tone: "info",
+        filter: "legacy",
+      },
+    ];
+  }, [mediaAudit]);
 
   const del = async (it) => {
     if (!await confirm({ title: "Datei endgültig löschen?", description: `"${it.filename}" wird aus der Medienbibliothek entfernt. Verknüpfte Bildfelder werden bereinigt.`, confirmLabel: "Löschen" })) return;
@@ -267,22 +321,6 @@ export default function AdminMediaPage() {
         >
           <RefreshCw className="w-3.5 h-3.5" /> Neu laden
         </button>
-        <button
-          onClick={auditScopes}
-          disabled={auditingScopes}
-          data-testid="media-scope-audit"
-          className="px-3 py-2 border border-white/10 hover:border-[#29B6E8]/60 hover:text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
-        >
-          {auditingScopes ? "Prüfe…" : "Scopes prüfen"}
-        </button>
-        <button
-          onClick={repairScopes}
-          disabled={repairingScopes}
-          data-testid="media-scope-repair"
-          className="px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
-        >
-          {repairingScopes ? "Sortiere…" : "Scopes reparieren"}
-        </button>
         <label className={`px-3 py-2 bg-[#FFD700] text-black rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer ${uploading ? "opacity-60" : ""}`} data-testid="media-upload">
           <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Bilder hochladen"}
           <input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={uploading} className="hidden" onChange={(e) => uploadFiles(e.target.files)} />
@@ -293,11 +331,12 @@ export default function AdminMediaPage() {
       </div>
 
       {mediaAudit && (
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
           {[
             ["Dateien", mediaAudit.total || 0, "text-white"],
             ["Ungenutzt", mediaAudit.unused || 0, mediaAudit.unused ? "text-[#FFD700]" : "text-white"],
             ["Ungetrackt", mediaAudit.untracked || 0, mediaAudit.untracked ? "text-[#FFD700]" : "text-white"],
+            ["Duplikate", mediaAudit.duplicate_files || 0, mediaAudit.duplicate_files ? "text-[#FFD700]" : "text-white"],
             ["Defekte Metadaten", mediaAudit.metadata_missing_files || 0, mediaAudit.metadata_missing_files ? "text-[#FF3B30]" : "text-white"],
             ["Fehlende Referenzen", mediaAudit.reference_summary?.missing_file || 0, mediaAudit.reference_summary?.missing_file ? "text-[#FF3B30]" : "text-white"],
           ].map(([label, value, color]) => (
@@ -307,6 +346,7 @@ export default function AdminMediaPage() {
               onClick={() => {
                 if (label === "Ungenutzt") setScopeFilter("unused");
                 if (label === "Ungetrackt") setScopeFilter("untracked");
+                if (label === "Duplikate") setScopeFilter("duplicate");
               }}
               className="border border-white/10 bg-[#121212] rounded-sm p-3 text-left hover:border-white/25"
             >
@@ -318,18 +358,85 @@ export default function AdminMediaPage() {
       )}
 
       {mediaAudit?.by_scope && (
-        <div className="mt-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-widest font-bold text-white/50">
-          {Object.entries(mediaAudit.by_scope).map(([scope, count]) => (
+        <details className="mt-4 border border-white/10 bg-[#0A0A0A] rounded-sm p-4 group">
+          <summary className="cursor-pointer list-none flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Medienpflege</div>
+              <p className="mt-1 text-xs text-white/45">Kategorien, Einsortierung und Reparatur nur bei Bedarf einblenden.</p>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/45 group-open:text-white">Einblenden</span>
+          </summary>
+          <div className="mt-4 flex flex-wrap gap-2">
             <button
-              key={scope}
-              type="button"
-              onClick={() => setScopeFilter(scope)}
-              className={`border rounded-sm px-2.5 py-1.5 ${scopeFilter === scope ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 hover:border-white/25"}`}
+              onClick={auditScopes}
+              disabled={auditingScopes}
+              data-testid="media-scope-audit"
+              className="px-3 py-2 border border-white/10 hover:border-[#29B6E8]/60 hover:text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
             >
-              {MEDIA_SCOPE_LABELS[scope] || scope}: {count}
+              {auditingScopes ? "Prüfe..." : "Scopes prüfen"}
             </button>
-          ))}
-        </div>
+            <button
+              onClick={repairScopes}
+              disabled={repairingScopes}
+              data-testid="media-scope-repair"
+              className="px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
+            >
+              {repairingScopes ? "Sortiere..." : "Scopes reparieren"}
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-widest font-bold text-white/50">
+            {Object.entries(mediaAudit.by_scope).map(([scope, count]) => (
+              <button
+                key={scope}
+                type="button"
+                onClick={() => setScopeFilter(scope)}
+                className={`border rounded-sm px-2.5 py-1.5 ${scopeFilter === scope ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 hover:border-white/25"}`}
+              >
+                {MEDIA_SCOPE_LABELS[scope] || scope}: {count}
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {mediaAudit && (
+        <details className="mt-4 border border-white/10 bg-[#121212] rounded-sm p-4 group" data-testid="media-quality-checklist">
+          <summary className="cursor-pointer list-none flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Medien-Qualitaetscheck</div>
+              <p className="mt-1 max-w-3xl text-xs text-white/50">
+                Zeigt technische Medienprobleme sofort sichtbar. Alt-Texte werden am Einsatzort gepflegt, weil ein Bild je nach News, Event, Galerie oder Sponsor unterschiedliche Bedeutung haben kann.
+              </p>
+            </div>
+            <span className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/60 group-open:text-white">
+              Details einblenden
+            </span>
+          </summary>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {qualityChecks.map((check) => {
+              const ok = Number(check.value || 0) === 0;
+              const color = ok ? "#00FF88" : check.tone === "danger" ? "#FF3B30" : "#FFD700";
+              const clickable = !!check.filter && !ok;
+              return (
+                <button
+                  key={check.key}
+                  type="button"
+                  disabled={!clickable}
+                  onClick={() => check.filter && setScopeFilter(check.filter)}
+                  className={`rounded-sm border bg-[#0A0A0A] p-3 text-left transition ${clickable ? "hover:border-[#29B6E8]/60" : ""}`}
+                  style={{ borderColor: ok ? "rgba(255,255,255,0.1)" : `${color}66` }}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">{check.label}</span>
+                    {ok ? <CheckCircle2 className="h-4 w-4 text-[#00FF88]" /> : <AlertTriangle className="h-4 w-4" style={{ color }} />}
+                  </div>
+                  <div className="mt-2 font-heading text-2xl font-black tabular-nums" style={{ color }}>{check.value || 0}</div>
+                  <div className="mt-1 text-xs text-white/45">{ok ? "Sauber." : check.detail}</div>
+                </button>
+              );
+            })}
+          </div>
+        </details>
       )}
 
       {scopeAudit?.summary && (
@@ -406,6 +513,7 @@ export default function AdminMediaPage() {
                       <span className="text-[9px] uppercase tracking-wider border border-white/10 px-1.5 py-0.5 text-white/45">{MEDIA_SCOPE_LABELS[it.media_scope] || it.media_scope || "Legacy"}</span>
                       {it.is_unused && <span className="text-[9px] uppercase tracking-wider border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">ungenutzt</span>}
                       {!it.tracked && <span className="text-[9px] uppercase tracking-wider border border-[#FF3B30]/30 px-1.5 py-0.5 text-[#FF3B30]">ungetrackt</span>}
+                      {it.duplicate_count > 1 && <span className="text-[9px] uppercase tracking-wider border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">duplikat</span>}
                     </div>
                     <div className="text-[10px] text-white/40 mt-1">{fmtBytes(it.size)} · {it.usage_count || 0}x genutzt</div>
                   </div>
@@ -492,6 +600,16 @@ function MediaDetailModal({ item, onClose, onCopy, onRotateLeft, onRotateRight, 
             <div className="col-span-2">
               <div className="uppercase text-[10px] text-white/40 tracking-widest">Originalname</div>
               <div className="text-white/80 font-mono break-all">{item.original_filename}</div>
+            </div>
+          )}
+          {item.duplicate_count > 1 && (
+            <div className="col-span-2">
+              <div className="uppercase text-[10px] text-white/40 tracking-widest">Duplikate</div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {(item.duplicate_filenames || []).map((name) => (
+                  <span key={name} className="rounded-sm border border-[#FFD700]/25 bg-[#FFD700]/5 px-2 py-1 font-mono text-[10px] text-[#FFD700]">{name}</span>
+                ))}
+              </div>
             </div>
           )}
           <div className="col-span-2">

@@ -1,8 +1,14 @@
 import { Link } from "react-router-dom";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Crown, Users, Heart, Trophy, Gamepad2, Mail } from "lucide-react";
 
 export default function JoinMembershipPage() {
+  useDocumentTitle(
+    "Mitglied werden",
+    "Mitglied werden bei THE LION SQUAD: eSports Verein, Gaming Community, Mitgliederbereich, Events, Turniere und Vorteile in Tirol."
+  );
+
   return (
     <PublicLayout>
       <section className="relative overflow-hidden">

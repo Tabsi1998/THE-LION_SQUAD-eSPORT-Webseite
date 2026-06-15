@@ -76,6 +76,17 @@ updates:
       mobile-npm:
         patterns:
           - "*"
+        exclude-patterns:
+          - "expo"
+          - "expo-*"
+          - "@expo/*"
+          - "react"
+          - "react-native"
+          - "react-native-keyboard-controller"
+          - "react-native-reanimated"
+          - "react-native-safe-area-context"
+          - "react-native-screens"
+          - "react-native-worklets"
         update-types:
           - minor
           - patch
@@ -83,5 +94,15 @@ updates:
       - dependency-name: "*"
         update-types:
           - version-update:semver-major
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "@expo/*"
+      - dependency-name: "react"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-keyboard-controller"
+      - dependency-name: "react-native-reanimated"
+      - dependency-name: "react-native-safe-area-context"
+      - dependency-name: "react-native-screens"
+      - dependency-name: "react-native-worklets"
     commit-message:
       prefix: chore

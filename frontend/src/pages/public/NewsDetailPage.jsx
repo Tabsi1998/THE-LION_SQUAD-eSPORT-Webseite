@@ -2,18 +2,21 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { seoTextPreview } from "@/lib/textPreview";
 import { Pin, ArrowLeft, Calendar, Trophy, Users, Flag } from "lucide-react";
 
 export default function NewsDetailPage() {
   const { slug } = useParams();
   const [post, setPost] = useState(null);
   const [error, setError] = useState(null);
-  useDocumentTitle(post?.title || "News", post?.excerpt || "News von THE LION SQUAD eSports.", {
+  const seoDescription = seoTextPreview(post?.excerpt || post?.content, "News von THE LION SQUAD eSports aus Tirol.");
+  useDocumentTitle(post?.title || "News", seoDescription, {
     image: post?.banner_url,
     type: "article",
     canonical: post?.slug ? `${window.location.origin}/news/${post.slug}` : undefined,
@@ -44,7 +47,7 @@ export default function NewsDetailPage() {
     </PublicLayout>
   );
 
-  if (!post) return <PublicLayout><div className="max-w-3xl mx-auto px-6 py-20 text-white/40">Lade …</div></PublicLayout>;
+  if (!post) return <PublicLayout><PublicLoadingState label="Lade News" /></PublicLayout>;
 
   return (
     <PublicLayout>

@@ -52,6 +52,7 @@ from routes.home_routes import router as home_router
 from routes.prize_routes import router as prize_router
 from routes.setup_routes import router as setup_router, sitemap_router
 from routes.contact_board_routes import contact_router, board_router
+from routes.search_routes import router as search_router
 from routes.extras_routes import (
     settings_router, season_router, widget_router, dsgvo_router, pdf_router, audit_router,
 )
@@ -251,6 +252,7 @@ app.include_router(setup_router)
 app.include_router(sitemap_router)
 app.include_router(contact_router)
 app.include_router(board_router)
+app.include_router(search_router)
 app.include_router(penalty_router)
 app.include_router(penalty_admin_router)
 

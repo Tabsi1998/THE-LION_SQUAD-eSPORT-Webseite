@@ -83,5 +83,5 @@ async def ensure_tournament_accepts_results(db, tournament_id: str) -> None:
     if not tournament or tournament.get("status") not in RESULT_OPEN_TOURNAMENT_STATUSES:
         raise HTTPException(
             status_code=409,
-            detail="Ergebnisse koennen erst gespeichert werden, wenn das Turnier gestartet ist.",
+            detail="Ergebnisse können erst gespeichert werden, wenn das Turnier gestartet ist.",
         )

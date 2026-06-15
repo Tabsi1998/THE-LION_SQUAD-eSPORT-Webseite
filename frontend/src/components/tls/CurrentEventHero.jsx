@@ -18,8 +18,8 @@ export function CurrentEventHero() {
   const load = useCallback(async () => {
     try {
       const [t, c] = await Promise.all([
-        api.get("/tournaments"),
-        api.get("/f1/challenges"),
+        api.get("/tournaments?compact=true&limit=24"),
+        api.get("/f1/challenges?compact=true&limit=24"),
       ]);
       setData({ tournaments: t.data, challenges: c.data, loading: false });
     } catch {

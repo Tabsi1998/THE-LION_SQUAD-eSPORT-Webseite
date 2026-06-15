@@ -28,7 +28,7 @@ PUBLIC_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # (collection, list of fields, optional pointer to nested list of {url_field}, optional sub-doc field-name)
 TARGETS: list[tuple[str, list[str]]] = [
-    ("settings", ["logo_url", "mascot_url", "favicon_url", "avatar_url"]),
+    ("settings", ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "qr_logo_url", "favicon_url", "favicon_light_url", "favicon_dark_url", "avatar_url"]),
     ("users", ["avatar_url", "banner_url"]),
     ("teams", ["logo_url", "banner_url"]),
     ("sponsors", ["logo_url"]),

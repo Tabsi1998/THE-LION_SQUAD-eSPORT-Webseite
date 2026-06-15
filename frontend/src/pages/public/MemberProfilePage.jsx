@@ -8,6 +8,7 @@ import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { AccountLevelPill, AccountLevelProgress, accountAvatarFrameClass, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { gameLabel } from "@/lib/gameLabels";
+import { seoTextPreview } from "@/lib/textPreview";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
@@ -15,7 +16,8 @@ export default function MemberProfilePage() {
   const { slug } = useParams();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  useDocumentTitle(profile?.display_name || "Vereinsmitglied", profile?.bio || "Vereinsmitglied bei THE LION SQUAD eSports.", {
+  const seoDescription = seoTextPreview(profile?.bio, "Vereinsmitglied bei THE LION SQUAD eSports aus Tirol.");
+  useDocumentTitle(profile?.display_name || "Vereinsmitglied", seoDescription, {
     image: profile?.avatar_url || profile?.banner_url,
     type: "profile",
     canonical: profile?.slug ? `${window.location.origin}/members/${profile.slug}` : undefined,

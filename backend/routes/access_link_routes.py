@@ -46,7 +46,7 @@ def _collection_for_target(target_type: str):
 async def _target_doc(target_type: str, target_id: str) -> dict:
     collection = _collection_for_target(target_type)
     if collection is None:
-        raise HTTPException(status_code=400, detail="Ungueltiger Zieltyp")
+        raise HTTPException(status_code=400, detail="Ungültiger Zieltyp")
     doc = await collection.find_one({"id": target_id}, {"_id": 0, "id": 1, "slug": 1, "name": 1, "title": 1})
     if not doc:
         raise HTTPException(status_code=404, detail="Ziel nicht gefunden")
@@ -93,7 +93,7 @@ async def list_access_links(
     query: dict = {}
     if target_type:
         if target_type not in TARGET_TYPES:
-            raise HTTPException(status_code=400, detail="Ungueltiger Zieltyp")
+            raise HTTPException(status_code=400, detail="Ungültiger Zieltyp")
         query["target_type"] = target_type
     if target_id:
         query["target_id"] = target_id
@@ -113,7 +113,7 @@ async def cleanup_access_links(
     query: dict = {"is_active": {"$ne": False}}
     if target_type:
         if target_type not in TARGET_TYPES:
-            raise HTTPException(status_code=400, detail="Ungueltiger Zieltyp")
+            raise HTTPException(status_code=400, detail="Ungültiger Zieltyp")
         query["target_type"] = target_type
     if target_id:
         query["target_id"] = target_id
@@ -158,7 +158,7 @@ async def create_access_link(body: AccessLinkCreate, me: dict = Depends(require_
     if any(grant in grants for grant in ("register", "submit")) and "view" not in grants:
         grants.insert(0, "view")
     if any(grant not in ACCESS_GRANTS for grant in grants):
-        raise HTTPException(status_code=400, detail="Ungueltige Freigabe")
+        raise HTTPException(status_code=400, detail="Ungültige Freigabe")
     token = new_access_token()
     now = now_utc().isoformat()
     doc = {

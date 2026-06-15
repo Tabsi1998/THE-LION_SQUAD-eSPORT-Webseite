@@ -2,10 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { seoTextPreview } from "@/lib/textPreview";
 import { Award, BarChart3, CalendarDays, CheckCircle2, CircleGauge, Flag, Medal, MessageCircle, ShieldCheck, Star, Timer, Trophy, Users, Zap } from "lucide-react";
 
 function rankColor(rank) {
@@ -66,7 +68,8 @@ export default function SeasonPage() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
   const season = data?.season;
-  useDocumentTitle(season?.name || "Jahreswertung", season?.description || "Jahreswertung von THE LION SQUAD eSports.", {
+  const seoDescription = seoTextPreview(season?.description, "Jahreswertung von THE LION SQUAD eSports mit Turnieren, Fast-Lap-Challenges und Community-Punkten.");
+  useDocumentTitle(season?.name || "Jahreswertung", seoDescription, {
     image: season?.banner_url,
     canonical: season?.slug ? `${window.location.origin}/seasons/${season.slug}` : undefined,
   });
@@ -77,7 +80,7 @@ export default function SeasonPage() {
   }, [slug]);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["seasons", "tournaments", "f1", "users"]);
-  if (!data) return <PublicLayout><div className="p-20 text-center text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
+  if (!data) return <PublicLayout><PublicLoadingState label="Lade Jahreswertung" /></PublicLayout>;
   const s = data.season;
   const standings = data.standings || [];
   const topThree = standings.slice(0, 3);

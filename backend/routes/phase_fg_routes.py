@@ -11,6 +11,7 @@ Endpoints:
   GET    /sitemap.xml                           — search-engine sitemap
   GET    /robots.txt                            — search-engine robots
 """
+import hashlib
 import os
 import re
 from pathlib import Path
@@ -32,7 +33,7 @@ PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
 PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 ADMIN_MEDIA_OWNER_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
 IMAGE_REFERENCE_FIELDS = [
-    ("settings", {"id": "branding"}, ["logo_url", "mascot_url", "favicon_url"]),
+    ("settings", {"id": "branding"}, ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "qr_logo_url", "favicon_url", "favicon_light_url", "favicon_dark_url"]),
     ("settings", {"id": "discord"}, ["avatar_url"]),
     ("users", {}, ["avatar_url", "banner_url"]),
     ("teams", {}, ["logo_url", "banner_url"]),
@@ -107,6 +108,14 @@ def _iter_text_media_values(value: Any) -> list[str]:
     return out
 
 
+def _file_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 async def _collect_media_usage(filenames: set[str]) -> dict[str, list[dict[str, Any]]]:
     if not filenames:
         return {}
@@ -167,6 +176,29 @@ async def _list_media_items(
         p for p in candidates
         if not p.name.startswith(".") and p.suffix.lower() in PUBLIC_IMAGE_EXTS
     ]
+    duplicate_lookup: dict[str, list[str]] = {}
+    if include_usage:
+        by_size: dict[int, list[Path]] = {}
+        for path in candidates:
+            try:
+                by_size.setdefault(path.stat().st_size, []).append(path)
+            except OSError:
+                continue
+        for same_size_paths in by_size.values():
+            if len(same_size_paths) < 2:
+                continue
+            by_digest: dict[str, list[Path]] = {}
+            for path in same_size_paths:
+                try:
+                    by_digest.setdefault(_file_digest(path), []).append(path)
+                except OSError:
+                    continue
+            for same_content_paths in by_digest.values():
+                if len(same_content_paths) < 2:
+                    continue
+                names = sorted({path.name for path in same_content_paths})
+                for name in names:
+                    duplicate_lookup[name] = names
     filenames = [p.name for p in candidates]
     usage = await _collect_media_usage(set(filenames)) if include_usage else {}
     media_meta: dict[str, dict[str, Any]] = {}
@@ -209,6 +241,8 @@ async def _list_media_items(
             "usage_count": len(refs) if include_usage else None,
             "references": refs[:6],
             "is_unused": (len(refs) == 0) if include_usage else None,
+            "duplicate_count": len(duplicate_lookup.get(p.name) or []),
+            "duplicate_filenames": (duplicate_lookup.get(p.name) or [])[:8],
         })
     return items[:500]
 
@@ -235,6 +269,11 @@ async def admin_media_audit(me: dict = Depends(require_admin())):
     for item in items:
         by_scope[item.get("media_scope") or "legacy"] = by_scope.get(item.get("media_scope") or "legacy", 0) + 1
         total_size += int(item.get("size") or 0)
+    duplicate_groups: dict[str, list[str]] = {}
+    for item in items:
+        names = item.get("duplicate_filenames") or []
+        if len(names) > 1:
+            duplicate_groups["|".join(names)] = names
 
     missing_meta_count = 0
     missing_meta: list[dict[str, Any]] = []
@@ -256,6 +295,9 @@ async def admin_media_audit(me: dict = Depends(require_admin())):
         "by_scope": by_scope,
         "unused": sum(1 for item in items if item.get("is_unused")),
         "untracked": sum(1 for item in items if not item.get("tracked")),
+        "duplicate_files": sum(len(names) for names in duplicate_groups.values()),
+        "duplicate_groups": len(duplicate_groups),
+        "duplicate_examples": list(duplicate_groups.values())[:10],
         "metadata_missing_files": missing_meta_count,
         "metadata_missing_examples": missing_meta,
         "reference_summary": reference_audit.get("summary") or {},
@@ -281,7 +323,7 @@ async def _clear_media_references(url: str) -> int:
 def _media_file_path(filename: str) -> Path:
     safe_name = Path(filename).name
     if safe_name != filename or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,180}", safe_name):
-        raise HTTPException(400, "Ungueltiger Dateiname.")
+        raise HTTPException(400, "Ungültiger Dateiname.")
     if Path(safe_name).suffix.lower() not in PUBLIC_IMAGE_EXTS:
         raise HTTPException(404, "Datei nicht gefunden.")
     for base_dir in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
@@ -327,7 +369,7 @@ async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = De
             save_kwargs = {"quality": 88, "method": 6}
         rotated.save(p, format=image_format, **save_kwargs)
     except UnidentifiedImageError:
-        raise HTTPException(400, "Ungueltige Bilddatei.")
+        raise HTTPException(400, "Ungültige Bilddatei.")
     except OSError as exc:
         raise HTTPException(500, "Drehen fehlgeschlagen.")
 
@@ -379,7 +421,8 @@ DEFAULT_NAV = {
             {"key": "gallery", "to": "/galerie", "label": "Galerie", "visible": True},
             {"key": "references", "to": "/references", "label": "Referenzen", "visible": True},
         ]},
-        {"key": "esports", "label": "eSports", "visible": True, "order": 4, "children": [
+        {"key": "esports", "to": "/esports", "label": "eSports", "visible": True, "order": 4, "children": [
+            {"key": "esports_overview", "to": "/esports", "label": "Übersicht", "visible": True},
             {"key": "tournaments", "to": "/tournaments", "label": "Turniere", "visible": True},
             {"key": "fastlap", "to": "/fastlap", "label": "Fast Lap", "visible": True},
             {"key": "season", "to": "/seasons/current", "label": "Jahreswertung", "visible": True},
@@ -512,6 +555,8 @@ async def robots():
         "Allow: /",
         "Allow: /api/static/uploads/",
         "Allow: /api/manifest.webmanifest",
+        "Allow: /api/seo/preview",
+        "Allow: /api/seo/meta",
         "Disallow: /admin/",
         "Disallow: /dashboard",
         "Disallow: /display/",
@@ -527,6 +572,11 @@ async def robots():
         "Disallow: /api/",
         "Disallow: /login",
         "Disallow: /register",
+        "Disallow: /forgot-password",
+        "Disallow: /reset-password",
+        "Disallow: /membership/apply",
+        "Disallow: /matches/",
+        "Disallow: /players",
     ]
     search_agents = [
         "Googlebot",
@@ -582,7 +632,14 @@ async def page_meta(slug: str):
     if base and not base.startswith(("http://", "https://")):
         base = "https://" + base
     canonical = f"{base}/{slug}".rstrip("/") if base else f"/{slug}"
-    image = branding.get("logo_url") or branding.get("mascot_url") or "/assets/brand/tls-wordmark.png"
+    image = (
+        branding.get("share_banner_url")
+        or branding.get("logo_url")
+        or branding.get("logo_light_url")
+        or branding.get("logo_dark_url")
+        or branding.get("mascot_url")
+        or "/assets/brand/og-default.png"
+    )
     if image and not image.startswith(("http://", "https://")) and base:
         image = f"{base}{image if image.startswith('/') else '/' + image}"
     json_ld = {

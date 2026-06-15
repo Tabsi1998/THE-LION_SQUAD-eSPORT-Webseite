@@ -17,7 +17,7 @@ export default function PlayersPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  useDocumentTitle("Community-Spieler", "Oeffentliche Community-Profile registrierter Benutzer.", {
+  useDocumentTitle("Community-Spieler", "Öffentliche Community-Profile registrierter Benutzer von THE LION SQUAD eSports.", {
     robots: "noindex, follow",
   });
 

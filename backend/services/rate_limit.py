@@ -50,7 +50,7 @@ async def enforce_rate_limit(
     if count >= limit:
         raise HTTPException(
             status_code=429,
-            detail="Zu viele Anfragen. Bitte versuche es spaeter erneut.",
+            detail="Zu viele Anfragen. Bitte versuche es später erneut.",
         )
     await db.rate_limits.insert_one({
         "id": new_id(),

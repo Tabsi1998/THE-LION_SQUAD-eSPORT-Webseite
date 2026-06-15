@@ -256,7 +256,7 @@ function EditGameModal({ game, games, onClose, onSaved }) {
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_ffa} onChange={(e) => set("supports_ffa", e.target.checked)} className="accent-[#29B6E8]" /> Mehrspieler frei</label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_time_trial} onChange={(e) => set("supports_time_trial", e.target.checked)} className="accent-[#29B6E8]" /> Zeitfahren</label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_grand_prix} onChange={(e) => set("supports_grand_prix", e.target.checked)} className="accent-[#29B6E8]" /> Rennserie</label>
-            <Input placeholder="Teamgroesse Standard" value={form.default_team_size} onChange={(v) => set("default_team_size", v)} testId="game-edit-team-size" />
+            <Input placeholder="Teamgröße Standard" value={form.default_team_size} onChange={(v) => set("default_team_size", v)} testId="game-edit-team-size" />
           </div>
           <select value={form.default_format} onChange={(e) => set("default_format", e.target.value)} data-testid="game-edit-format" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
             {TOURNAMENT_FORMAT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
