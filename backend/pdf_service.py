@@ -491,14 +491,18 @@ def _draw_qr_code(canvas, value: str, x: float, y: float, size: float, branding:
         or _brand_asset_path((branding or {}).get("logo_url"))
         or _brand_asset_path("/assets/brand/tls-mascot.png")
     )
-    logo_size = size * 0.145
-    logo_x = x + (size - logo_size) / 2
-    logo_y = y + (size - logo_size) / 2
+    badge_size = size * 0.19
+    logo_size = badge_size * 0.72
+    center_x = x + size / 2
+    center_y = y + size / 2
+    badge_r = badge_size / 2
+    logo_x = center_x - logo_size / 2
+    logo_y = center_y - logo_size / 2
     canvas.setFillColor(WHITE)
-    canvas.roundRect(logo_x - 0.9 * mm, logo_y - 0.9 * mm, logo_size + 1.8 * mm, logo_size + 1.8 * mm, 5, fill=1, stroke=0)
+    canvas.circle(center_x, center_y, badge_r, fill=1, stroke=0)
     canvas.setStrokeColor(colors.HexColor("#E5E7EB"))
-    canvas.setLineWidth(0.25)
-    canvas.roundRect(logo_x - 0.9 * mm, logo_y - 0.9 * mm, logo_size + 1.8 * mm, logo_size + 1.8 * mm, 5, fill=0, stroke=1)
+    canvas.setLineWidth(0.45)
+    canvas.circle(center_x, center_y, badge_r, fill=0, stroke=1)
     if logo_path:
         _draw_logo(canvas, logo_path, logo_x, logo_y, logo_size, logo_size, crop_transparent=True)
 
