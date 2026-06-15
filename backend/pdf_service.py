@@ -491,8 +491,8 @@ def _draw_qr_code(canvas, value: str, x: float, y: float, size: float, branding:
         or _brand_asset_path((branding or {}).get("logo_url"))
         or _brand_asset_path("/assets/brand/tls-mascot.png")
     )
-    badge_size = size * 0.19
-    logo_size = badge_size * 0.72
+    badge_size = size * 0.205
+    logo_size = badge_size * 0.76
     center_x = x + size / 2
     center_y = y + size / 2
     badge_r = badge_size / 2
@@ -500,8 +500,8 @@ def _draw_qr_code(canvas, value: str, x: float, y: float, size: float, branding:
     logo_y = center_y - logo_size / 2
     canvas.setFillColor(WHITE)
     canvas.circle(center_x, center_y, badge_r, fill=1, stroke=0)
-    canvas.setStrokeColor(colors.HexColor("#E5E7EB"))
-    canvas.setLineWidth(0.45)
+    canvas.setStrokeColor(BLACK)
+    canvas.setLineWidth(max(0.9, size * 0.006))
     canvas.circle(center_x, center_y, badge_r, fill=0, stroke=1)
     if logo_path:
         _draw_logo(canvas, logo_path, logo_x, logo_y, logo_size, logo_size, crop_transparent=True)
