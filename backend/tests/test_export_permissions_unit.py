@@ -48,6 +48,17 @@ def test_result_pdf_exports_are_optional_but_status_gated():
         assert "_result_export_allowed" in inspect.getsource(endpoint)
 
 
+def test_tournament_result_exports_forward_access_and_user_to_standings():
+    for endpoint in (
+        extras_routes.pdf_tournament_standings,
+        extras_routes.pdf_tournament_certificates,
+        extras_routes.pdf_tournament_certificate,
+    ):
+        signature = inspect.signature(endpoint)
+        assert "access" in signature.parameters
+        assert "access=access, user=user" in inspect.getsource(endpoint)
+
+
 def test_pdf_filenames_use_safe_fallbacks():
     assert extras_routes._pdf_filename_part("gamers-heaven", "t1") == "gamers-heaven"
     assert extras_routes._pdf_filename_part("", "t1") == "t1"

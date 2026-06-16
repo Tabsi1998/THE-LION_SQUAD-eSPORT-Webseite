@@ -1798,6 +1798,20 @@ async def _result_export_allowed(item: dict, user: dict | None) -> bool:
     return await user_can_see(user, item.get("visibility") or "public")
 
 
+async def _result_export_allowed_for_request(
+    db,
+    item: dict,
+    user: dict | None,
+    access: str | None,
+    resource_type: str,
+) -> bool:
+    if await _result_export_allowed(item, user):
+        return True
+    if not access or item.get("status") not in RESULT_EXPORT_STATUSES:
+        return False
+    return bool(await validate_access_link(db, access, resource_type, item.get("id"), user, "view"))
+
+
 def _certificate_source_from_item(item: dict, subtitle: str) -> dict:
     return {
         "title": item.get("title") or item.get("name") or "THE LION SQUAD",
@@ -1952,16 +1966,20 @@ async def pdf_tournament_station_signs(
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/standings.pdf")
-async def pdf_tournament_standings(slug_or_id: str, user: dict | None = Depends(get_optional_user)):
+async def pdf_tournament_standings(
+    slug_or_id: str,
+    access: Optional[str] = None,
+    user: dict | None = Depends(get_optional_user),
+):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404)
-    if not await _result_export_allowed(t, user):
+    if not await _result_export_allowed_for_request(db, t, user, access, "tournament"):
         raise HTTPException(status_code=403, detail="Ergebnis-PDF ist erst nach Turnierende öffentlich.")
     # Reuse standings logic
     from routes.tournament_routes import standings as st_fn
-    rows = await st_fn(t["id"])
+    rows = await st_fn(t["id"], access=access, user=user)
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
     file_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
@@ -1969,15 +1987,19 @@ async def pdf_tournament_standings(slug_or_id: str, user: dict | None = Depends(
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/certificates.pdf")
-async def pdf_tournament_certificates(slug_or_id: str, user: dict | None = Depends(get_optional_user)):
+async def pdf_tournament_certificates(
+    slug_or_id: str,
+    access: Optional[str] = None,
+    user: dict | None = Depends(get_optional_user),
+):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404)
-    if not await _result_export_allowed(t, user):
+    if not await _result_export_allowed_for_request(db, t, user, access, "tournament"):
         raise HTTPException(status_code=403, detail="Urkunden sind erst nach Turnierende öffentlich.")
     from routes.tournament_routes import standings as st_fn
-    rows = _top_certificate_rows(await st_fn(t["id"]))
+    rows = _top_certificate_rows(await st_fn(t["id"], access=access, user=user))
     if not rows:
         raise HTTPException(status_code=404, detail="Keine Top-4-Platzierungen für Urkunden gefunden.")
     sponsors = await _pdf_sponsors(db)
@@ -2000,15 +2022,20 @@ async def pdf_tournament_certificates(slug_or_id: str, user: dict | None = Depen
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/certificates/{registration_id}.pdf")
-async def pdf_tournament_certificate(slug_or_id: str, registration_id: str, user: dict | None = Depends(get_optional_user)):
+async def pdf_tournament_certificate(
+    slug_or_id: str,
+    registration_id: str,
+    access: Optional[str] = None,
+    user: dict | None = Depends(get_optional_user),
+):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404)
-    if not await _result_export_allowed(t, user):
+    if not await _result_export_allowed_for_request(db, t, user, access, "tournament"):
         raise HTTPException(status_code=403, detail="Urkunden sind erst nach Turnierende öffentlich.")
     from routes.tournament_routes import standings as st_fn
-    rows = await st_fn(t["id"])
+    rows = await st_fn(t["id"], access=access, user=user)
     row = next((item for item in rows if item.get("registration_id") == registration_id), None)
     if not row:
         raise HTTPException(status_code=404, detail="Platzierung nicht gefunden.")
