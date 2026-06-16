@@ -1,3 +1,5 @@
+import re
+
 from pdf_service import (
     pdf_checkin,
     pdf_certificate,
@@ -41,6 +43,14 @@ def assert_pdf_bytes(payload: bytes, minimum_size: int = 10_000) -> None:
     assert b"%%EOF" in payload[-2048:]
 
 
+def assert_portrait_pdf(payload: bytes) -> None:
+    match = re.search(rb"/MediaBox\s*\[\s*0\s+0\s+([0-9.]+)\s+([0-9.]+)\s*\]", payload)
+    assert match, "PDF MediaBox not found"
+    width = float(match.group(1))
+    height = float(match.group(2))
+    assert height > width
+
+
 def test_qr_sign_handles_long_titles_and_branded_logo():
     payload = pdf_qr_sign(
         TOURNAMENT["title"],
@@ -80,12 +90,14 @@ def test_certificates_generate_valid_branded_pdfs():
         pdf_branding=BRANDING,
     )
     assert_pdf_bytes(payload, minimum_size=35_000)
+    assert_portrait_pdf(payload)
 
     multi = pdf_certificates([
         {"source": {**TOURNAMENT, "subtitle": "Turnier"}, "row": row, "category": "Gesamtwertung", "metrics": metrics},
         {"source": {**TOURNAMENT, "subtitle": "Turnier"}, "row": {**row, "rank": 2, "display_name": "DerSushi"}, "category": "Gesamtwertung", "metrics": metrics},
     ], SPONSORS, BRANDING)
     assert_pdf_bytes(multi, minimum_size=55_000)
+    assert_portrait_pdf(multi)
 
 
 def test_table_exports_generate_valid_pdfs():

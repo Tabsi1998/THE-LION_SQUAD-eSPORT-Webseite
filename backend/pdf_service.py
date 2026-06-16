@@ -22,6 +22,7 @@ from reportlab.platypus import (
 from PIL import Image
 
 CYAN = colors.HexColor("#29B6E8")
+GOLD = colors.HexColor("#D6B45F")
 BLACK = colors.HexColor("#0A0A0A")
 WHITE = colors.white
 DARK = colors.HexColor("#121212")
@@ -181,6 +182,33 @@ def _draw_cover_image(canvas, path: Path, page_w: float, page_h: float, opacity:
         return True
     except Exception:
         return False
+
+
+def _draw_alpha_rect(canvas, x: float, y: float, width: float, height: float, color, opacity: float) -> None:
+    canvas.saveState()
+    if hasattr(canvas, "setFillAlpha"):
+        canvas.setFillAlpha(opacity)
+    canvas.setFillColor(color)
+    canvas.rect(x, y, width, height, fill=1, stroke=0)
+    canvas.restoreState()
+
+
+def _draw_alpha_logo(
+    canvas,
+    path: Path,
+    x: float,
+    y: float,
+    max_w: float,
+    max_h: float,
+    opacity: float,
+    crop_transparent: bool = False,
+) -> bool:
+    canvas.saveState()
+    if hasattr(canvas, "setFillAlpha"):
+        canvas.setFillAlpha(opacity)
+    drawn = _draw_logo(canvas, path, x, y, max_w, max_h, crop_transparent=crop_transparent)
+    canvas.restoreState()
+    return drawn
 
 
 def _draw_sponsor_footer(canvas, doc, sponsors: list | None):
@@ -561,121 +589,178 @@ def _certificate_page(canvas, doc, certificate: dict, branding: dict | None, spo
         or _brand_asset_path(source.get("seo_image_url"))
         or _brand_asset_path((branding or {}).get("share_banner_url"))
     )
+    mascot_path = (
+        _brand_asset_path((branding or {}).get("mascot_url"))
+        or _brand_asset_path((branding or {}).get("qr_logo_url"))
+        or _brand_asset_path("/assets/brand/tls-mascot.png")
+    )
 
     canvas.setFillColor(BLACK)
     canvas.rect(0, 0, page_w, page_h, fill=1, stroke=0)
     if background_path:
-        _draw_cover_image(canvas, background_path, page_w, page_h, opacity=0.15)
-    canvas.setFillColor(colors.Color(0, 0, 0, alpha=0.74))
-    canvas.rect(0, 0, page_w, page_h, fill=1, stroke=0)
+        _draw_cover_image(canvas, background_path, page_w, page_h, opacity=0.30)
+    _draw_alpha_rect(canvas, 0, 0, page_w, page_h, colors.HexColor("#030506"), 0.76)
+    if mascot_path:
+        _draw_alpha_logo(
+            canvas,
+            mascot_path,
+            (page_w - 10.8 * cm) / 2,
+            9.4 * cm,
+            10.8 * cm,
+            10.8 * cm,
+            0.095,
+            crop_transparent=True,
+        )
     canvas.setFillColor(CYAN)
     canvas.rect(0, page_h - 5, page_w, 5, fill=1, stroke=0)
+    canvas.setFillColor(GOLD)
+    canvas.rect(0, page_h - 9, page_w, 1.4, fill=1, stroke=0)
+
     _draw_brand_header(canvas, doc, branding)
 
-    canvas.setStrokeColor(colors.HexColor("#1F2937"))
-    canvas.setLineWidth(1.0)
-    canvas.roundRect(1.45 * cm, 3.25 * cm, page_w - 2.9 * cm, page_h - 6.25 * cm, 10, stroke=1, fill=0)
+    border_x = 1.25 * cm
+    border_y = 3.22 * cm
+    border_w = page_w - 2.5 * cm
+    border_h = page_h - 6.30 * cm
+    canvas.setStrokeColor(colors.HexColor("#24313B"))
+    canvas.setLineWidth(1.2)
+    canvas.roundRect(border_x, border_y, border_w, border_h, 8, stroke=1, fill=0)
+    canvas.setStrokeColor(GOLD)
+    canvas.setLineWidth(0.9)
+    canvas.roundRect(border_x + 0.24 * cm, border_y + 0.24 * cm, border_w - 0.48 * cm, border_h - 0.48 * cm, 5, stroke=1, fill=0)
     canvas.setStrokeColor(CYAN)
-    canvas.setLineWidth(1.4)
-    canvas.roundRect(1.82 * cm, 3.62 * cm, page_w - 3.64 * cm, page_h - 7.0 * cm, 7, stroke=1, fill=0)
+    canvas.setLineWidth(1.0)
+    corner = 1.35 * cm
+    for x0, y0, sx, sy in (
+        (border_x + 0.52 * cm, border_y + border_h - 0.52 * cm, 1, -1),
+        (border_x + border_w - 0.52 * cm, border_y + border_h - 0.52 * cm, -1, -1),
+        (border_x + 0.52 * cm, border_y + 0.52 * cm, 1, 1),
+        (border_x + border_w - 0.52 * cm, border_y + 0.52 * cm, -1, 1),
+    ):
+        canvas.line(x0, y0, x0 + sx * corner, y0)
+        canvas.line(x0, y0, x0, y0 + sy * corner)
 
-    y = page_h - 4.28 * cm
+    canvas.saveState()
+    canvas.translate(1.02 * cm, page_h / 2)
+    canvas.rotate(90)
+    canvas.setFillColor(colors.HexColor("#1B3A46"))
+    canvas.setFont("Helvetica-Bold", 6.5)
+    canvas.drawCentredString(0, 0, "THE LION SQUAD CERTIFICATE")
+    canvas.restoreState()
+
+    y = page_h - 4.22 * cm
     canvas.setFillColor(CYAN)
-    canvas.setFont("Helvetica-Bold", 10)
-    canvas.drawCentredString(page_w / 2, y, _normalize_pdf_text(subtitle).upper()[:72])
+    canvas.setFont("Helvetica-Bold", 8.5)
+    canvas.drawCentredString(page_w / 2, y, _truncate_to_width(_normalize_pdf_text(subtitle).upper(), page_w - 5.2 * cm, "Helvetica-Bold", 8.5))
 
     canvas.setFillColor(WHITE)
-    y -= 0.80 * cm
-    _draw_centered_wrapped(
+    y -= 0.72 * cm
+    title_bottom = _draw_centered_wrapped(
         canvas,
         _certificate_title(rank).upper(),
         page_w / 2,
         y,
-        page_w - 5.0 * cm,
-        start_size=31,
-        min_size=18,
+        page_w - 4.6 * cm,
+        start_size=35,
+        min_size=20,
         max_lines=2,
         leading_factor=1.10,
     )
 
-    y -= 2.10 * cm
-    canvas.setFillColor(colors.HexColor("#CBD5E1"))
-    canvas.setFont("Helvetica-Bold", 11)
-    canvas.drawCentredString(page_w / 2, y, "VERLIEHEN AN")
+    y = title_bottom - 0.42 * cm
+    canvas.setFillColor(GOLD)
+    canvas.setFont("Helvetica-Bold", 8.5)
+    canvas.drawCentredString(page_w / 2, y, "AUSGEZEICHNET WIRD")
 
-    y -= 1.05 * cm
+    y -= 0.82 * cm
     canvas.setFillColor(WHITE)
     recipient_bottom = _draw_centered_wrapped(
         canvas,
         recipient,
         page_w / 2,
         y,
-        page_w - 4.5 * cm,
-        start_size=36,
-        min_size=20,
+        page_w - 4.0 * cm,
+        start_size=38,
+        min_size=22,
         max_lines=2,
-        leading_factor=1.05,
+        leading_factor=1.02,
     )
+    canvas.setStrokeColor(GOLD)
+    canvas.setLineWidth(0.75)
+    canvas.line(4.0 * cm, recipient_bottom + 0.30 * cm, page_w - 4.0 * cm, recipient_bottom + 0.30 * cm)
 
-    y = recipient_bottom - 0.85 * cm
-    canvas.setFillColor(CYAN)
-    canvas.setFont("Helvetica-Bold", 22)
-    canvas.drawCentredString(page_w / 2, y, _placement_label(rank).upper())
-
-    y -= 1.00 * cm
+    y = recipient_bottom - 0.46 * cm
     canvas.setFillColor(colors.HexColor("#E5E7EB"))
+    canvas.setFont("Helvetica", 9.5)
+    canvas.drawCentredString(page_w / 2, y, "für die Leistung bei")
+    y -= 0.58 * cm
     _draw_centered_wrapped(
         canvas,
         title,
         page_w / 2,
         y,
-        page_w - 4.8 * cm,
-        start_size=18,
-        min_size=11,
+        page_w - 4.6 * cm,
+        start_size=16,
+        min_size=10,
         max_lines=3,
         leading_factor=1.14,
     )
 
-    y -= 2.05 * cm
+    medal_cx = page_w / 2
+    medal_cy = 11.95 * cm
+    canvas.setFillColor(colors.HexColor("#090D10"))
+    canvas.setStrokeColor(GOLD)
+    canvas.setLineWidth(1.4)
+    canvas.circle(medal_cx, medal_cy, 1.26 * cm, stroke=1, fill=1)
+    canvas.setStrokeColor(CYAN)
+    canvas.setLineWidth(0.6)
+    canvas.circle(medal_cx, medal_cy, 1.04 * cm, stroke=1, fill=0)
+    canvas.setFillColor(GOLD)
+    canvas.setFont("Helvetica-Bold", 21)
+    canvas.drawCentredString(medal_cx, medal_cy + 0.08 * cm, _placement_label(rank).split(" ")[0])
+    canvas.setFillColor(MUTED)
+    canvas.setFont("Helvetica-Bold", 5.8)
+    canvas.drawCentredString(medal_cx, medal_cy - 0.48 * cm, "PLATZIERUNG")
+
+    canvas.setFillColor(CYAN)
+    canvas.setFont("Helvetica-Bold", 15)
+    canvas.drawCentredString(page_w / 2, 10.06 * cm, _placement_label(rank).upper())
     canvas.setFillColor(colors.HexColor("#CBD5E1"))
-    canvas.setFont("Helvetica-Bold", 12)
-    canvas.drawCentredString(page_w / 2, y, category.upper())
+    canvas.setFont("Helvetica-Bold", 9)
+    canvas.drawCentredString(page_w / 2, 9.46 * cm, _truncate_to_width(category.upper(), page_w - 5.0 * cm, "Helvetica-Bold", 9))
 
     metrics = [m for m in (certificate.get("metrics") or []) if m and (m.get("value") not in (None, ""))]
     if metrics:
-        slot_w = min(4.6 * cm, (page_w - 5.2 * cm) / max(1, len(metrics)))
-        gap = 0.28 * cm
-        total_w = slot_w * len(metrics) + gap * (len(metrics) - 1)
+        visible_metrics = metrics[:4]
+        slot_w = min(4.15 * cm, (page_w - 4.8 * cm) / max(1, len(visible_metrics)))
+        gap = 0.22 * cm
+        total_w = slot_w * len(visible_metrics) + gap * (len(visible_metrics) - 1)
         start_x = (page_w - total_w) / 2
-        metric_y = 6.20 * cm
-        for index, metric in enumerate(metrics[:4]):
+        metric_y = 7.18 * cm
+        for index, metric in enumerate(visible_metrics):
             x = start_x + index * (slot_w + gap)
             canvas.setStrokeColor(colors.HexColor("#1F2937"))
             canvas.setFillColor(colors.HexColor("#0B1115"))
-            canvas.roundRect(x, metric_y, slot_w, 1.45 * cm, 5, fill=1, stroke=1)
-            canvas.setFillColor(CYAN)
-            canvas.setFont("Helvetica-Bold", 6.8)
-            canvas.drawCentredString(x + slot_w / 2, metric_y + 0.95 * cm, str(metric.get("label") or "").upper()[:22])
+            canvas.roundRect(x, metric_y, slot_w, 1.20 * cm, 5, fill=1, stroke=1)
+            canvas.setFillColor(GOLD)
+            canvas.setFont("Helvetica-Bold", 5.8)
+            canvas.drawCentredString(x + slot_w / 2, metric_y + 0.78 * cm, str(metric.get("label") or "").upper()[:20])
             canvas.setFillColor(WHITE)
-            canvas.setFont("Helvetica-Bold", 12.5)
-            canvas.drawCentredString(x + slot_w / 2, metric_y + 0.38 * cm, _truncate_to_width(str(metric.get("value")), slot_w - 0.35 * cm, "Helvetica-Bold", 12.5))
+            canvas.setFont("Helvetica-Bold", 11)
+            canvas.drawCentredString(x + slot_w / 2, metric_y + 0.30 * cm, _truncate_to_width(str(metric.get("value")), slot_w - 0.35 * cm, "Helvetica-Bold", 11))
 
     issued = _normalize_pdf_text(certificate.get("issued_label") or datetime.now().strftime("%d.%m.%Y"))
     canvas.setStrokeColor(colors.HexColor("#64748B"))
     canvas.setLineWidth(0.6)
-    canvas.line(4.2 * cm, 4.55 * cm, 9.0 * cm, 4.55 * cm)
-    canvas.line(page_w - 9.0 * cm, 4.55 * cm, page_w - 4.2 * cm, 4.55 * cm)
+    canvas.line(3.0 * cm, 5.05 * cm, 8.05 * cm, 5.05 * cm)
+    canvas.line(page_w - 8.05 * cm, 5.05 * cm, page_w - 3.0 * cm, 5.05 * cm)
     canvas.setFillColor(MUTED)
     canvas.setFont("Helvetica-Bold", 7)
-    canvas.drawCentredString(6.6 * cm, 4.18 * cm, issued.upper())
-    canvas.drawCentredString(page_w - 6.6 * cm, 4.18 * cm, "THE LION SQUAD")
+    canvas.drawCentredString(5.52 * cm, 4.66 * cm, f"AUSGESTELLT AM {issued}".upper())
+    canvas.drawCentredString(page_w - 5.52 * cm, 4.66 * cm, "TURNIERLEITUNG")
 
-    mascot_path = (
-        _brand_asset_path((branding or {}).get("mascot_url"))
-        or _brand_asset_path("/assets/brand/tls-mascot.png")
-    )
     if mascot_path:
-        _draw_logo(canvas, mascot_path, (page_w - 2.1 * cm) / 2, 3.68 * cm, 2.1 * cm, 2.1 * cm, crop_transparent=True)
+        _draw_logo(canvas, mascot_path, (page_w - 1.78 * cm) / 2, 4.15 * cm, 1.78 * cm, 1.78 * cm, crop_transparent=True)
 
     _draw_sponsor_footer(canvas, doc, sponsors or [])
     canvas.setFillColor(MUTED)
@@ -691,7 +776,7 @@ def pdf_certificates(
 ) -> bytes:
     """A4 certificate pages for tournament and Fast-Lap placements."""
     buf = io.BytesIO()
-    page_size = landscape(A4)
+    page_size = A4
     c = pdf_canvas.Canvas(buf, pagesize=page_size, pageCompression=1)
 
     class _Doc:
