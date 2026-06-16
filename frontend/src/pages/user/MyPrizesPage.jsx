@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { API_BASE, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Award, Gift, CheckCircle2, Clock, XCircle, MapPin, Trophy, Users, CalendarDays } from "lucide-react";
+import { Award, Download, Gift, CheckCircle2, Clock, XCircle, MapPin, Trophy, Users, CalendarDays } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const STATUS = {
@@ -28,11 +28,19 @@ function daysUntil(value) {
 
 export default function MyPrizesPage() {
   const [items, setItems] = useState([]);
+  const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get("/prizes/me").then(({ data }) => { setItems(data); setLoading(false); }).catch(() => setLoading(false));
+    Promise.allSettled([
+      api.get("/prizes/me"),
+      api.get("/prizes/me/certificates"),
+    ]).then(([prizesResult, certificatesResult]) => {
+      setItems(prizesResult.status === "fulfilled" ? prizesResult.value.data || [] : []);
+      setCertificates(certificatesResult.status === "fulfilled" ? certificatesResult.value.data || [] : []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["prizes", "tournaments", "f1"]);
@@ -40,7 +48,6 @@ export default function MyPrizesPage() {
   const open = items.filter((p) => ["pending", "ready"].includes(p.status));
   const closed = items.filter((p) => ["picked_up", "expired"].includes(p.status));
   const ready = items.filter((p) => p.status === "ready");
-  const teamPrizes = items.filter((p) => p.recipient_type === "team");
 
   return (
     <PublicLayout>
@@ -48,26 +55,33 @@ export default function MyPrizesPage() {
         <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Spieler</span>
         <h1 className="font-heading text-3xl md:text-5xl font-black uppercase mt-1 mb-4">Meine Gewinne</h1>
         <p className="text-white/60 max-w-2xl mb-8">
-          Hier siehst du alle Preise, die du in TLS-Turnieren und Fast-Lap-Challenges gewonnen hast — und ob sie schon zur Abholung bereit sind.
+          Hier siehst du deine Preise aus TLS-Turnieren und Fast-Lap-Challenges, deine Urkunden und ob Gewinne schon zur Abholung bereit sind.
         </p>
 
-        {!loading && items.length > 0 && (
+        {!loading && (items.length > 0 || certificates.length > 0) && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
             <PrizeStat icon={Gift} label="Offen" value={open.length} color="#FFD700" />
             <PrizeStat icon={MapPin} label="Abholbereit" value={ready.length} color="#29B6E8" />
             <PrizeStat icon={CheckCircle2} label="Abgeholt" value={closed.filter((p) => p.status === "picked_up").length} color="#00FF88" />
-            <PrizeStat icon={Users} label="Team-Preise" value={teamPrizes.length} color="#10B981" />
+            <PrizeStat icon={Award} label="Urkunden" value={certificates.length} color="#A855F7" />
           </div>
         )}
 
         {loading && <div className="text-white/40">Lade…</div>}
 
-        {!loading && items.length === 0 && (
+        {!loading && items.length === 0 && certificates.length === 0 && (
           <div className="border border-white/10 bg-[#121212] rounded-sm p-12 text-center">
             <Award className="w-12 h-12 text-white/20 mx-auto mb-3" />
-            <p className="text-white/60">Noch keine Gewinne — der nächste Pokal wartet auf dich!</p>
+            <p className="text-white/60">Noch keine Gewinne oder Urkunden.</p>
             <Link to="/tournaments" className="inline-block mt-4 px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Aktuelle Turniere</Link>
           </div>
+        )}
+
+        {!loading && certificates.length > 0 && (
+          <section className="mb-10">
+            <h2 className="text-lg font-heading font-bold uppercase tracking-widest text-[#FFD700] mb-4">Meine Urkunden</h2>
+            <div className="grid sm:grid-cols-2 gap-4">{certificates.map((item) => <CertificateCard key={item.id} item={item} />)}</div>
+          </section>
         )}
 
         {open.length > 0 && (
@@ -95,6 +109,41 @@ function PrizeStat({ icon: Icon, label, value, color }) {
         <Icon className="w-3.5 h-3.5" style={{ color }} /> {label}
       </div>
       <div className="mt-2 font-heading text-2xl font-black tabular-nums" style={{ color }}>{value}</div>
+    </div>
+  );
+}
+
+function absoluteDownloadUrl(path) {
+  if (!path) return "#";
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+function CertificateCard({ item }) {
+  return (
+    <div data-testid={`my-certificate-${item.id}`} className="border border-[#FFD700]/35 bg-gradient-to-br from-[#FFD700]/10 to-transparent rounded-sm p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700] flex items-center gap-2">
+            <Award className="w-3.5 h-3.5" /> {item.label || `Platz #${item.rank}`}
+          </div>
+          <div className="font-heading font-bold text-lg uppercase mt-1">{item.title}</div>
+          <div className="mt-1 text-xs text-white/50">{item.category || "Gesamtwertung"}</div>
+        </div>
+        <div className="shrink-0 w-10 h-10 border border-[#FFD700]/40 rounded-sm flex items-center justify-center font-heading font-black text-[#FFD700]">
+          {item.rank}
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {item.source_url && (
+          <Link to={item.source_url} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm text-[10px] uppercase tracking-wider font-bold hover:text-white">
+            Anzeigen
+          </Link>
+        )}
+        <a href={absoluteDownloadUrl(item.download_url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-[10px] uppercase tracking-wider font-bold hover:bg-[#FFD700]/10">
+          <Download className="w-3 h-3" /> PDF
+        </a>
+      </div>
     </div>
   );
 }

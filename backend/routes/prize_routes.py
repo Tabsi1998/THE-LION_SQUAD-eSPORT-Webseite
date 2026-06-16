@@ -1,5 +1,6 @@
 """Phase 9: PrizePickup admin + user routes."""
 from datetime import timedelta
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -9,10 +10,12 @@ from database import get_db
 from auth import require_admin, get_current_user
 from models import now_utc, new_id
 from services.prize_service import DEFAULT_PICKUP_WINDOW_DAYS, mark_ready, mark_picked_up
+from services.visibility import user_can_see
 
 router = APIRouter(prefix="/api/prizes", tags=["prizes"])
 
 PrizeStatus = Literal["pending", "ready", "picked_up", "expired"]
+RESULT_CERTIFICATE_STATUSES = {"completed", "results_published", "archived"}
 
 
 class PrizeUpdate(BaseModel):
@@ -92,6 +95,181 @@ async def my_prizes(me: dict = Depends(get_current_user)):
         q, {"_id": 0}
     ).sort("created_at", -1).to_list(100)
     return await _hydrate_pickups(pickups)
+
+
+def _top4_rank(row: dict | None) -> int | None:
+    try:
+        rank = int((row or {}).get("rank") or 0)
+    except (TypeError, ValueError):
+        return None
+    return rank if 1 <= rank <= 4 else None
+
+
+def _certificate_url(path: str, params: dict | None = None) -> str:
+    query = urlencode({k: v for k, v in (params or {}).items() if v not in (None, "")})
+    return path + (f"?{query}" if query else "")
+
+
+def _certificate_label(rank: int) -> str:
+    return {1: "Siegerurkunde", 2: "Urkunde zum 2. Platz", 3: "Urkunde zum 3. Platz", 4: "Urkunde zum 4. Platz"}.get(rank, "Urkunde")
+
+
+async def _my_team_ids(db, user_id: str) -> list[str]:
+    member_rows = await db.team_members.find({"user_id": user_id}, {"_id": 0, "team_id": 1}).to_list(200)
+    ids = {row.get("team_id") for row in member_rows if row.get("team_id")}
+    team_rows = await db.teams.find({"member_ids": user_id}, {"_id": 0, "id": 1}).to_list(200)
+    ids.update(row.get("id") for row in team_rows if row.get("id"))
+    return sorted(ids)
+
+
+async def _my_tournament_certificates(db, me: dict) -> list[dict]:
+    team_ids = await _my_team_ids(db, me["id"])
+    query = {"$or": [{"user_id": me["id"]}]}
+    if team_ids:
+        query["$or"].append({"team_id": {"$in": team_ids}})
+    regs = await db.tournament_registrations.find(query, {"_id": 0}).to_list(500)
+    if not regs:
+        return []
+    tournament_ids = sorted({reg.get("tournament_id") for reg in regs if reg.get("tournament_id")})
+    tournaments = await db.tournaments.find(
+        {"id": {"$in": tournament_ids}, "status": {"$in": list(RESULT_CERTIFICATE_STATUSES)}},
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "visibility": 1, "is_public": 1, "start_date": 1},
+    ).to_list(500)
+    tournament_map = {
+        item["id"]: item
+        for item in tournaments
+        if item.get("is_public") is not False
+        and item.get("status") in RESULT_CERTIFICATE_STATUSES
+        and await user_can_see(me, item.get("visibility") or "public")
+    }
+    if not tournament_map:
+        return []
+
+    from routes.tournament_routes import standings as tournament_standings
+
+    result = []
+    regs_by_tournament: dict[str, list[dict]] = {}
+    for reg in regs:
+        if reg.get("tournament_id") in tournament_map:
+            regs_by_tournament.setdefault(reg["tournament_id"], []).append(reg)
+    for tournament_id, own_regs in regs_by_tournament.items():
+        tournament = tournament_map.get(tournament_id)
+        if not tournament:
+            continue
+        rows = await tournament_standings(tournament_id, user=me)
+        rows_by_registration = {row.get("registration_id"): row for row in rows or [] if row.get("registration_id")}
+        slug_or_id = tournament.get("slug") or tournament["id"]
+        for reg in own_regs:
+            row = rows_by_registration.get(reg.get("id"))
+            rank = _top4_rank(row)
+            if not rank:
+                continue
+            result.append({
+                "id": f"tournament:{tournament['id']}:{reg['id']}",
+                "source_type": "tournament",
+                "title": tournament.get("title") or "Turnier",
+                "category": "Gesamtwertung",
+                "rank": rank,
+                "label": _certificate_label(rank),
+                "display_name": row.get("display_name") or reg.get("display_name"),
+                "source_url": f"/tournaments/{slug_or_id}/standings",
+                "download_url": f"/api/exports/tournaments/{slug_or_id}/certificates/{reg['id']}.pdf",
+                "sort_date": tournament.get("start_date") or "",
+            })
+    return result
+
+
+async def _my_f1_certificates(db, me: dict) -> list[dict]:
+    lap_query = {
+        "user_id": me["id"],
+        "is_invalid": {"$ne": True},
+        "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}],
+    }
+    laps = await db.f1_lap_times.find(lap_query, {"_id": 0, "challenge_id": 1, "track_id": 1}).to_list(2000)
+    if not laps:
+        return []
+    challenge_ids = sorted({row.get("challenge_id") for row in laps if row.get("challenge_id")})
+    challenges = await db.f1_challenges.find(
+        {"id": {"$in": challenge_ids}, "status": {"$in": list(RESULT_CERTIFICATE_STATUSES)}},
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "visibility": 1, "is_public": 1, "is_championship": 1, "start_date": 1},
+    ).to_list(500)
+    challenge_map = {
+        item["id"]: item
+        for item in challenges
+        if item.get("is_public") is not False
+        and item.get("status") in RESULT_CERTIFICATE_STATUSES
+        and await user_can_see(me, item.get("visibility") or "public")
+    }
+    if not challenge_map:
+        return []
+
+    from routes.f1_routes import leaderboard as f1_leaderboard, championship_standings
+
+    result = []
+    tracks_by_challenge: dict[str, set[str]] = {}
+    for lap in laps:
+        if lap.get("challenge_id") in challenge_map and lap.get("track_id"):
+            tracks_by_challenge.setdefault(lap["challenge_id"], set()).add(lap["track_id"])
+
+    for challenge_id, challenge in challenge_map.items():
+        slug_or_id = challenge.get("slug") or challenge["id"]
+        if challenge.get("is_championship"):
+            standings = await championship_standings(challenge_id, user=me)
+            row = next((item for item in standings.get("standings") or [] if item.get("user_id") == me["id"]), None)
+            rank = _top4_rank(row)
+            if rank:
+                result.append({
+                    "id": f"fastlap-championship:{challenge['id']}:{me['id']}",
+                    "source_type": "fastlap",
+                    "title": challenge.get("title") or "Fast Lap",
+                    "category": "Gesamtwertung",
+                    "rank": rank,
+                    "label": _certificate_label(rank),
+                    "display_name": row.get("display_name") or me.get("display_name") or me.get("username"),
+                    "source_url": f"/fastlap/{slug_or_id}",
+                    "download_url": f"/api/exports/f1/{slug_or_id}/championship-certificates/{me['id']}.pdf",
+                    "sort_date": challenge.get("start_date") or "",
+                })
+            continue
+
+        for track_id in sorted(tracks_by_challenge.get(challenge_id) or []):
+            board = await f1_leaderboard(challenge_id, track_id=track_id, user=me)
+            row = next((item for item in board.get("entries") or [] if item.get("user_id") == me["id"]), None)
+            rank = _top4_rank(row)
+            if not rank:
+                continue
+            track = board.get("track") or {}
+            result.append({
+                "id": f"fastlap-track:{challenge['id']}:{track_id}:{me['id']}",
+                "source_type": "fastlap",
+                "title": challenge.get("title") or "Fast Lap",
+                "category": track.get("name") or "Streckenwertung",
+                "rank": rank,
+                "label": _certificate_label(rank),
+                "display_name": row.get("display_name") or me.get("display_name") or me.get("username"),
+                "source_url": f"/fastlap/{slug_or_id}",
+                "download_url": _certificate_url(
+                    f"/api/exports/f1/{slug_or_id}/certificates/{me['id']}.pdf",
+                    {"track_id": track_id},
+                ),
+                "sort_date": challenge.get("start_date") or "",
+            })
+    return result
+
+
+@router.get("/me/certificates")
+async def my_certificates(me: dict = Depends(get_current_user)):
+    db = get_db()
+    rows = [*await _my_tournament_certificates(db, me), *await _my_f1_certificates(db, me)]
+    rows.sort(
+        key=lambda item: (
+            item.get("sort_date") or "",
+            -(int(item.get("rank") or 999)),
+            item.get("title") or "",
+        ),
+        reverse=True,
+    )
+    return rows[:100]
 
 
 @router.get("/me/open-count")
