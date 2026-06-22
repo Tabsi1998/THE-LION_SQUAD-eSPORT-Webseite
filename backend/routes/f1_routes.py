@@ -502,7 +502,7 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
     ):
         raise HTTPException(
             status_code=400,
-            detail="Wenn Vereinsmitglieder von der offiziellen Wertung ausgeschlossen sind, muessen Vereins-Referenzzeiten erlaubt bleiben.",
+            detail="Wenn Vereinsmitglieder von der offiziellen Wertung ausgeschlossen sind, müssen Vereins-Referenzzeiten erlaubt bleiben.",
         )
     if "registration_enabled" in updates:
         updates["online_registration_enabled"] = updates.get("registration_enabled") is True

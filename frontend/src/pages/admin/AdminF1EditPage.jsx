@@ -502,7 +502,7 @@ function F1StaffPanel({ challengeId, staff, users, onChanged }) {
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Notiz</div>
             <input value={form.notes} onChange={(e) => set("notes", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="z.B. Beamer-Station Samstag" />
           </label>
-          <button disabled={saving} className="w-full px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">Hinzufuegen</button>
+          <button disabled={saving} className="w-full px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">Hinzufügen</button>
         </form>
         <div className="lg:col-span-2 border border-white/10 rounded-sm overflow-hidden">
           <table className="w-full text-sm">
@@ -753,7 +753,7 @@ function FastLapPrizeEditor({ value, onChange }) {
           data-testid="f1-edit-prize-add"
           className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white"
         >
-          + Platz hinzufuegen
+          + Platz hinzufügen
         </button>
       </div>
       {prizes.map((p, i) => (

@@ -165,7 +165,7 @@ def normalize_v2_results(match: dict, raw_results: list[dict]) -> list[dict]:
     expected_ranks = set(range(1, len(participants) + 1))
     if seen_ranks != expected_ranks:
         missing = ", ".join(str(r) for r in sorted(expected_ranks - seen_ranks))
-        raise MatchV2ResultError(f"Ranks muessen fortlaufend 1-{len(participants)} sein; fehlt: {missing}")
+        raise MatchV2ResultError(f"Ranks müssen fortlaufend 1-{len(participants)} sein; fehlt: {missing}")
     return sorted(normalized, key=lambda item: item["rank"])
 
 
