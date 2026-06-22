@@ -422,6 +422,23 @@ def _resolve_schema(tournament: dict, stage: dict, registrations: list[dict], pr
     return None
 
 
+def _validate_stage_flow(tournament: dict, stage: dict, specs: list[BracketMatchSpec]) -> None:
+    stage_type = (stage.get("stage_type") or "").strip()
+    tournament_format = (tournament.get("format") or "").strip()
+    single_elimination = stage_type == "single_elimination" or tournament_format == "single_elim"
+    if not single_elimination:
+        return
+
+    loser_sections = {"lb", "loser", "lower", "lower_bracket", "loser bracket", "looser"}
+    bronze_sections = {"bronze", "br", "spiel um platz 3", "platz 3"}
+    for spec in specs:
+        section = (spec.section or "").strip().lower()
+        if section in loser_sections:
+            raise BracketSchemaError("Einzelausscheidung darf kein Loser-Bracket enthalten")
+        if section not in bronze_sections and any(source.get("type") == "rank" and source.get("flow") == "L" for source in spec.sources):
+            raise BracketSchemaError("Einzelausscheidung darf keine Verlierer in Folgematches weiterleiten")
+
+
 def _ready_status_for_slots(slots: list[dict], min_players: int) -> str:
     filled = sum(1 for slot in slots if slot.get("status") == "filled" and slot.get("registration_id"))
     has_pending_ref = any(
@@ -600,6 +617,7 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
     settings = stage.get("settings") or {}
     schema = _resolve_schema(tournament, stage, registrations, preview)
     specs = parse_custom_bracket_schema(schema)
+    _validate_stage_flow(tournament, stage, specs)
     rounds = infer_rounds(specs)
     ordered_regs = _ordered_registrations(registrations, tournament.get("seeding_mode") or "random")
     seed_to_reg = {index + 1: reg for index, reg in enumerate(ordered_regs)}
@@ -661,6 +679,7 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
                 "score_type": settings.get("score_type") or "points",
                 "calculation": settings.get("calculation") or "points",
                 "duration_minutes": int(settings.get("duration_minutes") or tournament.get("match_duration_minutes") or 30),
+                "randomize_advancement_rounds": bool(settings.get("randomize_advancement_rounds") or tournament.get("randomize_advancement_rounds")),
             },
             "status": "preview" if preview else ("ready" if not has_ref and filled_count >= min_players else "pending"),
             "is_preview": bool(preview),

@@ -32,6 +32,7 @@ export default function AdminPrizesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [allItems, setAllItems] = useState([]);
   const [filter, setFilter] = useState(searchParams.get("status") || "");
+  const [sourceFilter, setSourceFilter] = useState(searchParams.get("source") || "");
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [loading, setLoading] = useState(true);
   const [creatingMissing, setCreatingMissing] = useState(false);
@@ -51,20 +52,26 @@ export default function AdminPrizesPage() {
 
   useEffect(() => {
     const nextFilter = searchParams.get("status") || "";
+    const nextSource = searchParams.get("source") || "";
     const nextQuery = searchParams.get("q") || "";
     if (nextFilter !== filter) setFilter(nextFilter);
+    if (nextSource !== sourceFilter) setSourceFilter(nextSource);
     if (nextQuery !== query) setQuery(nextQuery);
-  }, [searchParams, filter, query]);
+  }, [searchParams, filter, sourceFilter, query]);
 
   const updateFilterParams = (patch) => {
     const nextFilter = Object.prototype.hasOwnProperty.call(patch, "status") ? patch.status : filter;
+    const nextSource = Object.prototype.hasOwnProperty.call(patch, "source") ? patch.source : sourceFilter;
     const nextQuery = Object.prototype.hasOwnProperty.call(patch, "q") ? patch.q : query;
     setFilter(nextFilter);
+    setSourceFilter(nextSource);
     setQuery(nextQuery);
     setSearchParams((current) => {
       const params = new URLSearchParams(current);
       if (nextFilter) params.set("status", nextFilter);
       else params.delete("status");
+      if (nextSource) params.set("source", nextSource);
+      else params.delete("source");
       if (nextQuery) params.set("q", nextQuery);
       else params.delete("q");
       return params;
@@ -117,6 +124,8 @@ export default function AdminPrizesPage() {
   const normalizedQuery = query.trim().toLowerCase();
   const items = allItems.filter((p) => {
     if (filter && p.status !== filter) return false;
+    if (sourceFilter === "fastlap" && p.source_type !== "fastlap") return false;
+    if (sourceFilter === "tournament" && p.source_type === "fastlap") return false;
     if (!normalizedQuery) return true;
     return [
       p.tournament_title,
@@ -130,6 +139,11 @@ export default function AdminPrizesPage() {
     ].some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
   });
   const counts = allItems.reduce((acc, p) => { acc[p.status] = (acc[p.status] || 0) + 1; return acc; }, {});
+  const sourceCounts = allItems.reduce((acc, p) => {
+    const key = p.source_type === "fastlap" ? "fastlap" : "tournament";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
   const dueSoon = allItems.filter((p) => ["pending", "ready"].includes(p.status) && daysUntil(p.pickup_deadline) !== null && daysUntil(p.pickup_deadline) <= 14).length;
 
   return (
@@ -156,6 +170,19 @@ export default function AdminPrizesPage() {
           <RefreshCw className={`h-4 w-4 ${creatingMissing ? "animate-spin" : ""}`} />
           Gewinne neu erzeugen
         </button>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        {[["", "Alle", allItems.length], ["tournament", "Turniere", sourceCounts.tournament || 0], ["fastlap", "Fast Lap", sourceCounts.fastlap || 0]].map(([value, label, count]) => (
+          <button
+            key={value || "all"}
+            type="button"
+            onClick={() => updateFilterParams({ source: sourceFilter === value ? "" : value })}
+            className={`rounded-sm border px-3 py-2 text-xs font-bold uppercase tracking-wider ${sourceFilter === value ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 bg-[#121212] text-white/60 hover:border-white/20"}`}
+          >
+            {label} <span className="text-white/40">({count})</span>
+          </button>
+        ))}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
