@@ -26,6 +26,7 @@ from services.tournament_permissions import (
     require_tournament_staff_permission,
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
+from services.match_v2_results import MatchV2ResultError, build_v2_result_application
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import (
     TournamentCreate, TournamentUpdate, RegistrationCreate, RegistrationUpdate,
@@ -2306,6 +2307,78 @@ async def list_tournament_matches_v2(tid: str, stage_id: str | None = None,
         q["stage_id"] = stage_id
     matches = await db.matches_v2.find(q, {"_id": 0}).sort([("round", 1), ("match_key", 1)]).to_list(2000)
     return matches
+
+
+@router.post("/{tid}/matches-v2/recalculate-advancement")
+async def recalculate_tournament_matches_v2_advancement(tid: str, stage_id: str | None = None,
+                                                        me: dict = Depends(get_current_user)):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, RESULT_STAFF_ROLES)
+    q = {"tournament_id": tid}
+    if stage_id:
+        q["stage_id"] = stage_id
+    stage_matches = await db.matches_v2.find(q, {"_id": 0}).sort([
+        ("stage_number", 1),
+        ("round", 1),
+        ("order", 1),
+        ("match_key", 1),
+    ]).to_list(3000)
+    by_id = {match["id"]: match for match in stage_matches if match.get("id")}
+    completed = [
+        match for match in stage_matches
+        if match.get("status") in {"completed", "forfeit"} and match.get("results")
+    ]
+    now_iso = now_utc().isoformat()
+    updated_match_ids: set[str] = set()
+    errors = []
+
+    for original in completed:
+        match = by_id.get(original["id"], original)
+        try:
+            application = build_v2_result_application(
+                match,
+                list(by_id.values()),
+                match.get("results") or [],
+                actor_id=me["id"],
+                now_iso=now_iso,
+                proof_url=(match.get("result_meta") or {}).get("proof_url"),
+                note=(match.get("result_meta") or {}).get("note"),
+                force=True,
+            )
+        except MatchV2ResultError as exc:
+            errors.append({
+                "match_id": match.get("id"),
+                "match_key": match.get("match_key"),
+                "detail": str(exc),
+            })
+            continue
+
+        for target_id, update in application["target_sets"].items():
+            await db.matches_v2.update_one({"id": target_id}, {"$set": update})
+            if target_id in by_id:
+                by_id[target_id].update(update)
+            updated_match_ids.add(target_id)
+
+    await _audit_tournament_action(
+        db,
+        "tournament.matches_v2.recalculate_advancement",
+        me.get("id"),
+        tid,
+        {
+            "stage_id": stage_id,
+            "source_match_count": len(completed),
+            "updated_match_count": len(updated_match_ids),
+            "error_count": len(errors),
+        },
+    )
+    return {
+        "ok": not errors,
+        "source_match_count": len(completed),
+        "updated_match_count": len(updated_match_ids),
+        "updated_match_ids": sorted(updated_match_ids),
+        "errors": errors,
+    }
 
 
 @router.post("/{tid}/stages/{stage_id}/generate")
