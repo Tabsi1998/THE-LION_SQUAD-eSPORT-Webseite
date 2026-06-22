@@ -80,6 +80,19 @@ def test_v2_generator_builds_slots_and_advancement():
     assert {entry["flow"] for entry in by_key["A"]["advancement"]} == {"W", "L"}
 
 
+def test_single_elimination_rejects_loser_bracket_flow():
+    tournament = {"id": "t1", "format": "single_elim", "seeding_mode": "manual"}
+    stage = {
+        "id": "s1",
+        "stage_type": "single_elimination",
+        "match_type": "duel",
+        "settings": {"schema": "[WB]\nA=[1,2]\n\n[LB]\nLA=[L:A:2,3]"},
+    }
+
+    with pytest.raises(BracketSchemaError, match="Loser-Bracket|Verlierer"):
+        build_matches_v2_from_schema(tournament, stage, [], preview=True)
+
+
 def test_v2_generator_compacts_first_round_ffa_seed_slots():
     schema = "\n".join([
         "[WB]",

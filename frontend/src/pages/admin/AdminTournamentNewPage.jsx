@@ -76,7 +76,7 @@ export default function AdminTournamentNewPage() {
     site_banner_enabled: false,
     auto_start_enabled: false,
     event_mode: "online", result_entry_mode: "", schedule_mode: "",
-    best_of: 1, bronze_match: false, seeding_mode: "random",
+    best_of: 1, bronze_match: false, seeding_mode: "random", randomize_advancement_rounds: false,
     is_public: true, rules: "", prize_pool: "",
     banner_url: "",
     prize_places: [
@@ -235,6 +235,10 @@ export default function AdminTournamentNewPage() {
             <Field label="Best of" type="number" value={form.best_of} onChange={(v) => set("best_of", Number(v))} testId="new-tr-bestof" />
             <Select label="Seeding" value={form.seeding_mode} onChange={(v) => set("seeding_mode", v)} options={[["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]]} testId="new-tr-seeding" />
           </Row>
+          <label className="mt-3 flex items-start gap-2 text-sm text-white/75">
+            <input type="checkbox" checked={!!form.randomize_advancement_rounds} onChange={(e) => set("randomize_advancement_rounds", e.target.checked)} data-testid="new-tr-randomize-advancement" className="accent-[#29B6E8] mt-1" />
+            <span>Folgerunden zufällig mischen<br /><span className="text-xs text-white/45">Runde 1 bleibt nach Check-in fix; qualifizierte Spieler werden in die nächste Runde zufällig verteilt.</span></span>
+          </label>
           {BRONZE_FORMATS.has(form.format) && (
             <label className="mt-3 flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.bronze_match} onChange={(e) => set("bronze_match", e.target.checked)} data-testid="new-tr-bronze" className="accent-[#29B6E8]" />

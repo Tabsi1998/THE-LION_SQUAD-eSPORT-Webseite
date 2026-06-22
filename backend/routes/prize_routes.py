@@ -68,6 +68,7 @@ async def _hydrate_pickups(pickups: list[dict]) -> list[dict]:
 async def list_prizes(
     status: Optional[PrizeStatus] = None,
     tournament_id: Optional[str] = None,
+    source_type: Optional[Literal["tournament", "fastlap"]] = None,
     me: dict = Depends(require_admin()),
 ):
     db = get_db()
@@ -76,6 +77,10 @@ async def list_prizes(
         q["status"] = status
     if tournament_id:
         q["tournament_id"] = tournament_id
+    if source_type == "fastlap":
+        q["source_type"] = "fastlap"
+    elif source_type == "tournament":
+        q["$or"] = [{"source_type": {"$exists": False}}, {"source_type": "tournament"}]
     pickups = await db.prize_pickups.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
     return await _hydrate_pickups(pickups)
 

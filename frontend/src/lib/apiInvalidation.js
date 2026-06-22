@@ -37,6 +37,9 @@ const RESOURCE_ALIASES = {
   "settings/smtp": ["settings", "mail"],
   uploads: ["media"],
   matches: ["tournaments"],
+  "matches-v2": ["tournaments", "matches"],
+  prizes: ["users"],
+  f1: ["fastlap", "prizes"],
 };
 
 function eventKeys(event) {

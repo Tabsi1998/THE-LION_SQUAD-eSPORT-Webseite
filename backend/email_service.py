@@ -496,7 +496,7 @@ def _wrap(title: str, body_html: str, cta_label: Optional[str] = None, cta_url: 
 def tpl_test(branding: str = "THE LION SQUAD") -> tuple[str, str]:
     return "Testmail von THE LION SQUAD", _wrap(
         "E-Mail-Test",
-        "<p>Diese Nachricht wurde ueber die Website von THE LION SQUAD eSports versendet.</p>"
+        "<p>Diese Nachricht wurde über die Website von THE LION SQUAD eSports versendet.</p>"
         "<p>Sie dient nur zur Prüfung der SMTP-Konfiguration.</p>",
     )
 

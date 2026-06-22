@@ -272,7 +272,7 @@ def _validate_squad_members(team: dict, member_ids: list[str]) -> list[str]:
     clean = []
     for uid in member_ids or []:
         if uid not in allowed:
-            raise HTTPException(status_code=400, detail="Squad-Mitglieder muessen im Team sein")
+            raise HTTPException(status_code=400, detail="Squad-Mitglieder müssen im Team sein")
         if uid not in clean:
             clean.append(uid)
     return clean

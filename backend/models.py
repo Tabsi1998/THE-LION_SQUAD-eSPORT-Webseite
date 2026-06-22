@@ -445,6 +445,7 @@ class TournamentCreate(BaseModel):
     location: Optional[str] = None
     banner_url: Optional[str] = None
     seeding_mode: Literal["manual", "random", "ranking"] = "random"
+    randomize_advancement_rounds: bool = False
     # Phase 5: unified stream-per-object
     has_live_stream: bool = False
     stream_platform: Optional[StreamPlatform] = None
@@ -503,6 +504,7 @@ class TournamentUpdate(BaseModel):
     location: Optional[str] = None
     banner_url: Optional[str] = None
     seeding_mode: Optional[Literal["manual", "random", "ranking"]] = None
+    randomize_advancement_rounds: Optional[bool] = None
     has_live_stream: Optional[bool] = None
     stream_platform: Optional[StreamPlatform] = None
     stream_url: Optional[str] = None

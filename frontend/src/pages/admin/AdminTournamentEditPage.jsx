@@ -1620,6 +1620,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     match_duration_minutes: source.match_duration_minutes || 30,
     bronze_match: !!source.bronze_match,
     seeding_mode: source.seeding_mode || "random",
+    randomize_advancement_rounds: !!source.randomize_advancement_rounds,
     is_public: source.is_public !== false,
     visibility: source.visibility || "public",
     site_banner_enabled: !!source.site_banner_enabled,
@@ -1671,6 +1672,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     match_duration_minutes: tournament.match_duration_minutes || 30,
     bronze_match: !!tournament.bronze_match,
     seeding_mode: tournament.seeding_mode || "random",
+    randomize_advancement_rounds: !!tournament.randomize_advancement_rounds,
     is_public: tournament.is_public !== false,
     visibility: tournament.visibility || "public",
     site_banner_enabled: !!tournament.site_banner_enabled,
@@ -1852,6 +1854,10 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
         <Details title="Erweiterte Spieloptionen">
           <div className="grid md:grid-cols-3 gap-3">
             <SelectField label="Seeding" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} />
+            <label className="flex items-start gap-2 text-sm text-white/75 sm:col-span-2">
+              <input type="checkbox" checked={!!f.randomize_advancement_rounds} onChange={(e)=>set("randomize_advancement_rounds", e.target.checked)} className="accent-[#29B6E8] mt-1"/>
+              <span>Folgerunden zufällig mischen<br /><span className="text-xs text-white/45">Runde 1 bleibt nach Check-in fix; qualifizierte Spieler werden in die nächste Runde zufällig auf freie Zielslots verteilt.</span></span>
+            </label>
             <Fld label="Best of" type="number" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"/>
             <Fld label="Matchdauer Min." type="number" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"/>
             <SeasonWeightField value={f.season_weight} onChange={(v)=>set("season_weight",v)} />

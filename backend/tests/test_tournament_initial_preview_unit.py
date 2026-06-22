@@ -289,7 +289,7 @@ def test_checkin_finalization_turns_preview_into_fixed_legacy_matches():
     anyio.run(run)
 
 
-def test_checkin_registration_change_rebuilds_until_real_match_started():
+def test_checkin_registration_change_keeps_bracket_fixed():
     async def run():
         tournament = {
             "id": "t1",
@@ -317,15 +317,9 @@ def test_checkin_registration_change_rebuilds_until_real_match_started():
             if pid
         }
 
-        assert rebuilt["reason"] == "checkin_rebuild"
-        assert rebuilt["participant_count"] == 4
-        assert {"r1", "r2", "r3", "r4"} <= participant_ids
-
-        db.matches.rows[0]["status"] = "in_progress"
-        blocked = await _refresh_tournament_previews_after_registration(db, tournament, "admin-1")
-
-        assert blocked["ok"] is False
-        assert blocked["reason"] == "matches_started"
-        assert blocked["locked_match_count"] == 1
+        assert rebuilt is None
+        assert {"r1", "r2"} <= participant_ids
+        assert "r3" not in participant_ids
+        assert "r4" not in participant_ids
 
     anyio.run(run)

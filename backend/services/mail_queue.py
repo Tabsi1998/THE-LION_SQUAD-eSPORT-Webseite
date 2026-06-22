@@ -352,7 +352,7 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
         elif auth_mode == "none":
             result["steps"].append({"ok": True, "label": "SMTP Login bewusst uebersprungen (lokaler Relay-Modus)."})
         else:
-            result["steps"].append({"ok": False, "label": "Auto-Modus konnte keinen Login durchfuehren. Stelle auf 'Mit Benutzer/Passwort' und nutze Port 587 STARTTLS."})
+            result["steps"].append({"ok": False, "label": "Auto-Modus konnte keinen Login durchführen. Stelle auf 'Mit Benutzer/Passwort' und nutze Port 587 STARTTLS."})
             result["recommendations"].append("Auto-Modus ist nur für Altbestand gedacht. Empfohlen ist 'Mit Benutzer/Passwort'.")
             return result
 

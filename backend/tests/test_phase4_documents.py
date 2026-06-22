@@ -414,7 +414,7 @@ def members_news(admin):
     payload = {
         "title": "TEST Phase4 Members-Only News",
         "slug": slug,
-        "summary": "Nur fuer Mitglieder",
+        "summary": "Nur für Mitglieder",
         "content": "Geheime Mitglieder-News",
         "visibility": "members",
         "published": True,

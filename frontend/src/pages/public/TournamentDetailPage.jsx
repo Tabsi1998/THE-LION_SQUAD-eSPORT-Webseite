@@ -140,7 +140,8 @@ export default function TournamentDetailPage() {
   const registration = getRegistrationState(t, "Anmeldung");
   const isTeamTournament = (t.team_mode || "solo") !== "solo";
   const myRegTeam = myReg?.team_id ? myTeams.find((team) => team.id === myReg.team_id) : null;
-  const canCheckIn = !!myReg && (!myReg.team_id || myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role));
+  const staffOnlyCheckIn = (t.event_mode || "online") === "local";
+  const canCheckIn = !staffOnlyCheckIn && !!myReg && (!myReg.team_id || myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role));
   const clubMemberBlocked = !!user?.is_club_member && !!t.block_club_member_registration;
   const hasRegisterAccess = t.access_link?.grants?.includes("register");
   const canSelfRegister = (registration.canRegister || hasRegisterAccess) && !clubMemberBlocked;
@@ -225,6 +226,11 @@ export default function TournamentDetailPage() {
             {canCheckIn && myReg.status === "approved" && t.status === "check_in" && (
               <button onClick={handleCheckin} data-testid="tournament-checkin-btn" className="px-6 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#EAC200] transition">
                 Check-in
+              </button>
+            )}
+            {staffOnlyCheckIn && myReg?.status === "approved" && t.status === "check_in" && (
+              <button type="button" disabled className="px-6 py-3 border border-[#FFD700]/35 text-[#FFD700]/75 font-bold uppercase tracking-wider rounded-sm cursor-not-allowed">
+                Check-in vor Ort
               </button>
             )}
             {canSelfUnregister && (

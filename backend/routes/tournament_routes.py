@@ -983,8 +983,6 @@ async def _refresh_stage_previews_after_registration(db, tournament: dict, actor
 
 async def _refresh_tournament_previews_after_registration(db, tournament: dict, actor_id: str | None) -> dict | None:
     """Refresh all draft bracket surfaces after participant changes."""
-    if tournament.get("status") == "check_in":
-        return await _rebuild_checkin_bracket_after_staff_change(db, tournament, actor_id)
     if tournament.get("status") in BRACKET_REFRESH_LOCKED_STATUSES:
         return None
     tid = tournament["id"]
@@ -2022,6 +2020,20 @@ async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_curr
     if not is_own_registration and not is_team_manager and not is_staff:
         raise HTTPException(status_code=403)
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if is_staff and (tournament or {}).get("status") == "check_in":
+        legacy_slots = await db.matches.count_documents({
+            "tournament_id": tid,
+            "$or": [{"participant_a_id": reg_id}, {"participant_b_id": reg_id}],
+        })
+        v2_slots = await db.matches_v2.count_documents({
+            "tournament_id": tid,
+            "slots.registration_id": reg_id,
+        })
+        if legacy_slots or v2_slots:
+            raise HTTPException(
+                status_code=409,
+                detail="Nach Check-in-Start bleibt der Turnierbaum fix. Teilnehmer als 'Nicht erschienen' markieren und per Ersatzspieler ersetzen.",
+            )
     if (is_own_registration or is_team_manager) and not is_staff:
         if reg.get("status") == "checked_in" or (tournament or {}).get("status") in {"live", "paused", "completed", "results_published", "archived"}:
             raise HTTPException(status_code=409, detail="Abmeldung ist nach Check-in oder Turnierstart nur über die Turnierleitung möglich.")
@@ -2364,7 +2376,9 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
 async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    await _ensure_tournament_unlocked(db, tid)
+    tournament = await _ensure_tournament_unlocked(db, tid)
+    if (tournament.get("event_mode") or "online") == "local":
+        raise HTTPException(status_code=403, detail="Bei Vor-Ort-Turnieren macht die Turnierleitung den Check-in.")
     reg = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": me["id"]})
     if not reg:
         team_ids = [

@@ -1,6 +1,7 @@
 """Result validation and advancement for matches_v2."""
 from __future__ import annotations
 
+import random
 from typing import Any
 from collections import defaultdict
 
@@ -164,7 +165,7 @@ def normalize_v2_results(match: dict, raw_results: list[dict]) -> list[dict]:
     expected_ranks = set(range(1, len(participants) + 1))
     if seen_ranks != expected_ranks:
         missing = ", ".join(str(r) for r in sorted(expected_ranks - seen_ranks))
-        raise MatchV2ResultError(f"Ranks muessen fortlaufend 1-{len(participants)} sein; fehlt: {missing}")
+        raise MatchV2ResultError(f"Ranks müssen fortlaufend 1-{len(participants)} sein; fehlt: {missing}")
     return sorted(normalized, key=lambda item: item["rank"])
 
 
@@ -179,6 +180,35 @@ def _find_slot(match: dict, slot_number: int) -> dict | None:
         if int(slot.get("slot") or 0) == int(slot_number):
             return slot
     return None
+
+
+def _randomize_advancement_enabled(match: dict) -> bool:
+    return bool((match.get("settings") or {}).get("randomize_advancement_rounds"))
+
+
+def _advancement_slot_candidates(target: dict, advancement: dict) -> list[dict]:
+    flow = advancement.get("flow")
+    candidates = []
+    for slot in target.get("slots") or []:
+        source = slot.get("source") or {}
+        if source.get("type") != "rank":
+            continue
+        if source.get("flow") != flow:
+            continue
+        if slot.get("registration_id") or slot.get("source_result"):
+            continue
+        candidates.append(slot)
+    return candidates
+
+
+def _select_advancement_slot(match: dict, target: dict, advancement: dict) -> dict | None:
+    configured = _find_slot(target, int(advancement.get("to_slot") or 0))
+    if not _randomize_advancement_enabled(match):
+        return configured
+    candidates = _advancement_slot_candidates(target, advancement)
+    if not candidates:
+        return configured
+    return random.choice(candidates)
 
 
 def _downstream_links(stage_matches: list[dict]) -> dict[str, list[tuple[str, int]]]:
@@ -292,7 +322,7 @@ def build_v2_result_application(
         target = by_id.get(advancement.get("to_match_id")) or by_key.get(advancement.get("to_match_key"))
         if not target:
             raise MatchV2ResultError(f"Zielmatch {advancement.get('to_match_key')} nicht gefunden")
-        target_slot = _find_slot(target, int(advancement.get("to_slot") or 0))
+        target_slot = _select_advancement_slot(match, target, advancement)
         if not target_slot:
             raise MatchV2ResultError(f"Zielslot {advancement.get('to_slot')} in {target.get('match_key')} nicht gefunden")
         result = result_by_rank.get(int(advancement.get("rank") or 0))
