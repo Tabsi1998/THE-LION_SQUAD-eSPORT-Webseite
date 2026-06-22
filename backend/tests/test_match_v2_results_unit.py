@@ -159,6 +159,37 @@ def test_l_flow_rank_is_loser_index_after_qualifiers():
     assert application["target_sets"]["m-l"]["slots"][0]["registration_id"] == "loser"
 
 
+def test_result_application_rejects_same_participant_advanced_twice():
+    source = {
+        "id": "m-a",
+        "tournament_id": "t1",
+        "stage_id": "s1",
+        "match_key": "A",
+        "status": "ready",
+        "settings": {"calculation": "points"},
+        "slots": [
+            {"slot": 1, "registration_id": "winner", "user_id": "u1", "status": "filled"},
+            {"slot": 2, "registration_id": "loser", "user_id": "u2", "status": "filled"},
+        ],
+        "advancement": [
+            {"flow": "W", "rank": 1, "to_match_id": "m-w", "to_match_key": "W", "to_slot": 1},
+            {"flow": "L", "rank": 1, "to_match_id": "m-l", "to_match_key": "L", "to_slot": 1},
+        ],
+    }
+
+    with pytest.raises(MatchV2ResultError, match="nicht mehrfach weitergeleitet"):
+        build_v2_result_application(
+            source,
+            [source, _target("m-w", "W"), _target("m-l", "L")],
+            [
+                {"registration_id": "winner", "score": 2},
+                {"registration_id": "loser", "score": 0},
+            ],
+            actor_id="admin",
+            now_iso="2026-05-08T12:00:00+00:00",
+        )
+
+
 def test_l_flow_can_address_multiple_non_qualifiers():
     source = _source_match()
     source["settings"] = {"match_size": 4, "qualifiers_per_match": 2, "calculation": "points"}

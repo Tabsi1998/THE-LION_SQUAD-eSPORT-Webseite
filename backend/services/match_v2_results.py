@@ -338,6 +338,7 @@ def build_v2_result_application(
     downstream = _downstream_links(stage_matches)
     target_sets: dict[str, dict] = {}
     overwritten_targets: set[str] = set()
+    advanced_registration_ids: set[str] = set()
 
     for advancement in match.get("advancement") or []:
         target = by_id.get(advancement.get("to_match_id")) or by_key.get(advancement.get("to_match_key"))
@@ -350,6 +351,12 @@ def build_v2_result_application(
         result = result_by_rank.get(result_rank)
         if not result:
             raise MatchV2ResultError(f"Rank {result_rank} fehlt für Advancement")
+        if result["registration_id"] in advanced_registration_ids:
+            raise MatchV2ResultError(
+                "Teilnehmer darf aus demselben Match nicht mehrfach weitergeleitet werden",
+                409,
+            )
+        advanced_registration_ids.add(result["registration_id"])
 
         existing_reg = target_slot.get("registration_id")
         if existing_reg and existing_reg != result["registration_id"]:
