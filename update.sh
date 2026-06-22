@@ -60,8 +60,27 @@ check_frontend_route() {
 
 # 1. Git update (if this is a git checkout)
 if [ -d .git ]; then
-  info "Pulling latest code…"
-  git pull --ff-only || warn "Git pull failed — continuing with local code."
+  TARGET_BRANCH="${DEPLOY_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
+  [ -n "$TARGET_BRANCH" ] && [ "$TARGET_BRANCH" != "HEAD" ] || fail "Cannot determine git branch. Set DEPLOY_BRANCH=<branch>."
+
+  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    fail "Tracked local changes detected. Commit, stash, or revert them before updating."
+  fi
+
+  info "Pulling latest code for branch ${TARGET_BRANCH}..."
+  git fetch --prune origin "$TARGET_BRANCH"
+
+  CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+  if [ "$CURRENT_BRANCH" != "$TARGET_BRANCH" ]; then
+    if git show-ref --verify --quiet "refs/heads/${TARGET_BRANCH}"; then
+      git switch "$TARGET_BRANCH"
+    else
+      git switch -c "$TARGET_BRANCH" --track "origin/${TARGET_BRANCH}"
+    fi
+  fi
+
+  git pull --ff-only origin "$TARGET_BRANCH"
+  ok "Code ready: $(git rev-parse --abbrev-ref HEAD) @ $(git rev-parse --short HEAD)"
 fi
 
 # Optional backup before containers are recreated.
