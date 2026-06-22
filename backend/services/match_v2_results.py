@@ -211,6 +211,27 @@ def _select_advancement_slot(match: dict, target: dict, advancement: dict) -> di
     return random.choice(candidates)
 
 
+def _advancement_result_rank(match: dict, advancement: dict) -> int:
+    rank = int(advancement.get("rank") or 0)
+    if advancement.get("flow") != "L":
+        return rank
+
+    settings = match.get("settings") or {}
+    if "qualifiers_per_match" not in settings:
+        return rank
+
+    match_size = int(settings.get("match_size") or len(match.get("slots") or []) or 0)
+    if match_size <= 0:
+        return rank
+    qualifiers = max(0, min(int(settings.get("qualifiers_per_match") or 0), match_size))
+    loser_count = max(0, match_size - qualifiers)
+    if 1 <= rank <= loser_count:
+        return qualifiers + rank
+
+    # Backward compatibility for old schemas that used L:<match>:<absolute rank>.
+    return rank
+
+
 def _downstream_links(stage_matches: list[dict]) -> dict[str, list[tuple[str, int]]]:
     links: dict[str, list[tuple[str, int]]] = defaultdict(list)
     for match in stage_matches:
@@ -325,9 +346,10 @@ def build_v2_result_application(
         target_slot = _select_advancement_slot(match, target, advancement)
         if not target_slot:
             raise MatchV2ResultError(f"Zielslot {advancement.get('to_slot')} in {target.get('match_key')} nicht gefunden")
-        result = result_by_rank.get(int(advancement.get("rank") or 0))
+        result_rank = _advancement_result_rank(match, advancement)
+        result = result_by_rank.get(result_rank)
         if not result:
-            raise MatchV2ResultError(f"Rank {advancement.get('rank')} fehlt für Advancement")
+            raise MatchV2ResultError(f"Rank {result_rank} fehlt für Advancement")
 
         existing_reg = target_slot.get("registration_id")
         if existing_reg and existing_reg != result["registration_id"]:
