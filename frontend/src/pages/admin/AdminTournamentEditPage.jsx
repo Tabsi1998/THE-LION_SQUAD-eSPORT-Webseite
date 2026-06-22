@@ -97,7 +97,7 @@ C=[W:A:1,W:A:2,W:B:1,W:B:2]
 
 [LB]
 # Runde 1
-LA=[L:A:3,L:A:4,L:B:3,L:B:4]`;
+LA=[L:A:1,L:A:2,L:B:1,L:B:2]`;
 const CUSTOM_STAGE_TYPES = new Set(["custom_bracket", "ffa_custom_bracket"]);
 const AUTO_STAGE_TYPES = new Set(["single_elimination", "double_elimination", "custom_bracket", "ffa_custom_bracket"]);
 const FFA_STAGE_TYPES = new Set(["simple", "ffa_single_elimination", "ffa_custom_bracket", "ffa_league"]);

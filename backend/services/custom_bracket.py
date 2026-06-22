@@ -6,8 +6,9 @@ The schema is intentionally small and explicit:
     A=[1,2,3,4]
     B=[W:A:1,W:A:2,5,6]
 
-Numeric tokens are seed slots. Reference tokens use FLOW:MATCH:RANK, where
-FLOW is W (winner/qualified), L (loser/lower ranks), or R (raw rank).
+Numeric tokens are seed slots. Reference tokens use FLOW:MATCH:RANK. W picks
+qualified ranks, L picks non-qualified ranks after the configured qualifiers,
+and R picks the raw absolute rank.
 """
 from __future__ import annotations
 
@@ -247,14 +248,14 @@ def _auto_single_elim_schema(slot_count: int, bronze_match: bool = False) -> str
         lines.append("")
         lines.append("[BRONZE]")
         lines.append("# Spiel um Platz 3")
-        lines.append(f"{key}=[L:{semifinals[0]}:2,L:{semifinals[1]}:2]")
+        lines.append(f"{key}=[L:{semifinals[0]}:1,L:{semifinals[1]}:1]")
     return "\n".join(lines)
 
 
 def _auto_double_elim_schema(slot_count: int) -> str:
     bracket_size = _next_power_of_two(max(2, slot_count))
     if bracket_size == 2:
-        return "[WB]\n# Winner Bracket\nA=[1,2]\n\n[GF]\n# Finale\nGF=[W:A:1,L:A:2]"
+        return "[WB]\n# Winner Bracket\nA=[1,2]\n\n[GF]\n# Finale\nGF=[W:A:1,L:A:1]"
 
     lines = ["[WB]"]
     sources = [str(seed) for seed in _seed_positions(bracket_size)]
@@ -284,7 +285,7 @@ def _auto_double_elim_schema(slot_count: int) -> str:
     for idx in range(0, len(first_wb), 2):
         key = f"L{_match_key(lb_key_index)}"
         lb_key_index += 1
-        lines.append(f"{key}=[L:{first_wb[idx]}:2,L:{first_wb[idx + 1]}:2]")
+        lines.append(f"{key}=[L:{first_wb[idx]}:1,L:{first_wb[idx + 1]}:1]")
         lb_prev.append(key)
 
     lb_round_num = 2
@@ -297,7 +298,7 @@ def _auto_double_elim_schema(slot_count: int) -> str:
                 break
             key = f"L{_match_key(lb_key_index)}"
             lb_key_index += 1
-            lines.append(f"{key}=[W:{lb_prev[idx]}:1,L:{wb_key}:2]")
+            lines.append(f"{key}=[W:{lb_prev[idx]}:1,L:{wb_key}:1]")
             drop_round.append(key)
         lb_prev = drop_round
         if len(lb_prev) > 1:
@@ -389,7 +390,7 @@ def _with_custom_bronze_match(schema: str) -> str:
         "",
         "[BRONZE]",
         "# Spiel um Platz 3",
-        f"{key}=[L:{left}:2,L:{right}:2]",
+        f"{key}=[L:{left}:1,L:{right}:1]",
     ])
 
 

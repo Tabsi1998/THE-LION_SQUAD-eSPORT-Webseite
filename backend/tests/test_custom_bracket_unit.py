@@ -24,7 +24,7 @@ C=[W:A:1,W:A:2,W:B:1,W:B:2]
 
 [LB]
 # Round 1 (4 -> 2)
-LA=[L:A:3,L:A:4,L:B:3,L:B:4]
+LA=[L:A:1,L:A:2,L:B:1,L:B:2]
 """
 
 
@@ -286,7 +286,7 @@ def test_v2_auto_single_elim_adds_bronze_match_from_semifinal_losers():
     assert bronze["round_name"] == "Spiel um Platz 3"
     assert {source["match_key"] for source in bronze_sources} == semifinal_keys
     assert {source["flow"] for source in bronze_sources} == {"L"}
-    assert {source["rank"] for source in bronze_sources} == {2}
+    assert {source["rank"] for source in bronze_sources} == {1}
 
 
 def test_v2_custom_duel_schema_adds_bronze_match_when_final_is_clear():
@@ -316,7 +316,7 @@ def test_v2_custom_duel_schema_adds_bronze_match_when_final_is_clear():
     assert bronze["round_name"] == "Spiel um Platz 3"
     assert [source["match_key"] for source in bronze_sources] == ["A", "B"]
     assert {source["flow"] for source in bronze_sources} == {"L"}
-    assert {source["rank"] for source in bronze_sources} == {2}
+    assert {source["rank"] for source in bronze_sources} == {1}
 
 
 def test_v2_generator_builds_auto_double_elim_schema():
