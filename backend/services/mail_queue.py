@@ -49,7 +49,7 @@ def explain_smtp_error(exc: Exception) -> str:
     if "Relay access denied" in raw:
         return (
             "Relay access denied: Der Mailserver erlaubt dem Backend nicht, an externe "
-            "Empfaenger zu senden. Loesung: SMTP AUTH auf dem Submission-Port verwenden "
+            "Empfänger zu senden. Lösung: SMTP AUTH auf dem Submission-Port verwenden "
             "oder die exakte Docker-/Server-IP im Mailserver als vertrauenswürdiges Relay "
             "eintragen. Port 25 ohne AUTH funktioniert nur für vertrauenswürdige interne "
             "Hosts und darf nie als offenes Relay konfiguriert werden."
@@ -350,7 +350,7 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
             result["auth_ok"] = True
             result["steps"].append({"ok": True, "label": "SMTP Login erfolgreich."})
         elif auth_mode == "none":
-            result["steps"].append({"ok": True, "label": "SMTP Login bewusst uebersprungen (lokaler Relay-Modus)."})
+            result["steps"].append({"ok": True, "label": "SMTP Login bewusst übersprungen (lokaler Relay-Modus)."})
         else:
             result["steps"].append({"ok": False, "label": "Auto-Modus konnte keinen Login durchführen. Stelle auf 'Mit Benutzer/Passwort' und nutze Port 587 STARTTLS."})
             result["recommendations"].append("Auto-Modus ist nur für Altbestand gedacht. Empfohlen ist 'Mit Benutzer/Passwort'.")
@@ -368,9 +368,9 @@ def _smtp_diagnose_sync(cfg: dict, to: str) -> dict:
         result["steps"].append({"ok": result["relay_ok"], "label": f"RCPT TO <{to}>: {rcpt_code} {rcpt_text}"})
         if result["relay_ok"]:
             result["ok"] = True
-            result["recommendations"].append("SMTP Diagnose erfolgreich. Der Server akzeptiert den Empfaenger vor DATA.")
+            result["recommendations"].append("SMTP Diagnose erfolgreich. Der Server akzeptiert den Empfänger vor DATA.")
         elif "Relay access denied" in rcpt_text:
-            result["recommendations"].append("Relay fehlt: Der Mailserver akzeptiert den Absender, erlaubt diesem Backend aber keine externen Empfaenger.")
+            result["recommendations"].append("Relay fehlt: Der Mailserver akzeptiert den Absender, erlaubt diesem Backend aber keine externen Empfänger.")
             result["recommendations"].append("Wenn du per lokaler IP verbinden musst, ist das okay: auf dieser IP muss aber Port 587 oder 465 mit SMTP AUTH aktiv sein.")
             result["recommendations"].append("Alternative für lokalen Relay-Betrieb: Port 25 ohne Anmeldung lassen, aber nur die exakte Webserver-/Docker-IP in mynetworks/permit_mynetworks erlauben. Nicht 0.0.0.0/0 freigeben.")
             result["recommendations"].append("Prüfe im Mailserver-Log, welche Quell-IP beim RCPT-Versuch ankommt; genau diese IP muss erlaubt werden.")

@@ -31,7 +31,7 @@ const SCHEDULE_MODE_LABELS = {
 const TOURNAMENT_STATUS_FILTERS = [
   ["", "Alle Status"],
   ["draft", "Entwurf"],
-  ["scheduled", "Angekuendigt"],
+  ["scheduled", "Angekündigt"],
   ["registration_open", "Anmeldung offen"],
   ["registration_closed", "Anmeldung geschlossen"],
   ["live", "Live"],

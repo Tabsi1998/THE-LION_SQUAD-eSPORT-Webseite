@@ -535,6 +535,11 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
             await _award_f1_season_points(c)
         except Exception:
             pass
+    prize_status = c.get("status") in {"completed", "results_published", "archived"}
+    should_create_prizes = prize_status and (
+        existing.get("status") != c.get("status") or "prize_places" in updates
+    )
+    if should_create_prizes:
         try:
             from services.prize_service import auto_create_for_f1_challenge
             await auto_create_for_f1_challenge(c["id"])

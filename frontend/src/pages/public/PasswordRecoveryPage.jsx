@@ -99,7 +99,7 @@ export function ResetPasswordPage() {
     if (!password) errors.password = "Bitte vergib ein neues Passwort.";
     else if (password.length < 10) errors.password = "Das Passwort braucht mindestens 10 Zeichen.";
     if (!confirm) errors.confirm = "Bitte wiederhole dein Passwort.";
-    else if (password !== confirm) errors.confirm = "Die Passwoerter stimmen nicht ueberein.";
+    else if (password !== confirm) errors.confirm = "Die Passwörter stimmen nicht überein.";
 
     setFieldErrors(errors);
     const first = errors.password ? "reset-password" : errors.confirm ? "reset-password-confirm" : null;

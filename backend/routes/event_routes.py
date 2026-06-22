@@ -831,7 +831,7 @@ async def update_event_registration(event_id: str, registration_id: str, body: E
     if proposed_status in ACTIVE_EVENT_REGISTRATION_STATUSES and event.get("max_participants"):
         summary = await _event_registration_summary(event, exclude_registration_id=registration_id)
         if summary["reserved_seats"] + _registration_seats(proposed) > int(event["max_participants"]):
-            raise HTTPException(status_code=400, detail="Kapazitaet waere ueberschritten")
+            raise HTTPException(status_code=400, detail="Kapazität wäre überschritten")
     updates["updated_at"] = now_utc().isoformat()
     await db.event_registrations.update_one({"id": registration_id}, {"$set": updates})
     await db.audit_logs.insert_one({

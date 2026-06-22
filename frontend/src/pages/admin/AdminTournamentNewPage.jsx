@@ -54,7 +54,7 @@ function buildPlanningWarnings(form, isTeam) {
   if (checkinFrom && checkinUntil && checkinUntil < checkinFrom) warnings.push("Der Check-in endet vor seiner Öffnung.");
   if (registrationUntil && start && registrationUntil > start) warnings.push("Die Anmeldung endet nach dem Turnierstart.");
   if (checkinUntil && start && checkinUntil > start) warnings.push("Der Check-in endet nach dem Turnierstart.");
-  if (form.status === "scheduled" && !form.start_date) warnings.push("Angekuendigte Turniere sollten eine Startzeit haben.");
+  if (form.status === "scheduled" && !form.start_date) warnings.push("Angekündigte Turniere sollten eine Startzeit haben.");
   if (form.twitch_enabled && !String(form.twitch_channel || "").trim()) warnings.push("Twitch ist aktiv, aber kein Kanal ist eingetragen.");
   return warnings;
 }

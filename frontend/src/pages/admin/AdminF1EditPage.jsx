@@ -92,7 +92,7 @@ export default function AdminF1EditPage() {
       setNewTrack({ name: "", image_url: "", country: "" });
       toast.success("Strecke hinzugefügt.");
       load();
-    } catch (err) { toast.error(formatRequestError(err, "Strecke konnte nicht hinzugefuegt werden.", { name: newTrack.name })); }
+    } catch (err) { toast.error(formatRequestError(err, "Strecke konnte nicht hinzugefügt werden.", { name: newTrack.name })); }
   };
 
   const delTrack = async (tid) => {

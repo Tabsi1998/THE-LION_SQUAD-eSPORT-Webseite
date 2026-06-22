@@ -442,6 +442,28 @@ RETIRED_NAV_CHILD_KEYS = {
     "community": {"members", "join"},
 }
 
+NAV_LABEL_REPLACEMENTS = {
+    "Ue" + "bersicht": "Übersicht",
+    "ue" + "bersicht": "Übersicht",
+    "Ue" + "ber uns": "Über uns",
+    "ue" + "ber uns": "Über uns",
+}
+
+
+def _normalize_nav_label(label: Any) -> Any:
+    if not isinstance(label, str):
+        return label
+    return NAV_LABEL_REPLACEMENTS.get(label, label)
+
+
+def _normalize_nav_item_labels(item: dict) -> dict:
+    copy = dict(item)
+    if "label" in copy:
+        copy["label"] = _normalize_nav_label(copy.get("label"))
+    if copy.get("children"):
+        copy["children"] = [_normalize_nav_item_labels(child) for child in copy["children"]]
+    return copy
+
 
 async def seed_default_nav():
     db = get_db()
@@ -474,6 +496,8 @@ def _filter_visible(items: list[dict]) -> list[dict]:
 
 def _merge_nav_item(current: dict, default: dict) -> dict:
     merged = {**default, **current}
+    if "label" in merged:
+        merged["label"] = _normalize_nav_label(merged.get("label"))
     parent_key = default.get("key") or default.get("to") or default.get("label")
     default_children = default.get("children") or []
     current_children = current.get("children") or []
@@ -485,7 +509,7 @@ def _merge_nav_item(current: dict, default: dict) -> dict:
             merged_children.append(_merge_nav_item(current_by_key.pop(key, {}), child_default))
         retired = RETIRED_NAV_CHILD_KEYS.get(parent_key, set())
         merged_children.extend(
-            child for key, child in current_by_key.items()
+            _normalize_nav_item_labels(child) for key, child in current_by_key.items()
             if key not in retired
         )
         merged["children"] = merged_children
@@ -501,7 +525,7 @@ def _normalize_nav_doc(doc: dict) -> dict:
     for default_item in DEFAULT_NAV["items"]:
         key = default_item.get("key") or default_item.get("to") or default_item.get("label")
         normalized.append(_merge_nav_item(current_by_key.pop(key, {}), default_item))
-    normalized.extend(current_by_key.values())
+    normalized.extend(_normalize_nav_item_labels(item) for item in current_by_key.values())
     return {**doc, "id": NAV_DOC_ID, "items": normalized}
 
 
@@ -531,12 +555,14 @@ class NavBody(BaseModel):
 @admin_nav_router.put("")
 async def admin_put_nav(body: NavBody, me: dict = Depends(require_admin())):
     db = get_db()
+    normalized = _normalize_nav_doc({"id": NAV_DOC_ID, "items": body.items})
     await db.cms_nav.update_one(
         {"id": NAV_DOC_ID},
-        {"$set": {"id": NAV_DOC_ID, "items": body.items, "updated_at": now_utc().isoformat()}},
+        {"$set": {"id": NAV_DOC_ID, "items": normalized["items"], "updated_at": now_utc().isoformat()}},
         upsert=True,
     )
-    return await db.cms_nav.find_one({"id": NAV_DOC_ID}, {"_id": 0})
+    doc = await db.cms_nav.find_one({"id": NAV_DOC_ID}, {"_id": 0})
+    return _normalize_nav_doc(doc or DEFAULT_NAV)
 
 
 # ============= SEO — robots.txt =============

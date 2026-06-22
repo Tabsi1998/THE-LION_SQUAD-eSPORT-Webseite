@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 const FAST_LAP_STATUS_OPTIONS = [
   ["", "Alle Status"],
   ["draft", "Entwurf"],
-  ["scheduled", "Angekuendigt"],
+  ["scheduled", "Angekündigt"],
   ["registration_open", "Einreichung offen"],
   ["live", "Live"],
   ["completed", "Abgeschlossen"],
@@ -147,7 +147,7 @@ export default function AdminF1Page() {
           </Link>
         ))}
         {list.length === 0 && <div className="text-center py-16 text-white/40 font-display tracking-widest">KEINE CHALLENGES</div>}
-        {list.length > 0 && filteredList.length === 0 && <div className="text-center py-16 text-white/40 font-display tracking-widest">KEINE CHALLENGES FUER DIESEN FILTER</div>}
+        {list.length > 0 && filteredList.length === 0 && <div className="text-center py-16 text-white/40 font-display tracking-widest">KEINE CHALLENGES FÜR DIESEN FILTER</div>}
       </div>
     </AdminLayout>
   );

@@ -58,7 +58,7 @@ export default function F1ListPage() {
             icon={Flag}
             eyebrow="Fast Lap"
             title="Noch keine Challenges sichtbar"
-            description="Sobald eine Fast-Lap-Challenge aktiv oder angekuendigt ist, findest du hier Strecken, Leaderboards und Teilnahmeinfos."
+            description="Sobald eine Fast-Lap-Challenge aktiv oder angekündigt ist, findest du hier Strecken, Leaderboards und Teilnahmeinfos."
             primaryAction={{ to: "/tournaments", label: "Turniere ansehen" }}
             secondaryAction={{ to: "/news", label: "News lesen" }}
           />

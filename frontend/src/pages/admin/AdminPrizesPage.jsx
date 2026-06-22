@@ -340,7 +340,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove }) {
 
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <div className="border border-white/10 bg-black/20 rounded-sm p-3">
-          <div className="text-[10px] uppercase tracking-widest text-white/35">Empfaenger</div>
+          <div className="text-[10px] uppercase tracking-widest text-white/35">Empfänger</div>
           <div className="mt-1 flex items-center gap-2 min-w-0">
             <RecipientIcon className={`w-4 h-4 shrink-0 ${p.recipient_type === "team" ? "text-[#10B981]" : "text-[#29B6E8]"}`} />
             <span className="font-semibold truncate">{p.recipient_label || p.display_name || "-"}</span>

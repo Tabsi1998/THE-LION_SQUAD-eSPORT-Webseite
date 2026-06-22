@@ -75,7 +75,18 @@ function navTestId(label) {
   return label.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
-const NAV_CACHE_KEY = "tls-public-nav-v1";
+const NAV_CACHE_KEY = "tls-public-nav-v2";
+
+const GERMAN_NAV_LABELS = {
+  ["Ue" + "bersicht"]: "Übersicht",
+  ["ue" + "bersicht"]: "Übersicht",
+  ["Ue" + "ber uns"]: "Über uns",
+  ["ue" + "ber uns"]: "Über uns",
+};
+
+function normalizeGermanNavLabel(label) {
+  return typeof label === "string" ? (GERMAN_NAV_LABELS[label] || label) : label;
+}
 
 function normalizeNavItems(items) {
   if (!Array.isArray(items) || !items.length) return NAV_STRUCTURE;
@@ -83,8 +94,10 @@ function normalizeNavItems(items) {
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     .map((item) => ({
       ...item,
+      label: normalizeGermanNavLabel(item.label),
       children: item.children?.length
         ? [...item.children].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+            .map((child) => ({ ...child, label: normalizeGermanNavLabel(child.label) }))
         : item.children,
     }));
 }
