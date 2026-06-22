@@ -190,6 +190,39 @@ def test_result_application_rejects_same_participant_advanced_twice():
         )
 
 
+def test_missing_loser_rank_from_bye_clears_loser_target_slot():
+    source = {
+        "id": "m-a",
+        "tournament_id": "t1",
+        "stage_id": "s1",
+        "match_key": "A",
+        "status": "ready",
+        "settings": {"match_size": 2, "qualifiers_per_match": 1, "calculation": "points"},
+        "slots": [
+            {"slot": 1, "registration_id": "winner", "user_id": "u1", "status": "filled"},
+            {"slot": 2, "registration_id": None, "user_id": None, "status": "bye"},
+        ],
+        "advancement": [
+            {"flow": "W", "rank": 1, "to_match_id": "m-w", "to_match_key": "W", "to_slot": 1},
+            {"flow": "L", "rank": 1, "to_match_id": "m-l", "to_match_key": "L", "to_slot": 1},
+        ],
+    }
+
+    application = build_v2_result_application(
+        source,
+        [source, _target("m-w", "W"), _target("m-l", "L")],
+        [{"registration_id": "winner", "score": 1}],
+        actor_id="admin",
+        now_iso="2026-05-08T12:00:00+00:00",
+    )
+
+    assert application["target_sets"]["m-w"]["slots"][0]["registration_id"] == "winner"
+    loser_slot = application["target_sets"]["m-l"]["slots"][0]
+    assert loser_slot["registration_id"] is None
+    assert loser_slot["status"] == "bye"
+    assert loser_slot["source_result"]["reason"] == "bye"
+
+
 def test_l_flow_can_address_multiple_non_qualifiers():
     source = _source_match()
     source["settings"] = {"match_size": 4, "qualifiers_per_match": 2, "calculation": "points"}

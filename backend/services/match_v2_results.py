@@ -232,6 +232,12 @@ def _advancement_result_rank(match: dict, advancement: dict) -> int:
     return rank
 
 
+def _rank_can_be_missing_because_of_bye(match: dict, result_rank: int) -> bool:
+    settings = match.get("settings") or {}
+    match_size = int(settings.get("match_size") or len(match.get("slots") or []) or 0)
+    return 1 <= result_rank <= match_size
+
+
 def _downstream_links(stage_matches: list[dict]) -> dict[str, list[tuple[str, int]]]:
     links: dict[str, list[tuple[str, int]]] = defaultdict(list)
     for match in stage_matches:
@@ -350,6 +356,25 @@ def build_v2_result_application(
         result_rank = _advancement_result_rank(match, advancement)
         result = result_by_rank.get(result_rank)
         if not result:
+            if _rank_can_be_missing_because_of_bye(match, result_rank):
+                target_slot["registration_id"] = None
+                target_slot["user_id"] = None
+                target_slot["source_result"] = {
+                    "from_match_id": match["id"],
+                    "from_match_key": match.get("match_key"),
+                    "rank": result_rank,
+                    "flow": advancement.get("flow"),
+                    "skipped": True,
+                    "reason": "bye",
+                    "confirmed_at": now_iso,
+                }
+                target_slot["status"] = "bye"
+                target_sets[target["id"]] = {
+                    "slots": target.get("slots") or [],
+                    "status": _status_after_slot_fill(target),
+                    "updated_at": now_iso,
+                }
+                continue
             raise MatchV2ResultError(f"Rank {result_rank} fehlt für Advancement")
         if result["registration_id"] in advanced_registration_ids:
             raise MatchV2ResultError(
