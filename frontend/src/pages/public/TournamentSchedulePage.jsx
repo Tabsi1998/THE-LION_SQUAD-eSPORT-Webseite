@@ -47,7 +47,11 @@ export default function TournamentSchedulePage() {
     setData(bracket);
   }, [slug, accessToken]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 7000);
+    return () => clearInterval(interval);
+  }, [load]);
   useApiInvalidation(load, ["tournaments", "matches", "matches_v2"]);
 
   const groups = useMemo(() => {

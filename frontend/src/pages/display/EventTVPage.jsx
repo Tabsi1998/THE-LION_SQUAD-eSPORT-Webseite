@@ -5,6 +5,7 @@ import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
 import { MascotBadge } from "@/components/tls/Logo";
 import { SponsorGrid } from "@/components/tls/SponsorTicker";
 import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { formatDateTime } from "@/lib/datetime";
 import { sortByNearestDate } from "@/lib/contentSort";
 import { CalendarDays, Flag, MapPin, Monitor, Trophy, Users } from "lucide-react";
@@ -59,6 +60,7 @@ export default function EventTVPage() {
     const interval = setInterval(load, 15000);
     return () => clearInterval(interval);
   }, [load]);
+  useApiInvalidation(load, ["events", "tournaments", "matches", "matches_v2", "stations", "f1"]);
 
   const activity = useMemo(() => {
     if (!event) return [];
