@@ -259,36 +259,11 @@ app.include_router(penalty_admin_router)
 # Static uploads: only public media files are served directly. Documents are
 # streamed through visibility-aware /api/documents/{id}/download.
 import pathlib
+from services.media_formats import PUBLIC_MEDIA_EXTS, PUBLIC_MEDIA_TYPES, VIDEO_MEDIA_EXTS
 upload_dir = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 upload_dir.mkdir(parents=True, exist_ok=True)
 public_upload_dir = upload_dir / "public"
 public_upload_dir.mkdir(parents=True, exist_ok=True)
-PUBLIC_MEDIA_EXTS = {
-    ".png", ".jpg", ".jpeg", ".webp", ".gif",
-    ".mp4", ".m4v", ".webm", ".mov",
-    ".nef", ".nrw", ".cr2", ".cr3", ".arw", ".dng", ".raf", ".orf", ".rw2",
-}
-PUBLIC_MEDIA_TYPES = {
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".webp": "image/webp",
-    ".gif": "image/gif",
-    ".mp4": "video/mp4",
-    ".m4v": "video/mp4",
-    ".webm": "video/webm",
-    ".mov": "video/quicktime",
-    ".nef": "image/x-nikon-nef",
-    ".nrw": "image/x-nikon-nrw",
-    ".cr2": "image/x-canon-cr2",
-    ".cr3": "image/x-canon-cr3",
-    ".arw": "image/x-sony-arw",
-    ".dng": "image/x-adobe-dng",
-    ".raf": "image/x-fuji-raf",
-    ".orf": "image/x-olympus-orf",
-    ".rw2": "image/x-panasonic-rw2",
-}
-VIDEO_MEDIA_EXTS = {".mp4", ".m4v", ".webm", ".mov"}
 
 
 def _iter_file_range(path: Path, start: int, end: int):

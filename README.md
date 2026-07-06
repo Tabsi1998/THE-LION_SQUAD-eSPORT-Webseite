@@ -99,7 +99,7 @@ DISABLE_SCHEDULER=false
 UPLOAD_DIR=/app/backend/uploads
 MAX_IMAGE_UPLOAD_MB=50
 MAX_VIDEO_UPLOAD_MB=1536
-MAX_ORIGINAL_UPLOAD_MB=200
+MAX_ORIGINAL_UPLOAD_MB=1536
 MAX_DOCUMENT_UPLOAD_MB=50
 PROXY_UPLOAD_LIMIT_MB=1700
 ADMIN_UPLOAD_RATE_LIMIT=240
@@ -515,7 +515,7 @@ Die Limits koennen in `.env` angepasst werden:
 ```env
 MAX_IMAGE_UPLOAD_MB=50
 MAX_VIDEO_UPLOAD_MB=1536
-MAX_ORIGINAL_UPLOAD_MB=200
+MAX_ORIGINAL_UPLOAD_MB=1536
 MAX_DOCUMENT_UPLOAD_MB=50
 PROXY_UPLOAD_LIMIT_MB=1700
 ADMIN_UPLOAD_RATE_LIMIT=240
@@ -528,7 +528,7 @@ Bilduploads gibt es fuer Profile, Branding, News, Events, Galerie, Sponsoren, Tu
 Fast-Lap-Challenges und Fast-Lap-Strecken.
 Galerie-Alben unterstuetzen zusaetzlich direkte Video-Uploads und externe Video-Links.
 Alben koennen in sortierte Abschnitte wie `Aufbau`, `Tag 1` und `Tag 2` gegliedert werden.
-Im Adminbereich laeuft der Medien-Upload ueber einen gemeinsamen Button fuer Bilder, Videos und unterstuetzte RAW-Originale wie NEF/DNG/CR2. RAW-Dateien werden als Originaldateien gespeichert, aber nicht automatisch als Galerie-Bild eingefuegt.
+Im Adminbereich laeuft der Medien-Upload ueber einen gemeinsamen Button fuer Bilder, Videos und unterstuetzte Originaldateien wie NEF/DNG/CR2, HEIC/HEIF, TIFF, XMP sowie Kamera-/Video-Originale wie AVI/MKV/MTS. Nicht browserfaehige Originaldateien werden gespeichert und downloadbar gemacht, aber nicht automatisch als Galerie-Bild oder Galerie-Video eingefuegt.
 
 ## Moderatoren und Ergebnisverwaltung
 

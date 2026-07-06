@@ -105,20 +105,27 @@ if [ "${PRE_UPDATE_BACKUP:-false}" = "true" ]; then
 fi
 
 MIN_VIDEO_UPLOAD_MB=1536
+MIN_ORIGINAL_UPLOAD_MB=1536
 MIN_PROXY_UPLOAD_LIMIT_MB=1700
 MAX_VIDEO_UPLOAD_MB="$(env_int MAX_VIDEO_UPLOAD_MB "$MIN_VIDEO_UPLOAD_MB")"
+MAX_ORIGINAL_UPLOAD_MB="$(env_int MAX_ORIGINAL_UPLOAD_MB "$MIN_ORIGINAL_UPLOAD_MB")"
 PROXY_UPLOAD_LIMIT_MB="$(env_int PROXY_UPLOAD_LIMIT_MB "$MIN_PROXY_UPLOAD_LIMIT_MB")"
 if [ "$MAX_VIDEO_UPLOAD_MB" -lt "$MIN_VIDEO_UPLOAD_MB" ]; then
   warn "MAX_VIDEO_UPLOAD_MB (${MAX_VIDEO_UPLOAD_MB} MB) is below the supported gallery video default. Using ${MIN_VIDEO_UPLOAD_MB} MB for this update."
   warn "Update .env to persist this: MAX_VIDEO_UPLOAD_MB=${MIN_VIDEO_UPLOAD_MB}"
   MAX_VIDEO_UPLOAD_MB="$MIN_VIDEO_UPLOAD_MB"
 fi
+if [ "$MAX_ORIGINAL_UPLOAD_MB" -lt "$MIN_ORIGINAL_UPLOAD_MB" ]; then
+  warn "MAX_ORIGINAL_UPLOAD_MB (${MAX_ORIGINAL_UPLOAD_MB} MB) is below the supported media original default. Using ${MIN_ORIGINAL_UPLOAD_MB} MB for this update."
+  warn "Update .env to persist this: MAX_ORIGINAL_UPLOAD_MB=${MIN_ORIGINAL_UPLOAD_MB}"
+  MAX_ORIGINAL_UPLOAD_MB="$MIN_ORIGINAL_UPLOAD_MB"
+fi
 if [ "$PROXY_UPLOAD_LIMIT_MB" -lt "$MIN_PROXY_UPLOAD_LIMIT_MB" ]; then
   warn "PROXY_UPLOAD_LIMIT_MB (${PROXY_UPLOAD_LIMIT_MB} MB) is below the recommended internal proxy limit. Using ${MIN_PROXY_UPLOAD_LIMIT_MB} MB for this update."
   warn "Update .env and your external reverse proxy to persist this: PROXY_UPLOAD_LIMIT_MB=${MIN_PROXY_UPLOAD_LIMIT_MB}"
   PROXY_UPLOAD_LIMIT_MB="$MIN_PROXY_UPLOAD_LIMIT_MB"
 fi
-export MAX_VIDEO_UPLOAD_MB PROXY_UPLOAD_LIMIT_MB
+export MAX_VIDEO_UPLOAD_MB MAX_ORIGINAL_UPLOAD_MB PROXY_UPLOAD_LIMIT_MB
 if [ "$PROXY_UPLOAD_LIMIT_MB" -lt "$MAX_VIDEO_UPLOAD_MB" ]; then
   warn "PROXY_UPLOAD_LIMIT_MB (${PROXY_UPLOAD_LIMIT_MB} MB) is lower than MAX_VIDEO_UPLOAD_MB (${MAX_VIDEO_UPLOAD_MB} MB)."
   warn "Direct gallery video uploads can fail with HTTP 413 until the reverse proxy body limit is raised."

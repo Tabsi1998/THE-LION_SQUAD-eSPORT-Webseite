@@ -27,13 +27,10 @@ from pydantic import BaseModel
 from database import get_db
 from auth import require_admin, get_current_user
 from models import now_utc
+from services.media_formats import PUBLIC_IMAGE_EXTS, PUBLIC_MEDIA_EXTS, PUBLIC_ORIGINAL_EXTS, PUBLIC_VIDEO_EXTS
 
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
-PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
-PUBLIC_VIDEO_EXTS = {".mp4", ".m4v", ".webm", ".mov"}
-PUBLIC_RAW_EXTS = {".nef", ".nrw", ".cr2", ".cr3", ".arw", ".dng", ".raf", ".orf", ".rw2"}
-PUBLIC_MEDIA_EXTS = PUBLIC_IMAGE_EXTS | PUBLIC_VIDEO_EXTS | PUBLIC_RAW_EXTS
 ADMIN_MEDIA_OWNER_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
 IMAGE_REFERENCE_FIELDS = [
     ("settings", {"id": "branding"}, ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "qr_logo_url", "favicon_url", "favicon_light_url", "favicon_dark_url"]),
@@ -106,7 +103,7 @@ def _media_type_from_ext(ext: str) -> str:
         return "video"
     if suffix in PUBLIC_IMAGE_EXTS:
         return "image"
-    if suffix in PUBLIC_RAW_EXTS:
+    if suffix in PUBLIC_ORIGINAL_EXTS:
         return "file"
     return "file"
 

@@ -15,6 +15,13 @@ from auth import require_admin, get_current_user
 from database import get_db
 from models import new_id, now_utc
 from services.rate_limit import enforce_rate_limit
+from services.media_formats import (
+    BROWSER_IMAGE_MIME_BY_EXT,
+    ORIGINAL_MEDIA_LABEL,
+    ORIGINAL_MEDIA_MIME_BY_EXT,
+    PLAYABLE_VIDEO_MIME_ALIASES,
+    PLAYABLE_VIDEO_MIME_BY_EXT,
+)
 
 logger = logging.getLogger("tls-arena.uploads")
 UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
@@ -28,35 +35,9 @@ ALLOWED_VIDEO = {"video/mp4", "video/webm", "video/quicktime", "video/x-m4v"}
 SUPPORTED_VIDEO_LABEL = "MP4, WebM, MOV oder M4V"
 ADMIN_MEDIA_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
 ALLOWED_MEDIA_SCOPES = {"user", "admin", "sponsor", "branding", "gallery"}
-IMAGE_MIME_BY_EXT = {
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".webp": "image/webp",
-}
-RAW_PHOTO_MIME_BY_EXT = {
-    ".nef": "image/x-nikon-nef",
-    ".nrw": "image/x-nikon-nrw",
-    ".cr2": "image/x-canon-cr2",
-    ".cr3": "image/x-canon-cr3",
-    ".arw": "image/x-sony-arw",
-    ".dng": "image/x-adobe-dng",
-    ".raf": "image/x-fuji-raf",
-    ".orf": "image/x-olympus-orf",
-    ".rw2": "image/x-panasonic-rw2",
-}
-VIDEO_MIME_BY_EXT = {
-    ".mp4": "video/mp4",
-    ".m4v": "video/mp4",
-    ".webm": "video/webm",
-    ".mov": "video/quicktime",
-}
-VIDEO_MIME_ALIASES = {
-    "application/mp4": "video/mp4",
-    "application/quicktime": "video/quicktime",
-    "video/m4v": "video/mp4",
-    "video/x-quicktime": "video/quicktime",
-}
+IMAGE_MIME_BY_EXT = BROWSER_IMAGE_MIME_BY_EXT
+VIDEO_MIME_BY_EXT = PLAYABLE_VIDEO_MIME_BY_EXT
+VIDEO_MIME_ALIASES = PLAYABLE_VIDEO_MIME_ALIASES
 VIDEO_EXT_BY_MIME = {
     "video/mp4": ".mp4",
     "video/webm": ".webm",
@@ -107,9 +88,9 @@ ALLOWED_DOC = {
     "image/png", "image/jpeg",
 }
 MAX_IMAGE_UPLOAD_MB = _upload_mb_from_env("MAX_IMAGE_UPLOAD_MB", 50)
-MAX_VIDEO_UPLOAD_MB = _upload_mb_from_env("MAX_VIDEO_UPLOAD_MB", 1536)
 MAX_DOCUMENT_UPLOAD_MB = _upload_mb_from_env("MAX_DOCUMENT_UPLOAD_MB", 50)
-MAX_ORIGINAL_UPLOAD_MB = _upload_mb_from_env("MAX_ORIGINAL_UPLOAD_MB", 200)
+MAX_VIDEO_UPLOAD_MB = _upload_mb_from_env("MAX_VIDEO_UPLOAD_MB", 1536)
+MAX_ORIGINAL_UPLOAD_MB = _upload_mb_from_env("MAX_ORIGINAL_UPLOAD_MB", MAX_VIDEO_UPLOAD_MB)
 MAX_BYTES = MAX_IMAGE_UPLOAD_MB * 1024 * 1024  # images before re-encoding
 MAX_VIDEO_BYTES = MAX_VIDEO_UPLOAD_MB * 1024 * 1024
 MAX_DOC_BYTES = MAX_DOCUMENT_UPLOAD_MB * 1024 * 1024  # docs
@@ -204,12 +185,12 @@ def _upload_kind_for_file(file: UploadFile) -> str:
     declared = (file.content_type or "").split(";")[0].strip().lower()
     declared_video = VIDEO_MIME_ALIASES.get(declared, declared)
     suffix = pathlib.Path(file.filename or "").suffix.lower()
-    if declared_video in ALLOWED_VIDEO or declared.startswith("video/") or suffix in VIDEO_MIME_BY_EXT:
+    if suffix in VIDEO_MIME_BY_EXT or declared_video in ALLOWED_VIDEO:
         return "video"
+    if suffix in ORIGINAL_MEDIA_MIME_BY_EXT:
+        return "file"
     if declared in ALLOWED_IMAGE or suffix in IMAGE_MIME_BY_EXT:
         return "image"
-    if suffix in RAW_PHOTO_MIME_BY_EXT:
-        return "file"
     return "unknown"
 
 
@@ -483,8 +464,8 @@ async def _upload_original_file_impl(
     if not _is_admin_media_user(me):
         raise HTTPException(status_code=403, detail="Originaldateien dürfen nur Admins hochladen.")
     suffix = pathlib.Path(file.filename or "").suffix.lower()
-    if suffix not in RAW_PHOTO_MIME_BY_EXT:
-        raise HTTPException(status_code=400, detail="Dieses Dateiformat wird nicht als Medien-Original unterstützt.")
+    if suffix not in ORIGINAL_MEDIA_MIME_BY_EXT:
+        raise HTTPException(status_code=400, detail=f"Dieses Dateiformat wird nicht als Medien-Original unterstützt. Erlaubt: {ORIGINAL_MEDIA_LABEL}.")
     filename_hint = file.filename or "original"
     head = await file.read(VIDEO_SNIFF_BYTES)
     if not head:
@@ -492,7 +473,7 @@ async def _upload_original_file_impl(
     filename = f"{uuid.uuid4().hex}{suffix}"
     path = PUBLIC_UPLOAD_DIR / filename
     size = await _write_upload_stream_limited(file, path, head, MAX_ORIGINAL_BYTES, MAX_ORIGINAL_UPLOAD_MB)
-    content_type = RAW_PHOTO_MIME_BY_EXT.get(suffix) or "application/octet-stream"
+    content_type = ORIGINAL_MEDIA_MIME_BY_EXT.get(suffix) or "application/octet-stream"
     url = f"/api/static/uploads/{filename}"
     try:
         await get_db().media_uploads.insert_one({
@@ -554,7 +535,7 @@ async def upload_media(
         return await _upload_video_impl(file, me, media_scope=media_scope)
     if kind == "file":
         return await _upload_original_file_impl(file, me, media_scope=media_scope)
-    raise HTTPException(status_code=400, detail="Nur PNG/JPG/WebP, MP4/WebM/MOV/M4V oder RAW-Fotos wie NEF/DNG/CR2 erlaubt.")
+    raise HTTPException(status_code=400, detail=f"Nur PNG/JPG/WebP, {SUPPORTED_VIDEO_LABEL} oder Originaldateien ({ORIGINAL_MEDIA_LABEL}) erlaubt.")
 
 
 @router.post("/video")

@@ -10,7 +10,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { UploadProgressPanel } from "@/components/tls/UploadProgressPanel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
-import { MEDIA_ACCEPT, RAW_PHOTO_EXTENSIONS, VIDEO_EXTENSIONS, mediaTypeFromFile } from "@/lib/galleryMedia";
+import { MEDIA_ACCEPT, ORIGINAL_MEDIA_EXTENSIONS, VIDEO_EXTENSIONS, mediaTypeFromFile } from "@/lib/galleryMedia";
 import { toast } from "sonner";
 import {
   Image as ImageIcon, FileText, Trash2, Copy, ExternalLink, Search, RefreshCw, Upload,
@@ -18,9 +18,9 @@ import {
 } from "lucide-react";
 
 const BACKEND = API_BASE;
-const IMG_EXT = new Set(["png", "jpg", "jpeg", "webp", "gif", "svg", "avif"]);
+const IMG_EXT = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif", "bmp"]);
 const VIDEO_EXT = VIDEO_EXTENSIONS;
-const RAW_EXT = RAW_PHOTO_EXTENSIONS;
+const ORIGINAL_EXT = ORIGINAL_MEDIA_EXTENSIONS;
 const parseUploadMb = (value, fallback) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -532,7 +532,7 @@ export default function AdminMediaPage() {
             {filtered.map((it) => {
               const isImg = IMG_EXT.has(it.ext);
               const isVideo = VIDEO_EXT.has(it.ext);
-              const isRaw = RAW_EXT.has(it.ext);
+              const isOriginal = ORIGINAL_EXT.has(it.ext);
               const fullUrl = `${BACKEND}${it.url}`;
               const previewUrl = cacheBustedMediaUrl(fullUrl, it);
               return (
@@ -553,7 +553,7 @@ export default function AdminMediaPage() {
                     ) : (
                       <div className="flex flex-col items-center gap-2 text-white/40">
                         <FileText className="w-10 h-10" />
-                        <span className="text-[10px] font-mono uppercase">{isRaw ? "raw" : it.ext || "file"}</span>
+                        <span className="text-[10px] font-mono uppercase">{isOriginal ? it.ext || "orig" : it.ext || "file"}</span>
                       </div>
                     )}
                   </div>

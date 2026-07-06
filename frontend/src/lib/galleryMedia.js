@@ -1,8 +1,31 @@
 import { API_BASE } from "@/lib/api";
 
-export const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif"]);
+export const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif", "bmp"]);
+export const UPLOAD_IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp"]);
 export const VIDEO_EXTENSIONS = new Set(["mp4", "m4v", "webm", "mov"]);
-export const RAW_PHOTO_EXTENSIONS = new Set(["nef", "nrw", "cr2", "cr3", "arw", "dng", "raf", "orf", "rw2"]);
+export const RAW_PHOTO_EXTENSIONS = new Set(["nef", "nrw", "cr2", "cr3", "arw", "dng", "raf", "orf", "rw2", "pef", "srw", "rwl", "3fr", "erf", "kdc", "dcr", "mos", "raw"]);
+export const ORIGINAL_MEDIA_EXTENSIONS = new Set([
+  ...RAW_PHOTO_EXTENSIONS,
+  "heic",
+  "heif",
+  "tif",
+  "tiff",
+  "gif",
+  "avif",
+  "bmp",
+  "avi",
+  "mkv",
+  "mts",
+  "m2ts",
+  "mpeg",
+  "mpg",
+  "3gp",
+  "3g2",
+  "wmv",
+  "mxf",
+  "mvo",
+  "xmp",
+]);
 export const VIDEO_ACCEPT = "video/*,video/mp4,video/webm,video/quicktime,video/x-m4v,video/m4v,video/x-quicktime,application/mp4,application/quicktime,.mp4,.m4v,.webm,.mov";
 export const MEDIA_ACCEPT = [
   "image/png",
@@ -13,15 +36,26 @@ export const MEDIA_ACCEPT = [
   ".jpeg",
   ".webp",
   VIDEO_ACCEPT,
-  ".nef",
-  ".nrw",
-  ".cr2",
-  ".cr3",
-  ".arw",
-  ".dng",
-  ".raf",
-  ".orf",
-  ".rw2",
+  ".heic",
+  ".heif",
+  ".tif",
+  ".tiff",
+  ".gif",
+  ".avif",
+  ".bmp",
+  ...Array.from(RAW_PHOTO_EXTENSIONS).map((ext) => `.${ext}`),
+  ".avi",
+  ".mkv",
+  ".mts",
+  ".m2ts",
+  ".mpeg",
+  ".mpg",
+  ".3gp",
+  ".3g2",
+  ".wmv",
+  ".mxf",
+  ".mvo",
+  ".xmp",
 ].join(",");
 
 const YOUTUBE_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]);
@@ -55,9 +89,9 @@ export function extensionFromName(value) {
 export function mediaTypeFromFile(file) {
   const type = String(file?.type || "").toLowerCase();
   const ext = extensionFromName(file?.name || "");
-  if (RAW_PHOTO_EXTENSIONS.has(ext)) return "file";
-  if (type.startsWith("video/") || VIDEO_EXTENSIONS.has(ext)) return "video";
-  if (type.startsWith("image/") || IMAGE_EXTENSIONS.has(ext)) return "image";
+  if (ORIGINAL_MEDIA_EXTENSIONS.has(ext)) return "file";
+  if (VIDEO_EXTENSIONS.has(ext) || type === "video/mp4" || type === "video/webm" || type === "video/quicktime" || type === "video/x-m4v" || type === "video/m4v") return "video";
+  if (UPLOAD_IMAGE_EXTENSIONS.has(ext) || ["image/png", "image/jpeg", "image/webp"].includes(type)) return "image";
   return "unknown";
 }
 
@@ -68,7 +102,7 @@ export function mediaTypeFromItem(item) {
   if (item?.embed_url || item?.external_url) return "embed";
   const ext = String(item?.ext || extensionFromUrl(item?.url || item?.image_url || "")).toLowerCase();
   if (VIDEO_EXTENSIONS.has(ext)) return "video";
-  if (RAW_PHOTO_EXTENSIONS.has(ext)) return "file";
+  if (ORIGINAL_MEDIA_EXTENSIONS.has(ext)) return "file";
   return "image";
 }
 
