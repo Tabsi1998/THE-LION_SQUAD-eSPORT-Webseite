@@ -8,14 +8,16 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { VIDEO_ACCEPT, VIDEO_EXTENSIONS } from "@/lib/galleryMedia";
 import { toast } from "sonner";
 import {
   Image as ImageIcon, FileText, Trash2, Copy, ExternalLink, Search, RefreshCw, Upload,
-  RotateCcw, RotateCw, AlertTriangle, CheckCircle2,
+  RotateCcw, RotateCw, AlertTriangle, CheckCircle2, Video,
 } from "lucide-react";
 
 const BACKEND = API_BASE;
 const IMG_EXT = new Set(["png", "jpg", "jpeg", "webp", "gif", "svg", "avif"]);
+const VIDEO_EXT = VIDEO_EXTENSIONS;
 const MEDIA_SCOPE_LABELS = {
   all: "Alle",
   admin: "Admin/CMS",
@@ -56,6 +58,21 @@ function MediaImage({ src, alt, className, compact = false }) {
   return <img src={src} alt={alt} className={className} loading="lazy" onError={() => setError(true)} />;
 }
 
+function MediaPreview({ item, src, className, compact = false }) {
+  const isVideo = VIDEO_EXT.has(item.ext);
+  if (isVideo) {
+    return (
+      <div className="relative w-full h-full">
+        <video src={src} className={className} muted playsInline preload="metadata" />
+        <span className="absolute left-1 bottom-1 inline-flex items-center gap-1 bg-black/75 px-1.5 py-1 rounded-sm text-[9px] uppercase tracking-widest font-black text-white">
+          <Video className="w-3 h-3" /> Video
+        </span>
+      </div>
+    );
+  }
+  return <MediaImage src={src} alt={item.filename} className={className} compact={compact} />;
+}
+
 export default function AdminMediaPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +82,7 @@ export default function AdminMediaPage() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [mediaAudit, setMediaAudit] = useState(null);
   const [scopeAudit, setScopeAudit] = useState(null);
   const [auditingScopes, setAuditingScopes] = useState(false);
@@ -93,7 +111,8 @@ export default function AdminMediaPage() {
   const filtered = useMemo(() => {
     return items.filter((it) => {
       if (filter === "images" && !IMG_EXT.has(it.ext)) return false;
-      if (filter === "files" && IMG_EXT.has(it.ext)) return false;
+      if (filter === "videos" && !VIDEO_EXT.has(it.ext)) return false;
+      if (filter === "files" && (IMG_EXT.has(it.ext) || VIDEO_EXT.has(it.ext))) return false;
       if (scopeFilter === "unused" && !it.is_unused) return false;
       else if (scopeFilter === "untracked" && it.tracked) return false;
       else if (scopeFilter === "duplicate" && !(it.duplicate_count > 1)) return false;
@@ -226,6 +245,27 @@ export default function AdminMediaPage() {
     load();
   };
 
+  const uploadVideoFiles = async (files) => {
+    if (!files?.length) return;
+    setUploadingVideo(true);
+    let ok = 0;
+    let failed = 0;
+    for (const file of Array.from(files)) {
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        await api.post("/uploads/video?media_scope=admin", fd);
+        ok++;
+      } catch (e) {
+        failed++;
+        toast.error(`${file.name}: ${formatApiError(e.response?.data?.detail) || e.message || "Upload fehlgeschlagen"}`);
+      }
+    }
+    setUploadingVideo(false);
+    toast.success(`${ok} Video(s) hochgeladen${failed ? `, ${failed} fehlgeschlagen` : ""}.`);
+    load();
+  };
+
   const auditScopes = async () => {
     setAuditingScopes(true);
     try {
@@ -271,7 +311,7 @@ export default function AdminMediaPage() {
       {/* Toolbar */}
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <div className="flex gap-1 border border-white/10 rounded-sm p-1 bg-[#121212]">
-          {[["all", "Alle"], ["images", "Bilder"], ["files", "Dateien"]].map(([k, label]) => (
+          {[["all", "Alle"], ["images", "Bilder"], ["videos", "Videos"], ["files", "Dateien"]].map(([k, label]) => (
             <button
               key={k}
               data-testid={`media-filter-${k}`}
@@ -324,6 +364,10 @@ export default function AdminMediaPage() {
         <label className={`px-3 py-2 bg-[#FFD700] text-black rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer ${uploading ? "opacity-60" : ""}`} data-testid="media-upload">
           <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Bilder hochladen"}
           <input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={uploading} className="hidden" onChange={(e) => uploadFiles(e.target.files)} />
+        </label>
+        <label className={`px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer hover:bg-[#FFD700]/10 ${uploadingVideo ? "opacity-60" : ""}`} data-testid="media-video-upload">
+          <Video className="w-3.5 h-3.5" /> {uploadingVideo ? "Lade hoch…" : "Videos hochladen"}
+          <input type="file" accept={VIDEO_ACCEPT} multiple disabled={uploadingVideo} className="hidden" onChange={(e) => uploadVideoFiles(e.target.files)} />
         </label>
         <span className="ml-auto text-xs text-white/45">
           {filtered.length} / {items.length} · {fmtBytes(totalSize)} gesamt
@@ -483,6 +527,7 @@ export default function AdminMediaPage() {
           >
             {filtered.map((it) => {
               const isImg = IMG_EXT.has(it.ext);
+              const isVideo = VIDEO_EXT.has(it.ext);
               const fullUrl = `${BACKEND}${it.url}`;
               const previewUrl = cacheBustedMediaUrl(fullUrl, it);
               return (
@@ -493,10 +538,10 @@ export default function AdminMediaPage() {
                   onClick={() => setSelected(it)}
                 >
                   <div className="aspect-square bg-[#0A0A0A] flex items-center justify-center overflow-hidden">
-                    {isImg ? (
-                      <MediaImage
+                    {isImg || isVideo ? (
+                      <MediaPreview
+                        item={it}
                         src={previewUrl}
-                        alt={it.filename}
                         className="w-full h-full object-cover group-hover:scale-105 transition"
                         compact
                       />
@@ -540,6 +585,7 @@ export default function AdminMediaPage() {
 
 function MediaDetailModal({ item, onClose, onCopy, onRotateLeft, onRotateRight, onDelete }) {
   const isImg = IMG_EXT.has(item.ext);
+  const isVideo = VIDEO_EXT.has(item.ext);
   const canRotate = ["png", "jpg", "jpeg", "webp"].includes(item.ext);
   const fullUrl = `${BACKEND}${item.url}`;
   const previewUrl = cacheBustedMediaUrl(fullUrl, item);
@@ -554,7 +600,7 @@ function MediaDetailModal({ item, onClose, onCopy, onRotateLeft, onRotateRight, 
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-heading text-xl font-black uppercase truncate flex items-center gap-2">
-            {isImg ? <ImageIcon className="w-5 h-5 text-[#FFD700]" /> : <FileText className="w-5 h-5 text-[#FFD700]" />}
+            {isImg ? <ImageIcon className="w-5 h-5 text-[#FFD700]" /> : isVideo ? <Video className="w-5 h-5 text-[#FFD700]" /> : <FileText className="w-5 h-5 text-[#FFD700]" />}
             {item.filename}
           </h3>
           <button onClick={onClose} className="text-white/50 hover:text-white text-2xl leading-none">×</button>
@@ -563,6 +609,8 @@ function MediaDetailModal({ item, onClose, onCopy, onRotateLeft, onRotateRight, 
         <div className="bg-[#0A0A0A] rounded-sm p-3 flex items-center justify-center min-h-[300px]">
           {isImg ? (
             <MediaImage src={previewUrl} alt={item.filename} className="max-h-[60vh] object-contain" />
+          ) : isVideo ? (
+            <video src={previewUrl} controls playsInline className="max-h-[60vh] max-w-full bg-black" />
           ) : (
             <div className="flex flex-col items-center gap-3 text-white/50 py-12">
               <FileText className="w-16 h-16" />

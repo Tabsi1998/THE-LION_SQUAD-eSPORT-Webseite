@@ -20,6 +20,18 @@ extract_main_assets() {
   grep -oE 'static/(js|css)/main\.[^" ]+' | sort -u
 }
 
+env_int() {
+  local key="$1"
+  local fallback="$2"
+  local value
+  value="$(grep -E "^${key}=" .env 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+  value="${value:-$fallback}"
+  case "$value" in
+    ''|*[!0-9]*) printf "%s" "$fallback" ;;
+    *) printf "%s" "$value" ;;
+  esac
+}
+
 check_frontend_route() {
   local base_url="$1"
   local route="$2"
@@ -89,6 +101,13 @@ if [ "${PRE_UPDATE_BACKUP:-false}" = "true" ]; then
   bash scripts/backup.sh
 fi
 
+MAX_VIDEO_UPLOAD_MB="$(env_int MAX_VIDEO_UPLOAD_MB 1024)"
+PROXY_UPLOAD_LIMIT_MB="$(env_int PROXY_UPLOAD_LIMIT_MB 1100)"
+if [ "$PROXY_UPLOAD_LIMIT_MB" -lt "$MAX_VIDEO_UPLOAD_MB" ]; then
+  warn "PROXY_UPLOAD_LIMIT_MB (${PROXY_UPLOAD_LIMIT_MB} MB) is lower than MAX_VIDEO_UPLOAD_MB (${MAX_VIDEO_UPLOAD_MB} MB)."
+  warn "Direct gallery video uploads can fail with HTTP 413 until the reverse proxy body limit is raised."
+fi
+
 # 2. Rebuild
 info "Rebuilding containers…"
 docker compose pull mongodb 2>/dev/null || true
@@ -130,6 +149,7 @@ done
 info "Checking frontend SPA routes…"
 check_frontend_route "$FRONTEND_LOCAL_URL" "/community" "local"
 check_frontend_route "$FRONTEND_LOCAL_URL" "/seasons/current" "local"
+check_frontend_route "$FRONTEND_LOCAL_URL" "/galerie" "local"
 
 FRONTEND_PUBLIC_URL="$(grep -E '^FRONTEND_URL=' .env 2>/dev/null | cut -d= -f2- || true)"
 if [ -n "${FRONTEND_PUBLIC_URL:-}" ]; then

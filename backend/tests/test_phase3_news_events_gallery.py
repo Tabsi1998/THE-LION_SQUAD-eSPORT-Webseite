@@ -558,6 +558,31 @@ class TestGallery:
         r = admin.get(f"{BASE_URL}/api/gallery/{c.json()['slug']}")
         assert r.status_code == 404
 
+    def test_album_accepts_external_video_media(self, admin):
+        suf = uuid.uuid4().hex[:6]
+        c = admin.post(f"{BASE_URL}/api/gallery", json={
+            "title": f"TEST Video Album {suf}", "slug": f"test-video-album-{suf}",
+            "visibility": "public", "published": True,
+        })
+        assert c.status_code == 200
+        aid = c.json()["id"]
+        video = admin.post(f"{BASE_URL}/api/gallery/{aid}/photos", json={
+            "media_type": "video",
+            "source_type": "external",
+            "external_url": "https://example.com/clip.mp4",
+            "video_url": "https://example.com/clip.mp4",
+            "caption": "Video Clip",
+        })
+        assert video.status_code == 200, video.text
+        assert video.json()["media_type"] == "video"
+        detail = admin.get(f"{BASE_URL}/api/gallery/{c.json()['slug']}")
+        assert detail.status_code == 200
+        assert detail.json()["photos"][0]["media_type"] == "video"
+        albums = admin.get(f"{BASE_URL}/api/admin/gallery")
+        row = next(a for a in albums.json() if a["id"] == aid)
+        assert row["video_count"] == 1
+        assert row["media_count"] == 1
+
     def test_cu_cannot_create_album(self, cu):
         r = cu.post(f"{BASE_URL}/api/gallery", json={
             "title": "Nope", "slug": f"nope-alb-{uuid.uuid4().hex[:6]}",

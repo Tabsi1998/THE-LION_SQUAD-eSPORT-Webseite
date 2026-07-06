@@ -4,8 +4,59 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload, prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import {
+  buildExternalGalleryPayload,
+  galleryMediaUrl,
+  galleryPosterUrl,
+  isVideoLike,
+  mediaTypeFromItem,
+  providerLabel,
+  VIDEO_ACCEPT,
+} from "@/lib/galleryMedia";
 import { toast } from "sonner";
-import { Plus, Save, X, Trash2, Image as ImageIcon, ArrowLeft } from "lucide-react";
+import { Plus, Save, X, Trash2, Image as ImageIcon, ArrowLeft, Video, Link as LinkIcon, Play, Film } from "lucide-react";
+
+const parseUploadMb = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const MAX_VIDEO_UPLOAD_MB = parseUploadMb(process.env.REACT_APP_MAX_VIDEO_UPLOAD_MB, 1024);
+const VIDEO_MAX_BYTES = MAX_VIDEO_UPLOAD_MB * 1024 * 1024;
+
+function albumMediaCount(album) {
+  return album.media_count ?? ((album.photo_count || 0) + (album.video_count || 0));
+}
+
+function captionFromFilename(name, fallback = "Medium") {
+  return (name || fallback).replace(/\.[^/.]+$/, "");
+}
+
+function galleryPayloadFromMediaItem(item, orderIndex) {
+  const type = mediaTypeFromItem(item);
+  const base = {
+    caption: captionFromFilename(item.original_filename || item.filename, type === "video" ? "Video" : "Bild"),
+    order_index: orderIndex,
+    thumbnail_url: type === "image" ? item.url : "",
+    mime: item.mime || undefined,
+    file_size: item.size || undefined,
+  };
+  if (type === "video") {
+    return {
+      ...base,
+      media_type: "video",
+      source_type: "upload",
+      video_url: item.url,
+      thumbnail_url: "",
+    };
+  }
+  return {
+    ...base,
+    media_type: "image",
+    source_type: "upload",
+    image_url: item.url,
+  };
+}
 
 export default function AdminGalleryPage() {
   const [albums, setAlbums] = useState([]);
@@ -28,7 +79,7 @@ export default function AdminGalleryPage() {
   const remove = async (id) => {
     if (!await confirm({
       title: "Album löschen?",
-      description: "Das Album und alle zugeordneten Fotos werden entfernt.",
+      description: "Das Album und alle zugeordneten Medien werden entfernt.",
       confirmLabel: "Löschen",
     })) return;
     const previous = albums;
@@ -77,11 +128,13 @@ export default function AdminGalleryPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between gap-2">
                   <div className="font-heading font-black uppercase truncate">{a.title}</div>
-                  <span className="text-[10px] uppercase tracking-widest text-white/40">{a.photo_count} Fotos</span>
+                  <span className="text-[10px] uppercase tracking-widest text-white/40">{albumMediaCount(a)} Medien</span>
                 </div>
-                <div className="text-[10px] uppercase tracking-widest text-[#29B6E8]/80 mt-1">{a.visibility} · {a.published ? "live" : "entwurf"}</div>
+                <div className="text-[10px] uppercase tracking-widest text-[#29B6E8]/80 mt-1">
+                  {a.visibility} · {a.published ? "live" : "entwurf"}{a.video_count ? ` · ${a.video_count} Videos` : ""}
+                </div>
                 <div className="mt-3 flex gap-2">
-                  <button onClick={() => setActiveAlbum(a)} data-testid={`album-open-${a.id}`} className="flex-1 text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10">Fotos</button>
+                  <button onClick={() => setActiveAlbum(a)} data-testid={`album-open-${a.id}`} className="flex-1 text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10">Medien</button>
                   <button onClick={() => setEditingAlbum(a)} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white">Bearb.</button>
                   <button onClick={() => remove(a.id)} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10"><Trash2 className="w-3 h-3" /></button>
                 </div>
@@ -186,7 +239,9 @@ function AlbumModal({ album, events, onClose, onSaved }) {
 function AlbumPhotos({ album, events, onBack }) {
   const [photos, setPhotos] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [mediaOpen, setMediaOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
   const [media, setMedia] = useState([]);
   const [selectedMedia, setSelectedMedia] = useState([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
@@ -211,10 +266,14 @@ function AlbumPhotos({ album, events, onBack }) {
         fd.append("file", uploadFile);
         const { data } = await api.post("/uploads/image?media_scope=gallery", fd, { headers: { "Content-Type": "multipart/form-data" } });
         await api.post(`/gallery/${album.id}/photos`, {
+          media_type: "image",
+          source_type: "upload",
           image_url: data.url,
           thumbnail_url: data.url,
-          caption: file.name.replace(/\.[^/.]+$/, ""),
+          caption: captionFromFilename(file.name, "Bild"),
           order_index: photos.length + ok + 1,
+          mime: data.mime,
+          file_size: data.size,
         });
         ok++;
       } catch (err) {
@@ -226,10 +285,41 @@ function AlbumPhotos({ album, events, onBack }) {
     toast.success(`${ok} Foto(s) hinzugefügt${fail ? `, ${fail} fehlgeschlagen` : ""}.`);
     load();
   };
+  const onPickVideos = async (files) => {
+    if (!files || !files.length) return;
+    setUploadingVideo(true);
+    let ok = 0, fail = 0;
+    for (const file of Array.from(files)) {
+      try {
+        if (file.size > VIDEO_MAX_BYTES) {
+          throw new Error(`Datei zu groß (max ${MAX_VIDEO_UPLOAD_MB} MB).`);
+        }
+        const fd = new FormData();
+        fd.append("file", file);
+        const { data } = await api.post("/uploads/video?media_scope=gallery", fd);
+        await api.post(`/gallery/${album.id}/photos`, {
+          media_type: "video",
+          source_type: "upload",
+          video_url: data.url,
+          caption: captionFromFilename(file.name, "Video"),
+          order_index: photos.length + ok + 1,
+          mime: data.mime,
+          file_size: data.size,
+        });
+        ok++;
+      } catch (err) {
+        fail++;
+        toast.error(`${file.name}: ${formatApiError(err.response?.data?.detail) || err.message || "Upload fehlgeschlagen"}`);
+      }
+    }
+    setUploadingVideo(false);
+    toast.success(`${ok} Video(s) hinzugefügt${fail ? `, ${fail} fehlgeschlagen` : ""}.`);
+    load();
+  };
   const remove = async (id) => {
     if (!await confirm({
-      title: "Foto löschen?",
-      description: "Das Foto wird aus diesem Album entfernt.",
+      title: "Medium löschen?",
+      description: "Der Eintrag wird aus diesem Album entfernt.",
       confirmLabel: "Löschen",
     })) return;
     const previous = photos;
@@ -248,7 +338,7 @@ function AlbumPhotos({ album, events, onBack }) {
     setLoadingMedia(true);
     setSelectedMedia([]);
     try {
-      const { data } = await api.get("/admin/media?type=images");
+      const { data } = await api.get("/admin/media?type=media");
       setMedia(data || []);
     } catch {
       toast.error("Medienbibliothek konnte nicht geladen werden.");
@@ -262,25 +352,29 @@ function AlbumPhotos({ album, events, onBack }) {
       : [...rows, item]);
   };
   const addSelectedMedia = async () => {
-    if (!selectedMedia.length) return toast.error("Bitte mindestens ein Bild auswählen.");
+    if (!selectedMedia.length) return toast.error("Bitte mindestens ein Medium auswählen.");
     let ok = 0, fail = 0;
     for (const item of selectedMedia) {
       try {
-        await api.post(`/gallery/${album.id}/photos`, {
-          image_url: item.url,
-          thumbnail_url: item.url,
-          caption: (item.filename || "Bild").replace(/\.[^/.]+$/, ""),
-          order_index: photos.length + ok + 1,
-        });
+        await api.post(`/gallery/${album.id}/photos`, galleryPayloadFromMediaItem(item, photos.length + ok + 1));
         ok++;
       } catch (err) {
         fail++;
-        toast.error(`${item.filename || "Bild"}: ${formatRequestError(err, "Bild konnte nicht hinzugefügt werden.")}`);
+        toast.error(`${item.filename || "Medium"}: ${formatRequestError(err, "Medium konnte nicht hinzugefügt werden.")}`);
       }
     }
-    toast.success(`${ok} Bild(er) aus Medien hinzugefügt${fail ? `, ${fail} fehlgeschlagen` : ""}.`);
+    toast.success(`${ok} Medium/Medien hinzugefügt${fail ? `, ${fail} fehlgeschlagen` : ""}.`);
     setMediaOpen(false);
     setSelectedMedia([]);
+    load();
+  };
+  const addExternalMedia = async (payload) => {
+    await api.post(`/gallery/${album.id}/photos`, {
+      ...payload,
+      order_index: photos.length + 1,
+    });
+    toast.success("Video-Link hinzugefügt.");
+    setLinkOpen(false);
     load();
   };
 
@@ -292,12 +386,19 @@ function AlbumPhotos({ album, events, onBack }) {
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <div>
           <h1 className="font-heading text-3xl font-black uppercase">{album.title}</h1>
-          <div className="text-xs text-white/50">{photos.length} Fotos · /{album.slug}</div>
+          <div className="text-xs text-white/50">{photos.length} Medien · /{album.slug}</div>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button type="button" onClick={openMedia} data-testid="photo-media-picker" className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/75 font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-white/5">
             <ImageIcon className="w-3.5 h-3.5" /> Aus Medien
           </button>
+          <button type="button" onClick={() => setLinkOpen(true)} data-testid="gallery-video-link" className="inline-flex items-center gap-2 px-4 py-2 border border-[#9F7AEA]/40 text-[#C4B5FD] font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#9F7AEA]/10">
+            <LinkIcon className="w-3.5 h-3.5" /> Video-Link
+          </button>
+          <label className={`inline-flex items-center gap-2 px-4 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider text-xs rounded-sm cursor-pointer hover:bg-[#FFD700]/10 ${uploadingVideo ? "opacity-50" : ""}`} data-testid="video-bulk-upload">
+            <Video className="w-3.5 h-3.5" /> {uploadingVideo ? "Lade hoch…" : "Videos hochladen"}
+            <input type="file" accept={VIDEO_ACCEPT} multiple disabled={uploadingVideo} className="hidden" onChange={(e) => onPickVideos(e.target.files)} />
+          </label>
           <label className={`inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm cursor-pointer ${uploading ? "opacity-50" : ""}`} data-testid="photo-bulk-upload">
             <Plus className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Fotos hochladen"}
             <input type="file" accept="image/*" multiple disabled={uploading} className="hidden" onChange={(e) => onPick(e.target.files)} />
@@ -306,12 +407,13 @@ function AlbumPhotos({ album, events, onBack }) {
       </div>
 
       {photos.length === 0 ? (
-        <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Noch keine Fotos. Lade welche hoch — du kannst auch mehrere auf einmal auswählen.</div>
+        <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Noch keine Medien. Lade Fotos oder Videos hoch, oder füge einen Video-Link hinzu.</div>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
           {photos.map((p) => (
             <div key={p.id} className="relative group aspect-square bg-[#0A0A0A] border border-white/10">
-              <img src={resolveMediaUrl(p.thumbnail_url || p.image_url)} alt={p.caption || ""} className="w-full h-full object-cover" />
+              <GalleryAdminThumb item={p} />
+              <MediaBadge item={p} />
               <button onClick={() => remove(p.id)} className="absolute top-1 right-1 p-1 bg-black/70 text-[#FF3B30] opacity-0 group-hover:opacity-100 transition" aria-label="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>
             </div>
           ))}
@@ -322,7 +424,7 @@ function AlbumPhotos({ album, events, onBack }) {
           <div className="max-w-5xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-4">
               <div>
-                <h3 className="font-heading text-xl font-black uppercase">Bilder aus Medienbibliothek</h3>
+                <h3 className="font-heading text-xl font-black uppercase">Medienbibliothek</h3>
                 <div className="text-xs text-white/45">{selectedMedia.length} ausgewählt</div>
               </div>
               <button type="button" onClick={() => setMediaOpen(false)} className="text-white/50 hover:text-white">×</button>
@@ -330,7 +432,7 @@ function AlbumPhotos({ album, events, onBack }) {
             {loadingMedia ? (
               <div className="text-white/40 py-12 text-center">Lade Medien…</div>
             ) : media.length === 0 ? (
-              <div className="text-white/40 py-12 text-center">Keine Bilder vorhanden.</div>
+              <div className="text-white/40 py-12 text-center">Keine Medien vorhanden.</div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                 {media.map((item) => {
@@ -343,7 +445,8 @@ function AlbumPhotos({ album, events, onBack }) {
                       className={`aspect-square border bg-[#0A0A0A] rounded-sm overflow-hidden relative ${active ? "border-[#29B6E8] ring-2 ring-[#29B6E8]/30" : "border-white/10 hover:border-[#29B6E8]/60"}`}
                       title={item.filename}
                     >
-                      <img src={resolveMediaUrl(item.url)} alt="" className="w-full h-full object-cover" />
+                      <GalleryAdminThumb item={item} />
+                      <MediaBadge item={item} />
                       {active && <span className="absolute top-1 right-1 bg-[#29B6E8] text-black text-[10px] font-black px-1.5 py-0.5 rounded-sm">OK</span>}
                     </button>
                   );
@@ -357,7 +460,96 @@ function AlbumPhotos({ album, events, onBack }) {
           </div>
         </div>
       )}
+      {linkOpen && <VideoLinkModal onClose={() => setLinkOpen(false)} onSave={addExternalMedia} />}
     </AdminLayout>
+  );
+}
+
+function GalleryAdminThumb({ item }) {
+  const type = mediaTypeFromItem(item);
+  const poster = galleryPosterUrl(item);
+  const url = galleryMediaUrl(item);
+  if (type === "image") {
+    return <img src={resolveMediaUrl(poster || url)} alt={item.caption || ""} className="w-full h-full object-cover" loading="lazy" />;
+  }
+  if (type === "video" && url && item.source_type !== "external") {
+    return (
+      <video
+        src={resolveMediaUrl(url)}
+        className="w-full h-full object-cover"
+        muted
+        playsInline
+        preload="metadata"
+      />
+    );
+  }
+  if (poster) {
+    return (
+      <div className="relative w-full h-full">
+        <img src={resolveMediaUrl(poster)} alt={item.caption || ""} className="w-full h-full object-cover" loading="lazy" />
+        <div className="absolute inset-0 bg-black/20" />
+      </div>
+    );
+  }
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-white/35">
+      <Film className="w-8 h-8" />
+      <span className="text-[10px] uppercase tracking-widest font-bold text-center px-2">{type === "embed" ? "Video-Link" : "Video"}</span>
+    </div>
+  );
+}
+
+function MediaBadge({ item }) {
+  if (!isVideoLike(item)) return null;
+  const label = item.embed_provider ? providerLabel(item.embed_provider) : "Video";
+  return (
+    <span className="absolute left-1 bottom-1 inline-flex items-center gap-1 rounded-sm bg-black/75 px-1.5 py-1 text-[9px] font-black uppercase tracking-widest text-white">
+      <Play className="w-3 h-3 fill-current" /> {label}
+    </span>
+  );
+}
+
+function VideoLinkModal({ onClose, onSave }) {
+  const [form, setForm] = useState({ url: "", caption: "", thumbnail_url: "" });
+  const [saving, setSaving] = useState(false);
+  const set = (k, v) => setForm((cur) => ({ ...cur, [k]: v }));
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.url.trim()) return toast.error("Bitte Video-Link eingeben.");
+    setSaving(true);
+    try {
+      await onSave(buildExternalGalleryPayload(form.url, form.caption, form.thumbnail_url));
+    } catch (err) {
+      toast.error(formatRequestError(err, "Video-Link konnte nicht hinzugefügt werden."));
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <form onSubmit={submit} className="w-full max-w-xl bg-[#121212] border border-white/10 rounded-sm">
+        <div className="flex items-center justify-between p-5 border-b border-white/10">
+          <h2 className="font-heading font-black uppercase">Video-Link hinzufügen</h2>
+          <button type="button" onClick={onClose} className="text-white/60 hover:text-white"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+          <Field label="Video-URL">
+            <Input value={form.url} onChange={(v) => set("url", v)} placeholder="YouTube, Twitch, Kick, Vimeo oder direkte MP4/WebM-URL" required testId="gallery-video-url" />
+          </Field>
+          <Field label="Titel / Caption">
+            <Input value={form.caption} onChange={(v) => set("caption", v)} placeholder="Optional" testId="gallery-video-caption" />
+          </Field>
+          <Field label="Vorschaubild">
+            <ImageUpload value={form.thumbnail_url} onChange={(v) => set("thumbnail_url", v)} testId="gallery-video-thumb" variant="wide" allowLibrary mediaScope="gallery" />
+          </Field>
+        </div>
+        <div className="flex gap-3 p-5 border-t border-white/10">
+          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm">Abbrechen</button>
+          <button type="submit" disabled={saving} className="ml-auto inline-flex items-center gap-2 px-5 py-2 bg-[#9F7AEA] text-white text-xs uppercase tracking-wider font-bold rounded-sm hover:bg-[#805AD5] disabled:opacity-50">
+            <LinkIcon className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Link hinzufügen"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

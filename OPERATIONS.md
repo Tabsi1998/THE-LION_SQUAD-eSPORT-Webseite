@@ -85,13 +85,14 @@ Empfohlene Werte:
 ```env
 UPLOAD_DIR=/app/backend/uploads
 MAX_IMAGE_UPLOAD_MB=50
+MAX_VIDEO_UPLOAD_MB=1024
 MAX_DOCUMENT_UPLOAD_MB=50
-PROXY_UPLOAD_LIMIT_MB=60
+PROXY_UPLOAD_LIMIT_MB=1100
 ```
 
 Reverse Proxy:
 
-- Body size mindestens 60 MB
+- Body size mindestens 1100 MB, wenn direkte Galerie-Video-Uploads genutzt werden
 - keine aggressive Bild-/HTML-Cache-Regel auf `/api/uploads/*`
 
 ## SEO, Crawler und Search Console

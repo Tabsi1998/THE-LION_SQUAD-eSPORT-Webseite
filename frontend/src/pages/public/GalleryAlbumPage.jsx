@@ -1,23 +1,57 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
+import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
+import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seoTextPreview } from "@/lib/textPreview";
-import { ArrowLeft, X, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import {
+  galleryEmbedSrc,
+  galleryMediaUrl,
+  galleryPosterUrl,
+  isExternalGalleryMedia,
+  isVideoLike,
+  mediaTypeFromItem,
+  providerLabel,
+} from "@/lib/galleryMedia";
+import { ArrowLeft, X, ChevronLeft, ChevronRight, Calendar, Play, Film, ExternalLink } from "lucide-react";
+
+const PINBOARD_TILE_CLASSES = [
+  "col-span-1 row-span-1",
+  "col-span-1 row-span-2",
+  "col-span-2 row-span-1",
+  "col-span-1 row-span-1",
+  "col-span-2 row-span-2",
+  "col-span-1 row-span-1",
+  "col-span-1 row-span-2",
+  "col-span-2 row-span-1",
+  "col-span-1 row-span-1",
+  "col-span-1 sm:col-span-2 row-span-2",
+  "col-span-1 row-span-1",
+  "col-span-2 row-span-1",
+];
+
+function pinboardTileClass(item, index) {
+  if (index === 0) return "col-span-2 row-span-2";
+  if (isVideoLike(item) && index % 3 === 0) return "col-span-2 row-span-2";
+  return PINBOARD_TILE_CLASSES[index % PINBOARD_TILE_CLASSES.length];
+}
 
 export default function GalleryAlbumPage() {
   const { slug } = useParams();
   const [a, setA] = useState(null);
   const [error, setError] = useState(null);
-  const [active, setActive] = useState(null); // index of active photo
-  const seoDescription = seoTextPreview(a?.description, "Fotos und Eindrücke von THE LION SQUAD eSports: Turniere, LAN-Partys, Events und Gaming Community.");
+  const [active, setActive] = useState(null);
+  const items = a?.photos || [];
+  const firstPreview = items.find((item) => galleryPosterUrl(item) || item.image_url);
+  const seoDescription = seoTextPreview(a?.description, "Fotos, Videos und Eindrücke von THE LION SQUAD eSports: Turniere, LAN-Partys, Events und Gaming Community.");
   useDocumentTitle(a?.title || "Galerie", seoDescription, {
-    image: a?.cover_url || a?.photos?.[0]?.thumbnail_url || a?.photos?.[0]?.image_url,
+    image: a?.cover_url || galleryPosterUrl(firstPreview) || firstPreview?.image_url,
     canonical: a?.slug ? `${window.location.origin}/galerie/${a.slug}` : undefined,
   });
   useCanonicalSlugRedirect(slug, a?.slug, "/galerie");
@@ -35,6 +69,17 @@ export default function GalleryAlbumPage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (active === null) return undefined;
+    const handler = (event) => {
+      if (event.key === "Escape") setActive(null);
+      if (event.key === "ArrowLeft") setActive((i) => (i - 1 + items.length) % items.length);
+      if (event.key === "ArrowRight") setActive((i) => (i + 1) % items.length);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [active, items.length]);
+
   useApiInvalidation(load, ["gallery"]);
 
   if (error) return (
@@ -46,8 +91,6 @@ export default function GalleryAlbumPage() {
     </PublicLayout>
   );
   if (!a) return <PublicLayout><PublicLoadingState label="Lade Album" /></PublicLayout>;
-
-  const photos = a.photos || [];
 
   return (
     <PublicLayout>
@@ -67,54 +110,186 @@ export default function GalleryAlbumPage() {
         <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-white/60">
           {a.taken_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {new Date(a.taken_at).toLocaleDateString("de-DE", { dateStyle: "long" })}</span>}
           {a.event && <Link to={`/events/${a.event.slug}`} className="text-[#9F7AEA] hover:underline">→ {a.event.name}</Link>}
+          <span>{items.length} Medien</span>
         </div>
         {a.description && <p className="mt-3 text-white/70 max-w-2xl">{a.description}</p>}
 
-        {photos.length === 0 ? (
-          <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Noch keine Fotos.</div>
+        {items.length === 0 ? (
+          <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Noch keine Medien.</div>
         ) : (
-          <div className="mt-10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-            {photos.map((p, i) => (
+          <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-6 auto-rows-[7.5rem] sm:auto-rows-[8.5rem] lg:auto-rows-[9.5rem] grid-flow-dense gap-3">
+            {items.map((item, i) => (
               <button
-                key={p.id}
+                key={item.id}
                 onClick={() => setActive(i)}
                 data-testid={`gallery-photo-${i}`}
-                className="aspect-square overflow-hidden bg-[#0A0A0A] border border-white/5 hover:border-[#29B6E8]/40 transition group"
+                className={`${pinboardTileClass(item, i)} min-h-0 overflow-hidden bg-[#0A0A0A] border border-white/5 hover:border-[#29B6E8]/45 transition group relative rounded-sm shadow-sm shadow-black/30 hover:-translate-y-0.5`}
+                aria-label={isVideoLike(item) ? "Video öffnen" : "Bild öffnen"}
               >
-                <img
-                  src={resolveMediaUrl(p.thumbnail_url || p.image_url)}
-                  alt={p.caption || ""}
-                  className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                  loading="lazy"
-                />
+                <GalleryTile item={item} />
               </button>
             ))}
           </div>
         )}
       </section>
 
-      {active !== null && photos[active] && (
-        <Lightbox photo={photos[active]} onClose={() => setActive(null)}
-          onPrev={() => setActive((i) => (i - 1 + photos.length) % photos.length)}
-          onNext={() => setActive((i) => (i + 1) % photos.length)}
+      {active !== null && items[active] && (
+        <Lightbox item={items[active]} onClose={() => setActive(null)}
+          onPrev={() => setActive((i) => (i - 1 + items.length) % items.length)}
+          onNext={() => setActive((i) => (i + 1) % items.length)}
         />
       )}
     </PublicLayout>
   );
 }
 
-function Lightbox({ photo, onClose, onPrev, onNext }) {
+function GalleryTile({ item }) {
+  const type = mediaTypeFromItem(item);
+  const poster = galleryPosterUrl(item);
+  const url = galleryMediaUrl(item);
+  if (type === "image") {
+    return (
+      <img
+        src={resolveMediaUrl(poster || url)}
+        alt={item.caption || ""}
+        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+        loading="lazy"
+      />
+    );
+  }
+  return (
+    <>
+      {type === "video" && url && !isExternalGalleryMedia(item) ? (
+        <CenterPreviewVideo src={resolveMediaUrl(url)} poster={poster ? resolveMediaUrl(poster) : ""} />
+      ) : poster ? (
+        <img src={resolveMediaUrl(poster)} alt={item.caption || ""} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy" />
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-white/35">
+          <Film className="w-9 h-9" />
+          <span className="text-[10px] uppercase tracking-widest font-bold">Video</span>
+        </div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent" />
+      <span className="absolute left-2 bottom-2 inline-flex items-center gap-1 rounded-sm bg-black/70 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-white">
+        <Play className="w-3 h-3 fill-current" /> {item.embed_provider ? providerLabel(item.embed_provider) : "Video"}
+      </span>
+    </>
+  );
+}
+
+function CenterPreviewVideo({ src, poster }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || typeof IntersectionObserver === "undefined") return undefined;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        node.play().catch(() => {});
+      } else {
+        node.pause();
+      }
+    }, { rootMargin: "-35% 0px -35% 0px", threshold: 0.15 });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <video
+      ref={ref}
+      src={src}
+      poster={poster || undefined}
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+    />
+  );
+}
+
+function Lightbox({ item, onClose, onPrev, onNext }) {
+  const type = mediaTypeFromItem(item);
   return (
     <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center" onClick={onClose}>
-      <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="absolute top-4 right-4 p-2 text-white/70 hover:text-white" aria-label="Schließen"><X className="w-6 h-6" /></button>
-      <button onClick={(e) => { e.stopPropagation(); onPrev(); }} className="absolute left-4 p-3 text-white/70 hover:text-white" aria-label="Vorheriges"><ChevronLeft className="w-6 h-6" /></button>
-      <img src={resolveMediaUrl(photo.image_url)} alt={photo.caption || ""} loading="lazy" decoding="async" className="max-w-[90vw] max-h-[85vh] object-contain" onClick={(e) => e.stopPropagation()} />
-      <button onClick={(e) => { e.stopPropagation(); onNext(); }} className="absolute right-4 p-3 text-white/70 hover:text-white" aria-label="Nächstes"><ChevronRight className="w-6 h-6" /></button>
-      {photo.caption && (
+      <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="absolute top-4 right-4 p-2 text-white/70 hover:text-white z-10" aria-label="Schließen"><X className="w-6 h-6" /></button>
+      <button onClick={(e) => { e.stopPropagation(); onPrev(); }} className="absolute left-4 p-3 text-white/70 hover:text-white z-10" aria-label="Vorheriges"><ChevronLeft className="w-6 h-6" /></button>
+      <div className="max-w-[92vw] max-h-[86vh] w-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+        {type === "image" ? <LightboxImage item={item} /> : <LightboxVideo item={item} />}
+      </div>
+      <button onClick={(e) => { e.stopPropagation(); onNext(); }} className="absolute right-4 p-3 text-white/70 hover:text-white z-10" aria-label="Nächstes"><ChevronRight className="w-6 h-6" /></button>
+      {item.caption && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 max-w-[80vw] text-center text-sm text-white/85 bg-black/60 px-4 py-2 rounded-sm">
-          {photo.caption}
+          {item.caption}
         </div>
       )}
     </div>
+  );
+}
+
+function LightboxImage({ item }) {
+  return (
+    <img
+      src={resolveMediaUrl(item.image_url)}
+      alt={item.caption || ""}
+      loading="lazy"
+      decoding="async"
+      className="max-w-[90vw] max-h-[85vh] object-contain"
+    />
+  );
+}
+
+function LightboxVideo({ item }) {
+  const { hasConsent } = useCookieConsent();
+  const url = galleryMediaUrl(item);
+  const embedSrc = mediaTypeFromItem(item) === "embed" ? galleryEmbedSrc(item) : "";
+  const external = isExternalGalleryMedia(item);
+  if (embedSrc) {
+    if (!hasConsent("external_media")) {
+      return (
+        <div className="w-full max-w-4xl">
+          <ExternalMediaNotice
+            service={`${providerLabel(item.embed_provider)} Video`}
+            reason="Der externe Videoplayer wird erst nach Zustimmung zu externen Medien geladen."
+            url={url}
+            accent="#9F7AEA"
+            testId="gallery-video-consent"
+          />
+        </div>
+      );
+    }
+    return (
+      <div className="w-full max-w-5xl aspect-video bg-black border border-white/10">
+        <iframe src={embedSrc} className="w-full h-full border-0" title={item.caption || "Galerie-Video"} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />
+      </div>
+    );
+  }
+  if (external && !hasConsent("external_media")) {
+    return (
+      <div className="w-full max-w-4xl">
+        <ExternalMediaNotice
+          service="Externes Video"
+          reason="Das externe Video wird erst nach Zustimmung zu externen Medien geladen."
+          url={url}
+          accent="#9F7AEA"
+          testId="gallery-direct-video-consent"
+        />
+      </div>
+    );
+  }
+  if (mediaTypeFromItem(item) === "video" && url) {
+    return (
+      <video
+        src={resolveMediaUrl(url)}
+        poster={galleryPosterUrl(item) ? resolveMediaUrl(galleryPosterUrl(item)) : undefined}
+        controls
+        autoPlay
+        playsInline
+        className="max-w-[90vw] max-h-[85vh] bg-black"
+      />
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-5 py-3 text-white/80 hover:text-white">
+      <ExternalLink className="w-4 h-4" /> Video öffnen
+    </a>
   );
 }

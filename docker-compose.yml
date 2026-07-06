@@ -37,6 +37,7 @@ services:
       DISABLE_SCHEDULER: "${DISABLE_SCHEDULER:-false}"
       UPLOAD_DIR: "${UPLOAD_DIR:-/app/backend/uploads}"
       MAX_IMAGE_UPLOAD_MB: "${MAX_IMAGE_UPLOAD_MB:-50}"
+      MAX_VIDEO_UPLOAD_MB: "${MAX_VIDEO_UPLOAD_MB:-1024}"
       MAX_DOCUMENT_UPLOAD_MB: "${MAX_DOCUMENT_UPLOAD_MB:-50}"
       ALLOW_INSECURE_CORS: "${ALLOW_INSECURE_CORS:-false}"
     ports:
@@ -60,8 +61,9 @@ services:
       args:
         REACT_APP_BACKEND_URL: "${PUBLIC_BACKEND_URL:?Set PUBLIC_BACKEND_URL in .env before deploying}"
         REACT_APP_MAX_IMAGE_UPLOAD_MB: "${MAX_IMAGE_UPLOAD_MB:-50}"
+        REACT_APP_MAX_VIDEO_UPLOAD_MB: "${MAX_VIDEO_UPLOAD_MB:-1024}"
         REACT_APP_MAX_DOCUMENT_UPLOAD_MB: "${MAX_DOCUMENT_UPLOAD_MB:-50}"
-        REACT_APP_PROXY_UPLOAD_LIMIT_MB: "${PROXY_UPLOAD_LIMIT_MB:-60}"
+        REACT_APP_PROXY_UPLOAD_LIMIT_MB: "${PROXY_UPLOAD_LIMIT_MB:-1100}"
     container_name: tls-frontend
     restart: unless-stopped
     depends_on:

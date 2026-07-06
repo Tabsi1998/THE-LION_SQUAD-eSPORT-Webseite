@@ -31,6 +31,8 @@ from models import now_utc
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
 PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+PUBLIC_VIDEO_EXTS = {".mp4", ".m4v", ".webm", ".mov"}
+PUBLIC_MEDIA_EXTS = PUBLIC_IMAGE_EXTS | PUBLIC_VIDEO_EXTS
 ADMIN_MEDIA_OWNER_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
 IMAGE_REFERENCE_FIELDS = [
     ("settings", {"id": "branding"}, ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "qr_logo_url", "favicon_url", "favicon_light_url", "favicon_dark_url"]),
@@ -47,7 +49,7 @@ IMAGE_REFERENCE_FIELDS = [
     ("f1_tracks", {}, ["image_url"]),
     ("seasons", {}, ["banner_url"]),
     ("gallery_albums", {}, ["cover_url"]),
-    ("gallery_photos", {}, ["image_url", "thumbnail_url"]),
+    ("gallery_photos", {}, ["image_url", "thumbnail_url", "video_url"]),
     ("member_benefits", {}, ["image_url"]),
     ("club_member_profiles", {}, ["photo_url", "cover_url"]),
 ]
@@ -92,9 +94,18 @@ def _filename_from_media_value(value: Any) -> str | None:
     ):
         return None
     name = Path(raw).name
-    if not name or name.startswith(".") or Path(name).suffix.lower() not in PUBLIC_IMAGE_EXTS:
+    if not name or name.startswith(".") or Path(name).suffix.lower() not in PUBLIC_MEDIA_EXTS:
         return None
     return name
+
+
+def _media_type_from_ext(ext: str) -> str:
+    suffix = (ext or "").lower()
+    if suffix in PUBLIC_VIDEO_EXTS:
+        return "video"
+    if suffix in PUBLIC_IMAGE_EXTS:
+        return "image"
+    return "file"
 
 
 def _iter_text_media_values(value: Any) -> list[str]:
@@ -165,6 +176,7 @@ async def _list_media_items(
     exclude_user_scope: bool = False,
     user_scope_only: bool = False,
     include_usage: bool = False,
+    media_type_filter: str | None = None,
 ) -> list[dict]:
     if not UPLOAD_DIR.exists():
         return []
@@ -174,8 +186,13 @@ async def _list_media_items(
             candidates.extend([p for p in base.iterdir() if p.is_file()])
     candidates = [
         p for p in candidates
-        if not p.name.startswith(".") and p.suffix.lower() in PUBLIC_IMAGE_EXTS
+        if not p.name.startswith(".") and p.suffix.lower() in PUBLIC_MEDIA_EXTS
     ]
+    requested_type = str(media_type_filter or "").strip().lower()
+    if requested_type in {"image", "images"}:
+        candidates = [p for p in candidates if p.suffix.lower() in PUBLIC_IMAGE_EXTS]
+    elif requested_type in {"video", "videos"}:
+        candidates = [p for p in candidates if p.suffix.lower() in PUBLIC_VIDEO_EXTS]
     duplicate_lookup: dict[str, list[str]] = {}
     if include_usage:
         by_size: dict[int, list[Path]] = {}
@@ -226,12 +243,17 @@ async def _list_media_items(
             continue
         stat = p.stat()
         refs = usage.get(p.name) or []
+        inferred_media_type = _media_type_from_ext(p.suffix.lower())
+        media_type = (meta.get("media_type") if meta else None) or inferred_media_type
         items.append({
             "filename": p.name,
             "url": f"/api/static/uploads/{p.name}",
             "size": stat.st_size,
             "mtime": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
             "ext": p.suffix.lower().lstrip("."),
+            "media_type": media_type,
+            "kind": media_type,
+            "mime": meta.get("mime") if meta else None,
             "owner_id": meta.get("owner_id") if meta else None,
             "owner_role": meta.get("owner_role") if meta else None,
             "media_scope": media_scope,
@@ -248,15 +270,15 @@ async def _list_media_items(
 
 
 @media_router.get("")
-async def list_media(me: dict = Depends(get_current_user)):
-    """List uploaded images visible in the current user's media picker."""
-    return await _list_media_items(owner_id=me["id"], include_untracked=False, user_scope_only=True)
+async def list_media(type: str = "", me: dict = Depends(get_current_user)):
+    """List uploaded media visible in the current user's media picker."""
+    return await _list_media_items(owner_id=me["id"], include_untracked=False, user_scope_only=True, media_type_filter=type)
 
 
 @admin_media_router.get("")
-async def admin_list_media(include_user_uploads: bool = False, include_usage: bool = False, me: dict = Depends(require_admin())):
+async def admin_list_media(include_user_uploads: bool = False, include_usage: bool = False, type: str = "", me: dict = Depends(require_admin())):
     """List CMS/admin files in the upload directory with metadata."""
-    return await _list_media_items(exclude_user_scope=not include_user_uploads, include_usage=include_usage)
+    return await _list_media_items(exclude_user_scope=not include_user_uploads, include_usage=include_usage, media_type_filter=type)
 
 
 @admin_media_router.get("/audit")
@@ -324,7 +346,7 @@ def _media_file_path(filename: str) -> Path:
     safe_name = Path(filename).name
     if safe_name != filename or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,180}", safe_name):
         raise HTTPException(400, "Ungültiger Dateiname.")
-    if Path(safe_name).suffix.lower() not in PUBLIC_IMAGE_EXTS:
+    if Path(safe_name).suffix.lower() not in PUBLIC_MEDIA_EXTS:
         raise HTTPException(404, "Datei nicht gefunden.")
     for base_dir in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
         base = base_dir.resolve(strict=False)

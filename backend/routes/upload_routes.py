@@ -1,6 +1,6 @@
 """File upload routes.
 
-Public images are stored on local disk and served through
+Public media is stored on local disk and served through
 /api/static/uploads/{filename}. A legacy /uploads/{filename} route is also kept
 for older stored URLs.
 """
@@ -24,6 +24,7 @@ PRIVATE_DOC_DIR = UPLOAD_DIR / "documents"
 PUBLIC_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 PRIVATE_DOC_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE = {"image/png", "image/jpeg", "image/webp"}
+ALLOWED_VIDEO = {"video/mp4", "video/webm", "video/quicktime", "video/x-m4v"}
 ADMIN_MEDIA_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
 ALLOWED_MEDIA_SCOPES = {"user", "admin", "sponsor", "branding", "gallery"}
 IMAGE_MIME_BY_EXT = {
@@ -31,6 +32,18 @@ IMAGE_MIME_BY_EXT = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".webp": "image/webp",
+}
+VIDEO_MIME_BY_EXT = {
+    ".mp4": "video/mp4",
+    ".m4v": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+}
+VIDEO_EXT_BY_MIME = {
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+    "video/quicktime": ".mov",
+    "video/x-m4v": ".m4v",
 }
 PIL_IMAGE_FORMATS = {
     "PNG": ("image/png", ".png"),
@@ -76,11 +89,15 @@ ALLOWED_DOC = {
     "image/png", "image/jpeg",
 }
 MAX_IMAGE_UPLOAD_MB = _upload_mb_from_env("MAX_IMAGE_UPLOAD_MB", 50)
+MAX_VIDEO_UPLOAD_MB = _upload_mb_from_env("MAX_VIDEO_UPLOAD_MB", 1024)
 MAX_DOCUMENT_UPLOAD_MB = _upload_mb_from_env("MAX_DOCUMENT_UPLOAD_MB", 50)
 MAX_BYTES = MAX_IMAGE_UPLOAD_MB * 1024 * 1024  # images before re-encoding
+MAX_VIDEO_BYTES = MAX_VIDEO_UPLOAD_MB * 1024 * 1024
 MAX_DOC_BYTES = MAX_DOCUMENT_UPLOAD_MB * 1024 * 1024  # docs
 MAX_IMAGE_DIMENSION = _int_from_env("MAX_IMAGE_DIMENSION", 4096)
 MAX_IMAGE_PIXELS = _int_from_env("MAX_IMAGE_PIXELS", 50_000_000)
+UPLOAD_STREAM_CHUNK_BYTES = 1024 * 1024
+VIDEO_SNIFF_BYTES = 4096
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
@@ -91,6 +108,39 @@ async def _read_upload_limited(file: UploadFile, max_bytes: int, max_mb: int) ->
     if len(data) > max_bytes:
         raise HTTPException(status_code=413, detail=f"Datei zu groß (max {max_mb} MB)")
     return data
+
+
+async def _write_upload_stream_limited(
+    file: UploadFile,
+    path: pathlib.Path,
+    first_chunk: bytes,
+    max_bytes: int,
+    max_mb: int,
+) -> int:
+    total = 0
+    try:
+        with path.open("wb") as out:
+            if first_chunk:
+                total += len(first_chunk)
+                if total > max_bytes:
+                    raise HTTPException(status_code=413, detail=f"Datei zu groß (max {max_mb} MB)")
+                out.write(first_chunk)
+            while True:
+                chunk = await file.read(UPLOAD_STREAM_CHUNK_BYTES)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > max_bytes:
+                    raise HTTPException(status_code=413, detail=f"Datei zu groß (max {max_mb} MB)")
+                out.write(chunk)
+    except HTTPException:
+        path.unlink(missing_ok=True)
+        raise
+    except OSError as exc:
+        path.unlink(missing_ok=True)
+        logger.error("[uploads] failed to write stream %s: %s", path, exc)
+        raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR prüfen.")
+    return total
 
 
 def _clean_media_scope(value: str | None, me: dict) -> str:
@@ -244,6 +294,7 @@ async def _upload_image_impl(
             "original_filename": filename_hint,
             "mime": content_type,
             "ext": ext.lstrip("."),
+            "media_type": "image",
             "owner_id": me.get("id"),
             "owner_role": me.get("role"),
             "media_scope": media_scope,
@@ -253,6 +304,80 @@ async def _upload_image_impl(
     except Exception as exc:
         logger.warning("[uploads] media metadata write failed for %s: %s", filename, exc)
     return {"url": url, "filename": filename, "size": len(data), "original_size": original_size, "media_scope": media_scope}
+
+
+def _detect_video_upload(data: bytes, declared_content_type: str, suffix: str) -> tuple[str, str]:
+    """Return (content_type, extension) after lightweight container sniffing."""
+    declared = (declared_content_type or "").split(";")[0].strip().lower()
+    suffix = (suffix or "").lower()
+    if data.startswith(b"\x1a\x45\xdf\xa3"):
+        return "video/webm", ".webm"
+    if len(data) >= 12 and data[4:8] == b"ftyp":
+        major_brand = data[8:12].lower()
+        if suffix == ".mov" or major_brand == b"qt  ":
+            return "video/quicktime", ".mov"
+        if suffix == ".m4v" or declared == "video/x-m4v":
+            return "video/mp4", ".m4v"
+        return "video/mp4", ".mp4"
+    if declared in ALLOWED_VIDEO and suffix in VIDEO_MIME_BY_EXT:
+        return declared, VIDEO_EXT_BY_MIME.get(declared) or suffix
+    if suffix in VIDEO_MIME_BY_EXT:
+        return VIDEO_MIME_BY_EXT[suffix], suffix
+    raise HTTPException(status_code=400, detail="Nur MP4, WebM, MOV oder M4V erlaubt.")
+
+
+async def _upload_video_impl(
+    file: UploadFile,
+    me: dict,
+    media_scope: str = "gallery",
+):
+    """Upload a video without transcoding. Returns public URL and metadata."""
+    media_scope = _clean_media_scope(media_scope, me)
+    declared_content_type = file.content_type or ""
+    suffix = pathlib.Path(file.filename or "").suffix.lower()
+    filename_hint = file.filename or "video"
+    declared = declared_content_type.split(";")[0].strip().lower()
+    if declared and declared not in ALLOWED_VIDEO and suffix not in VIDEO_MIME_BY_EXT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nur MP4, WebM, MOV oder M4V erlaubt. Erkannt: {declared_content_type or 'unbekannt'}",
+        )
+    head = await file.read(VIDEO_SNIFF_BYTES)
+    if not head:
+        raise HTTPException(status_code=400, detail="Leere Videodatei")
+    content_type, ext = _detect_video_upload(head, declared_content_type, suffix)
+    filename = f"{uuid.uuid4().hex}{ext}"
+    path = PUBLIC_UPLOAD_DIR / filename
+    size = await _write_upload_stream_limited(file, path, head, MAX_VIDEO_BYTES, MAX_VIDEO_UPLOAD_MB)
+    url = f"/api/static/uploads/{filename}"
+    try:
+        await get_db().media_uploads.insert_one({
+            "id": new_id(),
+            "filename": filename,
+            "url": url,
+            "size": size,
+            "original_size": size,
+            "original_filename": filename_hint,
+            "mime": content_type,
+            "ext": ext.lstrip("."),
+            "media_type": "video",
+            "owner_id": me.get("id"),
+            "owner_role": me.get("role"),
+            "media_scope": media_scope,
+            "created_at": now_utc().isoformat(),
+            "updated_at": now_utc().isoformat(),
+        })
+    except Exception as exc:
+        logger.warning("[uploads] media metadata write failed for %s: %s", filename, exc)
+    return {
+        "url": url,
+        "filename": filename,
+        "size": size,
+        "original_size": size,
+        "mime": content_type,
+        "media_type": "video",
+        "media_scope": media_scope,
+    }
 
 
 @router.post("/image")
@@ -265,6 +390,17 @@ async def upload_image(
 ):
     await enforce_rate_limit(request, "uploads:image:user", limit=30, window_seconds=3600, subject=me["id"])
     return await _upload_image_impl(file, me, trim_empty_borders, media_scope)
+
+
+@router.post("/video")
+async def upload_video(
+    request: Request,
+    file: UploadFile = File(...),
+    me: dict = Depends(require_admin()),
+    media_scope: str = "gallery",
+):
+    await enforce_rate_limit(request, "uploads:video:admin", limit=10, window_seconds=3600, subject=me["id"])
+    return await _upload_video_impl(file, me, media_scope)
 
 
 @router.post("/sponsor-logo")

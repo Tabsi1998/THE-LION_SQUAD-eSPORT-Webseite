@@ -1,5 +1,5 @@
 """Pydantic v2 models for THE LION SQUAD eSports."""
-from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator, model_validator
 from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime, timezone, date
 import uuid
@@ -999,6 +999,9 @@ class ReferenceUpdate(BaseModel):
 
 # ---------- Gallery ----------
 GalleryVisibility = Literal["public", "community", "members"]
+GalleryMediaType = Literal["image", "video", "embed"]
+GalleryMediaSource = Literal["upload", "external"]
+GalleryEmbedProvider = Literal["youtube", "twitch", "kick", "vimeo", "generic"]
 
 
 # ---------- Documents (members area) ----------
@@ -1068,15 +1071,38 @@ class GalleryAlbumUpdate(BaseModel):
 
 
 class GalleryPhotoCreate(BaseModel):
-    image_url: str
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+    media_type: GalleryMediaType = "image"
+    source_type: GalleryMediaSource = "upload"
+    external_url: Optional[str] = None
+    embed_url: Optional[str] = None
+    embed_provider: Optional[GalleryEmbedProvider] = None
     thumbnail_url: Optional[str] = None
     caption: Optional[str] = None
     order_index: int = 0
+    mime: Optional[str] = None
+    file_size: Optional[int] = None
+
+    @model_validator(mode="after")
+    def ensure_media_source(self):
+        if self.media_type == "image" and not self.image_url:
+            raise ValueError("image_url ist fuer Bilder erforderlich.")
+        if self.media_type == "video" and not (self.video_url or self.external_url):
+            raise ValueError("video_url oder external_url ist fuer Videos erforderlich.")
+        if self.media_type == "embed" and not (self.embed_url or self.external_url):
+            raise ValueError("embed_url oder external_url ist fuer eingebettete Videos erforderlich.")
+        if self.media_type == "video" and not self.video_url and self.external_url:
+            self.video_url = self.external_url
+        if self.media_type == "embed" and not self.embed_url and self.external_url:
+            self.embed_url = self.external_url
+        return self
 
 
 class GalleryPhotoUpdate(BaseModel):
     caption: Optional[str] = None
     order_index: Optional[int] = None
+    thumbnail_url: Optional[str] = None
 
 
 # ---------- Admin ----------

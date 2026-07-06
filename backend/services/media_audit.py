@@ -14,6 +14,8 @@ UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
 LOCAL_PREFIX = "/api/static/uploads/"
 PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+PUBLIC_VIDEO_EXTS = {".mp4", ".m4v", ".webm", ".mov"}
+PUBLIC_MEDIA_EXTS = PUBLIC_IMAGE_EXTS | PUBLIC_VIDEO_EXTS
 ADMIN_OWNER_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
 MEDIA_SCOPES = {"user", "admin", "sponsor", "branding", "gallery"}
 
@@ -31,7 +33,7 @@ TARGETS: list[tuple[str, list[str]]] = [
     ("f1_tracks", ["image_url"]),
     ("seasons", ["banner_url"]),
     ("gallery_albums", ["cover_url"]),
-    ("gallery_photos", ["image_url", "thumbnail_url"]),
+    ("gallery_photos", ["image_url", "thumbnail_url", "video_url"]),
     ("member_benefits", ["image_url"]),
     ("club_member_profiles", ["photo_url", "cover_url"]),
 ]
@@ -50,7 +52,7 @@ SCOPE_TARGETS: list[tuple[str, list[str], str]] = [
     ("settings", ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "qr_logo_url", "favicon_url", "favicon_light_url", "favicon_dark_url", "avatar_url"], "branding"),
     ("sponsors", ["logo_url"], "sponsor"),
     ("gallery_albums", ["cover_url"], "gallery"),
-    ("gallery_photos", ["image_url", "thumbnail_url"], "gallery"),
+    ("gallery_photos", ["image_url", "thumbnail_url", "video_url"], "gallery"),
     ("teams", ["logo_url", "banner_url"], "admin"),
     ("partners", ["logo_url"], "admin"),
     ("news_posts", ["banner_url", "cover_url"], "admin"),
@@ -90,7 +92,7 @@ def _filename_from_upload_path(path: str) -> str | None:
     filename = pathlib.PurePosixPath(path).name
     if not filename or filename.startswith(".") or "/" in filename or "\\" in filename:
         return None
-    if pathlib.Path(filename).suffix.lower() not in PUBLIC_IMAGE_EXTS:
+    if pathlib.Path(filename).suffix.lower() not in PUBLIC_MEDIA_EXTS:
         return None
     return filename
 

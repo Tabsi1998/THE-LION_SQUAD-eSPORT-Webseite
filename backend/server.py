@@ -256,20 +256,24 @@ app.include_router(search_router)
 app.include_router(penalty_router)
 app.include_router(penalty_admin_router)
 
-# Static uploads: only public image files are served directly. Documents are
+# Static uploads: only public media files are served directly. Documents are
 # streamed through visibility-aware /api/documents/{id}/download.
 import pathlib
 upload_dir = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 upload_dir.mkdir(parents=True, exist_ok=True)
 public_upload_dir = upload_dir / "public"
 public_upload_dir.mkdir(parents=True, exist_ok=True)
-PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
-PUBLIC_IMAGE_MEDIA_TYPES = {
+PUBLIC_MEDIA_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".m4v", ".webm", ".mov"}
+PUBLIC_MEDIA_TYPES = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".webp": "image/webp",
     ".gif": "image/gif",
+    ".mp4": "video/mp4",
+    ".m4v": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
 }
 
 
@@ -278,12 +282,12 @@ async def public_upload(filename: str):
     if "/" in filename or "\\" in filename or ".." in filename or filename.startswith("."):
         raise HTTPException(status_code=400, detail="Invalid filename")
     suffix = pathlib.Path(filename).suffix.lower()
-    if suffix not in PUBLIC_IMAGE_EXTS:
+    if suffix not in PUBLIC_MEDIA_EXTS:
         raise HTTPException(status_code=404, detail="File not found")
     for base in (public_upload_dir, upload_dir):
         path = base / filename
         if path.exists() and path.is_file():
-            return FileResponse(path, media_type=PUBLIC_IMAGE_MEDIA_TYPES.get(suffix))
+            return FileResponse(path, media_type=PUBLIC_MEDIA_TYPES.get(suffix))
     raise HTTPException(status_code=404, detail="File not found")
 
 

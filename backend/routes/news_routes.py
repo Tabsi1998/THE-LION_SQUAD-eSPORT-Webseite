@@ -118,7 +118,52 @@ def _compact_album(album: dict) -> dict:
         "visibility": album.get("visibility"),
         "event_id": album.get("event_id"),
         "photo_count": album.get("photo_count", 0),
+        "video_count": album.get("video_count", 0),
+        "media_count": album.get("media_count", album.get("photo_count", 0)),
     }
+
+
+def _gallery_image_query(album_id: str) -> dict:
+    return {
+        "album_id": album_id,
+        "$or": [
+            {"media_type": {"$exists": False}},
+            {"media_type": None},
+            {"media_type": "image"},
+        ],
+    }
+
+
+def _gallery_video_query(album_id: str) -> dict:
+    return {"album_id": album_id, "media_type": {"$in": ["video", "embed"]}}
+
+
+async def _attach_gallery_counts(db, album: dict) -> None:
+    album["photo_count"] = await db.gallery_photos.count_documents(_gallery_image_query(album["id"]))
+    album["video_count"] = await db.gallery_photos.count_documents(_gallery_video_query(album["id"]))
+    album["media_count"] = album["photo_count"] + album["video_count"]
+
+
+def _normalized_gallery_item(item: dict) -> dict:
+    out = dict(item or {})
+    media_type = out.get("media_type")
+    if media_type not in {"image", "video", "embed"}:
+        media_type = "video" if out.get("video_url") else "embed" if out.get("embed_url") else "image"
+    out["media_type"] = media_type
+    out["source_type"] = out.get("source_type") or ("external" if out.get("external_url") else "upload")
+    if media_type == "video" and not out.get("video_url") and out.get("external_url"):
+        out["video_url"] = out.get("external_url")
+    if media_type == "embed" and not out.get("embed_url") and out.get("external_url"):
+        out["embed_url"] = out.get("external_url")
+    return out
+
+
+def _validate_gallery_external_media(payload: dict) -> None:
+    if payload.get("source_type") != "external":
+        return
+    url = payload.get("external_url") or payload.get("video_url") or payload.get("embed_url")
+    if not url or not str(url).strip().lower().startswith(("http://", "https://")):
+        raise HTTPException(400, "Externe Galerie-Medien brauchen eine gueltige http(s)-URL.")
 
 
 async def _mentioned_user_ids_from_content(content: str | None, explicit_ids: list[str] | None = None) -> list[str]:
@@ -1063,9 +1108,8 @@ async def list_albums(
         }
     albums = await db.gallery_albums.find(q, projection).sort([("order_index", 1), ("taken_at", -1)]).to_list(500)
     visible = await _filter_visible(albums, user)
-    # attach photo count
     for a in visible:
-        a["photo_count"] = await db.gallery_photos.count_documents({"album_id": a["id"]})
+        await _attach_gallery_counts(db, a)
     if compact:
         visible = [_compact_album(a) for a in visible]
         return _page_items(visible, limit, offset, paged)
@@ -1082,7 +1126,8 @@ async def get_album(slug_or_id: str, user: dict | None = Depends(get_optional_us
         raise HTTPException(403, "Nicht sichtbar.")
     if was_old_slug and a.get("slug"):
         return RedirectResponse(url=f"/api/gallery/{a['slug']}", status_code=301)
-    a["photos"] = await db.gallery_photos.find({"album_id": a["id"]}, {"_id": 0}).sort("order_index", 1).to_list(2000)
+    photos = await db.gallery_photos.find({"album_id": a["id"]}, {"_id": 0}).sort("order_index", 1).to_list(2000)
+    a["photos"] = [_normalized_gallery_item(item) for item in photos]
     if a.get("event_id"):
         event = await _visible_event_summary(a["event_id"], user)
         if event:
@@ -1095,7 +1140,7 @@ async def admin_list_albums(me: dict = Depends(require_admin())):
     db = get_db()
     albums = await db.gallery_albums.find({}, {"_id": 0}).sort("order_index", 1).to_list(1000)
     for a in albums:
-        a["photo_count"] = await db.gallery_photos.count_documents({"album_id": a["id"]})
+        await _attach_gallery_counts(db, a)
     return albums
 
 
@@ -1105,7 +1150,8 @@ async def admin_get_album(aid: str, me: dict = Depends(require_admin())):
     a = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0})
     if not a:
         raise HTTPException(404, "Album nicht gefunden.")
-    a["photos"] = await db.gallery_photos.find({"album_id": a["id"]}, {"_id": 0}).sort("order_index", 1).to_list(2000)
+    photos = await db.gallery_photos.find({"album_id": a["id"]}, {"_id": 0}).sort("order_index", 1).to_list(2000)
+    a["photos"] = [_normalized_gallery_item(item) for item in photos]
     return a
 
 
@@ -1162,9 +1208,11 @@ async def add_photo(aid: str, body: GalleryPhotoCreate, me: dict = Depends(requi
     db = get_db()
     if not await db.gallery_albums.find_one({"id": aid}):
         raise HTTPException(404, "Album nicht gefunden.")
+    payload = body.model_dump()
+    _validate_gallery_external_media(payload)
     doc = {
         "id": new_id(), "album_id": aid,
-        **body.model_dump(),
+        **payload,
         "uploaded_at": now_utc().isoformat(),
         "uploaded_by": me["id"],
     }

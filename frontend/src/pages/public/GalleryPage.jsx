@@ -7,7 +7,7 @@ import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { Image as ImageIcon, Crown } from "lucide-react";
+import { Image as ImageIcon, Crown, Film } from "lucide-react";
 
 export default function GalleryPage() {
   useDocumentTitle(
@@ -79,8 +79,13 @@ function AlbumCard({ a }) {
           </span>
         )}
         <span className="absolute bottom-2 right-2 text-[10px] uppercase tracking-widest font-bold text-white bg-black/60 px-2 py-1 rounded-sm">
-          {a.photo_count || 0} Fotos
+          {a.media_count ?? a.photo_count ?? 0} Medien
         </span>
+        {!!a.video_count && (
+          <span className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-white bg-[#9F7AEA]/80 px-2 py-1 rounded-sm">
+            <Film className="w-3 h-3" /> {a.video_count}
+          </span>
+        )}
       </div>
       <div className="p-4">
         <div className="font-heading font-black uppercase group-hover:text-[#29B6E8] transition">{a.title}</div>
