@@ -25,6 +25,7 @@ PUBLIC_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 PRIVATE_DOC_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE = {"image/png", "image/jpeg", "image/webp"}
 ALLOWED_VIDEO = {"video/mp4", "video/webm", "video/quicktime", "video/x-m4v"}
+SUPPORTED_VIDEO_LABEL = "MP4, WebM, MOV oder M4V"
 ADMIN_MEDIA_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
 ALLOWED_MEDIA_SCOPES = {"user", "admin", "sponsor", "branding", "gallery"}
 IMAGE_MIME_BY_EXT = {
@@ -49,6 +50,12 @@ VIDEO_MIME_BY_EXT = {
     ".m4v": "video/mp4",
     ".webm": "video/webm",
     ".mov": "video/quicktime",
+}
+VIDEO_MIME_ALIASES = {
+    "application/mp4": "video/mp4",
+    "application/quicktime": "video/quicktime",
+    "video/m4v": "video/mp4",
+    "video/x-quicktime": "video/quicktime",
 }
 VIDEO_EXT_BY_MIME = {
     "video/mp4": ".mp4",
@@ -100,7 +107,7 @@ ALLOWED_DOC = {
     "image/png", "image/jpeg",
 }
 MAX_IMAGE_UPLOAD_MB = _upload_mb_from_env("MAX_IMAGE_UPLOAD_MB", 50)
-MAX_VIDEO_UPLOAD_MB = _upload_mb_from_env("MAX_VIDEO_UPLOAD_MB", 1024)
+MAX_VIDEO_UPLOAD_MB = _upload_mb_from_env("MAX_VIDEO_UPLOAD_MB", 1536)
 MAX_DOCUMENT_UPLOAD_MB = _upload_mb_from_env("MAX_DOCUMENT_UPLOAD_MB", 50)
 MAX_ORIGINAL_UPLOAD_MB = _upload_mb_from_env("MAX_ORIGINAL_UPLOAD_MB", 200)
 MAX_BYTES = MAX_IMAGE_UPLOAD_MB * 1024 * 1024  # images before re-encoding
@@ -195,8 +202,9 @@ async def _enforce_upload_rate_limit(request: Request, me: dict, bucket: str, me
 
 def _upload_kind_for_file(file: UploadFile) -> str:
     declared = (file.content_type or "").split(";")[0].strip().lower()
+    declared_video = VIDEO_MIME_ALIASES.get(declared, declared)
     suffix = pathlib.Path(file.filename or "").suffix.lower()
-    if declared in ALLOWED_VIDEO or suffix in VIDEO_MIME_BY_EXT:
+    if declared_video in ALLOWED_VIDEO or declared.startswith("video/") or suffix in VIDEO_MIME_BY_EXT:
         return "video"
     if declared in ALLOWED_IMAGE or suffix in IMAGE_MIME_BY_EXT:
         return "image"
@@ -384,21 +392,26 @@ async def _upload_image_impl(
 def _detect_video_upload(data: bytes, declared_content_type: str, suffix: str) -> tuple[str, str]:
     """Return (content_type, extension) after lightweight container sniffing."""
     declared = (declared_content_type or "").split(";")[0].strip().lower()
+    declared_video = VIDEO_MIME_ALIASES.get(declared, declared)
     suffix = (suffix or "").lower()
     if data.startswith(b"\x1a\x45\xdf\xa3"):
         return "video/webm", ".webm"
-    if len(data) >= 12 and data[4:8] == b"ftyp":
-        major_brand = data[8:12].lower()
+    ftyp_at = data[:512].find(b"ftyp")
+    if ftyp_at >= 4 and len(data) >= ftyp_at + 8:
+        major_brand = data[ftyp_at + 4:ftyp_at + 8].lower()
         if suffix == ".mov" or major_brand == b"qt  ":
             return "video/quicktime", ".mov"
-        if suffix == ".m4v" or declared == "video/x-m4v":
+        if suffix == ".m4v" or declared in {"video/x-m4v", "video/m4v"}:
             return "video/mp4", ".m4v"
         return "video/mp4", ".mp4"
-    if declared in ALLOWED_VIDEO and suffix in VIDEO_MIME_BY_EXT:
-        return declared, VIDEO_EXT_BY_MIME.get(declared) or suffix
     if suffix in VIDEO_MIME_BY_EXT:
         return VIDEO_MIME_BY_EXT[suffix], suffix
-    raise HTTPException(status_code=400, detail="Nur MP4, WebM, MOV oder M4V erlaubt.")
+    if declared_video in ALLOWED_VIDEO:
+        return declared_video, VIDEO_EXT_BY_MIME.get(declared_video) or ".mp4"
+    detail = f"Nur {SUPPORTED_VIDEO_LABEL} erlaubt."
+    if suffix or declared:
+        detail += f" Erkannt: {suffix or 'keine Dateiendung'} / {declared_content_type or 'unbekannt'}."
+    raise HTTPException(status_code=400, detail=detail)
 
 
 async def _upload_video_impl(
@@ -412,10 +425,15 @@ async def _upload_video_impl(
     suffix = pathlib.Path(file.filename or "").suffix.lower()
     filename_hint = file.filename or "video"
     declared = declared_content_type.split(";")[0].strip().lower()
-    if declared and declared not in ALLOWED_VIDEO and suffix not in VIDEO_MIME_BY_EXT:
+    declared_video = VIDEO_MIME_ALIASES.get(declared, declared)
+    if declared and declared_video not in ALLOWED_VIDEO and suffix not in VIDEO_MIME_BY_EXT:
+        unsupported = declared.startswith("video/") or declared_video.startswith("video/")
         raise HTTPException(
             status_code=400,
-            detail=f"Nur MP4, WebM, MOV oder M4V erlaubt. Erkannt: {declared_content_type or 'unbekannt'}",
+            detail=(
+                f"Dieses Videoformat kann im Browser nicht zuverlässig abgespielt werden. Bitte als {SUPPORTED_VIDEO_LABEL} exportieren."
+                if unsupported else f"Nur {SUPPORTED_VIDEO_LABEL} erlaubt."
+            ) + f" Erkannt: {suffix or 'keine Dateiendung'} / {declared_content_type or 'unbekannt'}",
         )
     head = await file.read(VIDEO_SNIFF_BYTES)
     if not head:

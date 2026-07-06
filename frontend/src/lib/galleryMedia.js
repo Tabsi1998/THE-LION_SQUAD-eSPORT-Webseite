@@ -3,7 +3,7 @@ import { API_BASE } from "@/lib/api";
 export const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif"]);
 export const VIDEO_EXTENSIONS = new Set(["mp4", "m4v", "webm", "mov"]);
 export const RAW_PHOTO_EXTENSIONS = new Set(["nef", "nrw", "cr2", "cr3", "arw", "dng", "raf", "orf", "rw2"]);
-export const VIDEO_ACCEPT = "video/mp4,video/webm,video/quicktime,video/x-m4v,.mp4,.m4v,.webm,.mov";
+export const VIDEO_ACCEPT = "video/*,video/mp4,video/webm,video/quicktime,video/x-m4v,video/m4v,video/x-quicktime,application/mp4,application/quicktime,.mp4,.m4v,.webm,.mov";
 export const MEDIA_ACCEPT = [
   "image/png",
   "image/jpeg",

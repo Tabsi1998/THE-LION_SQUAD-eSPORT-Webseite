@@ -98,10 +98,10 @@ SEED_DEMO=false
 DISABLE_SCHEDULER=false
 UPLOAD_DIR=/app/backend/uploads
 MAX_IMAGE_UPLOAD_MB=50
-MAX_VIDEO_UPLOAD_MB=1024
+MAX_VIDEO_UPLOAD_MB=1536
 MAX_ORIGINAL_UPLOAD_MB=200
 MAX_DOCUMENT_UPLOAD_MB=50
-PROXY_UPLOAD_LIMIT_MB=1100
+PROXY_UPLOAD_LIMIT_MB=1700
 ADMIN_UPLOAD_RATE_LIMIT=240
 ADMIN_UPLOAD_RATE_WINDOW_SECONDS=600
 USER_UPLOAD_RATE_LIMIT=30
@@ -504,20 +504,20 @@ Uploads werden im Docker-Volume `uploads_data` gespeichert und ueber
 `/api/static/uploads/...` ausgeliefert.
 
 Bild-Uploads erlauben PNG/JPG/WebP standardmaessig bis 50 MB. Galerie-Video-Uploads erlauben
-MP4/WebM/MOV/M4V standardmaessig bis 1024 MB. Der Frontend-Nginx im Container sollte Requests
-bis mindestens 1100 MB erlauben. Wenn vor Docker noch ein externer Reverse Proxy wie Nginx Proxy Manager,
+MP4/WebM/MOV/M4V standardmaessig bis 1536 MB. Der Frontend-Nginx im Container sollte Requests
+bis mindestens 1700 MB erlauben. Wenn vor Docker noch ein externer Reverse Proxy wie Nginx Proxy Manager,
 Apache, Cloudflare oder ein Hosting-Panel sitzt, muss dort ebenfalls ein Body-Limit von
-mindestens 1100 MB gesetzt werden, sonst kommt weiterhin `413 Request Entity Too Large`, bevor
+mindestens 1700 MB gesetzt werden, sonst kommt weiterhin `413 Request Entity Too Large`, bevor
 die App den Upload ueberhaupt sieht.
 
 Die Limits koennen in `.env` angepasst werden:
 
 ```env
 MAX_IMAGE_UPLOAD_MB=50
-MAX_VIDEO_UPLOAD_MB=1024
+MAX_VIDEO_UPLOAD_MB=1536
 MAX_ORIGINAL_UPLOAD_MB=200
 MAX_DOCUMENT_UPLOAD_MB=50
-PROXY_UPLOAD_LIMIT_MB=1100
+PROXY_UPLOAD_LIMIT_MB=1700
 ADMIN_UPLOAD_RATE_LIMIT=240
 ADMIN_UPLOAD_RATE_WINDOW_SECONDS=600
 USER_UPLOAD_RATE_LIMIT=30
@@ -679,7 +679,7 @@ Fuer Bilder PNG/JPG/WebP und fuer Galerie-Videos MP4/WebM/MOV/M4V verwenden. Bei
 externe Reverse Proxy groesser als das App-Limit eingestellt sein, z.B. Nginx Proxy Manager:
 
 ```nginx
-client_max_body_size 1100m;
+client_max_body_size 1700m;
 ```
 
 ## Entwicklung lokal

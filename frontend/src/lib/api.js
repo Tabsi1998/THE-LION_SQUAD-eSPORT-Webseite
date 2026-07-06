@@ -174,6 +174,32 @@ export function formatRequestError(error, fallback = "Ein Fehler ist aufgetreten
   return fallback;
 }
 
+export function formatUploadError(error, fallback = "Upload fehlgeschlagen.", options = {}) {
+  const { appLimitMb, proxyLimitMb } = options;
+  const status = error?.response?.status;
+  const detail = error?.response?.data?.detail;
+  const detailMessage = formatApiError(detail);
+  const proxyHint = proxyLimitMb ? ` Externer Proxy bitte auf mindestens ${proxyLimitMb} MB setzen.` : "";
+  const appHint = appLimitMb ? ` App-Limit: ${appLimitMb} MB.` : "";
+
+  if (status === 413) {
+    return `Upload fehlgeschlagen (413): Datei zu groß oder Reverse Proxy blockiert den Upload.${appHint}${proxyHint}`;
+  }
+  if (status) {
+    const message = detailMessage && detailMessage !== "Ein Fehler ist aufgetreten." ? detailMessage : fallback;
+    return `Upload fehlgeschlagen (${status}): ${message}`;
+  }
+  if (error?.code === "ERR_CANCELED") return "Upload abgebrochen.";
+  if (error?.code === "ERR_NETWORK" || (error?.request && !error?.response)) {
+    const limitHint = appLimitMb || proxyLimitMb
+      ? ` App-Limit: ${appLimitMb || "?"} MB${proxyLimitMb ? `, Proxy mindestens ${proxyLimitMb} MB` : ""}.`
+      : "";
+    return `Upload fehlgeschlagen: Keine Antwort vom Server. Bei großen Videos ist meistens ein Proxy-Limit, Timeout oder Verbindungsabbruch die Ursache.${limitHint}`;
+  }
+  if (error?.message) return error.message;
+  return fallback;
+}
+
 export function formatMs(ms) {
   if (ms == null) return "-";
   const m = Math.floor(ms / 60000);

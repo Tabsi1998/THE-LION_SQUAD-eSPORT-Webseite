@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, formatApiError, formatRequestError, resolveMediaUrl } from "@/lib/api";
+import { api, formatApiError, formatRequestError, formatUploadError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload, prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -24,7 +24,8 @@ const parseUploadMb = (value, fallback) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-const MAX_VIDEO_UPLOAD_MB = parseUploadMb(process.env.REACT_APP_MAX_VIDEO_UPLOAD_MB, 1024);
+const MAX_VIDEO_UPLOAD_MB = parseUploadMb(process.env.REACT_APP_MAX_VIDEO_UPLOAD_MB, 1536);
+const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(process.env.REACT_APP_PROXY_UPLOAD_LIMIT_MB, 1700);
 const VIDEO_MAX_BYTES = MAX_VIDEO_UPLOAD_MB * 1024 * 1024;
 
 function albumMediaCount(album) {
@@ -374,7 +375,10 @@ function AlbumPhotos({ album, events, onBack }) {
       } catch (err) {
         fail++;
         uploadProgress.failFile();
-        toast.error(`${file.name}: ${formatApiError(err.response?.data?.detail) || err.message || "Upload fehlgeschlagen"}`);
+        toast.error(`${file.name}: ${formatUploadError(err, "Upload fehlgeschlagen.", {
+          appLimitMb: MAX_VIDEO_UPLOAD_MB,
+          proxyLimitMb: PROXY_UPLOAD_LIMIT_MB,
+        })}`);
       }
     }
     setUploading(false);

@@ -3,7 +3,7 @@
  * Lists all uploaded files in /api/static/uploads, preview, copy URL, delete.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { API_BASE, api, formatApiError } from "@/lib/api";
+import { API_BASE, api, formatApiError, formatUploadError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -21,6 +21,13 @@ const BACKEND = API_BASE;
 const IMG_EXT = new Set(["png", "jpg", "jpeg", "webp", "gif", "svg", "avif"]);
 const VIDEO_EXT = VIDEO_EXTENSIONS;
 const RAW_EXT = RAW_PHOTO_EXTENSIONS;
+const parseUploadMb = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+const MAX_VIDEO_UPLOAD_MB = parseUploadMb(process.env.REACT_APP_MAX_VIDEO_UPLOAD_MB, 1536);
+const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(process.env.REACT_APP_PROXY_UPLOAD_LIMIT_MB, 1700);
+const VIDEO_MAX_BYTES = MAX_VIDEO_UPLOAD_MB * 1024 * 1024;
 const MEDIA_SCOPE_LABELS = {
   all: "Alle",
   admin: "Admin/CMS",
@@ -238,6 +245,9 @@ export default function AdminMediaPage() {
       try {
         const kind = mediaTypeFromFile(file);
         uploadProgress.startFile(file, index, kind === "image" ? "Bild wird vorbereitet" : "Upload startet");
+        if (kind === "video" && file.size > VIDEO_MAX_BYTES) {
+          throw new Error(`Datei zu groß (max ${MAX_VIDEO_UPLOAD_MB} MB).`);
+        }
         const uploadFile = kind === "image" ? await prepareImageForUpload(file) : file;
         const fd = new FormData();
         fd.append("file", uploadFile);
@@ -251,7 +261,10 @@ export default function AdminMediaPage() {
       } catch (e) {
         failed++;
         uploadProgress.failFile();
-        toast.error(`${file.name}: ${formatApiError(e.response?.data?.detail) || e.message || "Upload fehlgeschlagen"}`);
+        toast.error(`${file.name}: ${formatUploadError(e, "Upload fehlgeschlagen.", {
+          appLimitMb: MAX_VIDEO_UPLOAD_MB,
+          proxyLimitMb: PROXY_UPLOAD_LIMIT_MB,
+        })}`);
       }
     }
     setUploading(false);
