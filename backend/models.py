@@ -1070,6 +1070,18 @@ class GalleryAlbumUpdate(BaseModel):
     order_index: Optional[int] = None
 
 
+class GallerySectionCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=80)
+    description: Optional[str] = Field(default=None, max_length=500)
+    order_index: int = 0
+
+
+class GallerySectionUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    description: Optional[str] = Field(default=None, max_length=500)
+    order_index: Optional[int] = None
+
+
 class GalleryPhotoCreate(BaseModel):
     image_url: Optional[str] = None
     video_url: Optional[str] = None
@@ -1081,6 +1093,7 @@ class GalleryPhotoCreate(BaseModel):
     thumbnail_url: Optional[str] = None
     caption: Optional[str] = None
     order_index: int = 0
+    section_id: Optional[str] = None
     mime: Optional[str] = None
     file_size: Optional[int] = None
 
@@ -1102,6 +1115,7 @@ class GalleryPhotoCreate(BaseModel):
 class GalleryPhotoUpdate(BaseModel):
     caption: Optional[str] = None
     order_index: Optional[int] = None
+    section_id: Optional[str] = None
     thumbnail_url: Optional[str] = None
 
 

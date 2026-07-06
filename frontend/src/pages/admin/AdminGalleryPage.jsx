@@ -14,7 +14,7 @@ import {
   VIDEO_ACCEPT,
 } from "@/lib/galleryMedia";
 import { toast } from "sonner";
-import { Plus, Save, X, Trash2, Image as ImageIcon, ArrowLeft, Video, Link as LinkIcon, Play, Film } from "lucide-react";
+import { Plus, Save, X, Trash2, Image as ImageIcon, ArrowLeft, Video, Link as LinkIcon, Play, Film, Layers, Pencil } from "lucide-react";
 
 const parseUploadMb = (value, fallback) => {
   const parsed = Number(value);
@@ -28,15 +28,55 @@ function albumMediaCount(album) {
   return album.media_count ?? ((album.photo_count || 0) + (album.video_count || 0));
 }
 
+const UNSECTIONED_VALUE = "__none";
+
+function sortSections(sections) {
+  return [...(sections || [])].sort((a, b) => (a.order_index || 0) - (b.order_index || 0) || String(a.title || "").localeCompare(String(b.title || "")));
+}
+
+function sectionIdFromValue(value) {
+  return value && value !== UNSECTIONED_VALUE ? value : null;
+}
+
+function sectionValue(sectionId) {
+  return sectionId || UNSECTIONED_VALUE;
+}
+
+function sectionTitle(sections, sectionId) {
+  return sections.find((section) => section.id === sectionId)?.title || "Ohne Abschnitt";
+}
+
+function mediaGroupsBySection(media, sections, includeEmpty = false) {
+  const orderedSections = sortSections(sections);
+  if (!orderedSections.length) {
+    return [{ id: "__all", title: "Medien", description: "", items: media || [], section: null }];
+  }
+  const groups = orderedSections
+    .map((section) => ({
+      id: section.id,
+      title: section.title,
+      description: section.description || "",
+      section,
+      items: (media || []).filter((item) => item.section_id === section.id),
+    }))
+    .filter((group) => includeEmpty || group.items.length > 0);
+  const unsectioned = (media || []).filter((item) => !orderedSections.some((section) => section.id === item.section_id));
+  if (unsectioned.length) {
+    groups.push({ id: UNSECTIONED_VALUE, title: "Ohne Abschnitt", description: "", section: null, items: unsectioned });
+  }
+  return groups;
+}
+
 function captionFromFilename(name, fallback = "Medium") {
   return (name || fallback).replace(/\.[^/.]+$/, "");
 }
 
-function galleryPayloadFromMediaItem(item, orderIndex) {
+function galleryPayloadFromMediaItem(item, orderIndex, sectionId = null) {
   const type = mediaTypeFromItem(item);
   const base = {
     caption: captionFromFilename(item.original_filename || item.filename, type === "video" ? "Video" : "Bild"),
     order_index: orderIndex,
+    section_id: sectionId || null,
     thumbnail_url: type === "image" ? item.url : "",
     mime: item.mime || undefined,
     file_size: item.size || undefined,
@@ -131,7 +171,7 @@ export default function AdminGalleryPage() {
                   <span className="text-[10px] uppercase tracking-widest text-white/40">{albumMediaCount(a)} Medien</span>
                 </div>
                 <div className="text-[10px] uppercase tracking-widest text-[#29B6E8]/80 mt-1">
-                  {a.visibility} · {a.published ? "live" : "entwurf"}{a.video_count ? ` · ${a.video_count} Videos` : ""}
+                  {a.visibility} · {a.published ? "live" : "entwurf"}{a.section_count ? ` · ${a.section_count} Abschnitte` : ""}{a.video_count ? ` · ${a.video_count} Videos` : ""}
                 </div>
                 <div className="mt-3 flex gap-2">
                   <button onClick={() => setActiveAlbum(a)} data-testid={`album-open-${a.id}`} className="flex-1 text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10">Medien</button>
@@ -238,6 +278,9 @@ function AlbumModal({ album, events, onClose, onSaved }) {
 
 function AlbumPhotos({ album, events, onBack }) {
   const [photos, setPhotos] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [targetSectionId, setTargetSectionId] = useState("");
+  const [editingSection, setEditingSection] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [mediaOpen, setMediaOpen] = useState(false);
@@ -249,11 +292,22 @@ function AlbumPhotos({ album, events, onBack }) {
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/admin/gallery/${album.id}`);
+    const nextSections = sortSections(data.sections || []);
+    setSections(nextSections);
     setPhotos(data.photos || []);
+    setTargetSectionId((current) => {
+      if (!current) return "";
+      return nextSections.some((section) => section.id === current) ? current : "";
+    });
   }, [album.id]);
 
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["gallery"]);
+
+  const nextOrderIndex = (sectionId = targetSectionId, offset = 0) => {
+    const key = sectionId || null;
+    return photos.filter((item) => (item.section_id || null) === key).length + offset + 1;
+  };
 
   const onPick = async (files) => {
     if (!files || !files.length) return;
@@ -271,7 +325,8 @@ function AlbumPhotos({ album, events, onBack }) {
           image_url: data.url,
           thumbnail_url: data.url,
           caption: captionFromFilename(file.name, "Bild"),
-          order_index: photos.length + ok + 1,
+          order_index: nextOrderIndex(targetSectionId, ok),
+          section_id: targetSectionId || null,
           mime: data.mime,
           file_size: data.size,
         });
@@ -302,7 +357,8 @@ function AlbumPhotos({ album, events, onBack }) {
           source_type: "upload",
           video_url: data.url,
           caption: captionFromFilename(file.name, "Video"),
-          order_index: photos.length + ok + 1,
+          order_index: nextOrderIndex(targetSectionId, ok),
+          section_id: targetSectionId || null,
           mime: data.mime,
           file_size: data.size,
         });
@@ -333,6 +389,47 @@ function AlbumPhotos({ album, events, onBack }) {
       load();
     }
   };
+  const saveSection = async (payload) => {
+    if (editingSection?.id) {
+      await api.patch(`/gallery/${album.id}/sections/${editingSection.id}`, payload);
+      toast.success("Abschnitt gespeichert.");
+    } else {
+      await api.post(`/gallery/${album.id}/sections`, payload);
+      toast.success("Abschnitt angelegt.");
+    }
+    setEditingSection(null);
+    load();
+  };
+  const deleteSection = async (section) => {
+    if (!await confirm({
+      title: "Abschnitt löschen?",
+      description: "Die Medien bleiben im Album und werden zu „Ohne Abschnitt“ verschoben.",
+      confirmLabel: "Löschen",
+    })) return;
+    try {
+      await api.delete(`/gallery/${album.id}/sections/${section.id}`);
+      if (targetSectionId === section.id) setTargetSectionId("");
+      toast.success("Abschnitt gelöscht.");
+      load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    }
+  };
+  const moveMediaToSection = async (item, sectionId) => {
+    const cleanSectionId = sectionId || null;
+    const previous = photos;
+    setPhotos((rows) => rows.map((row) => row.id === item.id
+      ? { ...row, section_id: cleanSectionId, section_title: sectionTitle(sections, cleanSectionId) }
+      : row));
+    try {
+      await api.patch(`/gallery/photos/${item.id}`, { section_id: cleanSectionId });
+      toast.success("Abschnitt aktualisiert.");
+      load();
+    } catch (err) {
+      setPhotos(previous);
+      toast.error(formatApiError(err.response?.data?.detail));
+    }
+  };
   const openMedia = async () => {
     setMediaOpen(true);
     setLoadingMedia(true);
@@ -356,7 +453,7 @@ function AlbumPhotos({ album, events, onBack }) {
     let ok = 0, fail = 0;
     for (const item of selectedMedia) {
       try {
-        await api.post(`/gallery/${album.id}/photos`, galleryPayloadFromMediaItem(item, photos.length + ok + 1));
+        await api.post(`/gallery/${album.id}/photos`, galleryPayloadFromMediaItem(item, nextOrderIndex(targetSectionId, ok), targetSectionId || null));
         ok++;
       } catch (err) {
         fail++;
@@ -371,7 +468,8 @@ function AlbumPhotos({ album, events, onBack }) {
   const addExternalMedia = async (payload) => {
     await api.post(`/gallery/${album.id}/photos`, {
       ...payload,
-      order_index: photos.length + 1,
+      order_index: nextOrderIndex(targetSectionId),
+      section_id: targetSectionId || null,
     });
     toast.success("Video-Link hinzugefügt.");
     setLinkOpen(false);
@@ -386,7 +484,7 @@ function AlbumPhotos({ album, events, onBack }) {
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <div>
           <h1 className="font-heading text-3xl font-black uppercase">{album.title}</h1>
-          <div className="text-xs text-white/50">{photos.length} Medien · /{album.slug}</div>
+          <div className="text-xs text-white/50">{photos.length} Medien · {sections.length} Abschnitte · /{album.slug}</div>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button type="button" onClick={openMedia} data-testid="photo-media-picker" className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/75 font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-white/5">
@@ -406,15 +504,81 @@ function AlbumPhotos({ album, events, onBack }) {
         </div>
       </div>
 
+      <div className="mb-6 border border-white/10 bg-[#101010] rounded-sm p-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">
+              <Layers className="w-3.5 h-3.5" /> Album-Abschnitte
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {sections.length === 0 ? (
+                <span className="text-sm text-white/45">Noch keine Abschnitte.</span>
+              ) : sections.map((section) => (
+                <div key={section.id} className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-black/20 px-2.5 py-1.5">
+                  <span className="text-xs font-bold uppercase tracking-wider text-white">{section.title}</span>
+                  <span className="text-[10px] text-white/35">#{section.order_index || 0}</span>
+                  <button type="button" onClick={() => setEditingSection(section)} className="text-white/45 hover:text-[#29B6E8]" aria-label={`${section.title} bearbeiten`}>
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                  <button type="button" onClick={() => deleteSection(section)} className="text-white/45 hover:text-[#FF3B30]" aria-label={`${section.title} löschen`}>
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <button type="button" onClick={() => setEditingSection({})} data-testid="gallery-section-new" className="inline-flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/15 text-white font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-white/10">
+            <Plus className="w-3.5 h-3.5" /> Abschnitt
+          </button>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,16rem)_1fr] items-end">
+          <Field label="Upload-Ziel">
+            <select value={targetSectionId || ""} onChange={(e) => setTargetSectionId(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+              <option value="">Ohne Abschnitt</option>
+              {sections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
+            </select>
+          </Field>
+          <div className="text-xs text-white/45 pb-2">
+            Aktuell: <span className="text-white/75">{sectionTitle(sections, targetSectionId || null)}</span>
+          </div>
+        </div>
+      </div>
+
       {photos.length === 0 ? (
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Noch keine Medien. Lade Fotos oder Videos hoch, oder füge einen Video-Link hinzu.</div>
       ) : (
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
-          {photos.map((p) => (
-            <div key={p.id} className="relative group aspect-square bg-[#0A0A0A] border border-white/10">
-              <GalleryAdminThumb item={p} />
-              <MediaBadge item={p} />
-              <button onClick={() => remove(p.id)} className="absolute top-1 right-1 p-1 bg-black/70 text-[#FF3B30] opacity-0 group-hover:opacity-100 transition" aria-label="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>
+        <div className="space-y-8">
+          {mediaGroupsBySection(photos, sections, true).map((group) => (
+            <div key={group.id}>
+              <div className="mb-3 flex items-end justify-between gap-3 border-b border-white/10 pb-2">
+                <div>
+                  <h2 className="font-heading text-lg font-black uppercase">{group.title}</h2>
+                  {group.description && <p className="mt-1 text-sm text-white/50">{group.description}</p>}
+                </div>
+                <span className="text-[10px] uppercase tracking-widest text-white/40">{group.items.length} Medien</span>
+              </div>
+              {group.items.length === 0 ? (
+                <div className="border border-dashed border-white/10 rounded-sm p-6 text-center text-sm text-white/35">Leer</div>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                  {group.items.map((p) => (
+                    <div key={p.id} className="relative group aspect-square bg-[#0A0A0A] border border-white/10">
+                      <GalleryAdminThumb item={p} />
+                      <MediaBadge item={p} />
+                      <select
+                        value={sectionValue(p.section_id)}
+                        onChange={(e) => moveMediaToSection(p, sectionIdFromValue(e.target.value))}
+                        className="absolute left-1 top-1 max-w-[calc(100%-2.5rem)] bg-black/75 border border-white/10 px-1.5 py-1 text-[10px] text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition rounded-sm"
+                        aria-label="Abschnitt ändern"
+                      >
+                        <option value={UNSECTIONED_VALUE}>Ohne Abschnitt</option>
+                        {sections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
+                      </select>
+                      <button onClick={() => remove(p.id)} className="absolute top-1 right-1 p-1 bg-black/70 text-[#FF3B30] opacity-0 group-hover:opacity-100 transition" aria-label="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -461,7 +625,61 @@ function AlbumPhotos({ album, events, onBack }) {
         </div>
       )}
       {linkOpen && <VideoLinkModal onClose={() => setLinkOpen(false)} onSave={addExternalMedia} />}
+      {editingSection && <SectionModal section={editingSection} onClose={() => setEditingSection(null)} onSave={saveSection} />}
     </AdminLayout>
+  );
+}
+
+function SectionModal({ section, onClose, onSave }) {
+  const isNew = !section?.id;
+  const [form, setForm] = useState({
+    title: section.title || "",
+    description: section.description || "",
+    order_index: section.order_index ?? 0,
+  });
+  const [saving, setSaving] = useState(false);
+  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!form.title.trim()) return toast.error("Bitte Abschnittstitel eingeben.");
+    setSaving(true);
+    try {
+      await onSave({
+        title: form.title.trim(),
+        description: form.description.trim() || null,
+        order_index: parseInt(form.order_index, 10) || 0,
+      });
+    } catch (err) {
+      toast.error(formatRequestError(err, "Abschnitt konnte nicht gespeichert werden."));
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <form onSubmit={submit} className="w-full max-w-lg bg-[#121212] border border-white/10 rounded-sm">
+        <div className="flex items-center justify-between p-5 border-b border-white/10">
+          <h2 className="font-heading font-black uppercase">{isNew ? "Abschnitt anlegen" : "Abschnitt bearbeiten"}</h2>
+          <button type="button" onClick={onClose} className="text-white/60 hover:text-white"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <Field label="Titel">
+            <Input value={form.title} onChange={(value) => set("title", value)} placeholder="Aufbau, Tag 1, Tag 2" required testId="gallery-section-title" />
+          </Field>
+          <Field label="Beschreibung">
+            <textarea value={form.description} onChange={(event) => set("description", event.target.value)} rows={2} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
+          </Field>
+          <Field label="Reihenfolge">
+            <Input value={form.order_index} onChange={(value) => set("order_index", value)} testId="gallery-section-order" />
+          </Field>
+        </div>
+        <div className="flex gap-3 p-5 border-t border-white/10">
+          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm">Abbrechen</button>
+          <button type="submit" disabled={saving} className="ml-auto inline-flex items-center gap-2 px-5 py-2 bg-[#29B6E8] text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:bg-[#1E95C2] disabled:opacity-50">
+            <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

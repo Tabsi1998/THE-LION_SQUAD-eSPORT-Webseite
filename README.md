@@ -517,6 +517,7 @@ PROXY_UPLOAD_LIMIT_MB=1100
 Bilduploads gibt es fuer Profile, Branding, News, Events, Galerie, Sponsoren, Turniere,
 Fast-Lap-Challenges und Fast-Lap-Strecken.
 Galerie-Alben unterstuetzen zusaetzlich direkte Video-Uploads und externe Video-Links.
+Alben koennen in sortierte Abschnitte wie `Aufbau`, `Tag 1` und `Tag 2` gegliedert werden.
 
 ## Moderatoren und Ergebnisverwaltung
 

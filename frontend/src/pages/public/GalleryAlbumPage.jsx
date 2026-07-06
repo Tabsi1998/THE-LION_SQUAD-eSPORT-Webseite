@@ -19,7 +19,7 @@ import {
   mediaTypeFromItem,
   providerLabel,
 } from "@/lib/galleryMedia";
-import { ArrowLeft, X, ChevronLeft, ChevronRight, Calendar, Play, Film, ExternalLink } from "lucide-react";
+import { ArrowLeft, X, ChevronLeft, ChevronRight, Calendar, Play, Film, ExternalLink, Layers } from "lucide-react";
 
 const PINBOARD_TILE_CLASSES = [
   "col-span-1 row-span-1",
@@ -42,12 +42,44 @@ function pinboardTileClass(item, index) {
   return PINBOARD_TILE_CLASSES[index % PINBOARD_TILE_CLASSES.length];
 }
 
+function sortSections(sections) {
+  return [...(sections || [])].sort((a, b) => (a.order_index || 0) - (b.order_index || 0) || String(a.title || "").localeCompare(String(b.title || "")));
+}
+
+function sectionAnchor(section) {
+  return `abschnitt-${section?.slug || section?.id || "ohne"}`;
+}
+
+function buildSectionGroups(items, sections) {
+  const orderedSections = sortSections(sections);
+  if (!orderedSections.length) {
+    return [{ id: "__all", title: "", description: "", items: items.map((item, index) => ({ item, index })), section: null }];
+  }
+  const groups = orderedSections
+    .map((section) => ({
+      id: section.id,
+      title: section.title,
+      description: section.description || "",
+      section,
+      items: items.map((item, index) => ({ item, index })).filter(({ item }) => item.section_id === section.id),
+    }))
+    .filter((group) => group.items.length > 0);
+  const unsectioned = items.map((item, index) => ({ item, index }))
+    .filter(({ item }) => !orderedSections.some((section) => section.id === item.section_id));
+  if (unsectioned.length) {
+    groups.push({ id: "__none", title: "Weitere Medien", description: "", items: unsectioned, section: null });
+  }
+  return groups.length ? groups : [{ id: "__all", title: "", description: "", items: items.map((item, index) => ({ item, index })), section: null }];
+}
+
 export default function GalleryAlbumPage() {
   const { slug } = useParams();
   const [a, setA] = useState(null);
   const [error, setError] = useState(null);
   const [active, setActive] = useState(null);
   const items = a?.photos || [];
+  const sectionGroups = buildSectionGroups(items, a?.sections || []);
+  const hasSections = sectionGroups.some((group) => group.section);
   const firstPreview = items.find((item) => galleryPosterUrl(item) || item.image_url);
   const seoDescription = seoTextPreview(a?.description, "Fotos, Videos und Eindrücke von THE LION SQUAD eSports: Turniere, LAN-Partys, Events und Gaming Community.");
   useDocumentTitle(a?.title || "Galerie", seoDescription, {
@@ -111,23 +143,48 @@ export default function GalleryAlbumPage() {
           {a.taken_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {new Date(a.taken_at).toLocaleDateString("de-DE", { dateStyle: "long" })}</span>}
           {a.event && <Link to={`/events/${a.event.slug}`} className="text-[#9F7AEA] hover:underline">→ {a.event.name}</Link>}
           <span>{items.length} Medien</span>
+          {hasSections && <span className="inline-flex items-center gap-1.5"><Layers className="w-3.5 h-3.5" /> {sectionGroups.filter((group) => group.section).length} Abschnitte</span>}
         </div>
         {a.description && <p className="mt-3 text-white/70 max-w-2xl">{a.description}</p>}
+        {hasSections && (
+          <div className="mt-6 flex flex-wrap gap-2">
+            {sectionGroups.map((group) => (
+              <a key={group.id} href={`#${sectionAnchor(group.section || { id: group.id })}`} className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/70 hover:border-[#29B6E8]/50 hover:text-white">
+                {group.title || "Medien"} <span className="text-white/35">{group.items.length}</span>
+              </a>
+            ))}
+          </div>
+        )}
 
         {items.length === 0 ? (
           <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Noch keine Medien.</div>
         ) : (
-          <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-6 auto-rows-[7.5rem] sm:auto-rows-[8.5rem] lg:auto-rows-[9.5rem] grid-flow-dense gap-3">
-            {items.map((item, i) => (
-              <button
-                key={item.id}
-                onClick={() => setActive(i)}
-                data-testid={`gallery-photo-${i}`}
-                className={`${pinboardTileClass(item, i)} min-h-0 overflow-hidden bg-[#0A0A0A] border border-white/5 hover:border-[#29B6E8]/45 transition group relative rounded-sm shadow-sm shadow-black/30 hover:-translate-y-0.5`}
-                aria-label={isVideoLike(item) ? "Video öffnen" : "Bild öffnen"}
-              >
-                <GalleryTile item={item} />
-              </button>
+          <div className="mt-10 space-y-14">
+            {sectionGroups.map((group) => (
+              <div key={group.id} id={sectionAnchor(group.section || { id: group.id })} className="scroll-mt-24">
+                {hasSections && (
+                  <div className="mb-4 flex items-end justify-between gap-3 border-b border-white/10 pb-3">
+                    <div>
+                      <h2 className="font-heading text-2xl md:text-3xl font-black uppercase">{group.title}</h2>
+                      {group.description && <p className="mt-1 text-sm text-white/55 max-w-2xl">{group.description}</p>}
+                    </div>
+                    <span className="text-[10px] uppercase tracking-widest text-white/40">{group.items.length} Medien</span>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-6 auto-rows-[7.5rem] sm:auto-rows-[8.5rem] lg:auto-rows-[9.5rem] grid-flow-dense gap-3">
+                  {group.items.map(({ item, index }, localIndex) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setActive(index)}
+                      data-testid={`gallery-photo-${index}`}
+                      className={`${pinboardTileClass(item, hasSections ? localIndex : index)} min-h-0 overflow-hidden bg-[#0A0A0A] border border-white/5 hover:border-[#29B6E8]/45 transition group relative rounded-sm shadow-sm shadow-black/30 hover:-translate-y-0.5`}
+                      aria-label={isVideoLike(item) ? "Video öffnen" : "Bild öffnen"}
+                    >
+                      <GalleryTile item={item} />
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}

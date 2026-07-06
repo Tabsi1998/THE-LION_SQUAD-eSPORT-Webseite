@@ -583,6 +583,43 @@ class TestGallery:
         assert row["video_count"] == 1
         assert row["media_count"] == 1
 
+    def test_album_sections_order_and_media_assignment(self, admin):
+        suf = uuid.uuid4().hex[:6]
+        c = admin.post(f"{BASE_URL}/api/gallery", json={
+            "title": f"TEST Section Album {suf}", "slug": f"test-section-album-{suf}",
+            "visibility": "public", "published": True,
+        })
+        assert c.status_code == 200, c.text
+        aid = c.json()["id"]
+        tag1 = admin.post(f"{BASE_URL}/api/gallery/{aid}/sections", json={"title": "Tag 1", "order_index": 20})
+        setup = admin.post(f"{BASE_URL}/api/gallery/{aid}/sections", json={"title": "Aufbau", "order_index": 10})
+        assert tag1.status_code == 200, tag1.text
+        assert setup.status_code == 200, setup.text
+        p_setup = admin.post(f"{BASE_URL}/api/gallery/{aid}/photos", json={
+            "image_url": "https://example.com/setup.jpg",
+            "caption": "Setup",
+            "section_id": setup.json()["id"],
+        })
+        p_tag1 = admin.post(f"{BASE_URL}/api/gallery/{aid}/photos", json={
+            "image_url": "https://example.com/tag1.jpg",
+            "caption": "Tag 1",
+            "section_id": tag1.json()["id"],
+        })
+        assert p_setup.status_code == 200, p_setup.text
+        assert p_tag1.status_code == 200, p_tag1.text
+        detail = admin.get(f"{BASE_URL}/api/gallery/{c.json()['slug']}")
+        assert detail.status_code == 200, detail.text
+        body = detail.json()
+        assert [s["title"] for s in body["sections"][:2]] == ["Aufbau", "Tag 1"]
+        assert body["photos"][0]["section_title"] == "Aufbau"
+        assert body["photos"][1]["section_title"] == "Tag 1"
+
+        moved = admin.patch(f"{BASE_URL}/api/gallery/photos/{p_tag1.json()['id']}", json={"section_id": None})
+        assert moved.status_code == 200, moved.text
+        detail = admin.get(f"{BASE_URL}/api/gallery/{c.json()['slug']}")
+        assert detail.status_code == 200
+        assert next(p for p in detail.json()["photos"] if p["id"] == p_tag1.json()["id"]).get("section_id") is None
+
     def test_cu_cannot_create_album(self, cu):
         r = cu.post(f"{BASE_URL}/api/gallery", json={
             "title": "Nope", "slug": f"nope-alb-{uuid.uuid4().hex[:6]}",

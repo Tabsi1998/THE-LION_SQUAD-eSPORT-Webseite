@@ -16,6 +16,7 @@ from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
     PartnerCreate, PartnerUpdate, ReferenceCreate, ReferenceUpdate,
     GalleryAlbumCreate, GalleryAlbumUpdate,
+    GallerySectionCreate, GallerySectionUpdate,
     GalleryPhotoCreate, GalleryPhotoUpdate,
     now_utc, new_id,
 )
@@ -120,6 +121,7 @@ def _compact_album(album: dict) -> dict:
         "photo_count": album.get("photo_count", 0),
         "video_count": album.get("video_count", 0),
         "media_count": album.get("media_count", album.get("photo_count", 0)),
+        "section_count": album.get("section_count", 0),
     }
 
 
@@ -142,6 +144,132 @@ async def _attach_gallery_counts(db, album: dict) -> None:
     album["photo_count"] = await db.gallery_photos.count_documents(_gallery_image_query(album["id"]))
     album["video_count"] = await db.gallery_photos.count_documents(_gallery_video_query(album["id"]))
     album["media_count"] = album["photo_count"] + album["video_count"]
+    album["section_count"] = len(_normalized_gallery_sections(album))
+
+
+def _gallery_section_slug(title: str) -> str:
+    slug = (title or "").lower()
+    slug = slug.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")
+    slug = re.sub(r"[^a-z0-9]+", "-", slug).strip("-")
+    return slug[:80] or "abschnitt"
+
+
+def _clean_gallery_section_title(value: str | None) -> str:
+    title = str(value or "").strip()
+    if not title:
+        raise HTTPException(400, "Abschnitt braucht einen Titel.")
+    return title[:80]
+
+
+def _clean_gallery_section_description(value: str | None) -> str | None:
+    description = str(value or "").strip()
+    return description[:500] if description else None
+
+
+def _normalized_gallery_sections(album: dict | None) -> list[dict]:
+    raw_sections = (album or {}).get("sections") or []
+    sections: list[dict] = []
+    seen_ids: set[str] = set()
+    seen_slugs: set[str] = set()
+    for index, raw in enumerate(raw_sections):
+        if not isinstance(raw, dict):
+            continue
+        title = str(raw.get("title") or "").strip()
+        if not title:
+            continue
+        section_id = str(raw.get("id") or raw.get("slug") or _gallery_section_slug(title) or f"section-{index + 1}").strip()
+        base_id = section_id
+        suffix = 2
+        while section_id in seen_ids:
+            section_id = f"{base_id}-{suffix}"
+            suffix += 1
+        seen_ids.add(section_id)
+        slug = str(raw.get("slug") or _gallery_section_slug(title)).strip()
+        base_slug = slug
+        suffix = 2
+        while slug in seen_slugs:
+            slug = f"{base_slug}-{suffix}"
+            suffix += 1
+        seen_slugs.add(slug)
+        try:
+            order_index = int(raw.get("order_index", index))
+        except (TypeError, ValueError):
+            order_index = index
+        sections.append({
+            "id": section_id,
+            "title": title[:80],
+            "slug": slug,
+            "description": _clean_gallery_section_description(raw.get("description")),
+            "order_index": order_index,
+        })
+    sections.sort(key=lambda section: (section.get("order_index") or 0, section.get("title") or ""))
+    return sections
+
+
+def _unique_gallery_section_slug(sections: list[dict], title: str, current_id: str | None = None) -> str:
+    base = _gallery_section_slug(title)
+    used = {
+        (section.get("slug") or "").lower()
+        for section in sections
+        if section.get("id") != current_id and section.get("slug")
+    }
+    slug = base
+    suffix = 2
+    while slug.lower() in used:
+        slug = f"{base}-{suffix}"
+        suffix += 1
+    return slug
+
+
+def _gallery_section_map(sections: list[dict]) -> dict[str, dict]:
+    return {str(section.get("id")): section for section in sections if section.get("id")}
+
+
+def _gallery_items_with_sections(items: list[dict], sections: list[dict]) -> list[dict]:
+    section_by_id = _gallery_section_map(sections)
+    section_order = {section["id"]: index for index, section in enumerate(sections)}
+    normalized: list[dict] = []
+    for item in items:
+        out = _normalized_gallery_item(item)
+        section_id = str(out.get("section_id") or "").strip()
+        section = section_by_id.get(section_id)
+        if section:
+            out["section_id"] = section_id
+            out["section_title"] = section.get("title")
+            out["section_order_index"] = section.get("order_index", 0)
+        else:
+            out["section_id"] = None
+            out.pop("section_title", None)
+            out.pop("section_order_index", None)
+        normalized.append(out)
+    if sections:
+        normalized.sort(key=lambda item: (
+            section_order.get(item.get("section_id"), len(sections) + 1),
+            item.get("order_index") or 0,
+            item.get("uploaded_at") or "",
+        ))
+    return normalized
+
+
+def _sections_with_counts(sections: list[dict], items: list[dict]) -> list[dict]:
+    counts: dict[str, int] = {section["id"]: 0 for section in sections}
+    for item in items:
+        section_id = item.get("section_id")
+        if section_id in counts:
+            counts[section_id] += 1
+    return [{**section, "media_count": counts.get(section["id"], 0)} for section in sections]
+
+
+async def _ensure_gallery_section_exists(db, album_id: str, section_id: str | None) -> str | None:
+    clean = str(section_id or "").strip()
+    if not clean:
+        return None
+    album = await db.gallery_albums.find_one({"id": album_id}, {"_id": 0, "sections": 1})
+    if not album:
+        raise HTTPException(404, "Album nicht gefunden.")
+    if clean not in _gallery_section_map(_normalized_gallery_sections(album)):
+        raise HTTPException(400, "Abschnitt nicht gefunden.")
+    return clean
 
 
 def _normalized_gallery_item(item: dict) -> dict:
@@ -1105,6 +1233,7 @@ async def list_albums(
         projection = {
             "_id": 0, "id": 1, "title": 1, "slug": 1, "description": 1,
             "cover_url": 1, "taken_at": 1, "visibility": 1, "event_id": 1,
+            "sections": 1,
         }
     albums = await db.gallery_albums.find(q, projection).sort([("order_index", 1), ("taken_at", -1)]).to_list(500)
     visible = await _filter_visible(albums, user)
@@ -1126,8 +1255,10 @@ async def get_album(slug_or_id: str, user: dict | None = Depends(get_optional_us
         raise HTTPException(403, "Nicht sichtbar.")
     if was_old_slug and a.get("slug"):
         return RedirectResponse(url=f"/api/gallery/{a['slug']}", status_code=301)
+    sections = _normalized_gallery_sections(a)
     photos = await db.gallery_photos.find({"album_id": a["id"]}, {"_id": 0}).sort("order_index", 1).to_list(2000)
-    a["photos"] = [_normalized_gallery_item(item) for item in photos]
+    a["photos"] = _gallery_items_with_sections(photos, sections)
+    a["sections"] = _sections_with_counts(sections, a["photos"])
     if a.get("event_id"):
         event = await _visible_event_summary(a["event_id"], user)
         if event:
@@ -1150,8 +1281,10 @@ async def admin_get_album(aid: str, me: dict = Depends(require_admin())):
     a = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0})
     if not a:
         raise HTTPException(404, "Album nicht gefunden.")
+    sections = _normalized_gallery_sections(a)
     photos = await db.gallery_photos.find({"album_id": a["id"]}, {"_id": 0}).sort("order_index", 1).to_list(2000)
-    a["photos"] = [_normalized_gallery_item(item) for item in photos]
+    a["photos"] = _gallery_items_with_sections(photos, sections)
+    a["sections"] = _sections_with_counts(sections, a["photos"])
     return a
 
 
@@ -1203,12 +1336,86 @@ async def delete_album(aid: str, me: dict = Depends(require_admin())):
     return {"ok": True}
 
 
+@router.post("/gallery/{aid}/sections")
+async def add_gallery_section(aid: str, body: GallerySectionCreate, me: dict = Depends(require_admin())):
+    db = get_db()
+    album = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0, "id": 1, "sections": 1})
+    if not album:
+        raise HTTPException(404, "Album nicht gefunden.")
+    sections = _normalized_gallery_sections(album)
+    title = _clean_gallery_section_title(body.title)
+    order_index = body.order_index
+    if "order_index" not in body.model_fields_set:
+        order_index = max([section.get("order_index", 0) for section in sections], default=-1) + 1
+    doc = {
+        "id": new_id(),
+        "title": title,
+        "slug": _unique_gallery_section_slug(sections, title),
+        "description": _clean_gallery_section_description(body.description),
+        "order_index": int(order_index or 0),
+    }
+    sections.append(doc)
+    sections.sort(key=lambda section: (section.get("order_index") or 0, section.get("title") or ""))
+    await db.gallery_albums.update_one(
+        {"id": album["id"]},
+        {"$set": {"sections": sections, "updated_at": now_utc().isoformat()}},
+    )
+    return doc
+
+
+@router.put("/gallery/{aid}/sections/{sid}")
+@router.patch("/gallery/{aid}/sections/{sid}")
+async def update_gallery_section(aid: str, sid: str, body: GallerySectionUpdate, me: dict = Depends(require_admin())):
+    db = get_db()
+    album = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0, "id": 1, "sections": 1})
+    if not album:
+        raise HTTPException(404, "Album nicht gefunden.")
+    sections = _normalized_gallery_sections(album)
+    target = next((section for section in sections if section.get("id") == sid), None)
+    if not target:
+        raise HTTPException(404, "Abschnitt nicht gefunden.")
+    update = body.model_dump(exclude_unset=True)
+    if "title" in update:
+        title = _clean_gallery_section_title(update.get("title"))
+        target["title"] = title
+        target["slug"] = _unique_gallery_section_slug(sections, title, current_id=sid)
+    if "description" in update:
+        target["description"] = _clean_gallery_section_description(update.get("description"))
+    if "order_index" in update:
+        target["order_index"] = int(update.get("order_index") or 0)
+    sections.sort(key=lambda section: (section.get("order_index") or 0, section.get("title") or ""))
+    await db.gallery_albums.update_one(
+        {"id": album["id"]},
+        {"$set": {"sections": sections, "updated_at": now_utc().isoformat()}},
+    )
+    return target
+
+
+@router.delete("/gallery/{aid}/sections/{sid}")
+async def delete_gallery_section(aid: str, sid: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    album = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0, "id": 1, "sections": 1})
+    if not album:
+        raise HTTPException(404, "Album nicht gefunden.")
+    sections = _normalized_gallery_sections(album)
+    next_sections = [section for section in sections if section.get("id") != sid]
+    if len(next_sections) == len(sections):
+        raise HTTPException(404, "Abschnitt nicht gefunden.")
+    await db.gallery_albums.update_one(
+        {"id": album["id"]},
+        {"$set": {"sections": next_sections, "updated_at": now_utc().isoformat()}},
+    )
+    await db.gallery_photos.update_many({"album_id": album["id"], "section_id": sid}, {"$unset": {"section_id": "", "section_title": ""}})
+    return {"ok": True}
+
+
 @router.post("/gallery/{aid}/photos")
 async def add_photo(aid: str, body: GalleryPhotoCreate, me: dict = Depends(require_admin())):
     db = get_db()
     if not await db.gallery_albums.find_one({"id": aid}):
         raise HTTPException(404, "Album nicht gefunden.")
     payload = body.model_dump()
+    payload["section_id"] = await _ensure_gallery_section_exists(db, aid, payload.get("section_id"))
     _validate_gallery_external_media(payload)
     doc = {
         "id": new_id(), "album_id": aid,
@@ -1226,6 +1433,11 @@ async def add_photo(aid: str, body: GalleryPhotoCreate, me: dict = Depends(requi
 async def update_photo(pid: str, body: GalleryPhotoUpdate, me: dict = Depends(require_admin())):
     db = get_db()
     update = body.model_dump(exclude_unset=True)
+    if "section_id" in update:
+        photo = await db.gallery_photos.find_one({"id": pid}, {"_id": 0, "album_id": 1})
+        if not photo:
+            raise HTTPException(404, "Foto nicht gefunden.")
+        update["section_id"] = await _ensure_gallery_section_exists(db, photo["album_id"], update.get("section_id"))
     res = await db.gallery_photos.update_one({"id": pid}, {"$set": update})
     if res.matched_count == 0:
         raise HTTPException(404, "Foto nicht gefunden.")
