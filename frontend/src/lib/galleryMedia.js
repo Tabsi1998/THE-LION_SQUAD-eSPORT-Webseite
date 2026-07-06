@@ -2,7 +2,27 @@ import { API_BASE } from "@/lib/api";
 
 export const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif"]);
 export const VIDEO_EXTENSIONS = new Set(["mp4", "m4v", "webm", "mov"]);
+export const RAW_PHOTO_EXTENSIONS = new Set(["nef", "nrw", "cr2", "cr3", "arw", "dng", "raf", "orf", "rw2"]);
 export const VIDEO_ACCEPT = "video/mp4,video/webm,video/quicktime,video/x-m4v,.mp4,.m4v,.webm,.mov";
+export const MEDIA_ACCEPT = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  VIDEO_ACCEPT,
+  ".nef",
+  ".nrw",
+  ".cr2",
+  ".cr3",
+  ".arw",
+  ".dng",
+  ".raf",
+  ".orf",
+  ".rw2",
+].join(",");
 
 const YOUTUBE_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]);
 const KICK_HOSTS = new Set(["kick.com", "www.kick.com"]);
@@ -27,6 +47,20 @@ function extensionFromUrl(value) {
   return ext.length <= 5 ? ext : "";
 }
 
+export function extensionFromName(value) {
+  const ext = String(value || "").split(/[?#]/)[0].split(".").pop()?.toLowerCase() || "";
+  return ext.length <= 5 ? ext : "";
+}
+
+export function mediaTypeFromFile(file) {
+  const type = String(file?.type || "").toLowerCase();
+  const ext = extensionFromName(file?.name || "");
+  if (RAW_PHOTO_EXTENSIONS.has(ext)) return "file";
+  if (type.startsWith("video/") || VIDEO_EXTENSIONS.has(ext)) return "video";
+  if (type.startsWith("image/") || IMAGE_EXTENSIONS.has(ext)) return "image";
+  return "unknown";
+}
+
 export function mediaTypeFromItem(item) {
   const explicit = String(item?.media_type || item?.kind || "").toLowerCase();
   if (["image", "video", "embed"].includes(explicit)) return explicit;
@@ -34,6 +68,7 @@ export function mediaTypeFromItem(item) {
   if (item?.embed_url || item?.external_url) return "embed";
   const ext = String(item?.ext || extensionFromUrl(item?.url || item?.image_url || "")).toLowerCase();
   if (VIDEO_EXTENSIONS.has(ext)) return "video";
+  if (RAW_PHOTO_EXTENSIONS.has(ext)) return "file";
   return "image";
 }
 
@@ -46,6 +81,7 @@ export function galleryMediaUrl(item) {
   const type = mediaTypeFromItem(item);
   if (type === "image") return item?.image_url || item?.url || "";
   if (type === "video") return item?.video_url || item?.external_url || item?.url || "";
+  if (type === "file") return item?.file_url || item?.url || "";
   return item?.embed_url || item?.external_url || item?.url || "";
 }
 

@@ -19,7 +19,7 @@ import {
   mediaTypeFromItem,
   providerLabel,
 } from "@/lib/galleryMedia";
-import { ArrowLeft, X, ChevronLeft, ChevronRight, Calendar, Play, Film, ExternalLink, Layers } from "lucide-react";
+import { ArrowLeft, X, ChevronLeft, ChevronRight, Calendar, Play, Film, ExternalLink, Layers, Download } from "lucide-react";
 
 const PINBOARD_TILE_CLASSES = [
   "col-span-1 row-span-1",
@@ -36,7 +36,23 @@ const PINBOARD_TILE_CLASSES = [
   "col-span-2 row-span-1",
 ];
 
-function pinboardTileClass(item, index) {
+function dimensionKey(item) {
+  return item?.id || galleryMediaUrl(item) || item?.image_url || "";
+}
+
+function itemRatio(item, dimensions) {
+  const known = dimensions?.[dimensionKey(item)];
+  const width = Number(item?.width || known?.width || 0);
+  const height = Number(item?.height || known?.height || 0);
+  return width > 0 && height > 0 ? width / height : 0;
+}
+
+function pinboardTileClass(item, index, dimensions = {}) {
+  const ratio = itemRatio(item, dimensions);
+  if (ratio > 2.2) return "col-span-2 sm:col-span-3 row-span-1";
+  if (ratio > 1.25) return index % 4 === 0 ? "col-span-2 row-span-2" : "col-span-2 row-span-1";
+  if (ratio > 0 && ratio < 0.55) return "col-span-1 row-span-3";
+  if (ratio > 0 && ratio < 0.82) return index % 5 === 0 ? "col-span-2 row-span-3" : "col-span-1 row-span-2";
   if (index === 0) return "col-span-2 row-span-2";
   if (isVideoLike(item) && index % 3 === 0) return "col-span-2 row-span-2";
   return PINBOARD_TILE_CLASSES[index % PINBOARD_TILE_CLASSES.length];
@@ -77,6 +93,7 @@ export default function GalleryAlbumPage() {
   const [a, setA] = useState(null);
   const [error, setError] = useState(null);
   const [active, setActive] = useState(null);
+  const [dimensions, setDimensions] = useState({});
   const items = a?.photos || [];
   const sectionGroups = buildSectionGroups(items, a?.sections || []);
   const hasSections = sectionGroups.some((group) => group.section);
@@ -113,6 +130,17 @@ export default function GalleryAlbumPage() {
   }, [active, items.length]);
 
   useApiInvalidation(load, ["gallery"]);
+
+  const rememberDimensions = useCallback((item, width, height) => {
+    if (!item || !width || !height) return;
+    const key = dimensionKey(item);
+    if (!key) return;
+    setDimensions((current) => {
+      const known = current[key];
+      if (known?.width === width && known?.height === height) return current;
+      return { ...current, [key]: { width, height } };
+    });
+  }, []);
 
   if (error) return (
     <PublicLayout>
@@ -161,7 +189,7 @@ export default function GalleryAlbumPage() {
         ) : (
           <div className="mt-10 space-y-14">
             {sectionGroups.map((group) => (
-              <div key={group.id} id={sectionAnchor(group.section || { id: group.id })} className="scroll-mt-24">
+              <div key={group.id} id={sectionAnchor(group.section || { id: group.id })} className="scroll-mt-24" style={{ contentVisibility: "auto", containIntrinsicSize: "900px" }}>
                 {hasSections && (
                   <div className="mb-4 flex items-end justify-between gap-3 border-b border-white/10 pb-3">
                     <div>
@@ -177,10 +205,10 @@ export default function GalleryAlbumPage() {
                       key={item.id}
                       onClick={() => setActive(index)}
                       data-testid={`gallery-photo-${index}`}
-                      className={`${pinboardTileClass(item, hasSections ? localIndex : index)} min-h-0 overflow-hidden bg-[#0A0A0A] border border-white/5 hover:border-[#29B6E8]/45 transition group relative rounded-sm shadow-sm shadow-black/30 hover:-translate-y-0.5`}
+                      className={`${pinboardTileClass(item, hasSections ? localIndex : index, dimensions)} min-h-0 overflow-hidden bg-[#0A0A0A] border border-white/5 hover:border-[#29B6E8]/45 transition group relative rounded-sm shadow-sm shadow-black/30 hover:-translate-y-0.5`}
                       aria-label={isVideoLike(item) ? "Video öffnen" : "Bild öffnen"}
                     >
-                      <GalleryTile item={item} />
+                      <GalleryTile item={item} onDimensions={rememberDimensions} />
                     </button>
                   ))}
                 </div>
@@ -200,7 +228,7 @@ export default function GalleryAlbumPage() {
   );
 }
 
-function GalleryTile({ item }) {
+function GalleryTile({ item, onDimensions }) {
   const type = mediaTypeFromItem(item);
   const poster = galleryPosterUrl(item);
   const url = galleryMediaUrl(item);
@@ -211,15 +239,24 @@ function GalleryTile({ item }) {
         alt={item.caption || ""}
         className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
         loading="lazy"
+        decoding="async"
+        onLoad={(event) => onDimensions?.(item, event.currentTarget.naturalWidth, event.currentTarget.naturalHeight)}
       />
     );
   }
   return (
     <>
       {type === "video" && url && !isExternalGalleryMedia(item) ? (
-        <CenterPreviewVideo src={resolveMediaUrl(url)} poster={poster ? resolveMediaUrl(poster) : ""} />
+        <CenterPreviewVideo src={resolveMediaUrl(url)} poster={poster ? resolveMediaUrl(poster) : ""} onDimensions={(width, height) => onDimensions?.(item, width, height)} />
       ) : poster ? (
-        <img src={resolveMediaUrl(poster)} alt={item.caption || ""} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy" />
+        <img
+          src={resolveMediaUrl(poster)}
+          alt={item.caption || ""}
+          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+          loading="lazy"
+          decoding="async"
+          onLoad={(event) => onDimensions?.(item, event.currentTarget.naturalWidth, event.currentTarget.naturalHeight)}
+        />
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-white/35">
           <Film className="w-9 h-9" />
@@ -234,7 +271,7 @@ function GalleryTile({ item }) {
   );
 }
 
-function CenterPreviewVideo({ src, poster }) {
+function CenterPreviewVideo({ src, poster, onDimensions }) {
   const ref = useRef(null);
   useEffect(() => {
     const node = ref.current;
@@ -259,6 +296,7 @@ function CenterPreviewVideo({ src, poster }) {
       playsInline
       preload="metadata"
       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+      onLoadedMetadata={(event) => onDimensions?.(event.currentTarget.videoWidth, event.currentTarget.videoHeight)}
     />
   );
 }
@@ -333,15 +371,22 @@ function LightboxVideo({ item }) {
     );
   }
   if (mediaTypeFromItem(item) === "video" && url) {
+    const src = resolveMediaUrl(url);
     return (
-      <video
-        src={resolveMediaUrl(url)}
-        poster={galleryPosterUrl(item) ? resolveMediaUrl(galleryPosterUrl(item)) : undefined}
-        controls
-        autoPlay
-        playsInline
-        className="max-w-[90vw] max-h-[85vh] bg-black"
-      />
+      <div className="flex max-h-[85vh] flex-col items-center gap-3">
+        <video
+          src={src}
+          poster={galleryPosterUrl(item) ? resolveMediaUrl(galleryPosterUrl(item)) : undefined}
+          controls
+          autoPlay
+          playsInline
+          preload="metadata"
+          className="max-w-[90vw] max-h-[78vh] bg-black"
+        />
+        <a href={src} download className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white/75 hover:text-white">
+          <Download className="w-3.5 h-3.5" /> Video herunterladen
+        </a>
+      </div>
     );
   }
   return (

@@ -9,12 +9,13 @@ import {
   galleryMediaUrl,
   galleryPosterUrl,
   isVideoLike,
+  MEDIA_ACCEPT,
   mediaTypeFromItem,
+  mediaTypeFromFile,
   providerLabel,
-  VIDEO_ACCEPT,
 } from "@/lib/galleryMedia";
 import { toast } from "sonner";
-import { Plus, Save, X, Trash2, Image as ImageIcon, ArrowLeft, Video, Link as LinkIcon, Play, Film, Layers, Pencil } from "lucide-react";
+import { Plus, Save, X, Trash2, Image as ImageIcon, ArrowLeft, Upload, Link as LinkIcon, Play, Film, Layers, Pencil } from "lucide-react";
 
 const parseUploadMb = (value, fallback) => {
   const parsed = Number(value);
@@ -80,6 +81,8 @@ function galleryPayloadFromMediaItem(item, orderIndex, sectionId = null) {
     thumbnail_url: type === "image" ? item.url : "",
     mime: item.mime || undefined,
     file_size: item.size || undefined,
+    width: item.width || undefined,
+    height: item.height || undefined,
   };
   if (type === "video") {
     return {
@@ -282,7 +285,6 @@ function AlbumPhotos({ album, events, onBack }) {
   const [targetSectionId, setTargetSectionId] = useState("");
   const [editingSection, setEditingSection] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [mediaOpen, setMediaOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [media, setMedia] = useState([]);
@@ -309,26 +311,51 @@ function AlbumPhotos({ album, events, onBack }) {
     return photos.filter((item) => (item.section_id || null) === key).length + offset + 1;
   };
 
-  const onPick = async (files) => {
+  const onPickMedia = async (files) => {
     if (!files || !files.length) return;
     setUploading(true);
-    let ok = 0, fail = 0;
+    let ok = 0, fail = 0, originals = 0;
     for (const file of Array.from(files)) {
       try {
-        const uploadFile = await prepareImageForUpload(file);
+        const kind = mediaTypeFromFile(file);
+        if (kind === "video" && file.size > VIDEO_MAX_BYTES) {
+          throw new Error(`Datei zu groß (max ${MAX_VIDEO_UPLOAD_MB} MB).`);
+        }
+        const uploadFile = kind === "image" ? await prepareImageForUpload(file) : file;
         const fd = new FormData();
         fd.append("file", uploadFile);
-        const { data } = await api.post("/uploads/image?media_scope=gallery", fd, { headers: { "Content-Type": "multipart/form-data" } });
+        const { data } = await api.post("/uploads/media?media_scope=gallery", fd);
+        if (data.media_type === "file") {
+          originals++;
+          ok++;
+          continue;
+        }
+        if (data.media_type === "video") {
+          await api.post(`/gallery/${album.id}/photos`, {
+            media_type: "video",
+            source_type: "upload",
+            video_url: data.url,
+            caption: captionFromFilename(file.name, "Video"),
+            order_index: nextOrderIndex(targetSectionId, ok - originals),
+            section_id: targetSectionId || null,
+            mime: data.mime,
+            file_size: data.size,
+          });
+          ok++;
+          continue;
+        }
         await api.post(`/gallery/${album.id}/photos`, {
           media_type: "image",
           source_type: "upload",
           image_url: data.url,
           thumbnail_url: data.url,
           caption: captionFromFilename(file.name, "Bild"),
-          order_index: nextOrderIndex(targetSectionId, ok),
+          order_index: nextOrderIndex(targetSectionId, ok - originals),
           section_id: targetSectionId || null,
           mime: data.mime,
           file_size: data.size,
+          width: data.width,
+          height: data.height,
         });
         ok++;
       } catch (err) {
@@ -337,39 +364,7 @@ function AlbumPhotos({ album, events, onBack }) {
       }
     }
     setUploading(false);
-    toast.success(`${ok} Foto(s) hinzugefügt${fail ? `, ${fail} fehlgeschlagen` : ""}.`);
-    load();
-  };
-  const onPickVideos = async (files) => {
-    if (!files || !files.length) return;
-    setUploadingVideo(true);
-    let ok = 0, fail = 0;
-    for (const file of Array.from(files)) {
-      try {
-        if (file.size > VIDEO_MAX_BYTES) {
-          throw new Error(`Datei zu groß (max ${MAX_VIDEO_UPLOAD_MB} MB).`);
-        }
-        const fd = new FormData();
-        fd.append("file", file);
-        const { data } = await api.post("/uploads/video?media_scope=gallery", fd);
-        await api.post(`/gallery/${album.id}/photos`, {
-          media_type: "video",
-          source_type: "upload",
-          video_url: data.url,
-          caption: captionFromFilename(file.name, "Video"),
-          order_index: nextOrderIndex(targetSectionId, ok),
-          section_id: targetSectionId || null,
-          mime: data.mime,
-          file_size: data.size,
-        });
-        ok++;
-      } catch (err) {
-        fail++;
-        toast.error(`${file.name}: ${formatApiError(err.response?.data?.detail) || err.message || "Upload fehlgeschlagen"}`);
-      }
-    }
-    setUploadingVideo(false);
-    toast.success(`${ok} Video(s) hinzugefügt${fail ? `, ${fail} fehlgeschlagen` : ""}.`);
+    toast.success(`${Math.max(0, ok - originals)} Medium/Medien hinzugefügt${originals ? `, ${originals} Originaldatei(en) nur gespeichert` : ""}${fail ? `, ${fail} fehlgeschlagen` : ""}.`);
     load();
   };
   const remove = async (id) => {
@@ -493,13 +488,9 @@ function AlbumPhotos({ album, events, onBack }) {
           <button type="button" onClick={() => setLinkOpen(true)} data-testid="gallery-video-link" className="inline-flex items-center gap-2 px-4 py-2 border border-[#9F7AEA]/40 text-[#C4B5FD] font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#9F7AEA]/10">
             <LinkIcon className="w-3.5 h-3.5" /> Video-Link
           </button>
-          <label className={`inline-flex items-center gap-2 px-4 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider text-xs rounded-sm cursor-pointer hover:bg-[#FFD700]/10 ${uploadingVideo ? "opacity-50" : ""}`} data-testid="video-bulk-upload">
-            <Video className="w-3.5 h-3.5" /> {uploadingVideo ? "Lade hoch…" : "Videos hochladen"}
-            <input type="file" accept={VIDEO_ACCEPT} multiple disabled={uploadingVideo} className="hidden" onChange={(e) => onPickVideos(e.target.files)} />
-          </label>
-          <label className={`inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm cursor-pointer ${uploading ? "opacity-50" : ""}`} data-testid="photo-bulk-upload">
-            <Plus className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Fotos hochladen"}
-            <input type="file" accept="image/*" multiple disabled={uploading} className="hidden" onChange={(e) => onPick(e.target.files)} />
+          <label className={`inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm cursor-pointer ${uploading ? "opacity-50" : ""}`} data-testid="media-bulk-upload">
+            <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Medien hochladen"}
+            <input type="file" accept={MEDIA_ACCEPT} multiple disabled={uploading} className="hidden" onChange={(e) => onPickMedia(e.target.files)} />
           </label>
         </div>
       </div>

@@ -99,8 +99,13 @@ DISABLE_SCHEDULER=false
 UPLOAD_DIR=/app/backend/uploads
 MAX_IMAGE_UPLOAD_MB=50
 MAX_VIDEO_UPLOAD_MB=1024
+MAX_ORIGINAL_UPLOAD_MB=200
 MAX_DOCUMENT_UPLOAD_MB=50
 PROXY_UPLOAD_LIMIT_MB=1100
+ADMIN_UPLOAD_RATE_LIMIT=240
+ADMIN_UPLOAD_RATE_WINDOW_SECONDS=600
+USER_UPLOAD_RATE_LIMIT=30
+USER_UPLOAD_RATE_WINDOW_SECONDS=3600
 AUTH_COOKIE_DOMAIN=.lionsquad.at
 ```
 
@@ -510,14 +515,20 @@ Die Limits koennen in `.env` angepasst werden:
 ```env
 MAX_IMAGE_UPLOAD_MB=50
 MAX_VIDEO_UPLOAD_MB=1024
+MAX_ORIGINAL_UPLOAD_MB=200
 MAX_DOCUMENT_UPLOAD_MB=50
 PROXY_UPLOAD_LIMIT_MB=1100
+ADMIN_UPLOAD_RATE_LIMIT=240
+ADMIN_UPLOAD_RATE_WINDOW_SECONDS=600
+USER_UPLOAD_RATE_LIMIT=30
+USER_UPLOAD_RATE_WINDOW_SECONDS=3600
 ```
 
 Bilduploads gibt es fuer Profile, Branding, News, Events, Galerie, Sponsoren, Turniere,
 Fast-Lap-Challenges und Fast-Lap-Strecken.
 Galerie-Alben unterstuetzen zusaetzlich direkte Video-Uploads und externe Video-Links.
 Alben koennen in sortierte Abschnitte wie `Aufbau`, `Tag 1` und `Tag 2` gegliedert werden.
+Im Adminbereich laeuft der Medien-Upload ueber einen gemeinsamen Button fuer Bilder, Videos und unterstuetzte RAW-Originale wie NEF/DNG/CR2. RAW-Dateien werden als Originaldateien gespeichert, aber nicht automatisch als Galerie-Bild eingefuegt.
 
 ## Moderatoren und Ergebnisverwaltung
 

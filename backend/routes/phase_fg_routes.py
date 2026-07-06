@@ -32,7 +32,8 @@ UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
 PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 PUBLIC_VIDEO_EXTS = {".mp4", ".m4v", ".webm", ".mov"}
-PUBLIC_MEDIA_EXTS = PUBLIC_IMAGE_EXTS | PUBLIC_VIDEO_EXTS
+PUBLIC_RAW_EXTS = {".nef", ".nrw", ".cr2", ".cr3", ".arw", ".dng", ".raf", ".orf", ".rw2"}
+PUBLIC_MEDIA_EXTS = PUBLIC_IMAGE_EXTS | PUBLIC_VIDEO_EXTS | PUBLIC_RAW_EXTS
 ADMIN_MEDIA_OWNER_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
 IMAGE_REFERENCE_FIELDS = [
     ("settings", {"id": "branding"}, ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "qr_logo_url", "favicon_url", "favicon_light_url", "favicon_dark_url"]),
@@ -105,6 +106,8 @@ def _media_type_from_ext(ext: str) -> str:
         return "video"
     if suffix in PUBLIC_IMAGE_EXTS:
         return "image"
+    if suffix in PUBLIC_RAW_EXTS:
+        return "file"
     return "file"
 
 
@@ -193,6 +196,8 @@ async def _list_media_items(
         candidates = [p for p in candidates if p.suffix.lower() in PUBLIC_IMAGE_EXTS]
     elif requested_type in {"video", "videos"}:
         candidates = [p for p in candidates if p.suffix.lower() in PUBLIC_VIDEO_EXTS]
+    elif requested_type in {"media", "all-media"}:
+        candidates = [p for p in candidates if p.suffix.lower() in (PUBLIC_IMAGE_EXTS | PUBLIC_VIDEO_EXTS)]
     duplicate_lookup: dict[str, list[str]] = {}
     if include_usage:
         by_size: dict[int, list[Path]] = {}
@@ -254,6 +259,8 @@ async def _list_media_items(
             "media_type": media_type,
             "kind": media_type,
             "mime": meta.get("mime") if meta else None,
+            "width": meta.get("width") if meta else None,
+            "height": meta.get("height") if meta else None,
             "owner_id": meta.get("owner_id") if meta else None,
             "owner_role": meta.get("owner_role") if meta else None,
             "media_scope": media_scope,

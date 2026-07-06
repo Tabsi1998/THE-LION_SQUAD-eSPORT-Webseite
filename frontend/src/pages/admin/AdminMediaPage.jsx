@@ -8,16 +8,17 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { VIDEO_ACCEPT, VIDEO_EXTENSIONS } from "@/lib/galleryMedia";
+import { MEDIA_ACCEPT, RAW_PHOTO_EXTENSIONS, VIDEO_EXTENSIONS, mediaTypeFromFile } from "@/lib/galleryMedia";
 import { toast } from "sonner";
 import {
   Image as ImageIcon, FileText, Trash2, Copy, ExternalLink, Search, RefreshCw, Upload,
-  RotateCcw, RotateCw, AlertTriangle, CheckCircle2, Video,
+  RotateCcw, RotateCw, AlertTriangle, CheckCircle2, Video, Download,
 } from "lucide-react";
 
 const BACKEND = API_BASE;
 const IMG_EXT = new Set(["png", "jpg", "jpeg", "webp", "gif", "svg", "avif"]);
 const VIDEO_EXT = VIDEO_EXTENSIONS;
+const RAW_EXT = RAW_PHOTO_EXTENSIONS;
 const MEDIA_SCOPE_LABELS = {
   all: "Alle",
   admin: "Admin/CMS",
@@ -82,7 +83,6 @@ export default function AdminMediaPage() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [mediaAudit, setMediaAudit] = useState(null);
   const [scopeAudit, setScopeAudit] = useState(null);
   const [auditingScopes, setAuditingScopes] = useState(false);
@@ -223,17 +223,20 @@ export default function AdminMediaPage() {
     }
   };
 
-  const uploadFiles = async (files) => {
+  const uploadMediaFiles = async (files) => {
     if (!files?.length) return;
     setUploading(true);
     let ok = 0;
     let failed = 0;
+    let originals = 0;
     for (const file of Array.from(files)) {
       try {
-        const uploadFile = await prepareImageForUpload(file);
+        const kind = mediaTypeFromFile(file);
+        const uploadFile = kind === "image" ? await prepareImageForUpload(file) : file;
         const fd = new FormData();
         fd.append("file", uploadFile);
-        await api.post("/uploads/image?media_scope=admin", fd);
+        const { data } = await api.post("/uploads/media?media_scope=admin", fd);
+        if (data?.media_type === "file") originals++;
         ok++;
       } catch (e) {
         failed++;
@@ -241,28 +244,7 @@ export default function AdminMediaPage() {
       }
     }
     setUploading(false);
-    toast.success(`${ok} Datei(en) hochgeladen${failed ? `, ${failed} fehlgeschlagen` : ""}.`);
-    load();
-  };
-
-  const uploadVideoFiles = async (files) => {
-    if (!files?.length) return;
-    setUploadingVideo(true);
-    let ok = 0;
-    let failed = 0;
-    for (const file of Array.from(files)) {
-      try {
-        const fd = new FormData();
-        fd.append("file", file);
-        await api.post("/uploads/video?media_scope=admin", fd);
-        ok++;
-      } catch (e) {
-        failed++;
-        toast.error(`${file.name}: ${formatApiError(e.response?.data?.detail) || e.message || "Upload fehlgeschlagen"}`);
-      }
-    }
-    setUploadingVideo(false);
-    toast.success(`${ok} Video(s) hochgeladen${failed ? `, ${failed} fehlgeschlagen` : ""}.`);
+    toast.success(`${ok} Medium/Medien hochgeladen${originals ? `, ${originals} Originaldatei(en)` : ""}${failed ? `, ${failed} fehlgeschlagen` : ""}.`);
     load();
   };
 
@@ -362,12 +344,8 @@ export default function AdminMediaPage() {
           <RefreshCw className="w-3.5 h-3.5" /> Neu laden
         </button>
         <label className={`px-3 py-2 bg-[#FFD700] text-black rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer ${uploading ? "opacity-60" : ""}`} data-testid="media-upload">
-          <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Bilder hochladen"}
-          <input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={uploading} className="hidden" onChange={(e) => uploadFiles(e.target.files)} />
-        </label>
-        <label className={`px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer hover:bg-[#FFD700]/10 ${uploadingVideo ? "opacity-60" : ""}`} data-testid="media-video-upload">
-          <Video className="w-3.5 h-3.5" /> {uploadingVideo ? "Lade hoch…" : "Videos hochladen"}
-          <input type="file" accept={VIDEO_ACCEPT} multiple disabled={uploadingVideo} className="hidden" onChange={(e) => uploadVideoFiles(e.target.files)} />
+          <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Medien hochladen"}
+          <input type="file" accept={MEDIA_ACCEPT} multiple disabled={uploading} className="hidden" onChange={(e) => uploadMediaFiles(e.target.files)} />
         </label>
         <span className="ml-auto text-xs text-white/45">
           {filtered.length} / {items.length} · {fmtBytes(totalSize)} gesamt
@@ -528,6 +506,7 @@ export default function AdminMediaPage() {
             {filtered.map((it) => {
               const isImg = IMG_EXT.has(it.ext);
               const isVideo = VIDEO_EXT.has(it.ext);
+              const isRaw = RAW_EXT.has(it.ext);
               const fullUrl = `${BACKEND}${it.url}`;
               const previewUrl = cacheBustedMediaUrl(fullUrl, it);
               return (
@@ -548,7 +527,7 @@ export default function AdminMediaPage() {
                     ) : (
                       <div className="flex flex-col items-center gap-2 text-white/40">
                         <FileText className="w-10 h-10" />
-                        <span className="text-[10px] font-mono uppercase">{it.ext || "file"}</span>
+                        <span className="text-[10px] font-mono uppercase">{isRaw ? "raw" : it.ext || "file"}</span>
                       </div>
                     )}
                   </div>
@@ -706,6 +685,13 @@ function MediaDetailModal({ item, onClose, onCopy, onRotateLeft, onRotateRight, 
           >
             <Copy className="w-3.5 h-3.5" /> URL kopieren
           </button>
+          <a
+            href={fullUrl}
+            download={item.original_filename || item.filename}
+            className="px-4 py-2 border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"
+          >
+            <Download className="w-3.5 h-3.5" /> Download
+          </a>
           <button
             onClick={onDelete}
             data-testid="media-delete"

@@ -1096,6 +1096,8 @@ class GalleryPhotoCreate(BaseModel):
     section_id: Optional[str] = None
     mime: Optional[str] = None
     file_size: Optional[int] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
 
     @model_validator(mode="after")
     def ensure_media_source(self):
@@ -1117,6 +1119,8 @@ class GalleryPhotoUpdate(BaseModel):
     order_index: Optional[int] = None
     section_id: Optional[str] = None
     thumbnail_url: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
 
 
 # ---------- Admin ----------

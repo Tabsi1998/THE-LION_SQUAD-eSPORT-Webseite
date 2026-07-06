@@ -15,7 +15,8 @@ PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
 LOCAL_PREFIX = "/api/static/uploads/"
 PUBLIC_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 PUBLIC_VIDEO_EXTS = {".mp4", ".m4v", ".webm", ".mov"}
-PUBLIC_MEDIA_EXTS = PUBLIC_IMAGE_EXTS | PUBLIC_VIDEO_EXTS
+PUBLIC_RAW_EXTS = {".nef", ".nrw", ".cr2", ".cr3", ".arw", ".dng", ".raf", ".orf", ".rw2"}
+PUBLIC_MEDIA_EXTS = PUBLIC_IMAGE_EXTS | PUBLIC_VIDEO_EXTS | PUBLIC_RAW_EXTS
 ADMIN_OWNER_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
 MEDIA_SCOPES = {"user", "admin", "sponsor", "branding", "gallery"}
 

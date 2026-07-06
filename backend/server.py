@@ -263,7 +263,11 @@ upload_dir = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 upload_dir.mkdir(parents=True, exist_ok=True)
 public_upload_dir = upload_dir / "public"
 public_upload_dir.mkdir(parents=True, exist_ok=True)
-PUBLIC_MEDIA_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".m4v", ".webm", ".mov"}
+PUBLIC_MEDIA_EXTS = {
+    ".png", ".jpg", ".jpeg", ".webp", ".gif",
+    ".mp4", ".m4v", ".webm", ".mov",
+    ".nef", ".nrw", ".cr2", ".cr3", ".arw", ".dng", ".raf", ".orf", ".rw2",
+}
 PUBLIC_MEDIA_TYPES = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
@@ -274,11 +278,33 @@ PUBLIC_MEDIA_TYPES = {
     ".m4v": "video/mp4",
     ".webm": "video/webm",
     ".mov": "video/quicktime",
+    ".nef": "image/x-nikon-nef",
+    ".nrw": "image/x-nikon-nrw",
+    ".cr2": "image/x-canon-cr2",
+    ".cr3": "image/x-canon-cr3",
+    ".arw": "image/x-sony-arw",
+    ".dng": "image/x-adobe-dng",
+    ".raf": "image/x-fuji-raf",
+    ".orf": "image/x-olympus-orf",
+    ".rw2": "image/x-panasonic-rw2",
 }
+VIDEO_MEDIA_EXTS = {".mp4", ".m4v", ".webm", ".mov"}
+
+
+def _iter_file_range(path: Path, start: int, end: int):
+    with path.open("rb") as handle:
+        handle.seek(start)
+        remaining = end - start + 1
+        while remaining > 0:
+            chunk = handle.read(min(1024 * 1024, remaining))
+            if not chunk:
+                break
+            remaining -= len(chunk)
+            yield chunk
 
 
 @app.get("/api/static/uploads/{filename}")
-async def public_upload(filename: str):
+async def public_upload(filename: str, request: Request):
     if "/" in filename or "\\" in filename or ".." in filename or filename.startswith("."):
         raise HTTPException(status_code=400, detail="Invalid filename")
     suffix = pathlib.Path(filename).suffix.lower()
@@ -287,13 +313,35 @@ async def public_upload(filename: str):
     for base in (public_upload_dir, upload_dir):
         path = base / filename
         if path.exists() and path.is_file():
-            return FileResponse(path, media_type=PUBLIC_MEDIA_TYPES.get(suffix))
+            media_type = PUBLIC_MEDIA_TYPES.get(suffix) or "application/octet-stream"
+            headers = {"Accept-Ranges": "bytes", "X-Content-Type-Options": "nosniff"}
+            range_header = request.headers.get("range", "")
+            if suffix in VIDEO_MEDIA_EXTS and range_header.startswith("bytes="):
+                size = path.stat().st_size
+                raw_range = range_header.removeprefix("bytes=").split(",", 1)[0].strip()
+                start_raw, _, end_raw = raw_range.partition("-")
+                try:
+                    start = int(start_raw) if start_raw else 0
+                    end = int(end_raw) if end_raw else size - 1
+                except ValueError:
+                    raise HTTPException(status_code=416, detail="Invalid range")
+                start = max(0, start)
+                end = min(size - 1, end)
+                if start > end or start >= size:
+                    raise HTTPException(status_code=416, detail="Invalid range")
+                headers.update({
+                    "Content-Range": f"bytes {start}-{end}/{size}",
+                    "Content-Length": str(end - start + 1),
+                    "Content-Type": media_type,
+                })
+                return StreamingResponse(_iter_file_range(path, start, end), status_code=206, media_type=media_type, headers=headers)
+            return FileResponse(path, media_type=media_type, headers=headers)
     raise HTTPException(status_code=404, detail="File not found")
 
 
 @app.get("/uploads/{filename}")
-async def legacy_public_upload(filename: str):
-    return await public_upload(filename)
+async def legacy_public_upload(filename: str, request: Request):
+    return await public_upload(filename, request)
 
 
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}

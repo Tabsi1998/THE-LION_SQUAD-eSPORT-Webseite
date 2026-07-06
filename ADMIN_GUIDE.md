@@ -66,6 +66,7 @@ Wichtig:
 Admin-Medien entstehen bei News, Events, Sponsoren, Branding, Galerie und aehnlichen CMS-Inhalten.
 Galerie-Alben koennen neben Bildern auch direkte Video-Uploads und externe Video-Links enthalten.
 Innerhalb eines Galerie-Albums koennen Abschnitte wie `Aufbau`, `Tag 1` oder `Tag 2` angelegt und sortiert werden; neue und bestehende Medien lassen sich diesen Abschnitten zuordnen.
+Der Medienbereich nutzt einen gemeinsamen Upload fuer Bilder, Videos und RAW-Originale. RAW-Dateien wie NEF werden gespeichert, aber nicht automatisch als sichtbares Galerie-Bild verwendet.
 
 Empfohlene Pflege:
 

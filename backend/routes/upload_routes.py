@@ -33,6 +33,17 @@ IMAGE_MIME_BY_EXT = {
     ".jpeg": "image/jpeg",
     ".webp": "image/webp",
 }
+RAW_PHOTO_MIME_BY_EXT = {
+    ".nef": "image/x-nikon-nef",
+    ".nrw": "image/x-nikon-nrw",
+    ".cr2": "image/x-canon-cr2",
+    ".cr3": "image/x-canon-cr3",
+    ".arw": "image/x-sony-arw",
+    ".dng": "image/x-adobe-dng",
+    ".raf": "image/x-fuji-raf",
+    ".orf": "image/x-olympus-orf",
+    ".rw2": "image/x-panasonic-rw2",
+}
 VIDEO_MIME_BY_EXT = {
     ".mp4": "video/mp4",
     ".m4v": "video/mp4",
@@ -91,11 +102,17 @@ ALLOWED_DOC = {
 MAX_IMAGE_UPLOAD_MB = _upload_mb_from_env("MAX_IMAGE_UPLOAD_MB", 50)
 MAX_VIDEO_UPLOAD_MB = _upload_mb_from_env("MAX_VIDEO_UPLOAD_MB", 1024)
 MAX_DOCUMENT_UPLOAD_MB = _upload_mb_from_env("MAX_DOCUMENT_UPLOAD_MB", 50)
+MAX_ORIGINAL_UPLOAD_MB = _upload_mb_from_env("MAX_ORIGINAL_UPLOAD_MB", 200)
 MAX_BYTES = MAX_IMAGE_UPLOAD_MB * 1024 * 1024  # images before re-encoding
 MAX_VIDEO_BYTES = MAX_VIDEO_UPLOAD_MB * 1024 * 1024
 MAX_DOC_BYTES = MAX_DOCUMENT_UPLOAD_MB * 1024 * 1024  # docs
+MAX_ORIGINAL_BYTES = MAX_ORIGINAL_UPLOAD_MB * 1024 * 1024
 MAX_IMAGE_DIMENSION = _int_from_env("MAX_IMAGE_DIMENSION", 4096)
 MAX_IMAGE_PIXELS = _int_from_env("MAX_IMAGE_PIXELS", 50_000_000)
+ADMIN_UPLOAD_RATE_LIMIT = _int_from_env("ADMIN_UPLOAD_RATE_LIMIT", 240)
+ADMIN_UPLOAD_RATE_WINDOW_SECONDS = _int_from_env("ADMIN_UPLOAD_RATE_WINDOW_SECONDS", 600)
+USER_UPLOAD_RATE_LIMIT = _int_from_env("USER_UPLOAD_RATE_LIMIT", 30)
+USER_UPLOAD_RATE_WINDOW_SECONDS = _int_from_env("USER_UPLOAD_RATE_WINDOW_SECONDS", 3600)
 UPLOAD_STREAM_CHUNK_BYTES = 1024 * 1024
 VIDEO_SNIFF_BYTES = 4096
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
@@ -150,6 +167,42 @@ def _clean_media_scope(value: str | None, me: dict) -> str:
     if scope != "user" and me.get("role") not in ADMIN_MEDIA_ROLES:
         raise HTTPException(status_code=403, detail="Admin-Medienupload nicht erlaubt.")
     return scope
+
+
+def _is_admin_media_user(me: dict) -> bool:
+    return me.get("role") in ADMIN_MEDIA_ROLES
+
+
+async def _enforce_upload_rate_limit(request: Request, me: dict, bucket: str, media_scope: str = "user") -> None:
+    admin_bucket = _is_admin_media_user(me) and media_scope != "user"
+    if admin_bucket:
+        await enforce_rate_limit(
+            request,
+            f"uploads:{bucket}:admin",
+            limit=ADMIN_UPLOAD_RATE_LIMIT,
+            window_seconds=ADMIN_UPLOAD_RATE_WINDOW_SECONDS,
+            subject=me["id"],
+        )
+        return
+    await enforce_rate_limit(
+        request,
+        f"uploads:{bucket}:user",
+        limit=USER_UPLOAD_RATE_LIMIT,
+        window_seconds=USER_UPLOAD_RATE_WINDOW_SECONDS,
+        subject=me["id"],
+    )
+
+
+def _upload_kind_for_file(file: UploadFile) -> str:
+    declared = (file.content_type or "").split(";")[0].strip().lower()
+    suffix = pathlib.Path(file.filename or "").suffix.lower()
+    if declared in ALLOWED_VIDEO or suffix in VIDEO_MIME_BY_EXT:
+        return "video"
+    if declared in ALLOWED_IMAGE or suffix in IMAGE_MIME_BY_EXT:
+        return "image"
+    if suffix in RAW_PHOTO_MIME_BY_EXT:
+        return "file"
+    return "unknown"
 
 
 def _resize_for_storage(img: Image.Image) -> tuple[Image.Image, bool]:
@@ -219,6 +272,10 @@ async def _upload_image_impl(
     # Read & size check
     data = await _read_upload_limited(file, MAX_BYTES, MAX_IMAGE_UPLOAD_MB)
     original_size = len(data)
+    original_width = 0
+    original_height = 0
+    stored_width = 0
+    stored_height = 0
     try:
         with Image.open(BytesIO(data)) as img:
             img.verify()
@@ -231,6 +288,7 @@ async def _upload_image_impl(
                 )
             if img.width * img.height > MAX_IMAGE_PIXELS:
                 raise HTTPException(status_code=413, detail="Bildauflösung ist zu groß")
+            original_width, original_height = img.width, img.height
             content_type, ext = PIL_IMAGE_FORMATS[detected_format]
             img = ImageOps.exif_transpose(img)
             if declared_content_type and declared_content_type not in ALLOWED_IMAGE:
@@ -267,6 +325,7 @@ async def _upload_image_impl(
                 if img.mode not in ("RGB", "RGBA"):
                     img = img.convert("RGBA" if "A" in img.getbands() else "RGB")
                 save_kwargs = {"quality": 88, "method": 6}
+            stored_width, stored_height = img.width, img.height
             img.save(out, format=output_format, **save_kwargs)
             data = out.getvalue()
     except UnidentifiedImageError:
@@ -291,6 +350,10 @@ async def _upload_image_impl(
             "url": url,
             "size": len(data),
             "original_size": original_size,
+            "width": stored_width,
+            "height": stored_height,
+            "original_width": original_width,
+            "original_height": original_height,
             "original_filename": filename_hint,
             "mime": content_type,
             "ext": ext.lstrip("."),
@@ -303,7 +366,19 @@ async def _upload_image_impl(
         })
     except Exception as exc:
         logger.warning("[uploads] media metadata write failed for %s: %s", filename, exc)
-    return {"url": url, "filename": filename, "size": len(data), "original_size": original_size, "media_scope": media_scope}
+    return {
+        "url": url,
+        "filename": filename,
+        "size": len(data),
+        "original_size": original_size,
+        "mime": content_type,
+        "media_type": "image",
+        "media_scope": media_scope,
+        "width": stored_width,
+        "height": stored_height,
+        "original_width": original_width,
+        "original_height": original_height,
+    }
 
 
 def _detect_video_upload(data: bytes, declared_content_type: str, suffix: str) -> tuple[str, str]:
@@ -380,6 +455,57 @@ async def _upload_video_impl(
     }
 
 
+async def _upload_original_file_impl(
+    file: UploadFile,
+    me: dict,
+    media_scope: str = "admin",
+):
+    """Store a supported original media file that cannot be browser-previewed as an image."""
+    media_scope = _clean_media_scope(media_scope, me)
+    if not _is_admin_media_user(me):
+        raise HTTPException(status_code=403, detail="Originaldateien dürfen nur Admins hochladen.")
+    suffix = pathlib.Path(file.filename or "").suffix.lower()
+    if suffix not in RAW_PHOTO_MIME_BY_EXT:
+        raise HTTPException(status_code=400, detail="Dieses Dateiformat wird nicht als Medien-Original unterstützt.")
+    filename_hint = file.filename or "original"
+    head = await file.read(VIDEO_SNIFF_BYTES)
+    if not head:
+        raise HTTPException(status_code=400, detail="Leere Datei")
+    filename = f"{uuid.uuid4().hex}{suffix}"
+    path = PUBLIC_UPLOAD_DIR / filename
+    size = await _write_upload_stream_limited(file, path, head, MAX_ORIGINAL_BYTES, MAX_ORIGINAL_UPLOAD_MB)
+    content_type = RAW_PHOTO_MIME_BY_EXT.get(suffix) or "application/octet-stream"
+    url = f"/api/static/uploads/{filename}"
+    try:
+        await get_db().media_uploads.insert_one({
+            "id": new_id(),
+            "filename": filename,
+            "url": url,
+            "size": size,
+            "original_size": size,
+            "original_filename": filename_hint,
+            "mime": content_type,
+            "ext": suffix.lstrip("."),
+            "media_type": "file",
+            "owner_id": me.get("id"),
+            "owner_role": me.get("role"),
+            "media_scope": media_scope,
+            "created_at": now_utc().isoformat(),
+            "updated_at": now_utc().isoformat(),
+        })
+    except Exception as exc:
+        logger.warning("[uploads] media metadata write failed for %s: %s", filename, exc)
+    return {
+        "url": url,
+        "filename": filename,
+        "size": size,
+        "original_size": size,
+        "mime": content_type,
+        "media_type": "file",
+        "media_scope": media_scope,
+    }
+
+
 @router.post("/image")
 async def upload_image(
     request: Request,
@@ -388,8 +514,29 @@ async def upload_image(
     trim_empty_borders: bool = False,
     media_scope: str = "user",
 ):
-    await enforce_rate_limit(request, "uploads:image:user", limit=30, window_seconds=3600, subject=me["id"])
+    await _enforce_upload_rate_limit(request, me, "image", media_scope)
     return await _upload_image_impl(file, me, trim_empty_borders, media_scope)
+
+
+@router.post("/media")
+async def upload_media(
+    request: Request,
+    file: UploadFile = File(...),
+    me: dict = Depends(get_current_user),
+    media_scope: str = "user",
+):
+    media_scope = _clean_media_scope(media_scope, me)
+    await _enforce_upload_rate_limit(request, me, "media", media_scope)
+    kind = _upload_kind_for_file(file)
+    if kind == "image":
+        return await _upload_image_impl(file, me, media_scope=media_scope)
+    if kind == "video":
+        if not _is_admin_media_user(me):
+            raise HTTPException(status_code=403, detail="Video-Uploads sind nur im Admin-/CMS-Bereich erlaubt.")
+        return await _upload_video_impl(file, me, media_scope=media_scope)
+    if kind == "file":
+        return await _upload_original_file_impl(file, me, media_scope=media_scope)
+    raise HTTPException(status_code=400, detail="Nur PNG/JPG/WebP, MP4/WebM/MOV/M4V oder RAW-Fotos wie NEF/DNG/CR2 erlaubt.")
 
 
 @router.post("/video")
@@ -399,21 +546,21 @@ async def upload_video(
     me: dict = Depends(require_admin()),
     media_scope: str = "gallery",
 ):
-    await enforce_rate_limit(request, "uploads:video:admin", limit=10, window_seconds=3600, subject=me["id"])
+    await _enforce_upload_rate_limit(request, me, "video", media_scope)
     return await _upload_video_impl(file, me, media_scope)
 
 
 @router.post("/sponsor-logo")
 async def upload_sponsor_logo(request: Request, file: UploadFile = File(...), me: dict = Depends(require_admin())):
     """Admin-only convenience alias for sponsor logos."""
-    await enforce_rate_limit(request, "uploads:image:user", limit=30, window_seconds=3600, subject=me["id"])
+    await _enforce_upload_rate_limit(request, me, "image", "sponsor")
     return await _upload_image_impl(file, me, trim_empty_borders=True, media_scope="sponsor")
 
 
 @router.post("/logo")
 async def upload_logo(request: Request, file: UploadFile = File(...), me: dict = Depends(require_admin())):
     """Admin-only logo upload with automatic whitespace trimming."""
-    await enforce_rate_limit(request, "uploads:image:user", limit=30, window_seconds=3600, subject=me["id"])
+    await _enforce_upload_rate_limit(request, me, "image", "branding")
     return await _upload_image_impl(file, me, trim_empty_borders=True, media_scope="branding")
 
 
