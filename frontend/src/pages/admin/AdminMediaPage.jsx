@@ -7,7 +7,9 @@ import { API_BASE, api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { UploadProgressPanel } from "@/components/tls/UploadProgressPanel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useUploadProgress } from "@/hooks/useUploadProgress";
 import { MEDIA_ACCEPT, RAW_PHOTO_EXTENSIONS, VIDEO_EXTENSIONS, mediaTypeFromFile } from "@/lib/galleryMedia";
 import { toast } from "sonner";
 import {
@@ -88,6 +90,7 @@ export default function AdminMediaPage() {
   const [auditingScopes, setAuditingScopes] = useState(false);
   const [repairingScopes, setRepairingScopes] = useState(false);
   const confirm = useConfirm();
+  const uploadProgress = useUploadProgress();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -225,25 +228,34 @@ export default function AdminMediaPage() {
 
   const uploadMediaFiles = async (files) => {
     if (!files?.length) return;
+    const picked = Array.from(files);
+    uploadProgress.start(picked);
     setUploading(true);
     let ok = 0;
     let failed = 0;
     let originals = 0;
-    for (const file of Array.from(files)) {
+    for (const [index, file] of picked.entries()) {
       try {
         const kind = mediaTypeFromFile(file);
+        uploadProgress.startFile(file, index, kind === "image" ? "Bild wird vorbereitet" : "Upload startet");
         const uploadFile = kind === "image" ? await prepareImageForUpload(file) : file;
         const fd = new FormData();
         fd.append("file", uploadFile);
-        const { data } = await api.post("/uploads/media?media_scope=admin", fd);
+        uploadProgress.beginTransfer(uploadFile.size);
+        const { data } = await api.post("/uploads/media?media_scope=admin", fd, {
+          onUploadProgress: uploadProgress.updateUpload,
+        });
         if (data?.media_type === "file") originals++;
+        uploadProgress.finishFile({ original: data?.media_type === "file" });
         ok++;
       } catch (e) {
         failed++;
+        uploadProgress.failFile();
         toast.error(`${file.name}: ${formatApiError(e.response?.data?.detail) || e.message || "Upload fehlgeschlagen"}`);
       }
     }
     setUploading(false);
+    uploadProgress.finish();
     toast.success(`${ok} Medium/Medien hochgeladen${originals ? `, ${originals} Originaldatei(en)` : ""}${failed ? `, ${failed} fehlgeschlagen` : ""}.`);
     load();
   };
@@ -345,12 +357,13 @@ export default function AdminMediaPage() {
         </button>
         <label className={`px-3 py-2 bg-[#FFD700] text-black rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer ${uploading ? "opacity-60" : ""}`} data-testid="media-upload">
           <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Medien hochladen"}
-          <input type="file" accept={MEDIA_ACCEPT} multiple disabled={uploading} className="hidden" onChange={(e) => uploadMediaFiles(e.target.files)} />
+          <input type="file" accept={MEDIA_ACCEPT} multiple disabled={uploading} className="hidden" onChange={(e) => { uploadMediaFiles(e.target.files); e.target.value = ""; }} />
         </label>
         <span className="ml-auto text-xs text-white/45">
           {filtered.length} / {items.length} · {fmtBytes(totalSize)} gesamt
         </span>
       </div>
+      <UploadProgressPanel progress={uploadProgress.progress} className="mt-4" />
 
       {mediaAudit && (
         <div className="mt-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">

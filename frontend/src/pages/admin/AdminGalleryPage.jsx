@@ -3,7 +3,9 @@ import { api, formatApiError, formatRequestError, resolveMediaUrl } from "@/lib/
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload, prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { UploadProgressPanel } from "@/components/tls/UploadProgressPanel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useUploadProgress } from "@/hooks/useUploadProgress";
 import {
   buildExternalGalleryPayload,
   galleryMediaUrl,
@@ -291,6 +293,7 @@ function AlbumPhotos({ album, events, onBack }) {
   const [selectedMedia, setSelectedMedia] = useState([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const confirm = useConfirm();
+  const uploadProgress = useUploadProgress();
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/admin/gallery/${album.id}`);
@@ -313,23 +316,31 @@ function AlbumPhotos({ album, events, onBack }) {
 
   const onPickMedia = async (files) => {
     if (!files || !files.length) return;
+    const picked = Array.from(files);
+    uploadProgress.start(picked);
     setUploading(true);
     let ok = 0, fail = 0, originals = 0;
-    for (const file of Array.from(files)) {
+    for (const [index, file] of picked.entries()) {
       try {
         const kind = mediaTypeFromFile(file);
+        uploadProgress.startFile(file, index, kind === "image" ? "Bild wird vorbereitet" : "Upload startet");
         if (kind === "video" && file.size > VIDEO_MAX_BYTES) {
           throw new Error(`Datei zu groß (max ${MAX_VIDEO_UPLOAD_MB} MB).`);
         }
         const uploadFile = kind === "image" ? await prepareImageForUpload(file) : file;
         const fd = new FormData();
         fd.append("file", uploadFile);
-        const { data } = await api.post("/uploads/media?media_scope=gallery", fd);
+        uploadProgress.beginTransfer(uploadFile.size);
+        const { data } = await api.post("/uploads/media?media_scope=gallery", fd, {
+          onUploadProgress: uploadProgress.updateUpload,
+        });
         if (data.media_type === "file") {
           originals++;
+          uploadProgress.finishFile({ original: true });
           ok++;
           continue;
         }
+        uploadProgress.setPhase("Zum Album hinzufügen");
         if (data.media_type === "video") {
           await api.post(`/gallery/${album.id}/photos`, {
             media_type: "video",
@@ -341,6 +352,7 @@ function AlbumPhotos({ album, events, onBack }) {
             mime: data.mime,
             file_size: data.size,
           });
+          uploadProgress.finishFile();
           ok++;
           continue;
         }
@@ -357,13 +369,16 @@ function AlbumPhotos({ album, events, onBack }) {
           width: data.width,
           height: data.height,
         });
+        uploadProgress.finishFile();
         ok++;
       } catch (err) {
         fail++;
+        uploadProgress.failFile();
         toast.error(`${file.name}: ${formatApiError(err.response?.data?.detail) || err.message || "Upload fehlgeschlagen"}`);
       }
     }
     setUploading(false);
+    uploadProgress.finish();
     toast.success(`${Math.max(0, ok - originals)} Medium/Medien hinzugefügt${originals ? `, ${originals} Originaldatei(en) nur gespeichert` : ""}${fail ? `, ${fail} fehlgeschlagen` : ""}.`);
     load();
   };
@@ -490,10 +505,11 @@ function AlbumPhotos({ album, events, onBack }) {
           </button>
           <label className={`inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm cursor-pointer ${uploading ? "opacity-50" : ""}`} data-testid="media-bulk-upload">
             <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Medien hochladen"}
-            <input type="file" accept={MEDIA_ACCEPT} multiple disabled={uploading} className="hidden" onChange={(e) => onPickMedia(e.target.files)} />
+            <input type="file" accept={MEDIA_ACCEPT} multiple disabled={uploading} className="hidden" onChange={(e) => { onPickMedia(e.target.files); e.target.value = ""; }} />
           </label>
         </div>
       </div>
+      <UploadProgressPanel progress={uploadProgress.progress} className="mb-6" />
 
       <div className="mb-6 border border-white/10 bg-[#101010] rounded-sm p-4">
         <div className="flex items-start justify-between gap-3 flex-wrap">
