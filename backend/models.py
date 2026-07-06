@@ -1091,6 +1091,10 @@ class GalleryPhotoCreate(BaseModel):
     embed_url: Optional[str] = None
     embed_provider: Optional[GalleryEmbedProvider] = None
     thumbnail_url: Optional[str] = None
+    original_url: Optional[str] = None
+    original_filename: Optional[str] = None
+    original_mime: Optional[str] = None
+    original_file_size: Optional[int] = None
     caption: Optional[str] = None
     order_index: int = 0
     section_id: Optional[str] = None
@@ -1119,6 +1123,10 @@ class GalleryPhotoUpdate(BaseModel):
     order_index: Optional[int] = None
     section_id: Optional[str] = None
     thumbnail_url: Optional[str] = None
+    original_url: Optional[str] = None
+    original_filename: Optional[str] = None
+    original_mime: Optional[str] = None
+    original_file_size: Optional[int] = None
     width: Optional[int] = None
     height: Optional[int] = None
 

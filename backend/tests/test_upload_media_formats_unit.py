@@ -1,9 +1,12 @@
 import asyncio
 import pathlib
 import sys
+from io import BytesIO
 from types import SimpleNamespace
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+from PIL import Image
 
 from routes import upload_routes
 
@@ -52,25 +55,75 @@ def test_media_kind_keeps_browser_media_as_image_or_video():
     assert upload_routes._upload_kind_for_file(fake_file("clip.mov", "video/quicktime")) == "video"
 
 
-def test_original_media_upload_accepts_nef_and_mkv(monkeypatch, tmp_path):
+def test_original_media_upload_converts_nef_preview_and_keeps_original(monkeypatch, tmp_path):
     fake_db = FakeDb()
     monkeypatch.setattr(upload_routes, "PUBLIC_UPLOAD_DIR", tmp_path)
     monkeypatch.setattr(upload_routes, "get_db", lambda: fake_db)
     me = {"id": "admin-1", "role": "admin"}
 
+    def fake_preview(path, suffix):
+        assert suffix == ".nef"
+        name = "preview.webp"
+        (tmp_path / name).write_bytes(b"WEBP-PREVIEW")
+        return {
+            "filename": name,
+            "url": f"/api/static/uploads/{name}",
+            "size": len(b"WEBP-PREVIEW"),
+            "mime": "image/webp",
+            "ext": "webp",
+            "width": 1200,
+            "height": 800,
+            "original_width": 6000,
+            "original_height": 4000,
+        }
+
+    monkeypatch.setattr(upload_routes, "_create_original_image_preview", fake_preview)
     nef = FakeUpload("DSC_001.NEF", "application/octet-stream", b"NEF-DATA-123")
     nef_result = asyncio.run(upload_routes._upload_original_file_impl(nef, me, "gallery"))
 
+    assert nef_result["media_type"] == "image"
+    assert nef_result["mime"] == "image/webp"
+    assert nef_result["filename"] == "preview.webp"
+    assert nef_result["original_url"].endswith(".nef")
+    assert nef_result["original_mime"] == "image/x-nikon-nef"
+    original_name = pathlib.Path(nef_result["original_url"]).name
+    assert (tmp_path / original_name).read_bytes() == b"NEF-DATA-123"
+    assert (tmp_path / "preview.webp").read_bytes() == b"WEBP-PREVIEW"
+    assert [row["ext"] for row in fake_db.media_uploads.rows] == ["nef", "webp"]
+
+
+def test_original_media_upload_accepts_non_preview_video_original(monkeypatch, tmp_path):
+    fake_db = FakeDb()
+    monkeypatch.setattr(upload_routes, "PUBLIC_UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(upload_routes, "get_db", lambda: fake_db)
+    me = {"id": "admin-1", "role": "admin"}
+
     mkv = FakeUpload("clip.mkv", "video/x-matroska", b"\x1a\x45\xdf\xa3MKV-DATA")
     mkv_result = asyncio.run(upload_routes._upload_original_file_impl(mkv, me, "admin"))
-
-    assert nef_result["media_type"] == "file"
-    assert nef_result["mime"] == "image/x-nikon-nef"
-    assert nef_result["filename"].endswith(".nef")
-    assert (tmp_path / nef_result["filename"]).read_bytes() == b"NEF-DATA-123"
-
     assert mkv_result["media_type"] == "file"
     assert mkv_result["mime"] == "video/x-matroska"
     assert mkv_result["filename"].endswith(".mkv")
     assert (tmp_path / mkv_result["filename"]).read_bytes() == b"\x1a\x45\xdf\xa3MKV-DATA"
-    assert [row["ext"] for row in fake_db.media_uploads.rows] == ["nef", "mkv"]
+    assert [row["ext"] for row in fake_db.media_uploads.rows] == ["mkv"]
+
+
+def test_original_tiff_upload_is_converted_to_webp(monkeypatch, tmp_path):
+    fake_db = FakeDb()
+    monkeypatch.setattr(upload_routes, "PUBLIC_UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(upload_routes, "get_db", lambda: fake_db)
+    source = BytesIO()
+    Image.new("RGB", (32, 18), "#29B6E8").save(source, format="TIFF")
+
+    result = asyncio.run(upload_routes._upload_original_file_impl(
+        FakeUpload("scan.tif", "image/tiff", source.getvalue()),
+        {"id": "admin-1", "role": "admin"},
+        "gallery",
+    ))
+
+    assert result["media_type"] == "image"
+    assert result["mime"] == "image/webp"
+    assert result["filename"].endswith(".webp")
+    assert result["original_url"].endswith(".tif")
+    with Image.open(tmp_path / result["filename"]) as img:
+        assert img.format == "WEBP"
+        assert img.size == (32, 18)

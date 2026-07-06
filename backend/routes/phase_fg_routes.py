@@ -247,6 +247,12 @@ async def _list_media_items(
         refs = usage.get(p.name) or []
         inferred_media_type = _media_type_from_ext(p.suffix.lower())
         media_type = (meta.get("media_type") if meta else None) or inferred_media_type
+        if requested_type in {"image", "images"} and media_type != "image":
+            continue
+        if requested_type in {"video", "videos"} and media_type != "video":
+            continue
+        if requested_type in {"media", "all-media"} and media_type not in {"image", "video"}:
+            continue
         items.append({
             "filename": p.name,
             "url": f"/api/static/uploads/{p.name}",
@@ -262,6 +268,10 @@ async def _list_media_items(
             "owner_role": meta.get("owner_role") if meta else None,
             "media_scope": media_scope,
             "original_filename": meta.get("original_filename") if meta else None,
+            "original_url": meta.get("original_url") if meta else None,
+            "original_mime": meta.get("original_mime") if meta else None,
+            "original_file_size": meta.get("original_file_size") if meta else None,
+            "derived_from_filename": meta.get("derived_from_filename") if meta else None,
             "created_at": meta.get("created_at") if meta else None,
             "tracked": bool(meta),
             "usage_count": len(refs) if include_usage else None,

@@ -321,14 +321,22 @@ function Lightbox({ item, onClose, onPrev, onNext }) {
 }
 
 function LightboxImage({ item }) {
+  const originalUrl = item.original_url ? resolveMediaUrl(item.original_url) : "";
   return (
-    <img
-      src={resolveMediaUrl(item.image_url)}
-      alt={item.caption || ""}
-      loading="lazy"
-      decoding="async"
-      className="max-w-[90vw] max-h-[85vh] object-contain"
-    />
+    <div className="flex max-h-[85vh] flex-col items-center gap-3">
+      <img
+        src={resolveMediaUrl(item.image_url)}
+        alt={item.caption || ""}
+        loading="lazy"
+        decoding="async"
+        className="max-w-[90vw] max-h-[78vh] object-contain"
+      />
+      {originalUrl && (
+        <a href={originalUrl} download={item.original_filename || undefined} className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white/75 hover:text-white">
+          <Download className="w-3.5 h-3.5" /> Original herunterladen
+        </a>
+      )}
+    </div>
   );
 }
 

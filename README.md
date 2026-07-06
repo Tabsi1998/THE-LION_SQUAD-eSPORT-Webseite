@@ -528,7 +528,7 @@ Bilduploads gibt es fuer Profile, Branding, News, Events, Galerie, Sponsoren, Tu
 Fast-Lap-Challenges und Fast-Lap-Strecken.
 Galerie-Alben unterstuetzen zusaetzlich direkte Video-Uploads und externe Video-Links.
 Alben koennen in sortierte Abschnitte wie `Aufbau`, `Tag 1` und `Tag 2` gegliedert werden.
-Im Adminbereich laeuft der Medien-Upload ueber einen gemeinsamen Button fuer Bilder, Videos und unterstuetzte Originaldateien wie NEF/DNG/CR2, HEIC/HEIF, TIFF, XMP sowie Kamera-/Video-Originale wie AVI/MKV/MTS. Nicht browserfaehige Originaldateien werden gespeichert und downloadbar gemacht, aber nicht automatisch als Galerie-Bild oder Galerie-Video eingefuegt.
+Im Adminbereich laeuft der Medien-Upload ueber einen gemeinsamen Button fuer Bilder, Videos und unterstuetzte Originaldateien wie NEF/DNG/CR2, HEIC/HEIF, TIFF, XMP sowie Kamera-/Video-Originale wie AVI/MKV/MTS. RAW-/Bild-Originale wie NEF werden automatisch als WebP-Vorschau konvertiert und koennen dadurch direkt in Galerie-Alben angezeigt werden; das Original bleibt als Download erhalten. Nicht bildfaehige Originaldateien werden gespeichert und downloadbar gemacht, aber nicht automatisch als Galerie-Bild oder Galerie-Video eingefuegt.
 
 ## Moderatoren und Ergebnisverwaltung
 

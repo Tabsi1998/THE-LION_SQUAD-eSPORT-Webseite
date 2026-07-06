@@ -17,11 +17,24 @@ from models import new_id, now_utc
 from services.rate_limit import enforce_rate_limit
 from services.media_formats import (
     BROWSER_IMAGE_MIME_BY_EXT,
+    CONVERTIBLE_ORIGINAL_IMAGE_EXTS,
     ORIGINAL_MEDIA_LABEL,
     ORIGINAL_MEDIA_MIME_BY_EXT,
     PLAYABLE_VIDEO_MIME_ALIASES,
     PLAYABLE_VIDEO_MIME_BY_EXT,
+    RAW_PHOTO_MIME_BY_EXT,
 )
+
+try:
+    import rawpy
+except ImportError:  # pragma: no cover - exercised in deployments without optional wheel
+    rawpy = None
+
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:  # pragma: no cover
+    pass
 
 logger = logging.getLogger("tls-arena.uploads")
 UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
@@ -239,6 +252,64 @@ def _trim_empty_borders(img: Image.Image) -> tuple[Image.Image, bool]:
     diff = ImageChops.difference(rgba, bg)
     mask = diff.convert("L").point(lambda p: 255 if p > 18 else 0)
     return _crop_with_padding(rgba, mask.getbbox())
+
+
+def _image_to_webp_preview(img: Image.Image) -> dict:
+    img = ImageOps.exif_transpose(img)
+    original_width, original_height = img.width, img.height
+    img, _ = _resize_for_storage(img)
+    if img.mode not in ("RGB", "RGBA"):
+        img = img.convert("RGBA" if "A" in img.getbands() else "RGB")
+    out = BytesIO()
+    img.save(out, format="WEBP", quality=88, method=6)
+    data = out.getvalue()
+    filename = f"{uuid.uuid4().hex}.webp"
+    path = PUBLIC_UPLOAD_DIR / filename
+    try:
+        path.write_bytes(data)
+    except OSError as exc:
+        logger.error("[uploads] failed to write converted preview %s: %s", path, exc)
+        raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR prüfen.")
+    return {
+        "filename": filename,
+        "url": f"/api/static/uploads/{filename}",
+        "size": len(data),
+        "mime": "image/webp",
+        "ext": "webp",
+        "width": img.width,
+        "height": img.height,
+        "original_width": original_width,
+        "original_height": original_height,
+    }
+
+
+def _load_original_preview_image(path: pathlib.Path, suffix: str) -> Image.Image:
+    if suffix in RAW_PHOTO_MIME_BY_EXT:
+        if rawpy is None:
+            raise HTTPException(status_code=500, detail="RAW-Konverter ist nicht installiert. Bitte Deployment neu bauen.")
+        try:
+            with rawpy.imread(str(path)) as raw:
+                rgb = raw.postprocess(use_camera_wb=True, output_bps=8)
+            return Image.fromarray(rgb)
+        except Exception as exc:
+            logger.warning("[uploads] raw conversion failed for %s: %s", path.name, exc)
+            raise HTTPException(status_code=400, detail="RAW/NEF konnte nicht in ein Web-Bild konvertiert werden. Bitte Datei prüfen oder als JPG/WebP exportieren.")
+    try:
+        with Image.open(path) as source:
+            source.load()
+            return source.copy()
+    except UnidentifiedImageError:
+        raise HTTPException(status_code=400, detail="Originaldatei konnte nicht als Bild gelesen werden.")
+    except Exception as exc:
+        logger.warning("[uploads] original image conversion failed for %s: %s", path.name, exc)
+        raise HTTPException(status_code=400, detail="Originaldatei konnte nicht in ein Web-Bild konvertiert werden.")
+
+
+def _create_original_image_preview(path: pathlib.Path, suffix: str) -> dict | None:
+    if suffix not in CONVERTIBLE_ORIGINAL_IMAGE_EXTS:
+        return None
+    img = _load_original_preview_image(path, suffix)
+    return _image_to_webp_preview(img)
 
 
 async def _upload_image_impl(
@@ -475,6 +546,16 @@ async def _upload_original_file_impl(
     size = await _write_upload_stream_limited(file, path, head, MAX_ORIGINAL_BYTES, MAX_ORIGINAL_UPLOAD_MB)
     content_type = ORIGINAL_MEDIA_MIME_BY_EXT.get(suffix) or "application/octet-stream"
     url = f"/api/static/uploads/{filename}"
+    preview = None
+    try:
+        preview = _create_original_image_preview(path, suffix)
+    except HTTPException:
+        path.unlink(missing_ok=True)
+        raise
+    except Exception as exc:
+        path.unlink(missing_ok=True)
+        logger.warning("[uploads] original preview failed for %s: %s", filename, exc)
+        raise HTTPException(status_code=400, detail="Originaldatei konnte nicht automatisch konvertiert werden.")
     try:
         await get_db().media_uploads.insert_one({
             "id": new_id(),
@@ -492,8 +573,52 @@ async def _upload_original_file_impl(
             "created_at": now_utc().isoformat(),
             "updated_at": now_utc().isoformat(),
         })
+        if preview:
+            await get_db().media_uploads.insert_one({
+                "id": new_id(),
+                "filename": preview["filename"],
+                "url": preview["url"],
+                "size": preview["size"],
+                "original_size": size,
+                "width": preview["width"],
+                "height": preview["height"],
+                "original_width": preview["original_width"],
+                "original_height": preview["original_height"],
+                "original_filename": filename_hint,
+                "mime": preview["mime"],
+                "ext": preview["ext"],
+                "media_type": "image",
+                "owner_id": me.get("id"),
+                "owner_role": me.get("role"),
+                "media_scope": media_scope,
+                "original_url": url,
+                "original_mime": content_type,
+                "original_file_size": size,
+                "derived_from_filename": filename,
+                "created_at": now_utc().isoformat(),
+                "updated_at": now_utc().isoformat(),
+            })
     except Exception as exc:
         logger.warning("[uploads] media metadata write failed for %s: %s", filename, exc)
+    if preview:
+        return {
+            "url": preview["url"],
+            "filename": preview["filename"],
+            "size": preview["size"],
+            "original_size": size,
+            "mime": preview["mime"],
+            "media_type": "image",
+            "media_scope": media_scope,
+            "width": preview["width"],
+            "height": preview["height"],
+            "original_width": preview["original_width"],
+            "original_height": preview["original_height"],
+            "original_url": url,
+            "original_filename": filename_hint,
+            "original_mime": content_type,
+            "original_file_size": size,
+            "converted_from": suffix.lstrip("."),
+        }
     return {
         "url": url,
         "filename": filename,
