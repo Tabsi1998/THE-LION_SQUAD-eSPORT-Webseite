@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Crop, RotateCcw, RotateCw, Upload, X, Image as ImageIcon } from "lucide-react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
 import { toast } from "sonner";
 
 const parseUploadMb = (value, fallback) => {
@@ -387,6 +388,15 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
       const message = status === 413
         ? `Datei zu groß oder Reverse Proxy blockiert den Upload. App-Limit: ${maxSizeMb} MB, externer Proxy bitte auf mindestens ${PROXY_UPLOAD_LIMIT_MB} MB setzen.`
         : detail ? formatApiError(detail) : e.message || "Upload fehlgeschlagen";
+      await logUploadClientFailure(e, file, {
+        endpoint,
+        mediaScope: effectiveMediaScope,
+        kind: "image",
+        message,
+        phase: "Bild-Upload",
+        appLimitMb: maxSizeMb,
+        proxyLimitMb: PROXY_UPLOAD_LIMIT_MB,
+      });
       toast.error(status ? `Upload fehlgeschlagen (${status}): ${message}` : `Upload fehlgeschlagen: ${message}`);
       return false;
     } finally {

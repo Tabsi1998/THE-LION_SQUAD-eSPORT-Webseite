@@ -37,6 +37,7 @@ class FakeMediaUploads:
 class FakeDb:
     def __init__(self):
         self.media_uploads = FakeMediaUploads()
+        self.upload_events = FakeMediaUploads()
 
 
 def fake_file(filename, content_type="application/octet-stream"):
@@ -53,6 +54,38 @@ def test_media_kind_routes_camera_originals_as_files():
 def test_media_kind_keeps_browser_media_as_image_or_video():
     assert upload_routes._upload_kind_for_file(fake_file("photo.jpg", "image/jpeg")) == "image"
     assert upload_routes._upload_kind_for_file(fake_file("clip.mov", "video/quicktime")) == "video"
+
+
+def test_upload_event_records_diagnostics(monkeypatch):
+    fake_db = FakeDb()
+    monkeypatch.setattr(upload_routes, "get_db", lambda: fake_db)
+    request = SimpleNamespace(headers={"user-agent": "pytest"}, client=SimpleNamespace(host="127.0.0.1"))
+    result = {"url": "/api/static/uploads/video.mp4", "filename": "video.mp4", "media_type": "video"}
+
+    asyncio.run(upload_routes._record_upload_event(
+        request,
+        {"id": "admin-1", "role": "admin"},
+        endpoint="/uploads/media",
+        media_scope="gallery",
+        filename="clip.MOV",
+        size=123,
+        mime="video/quicktime",
+        kind="video",
+        status="success",
+        status_code=200,
+        detail="",
+        duration_ms=45,
+        result=result,
+    ))
+
+    row = fake_db.upload_events.rows[0]
+    assert row["endpoint"] == "/uploads/media"
+    assert row["media_scope"] == "gallery"
+    assert row["filename"] == "clip.MOV"
+    assert row["kind"] == "video"
+    assert row["status"] == "success"
+    assert row["result"]["url"] == "/api/static/uploads/video.mp4"
+    assert row["expires_at"] > upload_routes.now_utc()
 
 
 def test_original_media_upload_converts_nef_preview_and_keeps_original(monkeypatch, tmp_path):

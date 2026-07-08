@@ -11,10 +11,11 @@ import { UploadProgressPanel } from "@/components/tls/UploadProgressPanel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
 import { MEDIA_ACCEPT, ORIGINAL_MEDIA_EXTENSIONS, VIDEO_EXTENSIONS, mediaTypeFromFile } from "@/lib/galleryMedia";
+import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
 import { toast } from "sonner";
 import {
   Image as ImageIcon, FileText, Trash2, Copy, ExternalLink, Search, RefreshCw, Upload,
-  RotateCcw, RotateCw, AlertTriangle, CheckCircle2, Video, Download,
+  RotateCcw, RotateCw, AlertTriangle, CheckCircle2, Video, Download, Activity,
 } from "lucide-react";
 
 const BACKEND = API_BASE;
@@ -41,7 +42,27 @@ const MEDIA_SCOPE_LABELS = {
   duplicate: "Duplikate",
 };
 
+const UPLOAD_STATUS_LABELS = {
+  success: "OK",
+  failed: "Fehler",
+  client_failed: "Browser",
+};
+
+const uploadStatusClass = (status) => {
+  if (status === "success") return "border-[#00FF88]/35 bg-[#00FF88]/10 text-[#00FF88]";
+  if (status === "client_failed") return "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]";
+  return "border-[#FF3B30]/35 bg-[#FF3B30]/10 text-[#FF3B30]";
+};
+
+const fmtDateTime = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("de-DE");
+};
+
 const fmtBytes = (n) => {
+  if (n == null) return "-";
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / 1024 / 1024).toFixed(2)} MB`;
@@ -83,6 +104,62 @@ function MediaPreview({ item, src, className, compact = false }) {
   return <MediaImage src={src} alt={item.filename} className={className} compact={compact} />;
 }
 
+function UploadEventsPanel({ events, loading, onRefresh }) {
+  const rows = events.slice(0, 20);
+  return (
+    <div className="mt-4 border border-white/10 bg-[#0A0A0A] rounded-sm p-4" data-testid="upload-events-panel">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">
+            <Activity className="h-4 w-4" /> Upload-Protokoll
+          </div>
+          <p className="mt-1 text-xs text-white/45">Letzte Medien-Uploads inklusive Serverfehler, Proxy-Abbruch und Browserfehler.</p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={loading}
+          className="inline-flex items-center gap-2 self-start rounded-sm border border-white/10 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-white/70 hover:bg-white/5 disabled:opacity-50"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Aktualisieren
+        </button>
+      </div>
+      <div className="mt-3 grid gap-2">
+        {loading && !rows.length ? (
+          <div className="rounded-sm border border-white/10 bg-[#121212] px-3 py-4 text-sm text-white/45">Lade Upload-Protokoll...</div>
+        ) : rows.length === 0 ? (
+          <div className="rounded-sm border border-white/10 bg-[#121212] px-3 py-4 text-sm text-white/45">Noch keine Upload-Versuche protokolliert.</div>
+        ) : rows.map((event) => (
+          <div key={event.id} className="rounded-sm border border-white/10 bg-[#121212] p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${uploadStatusClass(event.status)}`}>
+                {UPLOAD_STATUS_LABELS[event.status] || event.status || "?"}
+              </span>
+              <span className="min-w-0 flex-1 break-all font-mono text-xs text-white/75">{event.filename || "upload"}</span>
+              <span className="text-[10px] uppercase tracking-wider text-white/35">{fmtDateTime(event.created_at)}</span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-white/45 sm:grid-cols-5">
+              <span>{event.kind || "unknown"} · {MEDIA_SCOPE_LABELS[event.media_scope] || event.media_scope || "Scope"}</span>
+              <span>{fmtBytes(event.size)}</span>
+              <span className="truncate">{event.mime || "-"}</span>
+              <span>HTTP {event.status_code || "-"}</span>
+              <span>{event.duration_ms != null ? `${event.duration_ms} ms` : "-"}</span>
+            </div>
+            {event.detail && (
+              <div className="mt-2 rounded-sm border border-white/10 bg-black/20 px-2 py-1.5 text-xs text-white/65 break-words">
+                {event.detail}
+              </div>
+            )}
+            {event.result?.url && (
+              <code className="mt-2 block break-all text-[10px] text-white/35">{event.result.url}</code>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminMediaPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -94,6 +171,8 @@ export default function AdminMediaPage() {
   const [uploading, setUploading] = useState(false);
   const [mediaAudit, setMediaAudit] = useState(null);
   const [scopeAudit, setScopeAudit] = useState(null);
+  const [uploadEvents, setUploadEvents] = useState([]);
+  const [loadingUploadEvents, setLoadingUploadEvents] = useState(false);
   const [auditingScopes, setAuditingScopes] = useState(false);
   const [repairingScopes, setRepairingScopes] = useState(false);
   const confirm = useConfirm();
@@ -115,8 +194,22 @@ export default function AdminMediaPage() {
     setLoading(false);
   }, [includeUserUploads]);
 
+  const loadUploadEvents = useCallback(async () => {
+    setLoadingUploadEvents(true);
+    try {
+      const { data } = await api.get("/uploads/events?limit=80");
+      setUploadEvents(data || []);
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Upload-Protokoll konnte nicht geladen werden.");
+    } finally {
+      setLoadingUploadEvents(false);
+    }
+  }, []);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadUploadEvents(); }, [loadUploadEvents]);
   useApiInvalidation(load, ["admin/media", "media", "uploads"]);
+  useApiInvalidation(loadUploadEvents, ["uploads"]);
 
   const filtered = useMemo(() => {
     return items.filter((it) => {
@@ -242,8 +335,8 @@ export default function AdminMediaPage() {
     let failed = 0;
     let originals = 0;
     for (const [index, file] of picked.entries()) {
+      let kind = mediaTypeFromFile(file);
       try {
-        const kind = mediaTypeFromFile(file);
         uploadProgress.startFile(file, index, kind === "image" ? "Bild wird vorbereitet" : "Upload startet");
         if (kind === "video" && file.size > VIDEO_MAX_BYTES) {
           throw new Error(`Datei zu groß (max ${MAX_VIDEO_UPLOAD_MB} MB).`);
@@ -261,16 +354,27 @@ export default function AdminMediaPage() {
       } catch (e) {
         failed++;
         uploadProgress.failFile();
-        toast.error(`${file.name}: ${formatUploadError(e, "Upload fehlgeschlagen.", {
+        const message = formatUploadError(e, "Upload fehlgeschlagen.", {
           appLimitMb: MAX_VIDEO_UPLOAD_MB,
           proxyLimitMb: PROXY_UPLOAD_LIMIT_MB,
-        })}`);
+        });
+        await logUploadClientFailure(e, file, {
+          endpoint: "/uploads/media",
+          mediaScope: "admin",
+          kind,
+          message,
+          phase: uploadProgress.progress?.phase,
+          appLimitMb: MAX_VIDEO_UPLOAD_MB,
+          proxyLimitMb: PROXY_UPLOAD_LIMIT_MB,
+        });
+        toast.error(`${file.name}: ${message}`);
       }
     }
     setUploading(false);
     uploadProgress.finish();
     toast.success(`${ok} Medium/Medien hochgeladen${originals ? `, ${originals} Originaldatei(en)` : ""}${failed ? `, ${failed} fehlgeschlagen` : ""}.`);
     load();
+    loadUploadEvents();
   };
 
   const auditScopes = async () => {
@@ -377,6 +481,7 @@ export default function AdminMediaPage() {
         </span>
       </div>
       <UploadProgressPanel progress={uploadProgress.progress} className="mt-4" />
+      <UploadEventsPanel events={uploadEvents} loading={loadingUploadEvents} onRefresh={loadUploadEvents} />
 
       {mediaAudit && (
         <div className="mt-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">

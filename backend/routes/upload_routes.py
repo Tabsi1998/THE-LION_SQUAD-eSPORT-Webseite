@@ -8,13 +8,16 @@ import os
 import uuid
 import pathlib
 import logging
+import time
+from datetime import timedelta
 from io import BytesIO
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
 from PIL import Image, ImageChops, ImageOps, UnidentifiedImageError
+from pydantic import BaseModel, Field
 from auth import require_admin, get_current_user
 from database import get_db
 from models import new_id, now_utc
-from services.rate_limit import enforce_rate_limit
+from services.rate_limit import enforce_rate_limit, get_client_ip
 from services.media_formats import (
     BROWSER_IMAGE_MIME_BY_EXT,
     CONVERTIBLE_ORIGINAL_IMAGE_EXTS,
@@ -114,11 +117,139 @@ ADMIN_UPLOAD_RATE_LIMIT = _int_from_env("ADMIN_UPLOAD_RATE_LIMIT", 240)
 ADMIN_UPLOAD_RATE_WINDOW_SECONDS = _int_from_env("ADMIN_UPLOAD_RATE_WINDOW_SECONDS", 600)
 USER_UPLOAD_RATE_LIMIT = _int_from_env("USER_UPLOAD_RATE_LIMIT", 30)
 USER_UPLOAD_RATE_WINDOW_SECONDS = _int_from_env("USER_UPLOAD_RATE_WINDOW_SECONDS", 3600)
+UPLOAD_EVENT_RETENTION_DAYS = _int_from_env("UPLOAD_EVENT_RETENTION_DAYS", 60)
 UPLOAD_STREAM_CHUNK_BYTES = 1024 * 1024
 VIDEO_SNIFF_BYTES = 4096
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
+
+
+class UploadClientFailurePayload(BaseModel):
+    endpoint: str = Field(default="/uploads/media", max_length=120)
+    media_scope: str = Field(default="admin", max_length=40)
+    filename: str | None = Field(default=None, max_length=260)
+    size: int | None = None
+    mime: str | None = Field(default=None, max_length=180)
+    kind: str | None = Field(default=None, max_length=40)
+    phase: str | None = Field(default=None, max_length=120)
+    status_code: int | None = None
+    message: str | None = Field(default=None, max_length=1200)
+
+
+def _clip_text(value, limit: int = 1000) -> str:
+    if value is None:
+        return ""
+    text = str(value)
+    return text if len(text) <= limit else f"{text[:limit - 1]}…"
+
+
+def _upload_declared_size(file: UploadFile | None) -> int | None:
+    size = getattr(file, "size", None)
+    try:
+        size = int(size)
+    except (TypeError, ValueError):
+        return None
+    return size if size >= 0 else None
+
+
+def _duration_ms(started_at: float) -> int:
+    return max(0, int((time.perf_counter() - started_at) * 1000))
+
+
+def _upload_result_summary(result) -> dict | None:
+    if not isinstance(result, dict):
+        return None
+    keys = (
+        "url",
+        "filename",
+        "media_type",
+        "media_scope",
+        "mime",
+        "size",
+        "original_url",
+        "original_filename",
+        "original_mime",
+        "original_file_size",
+        "converted_from",
+    )
+    summary = {key: result.get(key) for key in keys if result.get(key) is not None}
+    return summary or None
+
+
+async def _record_upload_event(
+    request: Request,
+    me: dict,
+    *,
+    endpoint: str,
+    media_scope: str,
+    filename: str | None,
+    size: int | None,
+    mime: str | None,
+    kind: str,
+    status: str,
+    status_code: int | None = None,
+    detail=None,
+    duration_ms: int | None = None,
+    result=None,
+    extra: dict | None = None,
+) -> None:
+    try:
+        created_at = now_utc()
+        row = {
+            "id": new_id(),
+            "created_at": created_at.isoformat(),
+            "expires_at": created_at + timedelta(days=UPLOAD_EVENT_RETENTION_DAYS),
+            "endpoint": _clip_text(endpoint, 120),
+            "media_scope": _clip_text(media_scope or "user", 40),
+            "filename": _clip_text(filename or "upload", 260),
+            "size": size,
+            "mime": _clip_text(mime or "", 180),
+            "kind": _clip_text(kind or "unknown", 40),
+            "status": _clip_text(status, 40),
+            "status_code": status_code,
+            "detail": _clip_text(detail, 1200),
+            "duration_ms": duration_ms,
+            "result": _upload_result_summary(result),
+            "owner_id": me.get("id"),
+            "owner_role": me.get("role"),
+            "ip": get_client_ip(request),
+            "user_agent": _clip_text(request.headers.get("user-agent", ""), 240),
+        }
+        if extra:
+            row["extra"] = {str(key): _clip_text(value, 240) for key, value in extra.items() if value is not None}
+        await get_db().upload_events.insert_one(row)
+    except Exception as exc:  # pragma: no cover - logging must never break uploads
+        logger.warning("[uploads] upload event write failed: %s", exc)
+
+
+async def _record_upload_exception(
+    request: Request,
+    me: dict,
+    file: UploadFile | None,
+    *,
+    endpoint: str,
+    media_scope: str,
+    kind: str,
+    started_at: float,
+    exc: Exception,
+) -> None:
+    status_code = exc.status_code if isinstance(exc, HTTPException) else 500
+    detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
+    await _record_upload_event(
+        request,
+        me,
+        endpoint=endpoint,
+        media_scope=media_scope,
+        filename=getattr(file, "filename", None),
+        size=_upload_declared_size(file),
+        mime=getattr(file, "content_type", None),
+        kind=kind,
+        status="failed",
+        status_code=status_code,
+        detail=detail,
+        duration_ms=_duration_ms(started_at),
+    )
 
 
 async def _read_upload_limited(file: UploadFile, max_bytes: int, max_mb: int) -> bytes:
@@ -638,8 +769,33 @@ async def upload_image(
     trim_empty_borders: bool = False,
     media_scope: str = "user",
 ):
-    await _enforce_upload_rate_limit(request, me, "image", media_scope)
-    return await _upload_image_impl(file, me, trim_empty_borders, media_scope)
+    started_at = time.perf_counter()
+    scope_for_log = media_scope or "user"
+    try:
+        scope_for_log = _clean_media_scope(media_scope, me)
+        await _enforce_upload_rate_limit(request, me, "image", scope_for_log)
+        result = await _upload_image_impl(file, me, trim_empty_borders, scope_for_log)
+    except HTTPException as exc:
+        await _record_upload_exception(request, me, file, endpoint="/uploads/image", media_scope=scope_for_log, kind="image", started_at=started_at, exc=exc)
+        raise
+    except Exception as exc:
+        await _record_upload_exception(request, me, file, endpoint="/uploads/image", media_scope=scope_for_log, kind="image", started_at=started_at, exc=exc)
+        raise
+    await _record_upload_event(
+        request,
+        me,
+        endpoint="/uploads/image",
+        media_scope=scope_for_log,
+        filename=file.filename,
+        size=result.get("original_size") or result.get("size") or _upload_declared_size(file),
+        mime=file.content_type,
+        kind="image",
+        status="success",
+        status_code=200,
+        duration_ms=_duration_ms(started_at),
+        result=result,
+    )
+    return result
 
 
 @router.post("/media")
@@ -649,18 +805,44 @@ async def upload_media(
     me: dict = Depends(get_current_user),
     media_scope: str = "user",
 ):
-    media_scope = _clean_media_scope(media_scope, me)
-    await _enforce_upload_rate_limit(request, me, "media", media_scope)
-    kind = _upload_kind_for_file(file)
-    if kind == "image":
-        return await _upload_image_impl(file, me, media_scope=media_scope)
-    if kind == "video":
-        if not _is_admin_media_user(me):
-            raise HTTPException(status_code=403, detail="Video-Uploads sind nur im Admin-/CMS-Bereich erlaubt.")
-        return await _upload_video_impl(file, me, media_scope=media_scope)
-    if kind == "file":
-        return await _upload_original_file_impl(file, me, media_scope=media_scope)
-    raise HTTPException(status_code=400, detail=f"Nur PNG/JPG/WebP, {SUPPORTED_VIDEO_LABEL} oder Originaldateien ({ORIGINAL_MEDIA_LABEL}) erlaubt.")
+    started_at = time.perf_counter()
+    scope_for_log = media_scope or "user"
+    kind = "unknown"
+    try:
+        scope_for_log = _clean_media_scope(media_scope, me)
+        await _enforce_upload_rate_limit(request, me, "media", scope_for_log)
+        kind = _upload_kind_for_file(file)
+        if kind == "image":
+            result = await _upload_image_impl(file, me, media_scope=scope_for_log)
+        elif kind == "video":
+            if not _is_admin_media_user(me):
+                raise HTTPException(status_code=403, detail="Video-Uploads sind nur im Admin-/CMS-Bereich erlaubt.")
+            result = await _upload_video_impl(file, me, media_scope=scope_for_log)
+        elif kind == "file":
+            result = await _upload_original_file_impl(file, me, media_scope=scope_for_log)
+        else:
+            raise HTTPException(status_code=400, detail=f"Nur PNG/JPG/WebP, {SUPPORTED_VIDEO_LABEL} oder Originaldateien ({ORIGINAL_MEDIA_LABEL}) erlaubt.")
+    except HTTPException as exc:
+        await _record_upload_exception(request, me, file, endpoint="/uploads/media", media_scope=scope_for_log, kind=kind, started_at=started_at, exc=exc)
+        raise
+    except Exception as exc:
+        await _record_upload_exception(request, me, file, endpoint="/uploads/media", media_scope=scope_for_log, kind=kind, started_at=started_at, exc=exc)
+        raise
+    await _record_upload_event(
+        request,
+        me,
+        endpoint="/uploads/media",
+        media_scope=scope_for_log,
+        filename=file.filename,
+        size=result.get("original_size") or result.get("size") or _upload_declared_size(file),
+        mime=file.content_type,
+        kind=kind,
+        status="success",
+        status_code=200,
+        duration_ms=_duration_ms(started_at),
+        result=result,
+    )
+    return result
 
 
 @router.post("/video")
@@ -670,22 +852,141 @@ async def upload_video(
     me: dict = Depends(require_admin()),
     media_scope: str = "gallery",
 ):
-    await _enforce_upload_rate_limit(request, me, "video", media_scope)
-    return await _upload_video_impl(file, me, media_scope)
+    started_at = time.perf_counter()
+    scope_for_log = media_scope or "gallery"
+    try:
+        scope_for_log = _clean_media_scope(media_scope, me)
+        await _enforce_upload_rate_limit(request, me, "video", scope_for_log)
+        result = await _upload_video_impl(file, me, scope_for_log)
+    except HTTPException as exc:
+        await _record_upload_exception(request, me, file, endpoint="/uploads/video", media_scope=scope_for_log, kind="video", started_at=started_at, exc=exc)
+        raise
+    except Exception as exc:
+        await _record_upload_exception(request, me, file, endpoint="/uploads/video", media_scope=scope_for_log, kind="video", started_at=started_at, exc=exc)
+        raise
+    await _record_upload_event(
+        request,
+        me,
+        endpoint="/uploads/video",
+        media_scope=scope_for_log,
+        filename=file.filename,
+        size=result.get("size") or _upload_declared_size(file),
+        mime=file.content_type,
+        kind="video",
+        status="success",
+        status_code=200,
+        duration_ms=_duration_ms(started_at),
+        result=result,
+    )
+    return result
+
+
+@router.get("/events")
+async def list_upload_events(
+    limit: int = 80,
+    status: str | None = None,
+    media_scope: str | None = None,
+    kind: str | None = None,
+    me: dict = Depends(get_current_user),
+):
+    if not _is_admin_media_user(me):
+        raise HTTPException(status_code=403, detail="Upload-Protokoll nur für Admin/CMS-Rollen.")
+    limit = max(1, min(int(limit or 80), 200))
+    query = {}
+    if status:
+        query["status"] = status
+    if media_scope:
+        query["media_scope"] = media_scope
+    if kind:
+        query["kind"] = kind
+    rows = await get_db().upload_events.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    return rows
+
+
+@router.post("/client-failure")
+async def record_upload_client_failure(
+    request: Request,
+    payload: UploadClientFailurePayload,
+    me: dict = Depends(get_current_user),
+):
+    if not _is_admin_media_user(me):
+        raise HTTPException(status_code=403, detail="Upload-Protokoll nur für Admin/CMS-Rollen.")
+    media_scope = _clean_media_scope(payload.media_scope, me)
+    await _record_upload_event(
+        request,
+        me,
+        endpoint=payload.endpoint,
+        media_scope=media_scope,
+        filename=payload.filename,
+        size=payload.size,
+        mime=payload.mime,
+        kind=payload.kind or "unknown",
+        status="client_failed",
+        status_code=payload.status_code,
+        detail=payload.message,
+        extra={"phase": payload.phase},
+    )
+    return {"ok": True}
 
 
 @router.post("/sponsor-logo")
 async def upload_sponsor_logo(request: Request, file: UploadFile = File(...), me: dict = Depends(require_admin())):
     """Admin-only convenience alias for sponsor logos."""
-    await _enforce_upload_rate_limit(request, me, "image", "sponsor")
-    return await _upload_image_impl(file, me, trim_empty_borders=True, media_scope="sponsor")
+    started_at = time.perf_counter()
+    try:
+        await _enforce_upload_rate_limit(request, me, "image", "sponsor")
+        result = await _upload_image_impl(file, me, trim_empty_borders=True, media_scope="sponsor")
+    except HTTPException as exc:
+        await _record_upload_exception(request, me, file, endpoint="/uploads/sponsor-logo", media_scope="sponsor", kind="image", started_at=started_at, exc=exc)
+        raise
+    except Exception as exc:
+        await _record_upload_exception(request, me, file, endpoint="/uploads/sponsor-logo", media_scope="sponsor", kind="image", started_at=started_at, exc=exc)
+        raise
+    await _record_upload_event(
+        request,
+        me,
+        endpoint="/uploads/sponsor-logo",
+        media_scope="sponsor",
+        filename=file.filename,
+        size=result.get("original_size") or result.get("size") or _upload_declared_size(file),
+        mime=file.content_type,
+        kind="image",
+        status="success",
+        status_code=200,
+        duration_ms=_duration_ms(started_at),
+        result=result,
+    )
+    return result
 
 
 @router.post("/logo")
 async def upload_logo(request: Request, file: UploadFile = File(...), me: dict = Depends(require_admin())):
     """Admin-only logo upload with automatic whitespace trimming."""
-    await _enforce_upload_rate_limit(request, me, "image", "branding")
-    return await _upload_image_impl(file, me, trim_empty_borders=True, media_scope="branding")
+    started_at = time.perf_counter()
+    try:
+        await _enforce_upload_rate_limit(request, me, "image", "branding")
+        result = await _upload_image_impl(file, me, trim_empty_borders=True, media_scope="branding")
+    except HTTPException as exc:
+        await _record_upload_exception(request, me, file, endpoint="/uploads/logo", media_scope="branding", kind="image", started_at=started_at, exc=exc)
+        raise
+    except Exception as exc:
+        await _record_upload_exception(request, me, file, endpoint="/uploads/logo", media_scope="branding", kind="image", started_at=started_at, exc=exc)
+        raise
+    await _record_upload_event(
+        request,
+        me,
+        endpoint="/uploads/logo",
+        media_scope="branding",
+        filename=file.filename,
+        size=result.get("original_size") or result.get("size") or _upload_declared_size(file),
+        mime=file.content_type,
+        kind="image",
+        status="success",
+        status_code=200,
+        duration_ms=_duration_ms(started_at),
+        result=result,
+    )
+    return result
 
 
 @router.post("/migrate-external-images")
@@ -750,39 +1051,47 @@ _EXT_BY_MIME = {
 async def upload_document(request: Request, file: UploadFile = File(...), me: dict = Depends(require_admin())):
     """Upload an arbitrary document (PDF, DOCX, XLSX, ZIP, ...).
     Stores it outside the public static tree and returns a storage key."""
-    await enforce_rate_limit(request, "uploads:document:user", limit=20, window_seconds=3600, subject=me["id"])
-    if file.content_type not in ALLOWED_DOC:
-        raise HTTPException(status_code=400, detail=f"Dateityp nicht erlaubt: {file.content_type}")
-    data = await _read_upload_limited(file, MAX_DOC_BYTES, MAX_DOCUMENT_UPLOAD_MB)
-    if file.content_type == "application/pdf" and not data.startswith(b"%PDF-"):
-        raise HTTPException(status_code=400, detail="Dateiinhalt ist kein gültiges PDF")
-    if file.content_type in {
-        "application/zip",
-        "application/x-zip-compressed",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    } and not data.startswith(b"PK"):
-        raise HTTPException(status_code=400, detail="Dateiinhalt passt nicht zum angegebenen Dateityp")
-    if file.content_type in {"image/png", "image/jpeg"}:
-        try:
-            with Image.open(BytesIO(data)) as img:
-                img.verify()
-        except UnidentifiedImageError:
-            raise HTTPException(status_code=400, detail="Ungültige Bilddatei")
-    # Extension by mime, fallback to original name extension
-    ext = _EXT_BY_MIME.get(file.content_type)
-    if not ext and file.filename:
-        ext = pathlib.Path(file.filename).suffix.lower()
-    filename = f"{uuid.uuid4().hex}{ext or ''}"
-    path = PRIVATE_DOC_DIR / filename
+    started_at = time.perf_counter()
     try:
-        PRIVATE_DOC_DIR.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
-    except OSError as exc:
-        logger.error("[uploads] failed to write document %s: %s", path, exc)
-        raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR prüfen.")
-    return {
+        await enforce_rate_limit(request, "uploads:document:user", limit=20, window_seconds=3600, subject=me["id"])
+        if file.content_type not in ALLOWED_DOC:
+            raise HTTPException(status_code=400, detail=f"Dateityp nicht erlaubt: {file.content_type}")
+        data = await _read_upload_limited(file, MAX_DOC_BYTES, MAX_DOCUMENT_UPLOAD_MB)
+        if file.content_type == "application/pdf" and not data.startswith(b"%PDF-"):
+            raise HTTPException(status_code=400, detail="Dateiinhalt ist kein gültiges PDF")
+        if file.content_type in {
+            "application/zip",
+            "application/x-zip-compressed",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        } and not data.startswith(b"PK"):
+            raise HTTPException(status_code=400, detail="Dateiinhalt passt nicht zum angegebenen Dateityp")
+        if file.content_type in {"image/png", "image/jpeg"}:
+            try:
+                with Image.open(BytesIO(data)) as img:
+                    img.verify()
+            except UnidentifiedImageError:
+                raise HTTPException(status_code=400, detail="Ungültige Bilddatei")
+        # Extension by mime, fallback to original name extension
+        ext = _EXT_BY_MIME.get(file.content_type)
+        if not ext and file.filename:
+            ext = pathlib.Path(file.filename).suffix.lower()
+        filename = f"{uuid.uuid4().hex}{ext or ''}"
+        path = PRIVATE_DOC_DIR / filename
+        try:
+            PRIVATE_DOC_DIR.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        except OSError as exc:
+            logger.error("[uploads] failed to write document %s: %s", path, exc)
+            raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR prüfen.")
+    except HTTPException as exc:
+        await _record_upload_exception(request, me, file, endpoint="/uploads/document", media_scope="documents", kind="document", started_at=started_at, exc=exc)
+        raise
+    except Exception as exc:
+        await _record_upload_exception(request, me, file, endpoint="/uploads/document", media_scope="documents", kind="document", started_at=started_at, exc=exc)
+        raise
+    result = {
         "url": "",
         "storage_key": filename,
         "filename": filename,
@@ -790,3 +1099,18 @@ async def upload_document(request: Request, file: UploadFile = File(...), me: di
         "size": len(data),
         "mime": file.content_type,
     }
+    await _record_upload_event(
+        request,
+        me,
+        endpoint="/uploads/document",
+        media_scope="documents",
+        filename=file.filename,
+        size=len(data),
+        mime=file.content_type,
+        kind="document",
+        status="success",
+        status_code=200,
+        duration_ms=_duration_ms(started_at),
+        result=result,
+    )
+    return result

@@ -16,6 +16,7 @@ import {
   mediaTypeFromFile,
   providerLabel,
 } from "@/lib/galleryMedia";
+import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
 import { toast } from "sonner";
 import { Plus, Save, X, Trash2, Image as ImageIcon, ArrowLeft, Upload, Link as LinkIcon, Play, Film, Layers, Pencil } from "lucide-react";
 
@@ -326,8 +327,8 @@ function AlbumPhotos({ album, events, onBack }) {
     setUploading(true);
     let ok = 0, fail = 0, originals = 0;
     for (const [index, file] of picked.entries()) {
+      let kind = mediaTypeFromFile(file);
       try {
-        const kind = mediaTypeFromFile(file);
         uploadProgress.startFile(file, index, kind === "image" ? "Bild wird vorbereitet" : "Upload startet");
         if (kind === "video" && file.size > VIDEO_MAX_BYTES) {
           throw new Error(`Datei zu groß (max ${MAX_VIDEO_UPLOAD_MB} MB).`);
@@ -383,10 +384,20 @@ function AlbumPhotos({ album, events, onBack }) {
       } catch (err) {
         fail++;
         uploadProgress.failFile();
-        toast.error(`${file.name}: ${formatUploadError(err, "Upload fehlgeschlagen.", {
+        const message = formatUploadError(err, "Upload fehlgeschlagen.", {
           appLimitMb: MAX_VIDEO_UPLOAD_MB,
           proxyLimitMb: PROXY_UPLOAD_LIMIT_MB,
-        })}`);
+        });
+        await logUploadClientFailure(err, file, {
+          endpoint: "/uploads/media",
+          mediaScope: "gallery",
+          kind,
+          message,
+          phase: uploadProgress.progress?.phase,
+          appLimitMb: MAX_VIDEO_UPLOAD_MB,
+          proxyLimitMb: PROXY_UPLOAD_LIMIT_MB,
+        });
+        toast.error(`${file.name}: ${message}`);
       }
     }
     setUploading(false);
