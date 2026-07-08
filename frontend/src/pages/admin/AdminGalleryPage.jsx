@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, formatApiError, formatRequestError, formatUploadError, resolveMediaUrl } from "@/lib/api";
+import { api, formatApiError, formatRequestError, formatUploadError, resolveMediaUrl, uploadApi } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload, prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -337,7 +337,7 @@ function AlbumPhotos({ album, events, onBack }) {
         const fd = new FormData();
         fd.append("file", uploadFile);
         uploadProgress.beginTransfer(uploadFile.size);
-        const { data } = await api.post("/uploads/media?media_scope=gallery", fd, {
+        const { data } = await uploadApi.post("/uploads/media?media_scope=gallery", fd, {
           onUploadProgress: uploadProgress.updateUpload,
         });
         if (data.media_type === "file") {

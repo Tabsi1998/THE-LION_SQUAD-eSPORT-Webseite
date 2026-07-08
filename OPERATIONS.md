@@ -93,12 +93,29 @@ ADMIN_UPLOAD_RATE_LIMIT=240
 ADMIN_UPLOAD_RATE_WINDOW_SECONDS=600
 USER_UPLOAD_RATE_LIMIT=30
 USER_UPLOAD_RATE_WINDOW_SECONDS=3600
+PUBLIC_UPLOAD_BACKEND_URL=https://upload.lionsquad.at
 ```
 
 Reverse Proxy:
 
 - Body size mindestens 1700 MB, wenn direkte Galerie-Video-Uploads genutzt werden
 - keine aggressive Bild-/HTML-Cache-Regel auf `/api/uploads/*`
+- Wenn Cloudflare vor `lionsquad.at` aktiv ist, grosse Uploads ueber eine DNS-only
+  Subdomain fuehren, z. B. `upload.lionsquad.at`.
+- `upload.lionsquad.at` im Nginx Proxy Manager auf denselben Upstream wie die Hauptseite
+  zeigen lassen und dieselben Upload-Werte setzen:
+
+```nginx
+client_max_body_size 2048m;
+client_body_timeout 3600s;
+proxy_connect_timeout 300s;
+proxy_send_timeout 3600s;
+proxy_read_timeout 3600s;
+send_timeout 3600s;
+proxy_request_buffering off;
+proxy_buffering off;
+proxy_max_temp_file_size 0;
+```
 
 ## SEO, Crawler und Search Console
 

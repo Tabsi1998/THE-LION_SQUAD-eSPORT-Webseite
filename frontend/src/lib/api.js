@@ -2,10 +2,13 @@ import axios from "axios";
 import { emitApiInvalidation } from "./apiInvalidation";
 
 const configuredBackendUrl = (process.env.REACT_APP_BACKEND_URL || "").trim().replace(/\/+$/, "");
+const configuredUploadBackendUrl = (process.env.REACT_APP_UPLOAD_BACKEND_URL || "").trim().replace(/\/+$/, "");
 
 export const API_BASE =
   configuredBackendUrl || (typeof window !== "undefined" ? window.location.origin : "");
 export const API = `${API_BASE}/api`;
+export const UPLOAD_API_BASE = configuredUploadBackendUrl || API_BASE;
+export const UPLOAD_API = `${UPLOAD_API_BASE}/api`;
 
 function normalizeUploadPath(pathname) {
   const normalized = String(pathname || "").replace(/^\/+/, "");
@@ -82,62 +85,77 @@ export const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+export const uploadApi = axios.create({
+  baseURL: UPLOAD_API,
+  withCredentials: true,
+  headers: { "Content-Type": "application/json" },
+});
+
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
-api.interceptors.request.use((config) => {
-  const method = (config.method || "get").toUpperCase();
-  const headers = ensureHeaders(config);
-  if (config.data instanceof FormData) {
-    deleteHeader(headers, "Content-Type");
-    deleteHeader(headers, "content-type");
-  }
-  if (method === "GET") {
-    setHeader(headers, "Cache-Control", "no-cache");
-    setHeader(headers, "Pragma", "no-cache");
-  }
-  if (UNSAFE_METHODS.has(method)) {
-    applyCsrfHeader(config);
-  }
-  return config;
-});
+function attachRequestInterceptors(client) {
+  client.interceptors.request.use((config) => {
+    const method = (config.method || "get").toUpperCase();
+    const headers = ensureHeaders(config);
+    if (config.data instanceof FormData) {
+      deleteHeader(headers, "Content-Type");
+      deleteHeader(headers, "content-type");
+    }
+    if (method === "GET") {
+      setHeader(headers, "Cache-Control", "no-cache");
+      setHeader(headers, "Pragma", "no-cache");
+    }
+    if (UNSAFE_METHODS.has(method)) {
+      applyCsrfHeader(config);
+    }
+    return config;
+  });
+}
 
 let refreshPromise = null;
 
-api.interceptors.response.use(
-  (response) => {
-    const method = (response.config?.method || "get").toUpperCase();
-    if (UNSAFE_METHODS.has(method) && response.status < 400) {
-      emitApiInvalidation({
-        source: "client",
-        method,
-        path: response.config?.url || "",
-        status: response.status,
-      });
+function attachResponseInterceptors(client) {
+  client.interceptors.response.use(
+    (response) => {
+      const method = (response.config?.method || "get").toUpperCase();
+      if (UNSAFE_METHODS.has(method) && response.status < 400) {
+        emitApiInvalidation({
+          source: "client",
+          method,
+          path: response.config?.url || "",
+          status: response.status,
+        });
+      }
+      return response;
+    },
+    async (error) => {
+      const original = error.config;
+      const url = original?.url || "";
+      const authRequest = url.includes("/auth/login") || url.includes("/auth/register") || url.includes("/auth/refresh");
+      const detail = formatApiError(error.response?.data?.detail);
+      const csrfError = error.response?.status === 403 && /csrf token missing or invalid/i.test(detail);
+      if (error.response?.status === 401 && original && !original._retry && !authRequest) {
+        original._retry = true;
+        refreshPromise = refreshPromise || api.post("/auth/refresh").finally(() => { refreshPromise = null; });
+        await refreshPromise;
+        return client(original);
+      }
+      if (csrfError && original && !original._csrfRetry && !authRequest) {
+        original._csrfRetry = true;
+        refreshPromise = refreshPromise || api.post("/auth/refresh").finally(() => { refreshPromise = null; });
+        await refreshPromise;
+        applyCsrfHeader(original);
+        return client(original);
+      }
+      return Promise.reject(error);
     }
-    return response;
-  },
-  async (error) => {
-    const original = error.config;
-    const url = original?.url || "";
-    const authRequest = url.includes("/auth/login") || url.includes("/auth/register") || url.includes("/auth/refresh");
-    const detail = formatApiError(error.response?.data?.detail);
-    const csrfError = error.response?.status === 403 && /csrf token missing or invalid/i.test(detail);
-    if (error.response?.status === 401 && original && !original._retry && !authRequest) {
-      original._retry = true;
-      refreshPromise = refreshPromise || api.post("/auth/refresh").finally(() => { refreshPromise = null; });
-      await refreshPromise;
-      return api(original);
-    }
-    if (csrfError && original && !original._csrfRetry && !authRequest) {
-      original._csrfRetry = true;
-      refreshPromise = refreshPromise || api.post("/auth/refresh").finally(() => { refreshPromise = null; });
-      await refreshPromise;
-      applyCsrfHeader(original);
-      return api(original);
-    }
-    return Promise.reject(error);
-  }
-);
+  );
+}
+
+attachRequestInterceptors(api);
+attachResponseInterceptors(api);
+attachRequestInterceptors(uploadApi);
+attachResponseInterceptors(uploadApi);
 
 export function formatApiError(detail) {
   if (detail == null) return "Ein Fehler ist aufgetreten.";

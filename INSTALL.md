@@ -37,6 +37,7 @@ Set:
 - `JWT_SECRET` — `python3 -c "import secrets; print(secrets.token_hex(32))"`
 - `ADMIN_PASSWORD` — strong password
 - `FRONTEND_URL`, `CORS_ORIGINS`, `PUBLIC_BACKEND_URL` — your public URLs
+- `PUBLIC_UPLOAD_BACKEND_URL` — optional DNS-only upload URL for large media behind Cloudflare
 - optional `PUBLIC_BASE_URL` — public website URL for generated links and Discord webhook media
 - `SEED_DEMO=false` (production)
 

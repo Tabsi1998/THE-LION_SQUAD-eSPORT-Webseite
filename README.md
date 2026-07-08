@@ -87,6 +87,7 @@ Hinter einem Reverse Proxy sollte die Webseite ueber `https://lionsquad.at` lauf
 APP_ENV=production
 FRONTEND_URL=https://lionsquad.at
 PUBLIC_BACKEND_URL=https://lionsquad.at
+PUBLIC_UPLOAD_BACKEND_URL=https://upload.lionsquad.at
 CORS_ORIGINS=https://lionsquad.at,https://www.lionsquad.at
 
 DB_NAME=tls_arena
@@ -112,6 +113,11 @@ AUTH_COOKIE_DOMAIN=.lionsquad.at
 Wenn die Seite sowohl unter `lionsquad.at` als auch unter `www.lionsquad.at` erreichbar ist,
 setze `AUTH_COOKIE_DOMAIN=.lionsquad.at` und nimm beide Origins in `CORS_ORIGINS` auf. Sonst
 kann ein Login auf einer Host-Variante fuer die andere Host-Variante unsichtbar sein.
+
+`PUBLIC_UPLOAD_BACKEND_URL` ist optional, aber fuer grosse Galerie-Videos hinter Cloudflare
+empfohlen. Lege dafuer z. B. `upload.lionsquad.at` als DNS-only Record an und leite ihn im
+Reverse Proxy auf dieselbe App wie `lionsquad.at`. Die normale Website kann weiter ueber
+Cloudflare laufen, Medienuploads gehen dann an die Upload-Domain.
 
 `JWT_SECRET` und `ADMIN_PASSWORD` muessen in Produktion gesetzt sein. Docker Compose bricht
 sonst bewusst ab.
