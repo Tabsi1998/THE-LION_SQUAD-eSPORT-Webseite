@@ -232,7 +232,7 @@ export default function AdminDashboardPage() {
         <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="font-heading font-bold uppercase text-lg flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Letzte Adminaktionen</h2>
-            <Link to="/admin/audit" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Logs</Link>
+            <Link to="/admin/logs" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Logs</Link>
           </div>
           <div className="space-y-2 text-sm">
             {(data?.recent_audit_logs || []).slice(0, 8).map((l, i) => (

@@ -8,7 +8,7 @@ import {
   ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon,
   Award, Inbox, UserCheck, Medal,
   FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing,
-  Search, Server, QrCode,
+  Search, Server, QrCode, Activity,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -70,6 +70,7 @@ const ADMIN_GROUPS = [
     label: "System",
     items: [
       { to: "/admin/downloads", label: "Downloads & QR", icon: QrCode },
+      { to: "/admin/logs", label: "Logs", icon: Activity },
       { to: "/admin/audit", label: "Audit Logs", icon: ShieldCheck },
       { to: "/admin/mobile-logs", label: "App-Logs", icon: Bug },
       { to: "/admin/mobile-push", label: "Push-Tests", icon: BellRing },
@@ -107,6 +108,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/references": ["erfolge", "platzierungen", "results"],
   "/admin/contact": ["kontakt", "inbox", "nachrichten"],
   "/admin/downloads": ["downloads", "qr", "pdf", "stationen", "turnier qr", "fastlap qr", "embed", "anzeigen"],
+  "/admin/logs": ["logs", "monitoring", "upload", "mail", "app", "audit", "diagnose"],
   "/admin/audit": ["logs", "aktionen", "sicherheit"],
   "/admin/mobile-logs": ["app", "fehler", "client"],
   "/admin/mobile-push": ["push", "notifications", "app"],

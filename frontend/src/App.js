@@ -75,6 +75,7 @@ const AdminEventsPage = lazy(() => import("@/pages/admin/AdminEventsPage"));
 const AdminNewsPage = lazy(() => import("@/pages/admin/AdminNewsPage"));
 const AdminSettingsPage = lazy(() => import("@/pages/admin/AdminSettingsPage"));
 const AdminSeasonsPage = lazy(() => import("@/pages/admin/AdminSeasonsPage"));
+const AdminLogsPage = lazy(() => import("@/pages/admin/AdminLogsPage"));
 const AdminAuditPage = lazy(() => import("@/pages/admin/AdminAuditPage"));
 const AdminMobileLogsPage = lazy(() => import("@/pages/admin/AdminMobileLogsPage"));
 const AdminMobilePushPage = lazy(() => import("@/pages/admin/AdminMobilePushPage"));
@@ -221,6 +222,7 @@ function App() {
           <Route path="/admin/documents" element={<ProtectedRoute requireAdmin><AdminDocumentsPage /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requireAdmin><AdminSettingsPage /></ProtectedRoute>} />
           <Route path="/admin/seasons" element={<ProtectedRoute requireAdmin><AdminSeasonsPage /></ProtectedRoute>} />
+          <Route path="/admin/logs" element={<ProtectedRoute requireAdmin><AdminLogsPage /></ProtectedRoute>} />
           <Route path="/admin/audit" element={<ProtectedRoute requireAdmin><AdminAuditPage /></ProtectedRoute>} />
           <Route path="/admin/mobile-logs" element={<ProtectedRoute requireAdmin><AdminMobileLogsPage /></ProtectedRoute>} />
           <Route path="/admin/mobile-push" element={<ProtectedRoute requireAdmin><AdminMobilePushPage /></ProtectedRoute>} />

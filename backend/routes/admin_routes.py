@@ -2,6 +2,7 @@
 import os
 import pathlib
 import logging
+import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from database import get_db
@@ -27,6 +28,66 @@ class MobilePushTestCreate(BaseModel):
 def _token_preview(token: str | None) -> str:
     value = str(token or "")
     return f"{value[:24]}..." if len(value) > 24 else value
+
+
+def _safe_log_limit(limit: int | None, default: int = 80) -> int:
+    try:
+        value = int(limit or default)
+    except (TypeError, ValueError):
+        value = default
+    return max(1, min(value, 200))
+
+
+def _clip_log_text(value, limit: int = 900) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        try:
+            value = json.dumps(value, ensure_ascii=False, default=str)
+        except TypeError:
+            value = str(value)
+    text = str(value)
+    return text if len(text) <= limit else f"{text[:limit - 1]}…"
+
+
+def _log_time(row: dict, *keys: str) -> str:
+    for key in keys:
+        value = row.get(key)
+        if not value:
+            continue
+        if hasattr(value, "isoformat"):
+            return value.isoformat()
+        return str(value)
+    return ""
+
+
+def _log_item(source: str, label: str, href: str, row: dict, *, severity: str, title: str, subtitle: str = "", detail="", status: str = "", time_keys=("created_at",)) -> dict:
+    return {
+        "id": row.get("id") or f"{source}:{_log_time(row, *time_keys)}:{title}",
+        "source": source,
+        "source_label": label,
+        "href": href,
+        "severity": severity,
+        "status": status,
+        "time": _log_time(row, *time_keys),
+        "title": _clip_log_text(title, 180),
+        "subtitle": _clip_log_text(subtitle, 260),
+        "detail": _clip_log_text(detail, 1200),
+    }
+
+
+def _source_summary(key: str, label: str, href: str, *, total: int, problem_count: int, items: list[dict], tone: str = "info") -> dict:
+    latest_at = max((item.get("time") or "" for item in items), default="")
+    return {
+        "key": key,
+        "label": label,
+        "href": href,
+        "total": total,
+        "problem_count": problem_count,
+        "latest_at": latest_at,
+        "tone": tone,
+        "items": items,
+    }
 
 
 @router.get("/dashboard")
@@ -114,6 +175,163 @@ async def mobile_client_logs(
             {"display_name": {"$regex": search, "$options": "i"}},
         ]
     return await db.mobile_client_logs.find(query, {"_id": 0}).sort([("priority_rank", 1), ("received_at", -1)]).to_list(limit)
+
+
+@router.get("/logs")
+async def admin_logs_overview(limit: int = Query(default=80, ge=1, le=200), me: dict = Depends(require_admin())):
+    db = get_db()
+    safe_limit = _safe_log_limit(limit)
+
+    upload_rows = await db.upload_events.find({}, {"_id": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    upload_items = [
+        _log_item(
+            "uploads",
+            "Uploads",
+            "/admin/media",
+            row,
+            severity="success" if row.get("status") == "success" else "warn" if row.get("status") == "client_failed" else "error",
+            status=row.get("status") or "",
+            title=row.get("filename") or "Upload",
+            subtitle=" · ".join(filter(None, [row.get("kind"), row.get("media_scope"), row.get("mime")])),
+            detail=row.get("detail") or (row.get("result") or {}).get("url") or "",
+            time_keys=("created_at",),
+        )
+        for row in upload_rows
+    ]
+
+    client_rows = await db.mobile_client_logs.find({}, {"_id": 0}).sort([("priority_rank", 1), ("received_at", -1)]).limit(safe_limit).to_list(safe_limit)
+    client_items = []
+    for row in client_rows:
+        level = row.get("level") or "info"
+        severity = "error" if level in {"fatal", "error"} else "warn" if level == "warn" else "info"
+        client_items.append(_log_item(
+            "client",
+            "App-/Client-Logs",
+            "/admin/mobile-logs",
+            row,
+            severity=severity,
+            status=row.get("status") or level,
+            title=row.get("message") or row.get("error_name") or "Client-Log",
+            subtitle=" · ".join(filter(None, [row.get("source"), row.get("screen"), row.get("display_name") or row.get("username"), row.get("platform")])),
+            detail=row.get("stack") or row.get("context") or "",
+            time_keys=("received_at", "created_at"),
+        ))
+
+    audit_rows = await db.audit_logs.find({}, {"_id": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    audit_items = [
+        _log_item(
+            "audit",
+            "Audit",
+            "/admin/audit",
+            row,
+            severity="info",
+            status="audit",
+            title=row.get("action") or "Admin-Aktion",
+            subtitle=" · ".join(filter(None, [row.get("actor_username") or row.get("actor_id"), row.get("target_id")])),
+            detail=row.get("data") or "",
+            time_keys=("created_at",),
+        )
+        for row in audit_rows
+    ]
+
+    email_rows = await db.email_logs.find({}, {"_id": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    email_items = []
+    for row in email_rows:
+        status = row.get("status") or ""
+        severity = "success" if status == "sent" else "error" if status == "failed" else "warn" if status == "skipped" else "info"
+        channel = row.get("channel") or "email"
+        email_items.append(_log_item(
+            "email",
+            "Mail/Discord",
+            "/admin/settings?tab=logs",
+            row,
+            severity=severity,
+            status=status,
+            title=row.get("template_key") or row.get("event_key") or row.get("subject") or "Versand",
+            subtitle=" · ".join(filter(None, [channel, row.get("to")])),
+            detail=row.get("error") or row.get("message_id") or "",
+            time_keys=("created_at",),
+        ))
+
+    queue_rows = await db.mail_jobs.find({}, {"_id": 0, "html": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    queue_items = []
+    for row in queue_rows:
+        status = row.get("status") or ""
+        severity = "success" if status == "sent" else "error" if status == "failed" else "warn" if status == "skipped" else "info"
+        queue_items.append(_log_item(
+            "mail_queue",
+            "Mail-Queue",
+            "/admin/settings?tab=queue",
+            row,
+            severity=severity,
+            status=status,
+            title=row.get("template_key") or row.get("subject") or "Mail-Job",
+            subtitle=" · ".join(filter(None, [row.get("to"), f"{row.get('attempts', 0)} Versuch(e)"])),
+            detail=row.get("last_error") or row.get("next_attempt_at") or row.get("message_id") or "",
+            time_keys=("updated_at", "created_at"),
+        ))
+
+    sources = [
+        _source_summary(
+            "uploads",
+            "Uploads",
+            "/admin/media",
+            total=await db.upload_events.count_documents({}),
+            problem_count=await db.upload_events.count_documents({"status": {"$ne": "success"}}),
+            items=upload_items,
+            tone="warn",
+        ),
+        _source_summary(
+            "client",
+            "App-/Client-Logs",
+            "/admin/mobile-logs",
+            total=await db.mobile_client_logs.count_documents({}),
+            problem_count=await db.mobile_client_logs.count_documents({"status": "open"}),
+            items=client_items,
+            tone="danger",
+        ),
+        _source_summary(
+            "audit",
+            "Audit",
+            "/admin/audit",
+            total=await db.audit_logs.count_documents({}),
+            problem_count=0,
+            items=audit_items,
+            tone="info",
+        ),
+        _source_summary(
+            "email",
+            "Mail/Discord",
+            "/admin/settings?tab=logs",
+            total=await db.email_logs.count_documents({}),
+            problem_count=await db.email_logs.count_documents({"status": {"$in": ["failed", "skipped"]}}),
+            items=email_items,
+            tone="warn",
+        ),
+        _source_summary(
+            "mail_queue",
+            "Mail-Queue",
+            "/admin/settings?tab=queue",
+            total=await db.mail_jobs.count_documents({}),
+            problem_count=await db.mail_jobs.count_documents({"status": "failed"}),
+            items=queue_items,
+            tone="warn",
+        ),
+    ]
+    combined = sorted(
+        [item for source in sources for item in source["items"]],
+        key=lambda item: item.get("time") or "",
+        reverse=True,
+    )[:safe_limit * 2]
+    return {
+        "sources": sources,
+        "combined": combined,
+        "summary": {
+            "total": sum(source["total"] for source in sources),
+            "problem_count": sum(source["problem_count"] for source in sources),
+            "latest_at": max((source["latest_at"] for source in sources), default=""),
+        },
+    }
 
 
 @router.patch("/mobile-logs/{log_id}")
