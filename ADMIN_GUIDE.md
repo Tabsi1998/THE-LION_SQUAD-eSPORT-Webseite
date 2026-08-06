@@ -271,6 +271,9 @@ Vor-Ort-Ablauf und Turnierstart:
 - Organisator und Referee mit turnierweiter Zuweisung duerfen Check-in, Live, Pause und Beendet operativ setzen. Veroeffentlichen, Archivieren oder Absagen bleibt globalen Turnieradmins vorbehalten.
 - Ein Match kann an einer Station erst gestartet werden, wenn die konfigurierte Mindestzahl an Teilnehmern vorhanden ist. Der echte Stationsstart setzt das Match auf `in_progress` und benachrichtigt die Spieler mit der Station.
 - Lokale Turniere mit `Fix durch Turnierleitung` senden keine zeitbasierte 10-Minuten-Erinnerung. Die Startnachricht kommt erst beim tatsaechlichen Stationsstart, damit reale Verzoegerungen keinen falschen Alarm erzeugen.
+- Web-Dashboard und LionsAPP zeigen normalen Teilnehmern nur ihre eigenen offenen Matches. Laufende Matches und Matches mit ausstehendem Ergebnis stehen immer vor lediglich geplanten Matches.
+- Zugewiesene Organisatoren, Referees und Ergebnis-Erfasser erhalten zusaetzlich den Bereich `Turnierleitung · Ergebnisse`. Dort erscheinen nur Matches aktiver Turniere, die von ihrer Turnier-, Phasen-, Stations- oder Match-Zuweisung abgedeckt sind.
+- Beim Oeffnen oder Zurueckkehren auf Dashboard und Matchseite werden Daten sofort aktualisiert; waehrend die Ansicht aktiv ist folgt ein regelmaessiger Live-Refresh. Nach dem Speichern bleibt die Matchseite offen und bestaetigt den aktualisierten Stand sichtbar.
 
 ### Fast Lap
 

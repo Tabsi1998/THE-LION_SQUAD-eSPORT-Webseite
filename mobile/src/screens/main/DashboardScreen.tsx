@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import React, { useCallback, useMemo, useState } from "react";
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
@@ -14,7 +15,7 @@ import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import type { MainTabParamList } from "../../navigation/types";
 import { colors } from "../../theme";
-import type { ClubEvent, DashboardAction, LiveStream, MobileDashboardData, NewsPost, Tournament } from "../../types";
+import type { ClubEvent, DashboardAction, LiveStream, Match, MobileDashboardData, NewsPost, Tournament } from "../../types";
 
 type Props = BottomTabScreenProps<MainTabParamList, "Dashboard">;
 type TimelineItem = {
@@ -36,11 +37,11 @@ type QuickActionItem = {
 };
 
 const emptyDashboard: MobileDashboardData = {
-  me: { tournaments: [], events: [], matches: [], actions: [] },
+  me: { tournaments: [], events: [], matches: [], staff_matches: [], actions: [] },
   public: { tournaments: [], events: [] },
   news: [],
   streams: [],
-  stats: { my_tournaments: 0, my_events: 0, open_matches: 0, open_actions: 0, news: 0, public_tournaments: 0, public_events: 0, live_streams: 0 },
+  stats: { my_tournaments: 0, my_events: 0, open_matches: 0, staff_matches: 0, open_actions: 0, news: 0, public_tournaments: 0, public_events: 0, live_streams: 0 },
 };
 const OPEN_MATCH_STATUSES = new Set(["ready", "scheduled", "in_progress", "waiting_result"]);
 
@@ -50,6 +51,7 @@ function normalizeDashboard(payload?: Partial<MobileDashboardData> | null): Mobi
       tournaments: Array.isArray(payload?.me?.tournaments) ? payload.me.tournaments : [],
       events: Array.isArray(payload?.me?.events) ? payload.me.events : [],
       matches: Array.isArray(payload?.me?.matches) ? payload.me.matches : [],
+      staff_matches: Array.isArray(payload?.me?.staff_matches) ? payload.me.staff_matches : [],
       actions: Array.isArray(payload?.me?.actions) ? payload.me.actions : [],
     },
     public: {
@@ -103,11 +105,11 @@ export function DashboardScreen({ navigation }: Props) {
     }
   }, [isGuest, refreshMe]);
 
-  useEffect(() => {
-    load();
-    const timer = setInterval(load, 10000);
+  useFocusEffect(useCallback(() => {
+    void load();
+    const timer = setInterval(() => void load(), 10000);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load]));
 
   const timeline = useMemo(() => {
     const source = isGuest
@@ -197,6 +199,31 @@ export function DashboardScreen({ navigation }: Props) {
           <Stat label="News" value={String(data.stats.news)} />
         </View>
 
+        {!isGuest && data.me.matches.length ? (
+          <Section title="Meine aktiven Matches">
+            {data.me.matches.slice(0, 6).map((match) => (
+              <MatchOverviewCard
+                key={match.id}
+                match={match}
+                onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id } })}
+              />
+            ))}
+          </Section>
+        ) : null}
+
+        {!isGuest && data.me.staff_matches.length ? (
+          <Section title="Turnierleitung · Ergebnisse">
+            {data.me.staff_matches.slice(0, 6).map((match) => (
+              <MatchOverviewCard
+                key={`staff-${match.id}`}
+                match={match}
+                staff
+                onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id } })}
+              />
+            ))}
+          </Section>
+        ) : null}
+
         <Section title="Schnellzugriff">
           <View style={styles.quickGrid}>
             {quickActions.map((action) => (
@@ -251,19 +278,6 @@ export function DashboardScreen({ navigation }: Props) {
             ) : (
               <EmptyState icon="checkmark-circle-outline" title="Keine offenen Aktionen" detail="Check-ins, offene Matches und wichtige Hinweise landen automatisch hier." />
             )}
-          </Section>
-        ) : null}
-
-        {!isGuest && data.me.matches.length ? (
-          <Section title="Nächste Matches">
-            {data.me.matches.slice(0, 4).map((match) => (
-              <Pressable key={match.id} onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id } })} style={({ pressed }) => [pressed && styles.pressed]}>
-                <Card style={styles.compactCard}>
-                  <Body style={styles.rowTitle}>{match.tournament_title || match.opponent_name || "Match"}</Body>
-                  <Muted>{formatDate(match.scheduled_at)} · {match.round_name || formatStatus(match.status)}</Muted>
-                </Card>
-              </Pressable>
-            ))}
           </Section>
         ) : null}
 
@@ -413,6 +427,39 @@ function TimelineCard({ item, onPress }: { item: TimelineItem; onPress: () => vo
   );
 }
 
+function MatchOverviewCard({ match, onPress, staff = false }: { match: Match; onPress: () => void; staff?: boolean }) {
+  const detail = [
+    match.opponent_name || match.participant_names?.join(" · "),
+    match.round_name || (match.round ? `Runde ${match.round}` : null),
+    match.station_label ? `Station ${match.station_label}` : null,
+  ].filter(Boolean).join(" · ");
+  const action = staff && match.can_submit_result
+    ? "Ergebnis erfassen"
+    : match.needs_result
+      ? "Ergebnis öffnen"
+      : "Match öffnen";
+
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
+      <Card style={[styles.matchCard, match.needs_result && styles.matchCardUrgent]}>
+        <View style={styles.matchIcon}>
+          <Ionicons name={match.needs_result ? "create-outline" : "game-controller-outline"} color={match.needs_result ? colors.gold : colors.cyan} size={20} />
+        </View>
+        <View style={styles.flex}>
+          <View style={styles.rowTop}>
+            <Body style={styles.rowTitle}>{match.tournament_title || "Turniermatch"}</Body>
+            <Badge label={formatStatus(match.status)} tone={match.needs_result ? "gold" : "cyan"} />
+          </View>
+          {detail ? <Muted numberOfLines={2}>{detail}</Muted> : null}
+          <Muted>{formatDate(match.scheduled_at)}</Muted>
+          <Muted style={match.needs_result ? styles.matchActionUrgent : styles.matchAction}>{action}</Muted>
+        </View>
+        <Ionicons name="chevron-forward" color={colors.muted} size={18} />
+      </Card>
+    </Pressable>
+  );
+}
+
 function NewsCard({ post, onPress }: { post: NewsPost; onPress: () => void }) {
   const detail = [post.category, post.excerpt || post.summary].filter(Boolean).join(" · ");
 
@@ -558,8 +605,34 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textTransform: "uppercase",
   },
-  compactCard: {
-    gap: 4,
+  matchCard: {
+    alignItems: "center",
+    borderColor: "rgba(41,182,232,0.26)",
+    flexDirection: "row",
+    gap: 12,
+  },
+  matchCardUrgent: {
+    borderColor: "rgba(240,180,41,0.48)",
+  },
+  matchIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(41,182,232,0.1)",
+    borderRadius: 9,
+    height: 42,
+    justifyContent: "center",
+    width: 42,
+  },
+  matchAction: {
+    color: colors.cyan,
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  matchActionUrgent: {
+    color: colors.gold,
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
   },
   actionCard: {
     alignItems: "center",

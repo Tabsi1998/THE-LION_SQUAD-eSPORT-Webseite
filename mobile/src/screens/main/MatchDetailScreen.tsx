@@ -1,4 +1,6 @@
+import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Button } from "../../components/Button";
@@ -10,6 +12,7 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
+import { invalidateCache } from "../../lib/cache";
 import {
   formatDate,
   formatDateTime,
@@ -90,6 +93,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [proposalAt, setProposalAt] = useState("");
   const [proposalNote, setProposalNote] = useState("");
   const [counterAt, setCounterAt] = useState("");
@@ -131,7 +135,6 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       }
     } catch (err) {
       setError(errorMessage(err, "Match konnte nicht geladen werden."));
-      setPage(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -152,15 +155,24 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     setForfeitReason("");
     setForfeitWinnerId("");
     setV2Rows([]);
+    setSuccess("");
   }, [route.params.id]);
 
-  useEffect(() => {
-    load({ preserveDrafts: false });
+  useFocusEffect(useCallback(() => {
+    void load({ preserveDrafts: false });
     const timer = setInterval(() => {
       void load();
     }, 10000);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load]));
+
+  const refreshAfterResult = useCallback(async () => {
+    await Promise.all([
+      invalidateCache("/mobile/dashboard"),
+      invalidateCache(`/matches/${route.params.id}`),
+    ]);
+    await load({ preserveDrafts: false });
+  }, [load, route.params.id]);
 
   const match = page?.match || {};
   const participants = page?.participants || [];
@@ -259,6 +271,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     const winnerId = a > b ? duelParticipants[0]?.registration_id : b > a ? duelParticipants[1]?.registration_id : null;
     setBusy(true);
     setError("");
+    setSuccess("");
     try {
       if (canStaffSubmitResult) {
         await api.patch(`/matches/${route.params.id}`, {
@@ -277,18 +290,20 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       }
       setProofUrl("");
       setResultNote("");
-      await load({ preserveDrafts: false });
+      await refreshAfterResult();
+      setSuccess(canStaffSubmitResult ? "Ergebnis gespeichert und Matchstand aktualisiert." : "Ergebnis gemeldet und Matchstand aktualisiert.");
     } catch (err) {
       setError(errorMessage(err, "Ergebnis konnte nicht gemeldet werden."));
     } finally {
       setBusy(false);
     }
-  }, [busy, canStaffSubmitResult, canSubmitLegacyResult, duelParticipants, load, proofUrl, resultNote, route.params.id, scoreA, scoreB]);
+  }, [busy, canStaffSubmitResult, canSubmitLegacyResult, duelParticipants, proofUrl, refreshAfterResult, resultNote, route.params.id, scoreA, scoreB]);
 
   const submitV2Result = useCallback(async () => {
     if (!canSubmitV2Result || busy) return;
     setBusy(true);
     setError("");
+    setSuccess("");
     try {
       await api.post(`/matches/${route.params.id}/result`, {
         proof_url: proofUrl.trim() || null,
@@ -304,13 +319,14 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       });
       setProofUrl("");
       setResultNote("");
-      await load({ preserveDrafts: false });
+      await refreshAfterResult();
+      setSuccess("Heat-Ergebnis gespeichert und Matchstand aktualisiert.");
     } catch (err) {
       setError(errorMessage(err, "Heat-Ergebnis konnte nicht gespeichert werden."));
     } finally {
       setBusy(false);
     }
-  }, [busy, canSubmitV2Result, load, proofUrl, resultNote, route.params.id, v2Rows]);
+  }, [busy, canSubmitV2Result, proofUrl, refreshAfterResult, resultNote, route.params.id, v2Rows]);
 
   const submitDispute = useCallback(async () => {
     const reason = disputeReason.trim();
@@ -401,6 +417,12 @@ export function MatchDetailScreen({ navigation, route }: Props) {
         </View>
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
+        {success ? (
+          <View style={styles.successNotice} accessibilityRole="alert">
+            <Ionicons name="checkmark-circle-outline" color={colors.success} size={20} />
+            <Body style={styles.successText}>{success}</Body>
+          </View>
+        ) : null}
 
         <Card style={styles.card}>
           <Heading>Teilnehmer</Heading>
@@ -776,6 +798,21 @@ const styles = StyleSheet.create({
   },
   error: {
     color: colors.live,
+  },
+  successNotice: {
+    alignItems: "center",
+    backgroundColor: "rgba(0,255,136,0.08)",
+    borderColor: "rgba(0,255,136,0.32)",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 9,
+    padding: 12,
+  },
+  successText: {
+    color: colors.success,
+    flex: 1,
+    fontWeight: "800",
   },
   flex: {
     flex: 1,
