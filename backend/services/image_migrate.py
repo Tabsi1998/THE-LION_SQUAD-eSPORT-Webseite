@@ -8,7 +8,6 @@ Idempotent: skips URLs that already point at /api/static/uploads/.
 Safe: errors per row are logged and don't abort the whole run.
 """
 import logging
-import os
 import uuid
 import pathlib
 import asyncio
@@ -19,12 +18,9 @@ from typing import Optional
 import httpx
 
 from database import get_db
+from storage import PUBLIC_UPLOAD_DIR, ensure_directory
 
 logger = logging.getLogger("tls.image_migrate")
-
-UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
-PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
-PUBLIC_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # (collection, list of fields, optional pointer to nested list of {url_field}, optional sub-doc field-name)
 TARGETS: list[tuple[str, list[str]]] = [
@@ -93,6 +89,7 @@ async def _download_to_local(url: str, client: httpx.AsyncClient) -> Optional[st
             logger.warning(f"[image-migrate] skip (too large): {url}")
             return None
         filename = f"{uuid.uuid4().hex}{ext}"
+        ensure_directory(PUBLIC_UPLOAD_DIR)
         (PUBLIC_UPLOAD_DIR / filename).write_bytes(resp.content)
         return f"{LOCAL_PREFIX}{filename}"
     except Exception as exc:

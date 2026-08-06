@@ -1,5 +1,4 @@
 """Document routes for the member portal."""
-import os
 import pathlib
 from typing import Optional
 from urllib.parse import quote
@@ -10,12 +9,9 @@ from fastapi.responses import FileResponse
 from auth import get_optional_user, require_admin
 from database import get_db
 from models import DocumentCreate, DocumentUpdate, new_id, now_utc
+from storage import PRIVATE_DOC_DIR, UPLOAD_DIR
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
-UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
-PRIVATE_DOC_DIR = UPLOAD_DIR / "documents"
-PRIVATE_DOC_DIR.mkdir(parents=True, exist_ok=True)
-
 ADMIN_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 INTERNAL_ROLES = {"club_admin", "superadmin"}
 
