@@ -26,6 +26,11 @@ logger = logging.getLogger("tls.scheduler")
 _scheduler: AsyncIOScheduler | None = None
 
 
+def _log_task_failure(task: str, exc: Exception) -> None:
+    """Log operational context without persisting exception payloads."""
+    logger.error("[scheduler] %s failed type=%s", task, type(exc).__name__)
+
+
 async def _safe_mail_queue():
     try:
         from services.mail_queue import process_mail_queue
@@ -33,7 +38,7 @@ async def _safe_mail_queue():
         if res.get("processed"):
             logger.info(f"[scheduler] mail_queue {res}")
     except Exception as exc:
-        logger.exception(f"[scheduler] mail_queue crash: {exc}")
+        _log_task_failure("mail_queue", exc)
 
 
 async def _safe_match_reminders():
@@ -43,7 +48,7 @@ async def _safe_match_reminders():
         if res.get("queued"):
             logger.info(f"[scheduler] match_reminders {res}")
     except Exception as exc:
-        logger.exception(f"[scheduler] match_reminders crash: {exc}")
+        _log_task_failure("match_reminders", exc)
 
 
 async def _safe_tournament_reminders():
@@ -53,7 +58,7 @@ async def _safe_tournament_reminders():
         if res.get("queued"):
             logger.info(f"[scheduler] tournament_reminders {res}")
     except Exception as exc:
-        logger.exception(f"[scheduler] tournament_reminders crash: {exc}")
+        _log_task_failure("tournament_reminders", exc)
 
 
 async def _safe_scheduled_news():
@@ -63,7 +68,7 @@ async def _safe_scheduled_news():
         if res.get("processed") or res.get("newsletter_queued") or res.get("mentions"):
             logger.info(f"[scheduler] scheduled_news {res}")
     except Exception as exc:
-        logger.exception(f"[scheduler] scheduled_news crash: {exc}")
+        _log_task_failure("scheduled_news", exc)
 
 
 async def _safe_prize_expiry():
@@ -73,7 +78,7 @@ async def _safe_prize_expiry():
         if n:
             logger.info(f"[scheduler] prize_expiry expired={n}")
     except Exception as exc:
-        logger.exception(f"[scheduler] prize_expiry crash: {exc}")
+        _log_task_failure("prize_expiry", exc)
 
 
 async def _safe_f1_prize_reminders():
@@ -83,7 +88,7 @@ async def _safe_f1_prize_reminders():
         if res.get("notifications"):
             logger.info(f"[scheduler] f1_prize_reminders {res}")
     except Exception as exc:
-        logger.exception(f"[scheduler] f1_prize_reminders crash: {exc}")
+        _log_task_failure("f1_prize_reminders", exc)
 
 
 async def _safe_birthday_greetings():
@@ -93,7 +98,7 @@ async def _safe_birthday_greetings():
         if res.get("queued") or res.get("deduped"):
             logger.info("[scheduler] birthday_greetings queued=%s deduped=%s", res.get("queued") or 0, res.get("deduped") or 0)
     except Exception as exc:
-        logger.exception(f"[scheduler] birthday_greetings crash: {exc}")
+        _log_task_failure("birthday_greetings", exc)
 
 
 async def _safe_twitch_poll():
@@ -101,7 +106,7 @@ async def _safe_twitch_poll():
         from services.twitch_service import twitch_poll_loop
         await twitch_poll_loop()
     except Exception as exc:
-        logger.exception(f"[scheduler] twitch_poll crash: {exc}")
+        _log_task_failure("twitch_poll", exc)
 
 
 async def _safe_game_server_sync():
@@ -111,7 +116,7 @@ async def _safe_game_server_sync():
         if res.get("processed"):
             logger.info(f"[scheduler] game_server_sync processed={res.get('processed')} failed={res.get('failed')}")
     except Exception as exc:
-        logger.exception(f"[scheduler] game_server_sync crash: {exc}")
+        _log_task_failure("game_server_sync", exc)
 
 
 async def _safe_mobile_push_receipts():
@@ -121,7 +126,7 @@ async def _safe_mobile_push_receipts():
         if res.get("checked") or res.get("errors") or res.get("disabled"):
             logger.info(f"[scheduler] mobile_push_receipts {res}")
     except Exception as exc:
-        logger.exception(f"[scheduler] mobile_push_receipts crash: {exc}")
+        _log_task_failure("mobile_push_receipts", exc)
 
 
 def _parse_dt(value):
@@ -182,7 +187,11 @@ async def _apply_tournament_transition_effects(db, doc: dict, next_status: str) 
         tournament = {**doc, "status": next_status}
         await _finalize_bracket_for_checkin(db, tournament, None)
     except Exception as exc:
-        logger.warning("[scheduler] tournament bracket finalize skipped for %s: %s", doc.get("id"), exc)
+        logger.warning(
+            "[scheduler] tournament bracket finalize skipped for %s type=%s",
+            doc.get("id"),
+            type(exc).__name__,
+        )
 
 
 async def _safe_status_transitions():
@@ -211,7 +220,7 @@ async def _safe_status_transitions():
         if changed:
             logger.info(f"[scheduler] status_transitions changed={changed}")
     except Exception as exc:
-        logger.exception(f"[scheduler] status_transitions crash: {exc}")
+        _log_task_failure("status_transitions", exc)
 
 
 def start_scheduler() -> AsyncIOScheduler:

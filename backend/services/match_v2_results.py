@@ -15,6 +15,16 @@ class MatchV2ResultError(ValueError):
 LOCKED_DOWNSTREAM_STATUSES = {"in_progress", "waiting_result", "disputed", "completed", "forfeit"}
 
 
+def public_recalculation_error(match: dict) -> dict:
+    """Return a stable client error without exposing validation internals."""
+    return {
+        "match_id": match.get("id"),
+        "match_key": match.get("match_key"),
+        "code": "invalid_result",
+        "detail": "Ergebnis konnte nicht sicher neu berechnet werden.",
+    }
+
+
 def _filled_slots(match: dict) -> list[dict]:
     return [
         slot for slot in match.get("slots") or []

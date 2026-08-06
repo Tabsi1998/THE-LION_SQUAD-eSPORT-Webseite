@@ -9,6 +9,7 @@ from services.match_v2_results import (
     MatchV2ResultError,
     build_v2_result_application,
     normalize_v2_results,
+    public_recalculation_error,
 )
 
 
@@ -54,6 +55,17 @@ RESULTS = [
     {"registration_id": "r4", "rank": 3, "score": 20},
     {"registration_id": "r3", "rank": 4, "score": 12},
 ]
+
+
+def test_public_recalculation_error_does_not_expose_internal_detail():
+    error = public_recalculation_error({"id": "m-secret", "match_key": "A"})
+
+    assert error == {
+        "match_id": "m-secret",
+        "match_key": "A",
+        "code": "invalid_result",
+        "detail": "Ergebnis konnte nicht sicher neu berechnet werden.",
+    }
 
 
 def test_normalize_v2_results_requires_all_filled_slots():

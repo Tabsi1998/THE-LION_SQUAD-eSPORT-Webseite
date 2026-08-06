@@ -52,18 +52,29 @@ const webpackConfig = {
 };
 
 webpackConfig.devServer = (devServerConfig) => {
-  if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
-    const originalSetupMiddlewares = devServerConfig.setupMiddlewares;
-
-    devServerConfig.setupMiddlewares = (middlewares, devServer) => {
-      if (originalSetupMiddlewares) {
-        middlewares = originalSetupMiddlewares(middlewares, devServer);
-      }
-
-      setupHealthEndpoints(devServer, healthPluginInstance);
-      return middlewares;
-    };
+  if (devServerConfig.https) {
+    devServerConfig.server = typeof devServerConfig.https === "object"
+      ? { type: "https", options: devServerConfig.https }
+      : "https";
   }
+  delete devServerConfig.https;
+  const legacyBefore = devServerConfig.onBeforeSetupMiddleware;
+  const legacyAfter = devServerConfig.onAfterSetupMiddleware;
+  const originalSetupMiddlewares = devServerConfig.setupMiddlewares;
+  delete devServerConfig.onBeforeSetupMiddleware;
+  delete devServerConfig.onAfterSetupMiddleware;
+
+  devServerConfig.setupMiddlewares = (middlewares, devServer) => {
+    legacyBefore?.(devServer);
+    if (originalSetupMiddlewares) {
+      middlewares = originalSetupMiddlewares(middlewares, devServer);
+    }
+    if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
+      setupHealthEndpoints(devServer, healthPluginInstance);
+    }
+    legacyAfter?.(devServer);
+    return middlewares;
+  };
 
   return devServerConfig;
 };
