@@ -75,6 +75,15 @@ registerRoute(
 );
 
 self.addEventListener("message", (event) => {
+  let messageOrigin = event.origin;
+  if (!messageOrigin && event.source?.url) {
+    try {
+      messageOrigin = new URL(event.source.url).origin;
+    } catch {
+      return;
+    }
+  }
+  if (messageOrigin !== self.location.origin) return;
   if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
   }

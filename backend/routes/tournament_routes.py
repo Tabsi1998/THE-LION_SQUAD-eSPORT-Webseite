@@ -26,7 +26,11 @@ from services.tournament_permissions import (
     require_tournament_staff_permission,
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
-from services.match_v2_results import MatchV2ResultError, build_v2_result_application
+from services.match_v2_results import (
+    MatchV2ResultError,
+    build_v2_result_application,
+    public_recalculation_error,
+)
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import (
     TournamentCreate, TournamentUpdate, RegistrationCreate, RegistrationUpdate,
@@ -2347,11 +2351,12 @@ async def recalculate_tournament_matches_v2_advancement(tid: str, stage_id: str 
                 force=True,
             )
         except MatchV2ResultError as exc:
-            errors.append({
-                "match_id": match.get("id"),
-                "match_key": match.get("match_key"),
-                "detail": str(exc),
-            })
+            logger.warning(
+                "[tournament] advancement recalculation rejected match=%s type=%s",
+                match.get("id"),
+                type(exc).__name__,
+            )
+            errors.append(public_recalculation_error(match))
             continue
 
         for target_id, update in application["target_sets"].items():

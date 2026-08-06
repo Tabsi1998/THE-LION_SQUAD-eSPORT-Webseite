@@ -85,7 +85,6 @@ function errorDetails(error: unknown) {
   if (error instanceof Error) {
     return {
       error_name: clip(error.name || "Error", 160),
-      stack: scrubLogText(error.stack || error.message, 4000),
     };
   }
   return {};

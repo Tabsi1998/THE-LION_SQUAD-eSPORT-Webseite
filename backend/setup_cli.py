@@ -8,7 +8,6 @@ Usage:
 """
 import asyncio
 import getpass
-import secrets
 import sys
 import os
 from dotenv import load_dotenv
@@ -19,7 +18,7 @@ load_dotenv(ROOT / ".env")
 
 from motor.motor_asyncio import AsyncIOMotorClient
 import bcrypt
-from runtime_config import resolve_app_environment
+from runtime_config import is_placeholder_secret, resolve_app_environment
 
 
 RESET = "\033[0m"
@@ -42,13 +41,26 @@ def banner():
 """)
 
 
-def ask(prompt: str, default: str = "", secret: bool = False, validator=None) -> str:
+def ask(prompt: str, default: str = "", validator=None) -> str:
     while True:
         hint = f" {DIM}[{default}]{RESET}" if default else ""
         full = f"{CYAN}▸{RESET} {prompt}{hint}: "
-        val = getpass.getpass(full) if secret else input(full)
+        val = input(full)
         val = (val.strip() or default).strip()
         if not val and not default:
+            print(f"{RED}  ✕ Pflichtfeld{RESET}")
+            continue
+        if validator and not validator(val):
+            print(f"{RED}  ✕ Ungültige Eingabe{RESET}")
+            continue
+        return val
+
+
+def ask_secret(prompt: str, validator=None) -> str:
+    """Read a secret without sharing the public-input data flow or echoing it."""
+    while True:
+        val = getpass.getpass(f"{CYAN}▸{RESET} {prompt}: ").strip()
+        if not val:
             print(f"{RED}  ✕ Pflichtfeld{RESET}")
             continue
         if validator and not validator(val):
@@ -65,24 +77,11 @@ def ask_yes_no(prompt: str, default=True) -> bool:
     return val in ("j", "ja", "y", "yes")
 
 
-def save_secret_to_env(name: str, value: str) -> None:
-    env_path = ROOT / ".env"
-    lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
-    prefix = f"{name}="
-    next_line = f"{name}={value}"
-    updated = False
-    for index, line in enumerate(lines):
-        if line.startswith(prefix):
-            lines[index] = next_line
-            updated = True
-            break
-    if not updated:
-        lines.append(next_line)
-    env_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
-    try:
-        os.chmod(env_path, 0o600)
-    except OSError:
-        pass
+def require_jwt_secret() -> str:
+    value = os.environ.get("JWT_SECRET", "")
+    if len(value) < 32 or is_placeholder_secret(value):
+        raise RuntimeError("JWT_SECRET muss vor dem Setup sicher gesetzt sein (mindestens 32 Zeichen).")
+    return value
 
 
 async def main():
@@ -96,6 +95,12 @@ async def main():
         print(f"{RED}MONGO_URL oder DB_NAME fehlen in .env. Abbruch.{RESET}")
         sys.exit(1)
 
+    try:
+        require_jwt_secret()
+    except RuntimeError:
+        print(f"{RED}JWT_SECRET fehlt oder ist unsicher. Bitte zuerst .env/install.sh sicher konfigurieren.{RESET}")
+        raise SystemExit(1)
+
     client = AsyncIOMotorClient(mongo_url)
     db = client[db_name]
 
@@ -104,6 +109,7 @@ async def main():
     setup_done = await db.settings.find_one({"id": "setup"})
     if setup_done and existing_super and not ask_yes_no("Setup ist bereits abgeschlossen. Erneut ausführen?", False):
         print(f"{YELLOW}Setup übersprungen.{RESET}")
+        client.close()
         return
 
     print(f"\n{BOLD}[1/6]{RESET} Vereins-Branding")
@@ -116,16 +122,16 @@ async def main():
     print(f"\n{BOLD}[2/6]{RESET} Superadmin Account")
     admin_email = ask("Admin E-Mail", os.environ.get("ADMIN_EMAIL", "admin@lionsquad.at"))
     while True:
-        admin_pw = ask("Admin Passwort (min. 10 Zeichen)", secret=True,
-                        validator=lambda v: len(v) >= 10)
-        admin_pw2 = ask("Passwort bestätigen", secret=True)
+        admin_pw = ask_secret("Admin Passwort (min. 12 Zeichen)",
+                              validator=lambda v: len(v) >= 12)
+        admin_pw2 = ask_secret("Passwort bestätigen")
         if admin_pw == admin_pw2:
             break
         print(f"{RED}  ✕ Passwörter stimmen nicht überein.{RESET}")
 
     print(f"\n{BOLD}[3/6]{RESET} E-Mail-Versand (Resend)")
     if ask_yes_no("Resend jetzt konfigurieren?", False):
-        resend_key = ask("Resend API Key (re_...)", secret=True)
+        resend_key = ask_secret("Resend API Key (re_...)")
         sender_name = ask("Absendername", club_name)
         sender_email = ask("Absender-E-Mail", "noreply@lionsquad.at")
     else:
@@ -147,22 +153,17 @@ async def main():
     demo_password = None
     if seed_demo:
         while True:
-            demo_password = ask(
+            demo_password = ask_secret(
                 "Eigenes Demo-Passwort (min. 12 Zeichen)",
-                secret=True,
                 validator=lambda value: len(value) >= 12,
             )
-            confirmation = ask("Demo-Passwort bestätigen", secret=True)
+            confirmation = ask_secret("Demo-Passwort bestätigen")
             if demo_password == confirmation:
                 break
             print(f"{RED}  ✕ Passwörter stimmen nicht überein.{RESET}")
 
     print(f"\n{BOLD}[6/6]{RESET} JWT-Secret")
-    jwt_secret = os.environ.get("JWT_SECRET", "")
-    if not jwt_secret or len(jwt_secret) < 32:
-        jwt_secret = secrets.token_hex(32)
-        save_secret_to_env("JWT_SECRET", jwt_secret)
-        print(f"{GREEN}  → Neues JWT-Secret generiert und in .env gespeichert.{RESET}")
+    print(f"{GREEN}  ✓ Extern vorkonfiguriertes JWT-Secret ist gültig.{RESET}")
 
     print(f"\n{YELLOW}Konfiguration schreiben …{RESET}")
 

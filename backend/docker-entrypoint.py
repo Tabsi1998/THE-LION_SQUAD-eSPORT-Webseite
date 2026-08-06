@@ -9,6 +9,8 @@ import stat
 APP_USER = os.environ.get("APP_USER", "appuser")
 UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 UPLOAD_SUBDIRS = (UPLOAD_DIR, UPLOAD_DIR / "public", UPLOAD_DIR / "documents")
+DIRECTORY_MODE = 0o700
+FILE_MODE = 0o600
 
 
 def _log(message: str) -> None:
@@ -44,15 +46,15 @@ def prepare_upload_volume(uid: int, gid: int) -> None:
     for root, dirs, files in os.walk(UPLOAD_DIR):
         root_path = pathlib.Path(root)
         _chown_if_needed(root_path, uid, gid)
-        _chmod(root_path, 0o750)
+        _chmod(root_path, DIRECTORY_MODE)
         for name in dirs:
             path = root_path / name
             _chown_if_needed(path, uid, gid)
-            _chmod(path, 0o750)
+            _chmod(path, DIRECTORY_MODE)
         for name in files:
             path = root_path / name
             _chown_if_needed(path, uid, gid)
-            _chmod(path, 0o640)
+            _chmod(path, FILE_MODE)
 
 
 def drop_privileges(user: pwd.struct_passwd) -> None:
