@@ -15,8 +15,8 @@ import pytest
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://fast-lap-mgmt.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
-ADMIN_EMAIL = "admin@thelionsquad.at"
-ADMIN_PW = "TLSAdmin2026!"
+ADMIN_EMAIL = os.environ.get("TEST_ADMIN_EMAIL", "")
+ADMIN_PW = os.environ.get("TEST_ADMIN_PASSWORD", "")
 
 
 def H(tok):

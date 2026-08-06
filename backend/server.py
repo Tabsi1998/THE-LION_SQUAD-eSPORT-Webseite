@@ -13,7 +13,6 @@ from starlette.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from database import get_db, init_indexes, close_client
-from seed import seed_admin, seed_demo_data
 from badges import seed_badges
 from routes.auth_routes import router as auth_router
 from routes.user_routes import router as user_router
@@ -21,7 +20,7 @@ from routes.team_routes import router as team_router
 from routes.message_routes import router as message_router
 from routes.friend_routes import router as friend_router
 from routes.game_routes import router as game_router
-from routes.game_server_routes import router as game_server_router, seed_demo_game_servers
+from routes.game_server_routes import router as game_server_router
 from routes.access_link_routes import router as access_link_router
 from routes.event_routes import router as event_router
 from routes.tournament_routes import router as tournament_router
@@ -57,32 +56,19 @@ from routes.extras_routes import (
     settings_router, season_router, widget_router, dsgvo_router, pdf_router, audit_router,
 )
 from services.change_events import change_event_stream, publish_api_change
+from runtime_config import resolve_app_environment, validate_runtime_environment
 
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("tls-arena")
 
-app_env = os.environ.get("APP_ENV", os.environ.get("ENVIRONMENT", "development")).lower()
-is_production = app_env in {"prod", "production"}
-PLACEHOLDER_SECRET_MARKERS = {"change-me", "changeme", "generate-with", "example", "replace-me"}
+app_env = resolve_app_environment()
+is_production = app_env == "production"
 
 
 def validate_runtime_env():
-    if not is_production:
-        return
-    jwt_secret = os.environ.get("JWT_SECRET", "")
-    jwt_secret_l = jwt_secret.lower()
-    if len(jwt_secret) < 32 or any(marker in jwt_secret_l for marker in PLACEHOLDER_SECRET_MARKERS):
-        raise RuntimeError("JWT_SECRET must be a real secret with at least 32 characters in production.")
-    admin_password = os.environ.get("ADMIN_PASSWORD", "")
-    admin_password_l = admin_password.lower()
-    if len(admin_password) < 12 or any(marker in admin_password_l for marker in PLACEHOLDER_SECRET_MARKERS):
-        raise RuntimeError("ADMIN_PASSWORD must be a real password with at least 12 characters in production.")
-    if not os.environ.get("FRONTEND_URL"):
-        raise RuntimeError("FRONTEND_URL must be set in production.")
-    if os.environ.get("TLS_RESET", "").lower() == "true":
-        raise RuntimeError("TLS_RESET=true is blocked in production.")
+    return validate_runtime_environment()
 
 
 @asynccontextmanager
@@ -90,43 +76,12 @@ async def lifespan(app: FastAPI):
     validate_runtime_env()
     logger.info("[THE LION SQUAD] Initializing indexes...")
     await init_indexes()
-    # One-time wipe for the new club platform launch (set TLS_RESET=true once, then unset)
-    if os.environ.get("TLS_RESET", "").lower() == "true":
-        from database import get_db
-        db = get_db()
-        # Preserve nothing — clean slate. Admin will be re-seeded right after.
-        for coll in [
-            "users", "teams", "team_members", "games", "events", "tournaments",
-            "game_servers",
-            "tournament_registrations", "matches", "f1_challenges", "f1_tracks",
-            "f1_lap_times", "stations", "news_posts", "sponsors", "partners", "seasons",
-            "references",
-            "tournament_groups", "memberships", "member_benefits", "user_socials",
-            "gallery_albums", "gallery_photos", "documents", "season_points",
-            "audit_logs", "email_logs", "notifications", "password_reset_tokens",
-            "login_attempts", "user_achievements", "achievements", "achievement_groups",
-            "mail_jobs", "media_uploads", "prize_pickups", "club_member_profiles",
-            "tournament_staff_assignments", "event_registrations", "tournament_stages",
-            "matches_v2", "match_reports_v2", "match_schedule_proposals", "match_chat_messages",
-            "direct_messages", "team_chat_messages", "team_invites",
-        ]:
-            try:
-                await db[coll].delete_many({})
-                logger.info(f"[TLS RESET] Cleared collection: {coll}")
-            except Exception as e:
-                logger.warning(f"[TLS RESET] {coll}: {e}")
-    logger.info("[THE LION SQUAD] Seeding admin...")
-    await seed_admin()
     logger.info("[THE LION SQUAD] Seeding badge catalog...")
     await seed_badges()
     logger.info("[THE LION SQUAD] Seeding CMS pages + email templates...")
     await seed_default_pages()
     await seed_email_templates()
     await seed_default_nav()
-    await seed_demo_game_servers()
-    if os.environ.get("SEED_DEMO", "false").lower() == "true":
-        logger.info("[THE LION SQUAD] Seeding demo data...")
-        await seed_demo_data()
     # Phase 8: start background scheduler (mail queue + reminders + prize expiry)
     if os.environ.get("DISABLE_SCHEDULER", "").lower() != "true":
         try:

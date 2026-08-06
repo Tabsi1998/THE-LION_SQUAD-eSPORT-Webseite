@@ -9,10 +9,10 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
     pytest.skip("REACT_APP_BACKEND_URL not configured; skipping live backend tests", allow_module_level=True)
-ADMIN_EMAIL = "admin@lionsquad.at"
-ADMIN_PASS = "TLSAdmin2026!"
-DEMO_EMAIL = "leon_king@demo.lionsquad.at"
-DEMO_PASS = "demo123"
+ADMIN_EMAIL = os.environ.get("TEST_ADMIN_EMAIL", "")
+ADMIN_PASS = os.environ.get("TEST_ADMIN_PASSWORD", "")
+DEMO_EMAIL = os.environ.get("TEST_DEMO_EMAIL", "")
+DEMO_PASS = os.environ.get("TEST_DEMO_PASSWORD", "")
 
 # 1x1 PNG (transparent)
 PNG_BYTES = base64.b64decode(

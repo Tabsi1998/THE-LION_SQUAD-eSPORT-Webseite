@@ -1,0 +1,7 @@
+{
+  "GHSA-qwww-vcr4-c8h2": {
+    "module": "react-router",
+    "expires": "2026-10-31",
+    "reason": "The advisory only affects unstable React Server Components APIs. This client-only CRA application does not import or enable the unstable RSC APIs. Upgrade to React Router 8 is tracked as a tested migration rather than an emergency breaking update."
+  }
+}

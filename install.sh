@@ -60,9 +60,21 @@ get_env() {
   grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d'=' -f2-
 }
 
+unset_env() {
+  local key="$1"
+  awk -v k="$key" 'BEGIN{FS="="} $1!=k{print}' .env > .env.tmp && mv .env.tmp .env
+}
+
+is_placeholder() {
+  case "${1:-}" in
+    ""|changeme|CHANGE_ME_*|change-me-*|*generate-with*|*replace-me*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # 2. JWT_SECRET
 CUR_SECRET="$(get_env JWT_SECRET)"
-if [ -z "$CUR_SECRET" ] || [ "$CUR_SECRET" = "changeme" ] || [ "$CUR_SECRET" = "CHANGE_ME_TO_LONG_RANDOM_HEX" ]; then
+if is_placeholder "$CUR_SECRET"; then
   SECRET="$(openssl rand -hex 32 2>/dev/null || python3 -c 'import secrets;print(secrets.token_hex(32))')"
   set_env JWT_SECRET "$SECRET"
   ok "Generated JWT_SECRET ($(echo "$SECRET" | head -c 8)…)"
@@ -76,7 +88,7 @@ if ! $NON_INTERACTIVE; then
     read -rp "Admin email [admin@thelionsquad.at]: " IN_EMAIL
     set_env ADMIN_EMAIL "${IN_EMAIL:-admin@thelionsquad.at}"
   fi
-  if [ -z "$CUR_PASS" ] || [ "$CUR_PASS" = "changeme" ] || [ "$CUR_PASS" = "CHANGE_ME_IMMEDIATELY" ]; then
+  if is_placeholder "$CUR_PASS"; then
     while true; do
       read -srp "Set admin password (min 12 chars): " PASS; echo
       if [ "${#PASS}" -lt 12 ]; then warn "Too short, try again."; continue; fi
@@ -119,6 +131,12 @@ if ! $NON_INTERACTIVE; then
   esac
 fi
 
+if is_placeholder "$(get_env ADMIN_PASSWORD)"; then
+  fail "ADMIN_PASSWORD is missing or still a placeholder. Set a unique password before non-interactive installation."
+fi
+
+chmod 600 .env
+
 # 7. Build & up
 info "Building containers (first run takes a few minutes)…"
 docker compose pull mongodb 2>/dev/null || true
@@ -138,6 +156,22 @@ for i in $(seq 1 60); do
 done
 echo
 if $HEALTHY; then ok "Backend up."; else warn "Backend did not become healthy within 120s — check 'docker compose logs backend'."; fi
+
+# 9. Create the first admin once. The API process never creates, promotes, or
+# reactivates accounts during normal startup.
+if $HEALTHY; then
+  info "Creating the initial superadmin if none exists…"
+  export BOOTSTRAP_ADMIN_EMAIL="$(get_env ADMIN_EMAIL)"
+  export BOOTSTRAP_ADMIN_PASSWORD="$(get_env ADMIN_PASSWORD)"
+  docker compose run --rm --no-deps \
+    -e BOOTSTRAP_ADMIN_EMAIL \
+    -e BOOTSTRAP_ADMIN_PASSWORD \
+    backend python bootstrap_admin.py
+  unset BOOTSTRAP_ADMIN_EMAIL BOOTSTRAP_ADMIN_PASSWORD
+  unset_env ADMIN_PASSWORD
+  chmod 600 .env
+  ok "Initial admin bootstrap complete; ADMIN_PASSWORD was removed from .env."
+fi
 
 cat <<EOF
 

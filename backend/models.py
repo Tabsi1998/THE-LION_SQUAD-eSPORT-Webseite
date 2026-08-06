@@ -1106,11 +1106,11 @@ class GalleryPhotoCreate(BaseModel):
     @model_validator(mode="after")
     def ensure_media_source(self):
         if self.media_type == "image" and not self.image_url:
-            raise ValueError("image_url ist fuer Bilder erforderlich.")
+            raise ValueError("image_url ist für Bilder erforderlich.")
         if self.media_type == "video" and not (self.video_url or self.external_url):
-            raise ValueError("video_url oder external_url ist fuer Videos erforderlich.")
+            raise ValueError("video_url oder external_url ist für Videos erforderlich.")
         if self.media_type == "embed" and not (self.embed_url or self.external_url):
-            raise ValueError("embed_url oder external_url ist fuer eingebettete Videos erforderlich.")
+            raise ValueError("embed_url oder external_url ist für eingebettete Videos erforderlich.")
         if self.media_type == "video" and not self.video_url and self.external_url:
             self.video_url = self.external_url
         if self.media_type == "embed" and not self.embed_url and self.external_url:

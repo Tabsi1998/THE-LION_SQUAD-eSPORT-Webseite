@@ -24,11 +24,18 @@ function randomSessionSuffix() {
     cryptoApi.getRandomValues(bytes);
     return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
   }
-  return `${Date.now().toString(36)}-${Platform.OS}-${Device.modelId || Device.modelName || "device"}`;
+  return `${Date.now().toString(36)}-${Platform.OS}`;
 }
 
 const sessionId = `${Date.now().toString(36)}-${randomSessionSuffix()}`;
+const clientLoggingEnabled = Constants.expoConfig?.extra?.clientLogging === true;
+const DEDUPE_MS = 60_000;
+const MAX_LOGS_PER_MINUTE = 12;
+const sentAtByFingerprint = new Map<string, number>();
+let recentSendTimes: number[] = [];
 let installed = false;
+
+const SENSITIVE_KEY = /(authorization|cookie|password|passwd|secret|token|email|session|api[_-]?key)/i;
 
 function clip(value: unknown, limit: number) {
   const text = typeof value === "string" ? value : String(value ?? "");
@@ -36,10 +43,16 @@ function clip(value: unknown, limit: number) {
 }
 
 function scrubLogText(value: unknown, limit: number) {
-  return clip(value, limit)
+  const scrubbed = String(value ?? "")
+    .replace(/https?:\/\/[^\s)]+/gi, (url) => url.split(/[?#]/, 1)[0])
+    .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, "Bearer [redacted]")
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[redacted-token]")
+    .replace(/([?&](?:access_token|refresh_token|token|code|key|secret|email)=)[^&#\s]*/gi, "$1[redacted]")
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[redacted-email]")
     .replace(/file:\/\/[^\s)]+/gi, "[local-file]")
     .replace(/[A-Z]:\\[^\s)]+/gi, "[local-path]")
     .replace(/\/(?:data|storage|Users|home)\/[^\s)]+/gi, "[local-path]");
+  return clip(scrubbed, limit);
 }
 
 function sanitizeContext(value: unknown, depth = 0): unknown {
@@ -50,7 +63,8 @@ function sanitizeContext(value: unknown, depth = 0): unknown {
   if (typeof value === "object") {
     const out: Record<string, unknown> = {};
     Object.entries(value as Record<string, unknown>).slice(0, 30).forEach(([key, item]) => {
-      out[scrubLogText(key, 80)] = sanitizeContext(item, depth + 1);
+      const safeKey = scrubLogText(key, 80);
+      out[safeKey] = SENSITIVE_KEY.test(key) ? "[redacted]" : sanitizeContext(item, depth + 1);
     });
     return out;
   }
@@ -71,7 +85,7 @@ function errorDetails(error: unknown) {
   if (error instanceof Error) {
     return {
       error_name: clip(error.name || "Error", 160),
-      stack: scrubLogText(error.message, 1000),
+      stack: scrubLogText(error.stack || error.message, 4000),
     };
   }
   return {};
@@ -89,14 +103,14 @@ function buildVersion() {
 }
 
 export function sendMobileLog(level: MobileLogLevel, message: string, options: MobileLogOptions = {}) {
+  if (!clientLoggingEnabled) return;
   const payload = {
     level,
     message: scrubLogText(message, 2000),
-    source: options.source,
-    screen: options.screen,
+    source: scrubLogText(options.source, 120),
+    screen: scrubLogText(options.screen, 120),
     context: sanitizeContext(options.context),
     platform: Platform.OS,
-    device_name: Device.deviceName || Device.modelName || "",
     os_version: Device.osVersion || "",
     app_version: appVersion(),
     build_version: buildVersion(),
@@ -104,6 +118,15 @@ export function sendMobileLog(level: MobileLogLevel, message: string, options: M
     created_at: new Date().toISOString(),
     ...errorDetails(options.error),
   };
+
+  const now = Date.now();
+  const fingerprint = `${payload.level}|${payload.source}|${payload.screen}|${payload.message}|${payload.error_name || ""}`;
+  const lastSentAt = sentAtByFingerprint.get(fingerprint) || 0;
+  if (now - lastSentAt < DEDUPE_MS) return;
+  recentSendTimes = recentSendTimes.filter((sentAt) => now - sentAt < 60_000);
+  if (recentSendTimes.length >= MAX_LOGS_PER_MINUTE) return;
+  sentAtByFingerprint.set(fingerprint, now);
+  recentSendTimes.push(now);
   api.post("/mobile/client-logs", payload).catch(() => {});
 }
 
@@ -113,7 +136,7 @@ export function logMobileError(error: unknown, source = "app", context?: Record<
 }
 
 export function installMobileLogHandlers() {
-  if (installed) return;
+  if (installed || !clientLoggingEnabled) return;
   installed = true;
 
   const originalWarn = console.warn.bind(console);

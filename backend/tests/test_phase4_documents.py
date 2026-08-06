@@ -7,8 +7,8 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
-ADMIN_EMAIL = "admin@lionsquad.at"
-ADMIN_PASSWORD = "TLSAdmin2026!"
+ADMIN_EMAIL = os.environ.get("TEST_ADMIN_EMAIL", "")
+ADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "")
 
 
 # ---------------- helpers ----------------

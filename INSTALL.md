@@ -35,11 +35,11 @@ sudo nano .env
 
 Set:
 - `JWT_SECRET` — `python3 -c "import secrets; print(secrets.token_hex(32))"`
-- `ADMIN_PASSWORD` — strong password
+- `ADMIN_PASSWORD` — strong one-time bootstrap password; `install.sh` removes it afterwards
 - `FRONTEND_URL`, `CORS_ORIGINS`, `PUBLIC_BACKEND_URL` — your public URLs
 - `PUBLIC_UPLOAD_BACKEND_URL` — optional DNS-only upload URL for large media behind Cloudflare
 - optional `PUBLIC_BASE_URL` — public website URL for generated links and Discord webhook media
-- `SEED_DEMO=false` (production)
+- `APP_ENV=production` (required; missing/unknown values fail closed)
 
 ## 3. Start
 
@@ -61,23 +61,26 @@ Set the proxy body size to at least 1700 MB when direct gallery video uploads ar
 otherwise image/document/video uploads can fail with
 `413 Request Entity Too Large` before the app receives the request.
 
-## 5. First Login
+## 5. First admin and login
 
-- Open `https://lionsquad.at/`
-- Login: `admin@lionsquad.at` / the password you set
-- Navigate to **/profile** → change password
-- Start creating games, tournaments, and F1 challenges.
+Prefer `./install.sh`, which creates the first superadmin once and then removes
+`ADMIN_PASSWORD` from `.env`. The normal API startup never creates, promotes, unbans,
+or reactivates an account.
 
-## 6. Create production admin (if you used a weak default)
+For an explicit manual bootstrap, pass the secret only to the one-off container:
 
 ```bash
-docker exec -it tls-backend python -c "
-import asyncio
-from seed import seed_admin
-asyncio.run(seed_admin())
-"
+export BOOTSTRAP_ADMIN_EMAIL="admin@example.com"
+read -rsp "Initial admin password: " BOOTSTRAP_ADMIN_PASSWORD; export BOOTSTRAP_ADMIN_PASSWORD
+docker compose run --rm --no-deps \
+  -e BOOTSTRAP_ADMIN_EMAIL -e BOOTSTRAP_ADMIN_PASSWORD \
+  backend python bootstrap_admin.py
+unset BOOTSTRAP_ADMIN_EMAIL BOOTSTRAP_ADMIN_PASSWORD
 ```
 
-## 7. Backups
+The command exits without changing anything when a superadmin already exists. It refuses
+to promote an existing non-admin account with the same email address.
+
+## 6. Backups
 
 See [BACKUP_RESTORE.md](BACKUP_RESTORE.md).

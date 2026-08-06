@@ -88,6 +88,9 @@ jobs:
       - name: Typecheck mobile app
         working-directory: mobile
         run: npm run typecheck
+      - name: Run mobile security regressions
+        working-directory: mobile
+        run: npm run test:security
       - name: Mobile release preflight
         working-directory: mobile
         run: npm run release:preflight
