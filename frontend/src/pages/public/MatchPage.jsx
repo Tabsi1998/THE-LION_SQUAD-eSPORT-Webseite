@@ -102,11 +102,20 @@ export default function MatchPage() {
   }, [id]);
 
   useEffect(() => {
+    const refreshVisible = () => {
+      if (typeof document === "undefined" || !document.hidden) load().catch(() => {});
+    };
     load({ preserveDrafts: false }).catch(() => setData(null));
     const timer = window.setInterval(() => {
-      load().catch(() => {});
+      refreshVisible();
     }, 10000);
-    return () => window.clearInterval(timer);
+    window.addEventListener("focus", refreshVisible);
+    document.addEventListener("visibilitychange", refreshVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshVisible);
+      document.removeEventListener("visibilitychange", refreshVisible);
+    };
   }, [load]);
   useApiInvalidation(load, ["matches", "matches_v2", "tournaments"]);
 

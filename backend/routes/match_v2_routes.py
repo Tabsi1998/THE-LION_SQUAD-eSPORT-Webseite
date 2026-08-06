@@ -22,6 +22,7 @@ from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     READ_STAFF_ROLES,
     RESULT_STAFF_ROLES,
+    has_match_result_permission,
     has_tournament_staff_permission,
     require_tournament_staff_permission,
 )
@@ -194,24 +195,13 @@ async def _assert_match_visible(match: dict, user: dict | None) -> None:
 
 
 async def _require_v2_result_permission(user: dict, match: dict) -> None:
-    allowed = (
-        await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "match", match["id"])
-        or await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "stage", match.get("stage_id"))
-        or await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "station", match.get("station_id"))
-    )
+    allowed = await has_match_result_permission(user, match)
     if not allowed:
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")
 
 
 async def _can_submit_result_for_match(match: dict, user: dict | None) -> bool:
-    return bool(
-        user
-        and (
-            await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "match", match["id"])
-            or await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "stage", match.get("stage_id"))
-            or await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "station", match.get("station_id"))
-        )
-    )
+    return await has_match_result_permission(user, match)
 
 
 def _schedule_deadline(match: dict, tournament: dict | None = None):

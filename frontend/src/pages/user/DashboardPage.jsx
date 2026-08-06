@@ -44,22 +44,29 @@ function DashboardAvatar({ user, isClubMember }) {
 export default function DashboardPage() {
   const { user, isClubMember } = useAuth();
   const [matches, setMatches] = useState([]);
+  const [staffMatches, setStaffMatches] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [openPrizes, setOpenPrizes] = useState(0);
   const [completeness, setCompleteness] = useState(null);
   const [penaltyCount, setPenaltyCount] = useState(0);
 
   const load = useCallback(async () => {
-    const [m, n, p, c, pen] = await Promise.allSettled([
+    const [m, operations, n, p, c, pen] = await Promise.allSettled([
       api.get("/matches/upcoming"),
+      api.get("/matches/operations"),
       api.get("/notifications/me"),
       api.get("/prizes/me/open-count"),
       api.get("/users/me/profile-completeness"),
       api.get("/penalties/me"),
     ]);
-    if (m.status === "fulfilled") {
-      const rows = Array.isArray(m.value.data) ? m.value.data : [];
-      setMatches(rows.filter((match) => OPEN_MATCH_STATUSES.has(String(match.status || ""))));
+    const ownRows = m.status === "fulfilled" && Array.isArray(m.value.data)
+      ? m.value.data.filter((match) => OPEN_MATCH_STATUSES.has(String(match.status || "")))
+      : [];
+    const ownIds = new Set(ownRows.map((match) => match.id));
+    if (m.status === "fulfilled") setMatches(ownRows);
+    if (operations.status === "fulfilled") {
+      const rows = Array.isArray(operations.value.data) ? operations.value.data : [];
+      setStaffMatches(rows.filter((match) => !ownIds.has(match.id) && OPEN_MATCH_STATUSES.has(String(match.status || ""))));
     }
     if (n.status === "fulfilled") setNotifications(Array.isArray(n.value.data) ? n.value.data : (n.value.data?.items || []));
     if (p.status === "fulfilled") setOpenPrizes(p.value.data?.count || 0);
@@ -67,11 +74,20 @@ export default function DashboardPage() {
     if (pen.status === "fulfilled") setPenaltyCount(pen.value.data?.count || 0);
   }, []);
   useEffect(() => {
-    load();
+    const refreshVisible = () => {
+      if (typeof document === "undefined" || !document.hidden) load().catch(() => {});
+    };
+    refreshVisible();
     const timer = window.setInterval(() => {
-      load().catch(() => {});
+      refreshVisible();
     }, 10000);
-    return () => window.clearInterval(timer);
+    window.addEventListener("focus", refreshVisible);
+    document.addEventListener("visibilitychange", refreshVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshVisible);
+      document.removeEventListener("visibilitychange", refreshVisible);
+    };
   }, [load]);
   useApiInvalidation(load, ["matches", "prizes", "users", "penalties", "achievements", "membership", "tournaments", "f1", "admin/notifications"]);
 
@@ -115,25 +131,10 @@ export default function DashboardPage() {
 
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 border border-white/10 rounded-sm bg-[#121212] p-5">
-            <h2 className="font-heading text-xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#29B6E8]" /> Nächste Spiele</h2>
+            <h2 className="font-heading text-xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#29B6E8]" /> Meine aktiven Matches</h2>
             <div className="space-y-3">
               {matches.length === 0 && <div className="text-sm text-white/40">Keine geplanten Spiele.</div>}
-              {matches.map((m) => (
-                <Link
-                  key={m.id}
-                  to={`/matches/${m.id}`}
-                  data-testid={`dashboard-match-${m.id}`}
-                  className="block border border-white/10 rounded-sm p-3 hover:border-[#29B6E8]/60 transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-white">{m.tournament_title || m.round_name || `Runde ${m.round}`}</div>
-                    <StatusBadge status={m.status} />
-                  </div>
-                  {m.tournament_title && <div className="text-xs text-white/45 mt-1">{m.round_name || `Runde ${m.round || "-"}`}</div>}
-                  {m.scheduled_at && <div className="text-xs text-white/50 mt-1">{new Date(m.scheduled_at).toLocaleString("de-DE")}</div>}
-                  <div className="mt-2 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]">Match öffnen · Ergebnis direkt erfassen</div>
-                </Link>
-              ))}
+              {matches.map((m) => <DashboardMatchCard key={m.id} match={m} testId={`dashboard-match-${m.id}`} />)}
             </div>
           </div>
           <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
@@ -149,6 +150,15 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {staffMatches.length > 0 && (
+          <div className="mt-6 border border-[#FFD700]/25 rounded-sm bg-[#121212] p-5" data-testid="dashboard-staff-matches">
+            <h2 className="font-heading text-xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Turnierleitung · Ergebnisse</h2>
+            <div className="grid md:grid-cols-2 gap-3">
+              {staffMatches.map((match) => <DashboardMatchCard key={match.id} match={match} staff />)}
+            </div>
+          </div>
+        )}
 
         <div className="mt-8 grid sm:grid-cols-2 md:grid-cols-3 gap-4">
           {openPrizes > 0 && (
@@ -246,5 +256,34 @@ export default function DashboardPage() {
         </div>
       </div>
     </PublicLayout>
+  );
+}
+
+function DashboardMatchCard({ match, staff = false, testId }) {
+  const details = [
+    match.opponent_name || (match.participant_names || []).join(" · "),
+    match.round_name || (match.round ? `Runde ${match.round}` : ""),
+    match.station_label ? `Station ${match.station_label}` : "",
+  ].filter(Boolean);
+  const attention = Boolean(match.needs_result);
+  const action = staff && match.can_submit_result
+    ? "Ergebnis erfassen"
+    : attention
+      ? "Ergebnis öffnen"
+      : "Match öffnen";
+  return (
+    <Link
+      to={`/matches/${match.id}`}
+      data-testid={testId}
+      className={`block border rounded-sm p-3 transition ${attention ? "border-[#FFD700]/45 bg-[#FFD700]/5 hover:border-[#FFD700]" : "border-white/10 hover:border-[#29B6E8]/60"}`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm text-white font-bold">{match.tournament_title || "Turniermatch"}</div>
+        <StatusBadge status={match.status} />
+      </div>
+      {details.length > 0 && <div className="text-xs text-white/50 mt-1">{details.join(" · ")}</div>}
+      {match.scheduled_at && <div className="text-xs text-white/45 mt-1">{new Date(match.scheduled_at).toLocaleString("de-DE")}</div>}
+      <div className={`mt-2 text-[10px] font-bold uppercase tracking-wider ${attention ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{action}</div>
+    </Link>
   );
 }

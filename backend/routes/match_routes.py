@@ -1,6 +1,6 @@
 """Match/Score/Dispute routes."""
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from database import get_db
@@ -9,8 +9,8 @@ from services.visibility import user_can_see
 from services.tournament_permissions import (
     READ_STAFF_ROLES,
     RESULT_STAFF_ROLES,
+    has_match_result_permission,
     has_tournament_staff_permission,
-    require_tournament_staff_permission,
 )
 from models import (
     MatchChatCreate,
@@ -26,6 +26,7 @@ from models import (
 from bracket_engine import advance_match_winner
 from match_rules import loser_for_winner, match_allows_draw, validate_winner_id
 from services.match_notifications import notify_match_result_confirmed
+from services.match_overview import operational_match_overviews, own_match_overviews
 from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
 from services.match_v2_results import MatchV2ResultError, build_v2_result_application
 from services.station_runtime import release_station_for_match
@@ -38,8 +39,6 @@ STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 EVENT_MODES = {"local", "online", "hybrid"}
 RESULT_ENTRY_MODES = {"staff_only", "player_confirmed", "hybrid"}
 SCHEDULE_MODES = {"fixed_by_staff", "player_proposal", "hybrid"}
-OPEN_MATCH_STATUSES = {"ready", "scheduled", "in_progress", "waiting_result"}
-ACTIVE_MATCH_REGISTRATION_STATUSES = {"registered", "approved", "checked_in"}
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 STAFF_MENTION_HANDLES = {"leitung", "turnierleitung", "orga", "organizer", "staff", "admin", "referee", "schiri", "scorekeeper"}
 USER_PUBLIC_PROJECTION = {
@@ -60,28 +59,6 @@ async def _ensure_match_tournament_unlocked(db, match: dict) -> None:
 
 def _is_staff(user: dict | None) -> bool:
     return bool(user and user.get("role") in STAFF_ROLES)
-
-
-def _upcoming_sort_key(match: dict) -> tuple:
-    scheduled = match.get("scheduled_at")
-    if scheduled:
-        try:
-            parsed = datetime.fromisoformat(str(scheduled).replace("Z", "+00:00"))
-            if parsed.tzinfo is None:
-                parsed = parsed.replace(tzinfo=timezone.utc)
-            return (0, parsed.astimezone(timezone.utc))
-        except (TypeError, ValueError):
-            pass
-    return (1, int(match.get("round") or 9999), str(match.get("match_key") or match.get("id") or ""))
-
-
-async def _team_ids_for_user(user_id: str) -> list[str]:
-    db = get_db()
-    memberships = await db.team_members.find(
-        {"user_id": user_id},
-        {"_id": 0, "team_id": 1},
-    ).to_list(200)
-    return [row["team_id"] for row in memberships if row.get("team_id")]
 
 
 def _mode_value(value: object, allowed: set[str]) -> str | None:
@@ -463,35 +440,20 @@ async def _acting_registration_for_match(match: dict, user: dict | None) -> dict
 async def _can_act_for_match(match: dict, user: dict | None) -> bool:
     return bool(
         _is_staff(user)
-        or await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES)
-        or await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "match", match.get("id"))
-        or await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "stage", match.get("stage_id"))
+        or await has_match_result_permission(user, match)
         or await _acting_registration_for_match(match, user)
     )
 
 
-async def _can_submit_result_for_match(match: dict, user: dict | None, collection: str) -> bool:
-    if not user:
-        return False
-    if collection == "matches":
-        return bool(
-            await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "tournament")
-            or await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "match", match.get("id"))
-            or (match.get("station_id") and await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "station", match.get("station_id")))
-        )
-    return bool(
-        await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES)
-        or await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "match", match.get("id"))
-        or await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "stage", match.get("stage_id"))
-        or (match.get("station_id") and await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES, "station", match.get("station_id")))
-    )
+async def _can_submit_result_for_match(match: dict, user: dict | None) -> bool:
+    return await has_match_result_permission(user, match)
 
 
 async def _can_forfeit_match(match: dict, user: dict | None, collection: str) -> bool:
     return bool(
         user
         and collection == "matches"
-        and await has_tournament_staff_permission(user, match.get("tournament_id"), RESULT_STAFF_ROLES)
+        and await has_match_result_permission(user, match)
     )
 
 
@@ -507,12 +469,7 @@ async def _can_read_match(match: dict, user: dict | None) -> bool:
 
 
 async def _require_result_permission(user: dict, match: dict) -> None:
-    allowed = (
-        await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES)
-        or await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "match", match["id"])
-        or await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "stage", match.get("stage_id"))
-        or (match.get("station_id") and await has_tournament_staff_permission(user, match["tournament_id"], RESULT_STAFF_ROLES, "station", match.get("station_id")))
-    )
+    allowed = await has_match_result_permission(user, match)
     if not allowed:
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")
 
@@ -639,7 +596,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     acting_reg = await _acting_registration_for_match(match, user)
     direct_reg = await _user_registration_for_match(match, user)
     policy = _match_policy(match, collection, tournament, stage)
-    can_submit_result = await _can_submit_result_for_match(match, user, collection)
+    can_submit_result = await _can_submit_result_for_match(match, user)
     can_player_report = bool(collection == "matches" and direct_reg and _players_can_report(policy))
     can_propose_schedule = bool(user and await _can_act_for_match(match, user) and _schedule_proposals_enabled(policy))
     round_number = match.get("matchday_number") or match.get("round")
@@ -675,40 +632,13 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
 
 @router.get("/upcoming")
 async def my_upcoming(me: dict = Depends(get_current_user)):
-    db = get_db()
-    team_ids = await _team_ids_for_user(me["id"])
-    reg_query = {"user_id": me["id"]}
-    if team_ids:
-        reg_query = {"$or": [{"user_id": me["id"]}, {"team_id": {"$in": team_ids}}]}
-    regs = await db.tournament_registrations.find(
-        {**reg_query, "status": {"$in": list(ACTIVE_MATCH_REGISTRATION_STATUSES)}},
-        {"_id": 0, "id": 1, "tournament_id": 1},
-    ).to_list(200)
-    reg_ids = [r["id"] for r in regs]
-    if not reg_ids:
-        return []
-    match_query = {
-        "$or": [{"participant_a_id": {"$in": reg_ids}},
-                {"participant_b_id": {"$in": reg_ids}},
-                {"slots.registration_id": {"$in": reg_ids}}],
-        "status": {"$in": list(OPEN_MATCH_STATUSES)},
-    }
-    legacy = await db.matches.find(match_query, {"_id": 0}).to_list(200)
-    v2 = await db.matches_v2.find(match_query, {"_id": 0}).to_list(200)
-    matches = sorted([{**m, "collection": "matches"} for m in legacy] + [{**m, "collection": "matches_v2"} for m in v2], key=_upcoming_sort_key)[:12]
-    tournament_ids = list({match.get("tournament_id") for match in matches if match.get("tournament_id")})
-    tournaments = {
-        tournament["id"]: tournament
-        for tournament in await db.tournaments.find(
-            {"id": {"$in": tournament_ids}},
-            {"_id": 0, "id": 1, "title": 1, "slug": 1},
-        ).to_list(100)
-    }
-    for match in matches:
-        tournament = tournaments.get(match.get("tournament_id") or "") or {}
-        match["tournament_title"] = tournament.get("title")
-        match["tournament_slug"] = tournament.get("slug")
+    matches, _registrations = await own_match_overviews(get_db(), me)
     return matches
+
+
+@router.get("/operations")
+async def operational_matches(me: dict = Depends(get_current_user)):
+    return await operational_match_overviews(get_db(), me)
 
 
 @router.get("/{match_id}/page")
@@ -1022,11 +952,7 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         m.get("score_a"),
         m.get("score_b"),
     )
-    allowed = (
-        await has_tournament_staff_permission(me, m["tournament_id"], RESULT_STAFF_ROLES, "tournament")
-        or await has_tournament_staff_permission(me, m["tournament_id"], RESULT_STAFF_ROLES, "match", match_id)
-        or (m.get("station_id") and await has_tournament_staff_permission(me, m["tournament_id"], RESULT_STAFF_ROLES, "station", m.get("station_id")))
-    )
+    allowed = await has_match_result_permission(me, m)
     if not allowed:
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")
     nullable_fields = {"winner_id", "scheduled_at", "station_id", "admin_note", "map", "best_of", "duration_minutes"}
@@ -1242,7 +1168,7 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(get_current_user
         raise HTTPException(status_code=404)
     await _ensure_match_tournament_unlocked(db, m)
     await ensure_tournament_accepts_results(db, m["tournament_id"])
-    await require_tournament_staff_permission(me, m["tournament_id"], RESULT_STAFF_ROLES)
+    await _require_result_permission(me, m)
     note = (body.get("note") or body.get("reason") or "").strip()
     if len(note) < 5:
         raise HTTPException(

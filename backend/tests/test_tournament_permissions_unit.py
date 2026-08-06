@@ -89,6 +89,23 @@ def test_role_and_scope_permissions(monkeypatch):
     assert asyncio.run(perms.has_tournament_staff_permission(user, "t1", perms.READ_STAFF_ROLES, "match", "m1"))
 
 
+def test_match_result_permission_accepts_only_matching_operational_scope(monkeypatch):
+    db = FakeDb([
+        {"tournament_id": "t1", "user_id": "u1", "role": "scorekeeper", "scope": "stage", "scope_id": "stage-1", "is_active": True},
+        {"tournament_id": "t1", "user_id": "u2", "role": "scorekeeper", "scope": "station", "scope_id": "station-1", "is_active": True},
+    ])
+    monkeypatch.setattr(perms, "get_db", lambda: db)
+
+    assert asyncio.run(perms.has_match_result_permission(
+        {"id": "u1", "role": "user"},
+        {"id": "m1", "tournament_id": "t1", "stage_id": "stage-1", "station_id": "station-2"},
+    ))
+    assert not asyncio.run(perms.has_match_result_permission(
+        {"id": "u1", "role": "user"},
+        {"id": "m2", "tournament_id": "t1", "stage_id": "stage-2", "station_id": "station-2"},
+    ))
+
+
 def test_require_tournament_staff_permission_raises_403(monkeypatch):
     db = FakeDb([])
     monkeypatch.setattr(perms, "get_db", lambda: db)
