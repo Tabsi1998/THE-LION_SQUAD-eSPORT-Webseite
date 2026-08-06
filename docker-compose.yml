@@ -29,6 +29,8 @@ services:
       JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env before deploying}"
       AUTH_COOKIE_DOMAIN: "${AUTH_COOKIE_DOMAIN:-}"
       TRUST_PROXY_HEADERS: "${TRUST_PROXY_HEADERS:-true}"
+      TRUSTED_PROXY_CIDRS: "${TRUSTED_PROXY_CIDRS:-127.0.0.1/32,::1/128,172.16.0.0/12}"
+      TRUSTED_HOSTS: "${TRUSTED_HOSTS:-}"
       SENDER_EMAIL: "${SENDER_EMAIL:-noreply@lionsquad.at}"
       RESEND_API_KEY: "${RESEND_API_KEY:-}"
       DISABLE_SCHEDULER: "${DISABLE_SCHEDULER:-false}"
@@ -43,7 +45,7 @@ services:
       USER_UPLOAD_RATE_WINDOW_SECONDS: "${USER_UPLOAD_RATE_WINDOW_SECONDS:-3600}"
       ALLOW_INSECURE_CORS: "${ALLOW_INSECURE_CORS:-false}"
     ports:
-      - "${BACKEND_BIND:-0.0.0.0}:${BACKEND_PORT:-8001}:8001"
+      - "${BACKEND_BIND:-127.0.0.1}:${BACKEND_PORT:-8001}:8001"
     volumes:
       - uploads_data:${UPLOAD_DIR:-/app/backend/uploads}
     extra_hosts:
@@ -74,7 +76,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${FRONTEND_BIND:-0.0.0.0}:${FRONTEND_PORT:-3000}:80"
+      - "${FRONTEND_BIND:-127.0.0.1}:${FRONTEND_PORT:-3000}:80"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
       interval: 15s

@@ -111,8 +111,7 @@ async def _issue_mobile_session(db, user: dict, request: Request) -> tuple[str, 
         "created_at": now_utc(),
         "expires_at": refresh_expires_at(),
         "user_agent": request.headers.get("user-agent"),
-        "ip": request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-              or (request.client.host if request.client else None),
+        "ip": get_client_ip(request),
         "client": "mobile",
     })
     return access, refresh

@@ -1,5 +1,4 @@
 """Small Mongo-backed rate limits for public or abuse-prone endpoints."""
-import os
 from datetime import datetime, timezone, timedelta
 
 from fastapi import HTTPException, Request
@@ -18,25 +17,8 @@ def _format_wait(seconds: int) -> str:
     return f"{minutes} Minuten {rest} Sekunden"
 
 
-def _truthy_env(name: str, default: str = "false") -> bool:
-    return os.environ.get(name, default).strip().lower() in {"1", "true", "yes", "on"}
-
-
 def get_client_ip(request: Request) -> str:
-    """Return the best client IP known to the app.
-
-    The production compose setup binds backend ports to localhost and routes API
-    traffic through nginx, so trusting proxy headers is appropriate there. If the
-    backend is ever exposed directly, set TRUST_PROXY_HEADERS=false.
-    """
-    if _truthy_env("TRUST_PROXY_HEADERS", "true"):
-        xff = request.headers.get("x-forwarded-for", "")
-        first = xff.split(",", 1)[0].strip() if xff else ""
-        if first:
-            return first[:120]
-        real_ip = request.headers.get("x-real-ip", "").strip()
-        if real_ip:
-            return real_ip[:120]
+    """Return Uvicorn's validated peer/client IP, never raw forwarding headers."""
     return (request.client.host if request.client else "unknown")[:120]
 
 

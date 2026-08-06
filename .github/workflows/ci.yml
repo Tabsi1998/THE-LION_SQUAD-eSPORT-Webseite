@@ -66,6 +66,18 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
+      - name: Validate reverse-proxy deployment config
+        env:
+          CORS_ORIGINS: https://example.test
+          FRONTEND_URL: https://example.test
+          JWT_SECRET: ci-only-secret-value-with-at-least-32-characters
+          PUBLIC_BACKEND_URL: https://example.test
+        run: |
+          docker compose config -q
+          docker run --rm \
+            --add-host backend:127.0.0.1 \
+            --volume "$PWD/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+            nginx:alpine nginx -t
       - uses: actions/setup-node@v6
         with:
           node-version: "20"

@@ -8,5 +8,6 @@ test("remote mobile logs never include local stack traces", async () => {
   const source = await readFile(sourceUrl, "utf8");
 
   assert.doesNotMatch(source, /error\.stack/);
+  assert.doesNotMatch(source, /console\.(?:warn|error)\s*=/);
   assert.match(source, /if \(!clientLoggingEnabled\) return/);
 });

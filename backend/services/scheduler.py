@@ -96,7 +96,7 @@ async def _safe_birthday_greetings():
         from services.birthday_mailer import queue_birthday_greetings
         res = await queue_birthday_greetings()
         if res.get("queued") or res.get("deduped"):
-            logger.info("[scheduler] birthday_greetings queued=%s deduped=%s", res.get("queued") or 0, res.get("deduped") or 0)
+            logger.info("[scheduler] birthday_greetings completed")
     except Exception as exc:
         _log_task_failure("birthday_greetings", exc)
 
