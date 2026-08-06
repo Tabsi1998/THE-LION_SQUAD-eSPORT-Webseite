@@ -57,6 +57,7 @@ from routes.extras_routes import (
 )
 from services.change_events import change_event_stream, publish_api_change
 from runtime_config import resolve_app_environment, validate_runtime_environment
+from storage import PUBLIC_UPLOAD_DIR, UPLOAD_DIR, ensure_storage_directories
 
 
 logging.basicConfig(level=logging.INFO,
@@ -74,6 +75,7 @@ def validate_runtime_env():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_runtime_env()
+    ensure_storage_directories()
     logger.info("[THE LION SQUAD] Initializing indexes...")
     await init_indexes()
     logger.info("[THE LION SQUAD] Seeding badge catalog...")
@@ -213,12 +215,9 @@ app.include_router(penalty_admin_router)
 
 # Static uploads: only public media files are served directly. Documents are
 # streamed through visibility-aware /api/documents/{id}/download.
-import pathlib
 from services.media_formats import PUBLIC_MEDIA_EXTS, PUBLIC_MEDIA_TYPES, VIDEO_MEDIA_EXTS
-upload_dir = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
-upload_dir.mkdir(parents=True, exist_ok=True)
-public_upload_dir = upload_dir / "public"
-public_upload_dir.mkdir(parents=True, exist_ok=True)
+upload_dir = UPLOAD_DIR
+public_upload_dir = PUBLIC_UPLOAD_DIR
 
 
 def _iter_file_range(path: Path, start: int, end: int):
@@ -237,7 +236,7 @@ def _iter_file_range(path: Path, start: int, end: int):
 async def public_upload(filename: str, request: Request):
     if "/" in filename or "\\" in filename or ".." in filename or filename.startswith("."):
         raise HTTPException(status_code=400, detail="Invalid filename")
-    suffix = pathlib.Path(filename).suffix.lower()
+    suffix = Path(filename).suffix.lower()
     if suffix not in PUBLIC_MEDIA_EXTS:
         raise HTTPException(status_code=404, detail="File not found")
     for base in (public_upload_dir, upload_dir):

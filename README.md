@@ -157,13 +157,16 @@ Lokaler Schnellcheck vor Commit oder groesseren Deployments:
 powershell -ExecutionPolicy Bypass -File .\scripts\quick-check.ps1
 ```
 
-Der Schnellcheck kompiliert kritische Backend-Dateien, fuehrt Match-V2-Unit-Tests aus,
-baut das Frontend und prueft die mobile App per TypeScript. Fuer reine Backend-Aenderungen
-kann der Frontend-Build oder der Mobile-Typecheck uebersprungen werden:
+Der Schnellcheck bildet die CI-Matrix lokal ab: kompletter Backend-Compile und alle
+Nicht-Live-Tests, Dependency-Audits, Frontend-Build sowie Unit-/Browser-Tests und die
+Mobile-Sicherheits-, Release- und Expo-Pruefungen. Er erwartet Python 3.11, Node.js 20
+und bereits installierte Entwicklungsabhaengigkeiten. Einzelne, fuer die Aenderung
+irrelevante Bereiche koennen bewusst uebersprungen werden:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\quick-check.ps1 -SkipFrontendBuild
 powershell -ExecutionPolicy Bypass -File .\scripts\quick-check.ps1 -SkipMobileTypecheck
+powershell -ExecutionPolicy Bypass -File .\scripts\quick-check.ps1 -SkipE2E -SkipExpoChecks
 ```
 
 Backend-Unit- und Smoke-Tests ohne laufendes Live-Backend:

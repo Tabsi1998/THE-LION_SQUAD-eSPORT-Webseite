@@ -18,6 +18,7 @@ from auth import require_admin, get_current_user
 from database import get_db
 from models import new_id, now_utc
 from services.rate_limit import enforce_rate_limit, get_client_ip
+from storage import PRIVATE_DOC_DIR, PUBLIC_UPLOAD_DIR, UPLOAD_DIR, ensure_directory
 from services.media_formats import (
     BROWSER_IMAGE_MIME_BY_EXT,
     CONVERTIBLE_ORIGINAL_IMAGE_EXTS,
@@ -40,12 +41,6 @@ except ImportError:  # pragma: no cover
     pass
 
 logger = logging.getLogger("tls-arena.uploads")
-UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
-PRIVATE_DOC_DIR = UPLOAD_DIR / "documents"
-PUBLIC_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-PRIVATE_DOC_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE = {"image/png", "image/jpeg", "image/webp"}
 ALLOWED_VIDEO = {"video/mp4", "video/webm", "video/quicktime", "video/x-m4v"}
 SUPPORTED_VIDEO_LABEL = "MP4, WebM, MOV oder M4V"
@@ -268,6 +263,7 @@ async def _write_upload_stream_limited(
 ) -> int:
     total = 0
     try:
+        ensure_directory(path.parent)
         with path.open("wb") as out:
             if first_chunk:
                 total += len(first_chunk)
@@ -397,6 +393,7 @@ def _image_to_webp_preview(img: Image.Image) -> dict:
     filename = f"{uuid.uuid4().hex}.webp"
     path = PUBLIC_UPLOAD_DIR / filename
     try:
+        ensure_directory(PUBLIC_UPLOAD_DIR)
         path.write_bytes(data)
     except OSError as exc:
         logger.error("[uploads] failed to write converted preview %s: %s", path, exc)
@@ -529,6 +526,7 @@ async def _upload_image_impl(
     filename = f"{uuid.uuid4().hex}{ext}"
     path = PUBLIC_UPLOAD_DIR / filename
     try:
+        ensure_directory(PUBLIC_UPLOAD_DIR)
         path.write_bytes(data)
     except OSError as exc:
         logger.error("[uploads] failed to write %s: %s", path, exc)
@@ -1080,7 +1078,7 @@ async def upload_document(request: Request, file: UploadFile = File(...), me: di
         filename = f"{uuid.uuid4().hex}{ext or ''}"
         path = PRIVATE_DOC_DIR / filename
         try:
-            PRIVATE_DOC_DIR.mkdir(parents=True, exist_ok=True)
+            ensure_directory(PRIVATE_DOC_DIR)
             path.write_bytes(data)
         except OSError as exc:
             logger.error("[uploads] failed to write document %s: %s", path, exc)
