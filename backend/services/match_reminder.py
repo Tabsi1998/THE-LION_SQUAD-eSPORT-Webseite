@@ -1,5 +1,4 @@
-"""Phase 8: Match-Reminder cron logic. Picks all matches with scheduled_at in the
-near future and enqueues reminder mails at 24h / 2h / 30m / 10m offsets.
+"""Queue a single scheduled 10-minute reminder for upcoming online matches.
 
 Idempotent via dedupe_key on the mail_jobs collection.
 """
@@ -14,15 +13,20 @@ from services.user_notifications import build_public_url, create_user_notificati
 
 logger = logging.getLogger("tls.match_reminders")
 
-# Lead times: (template_key, label, lead_minutes, window_minutes)
 LEAD_TIMES = [
-    ("match_lead_24h", "24h", 24 * 60, 30),
-    ("match_lead_2h", "2h", 120, 20),
-    ("match_lead_30m", "30m", 30, 10),
     ("match_lead_10m", "10m", 10, 5),
-    ("match_lead_5m", "5m", 5, 3),
 ]
 EMAIL_LEAD_LABELS = {"10m"}
+
+
+def _uses_actual_start_notifications(tournament: dict) -> bool:
+    event_mode = tournament.get("event_mode") or (
+        "local" if tournament.get("location") and not tournament.get("stream_link") else "online"
+    )
+    schedule_mode = tournament.get("schedule_mode") or (
+        "fixed_by_staff" if event_mode == "local" else "player_proposal"
+    )
+    return event_mode == "local" and schedule_mode == "fixed_by_staff"
 
 
 async def _participants_for_match(match: dict) -> list[dict]:
@@ -107,7 +111,8 @@ async def schedule_match_reminders() -> dict:
     ]
     queued = 0
     notifications = 0
-    for collection_name, cursor in queries:
+    actual_start_only = 0
+    for _collection_name, cursor in queries:
         async for m in cursor:
             try:
                 scheduled = datetime.fromisoformat(m["scheduled_at"].replace("Z", "+00:00"))
@@ -117,7 +122,20 @@ async def schedule_match_reminders() -> dict:
                 scheduled = scheduled.replace(tzinfo=timezone.utc)
             diff_min = (scheduled - now).total_seconds() / 60
             # Tournament + opponent context
-            t = await db.tournaments.find_one({"id": m.get("tournament_id")}, {"title": 1, "slug": 1}) or {}
+            t = await db.tournaments.find_one(
+                {"id": m.get("tournament_id")},
+                {
+                    "title": 1,
+                    "slug": 1,
+                    "event_mode": 1,
+                    "schedule_mode": 1,
+                    "location": 1,
+                    "stream_link": 1,
+                },
+            ) or {}
+            if _uses_actual_start_notifications(t):
+                actual_start_only += 1
+                continue
             url = f"/matches/{m.get('id')}"
             mail_url = await build_public_url(url)
             when_str = scheduled.astimezone(ZoneInfo("Europe/Vienna")).strftime("%d.%m. %H:%M Uhr")
@@ -179,4 +197,8 @@ async def schedule_match_reminders() -> dict:
                         queued += 1
     if queued or notifications:
         logger.info(f"[match-reminders] queued {queued} mails, created {notifications} web notifications")
-    return {"queued": queued, "notifications": notifications}
+    return {
+        "queued": queued,
+        "notifications": notifications,
+        "actual_start_only": actual_start_only,
+    }

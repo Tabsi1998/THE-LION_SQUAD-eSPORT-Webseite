@@ -179,19 +179,45 @@ def _next_status(doc: dict, now: datetime, kind: str = "tournament") -> str | No
     return None
 
 
-async def _apply_tournament_transition_effects(db, doc: dict, next_status: str) -> None:
+async def _prepare_tournament_transition(db, doc: dict, next_status: str) -> bool:
     if next_status not in {"check_in", "live"}:
-        return
+        return True
     try:
-        from routes.tournament_routes import _finalize_bracket_for_checkin
+        from routes.tournament_routes import (
+            _collect_plan_matches,
+            _finalize_bracket_for_checkin,
+            _live_start_blocker,
+            _planning_report,
+        )
         tournament = {**doc, "status": next_status}
         await _finalize_bracket_for_checkin(db, tournament, None)
+        if next_status == "live":
+            matches, current = await _collect_plan_matches(db, doc["id"])
+            participant_count = await db.tournament_registrations.count_documents({
+                "tournament_id": doc["id"],
+                "status": {"$in": ["approved", "checked_in"]},
+            })
+            report = _planning_report(
+                matches,
+                current,
+                participant_count=participant_count,
+                require_fixed_bracket=True,
+            )
+            if _live_start_blocker(report, force=False):
+                logger.warning(
+                    "[scheduler] tournament auto-start blocked for %s errors=%s",
+                    doc.get("id"),
+                    report.get("error_count", 0),
+                )
+                return False
+        return True
     except Exception as exc:
         logger.warning(
-            "[scheduler] tournament bracket finalize skipped for %s type=%s",
+            "[scheduler] tournament transition preparation failed for %s type=%s",
             doc.get("id"),
             type(exc).__name__,
         )
+        return next_status == "check_in"
 
 
 async def _safe_status_transitions():
@@ -210,12 +236,12 @@ async def _safe_status_transitions():
             async for doc in cursor:
                 nxt = _next_status(doc, now, kind)
                 if nxt and nxt != doc.get("status"):
+                    if kind == "tournament" and not await _prepare_tournament_transition(db, doc, nxt):
+                        continue
                     await db[collection_name].update_one(
                         {"id": doc["id"]},
                         {"$set": {"status": nxt, "updated_at": now_iso}},
                     )
-                    if kind == "tournament":
-                        await _apply_tournament_transition_effects(db, doc, nxt)
                     changed += 1
         if changed:
             logger.info(f"[scheduler] status_transitions changed={changed}")
