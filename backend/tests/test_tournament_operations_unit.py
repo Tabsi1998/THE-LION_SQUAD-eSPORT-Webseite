@@ -11,7 +11,6 @@ from routes.station_routes import (
     _assign_match_to_station,
     _match_has_minimum_participants,
 )
-from routes.tournament_routes import _live_start_blocker, _planning_report
 from services.match_reminder import _uses_actual_start_notifications
 
 
@@ -26,7 +25,7 @@ def _legacy_match(**updates):
 
 
 def test_start_report_requires_configured_minimum_participants():
-    report = _planning_report(
+    report = tournament_routes._planning_report(
         [_legacy_match()],
         {"event_mode": "online", "min_participants": 4},
         participant_count=3,
@@ -36,12 +35,12 @@ def test_start_report_requires_configured_minimum_participants():
     assert report["ready_match_count"] == 1
     assert report["ok"] is False
     assert report["errors"][0]["type"] == "insufficient_participants"
-    assert _live_start_blocker(report, force=False)["force_allowed"] is True
-    assert _live_start_blocker(report, force=True) is None
+    assert tournament_routes._live_start_blocker(report, force=False)["force_allowed"] is True
+    assert tournament_routes._live_start_blocker(report, force=True) is None
 
 
 def test_live_start_never_allows_only_preview_or_unfilled_matches():
-    report = _planning_report(
+    report = tournament_routes._planning_report(
         [
             _legacy_match(status="preview", is_preview=True),
             {"id": "future", "status": "pending", "participant_a_id": None, "participant_b_id": None},
@@ -51,14 +50,14 @@ def test_live_start_never_allows_only_preview_or_unfilled_matches():
         require_fixed_bracket=True,
     )
 
-    blocker = _live_start_blocker(report, force=True)
+    blocker = tournament_routes._live_start_blocker(report, force=True)
     assert blocker["force_allowed"] is False
     assert any(error["type"] == "no_playable_matches" for error in report["errors"])
     assert report["checked_matches"] == 1
 
 
 def test_planning_ignores_future_empty_matches_in_missing_station_noise():
-    report = _planning_report(
+    report = tournament_routes._planning_report(
         [{"id": "future", "status": "pending", "participant_a_id": None, "participant_b_id": None}],
         {"event_mode": "online"},
     )
