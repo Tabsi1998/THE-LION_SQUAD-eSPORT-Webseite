@@ -57,9 +57,23 @@ Create two proxy hosts:
 2. `lionsquad.at/api/*` -> backend container / host port `8001`
 
 Enable HTTPS (Let's Encrypt) inside NPM.
+Enable HTTP-to-HTTPS redirection and preserve the public `Host`. NPM must set
+`X-Forwarded-For` and `X-Forwarded-Proto`; the application accepts these headers
+only from the IP networks configured in `TRUSTED_PROXY_CIDRS`.
 Set the proxy body size to at least 1700 MB when direct gallery video uploads are enabled,
 otherwise image/document/video uploads can fail with
 `413 Request Entity Too Large` before the app receives the request.
+
+For a proxy installed directly on the host, Loopback is sufficient:
+
+```env
+TRUST_PROXY_HEADERS=true
+TRUSTED_PROXY_CIDRS=127.0.0.1/32,::1/128
+```
+
+For a Docker-based proxy or when all traffic first reaches the frontend container,
+add and then narrow the corresponding Docker network shown by
+`docker network inspect`. Never configure `*`, `0.0.0.0/0`, or `::/0`.
 
 ## 5. First admin and login
 

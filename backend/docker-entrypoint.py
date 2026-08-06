@@ -5,6 +5,8 @@ import pathlib
 import pwd
 import stat
 
+from runtime_config import env_flag, trusted_proxy_cidrs
+
 
 APP_USER = os.environ.get("APP_USER", "appuser")
 UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
@@ -77,6 +79,20 @@ def assert_upload_writable() -> None:
             raise RuntimeError(f"Upload path is not writable: {directory} ({exc})") from exc
 
 
+def build_uvicorn_args() -> list[str]:
+    port = os.environ.get("PORT", "8001")
+    args = ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", port]
+    if env_flag("TRUST_PROXY_HEADERS"):
+        args.extend([
+            "--proxy-headers",
+            "--forwarded-allow-ips",
+            ",".join(trusted_proxy_cidrs()),
+        ])
+    else:
+        args.append("--no-proxy-headers")
+    return args
+
+
 def main() -> None:
     try:
         user = pwd.getpwnam(APP_USER)
@@ -91,8 +107,7 @@ def main() -> None:
     assert_upload_writable()
     _log("upload volume writable; starting backend")
 
-    port = os.environ.get("PORT", "8001")
-    os.execvp("uvicorn", ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", port])
+    os.execvp("uvicorn", build_uvicorn_args())
 
 
 if __name__ == "__main__":

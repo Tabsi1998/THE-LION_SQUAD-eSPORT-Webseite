@@ -9,6 +9,12 @@
 - Client error telemetry is disabled by default (`CLIENT_LOGGING_ENABLED=false`). If enabled
   deliberately, query strings, tokens, email addresses, and local paths are redacted and
   client-side deduplication/rate limits apply.
+- Published container ports bind to Loopback by default for operation behind a reverse proxy.
+- Forwarded client IP and HTTPS information is accepted only from `TRUSTED_PROXY_CIDRS`;
+  wildcard/default-route trust is rejected. Rate limits and session audit records use the
+  client address already validated by Uvicorn, never raw forwarding headers.
+- Public Host headers are restricted to `FRONTEND_URL`, `CORS_ORIGINS`, optional
+  `TRUSTED_HOSTS`, and the internal health-check names.
 
 ## First administrator
 

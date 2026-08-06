@@ -734,9 +734,7 @@ def public_origin(request: Request, branding: dict) -> str:
     configured = (branding.get("domain") or os.environ.get("PUBLIC_URL") or os.environ.get("FRONTEND_URL") or "").strip().rstrip("/")
     if configured:
         return configured if configured.startswith(("http://", "https://")) else f"https://{configured}"
-    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
-    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
-    return f"{proto}://{host}".rstrip("/")
+    return str(request.base_url).rstrip("/")
 
 
 def absolute_url(value: str | None, origin: str) -> str:

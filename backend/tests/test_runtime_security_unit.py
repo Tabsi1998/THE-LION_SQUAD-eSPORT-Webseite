@@ -3,9 +3,17 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 import seed
-from runtime_config import resolve_app_environment, validate_runtime_environment
+from runtime_config import (
+    resolve_app_environment,
+    trusted_http_hosts,
+    trusted_proxy_cidrs,
+    validate_runtime_environment,
+)
 
 
 def test_app_environment_must_be_explicit():
@@ -33,6 +41,57 @@ def test_production_rejects_demo_and_reset_flags():
 def test_development_still_rejects_api_reset_flag():
     with pytest.raises(RuntimeError, match="not supported by the API process"):
         validate_runtime_environment({"APP_ENV": "development", "TLS_RESET": "true"})
+
+
+def test_proxy_headers_require_explicit_narrow_trust_boundary():
+    with pytest.raises(RuntimeError, match="requires explicit"):
+        trusted_proxy_cidrs({"TRUST_PROXY_HEADERS": "true"})
+    with pytest.raises(RuntimeError, match="never trust every source"):
+        trusted_proxy_cidrs({"TRUST_PROXY_HEADERS": "true", "TRUSTED_PROXY_CIDRS": "*"})
+    with pytest.raises(RuntimeError, match="default route"):
+        trusted_proxy_cidrs({"TRUST_PROXY_HEADERS": "true", "TRUSTED_PROXY_CIDRS": "0.0.0.0/0"})
+
+    assert trusted_proxy_cidrs({
+        "TRUST_PROXY_HEADERS": "true",
+        "TRUSTED_PROXY_CIDRS": "127.0.0.1, 172.20.0.0/24,127.0.0.1/32",
+    }) == ("127.0.0.1/32", "172.20.0.0/24")
+
+
+def test_trusted_hosts_derive_from_public_urls_and_reject_production_wildcard():
+    environment = {
+        "APP_ENV": "production",
+        "FRONTEND_URL": "https://lionsquad.at",
+        "CORS_ORIGINS": "https://www.lionsquad.at,https://app.example.test",
+    }
+    hosts = trusted_http_hosts(environment)
+    assert "lionsquad.at" in hosts
+    assert "www.lionsquad.at" in hosts
+    assert "app.example.test" in hosts
+    assert "localhost" in hosts
+
+    with pytest.raises(RuntimeError, match="not allowed in production"):
+        trusted_http_hosts({**environment, "TRUSTED_HOSTS": "*"})
+
+
+def test_trusted_host_middleware_rejects_injected_public_host():
+    environment = {
+        "APP_ENV": "production",
+        "FRONTEND_URL": "https://lionsquad.at",
+    }
+    app = FastAPI()
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=list(trusted_http_hosts(environment)),
+        www_redirect=False,
+    )
+
+    @app.get("/health")
+    async def health():
+        return {"status": "ok"}
+
+    client = TestClient(app)
+    assert client.get("/health", headers={"host": "lionsquad.at"}).status_code == 200
+    assert client.get("/health", headers={"host": "attacker.example"}).status_code == 400
 
 
 def test_admin_bootstrap_never_changes_existing_superadmin(monkeypatch):

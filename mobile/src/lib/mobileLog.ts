@@ -138,23 +138,6 @@ export function installMobileLogHandlers() {
   if (installed || !clientLoggingEnabled) return;
   installed = true;
 
-  const originalWarn = console.warn.bind(console);
-  const originalError = console.error.bind(console);
-
-  console.warn = (...args: unknown[]) => {
-    originalWarn(...args);
-    sendMobileLog("warn", args.map(describeArg).join(" "), { source: "console.warn" });
-  };
-
-  console.error = (...args: unknown[]) => {
-    originalError(...args);
-    const firstError = args.find((arg) => arg instanceof Error);
-    sendMobileLog("error", args.map(describeArg).join(" "), {
-      error: firstError,
-      source: "console.error",
-    });
-  };
-
   const previousHandler = typeof ErrorUtils !== "undefined" ? ErrorUtils?.getGlobalHandler?.() : undefined;
   if (typeof ErrorUtils !== "undefined" && ErrorUtils?.setGlobalHandler) {
     ErrorUtils.setGlobalHandler((error, isFatal) => {

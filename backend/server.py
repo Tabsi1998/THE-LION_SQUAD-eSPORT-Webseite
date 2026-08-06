@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
 
 from database import get_db, init_indexes, close_client
@@ -56,7 +57,11 @@ from routes.extras_routes import (
     settings_router, season_router, widget_router, dsgvo_router, pdf_router, audit_router,
 )
 from services.change_events import change_event_stream, publish_api_change
-from runtime_config import resolve_app_environment, validate_runtime_environment
+from runtime_config import (
+    resolve_app_environment,
+    trusted_http_hosts,
+    validate_runtime_environment,
+)
 from storage import PUBLIC_UPLOAD_DIR, UPLOAD_DIR, ensure_storage_directories
 
 
@@ -108,6 +113,11 @@ app = FastAPI(
     docs_url=None if is_production else "/docs",
     redoc_url=None if is_production else "/redoc",
     openapi_url=None if is_production else "/openapi.json",
+)
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=list(trusted_http_hosts()),
+    www_redirect=False,
 )
 
 # CORS: credentials require explicit trusted origins. Open wildcard CORS can be
@@ -311,8 +321,7 @@ async def security_headers(request, call_next):
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    forwarded_proto = request.headers.get("x-forwarded-proto", "")
-    if request.url.scheme == "https" or forwarded_proto == "https":
+    if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"

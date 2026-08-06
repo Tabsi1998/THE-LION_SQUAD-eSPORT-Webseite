@@ -214,13 +214,21 @@ Vor Livegang oder nach groesseren Updates:
 
 ## Reverse Proxy
 
-Empfohlene Variante:
+TLS endet am aeusseren Reverse Proxy. Dieser muss `Host`, `X-Forwarded-For` und
+`X-Forwarded-Proto` sauber setzen. Zwei Topologien werden unterstuetzt:
 
-- `https://lionsquad.at` zeigt auf den Frontend-Container.
-- `/api/*` wird an den Backend-Container weitergeleitet.
+- `https://lionsquad.at` zeigt auf den Frontend-Container und `/api/*` direkt auf
+  den Backend-Container; oder
+- der gesamte Traffic geht zum Frontend-Container, dessen internes Nginx `/api/*`
+  an das Backend weiterleitet.
+
+In beiden Faellen:
+
 - Websocket-Sonderregeln sind aktuell nicht erforderlich.
 - HTTPS per Let's Encrypt aktivieren.
 - HTTP auf HTTPS weiterleiten.
+- Eingehende `X-Forwarded-*`-Header am aeusseren Proxy ersetzen bzw. korrekt
+  erweitern; niemals ungeprueft vom Internet uebernehmen.
 
 Wenn Nginx Proxy Manager auf dem Docker-Host laeuft:
 
@@ -240,7 +248,34 @@ Empfohlen fuer reine Reverse-Proxy-Setups auf demselben Host:
 FRONTEND_BIND=127.0.0.1
 BACKEND_BIND=127.0.0.1
 TRUST_PROXY_HEADERS=true
+TRUSTED_PROXY_CIDRS=127.0.0.1/32,::1/128
 ```
+
+`TRUSTED_PROXY_CIDRS` enthaelt ausschliesslich die direkten Proxy-Quellen. Laeuft
+der Proxy oder der interne Frontend-Nginx in Docker, muessen deren tatsaechliche
+IP-Netze ergaenzt werden. Das Netz laesst sich mit `docker network inspect`
+ermitteln. Bei der Topologie "alles zum Frontend" muessen sowohl das App-Netz des
+Frontend-Nginx als auch die Quelle des aeusseren Proxys vertrauenswuerdig sein,
+damit Uvicorn die Weiterleitungskette von rechts sicher aufloesen kann.
+
+Die Compose-Vorgabe akzeptiert fuer bestehende Docker-Installationen zunaechst
+Loopback und `172.16.0.0/12`. Fuer Produktion sollte dieser Docker-Bereich auf das
+konkret verwendete Proxy-/App-Netz verkleinert werden. `*`, `0.0.0.0/0` und
+`::/0` werden bewusst abgelehnt. Zusaetzliche legitime Hostnamen koennen ueber
+`TRUSTED_HOSTS` angegeben werden; `FRONTEND_URL` und `CORS_ORIGINS` werden
+automatisch uebernommen.
+
+Nach einer Aenderung pruefen:
+
+```bash
+docker compose config
+docker compose up -d --build
+curl -I https://lionsquad.at/api/health
+```
+
+Die API-Antwort muss ueber die oeffentliche URL erreichbar sein. Login, Logout,
+ein Upload und ein absichtlich wiederholter Request bis zur `429`-Antwort pruefen
+zusaetzlich Cookies, Client-IP und Rate-Limit hinter dem Proxy.
 
 ## Analytics
 
