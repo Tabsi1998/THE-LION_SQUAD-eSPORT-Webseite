@@ -89,6 +89,13 @@ def test_live_match_sorts_before_later_scheduled_match():
     assert sorted([scheduled, live], key=match_overview_sort_key)[0]["id"] == "live"
 
 
+def test_invalid_schedule_sorts_after_valid_schedule_in_same_status():
+    invalid = {"id": "invalid", "status": "scheduled", "scheduled_at": "not-a-date"}
+    valid = {"id": "valid", "status": "scheduled", "scheduled_at": "2026-08-06T12:00:00+00:00"}
+
+    assert sorted([invalid, valid], key=match_overview_sort_key)[0]["id"] == "valid"
+
+
 def test_own_overview_only_returns_open_user_matches_with_opponent():
     rows, registrations = asyncio.run(own_match_overviews(FakeDb(), {"id": "u1", "role": "user"}))
 

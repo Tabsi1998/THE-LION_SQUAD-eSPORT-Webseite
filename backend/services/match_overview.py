@@ -42,7 +42,7 @@ def match_overview_sort_key(match: dict) -> tuple:
                 parsed = parsed.replace(tzinfo=timezone.utc)
             parsed = parsed.astimezone(timezone.utc)
         except (TypeError, ValueError):
-            pass
+            parsed = datetime.max.replace(tzinfo=timezone.utc)
     return (
         status_priority,
         parsed,
