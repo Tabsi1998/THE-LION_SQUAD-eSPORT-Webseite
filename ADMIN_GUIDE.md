@@ -263,6 +263,15 @@ Teilnehmerverwaltung:
 - Beim manuellen Hinzufuegen sollte bevorzugt ein Plattform-Konto ausgewaehlt werden. Nur ohne vorhandenen Account bleibt es ein manueller Gast.
 - Bei internen oder nicht oeffentlichen Turnieren duerfen hinzugefuegte Account-Teilnehmer das Turnier sehen, auch wenn sie keine Vereinsmitglieder sind.
 
+Vor-Ort-Ablauf und Turnierstart:
+
+- `Automatisch starten/beenden` bleibt fuer Vor-Ort-Turniere ausgeschaltet. Anmeldung und Check-in duerfen trotzdem zeitgesteuert wechseln.
+- Beim Check-in wird der Turnierbaum mit den realen Teilnehmern fixiert. Unvollstaendige FFA-Startgruppen werden soweit moeglich zusammengefuehrt; unvermeidbare 1v1-Freilose werden automatisch weitergesetzt.
+- Vor `Turnier starten` zeigt der Planungscheck fehlende Teilnehmer, unvollstaendige Matches und Stationskonflikte. Konflikte brauchen eine ausdrueckliche Bestaetigung; ohne ein einziges spielbares Match ist kein Start moeglich.
+- Organisator und Referee mit turnierweiter Zuweisung duerfen Check-in, Live, Pause und Beendet operativ setzen. Veroeffentlichen, Archivieren oder Absagen bleibt globalen Turnieradmins vorbehalten.
+- Ein Match kann an einer Station erst gestartet werden, wenn die konfigurierte Mindestzahl an Teilnehmern vorhanden ist. Der echte Stationsstart setzt das Match auf `in_progress` und benachrichtigt die Spieler mit der Station.
+- Lokale Turniere mit `Fix durch Turnierleitung` senden keine zeitbasierte 10-Minuten-Erinnerung. Die Startnachricht kommt erst beim tatsaechlichen Stationsstart, damit reale Verzoegerungen keinen falschen Alarm erzeugen.
+
 ### Fast Lap
 
 Fast-Lap-Challenges brauchen normalerweise keine Online-Anmeldung.

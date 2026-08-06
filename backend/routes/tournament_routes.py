@@ -23,6 +23,7 @@ from services.tournament_permissions import (
     STRUCTURE_STAFF_ROLES,
     assigned_tournament_ids,
     has_tournament_staff_permission,
+    is_global_tournament_admin,
     require_tournament_staff_permission,
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
@@ -276,10 +277,25 @@ def _plan_station_label(match: dict) -> str:
     return match.get("station_label") or match.get("station_name") or (match.get("station") or {}).get("name") or match.get("station_id") or ""
 
 
-def _has_playable_participants(match: dict) -> bool:
+def _match_participant_count(match: dict) -> int:
     if match.get("slots"):
-        return len([slot for slot in match.get("slots") or [] if slot.get("registration_id")]) >= 1
-    return bool(match.get("participant_a_id") or match.get("participant_b_id"))
+        return len([slot for slot in match.get("slots") or [] if slot.get("registration_id")])
+    return int(bool(match.get("participant_a_id"))) + int(bool(match.get("participant_b_id")))
+
+
+def _match_minimum_players(match: dict) -> int:
+    if match.get("slots"):
+        try:
+            return max(1, int((match.get("settings") or {}).get("min_players") or 2))
+        except (TypeError, ValueError):
+            return 2
+    return 2
+
+
+def _match_has_minimum_players(match: dict, allow_preview: bool = True) -> bool:
+    if not allow_preview and (match.get("is_preview") or match.get("status") == "preview"):
+        return False
+    return _match_participant_count(match) >= _match_minimum_players(match)
 
 
 async def _collect_plan_matches(db, tid: str) -> tuple[list[dict], dict]:
@@ -295,7 +311,12 @@ async def _collect_plan_matches(db, tid: str) -> tuple[list[dict], dict]:
     return sorted(matches, key=_plan_match_sort), tournament
 
 
-def _planning_report(matches: list[dict], tournament: dict | None = None) -> dict:
+def _planning_report(
+    matches: list[dict],
+    tournament: dict | None = None,
+    participant_count: int | None = None,
+    require_fixed_bracket: bool = False,
+) -> dict:
     tournament = tournament or {}
     warnings: list[dict] = []
     errors: list[dict] = []
@@ -325,8 +346,22 @@ def _planning_report(matches: list[dict], tournament: dict | None = None) -> dic
         match for match in matches
         if match.get("status") not in MATCH_PLAN_DONE_STATUSES
     ]
-    for match in active_matches:
+    plannable_matches = [match for match in active_matches if _match_participant_count(match)]
+    ready_matches = [
+        match for match in active_matches
+        if _match_has_minimum_players(match, allow_preview=not require_fixed_bracket)
+    ]
+    for match in plannable_matches:
         label = _plan_match_label(match)
+        if not _match_has_minimum_players(match, allow_preview=not require_fixed_bracket):
+            warnings.append({
+                "type": "incomplete_match",
+                "severity": "warning",
+                "match_id": match.get("id"),
+                "label": label,
+                "message": f"{label}: zu wenige Teilnehmer für einen sicheren Start.",
+            })
+            continue
         if not match.get("scheduled_at"):
             warnings.append({"type": "missing_time", "severity": "warning", "match_id": match.get("id"), "label": label, "message": f"{label}: keine Startzeit geplant."})
         if not match.get("station_id"):
@@ -358,6 +393,24 @@ def _planning_report(matches: list[dict], tournament: dict | None = None) -> dic
                     "other_match_id": other["match"].get("id"),
                     "message": msg,
                 })
+    try:
+        minimum_participants = max(2, int(tournament.get("min_participants") or 2))
+    except (TypeError, ValueError):
+        minimum_participants = 2
+    if participant_count is not None and participant_count < minimum_participants:
+        errors.insert(0, {
+            "type": "insufficient_participants",
+            "severity": "error",
+            "participant_count": participant_count,
+            "minimum_participants": minimum_participants,
+            "message": f"Nur {participant_count} von mindestens {minimum_participants} Teilnehmern sind startbereit.",
+        })
+    if require_fixed_bracket and not ready_matches:
+        errors.insert(0, {
+            "type": "no_playable_matches",
+            "severity": "error",
+            "message": "Es gibt keinen fixierten, vollständig belegten Match-Start. Bracket und Teilnehmer prüfen.",
+        })
     return {
         "ok": not errors,
         "rule_policy": {
@@ -367,9 +420,29 @@ def _planning_report(matches: list[dict], tournament: dict | None = None) -> dic
         },
         "error_count": len(errors),
         "warning_count": len(warnings),
-        "checked_matches": len(active_matches),
+        "participant_count": participant_count,
+        "minimum_participants": minimum_participants,
+        "checked_matches": len(plannable_matches),
+        "ready_match_count": len(ready_matches),
         "errors": errors,
         "warnings": warnings,
+    }
+
+
+def _live_start_blocker(report: dict, force: bool) -> dict | None:
+    errors = report.get("errors") or []
+    hard_block = any(error.get("type") == "no_playable_matches" for error in errors)
+    if not errors or (force and not hard_block):
+        return None
+    return {
+        "code": "tournament_not_ready",
+        "message": (
+            "Turnier kann ohne spielbares Match nicht gestartet werden."
+            if hard_block
+            else "Turnierplanung enthält Konflikte. Erneut mit force=true bestätigen oder Konflikte beheben."
+        ),
+        "force_allowed": not hard_block,
+        "planning": report,
     }
 
 
@@ -1467,6 +1540,10 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
     t["can_manage_results"] = bool(
         is_admin
         or await has_tournament_staff_permission(user, t["id"], RESULT_STAFF_ROLES)
+    )
+    t["can_manage_structure"] = bool(
+        is_admin
+        or await has_tournament_staff_permission(user, t["id"], STRUCTURE_STAFF_ROLES, "tournament")
     )
     if access_link:
         await touch_access_link(db, access_link, user)
@@ -2638,11 +2715,13 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
 
 
 @router.post("/{tid}/status")
-async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
+async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament")
     status = body.get("status")
+    force = body.get("force") is True
     allowed = {
         "draft", "scheduled", "registration_open", "registration_closed",
         "check_in", "live", "paused", "completed", "results_published",
@@ -2650,16 +2729,17 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
     }
     if status not in allowed:
         raise HTTPException(status_code=400, detail="Ungültiger Status")
+    if not is_global_tournament_admin(me) and status not in {"check_in", "live", "paused", "completed"}:
+        raise HTTPException(status_code=403, detail="Turnierleitung darf nur operative Status setzen")
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
     prev = t.get("status")
-    await db.tournaments.update_one({"id": tid}, {"$set": {"status": status, "updated_at": now_utc().isoformat()}})
     auto_generated_bracket = None
+    planning = None
     if prev != status and status == "check_in":
-        fresh_t = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or t
-        auto_generated_bracket = await _finalize_bracket_for_checkin(db, fresh_t, me.get("id"))
-    if status == "live":
+        auto_generated_bracket = await _finalize_bracket_for_checkin(db, {**t, "status": status}, me.get("id"))
+    if prev != status and status == "live":
         try:
-            fresh_t = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or t
+            fresh_t = {**t, "status": status}
             if prev != status:
                 auto_generated_bracket = await _finalize_bracket_for_checkin(db, fresh_t, me.get("id"))
             if not auto_generated_bracket:
@@ -2676,8 +2756,43 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
                         force=can_auto_replace,
                         set_live=False,
                     )
-        except HTTPException:
-            auto_generated_bracket = None
+        except HTTPException as exc:
+            auto_generated_bracket = {"ok": False, "reason": "generator_error", "detail": exc.detail}
+
+        matches, fresh_t = await _collect_plan_matches(db, tid)
+        participant_count = await db.tournament_registrations.count_documents({
+            "tournament_id": tid,
+            "status": {"$in": ["approved", "checked_in"]},
+        })
+        planning = _planning_report(
+            matches,
+            fresh_t,
+            participant_count=participant_count,
+            require_fixed_bracket=True,
+        )
+        blocker = _live_start_blocker(planning, force)
+        if blocker:
+            raise HTTPException(status_code=409, detail=blocker)
+
+    if prev != status:
+        changed_at = now_utc().isoformat()
+        await db.tournaments.update_one(
+            {"id": tid},
+            {"$set": {"status": status, "updated_at": changed_at}},
+        )
+        await _audit_tournament_action(
+            db,
+            "tournament.status.change",
+            me.get("id"),
+            tid,
+            {
+                "previous_status": prev,
+                "status": status,
+                "forced": force,
+                "planning_errors": (planning or {}).get("error_count", 0),
+                "planning_warnings": (planning or {}).get("warning_count", 0),
+            },
+        )
 
     # ---------- Season Points + Badges on results_published ----------
     if prev != status and status == "results_published":
@@ -2782,7 +2897,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(require_admin())):
             )
         except Exception:
             pass
-    return {"ok": True, "auto_generated_bracket": auto_generated_bracket}
+    return {"ok": True, "auto_generated_bracket": auto_generated_bracket, "planning": planning}
 
 
 @router.get("/{tid}/planning-check")
@@ -2791,7 +2906,11 @@ async def planning_check(tid: str, me: dict = Depends(get_current_user)):
     tid = await _resolve_tid(tid)
     await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES)
     matches, tournament = await _collect_plan_matches(db, tid)
-    return _planning_report(matches, tournament)
+    participant_count = await db.tournament_registrations.count_documents({
+        "tournament_id": tid,
+        "status": {"$in": ["approved", "checked_in"]},
+    })
+    return _planning_report(matches, tournament, participant_count=participant_count)
 
 
 @router.get("/{tid}/match-plan.csv")
