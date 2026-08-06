@@ -28,12 +28,9 @@ services:
       FRONTEND_URL: "${FRONTEND_URL:?Set FRONTEND_URL in .env before deploying}"
       JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env before deploying}"
       AUTH_COOKIE_DOMAIN: "${AUTH_COOKIE_DOMAIN:-}"
-      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@lionsquad.at}"
-      ADMIN_PASSWORD: "${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env before deploying}"
       TRUST_PROXY_HEADERS: "${TRUST_PROXY_HEADERS:-true}"
       SENDER_EMAIL: "${SENDER_EMAIL:-noreply@lionsquad.at}"
       RESEND_API_KEY: "${RESEND_API_KEY:-}"
-      SEED_DEMO: "${SEED_DEMO:-false}"
       DISABLE_SCHEDULER: "${DISABLE_SCHEDULER:-false}"
       UPLOAD_DIR: "${UPLOAD_DIR:-/app/backend/uploads}"
       MAX_IMAGE_UPLOAD_MB: "${MAX_IMAGE_UPLOAD_MB:-50}"
@@ -70,6 +67,7 @@ services:
         REACT_APP_MAX_VIDEO_UPLOAD_MB: "${MAX_VIDEO_UPLOAD_MB:-1536}"
         REACT_APP_MAX_DOCUMENT_UPLOAD_MB: "${MAX_DOCUMENT_UPLOAD_MB:-50}"
         REACT_APP_PROXY_UPLOAD_LIMIT_MB: "${PROXY_UPLOAD_LIMIT_MB:-1700}"
+        REACT_APP_CLIENT_LOGGING: "${CLIENT_LOGGING_ENABLED:-false}"
     container_name: tls-frontend
     restart: unless-stopped
     depends_on:

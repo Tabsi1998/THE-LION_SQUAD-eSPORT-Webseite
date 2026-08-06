@@ -27,15 +27,21 @@ LIVE_TEST_FILES = {
 }
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
-ADMIN_EMAIL = "admin@lionsquad.at"
-ADMIN_PASSWORD = "TLSAdmin2026!"
-DEMO_EMAIL = "leon_king@demo.lionsquad.at"
-DEMO_PASSWORD = "demo123"
+ADMIN_EMAIL = os.environ.get("TEST_ADMIN_EMAIL", "")
+ADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "")
+DEMO_EMAIL = os.environ.get("TEST_DEMO_EMAIL", "")
+DEMO_PASSWORD = os.environ.get("TEST_DEMO_PASSWORD", "")
 
 
 def pytest_collection_modifyitems(config, items):
-    live_enabled = bool(os.environ.get("REACT_APP_BACKEND_URL"))
-    skip_live = pytest.mark.skip(reason="live backend test; set REACT_APP_BACKEND_URL to run")
+    live_enabled = bool(
+        os.environ.get("REACT_APP_BACKEND_URL")
+        and os.environ.get("TEST_ADMIN_EMAIL")
+        and os.environ.get("TEST_ADMIN_PASSWORD")
+    )
+    skip_live = pytest.mark.skip(
+        reason="isolated live test requires REACT_APP_BACKEND_URL, TEST_ADMIN_EMAIL, and TEST_ADMIN_PASSWORD"
+    )
     for item in items:
         if item.path.name in LIVE_TEST_FILES:
             item.add_marker(pytest.mark.live)

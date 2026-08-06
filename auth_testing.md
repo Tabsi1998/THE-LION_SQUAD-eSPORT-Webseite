@@ -1,9 +1,9 @@
 # Auth Testing Playbook - TLS ARENA
 
 ## Test Credentials
-Use the values from your local `.env`:
-- Superadmin: `$ADMIN_EMAIL` / `$ADMIN_PASSWORD`
-- Demo users exist only when `SEED_DEMO=true`.
+Live/integration credentials are never stored in the repository. Use a disposable test
+environment and set `TEST_ADMIN_EMAIL`, `TEST_ADMIN_PASSWORD`, `TEST_DEMO_EMAIL`, and
+`TEST_DEMO_PASSWORD` only in the test process. Never point mutating tests at production.
 
 ## MongoDB Verification
 ```
@@ -21,7 +21,7 @@ db.f1_challenges.countDocuments()  // should be 1
 # Login (superadmin)
 curl -c /tmp/c.txt -X POST $BACKEND/api/auth/login \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}"
+  -d "{\"email\":\"$TEST_ADMIN_EMAIL\",\"password\":\"$TEST_ADMIN_PASSWORD\"}"
 
 CSRF=$(awk '$6=="csrf_token"{print $7}' /tmp/c.txt)
 

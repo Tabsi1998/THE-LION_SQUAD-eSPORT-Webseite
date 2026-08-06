@@ -93,10 +93,11 @@ CORS_ORIGINS=https://lionsquad.at,https://www.lionsquad.at
 DB_NAME=tls_arena
 JWT_SECRET=sehr-langer-zufaelliger-secret
 ADMIN_EMAIL=admin@lionsquad.at
+# Nur fuer ./install.sh; wird nach dem einmaligen Bootstrap aus .env entfernt.
 ADMIN_PASSWORD=sehr-langes-admin-passwort
 
-SEED_DEMO=false
 DISABLE_SCHEDULER=false
+CLIENT_LOGGING_ENABLED=false
 UPLOAD_DIR=/app/backend/uploads
 MAX_IMAGE_UPLOAD_MB=50
 MAX_VIDEO_UPLOAD_MB=1536
@@ -119,8 +120,9 @@ empfohlen. Lege dafuer z. B. `upload.lionsquad.at` als DNS-only Record an und le
 Reverse Proxy auf dieselbe App wie `lionsquad.at`. Die normale Website kann weiter ueber
 Cloudflare laufen, Medienuploads gehen dann an die Upload-Domain.
 
-`JWT_SECRET` und `ADMIN_PASSWORD` muessen in Produktion gesetzt sein. Docker Compose bricht
-sonst bewusst ab.
+`APP_ENV` muss immer explizit gesetzt sein. Der API-Prozess erstellt, reaktiviert oder
+befördert keine Admin-Konten. `ADMIN_PASSWORD` wird nur vom Installer fuer den einmaligen
+Bootstrap genutzt und danach aus `.env` entfernt. Details stehen in [SECURITY.md](SECURITY.md).
 
 ## Deployment und Updates
 
@@ -195,7 +197,7 @@ Weitere Details:
 
 Vor Livegang oder nach groesseren Updates:
 
-- `.env` pruefen: `APP_ENV=production`, `FRONTEND_URL`, `PUBLIC_BACKEND_URL`, `CORS_ORIGINS`, `JWT_SECRET`, `ADMIN_PASSWORD`, `AUTH_COOKIE_DOMAIN`.
+- `.env` pruefen: `APP_ENV=production`, `FRONTEND_URL`, `PUBLIC_BACKEND_URL`, `CORS_ORIGINS`, `JWT_SECRET`, `AUTH_COOKIE_DOMAIN`.
 - `docker compose ps` muss `backend`, `frontend` und `mongodb` als laufend zeigen.
 - `docker compose logs --tail=100 backend` auf Fehler pruefen.
 - `curl https://lionsquad.at/api/health` muss `{"status":"ok"}` liefern.
@@ -256,9 +258,9 @@ Fuer einen Live-Test:
 
 ## Admin Erststart
 
-1. Webseite oeffnen.
-2. Login mit `ADMIN_EMAIL` und `ADMIN_PASSWORD` aus `.env`.
-3. Admin-Passwort direkt aendern.
+1. Installation mit `./install.sh` abschliessen; der Installer legt genau einmal den ersten Superadmin an.
+2. Webseite oeffnen und mit dem gerade eingegebenen Admin-Konto anmelden.
+3. Pruefen, dass `ADMIN_PASSWORD` nicht mehr in `.env` steht.
 4. Unter `Admin -> Einstellungen` Branding, SMTP, Discord, Rechtliches und Systemstatus pruefen.
 5. Unter `Admin -> Navigation` nicht benoetigte Menuepunkte deaktivieren.
 
@@ -294,10 +296,10 @@ Browser-Favicon, Apple Icon, Manifest, Theme-Color und SEO-Meta.
 Der Tab `Community -> Server` zeigt Gameserver aus `/api/game-servers`. Admins pflegen
 sie unter `Admin -> Game-Server`.
 
-Produktive Installationen starten ohne automatisch angelegte Server. Die fruehere
-Demo-Startliste wird nur noch importiert, wenn `SEED_GAME_SERVERS=true` oder
-`SEED_DEMO=true` gesetzt ist. Falls aus einer alten Version bereits Startserver in
-der Datenbank liegen, kann sie ein Admin unter `Admin -> Game-Server` mit
+Produktive Installationen starten ohne automatisch angelegte Server. Demo-Daten koennen
+nur noch bewusst ueber den interaktiven Setup-CLI in einer Entwicklungs-/Testumgebung
+angelegt werden. Falls aus einer alten Version bereits Startserver in der Datenbank
+liegen, kann sie ein Admin unter `Admin -> Game-Server` mit
 `Demo-Startliste entfernen` bereinigen. Selbst angelegte Server werden dabei nicht
 geloescht.
 
@@ -647,9 +649,10 @@ docker compose logs backend
 
 Haeufige Ursachen:
 
+- `APP_ENV` fehlt oder enthaelt einen unbekannten Wert
 - `JWT_SECRET` zu kurz oder leer
-- `ADMIN_PASSWORD` leer
 - `FRONTEND_URL` fehlt
+- ein Demo-/Reset-Schalter ist in Produktion aktiviert
 - MongoDB nicht gesund
 
 ### SMTP: AUTH extension is not supported

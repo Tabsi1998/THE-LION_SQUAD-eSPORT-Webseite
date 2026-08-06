@@ -1,6 +1,7 @@
 import * as SecureStore from "expo-secure-store";
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { api, configureAuthBridge } from "../lib/api";
+import { clearAllCache } from "../lib/cache";
 import { isGuestUser, liveGuestUser } from "../live";
 import { unregisterPushToken } from "../notifications/PushService";
 import type { AuthResponse, User } from "../types";
@@ -38,14 +39,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [rememberSession, setRememberSession] = useState(true);
+  const rememberSessionRef = useRef(true);
+  const activeUserIdRef = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const persistSession = useCallback(async (session: AuthResponse, remember = rememberSession) => {
+  const persistSession = useCallback(async (session: AuthResponse, remember?: boolean) => {
+    const shouldRemember = remember ?? rememberSessionRef.current;
+    if (activeUserIdRef.current && activeUserIdRef.current !== session.user.id) {
+      await clearAllCache();
+    }
+    activeUserIdRef.current = session.user.id;
     setUser(session.user);
     setAccessToken(session.access_token);
     setRefreshToken(session.refresh_token);
-    setRememberSession(remember);
-    if (remember) {
+    setRememberSession(shouldRemember);
+    rememberSessionRef.current = shouldRemember;
+    if (shouldRemember) {
       await Promise.all([
         SecureStore.setItemAsync(ACCESS_KEY, session.access_token),
         SecureStore.setItemAsync(REFRESH_KEY, session.refresh_token),
@@ -58,25 +67,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         SecureStore.setItemAsync(REMEMBER_KEY, "false"),
       ]);
     }
-  }, [rememberSession]);
+  }, []);
 
   const clearSession = useCallback(async () => {
     setUser(null);
+    activeUserIdRef.current = null;
     setAccessToken(null);
     setRefreshToken(null);
     await Promise.all([
       SecureStore.deleteItemAsync(ACCESS_KEY),
       SecureStore.deleteItemAsync(REFRESH_KEY),
+      clearAllCache(),
     ]);
   }, []);
 
   useEffect(() => {
     configureAuthBridge({
-      readTokens: () => ({ accessToken, refreshToken }),
+      readTokens: () => ({ accessToken, refreshToken, userId: user?.id || null }),
       persistSession,
       clearSession,
     });
-  }, [accessToken, clearSession, persistSession, refreshToken]);
+  }, [accessToken, clearSession, persistSession, refreshToken, user?.id]);
 
   const refreshMe = useCallback(async () => {
     const { data } = await api.get<User>("/auth/me");
@@ -96,6 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const shouldRestore = storedRemember !== "false";
         setRememberSession(shouldRestore);
+        rememberSessionRef.current = shouldRestore;
         if (!shouldRestore) {
           await clearSession();
           return;
@@ -144,13 +156,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const continueAsGuest = useCallback(async () => {
     setUser(liveGuestUser);
+    activeUserIdRef.current = liveGuestUser.id;
     setAccessToken(null);
     setRefreshToken(null);
     setRememberSession(false);
+    rememberSessionRef.current = false;
     await Promise.all([
       SecureStore.deleteItemAsync(ACCESS_KEY),
       SecureStore.deleteItemAsync(REFRESH_KEY),
       SecureStore.setItemAsync(REMEMBER_KEY, "false"),
+      clearAllCache(),
     ]);
   }, []);
 

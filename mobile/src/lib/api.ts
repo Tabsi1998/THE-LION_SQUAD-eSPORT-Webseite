@@ -1,14 +1,21 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { API_BASE_URL, API_URL } from "../config";
 import type { AuthResponse } from "../types";
-import { getCached, setCached, getStaleCache } from "./cache";
+import { buildCacheKey, getStaleCache, setCached } from "./cache";
 
 type TokenSnapshot = {
   accessToken: string | null;
   refreshToken: string | null;
+  userId: string | null;
 };
 
-let readTokens: () => TokenSnapshot = () => ({ accessToken: null, refreshToken: null });
+type CacheAwareConfig = InternalAxiosRequestConfig & {
+  _cacheKey?: string;
+  _retry?: boolean;
+  _offlineFallback?: boolean;
+};
+
+let readTokens: () => TokenSnapshot = () => ({ accessToken: null, refreshToken: null, userId: null });
 let persistSession: (session: AuthResponse) => Promise<void> = async () => {};
 let clearSession: () => Promise<void> = async () => {};
 let refreshPromise: Promise<AuthResponse> | null = null;
@@ -35,19 +42,15 @@ export function configureAuthBridge(bridge: {
 
 // ─── Request Interceptor: Auth-Token + Cache-Check ───────────────────────────
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  const { accessToken } = readTokens();
+  const { accessToken, userId } = readTokens();
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  // Für GET-Requests: Cache prüfen und als Metadata anhängen
+  // Bind every cached response to the account and exact query parameters.
   if (config.method?.toLowerCase() === "get" && config.url) {
-    const cached = await getCached(config.url);
-    if (cached !== null) {
-      // Cache-Hit: Request trotzdem senden (Stale-While-Revalidate Strategie)
-      // Der Response-Interceptor wird den Cache aktualisieren
-      (config as InternalAxiosRequestConfig & { _cachedData?: unknown })._cachedData = cached;
-    }
+    const scope = userId ? `user:${userId}` : accessToken ? "authenticated:pending" : "anonymous";
+    (config as CacheAwareConfig)._cacheKey = buildCacheKey(config.url, config.params, scope);
   }
 
   return config;
@@ -58,12 +61,13 @@ api.interceptors.response.use(
   async (response) => {
     // Erfolgreiche GET-Responses cachen
     if (response.config.method?.toLowerCase() === "get" && response.config.url) {
-      await setCached(response.config.url, response.data);
+      const config = response.config as CacheAwareConfig;
+      if (config._cacheKey && config.url) await setCached(config._cacheKey, config.url, response.data);
     }
     return response;
   },
   async (error: AxiosError) => {
-    const original = error.config as (InternalAxiosRequestConfig & { _retry?: boolean; _offlineFallback?: boolean }) | undefined;
+    const original = error.config as CacheAwareConfig | undefined;
     const { refreshToken } = readTokens();
     const isAuthCall = original?.url?.includes("/auth/mobile/");
 
@@ -103,9 +107,9 @@ api.interceptors.response.use(
         error.message?.includes("timeout")
       );
 
-    if (isNetworkError && original?.url && original.method?.toLowerCase() === "get" && !original._offlineFallback) {
+    if (isNetworkError && original?.url && original._cacheKey && original.method?.toLowerCase() === "get" && !original._offlineFallback) {
       original._offlineFallback = true;
-      const stale = await getStaleCache(original.url);
+      const stale = await getStaleCache(original._cacheKey, original.url);
       if (stale !== null) {
         // Stale-Daten als Response zurückgeben mit Offline-Marker
         console.warn(`[LionsAPP] Offline – verwende gecachte Daten für: ${original.url}`);

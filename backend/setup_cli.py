@@ -19,6 +19,7 @@ load_dotenv(ROOT / ".env")
 
 from motor.motor_asyncio import AsyncIOMotorClient
 import bcrypt
+from runtime_config import resolve_app_environment
 
 
 RESET = "\033[0m"
@@ -138,7 +139,23 @@ async def main():
     privacy_short = ask("Datenschutz Kontakt", "datenschutz@lionsquad.at")
 
     print(f"\n{BOLD}[5/6]{RESET} Demo-Daten")
-    seed_demo = ask_yes_no("Demo-Daten (20 Testspieler + Beispielturniere) anlegen?", False)
+    if resolve_app_environment() == "production":
+        seed_demo = False
+        print(f"{DIM}  → Demo-Daten sind in Produktion gesperrt.{RESET}")
+    else:
+        seed_demo = ask_yes_no("Demo-Daten (20 Testspieler + Beispielturniere) anlegen?", False)
+    demo_password = None
+    if seed_demo:
+        while True:
+            demo_password = ask(
+                "Eigenes Demo-Passwort (min. 12 Zeichen)",
+                secret=True,
+                validator=lambda value: len(value) >= 12,
+            )
+            confirmation = ask("Demo-Passwort bestätigen", secret=True)
+            if demo_password == confirmation:
+                break
+            print(f"{RED}  ✕ Passwörter stimmen nicht überein.{RESET}")
 
     print(f"\n{BOLD}[6/6]{RESET} JWT-Secret")
     jwt_secret = os.environ.get("JWT_SECRET", "")
@@ -205,7 +222,7 @@ async def main():
     if seed_demo:
         from seed import seed_demo_data
         if await db.games.count_documents({}) == 0:
-            await seed_demo_data()
+            await seed_demo_data(demo_password)
             print(f"{GREEN}  ✓ Demo-Daten angelegt{RESET}")
 
     print(f"\n{BOLD}{GREEN}✓ Setup abgeschlossen.{RESET}")

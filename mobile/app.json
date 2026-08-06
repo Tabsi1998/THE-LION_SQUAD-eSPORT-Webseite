@@ -59,6 +59,7 @@
       "enabled": false
     },
     "extra": {
+      "clientLogging": false,
       "eas": {
         "projectId": "3eaaebbc-883e-469c-a135-09f3459e2c46"
       }

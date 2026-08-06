@@ -24,8 +24,8 @@ def _load_backend_url():
     return "http://localhost:8001"
 
 BASE_URL = _load_backend_url()
-ADMIN_EMAIL = "admin@thelionsquad.at"
-ADMIN_PASSWORD = "TLSAdmin2026!"
+ADMIN_EMAIL = os.environ.get("TEST_ADMIN_EMAIL", "")
+ADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "")
 
 
 # ------------------- Fixtures -------------------
