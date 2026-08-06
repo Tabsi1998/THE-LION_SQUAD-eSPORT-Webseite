@@ -18,7 +18,7 @@ from auth import require_admin, get_current_user
 from database import get_db
 from models import new_id, now_utc
 from services.rate_limit import enforce_rate_limit, get_client_ip
-from storage import PRIVATE_DOC_DIR, PUBLIC_UPLOAD_DIR, UPLOAD_DIR, ensure_directory
+from storage import PRIVATE_DOC_DIR, PUBLIC_UPLOAD_DIR, ensure_directory
 from services.media_formats import (
     BROWSER_IMAGE_MIME_BY_EXT,
     CONVERTIBLE_ORIGINAL_IMAGE_EXTS,
