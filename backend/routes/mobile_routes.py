@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user, get_optional_user
 from database import get_db
 from models import new_id, now_utc
+from services.match_overview import operational_match_overviews, own_match_overviews
 from services.profile_references import personal_profile_references
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
@@ -21,7 +22,6 @@ router = APIRouter(prefix="/api/mobile", tags=["mobile"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 ACTIVE_TOURNAMENT_REGISTRATION_STATUSES = {"pending", "registered", "approved", "checked_in", "waitlist"}
 ACTIVE_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in", "waitlist"}
-OPEN_MATCH_STATUSES = {"ready", "scheduled", "in_progress", "waiting_result"}
 HIDDEN_PUBLIC_STATUSES = {"draft", "completed", "results_published", "archived", "cancelled"}
 
 
@@ -266,19 +266,6 @@ def _compact_news(post: dict) -> dict:
     }
 
 
-def _compact_match(match: dict, tournament_map: dict[str, dict]) -> dict:
-    tournament = tournament_map.get(match.get("tournament_id") or "")
-    return {
-        "id": match.get("id"),
-        "status": match.get("status"),
-        "scheduled_at": match.get("scheduled_at"),
-        "tournament_id": match.get("tournament_id"),
-        "tournament_title": (tournament or {}).get("title"),
-        "round": match.get("round"),
-        "round_name": match.get("round_name") or match.get("matchday_label"),
-    }
-
-
 async def _latest_news(user: dict | None) -> list[dict]:
     db = get_db()
     posts = await db.news_posts.find(
@@ -371,33 +358,6 @@ async def _my_event_registrations(user: dict) -> list[dict]:
     ).sort("created_at", -1).to_list(200)
 
 
-async def _my_matches(registrations: list[dict]) -> list[dict]:
-    db = get_db()
-    reg_ids = [reg["id"] for reg in registrations if reg.get("id")]
-    if not reg_ids:
-        return []
-    match_query = {
-        "$or": [
-            {"participant_a_id": {"$in": reg_ids}},
-            {"participant_b_id": {"$in": reg_ids}},
-            {"slots.registration_id": {"$in": reg_ids}},
-        ],
-        "status": {"$in": list(OPEN_MATCH_STATUSES)},
-    }
-    legacy = await db.matches.find(match_query, {"_id": 0}).sort("scheduled_at", 1).to_list(60)
-    v2 = await db.matches_v2.find(match_query, {"_id": 0}).sort("scheduled_at", 1).to_list(60)
-    matches = sorted([*legacy, *v2], key=_date_key)[:12]
-    tournament_ids = list({match.get("tournament_id") for match in matches if match.get("tournament_id")})
-    tournament_map = {
-        tournament["id"]: tournament
-        for tournament in await db.tournaments.find(
-            {"id": {"$in": tournament_ids}},
-            {"_id": 0, "id": 1, "title": 1},
-        ).to_list(100)
-    }
-    return [_compact_match(match, tournament_map) for match in matches]
-
-
 def _dashboard_actions(tournaments: list[dict], events: list[dict], matches: list[dict]) -> list[dict]:
     actions = []
     for tournament in tournaments:
@@ -466,6 +426,7 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
     my_tournaments: list[dict] = []
     my_events: list[dict] = []
     my_matches: list[dict] = []
+    staff_matches: list[dict] = []
 
     if user:
         tournament_regs = await _my_tournament_registrations(user)
@@ -496,7 +457,12 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
         my_events.sort(key=_date_key)
         my_events = my_events[:12]
 
-        my_matches = await _my_matches(tournament_regs)
+        my_matches, _match_registrations = await own_match_overviews(db, user)
+        staff_matches = await operational_match_overviews(
+            db,
+            user,
+            exclude_match_ids={match.get("id") for match in my_matches if match.get("id")},
+        )
 
     actions = _dashboard_actions(my_tournaments, my_events, my_matches)
     return {
@@ -504,6 +470,7 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
             "tournaments": my_tournaments,
             "events": my_events,
             "matches": my_matches,
+            "staff_matches": staff_matches,
             "actions": actions,
         },
         "public": public,
@@ -513,6 +480,7 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
             "my_tournaments": len(my_tournaments),
             "my_events": len(my_events),
             "open_matches": len(my_matches),
+            "staff_matches": len(staff_matches),
             "open_actions": len(actions),
             "news": len(news),
             "public_tournaments": len(public["tournaments"]),

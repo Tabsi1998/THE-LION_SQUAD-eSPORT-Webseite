@@ -69,10 +69,20 @@ def _match_sort_key(match: dict) -> tuple:
     )
 
 
-def _match_has_participants(match: dict) -> bool:
+def _match_participant_count(match: dict) -> int:
     if match.get("slots"):
-        return any(slot.get("registration_id") for slot in match.get("slots") or [])
-    return bool(match.get("participant_a_id") or match.get("participant_b_id"))
+        return len([slot for slot in match.get("slots") or [] if slot.get("registration_id")])
+    return int(bool(match.get("participant_a_id"))) + int(bool(match.get("participant_b_id")))
+
+
+def _match_has_minimum_participants(match: dict) -> bool:
+    minimum = 2
+    if match.get("slots"):
+        try:
+            minimum = max(1, int((match.get("settings") or {}).get("min_players") or 2))
+        except (TypeError, ValueError):
+            minimum = 2
+    return _match_participant_count(match) >= minimum
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -151,6 +161,8 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
         raise HTTPException(status_code=409, detail="Station ist als defekt markiert")
     if station.get("current_match_id") and station.get("current_match_id") != match.get("id"):
         raise HTTPException(status_code=409, detail="Station ist bereits belegt. Bitte zuerst freigeben.")
+    if start_now and not _match_has_minimum_participants(match):
+        raise HTTPException(status_code=409, detail="Match hat zu wenige Teilnehmer und kann nicht gestartet werden.")
     await db.stations.update_many(
         {"current_match_id": match["id"], "id": {"$ne": station["id"]}},
         {"$set": {"current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()}},
@@ -251,7 +263,7 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
         "status": {"$in": status_filter},
     }, {"_id": 0}).to_list(3000)
     candidates = [("matches", m) for m in matches] + [("matches_v2", m) for m in matches_v2]
-    candidates = [item for item in candidates if _match_has_participants(item[1])]
+    candidates = [item for item in candidates if _match_has_minimum_participants(item[1])]
     candidates.sort(key=lambda item: _match_sort_key(item[1]))
 
     if plan and not start_now:

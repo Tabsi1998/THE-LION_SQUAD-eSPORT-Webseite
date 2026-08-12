@@ -65,6 +65,36 @@ async def has_tournament_staff_permission(
     return False
 
 
+async def has_match_result_permission(user: dict | None, match: dict) -> bool:
+    """Return whether a user may enter the result for one concrete match.
+
+    Keep the scope rules in one place so legacy and v2 routes, dashboards and
+    operational match lists cannot drift apart.
+    """
+    if not user or not match.get("tournament_id"):
+        return False
+    tournament_id = match["tournament_id"]
+    checks = [
+        ("tournament", None),
+        ("match", match.get("id")),
+        ("stage", match.get("stage_id")),
+        ("group", match.get("group_id")),
+        ("station", match.get("station_id")),
+    ]
+    for scope, scope_id in checks:
+        if scope != "tournament" and not scope_id:
+            continue
+        if await has_tournament_staff_permission(
+            user,
+            tournament_id,
+            RESULT_STAFF_ROLES,
+            scope,
+            scope_id,
+        ):
+            return True
+    return False
+
+
 async def require_tournament_staff_permission(
     user: dict | None,
     tournament_id: str,
