@@ -51,6 +51,35 @@ Im Admin:
 - `Einstellungen -> Discord`
 - `Einstellungen -> Twitch`
 
+## Oeffentlichen Inhalt im echten Browser pruefen
+
+Der wiederholbare Produktions-Crawl rendert statische Routen und alle URLs der Sitemap hinter
+dem aeusseren Reverse Proxy. Er meldet sichtbare Demo-/Theme-Platzhalter, reservierte
+Beispiel-Links, kaputte Bilder, Browserfehler, fehlgeschlagene Requests und HTTP-Fehler:
+
+```bash
+cd frontend
+yarn audit:public
+```
+
+Eine andere Umgebung oder ein kleinerer Diagnose-Lauf kann explizit gesetzt werden:
+
+```bash
+PUBLIC_AUDIT_BASE_URL=https://staging.example.at PUBLIC_AUDIT_LIMIT=20 yarn audit:public
+```
+
+Erwartet wird `findings: []` und Exit-Code 0. Der Crawl ist bewusst kein CI-Schritt gegen die
+Produktivseite; er wird nach Deployments oder Inhaltsmigrationen manuell ausgefuehrt.
+
+Das interne Nginx erzeugt pro HTML-Antwort eine CSP-Nonce. Runtime-JSON-LD, serverseitige
+SEO-Previews und Cloudflares injizierte JavaScript Detection verwenden dieselbe Nonce. Damit
+bleibt `script-src` strikt und braucht kein `unsafe-inline`. Cloudflare beschreibt dieses
+Nonce-Verhalten in der offiziellen Dokumentation:
+https://developers.cloudflare.com/cloudflare-challenges/challenge-types/javascript-detections/#if-you-have-a-content-security-policy-csp
+
+Externe Google-Fonts werden nicht geladen; die Seite verwendet lokale System-Fallbacks. Damit
+entsteht weder ein CSP-Fehler noch ein unangekuendigter Drittanbieter-Request fuer Schriften.
+
 ## Wenn `/community` alte Assets referenziert
 
 Symptom:

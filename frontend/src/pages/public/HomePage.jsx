@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { applyCspNonce } from "@/lib/csp";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { MascotBadge } from "@/components/tls/Logo";
@@ -180,6 +181,7 @@ function useHomeStructuredData(state) {
     script.type = "application/ld+json";
     script.dataset.tlsHomeStructuredData = "true";
     script.textContent = JSON.stringify(data);
+    applyCspNonce(script);
     document.head.appendChild(script);
     return () => script.remove();
   }, [state]);

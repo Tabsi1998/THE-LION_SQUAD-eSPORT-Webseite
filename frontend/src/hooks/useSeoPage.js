@@ -5,6 +5,7 @@
  */
 import { useCallback, useEffect } from "react";
 import { api } from "@/lib/api";
+import { applyCspNonce } from "@/lib/csp";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 const JSON_LD_ID = "tls-jsonld-cms";
@@ -109,6 +110,7 @@ export function useSeoPage(slug) {
           s = document.createElement("script");
           s.type = "application/ld+json";
           s.id = JSON_LD_ID;
+          applyCspNonce(s);
           document.head.appendChild(s);
         }
         s.textContent = JSON.stringify(data.json_ld);
@@ -169,6 +171,7 @@ export function useJsonLd(obj, key = "tls-jsonld-runtime") {
       s = document.createElement("script");
       s.type = "application/ld+json";
       s.id = key;
+      applyCspNonce(s);
       document.head.appendChild(s);
     }
     s.textContent = JSON.stringify(obj);

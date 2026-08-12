@@ -75,6 +75,26 @@ expect_gone() {
   }
 }
 
+expect_nonce_csp() {
+  local response headers body nonce
+  response="$(curl --silent --show-error --include --header "Host: lionsquad.at" "${base_url}/about")"
+  headers="${response%%$'\r\n\r\n'*}"
+  body="${response#*$'\r\n\r\n'}"
+  nonce="$(printf '%s\n' "$headers" | sed -nE "s/.*script-src 'self' 'nonce-([^']+)'.*/\1/p" | head -n 1)"
+  test -n "$nonce" || {
+    printf 'Expected a per-request script nonce in Content-Security-Policy.\n%s\n' "$headers" >&2
+    return 1
+  }
+  printf '%s' "$headers" | grep -Fq "script-src 'self' 'unsafe-inline'" && {
+    printf 'script-src must not allow unsafe-inline.\n%s\n' "$headers" >&2
+    return 1
+  }
+  printf '%s' "$body" | grep -Fq "<meta name=\"csp-nonce\" content=\"$nonce\" />" || {
+    printf 'HTML CSP nonce does not match its response header.\n' >&2
+    return 1
+  }
+}
+
 for path in / /about /esports /tournaments /fastlap /galerie /players; do
   expect_status "$path" 200
 done
@@ -112,5 +132,6 @@ for path in /elements/blockquote/ /product/demo /portfolio/demo /tag/demo /categ
 done
 
 expect_redirect "/esports?view=live" "https://lionsquad.at/esports?view=live" "www.lionsquad.at"
+expect_nonce_csp
 
 printf 'Public route contract passed.\n'
