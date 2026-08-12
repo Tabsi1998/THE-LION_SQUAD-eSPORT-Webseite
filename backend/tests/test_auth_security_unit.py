@@ -9,10 +9,11 @@ import pytest
 from fastapi import HTTPException, Response
 from pymongo.errors import DuplicateKeyError
 
-import auth
 from auth import (
+    JWT_ALGORITHM,
     create_access_token,
     create_refresh_token,
+    get_jwt_secret,
     get_current_user,
     hash_token,
     refresh_expires_at,
@@ -210,12 +211,12 @@ def test_parallel_refresh_replays_return_one_deterministic_successor():
         )
 
         assert first[2] == second[2]
-        replacement = jwt.decode(first[2], auth.get_jwt_secret(), algorithms=[auth.JWT_ALGORITHM])
+        replacement = jwt.decode(first[2], get_jwt_secret(), algorithms=[JWT_ALGORITHM])
         assert replacement["fid"] == old_jti
         active = [row for row in sessions.documents if row.get("revoked") is not True]
         assert [row["jti"] for row in active] == [replacement["jti"]]
         for result in (first, second):
-            access = jwt.decode(result[1], auth.get_jwt_secret(), algorithms=[auth.JWT_ALGORITHM])
+            access = jwt.decode(result[1], get_jwt_secret(), algorithms=[JWT_ALGORITHM])
             assert access["sid"] == replacement["jti"]
 
     asyncio.run(scenario())
@@ -235,7 +236,7 @@ def test_legacy_refresh_token_is_migrated_into_a_session_family():
             "jti": "legacy-session",
             "exp": expiry,
             "type": "refresh",
-        }, auth.get_jwt_secret(), algorithm=auth.JWT_ALGORITHM)
+        }, get_jwt_secret(), algorithm=JWT_ALGORITHM)
         sessions = _Documents([{
             "id": "legacy-record",
             "jti": "legacy-session",
@@ -248,8 +249,8 @@ def test_legacy_refresh_token_is_migrated_into_a_session_family():
 
         _user, access, refresh = await _rotate_session(db, legacy_token, _request(refresh=legacy_token))
 
-        refresh_payload = jwt.decode(refresh, auth.get_jwt_secret(), algorithms=[auth.JWT_ALGORITHM])
-        access_payload = jwt.decode(access, auth.get_jwt_secret(), algorithms=[auth.JWT_ALGORITHM])
+        refresh_payload = jwt.decode(refresh, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        access_payload = jwt.decode(access, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
         assert refresh_payload["fid"] == "legacy-session"
         assert access_payload["sid"] == refresh_payload["jti"]
 
@@ -313,7 +314,7 @@ def test_access_token_is_rejected_after_its_session_is_revoked(monkeypatch):
             memberships=SimpleNamespace(find_one=AsyncMock(return_value=None)),
             tournament_staff_assignments=SimpleNamespace(count_documents=AsyncMock(return_value=0)),
         )
-        monkeypatch.setattr(auth, "get_db", lambda: db)
+        monkeypatch.setattr("auth.get_db", lambda: db)
         token = create_access_token("user-1", "player@example.test", "player", "session-1")
         request = SimpleNamespace(cookies={"access_token": token}, headers={})
 
@@ -338,7 +339,7 @@ def test_inactive_account_is_rejected_at_the_authenticated_boundary(monkeypatch)
                 "id": "user-1", "role": "player", "is_active": False,
             })),
         )
-        monkeypatch.setattr(auth, "get_db", lambda: db)
+        monkeypatch.setattr("auth.get_db", lambda: db)
         token = create_access_token("user-1", "player@example.test", "player", "session-1")
 
         with pytest.raises(HTTPException) as exc:
