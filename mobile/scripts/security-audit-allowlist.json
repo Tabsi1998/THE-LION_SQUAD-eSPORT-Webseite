@@ -1,0 +1,12 @@
+{
+  "GHSA-5P2G-FCMC-QVQQ": {
+    "module": "image-size",
+    "expires": "2026-09-30",
+    "reason": "Expo 56 uses image-size only through the Metro build toolchain. No patched image-size release exists; npm's suggested force fix incorrectly downgrades Expo to 53."
+  },
+  "GHSA-W3RX-R6R6-PGPR": {
+    "module": "image-size",
+    "expires": "2026-09-30",
+    "reason": "Expo 56 uses image-size only through the Metro build toolchain. No patched image-size release exists; npm's suggested force fix incorrectly downgrades Expo to 53."
+  }
+}
