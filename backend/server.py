@@ -57,7 +57,11 @@ from routes.extras_routes import (
     settings_router, season_router, widget_router, dsgvo_router, pdf_router, audit_router,
 )
 from services.change_events import change_event_stream, publish_api_change
-from services.csrf import csrf_rejection_detail, normalize_origin
+from services.csrf import (
+    UNSAFE_METHODS,
+    csrf_rejection_detail,
+    normalize_origin,
+)
 from runtime_config import (
     resolve_app_environment,
     trusted_http_hosts,
