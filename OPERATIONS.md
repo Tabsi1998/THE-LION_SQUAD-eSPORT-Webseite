@@ -122,6 +122,11 @@ proxy_max_temp_file_size 0;
 Die Website trennt bewusst zwischen indexierbaren Vereins-/Content-Seiten und nicht wichtigen
 Profil-/Systemseiten.
 
+Der vollstaendige Vertrag fuer kanonische, private, umgeleitete und entfernte Pfade steht in
+[`PUBLIC_ROUTE_INVENTORY.md`](PUBLIC_ROUTE_INVENTORY.md). Der aeussere Reverse Proxy terminiert
+HTTPS und reicht den Pfad unveraendert weiter; `301`-/`410`-Entscheidungen trifft das versionierte
+Frontend-Nginx. Dadurch gelten dieselben Regeln auch nach einem Wechsel des Proxy-Produkts.
+
 Indexierbar und in der Sitemap:
 
 - Startseite, Verein, Vorstand, Werte, Kontakt, Sponsoren, Partner, Galerie, Referenzen

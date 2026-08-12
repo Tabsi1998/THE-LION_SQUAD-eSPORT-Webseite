@@ -36,6 +36,16 @@ function FastLapLegacyRedirect() {
   return <Navigate to={slug ? `/fastlap/${slug}` : "/fastlap"} replace />;
 }
 
+function GalleryLegacyRedirect() {
+  const { slug } = useParams();
+  return <Navigate to={slug ? `/galerie/${slug}` : "/galerie"} replace />;
+}
+
+function PlayerLegacyRedirect() {
+  const { username } = useParams();
+  return <Navigate to={`/u/${username}`} replace />;
+}
+
 import HomePage from "@/pages/public/HomePage";
 import TournamentsPage from "@/pages/public/TournamentsPage";
 import TournamentDetailPage from "@/pages/public/TournamentDetailPage";
@@ -233,13 +243,13 @@ function App() {
           <Route path="/seasons/:slug" element={<SeasonPage />} />
           <Route path="/u/me" element={<MeRedirect />} />
           <Route path="/u/:username" element={<PublicProfilePage />} />
-          <Route path="/players/:username" element={<PublicProfilePage />} />
+          <Route path="/players/:username" element={<PlayerLegacyRedirect />} />
           <Route path="/fastlap" element={<F1ListPage />} />
           <Route path="/fastlap/:slug" element={<F1DetailPage />} />
           <Route path="/galerie" element={<GalleryPage />} />
           <Route path="/galerie/:slug" element={<GalleryAlbumPage />} />
-          <Route path="/gallery" element={<GalleryPage />} />
-          <Route path="/gallery/:slug" element={<GalleryAlbumPage />} />
+          <Route path="/gallery" element={<GalleryLegacyRedirect />} />
+          <Route path="/gallery/:slug" element={<GalleryLegacyRedirect />} />
 
           {/* Admin */}
           <Route path="/admin/sponsors" element={<ProtectedRoute requireAdmin><AdminSponsorsPage /></ProtectedRoute>} />

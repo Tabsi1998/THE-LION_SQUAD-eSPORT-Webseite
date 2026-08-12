@@ -78,6 +78,8 @@ jobs:
             --add-host backend:127.0.0.1 \
             --volume "$PWD/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
             nginx:alpine nginx -t
+      - name: Validate public and legacy route contract
+        run: bash scripts/check-public-routes.sh
       - uses: actions/setup-node@v7
         with:
           node-version: "20"

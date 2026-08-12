@@ -34,6 +34,19 @@ test("public community structure is reachable", async ({ page }) => {
   await expect(page.getByRole("link", { name: /mitglieder öffnen/i })).toBeVisible();
 });
 
+test("legacy SPA aliases converge on canonical routes", async ({ page }) => {
+  for (const [legacy, canonical] of [
+    ["/f1", "/fastlap"],
+    ["/f1/example", "/fastlap/example"],
+    ["/gallery", "/galerie"],
+    ["/gallery/example", "/galerie/example"],
+    ["/players/example", "/u/example"],
+  ]) {
+    await page.goto(legacy);
+    await expect(page).toHaveURL(new RegExp(`${canonical.replaceAll("/", "\\/")}$`));
+  }
+});
+
 test("verein and community navigation are separated", async ({ page, isMobile }) => {
   await page.goto("/");
   await acceptCookies(page);
