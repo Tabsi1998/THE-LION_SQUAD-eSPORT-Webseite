@@ -273,6 +273,11 @@ TOURNAMENT_SITEMAP_PATHS = [
     ("matches", "0.65"),
     ("standings", "0.65"),
 ]
+STATIC_SITEMAP_PATHS = [
+    "/", "/about", "/news", "/events", "/esports", "/tournaments", "/fastlap",
+    "/teams", "/servers", "/members", "/membership/join",
+    "/sponsors", "/partners", "/contact", "/board", "/values", "/galerie", "/references",
+]
 
 
 def _parse_sitemap_dt(value):
@@ -304,11 +309,6 @@ async def sitemap():
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
     base = _normalise_base_url(branding.get("domain"))
 
-    static_paths = [
-        "/", "/about", "/news", "/events", "/esports", "/tournaments", "/fastlap",
-        "/teams", "/servers", "/members", "/membership/join",
-        "/sponsors", "/partners", "/contact", "/board", "/values", "/galerie", "/references",
-    ]
     urls: list[dict] = [
         {
             "loc": base + p,
@@ -316,7 +316,7 @@ async def sitemap():
             "changefreq": "daily" if p in ("/", "/news", "/events") else "weekly",
             "priority": "1.0" if p == "/" else "0.8" if p in ("/news", "/events", "/esports", "/tournaments", "/fastlap") else "0.6",
         }
-        for p in static_paths
+        for p in STATIC_SITEMAP_PATHS
     ]
 
     # tournaments

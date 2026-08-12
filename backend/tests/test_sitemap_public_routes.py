@@ -68,3 +68,16 @@ def test_sitemap_lists_public_tournament_subpages(monkeypatch):
     assert "<loc>https://example.test/tournaments/summer-cup/matches</loc>" in body
     assert "<loc>https://example.test/tournaments/summer-cup/standings</loc>" in body
     assert "<lastmod>2026-05-20</lastmod>" in body
+
+
+def test_static_sitemap_uses_only_canonical_public_paths(monkeypatch):
+    monkeypatch.setattr(setup_routes, "get_db", lambda: _SitemapDb())
+
+    response = asyncio.run(setup_routes.sitemap())
+    body = response.body.decode("utf-8")
+
+    for path in setup_routes.STATIC_SITEMAP_PATHS:
+        assert f"<loc>https://example.test{path}</loc>" in body
+
+    for legacy_path in ("/f1", "/gallery", "/players", "/turniere", "/mitglieder", "/esports/"):
+        assert f"<loc>https://example.test{legacy_path}</loc>" not in body
