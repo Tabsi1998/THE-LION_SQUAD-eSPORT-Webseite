@@ -8,8 +8,10 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
 import { Copy, Edit, MessageSquare, Plus, Search, Send, Shield, Trash2, Users, UserPlus } from "lucide-react";
 
@@ -107,6 +109,8 @@ function TeamDetail({ id }) {
   const [team, setTeam] = useState(null);
   const [editing, setEditing] = useState(null);
   const [joinCode, setJoinCode] = useState("");
+  const { submitting: mutating, submitOnce } = useSubmissionGuard();
+  const [actionError, setActionError] = useState("");
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
@@ -123,70 +127,80 @@ function TeamDetail({ id }) {
   const isMember = !!user && (team.is_member || team.member_ids?.includes(user.id));
   const canEdit = !!user && (team.can_manage || team.leader_id === user.id || team.co_leader_ids?.includes(user.id) || isAdmin);
 
+  const runAction = async (task, fallback) => {
+    setActionError("");
+    const attempt = await submitOnce(task);
+    if (!attempt.started || !attempt.error) return attempt.started;
+    const message = formatRequestError(attempt.error, fallback);
+    setActionError(message);
+    toast.error(message);
+    return false;
+  };
+
   const join = async (e) => {
     e.preventDefault();
-    try {
+    await runAction(async () => {
       await api.post(`/teams/${team.id}/join`, { join_code: joinCode.trim() });
       toast.success("Du bist dem Team beigetreten.");
       setJoinCode("");
-      load();
-    } catch (err) { toast.error(formatRequestError(err, "Team-Beitritt fehlgeschlagen.")); }
+      await load();
+    }, "Team-Beitritt fehlgeschlagen.");
   };
 
   const leave = async () => {
-    try {
+    await runAction(async () => {
       await api.post(`/teams/${team.id}/leave`);
       toast.success("Team verlassen.");
-      load();
-    } catch (err) { toast.error(formatRequestError(err, "Team konnte nicht verlassen werden.")); }
+      await load();
+    }, "Team konnte nicht verlassen werden.");
   };
 
   const remove = async () => {
-    if (!await confirm({
-      title: "Team endgültig löschen?",
-      description: "Das Team wird inklusive Verwaltung und Mitgliedschaften entfernt.",
-      confirmLabel: "Endgültig löschen",
-    })) return;
-    try {
+    await runAction(async () => {
+      if (!await confirm({
+        title: "Team endgültig löschen?",
+        description: "Das Team wird inklusive Verwaltung und Mitgliedschaften entfernt.",
+        confirmLabel: "Endgültig löschen",
+      })) return;
       await api.delete(`/teams/${team.id}`);
       toast.success("Team gelöscht.");
       nav("/teams");
-    } catch (err) { toast.error(formatRequestError(err, "Team konnte nicht gelöscht werden.")); }
+    }, "Team konnte nicht gelöscht werden.");
   };
 
   const kickMember = async (m) => {
-    if (!await confirm({
-      title: "Mitglied entfernen?",
-      description: `${m.display_name || m.username} wirklich aus dem Team entfernen?`,
-      confirmLabel: "Entfernen",
-    })) return;
-    try {
+    await runAction(async () => {
+      if (!await confirm({
+        title: "Mitglied entfernen?",
+        description: `${m.display_name || m.username} wirklich aus dem Team entfernen?`,
+        confirmLabel: "Entfernen",
+      })) return;
       await api.delete(`/teams/${team.id}/members/${m.id}`);
       toast.success(`${m.display_name || m.username} entfernt.`);
-      load();
-    } catch (err) { toast.error(formatRequestError(err, "Mitglied konnte nicht entfernt werden.")); }
+      await load();
+    }, "Mitglied konnte nicht entfernt werden.");
   };
 
   const setRole = async (m, role) => {
-    try {
+    await runAction(async () => {
       await api.post(`/teams/${team.id}/members/${m.id}/role`, { role });
       toast.success(role === "co_leader" ? "Zum Co-Leader befördert." : "Co-Leader-Rolle entzogen.");
-      load();
-    } catch (err) { toast.error(formatRequestError(err, "Rolle konnte nicht geändert werden.")); }
+      await load();
+    }, "Rolle konnte nicht geändert werden.");
   };
 
   const transferLead = async (m) => {
-    if (!await confirm({
-      title: "Leadership übertragen?",
-      description: `Leadership an ${m.display_name || m.username} übergeben? Du wirst automatisch Co-Leader.`,
-      confirmLabel: "Übertragen",
-      tone: "info",
-    })) return;
-    try {
+    await runAction(async () => {
+      if (!await confirm({
+        title: "Leadership übertragen?",
+        description: `Leadership an ${m.display_name || m.username} übergeben? Du wirst automatisch Co-Leader.`,
+        confirmLabel: "Übertragen",
+        tone: "info",
+      })) return;
       await api.post(`/teams/${team.id}/transfer-leader`, { new_leader_id: m.id });
       toast.success("Leadership übertragen.");
-      load();
-    } catch (err) { toast.error(formatRequestError(err, "Leadership konnte nicht übertragen werden.")); }
+      await load();
+    }, "Leadership konnte nicht übertragen werden.");
   };
 
   const copyJoin = async () => {
@@ -216,8 +230,8 @@ function TeamDetail({ id }) {
             </div>
             {canEdit && (
               <div className="flex gap-2 flex-wrap">
-                <button onClick={() => setEditing(team)} data-testid="team-edit-open" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
-                <button onClick={remove} data-testid="team-delete" className="px-4 py-2 border border-[#FF3B30]/50 text-[#FF3B30] rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" /> Löschen</button>
+                <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
+                <button onClick={remove} disabled={mutating} data-testid="team-delete" className="px-4 py-2 border border-[#FF3B30]/50 text-[#FF3B30] rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Trash2 className="w-3.5 h-3.5" /> Löschen</button>
               </div>
             )}
           </div>
@@ -257,22 +271,22 @@ function TeamDetail({ id }) {
                   {(showKick || showRole || showTransfer) && (
                     <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
                       {showRole && !isCo && (
-                        <button onClick={(e) => { e.preventDefault(); setRole(m, "co_leader"); }}
+                        <button disabled={mutating} onClick={(e) => { e.preventDefault(); setRole(m, "co_leader"); }}
                           data-testid={`team-promote-${m.id}`}
                           className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10 rounded-sm">↑ Co-Leader</button>
                       )}
                       {showRole && isCo && (
-                        <button onClick={(e) => { e.preventDefault(); setRole(m, "member"); }}
+                        <button disabled={mutating} onClick={(e) => { e.preventDefault(); setRole(m, "member"); }}
                           data-testid={`team-demote-${m.id}`}
                           className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider border border-white/15 text-white/60 hover:bg-white/5 rounded-sm">↓ Mitglied</button>
                       )}
                       {showTransfer && (
-                        <button onClick={(e) => { e.preventDefault(); transferLead(m); }}
+                        <button disabled={mutating} onClick={(e) => { e.preventDefault(); transferLead(m); }}
                           data-testid={`team-transfer-${m.id}`}
                           className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 rounded-sm">★ Leader machen</button>
                       )}
                       {showKick && (
-                        <button onClick={(e) => { e.preventDefault(); kickMember(m); }}
+                        <button disabled={mutating} onClick={(e) => { e.preventDefault(); kickMember(m); }}
                           data-testid={`team-kick-${m.id}`}
                           className="ml-auto px-2 py-1 text-[10px] font-bold uppercase tracking-wider border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 rounded-sm">Entfernen</button>
                       )}
@@ -286,6 +300,7 @@ function TeamDetail({ id }) {
           {(isMember || canEdit) && <TeamChat team={team} user={user} />}
         </div>
         <aside className="space-y-4">
+          {actionError && <AuthFormAlert id="team-action-error">{actionError}</AuthFormAlert>}
           {canEdit && (
             <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4">
               <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Join-Code</div>
@@ -299,12 +314,12 @@ function TeamDetail({ id }) {
           {user && !isMember && (
             <form onSubmit={join} className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
               <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Team beitreten</div>
-              <input value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="Join-Code" required data-testid="team-join-code" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
-              <button data-testid="team-join-submit" className="w-full px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold inline-flex justify-center items-center gap-2"><UserPlus className="w-3.5 h-3.5" /> Beitreten</button>
+              <input value={joinCode} onChange={(e) => { setJoinCode(e.target.value); setActionError(""); }} placeholder="Join-Code" required data-testid="team-join-code" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
+              <button disabled={mutating} data-testid="team-join-submit" className="w-full px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold inline-flex justify-center items-center gap-2 disabled:opacity-50"><UserPlus className="w-3.5 h-3.5" /> {mutating ? "Prüfe…" : "Beitreten"}</button>
             </form>
           )}
           {user && isMember && team.leader_id !== user.id && (
-            <button onClick={leave} data-testid="team-leave" className="w-full px-4 py-2 border border-white/15 text-white/70 rounded-sm text-xs uppercase tracking-wider font-bold">Team verlassen</button>
+            <button onClick={leave} disabled={mutating} data-testid="team-leave" className="w-full px-4 py-2 border border-white/15 text-white/70 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Team verlassen</button>
           )}
           {team.discord_link && <a href={team.discord_link} target="_blank" rel="noreferrer" className="block px-4 py-3 border border-white/10 rounded-sm text-center text-sm font-bold uppercase tracking-wider hover:border-[#29B6E8]/60 hover:text-[#29B6E8]">Discord</a>}
         </aside>
@@ -317,7 +332,8 @@ function TeamDetail({ id }) {
 function TeamChat({ team, user }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
-  const [loading, setLoading] = useState(false);
+  const { submitting: loading, submitOnce } = useSubmissionGuard();
+  const [sendError, setSendError] = useState("");
   const scrollRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -343,16 +359,17 @@ function TeamChat({ team, user }) {
 
   const send = async () => {
     const message = text.trim();
-    if (!message || loading) return;
-    setLoading(true);
-    try {
+    if (!message) return;
+    setSendError("");
+    const attempt = await submitOnce(async () => {
       const { data } = await api.post(`/teams/${team.id}/chat`, { message });
       setMessages((rows) => [...rows, data]);
       setText("");
-    } catch (err) {
-      toast.error(formatRequestError(err, "Nachricht konnte nicht gesendet werden."));
-    } finally {
-      setLoading(false);
+    });
+    if (attempt.started && attempt.error) {
+      const messageText = formatRequestError(attempt.error, "Nachricht konnte nicht gesendet werden.");
+      setSendError(messageText);
+      toast.error(messageText);
     }
   };
 
@@ -382,7 +399,7 @@ function TeamChat({ team, user }) {
         <div className="border-t border-white/10 p-3 flex gap-2">
           <MentionTextarea
             value={text}
-            onValueChange={setText}
+            onValueChange={(value) => { setText(value); setSendError(""); }}
             scope="team"
             scopeId={team.id}
             onKeyDown={(e) => {
@@ -401,6 +418,7 @@ function TeamChat({ team, user }) {
             <Send className="w-3.5 h-3.5" /> Senden
           </button>
         </div>
+        {sendError && <div className="border-t border-white/10 p-3"><AuthFormAlert id="team-chat-error">{sendError}</AuthFormAlert></div>}
       </div>
     </section>
   );
@@ -410,6 +428,8 @@ function InviteMemberPanel({ team }) {
   const [query, setQuery] = useState("");
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(false);
+  const { submitting: inviting, submitOnce } = useSubmissionGuard();
+  const [inviteError, setInviteError] = useState("");
 
   useEffect(() => {
     const needle = query.trim();
@@ -432,12 +452,16 @@ function InviteMemberPanel({ team }) {
   }, [query, team.id]);
 
   const invite = async (user) => {
-    try {
+    setInviteError("");
+    const attempt = await submitOnce(async () => {
       await api.post(`/teams/${team.id}/invites`, { user_id: user.id });
       toast.success(`${user.display_name || user.username} eingeladen.`);
       setCandidates((rows) => rows.map((row) => row.id === user.id ? { ...row, has_pending_invite: true } : row));
-    } catch (err) {
-      toast.error(formatRequestError(err, "Einladung konnte nicht gesendet werden."));
+    });
+    if (attempt.started && attempt.error) {
+      const message = formatRequestError(attempt.error, "Einladung konnte nicht gesendet werden.");
+      setInviteError(message);
+      toast.error(message);
     }
   };
 
@@ -451,7 +475,7 @@ function InviteMemberPanel({ team }) {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />
         <input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => { setQuery(e.target.value); setInviteError(""); }}
           placeholder="Username suchen"
           className="w-full bg-[#0A0A0A] border border-white/10 pl-9 pr-3 py-2 rounded-sm text-sm"
         />
@@ -466,7 +490,7 @@ function InviteMemberPanel({ team }) {
             </div>
             <button
               type="button"
-              disabled={candidate.has_pending_invite}
+              disabled={candidate.has_pending_invite || inviting}
               onClick={() => invite(candidate)}
               className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-45 disabled:pointer-events-none"
             >
@@ -475,6 +499,7 @@ function InviteMemberPanel({ team }) {
           </div>
         ))}
         {query.trim().length >= 2 && !loading && candidates.length === 0 && <div className="text-xs text-white/35">Keine passenden Benutzer gefunden.</div>}
+        {inviteError && <AuthFormAlert id="team-invite-error">{inviteError}</AuthFormAlert>}
       </div>
     </div>
   );
@@ -483,27 +508,32 @@ function InviteMemberPanel({ team }) {
 function TeamModal({ team, onClose, onSaved }) {
   const isNew = !team?.id;
   const [form, setForm] = useState({ ...emptyTeam, ...team });
-  const [saving, setSaving] = useState(false);
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const { submitting: saving, submitOnce } = useSubmissionGuard();
+  const [submitError, setSubmitError] = useState("");
+  const set = (k, v) => { setForm((f) => ({ ...f, [k]: v })); setSubmitError(""); };
 
   const submit = async (e) => {
     e.preventDefault();
-    setSaving(true);
-    try {
-      const payload = {
+    const payload = {
         name: form.name.trim(),
         tag: form.tag.trim().toUpperCase(),
         description: form.description || null,
         logo_url: form.logo_url || null,
         banner_url: form.banner_url || null,
         discord_link: form.discord_link || null,
-      };
+    };
+    setSubmitError("");
+    const attempt = await submitOnce(async () => {
       if (isNew) await api.post("/teams", payload);
       else await api.patch(`/teams/${team.id}`, payload);
       toast.success(isNew ? "Team erstellt." : "Team gespeichert.");
       onSaved();
-    } catch (err) { toast.error(formatRequestError(err, isNew ? "Team konnte nicht erstellt werden." : "Team konnte nicht gespeichert werden.", { name: form.name })); }
-    setSaving(false);
+    });
+    if (attempt.started && attempt.error) {
+      const message = formatRequestError(attempt.error, isNew ? "Team konnte nicht erstellt werden." : "Team konnte nicht gespeichert werden.", { name: form.name });
+      setSubmitError(message);
+      toast.error(message);
+    }
   };
 
   return (
@@ -522,7 +552,8 @@ function TeamModal({ team, onClose, onSaved }) {
           <Field label="Discord-Link"><Input value={form.discord_link || ""} onChange={(v) => set("discord_link", v)} placeholder="https://discord.gg/..." /></Field>
         </div>
         <div className="flex justify-end gap-2 p-5 border-t border-white/10">
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
+          {submitError && <div className="mr-auto"><AuthFormAlert id="team-submit-error">{submitError}</AuthFormAlert></div>}
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Abbrechen</button>
           <button disabled={saving} data-testid="team-save" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
         </div>
       </form>

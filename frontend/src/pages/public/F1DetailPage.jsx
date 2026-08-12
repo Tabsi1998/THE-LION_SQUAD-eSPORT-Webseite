@@ -8,6 +8,7 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
+import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { Award, Tv, Trophy, Flag, Calendar, Trash2, FileDown } from "lucide-react";
@@ -15,6 +16,7 @@ import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/l
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 
@@ -367,9 +369,14 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
   const [users, setUsers] = useState([]);
   const [times, setTimes] = useState([]);
   const [form, setForm] = useState({ user_id: "", time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "", score_scope: "official" });
-  const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
-  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const { submitting: saving, submitOnce } = useSubmissionGuard();
+  const [actionError, setActionError] = useState("");
+  const set = (key, value) => { setForm((current) => ({ ...current, [key]: value })); setActionError(""); };
+
+  const failAction = (message) => {
+    setActionError(message);
+    toast.error(message);
+  };
 
   useEffect(() => {
     if (!challenge?.id) return;
@@ -407,16 +414,16 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
     event.preventDefault();
     const ms = parseTimeStr(form.time_str);
     if (!ms) {
-      toast.error("Ungültiges Zeitformat. Beispiel: 1:24.587");
+      failAction("Ungültiges Zeitformat. Beispiel: 1:24.587");
       return;
     }
     const penalty = Number(form.penalty_seconds) || 0;
     if (penalty > 0 && (form.admin_note || "").trim().length < 5) {
-      toast.error("Bei Strafzeit ist eine Begründung Pflicht.");
+      failAction("Bei Strafzeit ist eine Begründung Pflicht.");
       return;
     }
-    setSaving(true);
-    try {
+    setActionError("");
+    const attempt = await submitOnce(async () => {
       await api.post(`/f1/challenges/${challenge.id}/times`, {
         user_id: form.user_id,
         track_id: trackId,
@@ -430,31 +437,29 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
       setForm((current) => ({ ...current, time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "" }));
       await loadTimes();
       onSaved();
-    } catch (err) {
-      toast.error(formatRequestError(err, "Zeit konnte nicht eingetragen werden."));
-    } finally {
-      setSaving(false);
+    });
+    if (attempt.started && attempt.error) {
+      failAction(formatRequestError(attempt.error, "Zeit konnte nicht eingetragen werden."));
     }
   };
 
   const deleteTime = async (time) => {
-    const ok = await confirm({
-      title: "Zeit löschen?",
-      description: `${time.user?.display_name || time.user?.username || "Fahrer"} - ${time.time_str} wird aus der Challenge entfernt.`,
-      confirmLabel: "Zeit löschen",
-      tone: "danger",
-    });
-    if (!ok) return;
-    setDeletingId(time.id);
-    try {
+    setActionError("");
+    const attempt = await submitOnce(async () => {
+      const ok = await confirm({
+        title: "Zeit löschen?",
+        description: `${time.user?.display_name || time.user?.username || "Fahrer"} - ${time.time_str} wird aus der Challenge entfernt.`,
+        confirmLabel: "Zeit löschen",
+        tone: "danger",
+      });
+      if (!ok) return;
       await api.delete(`/f1/times/${time.id}`);
       toast.success("Zeit gelöscht.");
       await loadTimes();
       onSaved();
-    } catch (err) {
-      toast.error(formatRequestError(err, "Zeit konnte nicht gelöscht werden."));
-    } finally {
-      setDeletingId(null);
+    });
+    if (attempt.started && attempt.error) {
+      failAction(formatRequestError(attempt.error, "Zeit konnte nicht gelöscht werden."));
     }
   };
 
@@ -471,14 +476,14 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
         <div className="grid md:grid-cols-[minmax(12rem,1fr)_9rem_11rem_8rem_auto] gap-2 items-end">
           <label className="block">
             <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Fahrer</span>
-            <select value={form.user_id} onChange={(e) => set("user_id", e.target.value)} required className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+            <select value={form.user_id} onChange={(e) => set("user_id", e.target.value)} required data-testid="fastlap-user" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
               <option value="">- auswählen -</option>
               {users.map((item) => <option key={item.id} value={item.id}>{item.display_name || item.username || item.email}</option>)}
             </select>
           </label>
           <label className="block">
             <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Zeit</span>
-            <input value={form.time_str} onChange={(e) => set("time_str", e.target.value)} required placeholder="1:24.587" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display tabular-nums" />
+            <input value={form.time_str} onChange={(e) => set("time_str", e.target.value)} required placeholder="1:24.587" data-testid="fastlap-time" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display tabular-nums" />
           </label>
           <label className="block">
             <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Wertung</span>
@@ -489,15 +494,16 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
           </label>
           <label className="block">
             <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Strafe</span>
-            <input type="number" step="0.1" value={form.penalty_seconds} onChange={(e) => set("penalty_seconds", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
+            <input type="number" step="0.1" value={form.penalty_seconds} onChange={(e) => set("penalty_seconds", e.target.value)} data-testid="fastlap-penalty" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
           </label>
-          <button disabled={saving} className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">Speichern</button>
+          <button disabled={saving} data-testid="fastlap-submit" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">Speichern</button>
         </div>
         <div className="mt-2 grid md:grid-cols-2 gap-2">
           <input value={form.proof_url} onChange={(e) => set("proof_url", e.target.value)} placeholder="Proof URL optional" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           <input value={form.admin_note} onChange={(e) => set("admin_note", e.target.value)} placeholder={Number(form.penalty_seconds) > 0 ? "Begründung für Strafe" : "Notiz optional"} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
         </div>
         {forceReferenceScope && <div className="mt-2 text-[10px] text-[#FFD700] uppercase tracking-widest">Vereinsmitglied: nur Referenzzeit möglich.</div>}
+        {actionError && <div className="mt-3"><AuthFormAlert id="fastlap-action-error">{actionError}</AuthFormAlert></div>}
       </form>
 
       <div className="mt-4 border-t border-white/10 pt-3">
@@ -522,7 +528,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
                 <button
                   type="button"
                   onClick={() => deleteTime(time)}
-                  disabled={deletingId === time.id}
+                  disabled={saving}
                   className="p-1.5 text-white/42 hover:text-[#FF3B30] disabled:opacity-40"
                   title="Zeit löschen"
                 >

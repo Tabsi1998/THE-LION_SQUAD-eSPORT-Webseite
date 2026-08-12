@@ -5,10 +5,12 @@ import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
+import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 
 const scheduleLabels = {
   proposed: "Terminvorschlag offen",
@@ -76,7 +78,8 @@ export default function MatchPage() {
   const [forfeitReason, setForfeitReason] = useState("");
   const [forfeitWinnerId, setForfeitWinnerId] = useState("");
   const [v2Rows, setV2Rows] = useState([]);
-  const [busy, setBusy] = useState(false);
+  const { submitting: busy, submitOnce } = useSubmissionGuard();
+  const [actionError, setActionError] = useState("");
 
   const load = useCallback(async ({ preserveDrafts = true } = {}) => {
     const [{ data: page }, { data: messages }] = await Promise.all([
@@ -125,48 +128,50 @@ export default function MatchPage() {
     : "Matchseite mit Terminabstimmung, Matchchat und Ergebnisstatus.";
   useDocumentTitle(title, description, { robots: "noindex, follow" });
 
+  const failAction = (message) => {
+    setActionError(message);
+    toast.error(message);
+  };
+
+  const runAction = async (task, fallback) => {
+    setActionError("");
+    const attempt = await submitOnce(task);
+    if (!attempt.started || !attempt.error) return attempt.started;
+    failAction(formatApiError(attempt.error.response?.data?.detail) || fallback);
+    return false;
+  };
+
   const propose = async (e) => {
     e.preventDefault();
     const scheduled_at = fromLocalInput(proposalAt);
-    if (!scheduled_at) return toast.error("Bitte Datum und Uhrzeit wählen.");
-    setBusy(true);
-    try {
+    if (!scheduled_at) return failAction("Bitte Datum und Uhrzeit wählen.");
+    await runAction(async () => {
       await api.post(`/matches/${id}/schedule-proposals`, { scheduled_at, note: proposalNote || null });
       toast.success("Terminvorschlag gesendet.");
       setProposalNote("");
       await load();
-    } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
-    } finally {
-      setBusy(false);
-    }
+    }, "Terminvorschlag konnte nicht gesendet werden.");
   };
 
   const decide = async (proposal, action) => {
     const payload = { action, note: decisionNote || null };
     if (action === "counter") {
       const scheduled_at = fromLocalInput(counterAt);
-      if (!scheduled_at) return toast.error("Bitte Datum und Uhrzeit für den Gegenvorschlag wählen.");
+      if (!scheduled_at) return failAction("Bitte Datum und Uhrzeit für den Gegenvorschlag wählen.");
       payload.scheduled_at = scheduled_at;
     }
-    setBusy(true);
-    try {
+    await runAction(async () => {
       await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/decision`, payload);
       toast.success(action === "accept" ? "Termin bestätigt." : action === "counter" ? "Gegenvorschlag gesendet." : "Vorschlag abgelehnt.");
       setDecisionNote("");
       setCounterAt("");
       await load();
-    } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
-    } finally {
-      setBusy(false);
-    }
+    }, "Terminentscheidung konnte nicht gespeichert werden.");
   };
 
   const submitLegacyResult = async (e) => {
     e.preventDefault();
-    setBusy(true);
-    try {
+    await runAction(async () => {
       const score_a = Math.max(0, Number.parseInt(scoreA || "0", 10) || 0);
       const score_b = Math.max(0, Number.parseInt(scoreB || "0", 10) || 0);
       if (data?.can_staff_submit_result) {
@@ -190,17 +195,12 @@ export default function MatchPage() {
       setProofUrl("");
       setReportNote("");
       await load({ preserveDrafts: false });
-    } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
-    } finally {
-      setBusy(false);
-    }
+    }, "Ergebnis konnte nicht gespeichert werden.");
   };
 
   const submitV2Result = async (e) => {
     e.preventDefault();
-    setBusy(true);
-    try {
+    await runAction(async () => {
       await api.post(`/matches/${id}/result`, {
         proof_url: proofUrl.trim() || null,
         note: reportNote.trim() || null,
@@ -217,59 +217,43 @@ export default function MatchPage() {
       setProofUrl("");
       setReportNote("");
       await load({ preserveDrafts: false });
-    } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
-    } finally {
-      setBusy(false);
-    }
+    }, "Heat-Ergebnis konnte nicht gespeichert werden.");
   };
 
   const submitDispute = async (e) => {
     e.preventDefault();
     const reason = disputeReason.trim();
-    if (!reason) return toast.error("Bitte Grund angeben.");
-    setBusy(true);
-    try {
+    if (!reason) return failAction("Bitte Grund angeben.");
+    await runAction(async () => {
       await api.post(`/matches/${id}/dispute`, { reason });
       toast.success("Klärfall gemeldet.");
       setDisputeReason("");
       await load({ preserveDrafts: false });
-    } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
-    } finally {
-      setBusy(false);
-    }
+    }, "Klärfall konnte nicht gemeldet werden.");
   };
 
   const submitForfeit = async (e) => {
     e.preventDefault();
     const note = forfeitReason.trim();
-    if (!note || note.length < 5) return toast.error("Bitte Forfeit-Begründung mit mindestens 5 Zeichen angeben.");
-    if (!forfeitWinnerId) return toast.error("Bitte Gewinner auswählen.");
+    if (!note || note.length < 5) return failAction("Bitte Forfeit-Begründung mit mindestens 5 Zeichen angeben.");
+    if (!forfeitWinnerId) return failAction("Bitte Gewinner auswählen.");
     if (!window.confirm("Forfeit wirklich speichern? Diese Staff-Aktion wertet das Match als Forfeit.")) return;
-    setBusy(true);
-    try {
+    await runAction(async () => {
       await api.post(`/matches/${id}/forfeit`, { winner_id: forfeitWinnerId, note });
       toast.success("Forfeit gespeichert.");
       setForfeitReason("");
       await load({ preserveDrafts: false });
-    } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
-    } finally {
-      setBusy(false);
-    }
+    }, "Forfeit konnte nicht gespeichert werden.");
   };
 
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!message.trim()) return;
-    try {
+    await runAction(async () => {
       const { data: saved } = await api.post(`/matches/${id}/chat`, { message: message.trim() });
       setChat((rows) => [...rows, saved]);
       setMessage("");
-    } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
-    }
+    }, "Nachricht konnte nicht gesendet werden.");
   };
 
   if (!data) {
@@ -333,6 +317,8 @@ export default function MatchPage() {
             )}
           </div>
         </div>
+
+        {actionError && <div className="mt-5"><AuthFormAlert id="match-action-error">{actionError}</AuthFormAlert></div>}
 
         <div className="mt-8 border border-[#29B6E8]/35 bg-[#0F1D23] rounded-sm p-5" data-testid="match-result-card">
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -504,8 +490,8 @@ export default function MatchPage() {
                       </div>
                       {canManageSchedule && p.status === "pending" && (
                         <div className="flex gap-1 shrink-0">
-                          <button type="button" onClick={() => decide(p, "accept")} className="p-2 border border-[#00D26A]/40 text-[#00D26A] rounded-sm"><Check className="w-3.5 h-3.5" /></button>
-                          <button type="button" onClick={() => decide(p, "decline")} className="p-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm"><X className="w-3.5 h-3.5" /></button>
+                          <button type="button" disabled={busy} onClick={() => decide(p, "accept")} className="p-2 border border-[#00D26A]/40 text-[#00D26A] rounded-sm disabled:opacity-50"><Check className="w-3.5 h-3.5" /></button>
+                          <button type="button" disabled={busy} onClick={() => decide(p, "decline")} className="p-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm disabled:opacity-50"><X className="w-3.5 h-3.5" /></button>
                         </div>
                       )}
                     </div>
@@ -513,7 +499,7 @@ export default function MatchPage() {
                       <div className="mt-3 grid md:grid-cols-[1fr_1fr_auto] gap-2 items-end">
                         <input type="datetime-local" value={counterAt} onChange={(e) => setCounterAt(e.target.value)} className="input" />
                         <input value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} className="input" placeholder="Antwort / Grund" />
-                        <button type="button" onClick={() => decide(p, "counter")} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] uppercase tracking-wider font-bold">Gegenvorschlag</button>
+                        <button type="button" disabled={busy} onClick={() => decide(p, "counter")} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">Gegenvorschlag</button>
                       </div>
                     )}
                   </div>
@@ -551,7 +537,7 @@ export default function MatchPage() {
                     textareaClassName="input w-full min-h-[4.5rem] resize-y"
                     placeholder="Nachricht schreiben, @leitung oder @username markieren"
                   />
-                  <button className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm"><Send className="w-4 h-4" /></button>
+                  <button disabled={busy || !message.trim()} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm disabled:opacity-50"><Send className="w-4 h-4" /></button>
                 </div>
               </form>
             ) : (

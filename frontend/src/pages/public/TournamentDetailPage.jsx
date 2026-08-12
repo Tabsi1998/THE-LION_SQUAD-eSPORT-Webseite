@@ -7,7 +7,9 @@ import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
+import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
 import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X, Flag, MessageSquare, Send } from "lucide-react";
 import { PrizeList } from "@/components/tls/PrizeList";
@@ -34,7 +36,8 @@ export default function TournamentDetailPage() {
   const [standings, setStandings] = useState([]);
   const [myReg, setMyReg] = useState(null);
   const [myTeams, setMyTeams] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { submitting: loading, submitOnce } = useSubmissionGuard();
+  const [actionError, setActionError] = useState("");
   const [registerModal, setRegisterModal] = useState(false);
   const confirm = useConfirm();
   const seoDescription = seoTextPreview(t?.description || t?.rules, "eSports Turnier von THE LION SQUAD mit Anmeldung, Check-in, Bracket und Rangliste.");
@@ -77,10 +80,19 @@ export default function TournamentDetailPage() {
 
   useApiInvalidation(load, ["tournaments"]);
 
+  const runAction = async (task, fallback) => {
+    setActionError("");
+    const attempt = await submitOnce(task);
+    if (!attempt.started || !attempt.error) return attempt.started;
+    const message = formatApiError(attempt.error.response?.data?.detail) || fallback;
+    setActionError(message);
+    toast.error(message);
+    return false;
+  };
+
   const submitRegistration = async ({ playerIds = {}, teamId = null } = {}) => {
     if (!user) { nav(`/login?next=${encodeURIComponent(`/tournaments/${slug}${accessToken ? `?access=${accessToken}` : ""}`)}`); return; }
-    setLoading(true);
-    try {
+    await runAction(async () => {
       await api.post(`/tournaments/${t.id}/register`, {
         team_id: teamId,
         ingame_name: user.display_name || user.username,
@@ -90,10 +102,8 @@ export default function TournamentDetailPage() {
       }, { params: accessToken ? { access: accessToken } : undefined });
       toast.success("Erfolgreich angemeldet!");
       setRegisterModal(false);
-      load();
-    } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail));
-    } finally { setLoading(false); }
+      await load();
+    }, "Anmeldung konnte nicht gespeichert werden.");
   };
 
   const handleRegister = async () => {
@@ -107,32 +117,27 @@ export default function TournamentDetailPage() {
   };
 
   const handleCheckin = async () => {
-    try {
+    await runAction(async () => {
       await api.post(`/tournaments/${t.id}/checkin`);
       toast.success("Check-in erfolgt.");
-      load();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+      await load();
+    }, "Check-in konnte nicht gespeichert werden.");
   };
 
   const handleUnregister = async () => {
     if (!myReg) return;
-    const ok = await confirm({
-      title: "Vom Turnier abmelden?",
-      description: "Deine Anmeldung wird entfernt und dein Platz wird im Vorschau-Turnierbaum wieder frei.",
-      confirmLabel: "Abmelden",
-      tone: "danger",
-    });
-    if (!ok) return;
-    setLoading(true);
-    try {
+    await runAction(async () => {
+      const ok = await confirm({
+        title: "Vom Turnier abmelden?",
+        description: "Deine Anmeldung wird entfernt und dein Platz wird im Vorschau-Turnierbaum wieder frei.",
+        confirmLabel: "Abmelden",
+        tone: "danger",
+      });
+      if (!ok) return;
       await api.delete(`/tournaments/${t.id}/registrations/${myReg.id}`);
       toast.success("Du bist vom Turnier abgemeldet.");
-      load();
-    } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail) || "Abmeldung fehlgeschlagen.");
-    } finally {
-      setLoading(false);
-    }
+      await load();
+    }, "Abmeldung fehlgeschlagen.");
   };
 
   if (!t) return <PublicLayout><PublicLoadingState label="Lade Turnier" /></PublicLayout>;
@@ -224,7 +229,7 @@ export default function TournamentDetailPage() {
               </button>
             )}
             {canCheckIn && myReg.status === "approved" && t.status === "check_in" && (
-              <button onClick={handleCheckin} data-testid="tournament-checkin-btn" className="px-6 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#EAC200] transition">
+              <button onClick={handleCheckin} disabled={loading} data-testid="tournament-checkin-btn" className="px-6 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#EAC200] disabled:opacity-50 transition">
                 Check-in
               </button>
             )}
@@ -265,6 +270,7 @@ export default function TournamentDetailPage() {
               </a>
             )}
           </div>
+          {!registerModal && actionError && <div className="mt-4 max-w-3xl"><AuthFormAlert id="tournament-action-error">{actionError}</AuthFormAlert></div>}
         </div>
       </div>
 
@@ -342,6 +348,7 @@ export default function TournamentDetailPage() {
           user={user}
           myTeams={myTeams}
           loading={loading}
+          error={actionError}
           onClose={() => setRegisterModal(false)}
           onSubmit={submitRegistration}
         />
@@ -353,8 +360,9 @@ export default function TournamentDetailPage() {
 function TournamentChat({ tournament, user }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
-  const [loading, setLoading] = useState(false);
+  const { submitting: loading, submitOnce } = useSubmissionGuard();
   const [blocked, setBlocked] = useState("");
+  const [sendError, setSendError] = useState("");
   const scrollRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -385,16 +393,17 @@ function TournamentChat({ tournament, user }) {
     event.preventDefault();
     const message = text.trim();
     if (!message) return;
-    setLoading(true);
-    try {
+    setSendError("");
+    const attempt = await submitOnce(async () => {
       const { data } = await api.post(`/tournaments/${tournament.id}/chat`, { message });
       setMessages((rows) => [...rows, data]);
       setText("");
       setBlocked("");
-    } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail) || "Nachricht konnte nicht gesendet werden.");
-    } finally {
-      setLoading(false);
+    });
+    if (attempt.started && attempt.error) {
+      const messageText = formatApiError(attempt.error.response?.data?.detail) || "Nachricht konnte nicht gesendet werden.";
+      setSendError(messageText);
+      toast.error(messageText);
     }
   };
 
@@ -432,7 +441,7 @@ function TournamentChat({ tournament, user }) {
             <form onSubmit={send} className="border-t border-white/10 p-3 flex gap-2">
               <MentionTextarea
                 value={text}
-                onValueChange={setText}
+                onValueChange={(value) => { setText(value); setSendError(""); }}
                 scope="tournament"
                 scopeId={tournament.id}
                 onKeyDown={(event) => {
@@ -451,6 +460,7 @@ function TournamentChat({ tournament, user }) {
                 <Send className="w-3.5 h-3.5" /> Senden
               </button>
             </form>
+            {sendError && <div className="border-t border-white/10 p-3"><AuthFormAlert id="tournament-chat-error">{sendError}</AuthFormAlert></div>}
           </>
         )}
       </div>
@@ -480,7 +490,7 @@ function PodiumCard({ row }) {
   );
 }
 
-function RegistrationModal({ tournament, user, myTeams = [], loading, onClose, onSubmit }) {
+function RegistrationModal({ tournament, user, myTeams = [], loading, error, onClose, onSubmit }) {
   const game = tournament.game || {};
   const fields = game.effective_player_id_fields || game.player_id_fields || [];
   const sourceSlug = game.identity_game_slug || game.slug;
@@ -539,6 +549,7 @@ function RegistrationModal({ tournament, user, myTeams = [], loading, onClose, o
             />
           </label>
         ))}
+        {error && <AuthFormAlert id="tournament-registration-error">{error}</AuthFormAlert>}
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 border border-white/15 text-white/70 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
           <button disabled={loading || (needsTeam && !teamId)} className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
