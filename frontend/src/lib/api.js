@@ -118,7 +118,7 @@ function attachResponseInterceptors(client) {
   client.interceptors.response.use(
     (response) => {
       const method = (response.config?.method || "get").toUpperCase();
-      if (UNSAFE_METHODS.has(method) && response.status < 400) {
+      if (UNSAFE_METHODS.has(method) && response.status < 400 && !response.config?.skipInvalidation) {
         emitApiInvalidation({
           source: "client",
           method,
@@ -136,13 +136,13 @@ function attachResponseInterceptors(client) {
       const csrfError = error.response?.status === 403 && /csrf token missing or invalid/i.test(detail);
       if (error.response?.status === 401 && original && !original._retry && !authRequest) {
         original._retry = true;
-        refreshPromise = refreshPromise || api.post("/auth/refresh").finally(() => { refreshPromise = null; });
+        refreshPromise = refreshPromise || api.post("/auth/refresh", null, { skipInvalidation: true }).finally(() => { refreshPromise = null; });
         await refreshPromise;
         return client(original);
       }
       if (csrfError && original && !original._csrfRetry && !authRequest) {
         original._csrfRetry = true;
-        refreshPromise = refreshPromise || api.post("/auth/refresh").finally(() => { refreshPromise = null; });
+        refreshPromise = refreshPromise || api.post("/auth/refresh", null, { skipInvalidation: true }).finally(() => { refreshPromise = null; });
         await refreshPromise;
         applyCsrfHeader(original);
         return client(original);

@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from database import get_db
 from auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
-    set_auth_cookies, clear_auth_cookies, get_current_user, _decode,
+    set_auth_cookies, clear_auth_cookies, get_current_user, get_optional_user, _decode,
     hash_token, refresh_expires_at,
 )
 from email_service import send_template
@@ -346,7 +346,15 @@ async def logout(request: Request, response: Response):
 
 
 @router.get("/me")
-async def me(user: dict = Depends(get_current_user)):
+async def me(request: Request, response: Response, user: dict | None = Depends(get_optional_user)):
+    """Return a quiet guest response while preserving refreshable sessions.
+
+    Public pages can bootstrap auth without producing an expected 401 in every
+    guest browser. A stale access cookie is refreshed explicitly by the client.
+    """
+    response.headers["Cache-Control"] = "no-store"
+    if user is None and request.cookies.get("refresh_token"):
+        response.headers["X-Session-Refresh"] = "required"
     return user
 
 

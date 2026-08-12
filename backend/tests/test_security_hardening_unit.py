@@ -120,3 +120,16 @@ def test_internal_nginx_preserves_tls_and_sanitizes_forwarded_host():
     assert "map $http_x_forwarded_proto $tls_forwarded_proto" in nginx
     assert "proxy_set_header X-Forwarded-Proto $scheme;" not in nginx
     assert nginx.count("proxy_set_header X-Forwarded-Host $host;") == 7
+
+
+def test_internal_nginx_uses_one_nonce_based_csp_without_external_fonts():
+    root = Path(__file__).resolve().parents[2]
+    nginx = (root / "frontend" / "nginx.conf").read_text(encoding="utf-8")
+    css = (root / "frontend" / "src" / "index.css").read_text(encoding="utf-8")
+
+    assert "map $request_id $tls_content_security_policy" in nginx
+    assert "script-src 'self' 'nonce-$request_id'" in nginx
+    assert "script-src 'self' 'unsafe-inline'" not in nginx
+    assert nginx.count("add_header Content-Security-Policy $tls_content_security_policy always;") == 7
+    assert 'meta name="csp-nonce" content="$request_id"' in nginx
+    assert "fonts.googleapis.com" not in css

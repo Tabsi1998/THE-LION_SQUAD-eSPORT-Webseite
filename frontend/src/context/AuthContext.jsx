@@ -11,8 +11,12 @@ export function AuthProvider({ children }) {
 
   const fetchMe = useCallback(async () => {
     try {
-      const { data } = await api.get("/auth/me");
-      setUser(data);
+      let response = await api.get("/auth/me");
+      if (response.headers?.["x-session-refresh"] === "required") {
+        await api.post("/auth/refresh", null, { skipInvalidation: true });
+        response = await api.get("/auth/me");
+      }
+      setUser(response.data || null);
     } catch {
       setUser(null);
     }
