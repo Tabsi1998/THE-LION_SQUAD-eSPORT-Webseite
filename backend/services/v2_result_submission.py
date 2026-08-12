@@ -3,11 +3,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 
 from models import now_utc
 from services.match_notifications import notify_match_result_confirmed
 from services.match_v2_results import build_v2_result_application, is_v2_result_replay, normalize_v2_results
 from services.station_runtime import release_station_for_match
+
+
+logger = logging.getLogger("tls.match_results")
 
 
 def _submission_identity(
@@ -68,12 +72,20 @@ async def _upsert_result_audit(
 async def _finish_result_side_effects(db, match: dict, force: bool) -> None:
     try:
         await notify_match_result_confirmed(db, match, "matches_v2", force=force)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            "Result notification failed for match=%s type=%s",
+            match.get("id"),
+            type(exc).__name__,
+        )
     try:
         await release_station_for_match(db, match, "matches_v2")
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            "Station release failed for match=%s type=%s",
+            match.get("id"),
+            type(exc).__name__,
+        )
 
 
 async def submit_v2_result(

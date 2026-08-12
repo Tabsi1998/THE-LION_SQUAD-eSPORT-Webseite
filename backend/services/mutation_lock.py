@@ -8,7 +8,7 @@ always releases only the token owned by the current operation.
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from time import monotonic
 from uuid import uuid4
@@ -102,6 +102,5 @@ async def mutation_lock(
     finally:
         if renewal_task:
             renewal_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await renewal_task
+            await asyncio.gather(renewal_task, return_exceptions=True)
         await db.mutation_locks.delete_one({"resource": resource, "owner": owner})
