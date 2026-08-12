@@ -71,7 +71,7 @@ def test_sitemap_lists_public_tournament_subpages(monkeypatch):
 
 
 def test_static_sitemap_uses_only_canonical_public_paths(monkeypatch):
-    monkeypatch.setattr(setup_routes, "get_db", lambda: _SitemapDb())
+    monkeypatch.setattr(setup_routes, "get_db", _SitemapDb)
 
     response = asyncio.run(setup_routes.sitemap())
     body = response.body.decode("utf-8")
