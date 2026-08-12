@@ -869,7 +869,10 @@ async def unban_user(user_id: str, me: dict = Depends(require_admin())):
 @router.post("/{user_id}/role")
 async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_super())):
     db = get_db()
-    await db.users.update_one({"id": user_id}, {"$set": {"role": body.role, "updated_at": now_utc().isoformat()}})
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"role": body.role, "roles": [body.role], "updated_at": now_utc().isoformat()}},
+    )
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.role_change", "target_id": user_id,
                                      "actor_id": me["id"], "data": {"role": body.role},
                                      "created_at": now_utc().isoformat()})

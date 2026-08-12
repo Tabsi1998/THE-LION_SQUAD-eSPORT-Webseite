@@ -38,6 +38,23 @@ def test_production_rejects_demo_and_reset_flags():
         validate_runtime_environment({**base, "SEED_DEMO": "true"})
 
 
+def test_production_requires_https_public_origins():
+    base = {
+        "APP_ENV": "production",
+        "JWT_SECRET": "a" * 48,
+        "FRONTEND_URL": "http://lionsquad.at",
+    }
+    with pytest.raises(RuntimeError, match="FRONTEND_URL must use https"):
+        validate_runtime_environment(base)
+
+    with pytest.raises(RuntimeError, match="CORS_ORIGINS"):
+        validate_runtime_environment({
+            **base,
+            "FRONTEND_URL": "https://lionsquad.at",
+            "CORS_ORIGINS": "http://www.lionsquad.at",
+        })
+
+
 def test_development_still_rejects_api_reset_flag():
     with pytest.raises(RuntimeError, match="not supported by the API process"):
         validate_runtime_environment({"APP_ENV": "development", "TLS_RESET": "true"})

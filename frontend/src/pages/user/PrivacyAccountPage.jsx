@@ -42,8 +42,7 @@ export default function PrivacyAccountPage() {
     try {
       await api.post("/dsgvo/anonymize-me");
       toast.success("Dein Account wurde anonymisiert.");
-      await logout();
-      nav("/");
+      if (await logout()) nav("/");
     } catch (err) { toast.error(formatRequestError(err, "Anonymisierung fehlgeschlagen.")); }
     setBusy(false);
   };

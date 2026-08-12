@@ -57,6 +57,7 @@ from routes.extras_routes import (
     settings_router, season_router, widget_router, dsgvo_router, pdf_router, audit_router,
 )
 from services.change_events import change_event_stream, publish_api_change
+from services.csrf import csrf_rejection_detail, normalize_origin
 from runtime_config import (
     resolve_app_environment,
     trusted_http_hosts,
@@ -148,6 +149,9 @@ for origin in list(explicit_origins):
             explicit_origins.append(candidate)
 if not explicit_origins and not allow_insecure_cors:
     explicit_origins.extend(["http://localhost:3000", "http://127.0.0.1:3000"])
+trusted_browser_origins = frozenset(
+    origin for value in explicit_origins if (origin := normalize_origin(value))
+)
 
 if explicit_origins:
     app.add_middleware(
@@ -283,11 +287,13 @@ async def legacy_public_upload(filename: str, request: Request):
     return await public_upload(filename, request)
 
 
-UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 CSRF_EXEMPT_PATHS = {
     "/api/auth/login",
     "/api/auth/register",
-    "/api/auth/refresh",
+    "/api/auth/mobile/login",
+    "/api/auth/mobile/register",
+    "/api/auth/mobile/refresh",
+    "/api/auth/mobile/logout",
     "/api/auth/forgot-password",
     "/api/auth/reset-password",
 }
@@ -295,21 +301,13 @@ CSRF_EXEMPT_PATHS = {
 
 @app.middleware("http")
 async def csrf_protection(request, call_next):
-    path = request.url.path
-    has_auth_cookie = bool(request.cookies.get("access_token") or request.cookies.get("refresh_token"))
-    if (
-        request.method.upper() in UNSAFE_METHODS
-        and path.startswith("/api/")
-        and path not in CSRF_EXEMPT_PATHS
-        and has_auth_cookie
-    ):
-        cookie_token = request.cookies.get("csrf_token")
-        header_token = request.headers.get("x-csrf-token")
-        if not cookie_token or not header_token or cookie_token != header_token:
-            return JSONResponse(
-                status_code=403,
-                content={"detail": "CSRF token missing or invalid"},
-            )
+    rejection = csrf_rejection_detail(
+        request,
+        trusted_browser_origins,
+        CSRF_EXEMPT_PATHS,
+    )
+    if rejection:
+        return JSONResponse(status_code=403, content={"detail": rejection})
     return await call_next(request)
 
 
