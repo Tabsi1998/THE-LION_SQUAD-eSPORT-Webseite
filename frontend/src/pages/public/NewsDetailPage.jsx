@@ -69,7 +69,12 @@ export default function NewsDetailPage() {
             <img src={resolveMediaUrl(post.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-auto" />
           </div>
         )}
-        <RichContent text={post.content} embeds={post.content_embeds || []} className="mt-8 prose prose-invert max-w-none text-white/85" />
+        <RichContent
+          text={post.content}
+          embeds={post.content_embeds || []}
+          validProfileUsernames={(post.mentioned_users || []).map((user) => user.username)}
+          className="mt-8 prose prose-invert max-w-none text-white/85"
+        />
 
         {post.mentioned_users?.length > 0 && (
           <div className="mt-10 border-t border-white/10 pt-8">

@@ -138,7 +138,7 @@ const AdminBoardPage = lazy(() => import("@/pages/admin/AdminBoardPage"));
 const AdminReferencesPage = lazy(() => import("@/pages/admin/AdminReferencesPage"));
 const AdminGameServersPage = lazy(() => import("@/pages/admin/AdminGameServersPage"));
 const SetupWizardPage = lazy(() => import("@/pages/SetupWizardPage"));
-import { NotFoundPage, ForbiddenPage } from "@/pages/ErrorPages";
+import { NotFoundPage, ForbiddenPage, ServerErrorPage } from "@/pages/ErrorPages";
 import { BoardPage, ValuesPage } from "@/pages/public/ClubPages";
 import CurrentSeasonRedirect from "@/pages/public/CurrentSeasonRedirect";
 
@@ -280,6 +280,7 @@ function App() {
 
           {/* Error pages */}
           <Route path="/403" element={<ForbiddenPage />} />
+          <Route path="/500" element={<ServerErrorPage />} />
           <Route path="*" element={<NotFoundPage />} />
             </Routes>
             </Suspense>

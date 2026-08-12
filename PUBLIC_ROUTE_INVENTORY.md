@@ -37,6 +37,7 @@ Diese Routen bleiben erreichbar, damit Menschen sie verwenden und Crawler `noind
 - `/membership/apply`
 - `/matches/<id>`
 - Login-, Registrierungs- und Passwort-Routen
+- Fehleransichten `/403`, `/500` und der SPA-404-Fallback; sie setzen `noindex, nofollow`
 
 ## Private und betriebliche Routen
 

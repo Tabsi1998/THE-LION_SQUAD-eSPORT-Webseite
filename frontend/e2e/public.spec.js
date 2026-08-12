@@ -51,6 +51,52 @@ const canonicalPublicSettings = {
   legal_ready: true,
 };
 
+test("403, 404 and 500 views explain recovery and stay out of search indexes", async ({ page }) => {
+  await mockPublicChrome(page);
+
+  for (const entry of [
+    { path: "/403", code: "403", title: "Kein Zugriff" },
+    { path: "/audit-does-not-exist", code: "404", title: "Seite nicht gefunden" },
+    { path: "/500", code: "500", title: "Etwas ist schiefgelaufen" },
+  ]) {
+    await page.goto(entry.path);
+    await expect(page.getByTestId(`error-title-${entry.code}`)).toHaveText(entry.title);
+    await expect(page.getByTestId("error-home-btn")).toHaveAttribute("href", "/");
+    await expect(page.getByRole("link", { name: "Turniere" })).toHaveAttribute("href", "/tournaments");
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex, nofollow");
+    await expect(page).toHaveTitle(new RegExp(`^${entry.code} .+THE LION SQUAD$`));
+  }
+
+  await page.goto("/403");
+  await expect(page.getByTestId("error-login-btn")).toHaveAttribute("href", "/login");
+  await page.goto("/500");
+  await expect(page.getByTestId("error-retry-btn")).toBeVisible();
+});
+
+test("news keeps stale mentions as text without linking to unavailable profiles", async ({ page }) => {
+  await mockPublicChrome(page);
+  await page.route("**/api/news/stale-profile-mention", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({
+      id: "news-1",
+      slug: "stale-profile-mention",
+      title: "Rennbericht",
+      category: "Turniere",
+      published: true,
+      published_at: "2026-08-12T10:00:00Z",
+      content: "[@PublicPlayer](/u/PublicPlayer) und [@FormerPlayer](/u/FormerPlayer)",
+      mentioned_users: [{ id: "user-1", username: "PublicPlayer", display_name: "Public Player" }],
+      content_embeds: [],
+    }),
+  }));
+
+  await page.goto("/news/stale-profile-mention");
+  const content = page.locator(".prose-cms");
+  await expect(content).toContainText("@PublicPlayer und @FormerPlayer");
+  await expect(content.locator('a[href="/u/PublicPlayer"]')).toHaveCount(1);
+  await expect(content.locator('a[href="/u/FormerPlayer"]')).toHaveCount(0);
+});
+
 test("contact and legal pages share one configured public data source", async ({ page }) => {
   await page.route("**/api/settings/public**", (route) => route.fulfill({
     contentType: "application/json",

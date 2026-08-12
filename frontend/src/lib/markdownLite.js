@@ -24,10 +24,29 @@ function sanitizeHref(rawHref) {
   }
 }
 
-function linkMentions(html) {
-  return html.replace(/(^|[^A-Za-z0-9_.-])@([A-Za-z0-9_.-]{2,32})/g, (match, prefix, username) => (
-    `${prefix}<a href="/u/${encodeURIComponent(username)}" class="mention-link">@${username}</a>`
-  ));
+function validProfileSet(options = {}) {
+  if (!Array.isArray(options.validProfileUsernames)) return null;
+  return new Set(options.validProfileUsernames.map((username) => String(username || "").toLowerCase()).filter(Boolean));
+}
+
+function allowedProfileLink(href, options = {}) {
+  const validProfiles = validProfileSet(options);
+  if (validProfiles == null) return true;
+  const match = String(href || "").match(/^\/u\/([^/?#]+)\/?(?:[?#].*)?$/i);
+  if (!match) return true;
+  try {
+    return validProfiles.has(decodeURIComponent(match[1]).toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function linkMentions(html, options = {}) {
+  const validProfiles = validProfileSet(options);
+  return html.replace(/(^|[^A-Za-z0-9_.-])@([A-Za-z0-9_.-]{2,32})/g, (match, prefix, username) => {
+    if (validProfiles != null && !validProfiles.has(username.toLowerCase())) return `${prefix}@${username}`;
+    return `${prefix}<a href="/u/${encodeURIComponent(username)}" class="mention-link">@${username}</a>`;
+  });
 }
 
 function formatInlineText(rawText, options = {}) {
@@ -37,23 +56,23 @@ function formatInlineText(rawText, options = {}) {
     .replace(/\+\+(.+?)\+\+/g, "<u>$1</u>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>");
-  return options.linkMentions === false ? html : linkMentions(html);
+  return options.linkMentions === false ? html : linkMentions(html, options);
 }
 
-function renderInline(rawText) {
+function renderInline(rawText, options = {}) {
   const linkPattern = /(!?)\[([^\]\n]+)\]\(([^)\s]+)\)/g;
   let html = "";
   let lastIndex = 0;
   let match;
 
   while ((match = linkPattern.exec(rawText)) !== null) {
-    html += formatInlineText(rawText.slice(lastIndex, match.index));
+    html += formatInlineText(rawText.slice(lastIndex, match.index), options);
     const isImage = match[1] === "!";
-    const label = formatInlineText(match[2], { linkMentions: false });
+    const label = formatInlineText(match[2], { ...options, linkMentions: false });
     const href = sanitizeHref(match[3]);
     if (href && isImage) {
       html += `<img src="${escapeHtml(href)}" alt="${escapeHtml(match[2])}" loading="lazy"/>`;
-    } else if (href) {
+    } else if (href && allowedProfileLink(href, options)) {
       html += `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
     } else {
       html += label;
@@ -61,11 +80,11 @@ function renderInline(rawText) {
     lastIndex = match.index + match[0].length;
   }
 
-  html += formatInlineText(rawText.slice(lastIndex));
+  html += formatInlineText(rawText.slice(lastIndex), options);
   return html;
 }
 
-export function renderMarkdownLite(md) {
+export function renderMarkdownLite(md, options = {}) {
   if (!md) return "";
 
   const lines = String(md).split(/\r?\n/);
@@ -119,12 +138,12 @@ export function renderMarkdownLite(md) {
       }
       i -= 1;
       html += "<div class=\"prose-cms-table\"><table><thead><tr>";
-      html += headers.map((cell) => `<th>${renderInline(cell)}</th>`).join("");
+      html += headers.map((cell) => `<th>${renderInline(cell, options)}</th>`).join("");
       html += "</tr></thead><tbody>";
       rows.forEach((row) => {
         html += "<tr>";
         headers.forEach((_, index) => {
-          html += `<td>${renderInline(row[index] || "")}</td>`;
+          html += `<td>${renderInline(row[index] || "", options)}</td>`;
         });
         html += "</tr>";
       });
@@ -133,17 +152,17 @@ export function renderMarkdownLite(md) {
     }
     if (/^###\s+/.test(raw)) {
       close();
-      html += `<h3>${renderInline(raw.replace(/^###\s+/, ""))}</h3>`;
+      html += `<h3>${renderInline(raw.replace(/^###\s+/, ""), options)}</h3>`;
       continue;
     }
     if (/^##\s+/.test(raw)) {
       close();
-      html += `<h2>${renderInline(raw.replace(/^##\s+/, ""))}</h2>`;
+      html += `<h2>${renderInline(raw.replace(/^##\s+/, ""), options)}</h2>`;
       continue;
     }
     if (/^#\s+/.test(raw)) {
       close();
-      html += `<h1>${renderInline(raw.replace(/^#\s+/, ""))}</h1>`;
+      html += `<h1>${renderInline(raw.replace(/^#\s+/, ""), options)}</h1>`;
       continue;
     }
     if (/^\s*[-*]\s+/.test(raw)) {
@@ -152,12 +171,12 @@ export function renderMarkdownLite(md) {
         html += "<ul>";
         inList = "ul";
       }
-      html += `<li>${renderInline(raw.replace(/^\s*[-*]\s+/, ""))}</li>`;
+      html += `<li>${renderInline(raw.replace(/^\s*[-*]\s+/, ""), options)}</li>`;
       continue;
     }
     if (/^>\s?/.test(raw)) {
       close();
-      html += `<blockquote>${renderInline(raw.replace(/^>\s?/, ""))}</blockquote>`;
+      html += `<blockquote>${renderInline(raw.replace(/^>\s?/, ""), options)}</blockquote>`;
       continue;
     }
     if (/^\s*\d+\.\s+/.test(raw)) {
@@ -166,7 +185,7 @@ export function renderMarkdownLite(md) {
         html += "<ol>";
         inList = "ol";
       }
-      html += `<li>${renderInline(raw.replace(/^\s*\d+\.\s+/, ""))}</li>`;
+      html += `<li>${renderInline(raw.replace(/^\s*\d+\.\s+/, ""), options)}</li>`;
       continue;
     }
     if (/^---+$/.test(raw)) {
@@ -179,7 +198,7 @@ export function renderMarkdownLite(md) {
       continue;
     }
     close();
-    html += `<p>${renderInline(raw)}</p>`;
+    html += `<p>${renderInline(raw, options)}</p>`;
   }
 
   if (inCodeBlock) closeCodeBlock();

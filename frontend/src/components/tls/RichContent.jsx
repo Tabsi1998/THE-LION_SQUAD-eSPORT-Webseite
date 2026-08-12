@@ -47,9 +47,9 @@ function embedMeta(kind, item) {
   return { icon: Flag, accent: "text-[#29B6E8]", border: "hover:border-[#29B6E8]/60", to: `/fastlap/${item.slug || item.id}`, title: item.title, label: "Fast Lap" };
 }
 
-function TextChunk({ text }) {
+function TextChunk({ text, validProfileUsernames }) {
   if (!text) return null;
-  return <div className="prose-cms max-w-none" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(text) }} />;
+  return <div className="prose-cms max-w-none" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(text, { validProfileUsernames }) }} />;
 }
 
 function EmbedCard({ embed }) {
@@ -84,7 +84,7 @@ function EmbedCard({ embed }) {
   );
 }
 
-export function RichContent({ text = "", embeds = [], className = "" }) {
+export function RichContent({ text = "", embeds = [], validProfileUsernames, className = "" }) {
   const byToken = buildEmbedIndex(embeds);
   const parts = [];
   let lastIndex = 0;
@@ -103,7 +103,7 @@ export function RichContent({ text = "", embeds = [], className = "" }) {
       {parts.map((part, idx) => (
         part.type === "embed"
           ? <EmbedCard key={`${part.value.kind}-${part.value.ref}-${idx}`} embed={part.value} />
-          : <TextChunk key={`text-${idx}`} text={part.value} />
+          : <TextChunk key={`text-${idx}`} text={part.value} validProfileUsernames={validProfileUsernames} />
       ))}
     </div>
   );
