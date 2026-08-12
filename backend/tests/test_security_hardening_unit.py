@@ -115,13 +115,16 @@ def test_untrusted_direct_peer_cannot_override_client_or_scheme():
 
 
 def test_internal_nginx_preserves_tls_and_sanitizes_forwarded_host():
-    nginx = (Path(__file__).resolve().parents[2] / "frontend" / "nginx.conf").read_text(encoding="utf-8")
+    root = Path(__file__).resolve().parents[2]
+    nginx = (root / "frontend" / "nginx.conf").read_text(encoding="utf-8")
+    route_contract = (root / "scripts" / "check-public-routes.sh").read_text(encoding="utf-8")
 
     assert "map $http_x_forwarded_proto $tls_forwarded_proto" in nginx
     assert "proxy_set_header X-Forwarded-Proto $scheme;" not in nginx
     assert nginx.count("proxy_set_header X-Forwarded-Host $host;") == 7
     assert 'if ($host = "www.lionsquad.at")' in nginx
     assert "return 308 https://lionsquad.at$request_uri;" in nginx
+    assert '"www.lionsquad.at" "308"' in route_contract
 
 
 def test_internal_nginx_uses_one_nonce_based_csp_without_external_fonts():

@@ -53,12 +53,13 @@ expect_redirect() {
   local path="$1"
   local target="$2"
   local host="${3:-lionsquad.at}"
+  local expected_status="${4:-301}"
   local headers status location
   headers="$(request_headers "$path" "$host")"
   status="$(printf '%s\n' "$headers" | awk 'NR == 1 { print $2 }')"
   location="$(printf '%s\n' "$headers" | awk 'BEGIN { IGNORECASE=1 } /^Location:/ { sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }')"
-  test "$status" = "301" && test "$location" = "$target" || {
-    printf 'Expected 301 -> %s for %s, received %s -> %s\n%s\n' "$target" "$path" "$status" "$location" "$headers" >&2
+  test "$status" = "$expected_status" && test "$location" = "$target" || {
+    printf 'Expected %s -> %s for %s, received %s -> %s\n%s\n' "$expected_status" "$target" "$path" "$status" "$location" "$headers" >&2
     return 1
   }
 }
@@ -131,7 +132,7 @@ for path in /elements/blockquote/ /product/demo /portfolio/demo /tag/demo /categ
   expect_gone "$path"
 done
 
-expect_redirect "/esports?view=live" "https://lionsquad.at/esports?view=live" "www.lionsquad.at"
+expect_redirect "/esports?view=live" "https://lionsquad.at/esports?view=live" "www.lionsquad.at" "308"
 expect_nonce_csp
 
 printf 'Public route contract passed.\n'
