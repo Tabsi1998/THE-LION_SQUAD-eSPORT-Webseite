@@ -6,6 +6,7 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { toast } from "sonner";
 import { Mail, MessageSquare, MapPin, Send, Check } from "lucide-react";
 
@@ -16,7 +17,7 @@ export default function ContactPage() {
   );
 
   const { user } = useAuth();
-  const [branding, setBranding] = useState(null);
+  const branding = usePublicSiteSettings();
   const [topics, setTopics] = useState([]);
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -29,12 +30,11 @@ export default function ContactPage() {
     accept_privacy: false,
   });
 
-  const loadInfo = useCallback(() => {
-    api.get("/settings/public").then(({ data }) => setBranding(data)).catch(() => {});
+  const loadTopics = useCallback(() => {
     api.get("/contact/topics").then(({ data }) => setTopics(data)).catch(() => {});
   }, []);
-  useEffect(() => { loadInfo(); }, [loadInfo]);
-  useApiInvalidation(loadInfo, ["settings", "contact"]);
+  useEffect(() => { loadTopics(); }, [loadTopics]);
+  useApiInvalidation(loadTopics, ["contact"]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -50,7 +50,7 @@ export default function ContactPage() {
     setSubmitting(false);
   };
 
-  const contactEmail = branding?.contact_email || "info@lionsquad.at";
+  const contactEmail = branding?.contact_email;
 
   return (
     <PublicLayout>
@@ -68,11 +68,19 @@ export default function ContactPage() {
             <h3 className="font-heading font-black uppercase text-base">Discord Server</h3>
             <p className="mt-1 text-sm text-white/60">Schnellster Weg zu uns.</p>
           </a>
-          <a href={`mailto:${contactEmail}`} data-testid="contact-email-link" className="border border-white/10 hover:border-[#29B6E8]/60 rounded-sm bg-[#121212] p-5 transition group">
-            <Mail className="w-6 h-6 text-[#29B6E8] mb-3" />
-            <h3 className="font-heading font-black uppercase text-base">E-Mail direkt</h3>
-            <p className="mt-1 text-sm text-white/60 group-hover:text-white/80 break-all transition">{contactEmail}</p>
-          </a>
+          {contactEmail ? (
+            <a href={`mailto:${contactEmail}`} data-testid="contact-email-link" className="border border-white/10 hover:border-[#29B6E8]/60 rounded-sm bg-[#121212] p-5 transition group">
+              <Mail className="w-6 h-6 text-[#29B6E8] mb-3" />
+              <h3 className="font-heading font-black uppercase text-base">E-Mail direkt</h3>
+              <p className="mt-1 text-sm text-white/60 group-hover:text-white/80 break-all transition">{contactEmail}</p>
+            </a>
+          ) : (
+            <div data-testid="contact-email-unavailable" className="border border-white/10 rounded-sm bg-[#121212] p-5">
+              <Mail className="w-6 h-6 text-white/35 mb-3" />
+              <h3 className="font-heading font-black uppercase text-base">Kontaktformular</h3>
+              <p className="mt-1 text-sm text-white/60">Nutze bitte das Formular auf dieser Seite.</p>
+            </div>
+          )}
         </div>
 
         {/* Formular */}

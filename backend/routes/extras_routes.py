@@ -14,6 +14,7 @@ from auth import require_admin, require_role, require_super, get_current_user, g
 from services.visibility import user_can_see
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services.access_links import validate_access_link
+from services.public_site_settings import PUBLIC_LEGAL_SOURCE_FIELDS, build_public_legal_settings
 from models import now_utc, new_id
 from email_service import send_template, _get_email_config
 from pdf_service import (
@@ -534,10 +535,9 @@ async def public_settings(response: Response):
     tagline = b.get("tagline", "eSports Verein")
     if str(tagline).strip().lower() == "esports arena":
         tagline = "eSports Verein"
-    city = b.get("city") or ""
-    state = b.get("state") or "Tirol"
-    country = b.get("country") or "Österreich"
-    contact_email = b.get("contact_email") or "office@lionsquad.at"
+    legal_settings = build_public_legal_settings(b)
+    legal_settings.pop("contact_ready", None)
+    legal_settings.pop("missing_legal_fields", None)
     return {
         "club_name": b.get("club_name", "THE LION SQUAD"),
         "tagline": tagline,
@@ -555,32 +555,7 @@ async def public_settings(response: Response):
         "favicon_dark_url": b.get("favicon_dark_url"),
         "domain": domain,
         "timezone": b.get("timezone") or "Europe/Vienna",
-        "contact_email": contact_email,
-        "imprint": b.get("imprint"),
-        "privacy_policy": b.get("privacy_policy"),
-        "legal_name": b.get("legal_name") or b.get("club_name") or "THE LION SQUAD eSports",
-        "legal_form": b.get("legal_form") or "eingetragener Verein nach österreichischem Vereinsrecht",
-        "zvr_number": b.get("zvr_number") or "",
-        "street_address": b.get("street_address") or "",
-        "address_extra": b.get("address_extra") or "",
-        "postal_code": b.get("postal_code") or "",
-        "city": city,
-        "state": state,
-        "country": country,
-        "registered_seat": b.get("registered_seat") or city or state,
-        "register_authority": b.get("register_authority") or "Vereinsbehörde am Vereinssitz in Tirol",
-        "representative_name": b.get("representative_name") or "",
-        "representative_role": b.get("representative_role") or "Obmann/Obfrau bzw. vertretungsbefugtes Vereinsorgan",
-        "content_responsible": b.get("content_responsible") or b.get("representative_name") or "",
-        "phone": b.get("phone") or "",
-        "privacy_contact_email": b.get("privacy_contact_email") or contact_email,
-        "hosting_provider": b.get("hosting_provider") or "",
-        "hosting_country": b.get("hosting_country") or "Österreich/EU",
-        "vat_number": b.get("vat_number") or "",
-        "tournament_terms_url": b.get("tournament_terms_url") or "",
-        "paid_tournaments_enabled": bool(b.get("paid_tournaments_enabled", False)),
-        "legal_extra": b.get("legal_extra") or "",
-        "privacy_extra": b.get("privacy_extra") or "",
+        **legal_settings,
         "discord_invite_url": b.get("discord_invite_url") or "https://discord.com/invite/thelionsquadesports",
         "twitch_channel": b.get("twitch_channel") or "the_lion_squad_esports",
         "whatsapp_channel_url": b.get("whatsapp_channel_url") or "https://whatsapp.com/channel/0029VaaWufTGU3BNG6VOxo1I",
@@ -982,6 +957,8 @@ async def update_branding(body: BrandingSettings, me: dict = Depends(require_adm
     if not changed_fields:
         return current or {"ok": True, "changed": False}
     updates["updated_at"] = now_utc().isoformat()
+    if set(changed_fields) & PUBLIC_LEGAL_SOURCE_FIELDS:
+        updates["legal_updated_at"] = updates["updated_at"]
     await db.settings.update_one(
         {"id": "branding"}, {"$set": updates, "$setOnInsert": {"id": "branding"}}, upsert=True,
     )

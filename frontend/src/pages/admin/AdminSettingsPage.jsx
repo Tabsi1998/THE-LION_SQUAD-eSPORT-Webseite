@@ -168,6 +168,11 @@ function brandPayload(source = {}) {
   return payload;
 }
 
+function mergedLegacyText(primary, legacy) {
+  const values = [primary, legacy].map((value) => String(value || "").trim()).filter(Boolean);
+  return [...new Map(values.map((value) => [value.replace(/\s+/g, " ").toLocaleLowerCase(), value])).values()].join("\n\n");
+}
+
 function discordPayload(source) {
   const payload = { ...(source || {}) };
   if (!payload.webhook_url) delete payload.webhook_url;
@@ -406,6 +411,11 @@ export default function AdminSettingsPage() {
     setDiscord((prev) => ({ ...prev, [key]: value }));
   };
 
+  const setCanonicalLegalText = (key, legacyKey, value) => {
+    brandDirtyRef.current = true;
+    setBrand((prev) => ({ ...prev, [key]: value, [legacyKey]: "" }));
+  };
+
   const loadDiscordCounters = useCallback((query = discordCounterQuery) => {
     api.get(`/admin/discord/counters?q=${encodeURIComponent(query)}&limit=50`)
       .then(({ data }) => setDiscordCounters(Array.isArray(data) ? data : []))
@@ -422,9 +432,7 @@ export default function AdminSettingsPage() {
     try {
       const { data } = await api.get("/settings/public", { params: { _: Date.now() } });
       setCachedBranding(data || {});
-    } catch {
-      setCachedBranding(brand);
-    }
+    } catch {}
   };
 
   const saveEmail = async () => {
@@ -1711,7 +1719,7 @@ export default function AdminSettingsPage() {
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-5">
             <div>
               <div className="font-heading font-bold uppercase">Vereinsdaten für Impressum und Datenschutz</div>
-              <p className="text-xs text-white/50 mt-1">Diese Angaben werden dynamisch auf /imprint und /privacy ausgegeben. ZVR, Adresse und vertretungsbefugte Person bitte mit den echten Vereinsdaten eintragen.</p>
+              <p className="text-xs text-white/50 mt-1">Dies ist die zentrale Datenquelle für /contact, /imprint und /privacy. ZVR, Adresse, Kontakt und vertretungsbefugte Person bitte ausschließlich hier mit den echten Vereinsdaten pflegen.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <BrandField label="Rechtlicher Vereinsname" value={brand.legal_name} onChange={(v) => setBrandField("legal_name", v)} testId="legal-name" />
@@ -1745,10 +1753,8 @@ export default function AdminSettingsPage() {
               <input type="checkbox" checked={!!brand.paid_tournaments_enabled} onChange={(e) => setBrandField("paid_tournaments_enabled", e.target.checked)} data-testid="legal-paid-tournaments" className="accent-[#29B6E8] mt-1" />
               <span>Preisturniere oder Turniere mit Startgeld können stattfinden.</span>
             </label>
-            <LegalTextArea label="Freitext Impressum" value={brand.imprint} onChange={(v) => setBrandField("imprint", v)} testId="brand-imprint" rows={4} />
-            <LegalTextArea label="Zusätzliche rechtliche Hinweise" value={brand.legal_extra} onChange={(v) => setBrandField("legal_extra", v)} testId="legal-extra" rows={4} />
-            <LegalTextArea label="Freitext Datenschutz" value={brand.privacy_policy} onChange={(v) => setBrandField("privacy_policy", v)} testId="brand-privacy" rows={5} />
-            <LegalTextArea label="Zusätzliche Datenschutzhinweise" value={brand.privacy_extra} onChange={(v) => setBrandField("privacy_extra", v)} testId="privacy-extra" rows={5} />
+            <LegalTextArea label="Zusätzliche rechtliche Hinweise (optional)" value={mergedLegacyText(brand.legal_extra, brand.imprint)} onChange={(v) => setCanonicalLegalText("legal_extra", "imprint", v)} testId="legal-extra" rows={5} />
+            <LegalTextArea label="Zusätzliche Datenschutzhinweise (optional)" value={mergedLegacyText(brand.privacy_extra, brand.privacy_policy)} onChange={(v) => setCanonicalLegalText("privacy_extra", "privacy_policy", v)} testId="privacy-extra" rows={6} />
             <button onClick={saveBrand} disabled={imageUploadBusy || savingBrand} data-testid="legal-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingBrand ? "Speichere..." : "Rechtliches speichern"}</button>
           </div>
         </div>
