@@ -54,7 +54,7 @@ jobs:
       - name: Validate Expo SDK compatibility
         working-directory: mobile
         run: |
-          npm audit --audit-level=moderate
+          npm run audit:ci
           npx expo install --check
           npx expo-doctor
 
