@@ -25,7 +25,7 @@ Release builds default to `https://lionsquad.at`. The login uses the deployed mo
 npm run typecheck
 npx expo install --check
 npx expo export --platform android
-npm audit --audit-level=moderate
+npm run audit:ci
 ```
 
 ## Push Notifications
