@@ -48,13 +48,17 @@ APP_ENV=development python backend/reset_data.py \
   --confirm RESET-ALL-DATA
 ```
 
-## Dependency exception
+## Dependency exceptions
 
-`frontend/scripts/security-audit-allowlist.json` contains one time-limited React Router
-advisory exception. The advisory affects only experimental React Server Components APIs,
-which this client-only application does not use. The exception expires on 2026-10-31 and
-must not be extended without a new review; the permanent resolution is a tested Router/Vite
-migration.
+Audit exceptions must name an exact advisory, explain the exposure, and expire. CI continues
+to fail for every unlisted or expired finding at the configured threshold (moderate for the
+mobile app, high for the frontend).
+
+`mobile/scripts/security-audit-allowlist.json` temporarily accepts two `image-size` denial-of-
+service advisories in Expo 56's Metro build toolchain. The package is not used by the shipped
+app at runtime, no patched release exists, and npm's proposed forced fix downgrades Expo to an
+incompatible major version. Both exceptions expire on 2026-09-30 and must be removed as soon
+as Expo/Metro provides a compatible fix.
 
 ## Reporting
 
