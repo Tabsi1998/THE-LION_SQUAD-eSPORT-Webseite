@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import { api, formatApiError } from "@/lib/api";
 import { normalizeApiPath } from "@/lib/apiInvalidation";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { toast } from "sonner";
 
 const AuthContext = createContext(null);
 
@@ -65,8 +66,16 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    try { await api.post("/auth/logout"); } catch {}
-    setUser(null);
+    try {
+      await api.post("/auth/logout");
+      setUser(null);
+      return true;
+    } catch (e) {
+      const msg = formatApiError(e.response?.data?.detail) || "Logout fehlgeschlagen.";
+      setError(msg);
+      toast.error(msg);
+      return false;
+    }
   };
 
   const isAdmin = user && ["tournament_admin", "club_admin", "superadmin"].includes(user.role);

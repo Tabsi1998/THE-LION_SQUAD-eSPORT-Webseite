@@ -40,22 +40,29 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-def create_access_token(user_id: str, email: str, role: str) -> str:
+def create_access_token(user_id: str, email: str, role: str, session_id: str) -> str:
     payload = {
         "sub": user_id,
         "email": email,
         "role": role,
+        "sid": session_id,
         "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_MINUTES),
         "type": "access",
     }
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
-def create_refresh_token(user_id: str, token_id: str) -> str:
+def create_refresh_token(
+    user_id: str,
+    token_id: str,
+    family_id: str,
+    expires_at: datetime | None = None,
+) -> str:
     payload = {
         "sub": user_id,
         "jti": token_id,
-        "exp": datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_DAYS),
+        "fid": family_id,
+        "exp": expires_at or refresh_expires_at(),
         "type": "refresh",
     }
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
@@ -63,6 +70,16 @@ def create_refresh_token(user_id: str, token_id: str) -> str:
 
 def refresh_expires_at() -> datetime:
     return datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_DAYS)
+
+
+def as_utc_datetime(value) -> datetime | None:
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if not isinstance(value, datetime):
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 def hash_token(token: str) -> str:
@@ -82,7 +99,13 @@ def _secure_cookies() -> bool:
 def _cookie_domain() -> str | None:
     explicit = os.environ.get("AUTH_COOKIE_DOMAIN", "").strip()
     if explicit:
-        return explicit if explicit.startswith(".") else f".{explicit}"
+        domain = explicit.lower().strip(".")
+        if not domain or "." not in domain or any(char in domain for char in "/:@"):
+            raise RuntimeError("AUTH_COOKIE_DOMAIN must be a hostname without scheme or port.")
+        frontend_host = (urlparse(os.environ.get("FRONTEND_URL", "")).hostname or "").lower().strip(".")
+        if frontend_host and frontend_host != domain and not frontend_host.endswith(f".{domain}"):
+            raise RuntimeError("AUTH_COOKIE_DOMAIN must contain the configured FRONTEND_URL host.")
+        return f".{domain}"
     host = urlparse(os.environ.get("FRONTEND_URL", "")).hostname or ""
     host = host.lower().strip(".")
     if not host or host in {"localhost", "127.0.0.1"} or host.endswith(".local"):
@@ -97,21 +120,18 @@ def _cookie_domain() -> str | None:
 
 def set_auth_cookies(response: Response, access: str, refresh: str, csrf_token: str | None = None):
     secure = _secure_cookies()
-    # When on HTTPS (cross-site scenarios behind CDN), use SameSite=None + Secure.
-    # When purely local HTTP, use SameSite=Lax.
-    samesite = "none" if secure else "lax"
     csrf_token = csrf_token or new_csrf_token()
     domain = _cookie_domain()
     response.set_cookie(
-        "access_token", access, httponly=True, secure=secure, samesite=samesite,
+        "access_token", access, httponly=True, secure=secure, samesite="lax",
         max_age=ACCESS_TOKEN_MINUTES * 60, path="/", domain=domain,
     )
     response.set_cookie(
-        "refresh_token", refresh, httponly=True, secure=secure, samesite=samesite,
+        "refresh_token", refresh, httponly=True, secure=secure, samesite="lax",
         max_age=REFRESH_TOKEN_DAYS * 24 * 3600, path="/", domain=domain,
     )
     response.set_cookie(
-        "csrf_token", csrf_token, httponly=False, secure=secure, samesite=samesite,
+        "csrf_token", csrf_token, httponly=False, secure=secure, samesite="lax",
         max_age=REFRESH_TOKEN_DAYS * 24 * 3600, path="/", domain=domain,
     )
 
@@ -154,9 +174,25 @@ async def get_current_user(request: Request) -> dict:
     if payload.get("type") != "access":
         raise HTTPException(status_code=401, detail="Invalid token type")
     db = get_db()
-    user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
+    user_id = payload.get("sub")
+    session_id = payload.get("sid")
+    if not user_id or not session_id:
+        raise HTTPException(status_code=401, detail="Session expired")
+    session = await db.refresh_tokens.find_one({
+        "jti": session_id,
+        "user_id": user_id,
+        "revoked": {"$ne": True},
+    }, {"_id": 0, "expires_at": 1})
+    if not session:
+        raise HTTPException(status_code=401, detail="Session expired")
+    expires_at = as_utc_datetime(session.get("expires_at"))
+    if expires_at and expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=401, detail="Session expired")
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    if user.get("is_active") is False:
+        raise HTTPException(status_code=403, detail="Account is inactive")
     if user.get("is_banned"):
         raise HTTPException(status_code=403, detail="Account is banned")
     # Attach membership for downstream guards / UI

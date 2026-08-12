@@ -272,7 +272,7 @@ export function AdminLayout({ children }) {
               <div className="text-[10px] text-[#29B6E8] uppercase tracking-widest">{user?.role}</div>
             </div>
             <button
-              onClick={async () => { await logout(); nav("/"); }}
+              onClick={async () => { if (await logout()) nav("/"); }}
               data-testid="admin-logout"
               className="inline-flex items-center gap-1.5 px-2 py-2 text-[#FF3B30] border border-[#FF3B30]/30 hover:bg-[#FF3B30]/10 rounded-sm text-[10px] font-bold uppercase tracking-wider shrink-0"
               aria-label="Logout"

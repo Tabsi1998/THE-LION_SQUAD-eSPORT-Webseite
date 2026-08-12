@@ -120,6 +120,8 @@ def test_internal_nginx_preserves_tls_and_sanitizes_forwarded_host():
     assert "map $http_x_forwarded_proto $tls_forwarded_proto" in nginx
     assert "proxy_set_header X-Forwarded-Proto $scheme;" not in nginx
     assert nginx.count("proxy_set_header X-Forwarded-Host $host;") == 7
+    assert 'if ($host = "www.lionsquad.at")' in nginx
+    assert "return 308 https://lionsquad.at$request_uri;" in nginx
 
 
 def test_internal_nginx_uses_one_nonce_based_csp_without_external_fonts():

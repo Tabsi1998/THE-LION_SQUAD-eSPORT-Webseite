@@ -4,11 +4,13 @@ import secrets
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Response, Request, HTTPException, Depends
 from pydantic import BaseModel
+from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 from database import get_db
 from auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
     set_auth_cookies, clear_auth_cookies, get_current_user, get_optional_user, _decode,
-    hash_token, refresh_expires_at,
+    hash_token, refresh_expires_at, as_utc_datetime,
 )
 from email_service import send_template
 from models import (
@@ -21,6 +23,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 BRUTE_FORCE_MAX = 7
 BRUTE_FORCE_WINDOW_MIN = 15
+REFRESH_REPLAY_GRACE_SECONDS = 10
 
 
 class MobileRefreshBody(BaseModel):
@@ -60,21 +63,83 @@ async def _clear_failed(db, identifier: str):
     await db.login_attempts.delete_many({"identifier": identifier})
 
 
-async def _issue_session(db, response: Response, user: dict, request: Request):
-    access = create_access_token(user["id"], user["email"], user.get("role", "player"))
-    token_id = secrets.token_urlsafe(24)
-    refresh = create_refresh_token(user["id"], token_id)
-    await db.refresh_tokens.insert_one({
-        "id": new_id(),
+def _request_identity(request: Request) -> tuple[str, str]:
+    return (str(request.headers.get("user-agent") or "")[:512], get_client_ip(request))
+
+
+def _eligible_session_user(user: dict | None) -> dict:
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    if user.get("is_active") is False:
+        raise HTTPException(status_code=403, detail="Account deaktiviert")
+    if user.get("is_banned"):
+        raise HTTPException(status_code=403, detail="Account gesperrt")
+    if user.get("password_setup_required"):
+        raise HTTPException(status_code=403, detail="Bitte zuerst ein Passwort erstellen")
+    return user
+
+
+async def _store_session(
+    db,
+    user: dict,
+    request: Request,
+    *,
+    token_id: str,
+    family_id: str,
+    record_id: str,
+    expires_at: datetime,
+    client: str | None = None,
+) -> tuple[str, str]:
+    refresh = create_refresh_token(user["id"], token_id, family_id, expires_at)
+    access = create_access_token(
+        user["id"], user["email"], user.get("role", "player"), token_id,
+    )
+    user_agent, ip = _request_identity(request)
+    document = {
+        "id": record_id,
         "jti": token_id,
+        "family_id": family_id,
         "user_id": user["id"],
         "token_hash": hash_token(refresh),
         "revoked": False,
         "created_at": now_utc(),
-        "expires_at": refresh_expires_at(),
-        "user_agent": request.headers.get("user-agent"),
-        "ip": get_client_ip(request),
-    })
+        "expires_at": expires_at,
+        "user_agent": user_agent,
+        "ip": ip,
+    }
+    if client:
+        document["client"] = client
+    try:
+        await db.refresh_tokens.insert_one(document)
+    except DuplicateKeyError:
+        existing = await db.refresh_tokens.find_one({"jti": token_id})
+        if not existing or existing.get("token_hash") != document["token_hash"] or existing.get("revoked") is True:
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+    return access, refresh
+
+
+async def _issue_tokens(
+    db,
+    user: dict,
+    request: Request,
+    *,
+    client: str | None = None,
+) -> tuple[str, str]:
+    token_id = secrets.token_urlsafe(24)
+    return await _store_session(
+        db,
+        user,
+        request,
+        token_id=token_id,
+        family_id=token_id,
+        record_id=new_id(),
+        expires_at=refresh_expires_at(),
+        client=client,
+    )
+
+
+async def _issue_session(db, response: Response, user: dict, request: Request):
+    access, refresh = await _issue_tokens(db, user, request)
     set_auth_cookies(response, access, refresh)
     return access, refresh
 
@@ -99,51 +164,103 @@ async def _attach_membership(user: dict) -> dict:
 
 
 async def _issue_mobile_session(db, user: dict, request: Request) -> tuple[str, str]:
-    access = create_access_token(user["id"], user["email"], user.get("role", "player"))
-    token_id = secrets.token_urlsafe(24)
-    refresh = create_refresh_token(user["id"], token_id)
-    await db.refresh_tokens.insert_one({
-        "id": new_id(),
-        "jti": token_id,
-        "user_id": user["id"],
-        "token_hash": hash_token(refresh),
-        "revoked": False,
-        "created_at": now_utc(),
-        "expires_at": refresh_expires_at(),
-        "user_agent": request.headers.get("user-agent"),
-        "ip": get_client_ip(request),
-        "client": "mobile",
-    })
-    return access, refresh
+    return await _issue_tokens(db, user, request, client="mobile")
 
 
-async def _refresh_mobile_session(db, token: str, request: Request) -> tuple[dict, str, str]:
+def _recent_same_client_rotation(stored: dict, request: Request, now: datetime) -> bool:
+    rotated_at = as_utc_datetime(stored.get("rotated_at"))
+    if not rotated_at or now - rotated_at > timedelta(seconds=REFRESH_REPLAY_GRACE_SECONDS):
+        return False
+    user_agent, ip = _request_identity(request)
+    return (
+        stored.get("rotation_user_agent", "") == user_agent
+        and stored.get("rotation_ip", "") == ip
+    )
+
+
+async def _revoke_refresh_family(db, user_id: str, family_id: str, reason: str):
+    await db.refresh_tokens.update_many(
+        {"user_id": user_id, "$or": [{"family_id": family_id}, {"jti": family_id}]},
+        {"$set": {
+            "revoked": True,
+            "revoked_at": now_utc(),
+            "revocation_reason": reason,
+        }},
+    )
+
+
+async def _rotate_session(
+    db,
+    token: str,
+    request: Request,
+    *,
+    client: str | None = None,
+) -> tuple[dict, str, str]:
     payload = _decode(token)
     if payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     token_id = payload.get("jti")
-    if not token_id:
+    user_id = payload.get("sub")
+    if not token_id or not user_id:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
-    stored = await db.refresh_tokens.find_one({
-        "jti": token_id,
-        "token_hash": hash_token(token),
-        "revoked": {"$ne": True},
-    })
-    if not stored:
-        await db.refresh_tokens.update_many(
-            {"user_id": payload["sub"]},
-            {"$set": {"revoked": True, "revoked_at": now_utc(), "revocation_reason": "refresh_reuse"}},
-        )
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
-    user = await db.users.find_one({"id": payload["sub"]})
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    await db.refresh_tokens.update_one(
-        {"id": stored["id"]},
-        {"$set": {"revoked": True, "rotated_at": now_utc()}},
+
+    now = datetime.now(timezone.utc)
+    family_id = payload.get("fid") or token_id
+    replacement_jti = secrets.token_urlsafe(24)
+    replacement_id = new_id()
+    replacement_expires_at = refresh_expires_at()
+    user_agent, ip = _request_identity(request)
+    stored = await db.refresh_tokens.find_one_and_update(
+        {
+            "jti": token_id,
+            "token_hash": hash_token(token),
+            "revoked": {"$ne": True},
+        },
+        {"$set": {
+            "revoked": True,
+            "rotated_at": now,
+            "revocation_reason": "rotated",
+            "family_id": family_id,
+            "replacement_jti": replacement_jti,
+            "replacement_id": replacement_id,
+            "replacement_expires_at": replacement_expires_at,
+            "rotation_user_agent": user_agent,
+            "rotation_ip": ip,
+        }},
+        return_document=ReturnDocument.BEFORE,
     )
-    access, refresh = await _issue_mobile_session(db, user, request)
+
+    if stored is None:
+        stored = await db.refresh_tokens.find_one({
+            "jti": token_id,
+            "token_hash": hash_token(token),
+        })
+        if not stored or not _recent_same_client_rotation(stored, request, now):
+            await _revoke_refresh_family(db, user_id, family_id, "refresh_reuse")
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+        replacement_jti = stored.get("replacement_jti")
+        replacement_id = stored.get("replacement_id")
+        replacement_expires_at = as_utc_datetime(stored.get("replacement_expires_at"))
+        if not replacement_jti or not replacement_id or not replacement_expires_at:
+            await _revoke_refresh_family(db, user_id, family_id, "incomplete_rotation")
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    user = _eligible_session_user(await db.users.find_one({"id": user_id}))
+    access, refresh = await _store_session(
+        db,
+        user,
+        request,
+        token_id=replacement_jti,
+        family_id=family_id,
+        record_id=replacement_id,
+        expires_at=replacement_expires_at,
+        client=client,
+    )
     return user, access, refresh
+
+
+async def _refresh_mobile_session(db, token: str, request: Request) -> tuple[dict, str, str]:
+    return await _rotate_session(db, token, request, client="mobile")
 
 
 async def _revoke_refresh(db, token: str):
@@ -228,6 +345,8 @@ async def login(body: UserLogin, request: Request, response: Response):
     if not user or not verify_password(body.password, user["password_hash"]):
         await _record_failed(db, identifier)
         raise HTTPException(status_code=401, detail="Ungültige Zugangsdaten")
+    if user.get("is_active") is False:
+        raise HTTPException(status_code=403, detail="Account deaktiviert")
     if user.get("is_banned"):
         raise HTTPException(status_code=403, detail="Account gesperrt")
 
@@ -308,6 +427,8 @@ async def mobile_login(body: UserLogin, request: Request):
     if not user or not verify_password(body.password, user["password_hash"]):
         await _record_failed(db, identifier)
         raise HTTPException(status_code=401, detail="Ungültige Zugangsdaten")
+    if user.get("is_active") is False:
+        raise HTTPException(status_code=403, detail="Account deaktiviert")
     if user.get("is_banned"):
         raise HTTPException(status_code=403, detail="Account gesperrt")
 
@@ -363,32 +484,9 @@ async def refresh(request: Request, response: Response):
     token = request.cookies.get("refresh_token")
     if not token:
         raise HTTPException(status_code=401, detail="No refresh token")
-    payload = _decode(token)
-    if payload.get("type") != "refresh":
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
-    token_id = payload.get("jti")
-    if not token_id:
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
     db = get_db()
-    stored = await db.refresh_tokens.find_one({
-        "jti": token_id,
-        "token_hash": hash_token(token),
-        "revoked": {"$ne": True},
-    })
-    if not stored:
-        await db.refresh_tokens.update_many(
-            {"user_id": payload["sub"]},
-            {"$set": {"revoked": True, "revoked_at": now_utc(), "revocation_reason": "refresh_reuse"}},
-        )
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
-    user = await db.users.find_one({"id": payload["sub"]})
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    await db.refresh_tokens.update_one(
-        {"id": stored["id"]},
-        {"$set": {"revoked": True, "rotated_at": now_utc()}},
-    )
-    await _issue_session(db, response, user, request)
+    _user, access, refresh_token = await _rotate_session(db, token, request)
+    set_auth_cookies(response, access, refresh_token)
     return {"ok": True}
 
 
@@ -425,9 +523,7 @@ async def reset_password(body: ResetPasswordBody, request: Request):
     if not doc:
         raise HTTPException(status_code=400, detail="Ungültiger oder abgelaufener Token")
     # Expiry check (defense-in-depth; Mongo TTL also handles it)
-    exp = doc.get("expires_at")
-    if isinstance(exp, str):
-        exp = datetime.fromisoformat(exp.replace("Z", "+00:00"))
+    exp = as_utc_datetime(doc.get("expires_at"))
     if exp and exp < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Token abgelaufen")
     await db.users.update_one(

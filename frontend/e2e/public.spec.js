@@ -198,6 +198,37 @@ test("login shows inline validation and blocks simultaneous requests", async ({ 
   expect(submissions).toBe(1);
 });
 
+test("logout keeps the visible session when server revocation fails", async ({ page }) => {
+  await mockPublicChrome(page);
+  const user = { id: "user-1", username: "testplayer", display_name: "Test Player", role: "player" };
+  let loggedIn = true;
+  let attempts = 0;
+  await page.route("**/api/auth/me", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify(loggedIn ? user : null),
+  }));
+  await page.route("**/api/auth/logout", async (route) => {
+    attempts += 1;
+    if (attempts === 1) {
+      await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: "Logout derzeit nicht möglich" }) });
+      return;
+    }
+    loggedIn = false;
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  });
+
+  await page.goto("/403");
+  await acceptCookies(page);
+  await expect(page.getByTestId("nav-logout")).toBeVisible();
+  await page.getByTestId("nav-logout").click();
+  await expect(page.getByText("Logout derzeit nicht möglich")).toBeVisible();
+  await expect(page.getByTestId("nav-logout")).toBeVisible();
+
+  await page.getByTestId("nav-logout").click();
+  await expect(page.getByTestId("nav-logout")).toHaveCount(0);
+  expect(attempts).toBe(2);
+});
+
 test("registration validates consent and exposes a single API failure", async ({ page }) => {
   await page.route("**/api/auth/me", (route) => route.fulfill({ contentType: "application/json", body: "null" }));
   let submissions = 0;

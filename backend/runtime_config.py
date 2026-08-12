@@ -131,6 +131,16 @@ def validate_runtime_environment(environ: Mapping[str, str] | None = None) -> st
         raise RuntimeError("JWT_SECRET must be a real secret with at least 32 characters in production.")
     if not str(source.get("FRONTEND_URL", "")).strip():
         raise RuntimeError("FRONTEND_URL must be set in production.")
+    frontend_url = urlparse(str(source.get("FRONTEND_URL", "")).strip())
+    if frontend_url.scheme != "https" or not frontend_url.hostname:
+        raise RuntimeError("FRONTEND_URL must use https in production.")
+    for raw_origin in str(source.get("CORS_ORIGINS", "")).split(","):
+        origin = raw_origin.strip()
+        if not origin:
+            continue
+        parsed = urlparse(origin)
+        if parsed.scheme != "https" or not parsed.hostname:
+            raise RuntimeError("CORS_ORIGINS must contain only https origins in production.")
     if env_flag("ALLOW_INSECURE_CORS", source):
         raise RuntimeError("ALLOW_INSECURE_CORS is blocked in production.")
     if env_flag("SEED_DEMO", source) or env_flag("SEED_GAME_SERVERS", source):

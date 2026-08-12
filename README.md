@@ -113,7 +113,10 @@ AUTH_COOKIE_DOMAIN=.lionsquad.at
 
 Wenn die Seite sowohl unter `lionsquad.at` als auch unter `www.lionsquad.at` erreichbar ist,
 setze `AUTH_COOKIE_DOMAIN=.lionsquad.at` und nimm beide Origins in `CORS_ORIGINS` auf. Sonst
-kann ein Login auf einer Host-Variante fuer die andere Host-Variante unsichtbar sein.
+kann ein Login auf einer Host-Variante fuer die andere Host-Variante unsichtbar sein. Das interne
+Nginx leitet `www` mit `308 Permanent Redirect` auf die kanonische Domain um, damit auch bei einem
+versehentlichen API-Aufruf Methode und Request-Body erhalten bleiben. Der aeussere Reverse Proxy
+sollte denselben kanonischen Host verwenden.
 
 `PUBLIC_UPLOAD_BACKEND_URL` ist optional, aber fuer grosse Galerie-Videos hinter Cloudflare
 empfohlen. Lege dafuer z. B. `upload.lionsquad.at` als DNS-only Record an und leite ihn im
@@ -229,6 +232,8 @@ In beiden Faellen:
 - HTTP auf HTTPS weiterleiten.
 - Eingehende `X-Forwarded-*`-Header am aeusseren Proxy ersetzen bzw. korrekt
   erweitern; niemals ungeprueft vom Internet uebernehmen.
+- Den Browser-Header `Origin` unveraendert weiterreichen. Schreibende Cookie-Requests
+  werden gegen `FRONTEND_URL`/`CORS_ORIGINS` und den CSRF-Token geprueft.
 
 Wenn Nginx Proxy Manager auf dem Docker-Host laeuft:
 
@@ -273,9 +278,11 @@ docker compose up -d --build
 curl -I https://lionsquad.at/api/health
 ```
 
-Die API-Antwort muss ueber die oeffentliche URL erreichbar sein. Login, Logout,
-ein Upload und ein absichtlich wiederholter Request bis zur `429`-Antwort pruefen
-zusaetzlich Cookies, Client-IP und Rate-Limit hinter dem Proxy.
+Die API-Antwort muss ueber die oeffentliche URL erreichbar sein. Login, Ablauf/Refresh,
+Logout, Rollenwechsel, ein Upload, ein Wechsel von `www` auf die kanonische Domain und
+ein absichtlich wiederholter Request bis zur `429`-Antwort pruefen zusaetzlich Cookies,
+CSRF, Session-Widerruf, Client-IP und Rate-Limit hinter dem Proxy. Bestehende Refresh-Sessions
+werden beim ersten Refresh automatisch in das aktuelle Session-Familienformat migriert.
 
 ## Analytics
 
