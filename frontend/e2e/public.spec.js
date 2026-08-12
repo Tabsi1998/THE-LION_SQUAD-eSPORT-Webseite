@@ -25,6 +25,16 @@ async function expectNoPageXOverflow(page) {
   expect(overflow).toBeLessThanOrEqual(1);
 }
 
+async function dispatchDoubleSubmit(page, submitTestId) {
+  await page.evaluate((testId) => {
+    const submitter = document.querySelector(`[data-testid="${testId}"]`);
+    const form = submitter?.closest("form");
+    if (!form) throw new Error(`Form for ${testId} not found`);
+    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  }, submitTestId);
+}
+
 const canonicalPublicSettings = {
   club_name: "THE LION SQUAD - eSPORTS",
   tagline: "Verein",
@@ -95,6 +105,172 @@ test("news keeps stale mentions as text without linking to unavailable profiles"
   await expect(content).toContainText("@PublicPlayer und @FormerPlayer");
   await expect(content.locator('a[href="/u/PublicPlayer"]')).toHaveCount(1);
   await expect(content.locator('a[href="/u/FormerPlayer"]')).toHaveCount(0);
+});
+
+test("contact form validates fields, prevents duplicate submits and confirms success", async ({ page }) => {
+  await mockPublicChrome(page);
+  await page.route("**/api/auth/me", (route) => route.fulfill({ contentType: "application/json", body: "null" }));
+  await page.route("**/api/contact/topics", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify([{ value: "general", label: "Allgemein" }]),
+  }));
+  let submissions = 0;
+  await page.route("**/api/contact/submit", async (route) => {
+    submissions += 1;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, id: "contact-1" }) });
+  });
+
+  await page.goto("/contact");
+  await acceptCookies(page);
+  await page.getByTestId("contact-submit").click();
+  await expect(page.locator("#contact-name-error")).toBeVisible();
+  await expect(page.getByTestId("contact-name")).toBeFocused();
+  expect(submissions).toBe(0);
+
+  await page.getByTestId("contact-name").fill("Test Person");
+  await page.getByTestId("contact-email-input").fill("person@example.com");
+  await page.getByTestId("contact-subject").fill("Testanfrage");
+  await page.getByTestId("contact-message").fill("Das ist eine echte Testnachricht.");
+  await page.getByTestId("contact-privacy").check();
+  await dispatchDoubleSubmit(page, "contact-submit");
+
+  await expect(page.getByTestId("contact-success")).toBeVisible();
+  expect(submissions).toBe(1);
+});
+
+test("membership application waits for auth, validates inline and submits only once", async ({ page }) => {
+  await mockPublicChrome(page);
+  const user = { id: "user-1", username: "testplayer", display_name: "Test Player", role: "player", user_type: "community_user" };
+  let application = null;
+  let submissions = 0;
+  await page.route("**/api/auth/me", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(user) }));
+  await page.route("**/api/membership/apply/me", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify(application),
+  }));
+  await page.route("**/api/membership/apply", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    submissions += 1;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    application = { id: "application-1", status: "pending", created_at: "2026-08-12T10:00:00Z" };
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(application) });
+  });
+
+  await page.goto("/membership/apply");
+  await acceptCookies(page);
+  await expect(page.getByTestId("apply-form")).toBeVisible();
+  await page.getByTestId("apply-submit").click();
+  await expect(page.locator("#apply-motivation-error")).toBeVisible();
+  await expect(page.getByTestId("apply-motivation")).toBeFocused();
+  expect(submissions).toBe(0);
+
+  await page.getByTestId("apply-motivation").fill("Ich möchte den Verein langfristig aktiv unterstützen.");
+  await page.getByTestId("apply-statutes").check();
+  await page.getByTestId("apply-privacy").check();
+  await dispatchDoubleSubmit(page, "apply-submit");
+
+  await expect(page.getByTestId("apply-pending")).toBeVisible();
+  expect(submissions).toBe(1);
+});
+
+test("login shows inline validation and blocks simultaneous requests", async ({ page }) => {
+  await page.route("**/api/auth/me", (route) => route.fulfill({ contentType: "application/json", body: "null" }));
+  let submissions = 0;
+  await page.route("**/api/auth/login", async (route) => {
+    submissions += 1;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ detail: "Ungültige Zugangsdaten" }) });
+  });
+
+  await page.goto("/login");
+  await acceptCookies(page);
+  await page.getByTestId("login-submit").click();
+  await expect(page.locator("#login-email-error")).toBeVisible();
+  expect(submissions).toBe(0);
+
+  await page.getByTestId("login-email").fill("person@example.com");
+  await page.getByTestId("login-password").fill("ungueltiges-passwort");
+  await dispatchDoubleSubmit(page, "login-submit");
+
+  await expect(page.locator("#login-error")).toContainText("Ungültige Zugangsdaten");
+  await expect(page.getByTestId("login-submit")).toBeEnabled();
+  expect(submissions).toBe(1);
+});
+
+test("registration validates consent and exposes a single API failure", async ({ page }) => {
+  await page.route("**/api/auth/me", (route) => route.fulfill({ contentType: "application/json", body: "null" }));
+  let submissions = 0;
+  await page.route("**/api/auth/register", async (route) => {
+    submissions += 1;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ detail: "Benutzername bereits vergeben" }) });
+  });
+
+  await page.goto("/register");
+  await acceptCookies(page);
+  await page.getByTestId("register-submit").click();
+  await expect(page.locator("#register-username-error")).toBeVisible();
+  await expect(page.getByTestId("register-username")).toBeFocused();
+  expect(submissions).toBe(0);
+
+  await page.getByTestId("register-username").fill("newplayer");
+  await page.getByTestId("register-email").fill("newplayer@example.com");
+  await page.getByTestId("register-password").fill("sicheres-passwort");
+  await page.getByTestId("register-accept").check();
+  await page.getByTestId("register-accept-terms").check();
+  await dispatchDoubleSubmit(page, "register-submit");
+
+  await expect(page.locator("#register-error")).toContainText("Benutzername bereits vergeben");
+  await expect(page.getByTestId("register-submit")).toBeEnabled();
+  expect(submissions).toBe(1);
+});
+
+test("password recovery prevents duplicate mail requests and shows a stable success state", async ({ page }) => {
+  await page.route("**/api/auth/me", (route) => route.fulfill({ contentType: "application/json", body: "null" }));
+  let submissions = 0;
+  await page.route("**/api/auth/forgot-password", async (route) => {
+    submissions += 1;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  });
+
+  await page.goto("/forgot-password");
+  await acceptCookies(page);
+  await page.getByTestId("forgot-submit").click();
+  await expect(page.locator("#forgot-email-error")).toBeVisible();
+  expect(submissions).toBe(0);
+
+  await page.getByTestId("forgot-email").fill("person@example.com");
+  await dispatchDoubleSubmit(page, "forgot-submit");
+
+  await expect(page.locator("#forgot-success")).toBeVisible();
+  expect(submissions).toBe(1);
+});
+
+test("password reset validates confirmation and keeps an API error visible", async ({ page }) => {
+  await page.route("**/api/auth/me", (route) => route.fulfill({ contentType: "application/json", body: "null" }));
+  let submissions = 0;
+  await page.route("**/api/auth/reset-password", async (route) => {
+    submissions += 1;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ detail: "Token abgelaufen" }) });
+  });
+
+  await page.goto("/reset-password?token=expired-token");
+  await acceptCookies(page);
+  await page.getByTestId("reset-submit").click();
+  await expect(page.locator("#reset-password-error")).toBeVisible();
+  await expect(page.getByTestId("reset-password")).toBeFocused();
+  expect(submissions).toBe(0);
+
+  await page.getByTestId("reset-password").fill("neues-passwort");
+  await page.getByTestId("reset-password-confirm").fill("neues-passwort");
+  await dispatchDoubleSubmit(page, "reset-submit");
+
+  await expect(page.locator("#reset-submit-error")).toContainText("Token abgelaufen");
+  await expect(page.getByTestId("reset-submit")).toBeEnabled();
+  expect(submissions).toBe(1);
 });
 
 test("contact and legal pages share one configured public data source", async ({ page }) => {

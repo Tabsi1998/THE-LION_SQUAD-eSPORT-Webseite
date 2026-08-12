@@ -9,7 +9,7 @@ Endpoints:
 import html
 
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Literal
 
 from database import get_db
@@ -58,7 +58,21 @@ class ApplyBody(BaseModel):
     contribution_pref: Literal["full", "supporter", "youth", "honorary"] = "full"
     accept_statutes: bool
     accept_privacy: bool
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(default=None, max_length=2000)
+
+    @field_validator("motivation")
+    @classmethod
+    def clean_motivation(cls, value: str):
+        cleaned = value.strip()
+        if len(cleaned) < 20:
+            raise ValueError("Motivation muss mindestens 20 Zeichen enthalten")
+        return cleaned
+
+    @field_validator("notes")
+    @classmethod
+    def clean_notes(cls, value: Optional[str]):
+        cleaned = str(value or "").strip()
+        return cleaned or None
 
 
 @router.post("/membership/apply")

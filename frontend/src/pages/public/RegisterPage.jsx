@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import {
   AuthCheckboxField,
   AuthFormAlert,
@@ -49,7 +50,7 @@ export default function RegisterPage() {
   const [accept, setAccept] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [newsletter, setNewsletter] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { submitting: loading, submitOnce } = useSubmissionGuard();
   const [err, setErr] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
 
@@ -93,7 +94,6 @@ export default function RegisterPage() {
     if (!validate()) return;
 
     setErr(null);
-    setLoading(true);
     const payload = {
       username: form.username.trim(),
       email: form.email.trim(),
@@ -105,8 +105,13 @@ export default function RegisterPage() {
       accept_terms: true,
       newsletter_consent: newsletter,
     };
-    const res = await register(payload);
-    setLoading(false);
+    const attempt = await submitOnce(() => register(payload));
+    if (!attempt.started) return;
+    if (attempt.error) {
+      setErr("Registrierung konnte nicht abgeschlossen werden. Bitte versuche es erneut.");
+      return;
+    }
+    const res = attempt.value;
 
     if (res.ok) {
       toast.success("Willkommen in der TLS Community!");
