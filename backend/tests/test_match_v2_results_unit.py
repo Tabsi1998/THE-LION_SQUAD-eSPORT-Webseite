@@ -8,6 +8,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from services.match_v2_results import (
     MatchV2ResultError,
     build_v2_result_application,
+    is_v2_result_replay,
     normalize_v2_results,
     public_recalculation_error,
 )
@@ -134,6 +135,45 @@ def test_v2_result_application_fills_advancement_slots():
     assert application["target_sets"]["m-b"]["slots"][1]["registration_id"] == "r1"
     assert application["target_sets"]["m-l"]["slots"][0]["registration_id"] == "r4"
     assert application["target_sets"]["m-l"]["slots"][1]["registration_id"] == "r3"
+
+
+def test_completed_v2_result_detects_exact_idempotent_replay():
+    source = _source_match()
+    application = build_v2_result_application(
+        source,
+        [source, _target("m-b", "B"), _target("m-l", "L")],
+        RESULTS,
+        actor_id="admin",
+        now_iso="2026-05-08T12:00:00+00:00",
+        proof_url=" https://example.test/proof ",
+        note=" final ",
+    )
+    completed = {**source, **application["match_set"]}
+
+    assert is_v2_result_replay(
+        completed,
+        RESULTS,
+        proof_url="https://example.test/proof",
+        note="final",
+    )
+
+
+def test_completed_v2_result_replay_requires_same_payload_and_metadata():
+    source = _source_match()
+    application = build_v2_result_application(
+        source,
+        [source, _target("m-b", "B"), _target("m-l", "L")],
+        RESULTS,
+        actor_id="admin",
+        now_iso="2026-05-08T12:00:00+00:00",
+        note="final",
+    )
+    completed = {**source, **application["match_set"]}
+    changed = [dict(entry) for entry in RESULTS]
+    changed[0]["score"] = 999
+
+    assert not is_v2_result_replay(completed, changed, note="final")
+    assert not is_v2_result_replay(completed, RESULTS, note="korrigiert")
 
 
 def test_l_flow_rank_is_loser_index_after_qualifiers():

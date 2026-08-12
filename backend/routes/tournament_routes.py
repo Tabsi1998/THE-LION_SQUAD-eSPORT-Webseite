@@ -1,6 +1,8 @@
 """Tournament + bracket routes."""
 import csv
+import hashlib
 import io
+import json
 import re
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse, StreamingResponse
@@ -9,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 import math
 from urllib.parse import quote, urlencode
 from pydantic import BaseModel, Field
+from pymongo.errors import DuplicateKeyError
 from database import get_db
 from auth import get_current_user, require_admin, get_optional_user
 from services.visibility import user_can_see
@@ -32,6 +35,7 @@ from services.match_v2_results import (
     build_v2_result_application,
     public_recalculation_error,
 )
+from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import (
     TournamentCreate, TournamentUpdate, RegistrationCreate, RegistrationUpdate,
@@ -674,7 +678,7 @@ async def _get_visible_tournament(tid: str, user: dict | None) -> dict:
 
 def _public_registration(reg: dict, user: dict | None, is_staff: bool) -> dict:
     if is_staff:
-        return reg
+        return {key: value for key, value in reg.items() if key not in {"_id", "identity_key"}}
     is_self = bool(user and reg.get("user_id") == user.get("id"))
     out = {
         "id": reg.get("id"),
@@ -1435,6 +1439,7 @@ async def _apply_checked_in_badges(user_id: str, tid: str) -> None:
 
 async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
     db = get_db()
+    t.pop("creation_key", None)
     t["public_phase"] = derive_public_phase(t, "tournament")
     if t.get("game_id"):
         g = await db.games.find_one({"id": t["game_id"]}, {"_id": 0})
@@ -1455,6 +1460,17 @@ async def _resolve_tid(slug_or_id: str) -> str:
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     return t["id"]
+
+
+async def _serialized_tournament_write(tid: str):
+    """Serialize critical writes for one canonical tournament across workers."""
+    db = get_db()
+    resolved_tid = await _resolve_tid(tid)
+    try:
+        async with mutation_lock(db, tournament_write_resource(resolved_tid)):
+            yield resolved_tid
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
 
 
 @router.get("")
@@ -1641,35 +1657,59 @@ async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = 
 @router.post("")
 async def create_tournament(body: TournamentCreate, me: dict = Depends(require_admin())):
     db = get_db()
-    # Validate game
-    if not await db.games.find_one({"id": body.game_id}):
-        raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
-    doc = body.model_dump()
-    doc["slug"] = await unique_slug(db.tournaments, doc.get("slug") or doc.get("title"), fallback="turnier")
-    doc["format_label"] = (doc.get("format_label") or "").strip() or None
-    if doc.get("format") != "single_elim":
-        doc["bronze_match"] = False
-    # ISO-serialize datetimes
-    for k in ["registration_open_from", "registration_open_until", "check_in_from",
-              "check_in_until", "start_date", "end_date"]:
-        doc[k] = _iso(doc.get(k))
-    doc["id"] = new_id()
-    # Allow scheduling directly (announced) — fall back to draft.
-    if not doc.get("status"):
-        doc["status"] = "draft"
-    doc["created_at"] = now_utc().isoformat()
-    doc["updated_at"] = now_utc().isoformat()
-    doc["created_by"] = me["id"]
-    await db.tournaments.insert_one(doc)
-    auto_preview = await _create_initial_bracket_preview(db, doc, me.get("id"))
-    doc.pop("_id", None)
-    doc["auto_generated_bracket"] = auto_preview
-    return doc
+    canonical_body = body.model_dump(mode="json")
+    creation_digest = hashlib.sha256(
+        json.dumps(canonical_body, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+    creation_key = f"{me['id']}:{creation_digest}"
+    try:
+        async with mutation_lock(db, "tournament:create"):
+            existing = await db.tournaments.find_one({"creation_key": creation_key}, {"_id": 0})
+            if existing:
+                existing.pop("creation_key", None)
+                return {**existing, "auto_generated_bracket": None, "idempotent_replay": True}
+            # Validate game
+            if not await db.games.find_one({"id": body.game_id}):
+                raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
+            doc = body.model_dump()
+            doc["creation_key"] = creation_key
+            doc["slug"] = await unique_slug(db.tournaments, doc.get("slug") or doc.get("title"), fallback="turnier")
+            doc["format_label"] = (doc.get("format_label") or "").strip() or None
+            if doc.get("format") != "single_elim":
+                doc["bronze_match"] = False
+            # ISO-serialize datetimes
+            for k in ["registration_open_from", "registration_open_until", "check_in_from",
+                      "check_in_until", "start_date", "end_date"]:
+                doc[k] = _iso(doc.get(k))
+            doc["id"] = new_id()
+            # Allow scheduling directly (announced) — fall back to draft.
+            if not doc.get("status"):
+                doc["status"] = "draft"
+            doc["created_at"] = now_utc().isoformat()
+            doc["updated_at"] = now_utc().isoformat()
+            doc["created_by"] = me["id"]
+            try:
+                await db.tournaments.insert_one(doc)
+            except DuplicateKeyError:
+                existing = await db.tournaments.find_one({"creation_key": creation_key}, {"_id": 0})
+                if not existing:
+                    raise HTTPException(status_code=409, detail="Turnier konnte wegen einer parallelen Erstellung nicht angelegt werden")
+                existing.pop("creation_key", None)
+                return {**existing, "auto_generated_bracket": None, "idempotent_replay": True}
+            auto_preview = await _create_initial_bracket_preview(db, doc, me.get("id"))
+            doc.pop("_id", None)
+            doc.pop("creation_key", None)
+            doc["auto_generated_bracket"] = auto_preview
+            doc["idempotent_replay"] = False
+            return doc
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail="Eine Turniererstellung wird bereits verarbeitet. Bitte erneut versuchen.")
 
 
 @router.put("/{tid}")
 @router.patch("/{tid}")
-async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends(require_admin())):
+async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends(require_admin()),
+                            _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     if body.game_id and not await db.games.find_one({"id": body.game_id}, {"id": 1}):
@@ -1708,14 +1748,20 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     updates["updated_at"] = now_utc().isoformat()
     await db.tournaments.update_one({"id": tid}, {"$set": updates})
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    t.pop("creation_key", None)
     return t
 
 
 @router.post("/{tid}/lock")
-async def lock_tournament(tid: str, me: dict = Depends(require_admin())):
+async def lock_tournament(tid: str, me: dict = Depends(require_admin()),
+                          _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    tournament = await _ensure_tournament_unlocked(db, tid)
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if tournament.get("locked_at"):
+        return {"ok": True, "locked_at": tournament["locked_at"], "idempotent_replay": True}
     if tournament.get("status") not in LOCKABLE_TOURNAMENT_STATUSES:
         raise HTTPException(status_code=400, detail="Nur beendete, veröffentlichte, archivierte oder abgesagte Turniere können gesperrt werden.")
     now = now_utc().isoformat()
@@ -1724,27 +1770,31 @@ async def lock_tournament(tid: str, me: dict = Depends(require_admin())):
         {"$set": {"locked_at": now, "locked_by": me.get("id"), "updated_at": now}},
     )
     await _audit_tournament_action(db, "tournament.lock", me.get("id"), tid, {"status": tournament.get("status")})
-    return {"ok": True, "locked_at": now}
+    return {"ok": True, "locked_at": now, "idempotent_replay": False}
 
 
 @router.post("/{tid}/unlock")
-async def unlock_tournament(tid: str, me: dict = Depends(require_admin())):
+async def unlock_tournament(tid: str, me: dict = Depends(require_admin()),
+                            _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if not tournament.get("locked_at"):
+        return {"ok": True, "idempotent_replay": True}
     now = now_utc().isoformat()
     await db.tournaments.update_one(
         {"id": tid},
         {"$unset": {"locked_at": "", "locked_by": ""}, "$set": {"updated_at": now}},
     )
     await _audit_tournament_action(db, "tournament.unlock", me.get("id"), tid, {"previous_locked_at": tournament.get("locked_at")})
-    return {"ok": True}
+    return {"ok": True, "idempotent_replay": False}
 
 
 @router.delete("/{tid}")
-async def delete_tournament(tid: str, me: dict = Depends(require_admin())):
+async def delete_tournament(tid: str, me: dict = Depends(require_admin()),
+                            _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     v2_match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
@@ -1828,6 +1878,94 @@ async def list_assignable_tournament_users(tid: str, q: str | None = None, limit
     return users
 
 
+async def _create_self_registration(db, tid: str, tournament: dict, body: RegistrationCreate,
+                                    me: dict, register_access: dict | None) -> dict:
+    existing = await db.tournament_registrations.find_one(
+        {"tournament_id": tid, "user_id": me["id"]},
+        {"_id": 0},
+    )
+    if existing:
+        existing.pop("identity_key", None)
+        return {**existing, "auto_bracket_update": None, "idempotent_replay": True}
+    team = await _validate_registration_actor(db, tournament, body, me)
+    if team:
+        existing_team = await db.tournament_registrations.find_one(
+            {"tournament_id": tid, "team_id": team["id"]},
+            {"_id": 0},
+        )
+        if existing_team:
+            existing_team.pop("identity_key", None)
+            return {**existing_team, "auto_bracket_update": None, "idempotent_replay": True}
+    game = await db.games.find_one({"id": tournament.get("game_id")}, {"_id": 0}) if tournament.get("game_id") else None
+    game = await _enrich_game_identity(db, game)
+    submitted_ids = body.player_ids or {}
+    profile_ids = me.get("game_ids") or {}
+    source_slug = game.get("identity_game_slug") if game else None
+    profile_source_ids = (profile_ids.get(source_slug) if source_slug else {}) or {}
+    profile_game_ids = (profile_ids.get(game.get("slug")) if game else {}) or {}
+    player_ids = {**profile_source_ids, **profile_game_ids, **submitted_ids}
+    missing = [
+        field.get("label") or field.get("key")
+        for field in _required_game_fields(game)
+        if not str(player_ids.get(field.get("key"), "")).strip()
+    ]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Für dieses Turnier fehlen Pflicht-IDs: {', '.join(missing)}")
+    # Count approved
+    count = await db.tournament_registrations.count_documents(
+        {"tournament_id": tid, "status": {"$in": ["pending", "approved", "checked_in"]}})
+    reg = {
+        "id": new_id(),
+        "identity_key": f"{tid}:team:{team['id']}" if team else f"{tid}:user:{me['id']}",
+        "tournament_id": tid,
+        "user_id": me["id"],
+        "team_id": team.get("id") if team else None,
+        "status": "approved",  # auto-approve by default; admin can flip to manual flow
+        "ingame_name": body.ingame_name or (team.get("name") if team else None) or me.get("display_name") or me.get("username"),
+        "discord": body.discord or me.get("discord_name"),
+        "platform_id": body.platform_id,
+        "player_ids": player_ids,
+        "notes": body.notes,
+        "accepted_rules": body.accept_rules,
+        "accepted_privacy": body.accept_privacy,
+        "seed": None,
+        "display_name": (f"[{team.get('tag')}] {team.get('name')}" if team and team.get("tag") else (team.get("name") if team else None)) or me.get("display_name") or me.get("username"),
+        "registration_type": "team" if team else "solo",
+        "registered_by": me["id"],
+        "created_at": now_utc().isoformat(),
+        "updated_at": now_utc().isoformat(),
+    }
+    if count >= tournament.get("max_participants", 32):
+        reg["status"] = "waitlist"
+    try:
+        await db.tournament_registrations.insert_one(reg)
+    except DuplicateKeyError:
+        existing = await db.tournament_registrations.find_one(
+            {"identity_key": reg["identity_key"]},
+            {"_id": 0},
+        )
+        if existing:
+            existing.pop("identity_key", None)
+            return {**existing, "auto_bracket_update": None, "idempotent_replay": True}
+        raise
+    auto_bracket_update = None
+    if reg["status"] in {"approved", "checked_in"}:
+        auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
+    reg.pop("_id", None)
+    reg.pop("identity_key", None)
+    reg["auto_bracket_update"] = auto_bracket_update
+    reg["idempotent_replay"] = False
+    # Badge trigger
+    try:
+        from badges import on_tournament_registered
+        await on_tournament_registered(me["id"], tid)
+    except Exception:
+        pass
+    if register_access:
+        await record_access_link_use(db, register_access, me)
+    return reg
+
+
 @router.post("/{tid}/register")
 async def register_for_tournament(tid: str, body: RegistrationCreate,
                                    access: str | None = None,
@@ -1853,73 +1991,25 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
         raise HTTPException(status_code=400, detail=registration_error)
     if t.get("block_club_member_registration") and await _is_active_club_member(db, me):
         raise HTTPException(status_code=403, detail="Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.")
-    existing = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": me["id"]})
-    if existing:
-        raise HTTPException(status_code=409, detail="Bereits angemeldet")
-    team = await _validate_registration_actor(db, t, body, me)
-    game = await db.games.find_one({"id": t.get("game_id")}, {"_id": 0}) if t.get("game_id") else None
-    game = await _enrich_game_identity(db, game)
-    submitted_ids = body.player_ids or {}
-    profile_ids = me.get("game_ids") or {}
-    source_slug = game.get("identity_game_slug") if game else None
-    profile_source_ids = (profile_ids.get(source_slug) if source_slug else {}) or {}
-    profile_game_ids = (profile_ids.get(game.get("slug")) if game else {}) or {}
-    player_ids = {**profile_source_ids, **profile_game_ids, **submitted_ids}
-    missing = [
-        field.get("label") or field.get("key")
-        for field in _required_game_fields(game)
-        if not str(player_ids.get(field.get("key"), "")).strip()
-    ]
-    if missing:
-        raise HTTPException(status_code=400, detail=f"Für dieses Turnier fehlen Pflicht-IDs: {', '.join(missing)}")
-    # Count approved
-    count = await db.tournament_registrations.count_documents(
-        {"tournament_id": tid, "status": {"$in": ["pending", "approved", "checked_in"]}})
-    status = "pending" if count >= t.get("max_participants", 32) else "approved"
-    if status == "pending" and count >= t.get("max_participants", 32):
-        status = "waitlist"
-    reg = {
-        "id": new_id(),
-        "tournament_id": tid,
-        "user_id": me["id"],
-        "team_id": team.get("id") if team else None,
-        "status": "approved",  # auto-approve by default; admin can flip to manual flow
-        "ingame_name": body.ingame_name or (team.get("name") if team else None) or me.get("display_name") or me.get("username"),
-        "discord": body.discord or me.get("discord_name"),
-        "platform_id": body.platform_id,
-        "player_ids": player_ids,
-        "notes": body.notes,
-        "accepted_rules": body.accept_rules,
-        "accepted_privacy": body.accept_privacy,
-        "seed": None,
-        "display_name": (f"[{team.get('tag')}] {team.get('name')}" if team and team.get("tag") else (team.get("name") if team else None)) or me.get("display_name") or me.get("username"),
-        "registration_type": "team" if team else "solo",
-        "registered_by": me["id"],
-        "created_at": now_utc().isoformat(),
-        "updated_at": now_utc().isoformat(),
-    }
-    if count >= t.get("max_participants", 32):
-        reg["status"] = "waitlist"
-    await db.tournament_registrations.insert_one(reg)
-    auto_bracket_update = None
-    if reg["status"] in {"approved", "checked_in"}:
-        auto_bracket_update = await _refresh_tournament_previews_after_registration(db, t, me.get("id"))
-    reg.pop("_id", None)
-    reg["auto_bracket_update"] = auto_bracket_update
-    # Badge trigger
     try:
-        from badges import on_tournament_registered
-        await on_tournament_registered(me["id"], tid)
-    except Exception:
-        pass
-    if register_access:
-        await record_access_link_use(db, register_access, me)
-    return reg
+        async with mutation_lock(db, tournament_write_resource(tid)):
+            current = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+            if not current:
+                raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+            if _is_tournament_locked(current):
+                raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
+            current_error = _registration_error(current)
+            if current_error and not register_access:
+                raise HTTPException(status_code=400, detail=current_error)
+            return await _create_self_registration(db, tid, current, body, me, register_access)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
 
 
 @router.post("/{tid}/registrations")
 async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
-                                    me: dict = Depends(get_current_user)):
+                                    me: dict = Depends(get_current_user),
+                                    _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament = await _ensure_tournament_unlocked(db, tid)
@@ -1931,17 +2021,33 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
         user = await db.users.find_one({"id": payload["user_id"]}, {"_id": 0, "password_hash": 0})
         if not user:
             raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
-        existing = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": payload["user_id"]}, {"id": 1})
+        existing = await db.tournament_registrations.find_one(
+            {"tournament_id": tid, "user_id": payload["user_id"]},
+            {"_id": 0, "identity_key": 0},
+        )
         if existing:
-            raise HTTPException(status_code=409, detail="Dieser Nutzer ist bereits angemeldet")
+            return {
+                "registration": existing,
+                "replacement": None,
+                "auto_bracket_update": None,
+                "idempotent_replay": True,
+            }
     team = None
     if payload.get("team_id"):
         team = await db.teams.find_one({"id": payload["team_id"]}, {"_id": 0})
         if not team:
             raise HTTPException(status_code=404, detail="Team nicht gefunden")
-        existing_team = await db.tournament_registrations.find_one({"tournament_id": tid, "team_id": payload["team_id"]}, {"id": 1})
+        existing_team = await db.tournament_registrations.find_one(
+            {"tournament_id": tid, "team_id": payload["team_id"]},
+            {"_id": 0, "identity_key": 0},
+        )
         if existing_team:
-            raise HTTPException(status_code=409, detail="Dieses Team ist bereits angemeldet")
+            return {
+                "registration": existing_team,
+                "replacement": None,
+                "auto_bracket_update": None,
+                "idempotent_replay": True,
+            }
     if _is_team_tournament(tournament) and not team:
         raise HTTPException(status_code=400, detail="Dieses Turnier erwartet eine Team-Anmeldung")
     if not _is_team_tournament(tournament) and team:
@@ -2000,7 +2106,14 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
         "created_at": now_utc().isoformat(),
         "updated_at": now_utc().isoformat(),
     }
-    await db.tournament_registrations.insert_one(reg)
+    if reg.get("team_id"):
+        reg["identity_key"] = f"{tid}:team:{reg['team_id']}"
+    elif reg.get("user_id"):
+        reg["identity_key"] = f"{tid}:user:{reg['user_id']}"
+    try:
+        await db.tournament_registrations.insert_one(reg)
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="Dieser Nutzer oder dieses Team ist bereits angemeldet")
 
     replacement = None
     if old_reg_id:
@@ -2021,28 +2134,38 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
         {"registration_id": reg["id"], "user_id": reg.get("user_id"), "is_guest": reg["is_guest"], "replace_registration_id": old_reg_id},
     )
     reg.pop("_id", None)
-    return {"registration": reg, "replacement": replacement, "auto_bracket_update": auto_bracket_update}
+    reg.pop("identity_key", None)
+    return {
+        "registration": reg,
+        "replacement": replacement,
+        "auto_bracket_update": auto_bracket_update,
+        "idempotent_replay": False,
+    }
 
 
 @router.put("/{tid}/registrations/{reg_id}")
 @router.patch("/{tid}/registrations/{reg_id}")
 async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
-                               me: dict = Depends(get_current_user)):
+                               me: dict = Depends(get_current_user),
+                               _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
-    updates["updated_at"] = now_utc().isoformat()
-    await db.tournament_registrations.update_one({"id": reg_id, "tournament_id": tid}, {"$set": updates})
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
     if not reg:
         raise HTTPException(status_code=404, detail="Anmeldung nicht gefunden")
+    if updates and all(reg.get(key) == value for key, value in updates.items()):
+        return {**reg, "idempotent_replay": True}
+    updates["updated_at"] = now_utc().isoformat()
+    await db.tournament_registrations.update_one({"id": reg_id, "tournament_id": tid}, {"$set": updates})
+    reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
     if updates.get("status") in {"approved", "checked_in", "rejected", "waitlist", "no_show"}:
         tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
         if tournament:
             reg["auto_bracket_update"] = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
-    return reg
+    return {**reg, "idempotent_replay": False}
 
 
 @router.post("/{tid}/registrations/{reg_id}/checkin")
@@ -2058,35 +2181,42 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, CHECKIN_STAFF_ROLES)
-    reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
-    if not reg:
-        raise HTTPException(status_code=404, detail="Anmeldung nicht gefunden")
     status = body.get("status")
     if status not in REGISTRATION_CHECKIN_STATUSES:
         raise HTTPException(status_code=400, detail="Ungültiger Check-in-Status")
-    if reg.get("status") in ("rejected", "waitlist") and status == "checked_in":
-        raise HTTPException(status_code=400, detail="Diese Anmeldung kann nicht eingecheckt werden")
+    try:
+        async with mutation_lock(db, tournament_write_resource(tid)):
+            reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
+            if not reg:
+                raise HTTPException(status_code=404, detail="Anmeldung nicht gefunden")
+            if reg.get("status") == status:
+                return {**reg, "idempotent_replay": True}
+            if reg.get("status") in ("rejected", "waitlist") and status == "checked_in":
+                raise HTTPException(status_code=400, detail="Diese Anmeldung kann nicht eingecheckt werden")
 
-    await db.tournament_registrations.update_one(
-        {"id": reg_id},
-        {"$set": {"status": status, "updated_at": now_utc().isoformat()}},
-    )
-    if status == "checked_in" and reg.get("user_id"):
-        await _apply_late_checkin_hooks(db, tid, reg["user_id"])
-        await _apply_checked_in_badges(reg["user_id"], tid)
-    await _audit_tournament_action(
-        db,
-        "tournament.registration.checkin_status",
-        me.get("id"),
-        tid,
-        {"registration_id": reg_id, "from_status": reg.get("status"), "to_status": status},
-    )
-    updated = await db.tournament_registrations.find_one({"id": reg_id}, {"_id": 0})
-    return updated
+            await db.tournament_registrations.update_one(
+                {"id": reg_id},
+                {"$set": {"status": status, "updated_at": now_utc().isoformat()}},
+            )
+            if status == "checked_in" and reg.get("user_id"):
+                await _apply_late_checkin_hooks(db, tid, reg["user_id"])
+                await _apply_checked_in_badges(reg["user_id"], tid)
+            await _audit_tournament_action(
+                db,
+                "tournament.registration.checkin_status",
+                me.get("id"),
+                tid,
+                {"registration_id": reg_id, "from_status": reg.get("status"), "to_status": status},
+            )
+            updated = await db.tournament_registrations.find_one({"id": reg_id}, {"_id": 0})
+            return {**updated, "idempotent_replay": False}
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
 
 
 @router.delete("/{tid}/registrations/{reg_id}")
-async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_current_user)):
+async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_current_user),
+                              _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
@@ -2180,7 +2310,8 @@ async def list_tournament_staff(tid: str, me: dict = Depends(get_current_user)):
 
 @router.post("/{tid}/staff")
 async def create_tournament_staff(tid: str, body: TournamentStaffAssignmentCreate,
-                                  me: dict = Depends(require_admin())):
+                                  me: dict = Depends(require_admin()),
+                                  _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     if not await db.users.find_one({"id": body.user_id}, {"id": 1}):
@@ -2195,7 +2326,9 @@ async def create_tournament_staff(tid: str, body: TournamentStaffAssignmentCreat
         "scope_id": scope_id,
     })
     if existing:
-        raise HTTPException(status_code=409, detail="Diese Zuweisung existiert bereits")
+        existing.pop("_id", None)
+        enriched = (await _enrich_staff_assignments([existing]))[0]
+        return {**enriched, "idempotent_replay": True}
     doc = _normalize_team_settings(body.model_dump())
     doc["id"] = new_id()
     doc["tournament_id"] = tid
@@ -2213,13 +2346,15 @@ async def create_tournament_staff(tid: str, body: TournamentStaffAssignmentCreat
         {"assignment_id": doc["id"], "user_id": doc["user_id"], "role": doc["role"], "scope": doc["scope"], "scope_id": doc.get("scope_id")},
     )
     doc.pop("_id", None)
-    return (await _enrich_staff_assignments([doc]))[0]
+    enriched = (await _enrich_staff_assignments([doc]))[0]
+    return {**enriched, "idempotent_replay": False}
 
 
 @router.patch("/{tid}/staff/{assignment_id}")
 @router.put("/{tid}/staff/{assignment_id}")
 async def update_tournament_staff(tid: str, assignment_id: str, body: TournamentStaffAssignmentUpdate,
-                                  me: dict = Depends(require_admin())):
+                                  me: dict = Depends(require_admin()),
+                                  _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     current = await db.tournament_staff_assignments.find_one({"id": assignment_id, "tournament_id": tid}, {"_id": 0})
@@ -2254,7 +2389,8 @@ async def update_tournament_staff(tid: str, assignment_id: str, body: Tournament
 
 
 @router.delete("/{tid}/staff/{assignment_id}")
-async def delete_tournament_staff(tid: str, assignment_id: str, me: dict = Depends(require_admin())):
+async def delete_tournament_staff(tid: str, assignment_id: str, me: dict = Depends(require_admin()),
+                                  _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     current = await db.tournament_staff_assignments.find_one({"id": assignment_id, "tournament_id": tid}, {"_id": 0})
@@ -2281,17 +2417,28 @@ async def list_tournament_stages(tid: str, user=Depends(get_optional_user)):
         {"tournament_id": tid},
         {"_id": 0},
     ).sort("number", 1).to_list(200)
+    for stage in stages:
+        stage.pop("creation_key", None)
     return stages
 
 
 @router.post("/{tid}/stages")
 async def create_tournament_stage(tid: str, body: TournamentStageCreate,
-                                  me: dict = Depends(get_current_user)):
+                                  me: dict = Depends(get_current_user),
+                                  _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     doc = body.model_dump()
+    creation_digest = hashlib.sha256(
+        json.dumps(body.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+    creation_key = f"{tid}:{me['id']}:{creation_digest}"
+    existing_creation = await db.tournament_stages.find_one({"creation_key": creation_key}, {"_id": 0})
+    if existing_creation:
+        existing_creation.pop("creation_key", None)
+        return {**existing_creation, "idempotent_replay": True}
     if doc.get("number") is None:
         last = await db.tournament_stages.find(
             {"tournament_id": tid},
@@ -2305,6 +2452,7 @@ async def create_tournament_stage(tid: str, body: TournamentStageCreate,
     if duplicate:
         raise HTTPException(status_code=409, detail="Stage-Nummer existiert bereits")
     doc["id"] = new_id()
+    doc["creation_key"] = creation_key
     doc["tournament_id"] = tid
     doc["created_at"] = now_utc().isoformat()
     doc["updated_at"] = doc["created_at"]
@@ -2318,13 +2466,15 @@ async def create_tournament_stage(tid: str, body: TournamentStageCreate,
         {"stage_id": doc["id"], "stage_type": doc["stage_type"], "match_type": doc["match_type"]},
     )
     doc.pop("_id", None)
-    return doc
+    doc.pop("creation_key", None)
+    return {**doc, "idempotent_replay": False}
 
 
 @router.patch("/{tid}/stages/{stage_id}")
 @router.put("/{tid}/stages/{stage_id}")
 async def update_tournament_stage(tid: str, stage_id: str, body: TournamentStageUpdate,
-                                  me: dict = Depends(get_current_user)):
+                                  me: dict = Depends(get_current_user),
+                                  _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
@@ -2350,11 +2500,13 @@ async def update_tournament_stage(tid: str, stage_id: str, body: TournamentStage
         {"stage_id": stage_id, "updates": {k: v for k, v in updates.items() if k != "updated_at"}},
     )
     updated = await db.tournament_stages.find_one({"id": stage_id}, {"_id": 0})
+    updated.pop("creation_key", None)
     return updated
 
 
 @router.delete("/{tid}/stages/{stage_id}")
-async def delete_tournament_stage(tid: str, stage_id: str, me: dict = Depends(get_current_user)):
+async def delete_tournament_stage(tid: str, stage_id: str, me: dict = Depends(get_current_user),
+                                  _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
@@ -2392,7 +2544,8 @@ async def list_tournament_matches_v2(tid: str, stage_id: str | None = None,
 
 @router.post("/{tid}/matches-v2/recalculate-advancement")
 async def recalculate_tournament_matches_v2_advancement(tid: str, stage_id: str | None = None,
-                                                        me: dict = Depends(get_current_user)):
+                                                        me: dict = Depends(get_current_user),
+                                                        _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     await require_tournament_staff_permission(me, tid, RESULT_STAFF_ROLES)
@@ -2466,7 +2619,8 @@ async def recalculate_tournament_matches_v2_advancement(tid: str, stage_id: str 
 @router.post("/{tid}/stages/{stage_id}/generate")
 async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool = False,
                                             preview: bool = False,
-                                            me: dict = Depends(get_current_user)):
+                                            me: dict = Depends(get_current_user),
+                                            _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
@@ -2527,25 +2681,19 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
     return {"ok": True, "stage_id": stage_id, "match_count": len(matches), "preview": preview}
 
 
-@router.post("/{tid}/checkin")
-async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
-    db = get_db()
-    tid = await _resolve_tid(tid)
-    tournament = await _ensure_tournament_unlocked(db, tid)
-    if (tournament.get("event_mode") or "online") == "local":
-        raise HTTPException(status_code=403, detail="Bei Vor-Ort-Turnieren macht die Turnierleitung den Check-in.")
-    reg = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": me["id"]})
+async def _find_self_registration(db, tid: str, user_id: str) -> dict | None:
+    reg = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": user_id})
     if not reg:
         team_ids = [
             row.get("team_id")
-            for row in await db.team_members.find({"user_id": me["id"]}, {"_id": 0, "team_id": 1}).to_list(100)
+            for row in await db.team_members.find({"user_id": user_id}, {"_id": 0, "team_id": 1}).to_list(100)
             if row.get("team_id")
         ]
         if team_ids:
             teams = await db.teams.find(
                 {
                     "id": {"$in": team_ids},
-                    "$or": [{"leader_id": me["id"]}, {"co_leader_ids": me["id"]}],
+                    "$or": [{"leader_id": user_id}, {"co_leader_ids": user_id}],
                 },
                 {"_id": 0, "id": 1},
             ).to_list(100)
@@ -2555,29 +2703,47 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
                     "tournament_id": tid,
                     "team_id": {"$in": manageable_team_ids},
                 })
-    if not reg:
-        raise HTTPException(status_code=404, detail="Keine Anmeldung gefunden")
-    if reg["status"] not in ("approved", "checked_in"):
-        raise HTTPException(status_code=400, detail="Nicht check-in-fähig")
-    await db.tournament_registrations.update_one(
-        {"id": reg["id"]}, {"$set": {"status": "checked_in", "updated_at": now_utc().isoformat()}})
-    # Phase B v4.1: late check-in detection (check-in after start_date) → neg_late_checkin
-    await _apply_late_checkin_hooks(db, tid, me["id"])
-    await _apply_checked_in_badges(me["id"], tid)
-    await _audit_tournament_action(
-        db,
-        "tournament.registration.self_checkin",
-        me.get("id"),
-        tid,
-        {"registration_id": reg["id"], "from_status": reg.get("status"), "to_status": "checked_in"},
-    )
-    return {"ok": True}
+    return reg
+
+
+@router.post("/{tid}/checkin")
+async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    tournament = await _ensure_tournament_unlocked(db, tid)
+    if (tournament.get("event_mode") or "online") == "local":
+        raise HTTPException(status_code=403, detail="Bei Vor-Ort-Turnieren macht die Turnierleitung den Check-in.")
+    try:
+        async with mutation_lock(db, tournament_write_resource(tid)):
+            reg = await _find_self_registration(db, tid, me["id"])
+            if not reg:
+                raise HTTPException(status_code=404, detail="Keine Anmeldung gefunden")
+            if reg["status"] == "checked_in":
+                return {"ok": True, "idempotent_replay": True}
+            if reg["status"] != "approved":
+                raise HTTPException(status_code=400, detail="Nicht check-in-fähig")
+            await db.tournament_registrations.update_one(
+                {"id": reg["id"]}, {"$set": {"status": "checked_in", "updated_at": now_utc().isoformat()}})
+            # Phase B v4.1: late check-in detection (check-in after start_date) → neg_late_checkin
+            await _apply_late_checkin_hooks(db, tid, me["id"])
+            await _apply_checked_in_badges(me["id"], tid)
+            await _audit_tournament_action(
+                db,
+                "tournament.registration.self_checkin",
+                me.get("id"),
+                tid,
+                {"registration_id": reg["id"], "from_status": reg.get("status"), "to_status": "checked_in"},
+            )
+            return {"ok": True, "idempotent_replay": False}
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
 
 
 # --- Bracket generation ---
 @router.post("/{tid}/generate-bracket")
 async def generate(tid: str, preview: bool = False, force: bool = False,
-                   me: dict = Depends(get_current_user)):
+                   me: dict = Depends(get_current_user),
+                   _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     t = await _ensure_tournament_unlocked(db, tid)
@@ -2588,7 +2754,8 @@ async def generate(tid: str, preview: bool = False, force: bool = False,
 @router.post("/{tid}/bracket/from-format")
 async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBracketStructurePayload | None = None,
                                                  preview: bool = True, force: bool = False,
-                                                 me: dict = Depends(get_current_user)):
+                                                 me: dict = Depends(get_current_user),
+                                                 _mutation_tid: str = Depends(_serialized_tournament_write)):
     """Use the tournament structure as the single source of truth and rebuild the bracket preview."""
     db = get_db()
     tid = await _resolve_tid(tid)
@@ -2687,7 +2854,8 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
 
 
 @router.post("/{tid}/reset-bracket")
-async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_current_user)):
+async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_current_user),
+                        _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     t = await _ensure_tournament_unlocked(db, tid)
@@ -2699,6 +2867,8 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
         )
     match_count = await db.matches.count_documents({"tournament_id": tid})
     v2_match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
+    if match_count == 0 and not v2_match_ids and t.get("status") == "draft":
+        return {"ok": True, "idempotent_replay": True}
     await db.matches.delete_many({"tournament_id": tid})
     await db.matches_v2.delete_many({"tournament_id": tid})
     if v2_match_ids:
@@ -2711,11 +2881,12 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
         tid,
         {"previous_status": t.get("status"), "match_count": match_count, "v2_match_count": len(v2_match_ids), "force": force},
     )
-    return {"ok": True}
+    return {"ok": True, "idempotent_replay": False}
 
 
 @router.post("/{tid}/status")
-async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user)):
+async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
+                     _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
@@ -2897,7 +3068,12 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user))
             )
         except Exception:
             pass
-    return {"ok": True, "auto_generated_bracket": auto_generated_bracket, "planning": planning}
+    return {
+        "ok": True,
+        "auto_generated_bracket": auto_generated_bracket,
+        "planning": planning,
+        "idempotent_replay": prev == status,
+    }
 
 
 @router.get("/{tid}/planning-check")
@@ -3139,7 +3315,8 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
 
 # ---------- Swiss / Groups specific ----------
 @router.post("/{tid}/swiss/next-round")
-async def swiss_next_round(tid: str, me: dict = Depends(require_admin())):
+async def swiss_next_round(tid: str, me: dict = Depends(require_admin()),
+                           _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     t = await db.tournaments.find_one({"id": tid})
@@ -3164,7 +3341,8 @@ async def swiss_next_round(tid: str, me: dict = Depends(require_admin())):
 
 
 @router.post("/{tid}/groups/generate")
-async def groups_generate(tid: str, body: dict, me: dict = Depends(require_admin())):
+async def groups_generate(tid: str, body: dict, me: dict = Depends(require_admin()),
+                          _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     t = await db.tournaments.find_one({"id": tid})
