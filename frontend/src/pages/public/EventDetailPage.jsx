@@ -8,9 +8,11 @@ import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { RichContent } from "@/components/tls/RichContent";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
+import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
@@ -250,7 +252,8 @@ const EVENT_REGISTRATION_LABELS = {
 function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
   const [companionCount, setCompanionCount] = useState(0);
   const [note, setNote] = useState("");
-  const [saving, setSaving] = useState(false);
+  const { submitting: saving, submitOnce } = useSubmissionGuard();
+  const [actionError, setActionError] = useState("");
   const summary = event.registration_summary || {};
   const own = event.own_registration;
   const activeOwn = own && !["cancelled", "no_show"].includes(own.status);
@@ -263,35 +266,38 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
   useEffect(() => {
     setCompanionCount(0);
     setNote("");
+    setActionError("");
   }, [event.id]);
 
   const register = async (ev) => {
     ev.preventDefault();
-    setSaving(true);
-    try {
+    setActionError("");
+    const attempt = await submitOnce(async () => {
       await api.post(`/events/${event.id}/registrations`, {
         companion_count: Number(companionCount || 0),
-        note: note || null,
+        note: note.trim() || null,
       }, { params: accessToken ? { access: accessToken } : undefined });
       toast.success("Anmeldung gespeichert.");
       await onChanged();
-    } catch (err) {
-      toast.error(formatRequestError(err, "Anmeldung konnte nicht gespeichert werden."));
-    } finally {
-      setSaving(false);
+    });
+    if (attempt.started && attempt.error) {
+      const message = formatRequestError(attempt.error, "Anmeldung konnte nicht gespeichert werden.");
+      setActionError(message);
+      toast.error(message);
     }
   };
 
   const cancel = async () => {
-    setSaving(true);
-    try {
+    setActionError("");
+    const attempt = await submitOnce(async () => {
       await api.delete(`/events/${event.id}/registrations/me`);
       toast.success("Anmeldung storniert.");
       await onChanged();
-    } catch (err) {
-      toast.error(formatRequestError(err, "Anmeldung konnte nicht storniert werden."));
-    } finally {
-      setSaving(false);
+    });
+    if (attempt.started && attempt.error) {
+      const message = formatRequestError(attempt.error, "Anmeldung konnte nicht storniert werden.");
+      setActionError(message);
+      toast.error(message);
     }
   };
 
@@ -341,19 +347,20 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
           {event.allow_companions && (
             <label className="block">
               <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Begleitpersonen</div>
-              <input type="number" min="0" max={maxCompanions} value={companionCount} onChange={(ev) => setCompanionCount(ev.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
+              <input type="number" min="0" max={maxCompanions} value={companionCount} onChange={(ev) => { setCompanionCount(ev.target.value); setActionError(""); }} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
               <div className="mt-1 text-xs text-white/40">Maximal {maxCompanions} pro Anmeldung.</div>
             </label>
           )}
           <label className="block">
             <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Hinweis optional</div>
-            <textarea value={note} onChange={(ev) => setNote(ev.target.value)} rows={3} maxLength={500} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="z.B. komme etwas später" />
+            <textarea value={note} onChange={(ev) => { setNote(ev.target.value); setActionError(""); }} rows={3} maxLength={500} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="z.B. komme etwas später" />
           </label>
-          <button disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 bg-[#9F7AEA] text-black text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
+          <button disabled={saving} data-testid="event-register-submit" className="inline-flex items-center gap-2 px-4 py-2 bg-[#9F7AEA] text-black text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
             <UserPlus className="w-3.5 h-3.5" /> {saving ? "Speichere..." : "Anmelden"}
           </button>
         </form>
       )}
+      {actionError && <div className="mt-4"><AuthFormAlert id="event-registration-error">{actionError}</AuthFormAlert></div>}
       {!!event.registrations?.length && (
         <div className="mt-6 border-t border-white/10 pt-4">
           <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">Angemeldet</div>
