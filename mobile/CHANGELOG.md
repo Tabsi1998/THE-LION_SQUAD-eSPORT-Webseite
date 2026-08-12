@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0-beta.2 - 2026-08-12
+
+- Mobile: Das Dashboard priorisiert eigene und betreute offene Matches und fuehrt direkt zur Ergebniserfassung; Erfolgs- und Fehlerfeedback ist in den Match-Workflow integriert.
+- Mobile: Abgeschlossene Turniere stellen Sieger, Podium, finale Rangliste, Abschlusszeit und Turnierstatistiken in den Vordergrund; alte Matches erscheinen als kompakte Historie.
+- Backend/Web/Mobile: E-Mail, Push und In-App lassen sich global sowie je Thema konfigurieren; Deduplizierung und Cooldowns reduzieren wiederholte Hinweise.
+- Release: Android-Build 56 verwendet die aktualisierten Expo-kompatiblen Abhaengigkeiten und das streng begrenzte, befristete Mobile-Audit-Gate.
+
 ## 2.0.0-beta.1 - 2026-06-02
 
 - Backend/Web: Gewinnabholungen koennen fuer veroeffentlichte Turniere und Fast-Lap-Challenges nachtraeglich erzeugt werden; Stage-/Custom-Bracket-Ergebnisse werden dabei korrekt ausgewertet.
