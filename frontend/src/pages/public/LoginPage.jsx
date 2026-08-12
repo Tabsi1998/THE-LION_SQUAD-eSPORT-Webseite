@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { AuthFormAlert, AuthPasswordField, AuthTextField } from "@/components/tls/AuthFormFields";
 import { toast } from "sonner";
 
@@ -18,7 +19,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { submitting: loading, submitOnce } = useSubmissionGuard();
   const [err, setErr] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
 
@@ -45,9 +46,13 @@ export default function LoginPage() {
     if (!validate()) return;
 
     setErr(null);
-    setLoading(true);
-    const res = await login(email.trim(), pw);
-    setLoading(false);
+    const attempt = await submitOnce(() => login(email.trim(), pw));
+    if (!attempt.started) return;
+    if (attempt.error) {
+      setErr("Login konnte nicht abgeschlossen werden. Bitte versuche es erneut.");
+      return;
+    }
+    const res = attempt.value;
 
     if (res.ok) {
       toast.success("Willkommen zurück!");

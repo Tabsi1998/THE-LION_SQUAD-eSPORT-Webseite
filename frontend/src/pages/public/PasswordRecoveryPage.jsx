@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, formatApiError } from "@/lib/api";
 import { Logo } from "@/components/tls/Logo";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { AuthFormAlert, AuthPasswordField, AuthTextField } from "@/components/tls/AuthFormFields";
 import { toast } from "sonner";
 
@@ -13,12 +14,14 @@ export function ForgotPasswordPage() {
 
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { submitting: loading, submitOnce } = useSubmissionGuard();
   const [fieldErrors, setFieldErrors] = useState({});
+  const [submitError, setSubmitError] = useState("");
 
   const setEmailValue = (value) => {
     setEmail(value);
     setFieldErrors({});
+    setSubmitError("");
   };
 
   const validate = () => {
@@ -35,15 +38,18 @@ export function ForgotPasswordPage() {
     event.preventDefault();
     if (!validate()) return;
 
-    setLoading(true);
-    try {
-      await api.post("/auth/forgot-password", { email: email.trim() });
+    setSubmitError("");
+    const attempt = await submitOnce(() => api.post("/auth/forgot-password", { email: email.trim() }));
+    if (!attempt.started) return;
+    if (!attempt.error) {
       setSent(true);
       toast.success("Wenn die E-Mail existiert, wurde ein Link gesendet.");
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Anfrage fehlgeschlagen.");
+    } else {
+      const err = attempt.error;
+      const message = formatApiError(err.response?.data?.detail) || "Anfrage fehlgeschlagen.";
+      setSubmitError(message);
+      toast.error(message);
     }
-    setLoading(false);
   };
 
   return (
@@ -65,6 +71,7 @@ export function ForgotPasswordPage() {
             error={fieldErrors["forgot-email"]}
             testId="forgot-email"
           />
+          {submitError && <AuthFormAlert id="forgot-submit-error">{submitError}</AuthFormAlert>}
           <button disabled={loading} data-testid="forgot-submit" className="w-full py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition">
             {loading ? "Sende ..." : "Link senden"}
           </button>
@@ -86,12 +93,14 @@ export function ResetPasswordPage() {
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { submitting: loading, submitOnce } = useSubmissionGuard();
   const [fieldErrors, setFieldErrors] = useState({});
+  const [submitError, setSubmitError] = useState("");
 
   const setField = (field, setter) => (value) => {
     setter(value);
     setFieldErrors((current) => ({ ...current, [field]: null }));
+    setSubmitError("");
   };
 
   const validate = () => {
@@ -111,15 +120,18 @@ export function ResetPasswordPage() {
     event.preventDefault();
     if (!validate()) return;
 
-    setLoading(true);
-    try {
-      await api.post("/auth/reset-password", { token, new_password: password });
+    setSubmitError("");
+    const attempt = await submitOnce(() => api.post("/auth/reset-password", { token, new_password: password }));
+    if (!attempt.started) return;
+    if (!attempt.error) {
       toast.success(isInvite ? "Account aktiviert. Du kannst dich jetzt einloggen." : "Passwort aktualisiert.");
       nav("/login");
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Link ungültig oder abgelaufen.");
+    } else {
+      const err = attempt.error;
+      const message = formatApiError(err.response?.data?.detail) || "Link ungültig oder abgelaufen.";
+      setSubmitError(message);
+      toast.error(message);
     }
-    setLoading(false);
   };
 
   return (
@@ -156,6 +168,7 @@ export function ResetPasswordPage() {
             error={fieldErrors.confirm}
             testId="reset-password-confirm"
           />
+          {submitError && <AuthFormAlert id="reset-submit-error">{submitError}</AuthFormAlert>}
           <button disabled={loading} data-testid="reset-submit" className="w-full py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition">
             {loading ? "Speichere ..." : "Passwort speichern"}
           </button>

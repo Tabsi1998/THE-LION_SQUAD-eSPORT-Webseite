@@ -10,6 +10,8 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
+import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { toast } from "sonner";
 import { Crown, CheckCircle2, FileText, Mail } from "lucide-react";
 
@@ -38,9 +40,12 @@ export default function MembershipApplyPage() {
     accept_privacy: false,
     notes: "",
   });
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, submitOnce } = useSubmissionGuard();
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [submitError, setSubmitError] = useState("");
 
   const loadExisting = useCallback(() => {
+    if (user === undefined) return;
     if (!user) { nav("/login?next=/membership/apply"); return; }
     setLoading(true);
     return api.get("/membership/apply/me").then(({ data }) => { setExisting(data); setLoading(false); }).catch(() => setLoading(false));
@@ -48,17 +53,39 @@ export default function MembershipApplyPage() {
   useEffect(() => { loadExisting(); }, [loadExisting]);
   useApiInvalidation(loadExisting, ["membership"]);
 
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setFieldErrors((current) => ({ ...current, [field]: null }));
+    setSubmitError("");
+  };
+
+  const validate = () => {
+    const errors = {};
+    if (form.motivation.trim().length < 20) errors.motivation = "Bitte beschreibe deine Motivation mit mindestens 20 Zeichen.";
+    if (!form.accept_statutes) errors.accept_statutes = "Bitte akzeptiere die Vereinsstatuten.";
+    if (!form.accept_privacy) errors.accept_privacy = "Bitte akzeptiere die Datenschutzerklärung.";
+    setFieldErrors(errors);
+    const first = ["motivation", "accept_statutes", "accept_privacy"].find((field) => errors[field]);
+    if (first) document.getElementById(`apply-${first.replace("accept_", "")}`)?.focus();
+    return Object.keys(errors).length === 0;
+  };
+
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.accept_statutes || !form.accept_privacy) { toast.error("Bitte Statuten und Datenschutz akzeptieren."); return; }
-    if (form.motivation.length < 20) { toast.error("Motivation: mind. 20 Zeichen."); return; }
-    setSubmitting(true);
-    try {
-      const { data } = await api.post("/membership/apply", form);
-      setExisting(data);
+    if (!validate()) return;
+    const payload = { ...form, motivation: form.motivation.trim(), notes: form.notes.trim() || null };
+    setSubmitError("");
+    const attempt = await submitOnce(() => api.post("/membership/apply", payload));
+    if (!attempt.started) return;
+    if (!attempt.error) {
+      setExisting(attempt.value.data);
       toast.success("Bewerbung eingereicht! Wir melden uns per Mail.");
-    } catch (err) { toast.error(formatApiError(err.response?.data?.detail) || "Fehler"); }
-    setSubmitting(false);
+    } else {
+      const err = attempt.error;
+      const message = formatApiError(err.response?.data?.detail) || "Bewerbung konnte nicht gesendet werden.";
+      setSubmitError(message);
+      toast.error(message);
+    }
   };
 
   return (
@@ -77,28 +104,29 @@ export default function MembershipApplyPage() {
         ) : existing && existing.status === "rejected" ? (
           <StatusCard testId="apply-rejected" icon={FileText} color="#FF3B30" title="Bewerbung abgelehnt" body={existing.decision_note || "Du kannst zu einem späteren Zeitpunkt erneut versuchen."} />
         ) : (
-          <form onSubmit={submit} className="mt-8 space-y-5 border border-white/10 bg-[#121212] rounded-sm p-6" data-testid="apply-form">
-            <Field label="Beitragsart">
-              <select className="input" value={form.contribution_pref} onChange={(e) => setForm({ ...form, contribution_pref: e.target.value })} data-testid="apply-contribution">
+          <form onSubmit={submit} className="mt-8 space-y-5 border border-white/10 bg-[#121212] rounded-sm p-6" data-testid="apply-form" noValidate>
+            <Field id="apply-contribution" label="Beitragsart">
+              <select id="apply-contribution" className="input" value={form.contribution_pref} onChange={(e) => updateField("contribution_pref", e.target.value)} data-testid="apply-contribution">
                 {CONTRIB_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </Field>
-            <Field label={`Motivation (${form.motivation.length}/2000)`}>
-              <textarea required minLength={20} maxLength={2000} rows={6} value={form.motivation} onChange={(e) => setForm({ ...form, motivation: e.target.value })} placeholder="Warum möchtest du Mitglied werden? Welche Spiele/Plattformen? Wie viel Zeit kannst du einbringen?" className="input" data-testid="apply-motivation" />
+            <Field id="apply-motivation" label={`Motivation (${form.motivation.length}/2000)`} error={fieldErrors.motivation}>
+              <textarea id="apply-motivation" required minLength={20} maxLength={2000} rows={6} value={form.motivation} onChange={(e) => updateField("motivation", e.target.value)} placeholder="Warum möchtest du Mitglied werden? Welche Spiele/Plattformen? Wie viel Zeit kannst du einbringen?" className="input" data-testid="apply-motivation" aria-invalid={!!fieldErrors.motivation} aria-describedby={fieldErrors.motivation ? "apply-motivation-error" : undefined} />
             </Field>
-            <Field label="Anmerkungen (optional)">
-              <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input" />
+            <Field id="apply-notes" label="Anmerkungen (optional)">
+              <textarea id="apply-notes" rows={2} maxLength={2000} value={form.notes} onChange={(e) => updateField("notes", e.target.value)} className="input" />
             </Field>
             <div className="space-y-2 pt-2 border-t border-white/5">
               <label className="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" required checked={form.accept_statutes} onChange={(e) => setForm({ ...form, accept_statutes: e.target.checked })} data-testid="apply-statutes" className="mt-1 accent-[#FFD700]" />
-                <span className="text-sm text-white/70">Ich habe die <a href="/imprint" className="text-[#29B6E8] underline">Vereinsstatuten</a> gelesen und akzeptiere sie.</span>
+                <input id="apply-statutes" type="checkbox" required checked={form.accept_statutes} onChange={(e) => updateField("accept_statutes", e.target.checked)} data-testid="apply-statutes" aria-invalid={!!fieldErrors.accept_statutes} aria-describedby={fieldErrors.accept_statutes ? "apply-statutes-error" : undefined} className="mt-1 accent-[#FFD700]" />
+                <span className="text-sm text-white/70">Ich habe die <a href="/imprint" className="text-[#29B6E8] underline">Vereinsstatuten</a> gelesen und akzeptiere sie.{fieldErrors.accept_statutes && <span id="apply-statutes-error" role="alert" className="block mt-1 text-xs text-[#FF8A80]">{fieldErrors.accept_statutes}</span>}</span>
               </label>
               <label className="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" required checked={form.accept_privacy} onChange={(e) => setForm({ ...form, accept_privacy: e.target.checked })} data-testid="apply-privacy" className="mt-1 accent-[#FFD700]" />
-                <span className="text-sm text-white/70">Ich akzeptiere die <a href="/privacy" className="text-[#29B6E8] underline">Datenschutzerklärung</a>.</span>
+                <input id="apply-privacy" type="checkbox" required checked={form.accept_privacy} onChange={(e) => updateField("accept_privacy", e.target.checked)} data-testid="apply-privacy" aria-invalid={!!fieldErrors.accept_privacy} aria-describedby={fieldErrors.accept_privacy ? "apply-privacy-error" : undefined} className="mt-1 accent-[#FFD700]" />
+                <span className="text-sm text-white/70">Ich akzeptiere die <a href="/privacy" className="text-[#29B6E8] underline">Datenschutzerklärung</a>.{fieldErrors.accept_privacy && <span id="apply-privacy-error" role="alert" className="block mt-1 text-xs text-[#FF8A80]">{fieldErrors.accept_privacy}</span>}</span>
               </label>
             </div>
+            {submitError && <AuthFormAlert id="apply-submit-error">{submitError}</AuthFormAlert>}
             <button type="submit" disabled={submitting} data-testid="apply-submit" className="w-full px-6 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-50">
               <Crown className="w-4 h-4" /> {submitting ? "Sende …" : "Bewerbung einreichen"}
             </button>
@@ -110,11 +138,12 @@ export default function MembershipApplyPage() {
   );
 }
 
-function Field({ label, children }) {
+function Field({ id, label, error, children }) {
   return (
-    <label className="block">
+    <label htmlFor={id} className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
       {children}
+      {error && <div id={`${id}-error`} role="alert" className="mt-1 text-xs text-[#FF8A80]">{error}</div>}
     </label>
   );
 }

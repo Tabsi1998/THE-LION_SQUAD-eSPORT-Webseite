@@ -8,7 +8,7 @@
 from html import escape
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, Literal, List
 
 from database import get_db
@@ -48,6 +48,15 @@ class ContactSubmit(BaseModel):
     message: str = Field(min_length=5, max_length=4000)
     related_id: Optional[str] = None  # tournament_id / event_id / etc.
     accept_privacy: bool = Field(..., description="Must be explicitly true")
+
+    @field_validator("name", "subject", "message")
+    @classmethod
+    def clean_required_text(cls, value: str, info):
+        cleaned = value.strip()
+        minimum = {"name": 2, "subject": 2, "message": 5}[info.field_name]
+        if len(cleaned) < minimum:
+            raise ValueError(f"{info.field_name} ist zu kurz")
+        return cleaned
 
 
 def _html(value: object) -> str:
