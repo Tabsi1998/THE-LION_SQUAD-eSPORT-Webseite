@@ -124,13 +124,23 @@ export type TeamInvite = {
 
 export type Match = {
   id: string;
+  collection?: "matches" | "matches_v2" | string;
   status?: string;
   scheduled_at?: string | null;
   tournament_id?: string | null;
   tournament_title?: string | null;
+  tournament_slug?: string | null;
   opponent_name?: string | null;
+  participant_names?: string[];
+  participant_count?: number;
   round?: number | string | null;
   round_name?: string | null;
+  match_key?: string | null;
+  station_id?: string | null;
+  station_label?: string | null;
+  is_own_match?: boolean;
+  can_submit_result?: boolean;
+  needs_result?: boolean;
 };
 
 export type Achievement = {
@@ -251,6 +261,7 @@ export type MobileDashboardData = {
     tournaments: Tournament[];
     events: ClubEvent[];
     matches: Match[];
+    staff_matches: Match[];
     actions: DashboardAction[];
   };
   public: {
@@ -263,6 +274,7 @@ export type MobileDashboardData = {
     my_tournaments: number;
     my_events: number;
     open_matches: number;
+    staff_matches: number;
     open_actions: number;
     news: number;
     public_tournaments: number;

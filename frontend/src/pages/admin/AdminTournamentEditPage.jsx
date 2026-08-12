@@ -42,6 +42,7 @@ const TOURNAMENT_STATUS_OPTIONS = [
   ["archived", "Archiviert"],
   ["cancelled", "Abgesagt"],
 ];
+const OPERATIONAL_STATUS_VALUES = new Set(["check_in", "live", "paused", "completed"]);
 
 const TOURNAMENT_FORMAT_OPTIONS = [
   ["single_elim", "Einzelausscheidung"],
@@ -458,6 +459,7 @@ export default function AdminTournamentEditPage() {
     return data;
   };
   const setTournStatus = async (status) => {
+    let forceStart = false;
     try {
       if (status === "live") {
         const report = await runPlanningCheck({ silent: true });
@@ -473,15 +475,21 @@ export default function AdminTournamentEditPage() {
             tone: report.ok ? "info" : "danger",
           });
           if (!ok) return;
+          forceStart = !report.ok;
         }
       }
-      const { data } = await api.post(`/tournaments/${id}/status`, { status });
+      const { data } = await api.post(`/tournaments/${id}/status`, { status, force: forceStart });
       if (["check_in", "live"].includes(status) && data?.auto_generated_bracket && data.auto_generated_bracket.ok !== false) {
         await autoAssignStations({ silent: true, reload: false });
       }
       toast.success(`Status: ${TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status}`);
       load();
     } catch (e) {
+      const statusDetail = e.response?.data?.detail;
+      if (statusDetail?.code === "tournament_not_ready") {
+        toast.error(statusDetail.message || "Turnier ist noch nicht startbereit.");
+        return;
+      }
       toast.error(formatRequestError(e, "Turnierstatus konnte nicht gespeichert werden."));
     }
   };
@@ -625,6 +633,10 @@ export default function AdminTournamentEditPage() {
     return haystack.includes(participantSearch);
   });
   const primaryAction = primaryTournamentAction(t.status);
+  const canOperateTournament = isAdmin || !!t.can_manage_structure;
+  const visibleStatusOptions = isAdmin
+    ? TOURNAMENT_STATUS_OPTIONS
+    : TOURNAMENT_STATUS_OPTIONS.filter(([value]) => OPERATIONAL_STATUS_VALUES.has(value));
 
   return (
     <AdminLayout>
@@ -640,7 +652,7 @@ export default function AdminTournamentEditPage() {
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {isAdmin && primaryAction && (
+          {canOperateTournament && primaryAction && (
             <button
               type="button"
               onClick={() => setTournStatus(primaryAction.status)}
@@ -650,12 +662,13 @@ export default function AdminTournamentEditPage() {
               <Zap className="w-3.5 h-3.5" /> {primaryAction.label}
             </button>
           )}
-          {isAdmin && (
+          {canOperateTournament && (
             <div>
               <select value={t.status} onChange={(e) => setTournStatus(e.target.value)} data-testid="admin-tr-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
-                {TOURNAMENT_STATUS_OPTIONS.map(([s, label]) => <option key={s} value={s}>{label}</option>)}
+                {!visibleStatusOptions.some(([value]) => value === t.status) && <option key={t.status} value={t.status}>{TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === t.status)?.[1] || t.status}</option>}
+                {visibleStatusOptions.map(([s, label]) => <option key={s} value={s}>{label}</option>)}
               </select>
-              <div className="mt-1 text-[10px] text-white/40">Manuell nur für Ausnahmen; Zeitplan automatisiert.</div>
+              <div className="mt-1 text-[10px] text-white/40">Operativ durch Turnierleitung; Zeitautomatik nur wenn ausdrücklich aktiviert.</div>
             </div>
           )}
           {isAdmin && ["completed", "results_published", "archived", "cancelled"].includes(t.status) && (
