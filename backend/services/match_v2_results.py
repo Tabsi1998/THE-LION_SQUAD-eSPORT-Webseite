@@ -179,6 +179,33 @@ def normalize_v2_results(match: dict, raw_results: list[dict]) -> list[dict]:
     return sorted(normalized, key=lambda item: item["rank"])
 
 
+def is_v2_result_replay(
+    match: dict,
+    raw_results: list[dict],
+    *,
+    proof_url: str | None = None,
+    note: str | None = None,
+) -> bool:
+    """Return whether a completed match already contains this exact result.
+
+    This comparison is intentionally independent of the actor and ``force``:
+    permissions are checked by the route first, while an exact retry must not
+    create another report, audit entry, notification, or advancement update.
+    """
+    if match.get("status") != "completed":
+        return False
+    try:
+        normalized = normalize_v2_results(match, raw_results)
+    except MatchV2ResultError:
+        return False
+    meta = match.get("result_meta") or {}
+    return (
+        normalized == (match.get("results") or [])
+        and ((proof_url or "").strip() or None) == meta.get("proof_url")
+        and ((note or "").strip() or None) == meta.get("note")
+    )
+
+
 def _target_lookup(stage_matches: list[dict]) -> tuple[dict[str, dict], dict[str, dict]]:
     by_id = {match["id"]: match for match in stage_matches if match.get("id")}
     by_key = {match["match_key"]: match for match in stage_matches if match.get("match_key")}

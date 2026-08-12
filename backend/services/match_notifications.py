@@ -81,6 +81,13 @@ async def notify_match_result_confirmed(db, match: dict, collection_name: str = 
         "collection": collection_name,
         "force": bool(force),
     }
+    result_token = (
+        (match.get("result_meta") or {}).get("report_id")
+        or match.get("admin_decision_at")
+        or match.get("updated_at")
+    )
+    if result_token:
+        meta["dedupe_key"] = f"match-result:{match.get('id')}:{result_token}"
     sent = 0
     for user_id in user_ids:
         await create_user_notification(

@@ -1,5 +1,6 @@
 """Regression tests for Package 4 tournament start and station safety."""
 import asyncio
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -12,6 +13,7 @@ from routes.station_routes import (
     _match_has_minimum_participants,
 )
 from services.match_reminder import _uses_actual_start_notifications
+from models import RegistrationUpdate, TournamentCreate, TournamentStageCreate
 
 
 def _legacy_match(**updates):
@@ -147,3 +149,245 @@ def test_manual_live_start_does_not_change_status_before_hard_preflight(monkeypa
     assert error.value.status_code == 409
     assert error.value.detail["force_allowed"] is False
     tournaments.update_one.assert_not_awaited()
+
+
+def test_self_registration_exact_retry_returns_existing_record_without_insert():
+    existing = {"id": "reg-1", "tournament_id": "t1", "user_id": "user-1", "status": "approved"}
+    registrations = SimpleNamespace(
+        find_one=AsyncMock(return_value=existing),
+        insert_one=AsyncMock(),
+    )
+    db = SimpleNamespace(tournament_registrations=registrations)
+
+    result = asyncio.run(tournament_routes._create_self_registration(
+        db,
+        "t1",
+        {"id": "t1"},
+        object(),
+        {"id": "user-1"},
+        None,
+    ))
+
+    assert result["id"] == "reg-1"
+    assert result["idempotent_replay"] is True
+    assert result["auto_bracket_update"] is None
+    registrations.insert_one.assert_not_awaited()
+
+
+def test_team_registration_retry_by_another_manager_reuses_team_record(monkeypatch):
+    existing_team = {"id": "reg-team", "tournament_id": "t1", "team_id": "team-1", "status": "approved"}
+    registrations = SimpleNamespace(
+        find_one=AsyncMock(side_effect=[None, existing_team]),
+        insert_one=AsyncMock(),
+    )
+    db = SimpleNamespace(tournament_registrations=registrations)
+
+    async def valid_team(*_args):
+        return {"id": "team-1", "name": "Lions", "tag": "TLS"}
+
+    monkeypatch.setattr(tournament_routes, "_validate_registration_actor", valid_team)
+    result = asyncio.run(tournament_routes._create_self_registration(
+        db,
+        "t1",
+        {"id": "t1"},
+        object(),
+        {"id": "manager-2"},
+        None,
+    ))
+
+    assert result["id"] == "reg-team"
+    assert result["idempotent_replay"] is True
+    registrations.insert_one.assert_not_awaited()
+
+
+@asynccontextmanager
+async def _uncontended_lock(*_args, **_kwargs):
+    yield "test-owner"
+
+
+def test_staff_checkin_replay_skips_badges_and_audit(monkeypatch):
+    registration = {"id": "reg-1", "tournament_id": "t1", "user_id": "user-1", "status": "checked_in"}
+    registrations = SimpleNamespace(
+        find_one=AsyncMock(return_value=registration),
+        update_one=AsyncMock(),
+    )
+    db = SimpleNamespace(tournament_registrations=registrations)
+
+    async def identity(value):
+        return value
+
+    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_routes, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_routes, "_ensure_tournament_unlocked", AsyncMock())
+    monkeypatch.setattr(tournament_routes, "require_tournament_staff_permission", AsyncMock())
+    monkeypatch.setattr(tournament_routes, "mutation_lock", _uncontended_lock)
+    badges = AsyncMock()
+    audit = AsyncMock()
+    monkeypatch.setattr(tournament_routes, "_apply_checked_in_badges", badges)
+    monkeypatch.setattr(tournament_routes, "_audit_tournament_action", audit)
+
+    result = asyncio.run(tournament_routes.staff_set_registration_checkin(
+        "t1",
+        "reg-1",
+        {"status": "checked_in"},
+        {"id": "admin-1"},
+    ))
+
+    assert result["idempotent_replay"] is True
+    registrations.update_one.assert_not_awaited()
+    badges.assert_not_awaited()
+    audit.assert_not_awaited()
+
+
+def test_self_checkin_replay_skips_late_hooks_badges_and_audit(monkeypatch):
+    db = SimpleNamespace()
+
+    async def identity(value):
+        return value
+
+    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_routes, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_routes, "_ensure_tournament_unlocked", AsyncMock(return_value={"event_mode": "online"}))
+    monkeypatch.setattr(tournament_routes, "mutation_lock", _uncontended_lock)
+    monkeypatch.setattr(tournament_routes, "_find_self_registration", AsyncMock(return_value={
+        "id": "reg-1", "user_id": "user-1", "status": "checked_in",
+    }))
+    late_hooks = AsyncMock()
+    badges = AsyncMock()
+    audit = AsyncMock()
+    monkeypatch.setattr(tournament_routes, "_apply_late_checkin_hooks", late_hooks)
+    monkeypatch.setattr(tournament_routes, "_apply_checked_in_badges", badges)
+    monkeypatch.setattr(tournament_routes, "_audit_tournament_action", audit)
+
+    result = asyncio.run(tournament_routes.checkin_self("t1", {"id": "user-1"}))
+
+    assert result == {"ok": True, "idempotent_replay": True}
+    late_hooks.assert_not_awaited()
+    badges.assert_not_awaited()
+    audit.assert_not_awaited()
+
+
+def test_registration_update_replay_skips_write_and_bracket_refresh(monkeypatch):
+    registration = {"id": "reg-1", "tournament_id": "t1", "status": "approved"}
+    registrations = SimpleNamespace(
+        find_one=AsyncMock(return_value=registration),
+        update_one=AsyncMock(),
+    )
+    db = SimpleNamespace(tournament_registrations=registrations)
+
+    async def identity(value):
+        return value
+
+    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_routes, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_routes, "_ensure_tournament_unlocked", AsyncMock())
+    monkeypatch.setattr(tournament_routes, "require_tournament_staff_permission", AsyncMock())
+    refresh = AsyncMock()
+    monkeypatch.setattr(tournament_routes, "_refresh_tournament_previews_after_registration", refresh)
+
+    result = asyncio.run(tournament_routes.update_registration(
+        "t1",
+        "reg-1",
+        RegistrationUpdate(status="approved"),
+        {"id": "admin-1"},
+    ))
+
+    assert result["idempotent_replay"] is True
+    registrations.update_one.assert_not_awaited()
+    refresh.assert_not_awaited()
+
+
+def test_lock_and_unlock_replays_skip_second_audit(monkeypatch):
+    async def identity(value):
+        return value
+
+    audit = AsyncMock()
+    updates = AsyncMock()
+    monkeypatch.setattr(tournament_routes, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_routes, "_audit_tournament_action", audit)
+
+    locked_db = SimpleNamespace(tournaments=SimpleNamespace(
+        find_one=AsyncMock(return_value={"id": "t1", "status": "completed", "locked_at": "2026-08-12T12:00:00+00:00"}),
+        update_one=updates,
+    ))
+    monkeypatch.setattr(tournament_routes, "get_db", lambda: locked_db)
+    locked = asyncio.run(tournament_routes.lock_tournament("t1", {"id": "admin-1"}))
+    assert locked["idempotent_replay"] is True
+
+    unlocked_db = SimpleNamespace(tournaments=SimpleNamespace(
+        find_one=AsyncMock(return_value={"id": "t1", "status": "completed"}),
+        update_one=updates,
+    ))
+    monkeypatch.setattr(tournament_routes, "get_db", lambda: unlocked_db)
+    unlocked = asyncio.run(tournament_routes.unlock_tournament("t1", {"id": "admin-1"}))
+    assert unlocked["idempotent_replay"] is True
+
+    updates.assert_not_awaited()
+    audit.assert_not_awaited()
+
+
+def test_tournament_creation_replay_reuses_existing_document(monkeypatch):
+    tournaments = SimpleNamespace(
+        find_one=AsyncMock(return_value={
+            "id": "t1",
+            "title": "Sommer-Cup",
+            "game_id": "game-1",
+            "creation_key": "internal",
+        }),
+        insert_one=AsyncMock(),
+    )
+    games = SimpleNamespace(find_one=AsyncMock())
+    db = SimpleNamespace(tournaments=tournaments, games=games)
+    preview = AsyncMock()
+
+    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_routes, "mutation_lock", _uncontended_lock)
+    monkeypatch.setattr(tournament_routes, "_create_initial_bracket_preview", preview)
+
+    result = asyncio.run(tournament_routes.create_tournament(
+        TournamentCreate(title="Sommer-Cup", game_id="game-1"),
+        {"id": "admin-1"},
+    ))
+
+    assert result["id"] == "t1"
+    assert result["idempotent_replay"] is True
+    assert "creation_key" not in result
+    games.find_one.assert_not_awaited()
+    tournaments.insert_one.assert_not_awaited()
+    preview.assert_not_awaited()
+
+
+def test_tournament_stage_creation_replay_reuses_existing_document(monkeypatch):
+    stages = SimpleNamespace(
+        find_one=AsyncMock(return_value={
+            "id": "stage-1",
+            "tournament_id": "t1",
+            "name": "Finale",
+            "number": 1,
+            "creation_key": "internal",
+        }),
+        insert_one=AsyncMock(),
+    )
+    db = SimpleNamespace(tournament_stages=stages)
+
+    async def identity(value):
+        return value
+
+    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_routes, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_routes, "_ensure_tournament_unlocked", AsyncMock())
+    monkeypatch.setattr(tournament_routes, "require_tournament_staff_permission", AsyncMock())
+    audit = AsyncMock()
+    monkeypatch.setattr(tournament_routes, "_audit_tournament_action", audit)
+
+    result = asyncio.run(tournament_routes.create_tournament_stage(
+        "t1",
+        TournamentStageCreate(name="Finale", number=1),
+        {"id": "admin-1"},
+    ))
+
+    assert result["id"] == "stage-1"
+    assert result["idempotent_replay"] is True
+    assert "creation_key" not in result
+    stages.insert_one.assert_not_awaited()
+    audit.assert_not_awaited()

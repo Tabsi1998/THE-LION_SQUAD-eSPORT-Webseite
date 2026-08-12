@@ -13,11 +13,11 @@ from models import (
     new_id,
     now_utc,
 )
-from services.match_v2_results import MatchV2ResultError, build_v2_result_application
-from services.match_notifications import notify_match_result_confirmed
+from services.match_v2_results import MatchV2ResultError
 from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
+from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from services.rate_limit import enforce_rate_limit
-from services.station_runtime import release_station_for_match
+from services.v2_result_submission import submit_v2_result
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     READ_STAFF_ROLES,
@@ -185,7 +185,9 @@ async def _assert_match_visible(match: dict, user: dict | None) -> None:
     if await _can_read_match(user, match):
         return
     db = get_db()
-    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0})
+    tournament = await db.tournaments.find_one(
+        {"id": match.get("tournament_id")}, {"_id": 0, "creation_key": 0}
+    )
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if tournament.get("status") == "draft" or tournament.get("is_public") is False:
@@ -244,7 +246,9 @@ async def _match_page_payload(match: dict, user: dict | None = None) -> dict:
     db = get_db()
     match = await _refresh_schedule_escalation(match)
     tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0})
-    stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0})
+    stage = await db.tournament_stages.find_one(
+        {"id": match.get("stage_id")}, {"_id": 0, "creation_key": 0}
+    )
     regs = await _registrations_for_match(match)
     reg_by_id = {r["id"]: r for r in regs}
     user_ids = list({r.get("user_id") for r in regs if r.get("user_id")})
@@ -302,6 +306,18 @@ async def _match_page_payload(match: dict, user: dict | None = None) -> dict:
     }
 
 
+async def _serialized_match_v2_write(match_id: str):
+    db = get_db()
+    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+    if not match:
+        raise HTTPException(status_code=404, detail="Match nicht gefunden")
+    try:
+        async with mutation_lock(db, tournament_write_resource(match["tournament_id"])):
+            yield
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
+
+
 @router.get("/{match_id}")
 async def get_match_v2(match_id: str, user: dict | None = Depends(get_optional_user)):
     db = get_db()
@@ -335,7 +351,8 @@ async def list_schedule_proposals(match_id: str, user: dict | None = Depends(get
 
 @router.post("/{match_id}/schedule-proposals")
 async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCreate,
-                                   me: dict = Depends(get_current_user)):
+                                   me: dict = Depends(get_current_user),
+                                   _mutation: None = Depends(_serialized_match_v2_write)):
     db = get_db()
     match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
     if not match:
@@ -350,6 +367,17 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen Termine vorschlagen")
     acting_reg = await _acting_registration_for_match(match, me)
     now_iso = now_utc().isoformat()
+    normalized_note = (body.note or "").strip() or None
+    existing = await db.match_schedule_proposals.find_one({
+        "match_id": match_id,
+        "actor_user_id": me["id"],
+        "scheduled_at": body.scheduled_at.isoformat(),
+        "note": normalized_note,
+        "status": "pending",
+        "kind": "proposal",
+    }, {"_id": 0})
+    if existing:
+        return {**existing, "idempotent_replay": True}
     doc = {
         "id": new_id(),
         "match_id": match_id,
@@ -358,7 +386,7 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
         "actor_user_id": me["id"],
         "actor_registration_id": acting_reg.get("id") if acting_reg else None,
         "scheduled_at": body.scheduled_at.isoformat(),
-        "note": (body.note or "").strip() or None,
+        "note": normalized_note,
         "status": "pending",
         "kind": "proposal",
         "created_at": now_iso,
@@ -371,12 +399,14 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
         "updated_at": now_iso,
     }})
     doc.pop("_id", None)
+    doc["idempotent_replay"] = False
     return doc
 
 
 @router.post("/{match_id}/schedule-proposals/{proposal_id}/decision")
 async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchScheduleProposalDecision,
-                                   me: dict = Depends(get_current_user)):
+                                   me: dict = Depends(get_current_user),
+                                   _mutation: None = Depends(_serialized_match_v2_write)):
     db = get_db()
     match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
     proposal = await db.match_schedule_proposals.find_one({"id": proposal_id, "match_id": match_id}, {"_id": 0})
@@ -393,12 +423,34 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     if acting_reg and proposal.get("actor_registration_id") == acting_reg.get("id") and body.action in {"accept", "decline"}:
         raise HTTPException(status_code=400, detail="Der eigene Vorschlag muss von der Gegenseite bestaetigt werden")
     now_iso = now_utc().isoformat()
+    normalized_note = (body.note or "").strip() or None
+    completed_action = {"accept": "accepted", "decline": "declined", "counter": "countered"}[body.action]
+    if (
+        proposal.get("status") == completed_action
+        and proposal.get("decision_user_id") == me["id"]
+        and proposal.get("decision_note") == normalized_note
+    ):
+        if completed_action == "countered" and body.scheduled_at:
+            existing_counter = await db.match_schedule_proposals.find_one({
+                "parent_proposal_id": proposal_id,
+                "actor_user_id": me["id"],
+                "scheduled_at": body.scheduled_at.isoformat(),
+                "note": normalized_note,
+            }, {"_id": 0})
+            if existing_counter:
+                return {**existing_counter, "idempotent_replay": True}
+        response = {"ok": True, "status": completed_action, "idempotent_replay": True}
+        if completed_action == "accepted":
+            response["scheduled_at"] = proposal.get("scheduled_at")
+        return response
+    if proposal.get("status") != "pending":
+        raise HTTPException(status_code=409, detail="Über diesen Terminvorschlag wurde bereits entschieden")
     if body.action == "accept":
         scheduled_at = proposal.get("scheduled_at")
         await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": {
             "status": "accepted",
             "decision_user_id": me["id"],
-            "decision_note": (body.note or "").strip() or None,
+            "decision_note": normalized_note,
             "updated_at": now_iso,
         }})
         await db.matches_v2.update_one({"id": match_id}, {"$set": {
@@ -407,22 +459,22 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
             "status": "scheduled" if match.get("status") in {"pending", "ready", "preview"} else match.get("status"),
             "updated_at": now_iso,
         }})
-        return {"ok": True, "status": "accepted", "scheduled_at": scheduled_at}
+        return {"ok": True, "status": "accepted", "scheduled_at": scheduled_at, "idempotent_replay": False}
     if body.action == "decline":
         await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": {
             "status": "declined",
             "decision_user_id": me["id"],
-            "decision_note": (body.note or "").strip() or None,
+            "decision_note": normalized_note,
             "updated_at": now_iso,
         }})
         await db.matches_v2.update_one({"id": match_id}, {"$set": {"schedule_status": "declined", "updated_at": now_iso}})
-        return {"ok": True, "status": "declined"}
+        return {"ok": True, "status": "declined", "idempotent_replay": False}
     if not body.scheduled_at:
         raise HTTPException(status_code=400, detail="Gegenvorschlag braucht Datum und Uhrzeit")
     await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": {
         "status": "countered",
         "decision_user_id": me["id"],
-        "decision_note": (body.note or "").strip() or None,
+        "decision_note": normalized_note,
         "updated_at": now_iso,
     }})
     counter = {
@@ -433,7 +485,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         "actor_user_id": me["id"],
         "actor_registration_id": acting_reg.get("id") if acting_reg else None,
         "scheduled_at": body.scheduled_at.isoformat(),
-        "note": (body.note or "").strip() or None,
+        "note": normalized_note,
         "status": "pending",
         "kind": "counter",
         "parent_proposal_id": proposal_id,
@@ -443,6 +495,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     await db.match_schedule_proposals.insert_one(counter)
     await db.matches_v2.update_one({"id": match_id}, {"$set": {"schedule_status": "proposed", "updated_at": now_iso}})
     counter.pop("_id", None)
+    counter["idempotent_replay"] = False
     return counter
 
 
@@ -506,7 +559,8 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
 @router.patch("/{match_id}")
 @router.put("/{match_id}")
 async def update_match_v2(match_id: str, body: MatchV2Update,
-                          me: dict = Depends(get_current_user)):
+                          me: dict = Depends(get_current_user),
+                          _mutation: None = Depends(_serialized_match_v2_write)):
     db = get_db()
     match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
     if not match:
@@ -521,10 +575,12 @@ async def update_match_v2(match_id: str, body: MatchV2Update,
     if updates.get("scheduled_at") and match.get("status") in {"pending", "ready", "preview"} and "status" not in updates:
         updates["status"] = "scheduled"
     await ensure_station_slot_available(db, match, updates, "matches_v2")
+    if updates and all(match.get(key) == value for key, value in updates.items()):
+        return {**match, "idempotent_replay": True}
     updates["updated_at"] = now_utc().isoformat()
     await db.matches_v2.update_one({"id": match_id}, {"$set": updates})
     updated = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
-    return updated
+    return {**updated, "idempotent_replay": False}
 
 
 @router.post("/{match_id}/result")
@@ -538,69 +594,25 @@ async def submit_match_v2_result(match_id: str, body: MatchV2ResultSubmit,
     await _ensure_match_tournament_unlocked(db, match)
     await ensure_tournament_accepts_results(db, match["tournament_id"])
     await _require_v2_result_permission(me, match)
-    stage_matches = await db.matches_v2.find(
-        {"stage_id": match["stage_id"]},
-        {"_id": 0},
-    ).to_list(3000)
-    now_iso = now_utc().isoformat()
     try:
-        application = build_v2_result_application(
-            match,
-            stage_matches,
-            [entry.model_dump() for entry in body.results],
-            actor_id=me["id"],
-            now_iso=now_iso,
-            proof_url=body.proof_url,
-            note=body.note,
-            force=force,
-        )
+        async with mutation_lock(db, tournament_write_resource(match["tournament_id"])):
+            match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+            if not match:
+                raise HTTPException(status_code=404, detail="Match nicht gefunden")
+            await _ensure_match_tournament_unlocked(db, match)
+            await ensure_tournament_accepts_results(db, match["tournament_id"])
+            await _require_v2_result_permission(me, match)
+            return await submit_v2_result(
+                db,
+                match,
+                [entry.model_dump() for entry in body.results],
+                actor_id=me["id"],
+                proof_url=body.proof_url,
+                note=body.note,
+                force=force,
+                audit_action="match_v2.result.submit",
+            )
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
     except MatchV2ResultError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
-
-    await db.matches_v2.update_one({"id": match_id}, {"$set": application["match_set"]})
-    for target_id, update in application["target_sets"].items():
-        await db.matches_v2.update_one({"id": target_id}, {"$set": update})
-
-    report = {
-        "id": new_id(),
-        "match_id": match_id,
-        "tournament_id": match["tournament_id"],
-        "stage_id": match["stage_id"],
-        "reporter_user_id": me["id"],
-        "source": "staff",
-        "results": application["results"],
-        "proof_url": body.proof_url,
-        "note": body.note,
-        "force": force,
-        "created_at": now_iso,
-    }
-    await db.match_reports_v2.insert_one(report)
-    await db.audit_logs.insert_one({
-        "id": new_id(),
-        "action": "match_v2.result.submit",
-        "target_id": match["tournament_id"],
-        "actor_id": me["id"],
-        "data": {
-            "match_id": match_id,
-            "stage_id": match["stage_id"],
-            "match_key": match.get("match_key"),
-            "advanced_matches": list(application["target_sets"].keys()),
-            "force": force,
-        },
-        "created_at": now_iso,
-    })
-    updated = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
-    try:
-        await notify_match_result_confirmed(db, updated, "matches_v2", force=force)
-    except Exception:
-        pass
-    try:
-        await release_station_for_match(db, updated, "matches_v2")
-    except Exception:
-        pass
-    return {
-        "ok": True,
-        "match": updated,
-        "advanced_match_ids": list(application["target_sets"].keys()),
-        "report_id": report["id"],
-    }

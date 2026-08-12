@@ -52,12 +52,14 @@ async def init_indexes():
     await db.tournaments.create_index("id", unique=True)
     await db.tournaments.create_index("slug", unique=True)
     await db.tournaments.create_index("slug_history")
+    await db.tournaments.create_index("creation_key", unique=True, sparse=True)
     await db.tournaments.create_index("status")
     await db.tournaments.create_index("game_id")
     await db.tournaments.create_index("event_id")
     # Registrations
     await db.tournament_registrations.create_index("id", unique=True)
     await db.tournament_registrations.create_index([("tournament_id", 1), ("user_id", 1)])
+    await db.tournament_registrations.create_index("identity_key", unique=True, sparse=True)
     # Matches
     await db.matches.create_index("id", unique=True)
     await db.matches.create_index("tournament_id")
@@ -117,6 +119,10 @@ async def init_indexes():
     # Audit
     await db.audit_logs.create_index("id", unique=True)
     await db.audit_logs.create_index("created_at")
+    # Cross-worker mutation leases.  These protect multi-document tournament
+    # operations when multiple API workers receive the same action at once.
+    await db.mutation_locks.create_index("resource", unique=True)
+    await db.mutation_locks.create_index("expires_at", expireAfterSeconds=0)
     # Auth helpers
     await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
     await db.login_attempts.create_index("identifier")
@@ -148,6 +154,7 @@ async def init_indexes():
     await db.tournament_staff_assignments.create_index("user_id")
     await db.tournament_stages.create_index("id", unique=True)
     await db.tournament_stages.create_index([("tournament_id", 1), ("number", 1)])
+    await db.tournament_stages.create_index("creation_key", unique=True, sparse=True)
     await db.matches_v2.create_index("id", unique=True)
     await db.matches_v2.create_index([("tournament_id", 1), ("stage_id", 1)])
     await db.matches_v2.create_index([("stage_id", 1), ("match_key", 1)])
