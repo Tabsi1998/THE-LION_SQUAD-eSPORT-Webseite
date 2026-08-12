@@ -30,6 +30,7 @@ COMPLETE_BRANDING = {
     "phone": "+43 123 456",
     "hosting_provider": "Eigenhosting",
     "hosting_country": "Österreich/EU",
+    "legal_updated_at": "2026-08-12T10:00:00+00:00",
     "updated_at": "2026-08-12T10:00:00+00:00",
 }
 
@@ -59,7 +60,7 @@ def test_canonical_contract_uses_configured_values_and_folds_legacy_text_once():
     assert result["privacy_extra"] == "Neuer Zusatz\n\nBestehender Datenschutztext"
     assert result["legal_ready"] is True
     assert result["missing_legal_fields"] == []
-    assert result["legal_updated_at"] == COMPLETE_BRANDING["updated_at"]
+    assert result["legal_updated_at"] == COMPLETE_BRANDING["legal_updated_at"]
 
 
 def test_missing_contact_is_not_replaced_with_a_fabricated_address():

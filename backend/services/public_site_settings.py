@@ -143,7 +143,7 @@ def build_public_legal_settings(branding: dict[str, Any] | None) -> dict[str, An
         "paid_tournaments_enabled": bool(source.get("paid_tournaments_enabled", False)),
         "legal_extra": _merge_unique_text(source.get("legal_extra"), source.get("imprint")),
         "privacy_extra": _merge_unique_text(source.get("privacy_extra"), source.get("privacy_policy")),
-        "legal_updated_at": public_text(source.get("legal_updated_at") or source.get("updated_at")),
+        "legal_updated_at": public_text(source.get("legal_updated_at")),
     }
     missing = [field for field in PUBLIC_LEGAL_REQUIRED_FIELDS if not result.get(field)]
     result["contact_ready"] = bool(contact_email)
