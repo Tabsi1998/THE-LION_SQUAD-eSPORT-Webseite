@@ -11,6 +11,7 @@ import bcrypt
 from database import get_db
 from auth import require_admin, require_super, get_current_user
 from models import MIN_PASSWORD_LENGTH, now_utc, new_id
+from services.public_site_settings import build_public_legal_settings
 
 router = APIRouter(prefix="/api/setup", tags=["setup"])
 HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -56,13 +57,14 @@ def _truthy_mail_config(mail: dict, legacy_email: dict) -> bool:
 
 
 def _setup_checks(s: dict, branding: dict, mail: dict, legacy_email: dict, has_admin: bool) -> list[dict]:
+    public_legal = build_public_legal_settings(branding)
     return [
         {"key": "admin", "label": "Superadmin vorhanden", "ok": has_admin, "target": "/admin/users"},
         {"key": "completed", "label": "Setup abgeschlossen", "ok": bool(s.get("completed")), "target": "/setup"},
         {"key": "club_name", "label": "Vereinsname gepflegt", "ok": bool(branding.get("club_name")), "target": "/admin/settings?tab=brand"},
         {"key": "domain", "label": "Öffentliche Domain gesetzt", "ok": bool(branding.get("domain")), "target": "/admin/settings?tab=brand"},
-        {"key": "contact_email", "label": "Kontakt-E-Mail gesetzt", "ok": bool(branding.get("contact_email")), "target": "/admin/settings?tab=brand"},
-        {"key": "legal", "label": "Impressum/Datenschutz ergänzt", "ok": bool(branding.get("imprint") or branding.get("privacy_policy")), "target": "/admin/settings?tab=legal"},
+        {"key": "contact_email", "label": "Kontakt-E-Mail gesetzt", "ok": public_legal["contact_ready"], "target": "/admin/settings?tab=brand"},
+        {"key": "legal", "label": "Impressum/Datenschutz vollständig", "ok": public_legal["legal_ready"], "target": "/admin/settings?tab=legal"},
         {"key": "mail", "label": "E-Mail-Versand konfiguriert", "ok": _truthy_mail_config(mail, legacy_email), "target": "/admin/settings?tab=smtp"},
     ]
 
@@ -186,6 +188,8 @@ async def complete_setup(body: SetupWizardBody, me: dict = Depends(require_super
     brand_updates = {k: getattr(body, k) for k in brand_keys if getattr(body, k) is not None}
     if brand_updates:
         brand_updates["updated_at"] = now_iso
+        if {"club_name", "domain", "contact_email", "imprint", "privacy_policy"} & set(brand_updates):
+            brand_updates["legal_updated_at"] = now_iso
         await db.settings.update_one(
             {"id": "branding"},
             {"$set": brand_updates, "$setOnInsert": {"id": "branding"}},

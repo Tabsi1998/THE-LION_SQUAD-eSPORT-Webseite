@@ -25,6 +25,77 @@ async function expectNoPageXOverflow(page) {
   expect(overflow).toBeLessThanOrEqual(1);
 }
 
+const canonicalPublicSettings = {
+  club_name: "THE LION SQUAD - eSPORTS",
+  tagline: "Verein",
+  domain: "https://lionsquad.at",
+  contact_email: "kontakt@lionsquad.at",
+  privacy_contact_email: "datenschutz@lionsquad.at",
+  legal_name: "THE LION SQUAD - eSPORTS",
+  legal_form: "eingetragener Verein",
+  zvr_number: "1234567890",
+  street_address: "Vereinsstraße 1",
+  postal_code: "6410",
+  city: "Telfs",
+  state: "Tirol",
+  country: "Österreich",
+  registered_seat: "Telfs",
+  register_authority: "Bezirkshauptmannschaft Innsbruck",
+  representative_name: "Vereinsvertretung",
+  representative_role: "Obmann",
+  content_responsible: "Vereinsvertretung",
+  phone: "+43 123 456",
+  hosting_provider: "Eigenhosting",
+  hosting_country: "Österreich/EU",
+  legal_updated_at: "2026-08-12T10:00:00Z",
+  legal_ready: true,
+};
+
+test("contact and legal pages share one configured public data source", async ({ page }) => {
+  await page.route("**/api/settings/public**", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify(canonicalPublicSettings),
+  }));
+  await page.route("**/api/contact/topics", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify([{ value: "general", label: "Allgemein" }]),
+  }));
+
+  await page.goto("/contact");
+  await expect(page.getByTestId("contact-email-link")).toHaveAttribute("href", "mailto:kontakt@lionsquad.at");
+
+  await page.goto("/imprint");
+  await expect(page.getByRole("heading", { name: "Impressum" })).toBeVisible();
+  await expect(page.locator('a[href="mailto:kontakt@lionsquad.at"]')).toBeVisible();
+  await expect(page.locator('a[href="mailto:datenschutz@lionsquad.at"]')).toBeVisible();
+  await expect(page.getByText("Stand: 12.08.2026")).toBeVisible();
+
+  await page.goto("/privacy");
+  await expect(page.getByRole("heading", { name: "Datenschutzerklärung" })).toBeVisible();
+  await expect(page.locator('a[href="mailto:kontakt@lionsquad.at"]')).toBeVisible();
+  await expect(page.locator('a[href="mailto:datenschutz@lionsquad.at"]').first()).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/noch im adminbereich zu hinterlegen|image:\s*null|example\.(com|test)/i);
+});
+
+test("missing public settings never create a fake email or internal placeholder", async ({ page }) => {
+  await page.route("**/api/settings/public**", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ club_name: "THE LION SQUAD", legal_ready: false }),
+  }));
+  await page.route("**/api/contact/topics", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify([{ value: "general", label: "Allgemein" }]),
+  }));
+
+  await page.goto("/contact");
+  await expect(page.getByTestId("contact-email-unavailable")).toBeVisible();
+  await expect(page.locator('a[href^="mailto:"]')).toHaveCount(0);
+
+  await page.goto("/imprint");
+  await expect(page.getByTestId("legal-data-incomplete")).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/office@|info@|noch im adminbereich zu hinterlegen|image:\s*null|example\.(com|test)/i);
+});
+
 test("public community structure is reachable", async ({ page }) => {
   await page.goto("/community");
   await acceptCookies(page);

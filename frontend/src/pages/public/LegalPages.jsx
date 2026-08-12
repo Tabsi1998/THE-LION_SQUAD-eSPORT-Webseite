@@ -1,25 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 
-const UPDATED_AT = "18.05.2026";
-
-function useBranding() {
-  const [branding, setBranding] = useState({});
-  const load = useCallback(() => {
-    api.get("/settings/public").then(({ data }) => setBranding(data || {})).catch(() => {});
-  }, []);
-  useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["settings", "branding"]);
-  return branding;
-}
-
-function valueOrOpen(value) {
-  return value && String(value).trim() ? value : "Noch im Adminbereich zu hinterlegen";
+function formatLegalDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("de-AT", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
 }
 
 function addressLines(branding) {
@@ -31,8 +20,9 @@ function addressLines(branding) {
   ].filter(Boolean);
 }
 
-function LegalArticle({ title, intro, children }) {
+function LegalArticle({ title, intro, updatedAt, children }) {
   useDocumentTitle(title, intro, { robots: "noindex, follow" });
+  const formattedUpdatedAt = formatLegalDate(updatedAt);
 
   return (
     <PublicLayout>
@@ -41,7 +31,7 @@ function LegalArticle({ title, intro, children }) {
         <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Rechtliches</p>
         <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">{title}</h1>
         <p className="mt-3 text-white/60 max-w-2xl">{intro}</p>
-        <p className="mt-2 text-xs text-white/40">Stand: {UPDATED_AT}</p>
+        {formattedUpdatedAt && <p className="mt-2 text-xs text-white/40">Stand: {formattedUpdatedAt}</p>}
         <div className="mt-10 space-y-8 text-sm leading-relaxed text-white/75">{children}</div>
       </article>
     </PublicLayout>
@@ -58,9 +48,11 @@ function Section({ title, children }) {
 }
 
 function InfoList({ items }) {
+  const configuredItems = items.filter(([, value]) => value !== null && value !== undefined && value !== "");
+  if (!configuredItems.length) return null;
   return (
     <dl className="grid sm:grid-cols-[210px_1fr] gap-x-5 gap-y-2">
-      {items.map(([label, value]) => (
+      {configuredItems.map(([label, value]) => (
         <div key={label} className="contents">
           <dt className="text-white/45">{label}</dt>
           <dd className="text-white break-words">{value}</dd>
@@ -68,6 +60,25 @@ function InfoList({ items }) {
       ))}
     </dl>
   );
+}
+
+function LegalDataNotice({ branding }) {
+  if (branding.legal_ready !== false) return null;
+  return (
+    <div data-testid="legal-data-incomplete" className="rounded-sm border border-amber-300/30 bg-amber-300/10 p-4 text-amber-100">
+      Die rechtlichen Kontaktdaten sind derzeit nicht vollständig verfügbar. Bitte nutze bei Fragen das Kontaktformular.
+    </div>
+  );
+}
+
+function EmailLink({ email }) {
+  if (!email) return null;
+  return <a href={`mailto:${email}`} className="text-[#29B6E8] hover:underline">{email}</a>;
+}
+
+function WebsiteLink({ url }) {
+  if (!url) return null;
+  return <a href={url} className="text-[#29B6E8] hover:underline">{url}</a>;
 }
 
 function TextBlock({ children }) {
@@ -80,11 +91,11 @@ function TextBlock({ children }) {
 }
 
 export function ImprintPage() {
-  const branding = useBranding();
+  const branding = usePublicSiteSettings();
   const clubName = branding.club_name || "THE LION SQUAD";
   const legalName = branding.legal_name || clubName;
-  const domain = branding.domain || "https://lionsquad.at";
-  const contactEmail = branding.contact_email || "office@lionsquad.at";
+  const domain = branding.domain;
+  const contactEmail = branding.contact_email;
   const privacyEmail = branding.privacy_contact_email || contactEmail;
   const lines = addressLines(branding);
 
@@ -92,18 +103,20 @@ export function ImprintPage() {
     <LegalArticle
       title="Impressum"
       intro="Anbieterkennzeichnung, Offenlegung und Kontaktinformationen des Vereins."
+      updatedAt={branding.legal_updated_at}
     >
+      <LegalDataNotice branding={branding} />
       <Section title="Medieninhaber und Betreiber">
         <InfoList
           items={[
             ["Verein", legalName],
-            ["Rechtsform", branding.legal_form || "eingetragener Verein nach österreichischem Vereinsrecht"],
-            ["ZVR-Zahl", valueOrOpen(branding.zvr_number)],
-            ["Vereinssitz", branding.registered_seat || branding.city || "Tirol, Österreich"],
-            ["Adresse", lines.length ? lines.map((line) => <div key={line}>{line}</div>) : valueOrOpen("")],
-            ["Website", <a href={domain} className="text-[#29B6E8] hover:underline">{domain}</a>],
-            ["E-Mail", <a href={`mailto:${contactEmail}`} className="text-[#29B6E8] hover:underline">{contactEmail}</a>],
-            ["Telefon", valueOrOpen(branding.phone)],
+            ["Rechtsform", branding.legal_form],
+            ["ZVR-Zahl", branding.zvr_number],
+            ["Vereinssitz", branding.registered_seat || branding.city],
+            ["Adresse", lines.length ? lines.map((line) => <div key={line}>{line}</div>) : ""],
+            ["Website", domain ? <WebsiteLink url={domain} /> : ""],
+            ["E-Mail", contactEmail ? <EmailLink email={contactEmail} /> : ""],
+            ["Telefon", branding.phone],
           ]}
         />
       </Section>
@@ -111,10 +124,10 @@ export function ImprintPage() {
       <Section title="Vertretung und Verantwortung">
         <InfoList
           items={[
-            ["Vertretungsbefugt", valueOrOpen(branding.representative_name)],
-            ["Funktion", branding.representative_role || "Obmann/Obfrau bzw. vertretungsbefugtes Vereinsorgan"],
-            ["Inhaltlich verantwortlich", valueOrOpen(branding.content_responsible || branding.representative_name)],
-            ["Vereinsbehoerde", branding.register_authority || "Vereinsbehoerde am Vereinssitz in Tirol"],
+            ["Vertretungsbefugt", branding.representative_name],
+            ["Funktion", branding.representative_role],
+            ["Inhaltlich verantwortlich", branding.content_responsible || branding.representative_name],
+            ["Vereinsbehörde", branding.register_authority],
           ]}
         />
       </Section>
@@ -126,8 +139,8 @@ export function ImprintPage() {
           eSports-Turniere, Fast-Lap-Challenges, Ranglisten, News, Sponsoren und Kontaktmöglichkeiten.
         </p>
         <p>
-          Der Vereinssitz liegt in Tirol. Die Vereinstätigkeit ist nicht auf Gewinn gerichtet,
-          soweit sich aus den Statuten nichts anderes ergibt.
+          {branding.registered_seat && <>Der Vereinssitz liegt in {branding.registered_seat}. </>}
+          Die Vereinstätigkeit ist nicht auf Gewinn gerichtet, soweit sich aus den Statuten nichts anderes ergibt.
         </p>
       </Section>
 
@@ -159,13 +172,11 @@ export function ImprintPage() {
         )}
       </Section>
 
-      <Section title="UID und wirtschaftliche Angaben">
-        <InfoList
-          items={[
-            ["UID-Nummer", branding.vat_number || "Nicht hinterlegt bzw. nicht anwendbar"],
-          ]}
-        />
-      </Section>
+      {branding.vat_number && (
+        <Section title="UID und wirtschaftliche Angaben">
+          <InfoList items={[["UID-Nummer", branding.vat_number]]} />
+        </Section>
+      )}
 
       <Section title="Haftung und externe Links">
         <p>
@@ -190,18 +201,18 @@ export function ImprintPage() {
         </p>
       </Section>
 
-      <Section title="Datenschutzkontakt">
+      {privacyEmail && <Section title="Datenschutzkontakt">
         <p>
           Datenschutzanfragen können an{" "}
-          <a href={`mailto:${privacyEmail}`} className="text-[#29B6E8] hover:underline">{privacyEmail}</a>{" "}
+          <EmailLink email={privacyEmail} />{" "}
           gerichtet werden. Weitere Informationen stehen in der{" "}
           <Link to="/privacy" className="text-[#29B6E8] hover:underline">Datenschutzerklärung</Link>.
         </p>
-      </Section>
+      </Section>}
 
-      {(branding.imprint || branding.legal_extra) && (
+      {branding.legal_extra && (
         <Section title="Ergänzende Angaben">
-          <TextBlock>{[branding.imprint, branding.legal_extra].filter(Boolean).join("\n\n")}</TextBlock>
+          <TextBlock>{branding.legal_extra}</TextBlock>
         </Section>
       )}
     </LegalArticle>
@@ -209,10 +220,10 @@ export function ImprintPage() {
 }
 
 export function PrivacyPage() {
-  const branding = useBranding();
+  const branding = usePublicSiteSettings();
   const clubName = branding.legal_name || branding.club_name || "THE LION SQUAD";
-  const domain = branding.domain || "https://lionsquad.at";
-  const contactEmail = branding.contact_email || "office@lionsquad.at";
+  const domain = branding.domain;
+  const contactEmail = branding.contact_email;
   const privacyEmail = branding.privacy_contact_email || contactEmail;
   const lines = addressLines(branding);
 
@@ -220,15 +231,17 @@ export function PrivacyPage() {
     <LegalArticle
       title="Datenschutzerklärung"
       intro="Informationen zur Verarbeitung personenbezogener Daten auf dieser Vereinsplattform."
+      updatedAt={branding.legal_updated_at}
     >
+      <LegalDataNotice branding={branding} />
       <Section title="Verantwortlicher">
         <InfoList
           items={[
             ["Verantwortlicher", clubName],
-            ["Adresse", lines.length ? lines.map((line) => <div key={line}>{line}</div>) : valueOrOpen("")],
-            ["Website", <a href={domain} className="text-[#29B6E8] hover:underline">{domain}</a>],
-            ["Kontakt", <a href={`mailto:${contactEmail}`} className="text-[#29B6E8] hover:underline">{contactEmail}</a>],
-            ["Datenschutz", <a href={`mailto:${privacyEmail}`} className="text-[#29B6E8] hover:underline">{privacyEmail}</a>],
+            ["Adresse", lines.length ? lines.map((line) => <div key={line}>{line}</div>) : ""],
+            ["Website", domain ? <WebsiteLink url={domain} /> : ""],
+            ["Kontakt", contactEmail ? <EmailLink email={contactEmail} /> : ""],
+            ["Datenschutz", privacyEmail ? <EmailLink email={privacyEmail} /> : ""],
           ]}
         />
       </Section>
@@ -334,12 +347,10 @@ export function PrivacyPage() {
           Die Plattform verarbeitet Daten auf den eingesetzten Servern, Datenbanken und
           Backup-Speichern. Technische Logs dienen Sicherheit, Fehleranalyse und Betrieb.
         </p>
-        <InfoList
-          items={[
-            ["Hosting / Betrieb", branding.hosting_provider || "Vom Verein bzw. beauftragten Dienstleistern betrieben"],
-            ["Hosting-Region", branding.hosting_country || "Österreich/EU"],
-          ]}
-        />
+        <InfoList items={[
+          ["Hosting / Betrieb", branding.hosting_provider],
+          ["Hosting-Region", branding.hosting_country],
+        ]} />
       </Section>
 
       <Section title="Cookies und lokale Speicherung">
@@ -391,8 +402,8 @@ export function PrivacyPage() {
         <p>
           Betroffene Personen haben nach Maßgabe der DSGVO Rechte auf Information, Auskunft,
           Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit, Widerspruch sowie Widerruf
-          erteilter Einwilligungen. Zur Ausübung genügt eine Nachricht an{" "}
-          <a href={`mailto:${privacyEmail}`} className="text-[#29B6E8] hover:underline">{privacyEmail}</a>.
+          erteilter Einwilligungen. Zur Ausübung nutze bitte{" "}
+          {privacyEmail ? <EmailLink email={privacyEmail} /> : <Link to="/contact" className="text-[#29B6E8] hover:underline">das Kontaktformular</Link>}.
         </p>
         <p>
           Außerdem besteht das Recht auf Beschwerde bei der Österreichischen Datenschutzbehörde,
@@ -401,9 +412,9 @@ export function PrivacyPage() {
         </p>
       </Section>
 
-      {(branding.privacy_policy || branding.privacy_extra) && (
+      {branding.privacy_extra && (
         <Section title="Ergänzende Datenschutzhinweise">
-          <TextBlock>{[branding.privacy_policy, branding.privacy_extra].filter(Boolean).join("\n\n")}</TextBlock>
+          <TextBlock>{branding.privacy_extra}</TextBlock>
         </Section>
       )}
 
