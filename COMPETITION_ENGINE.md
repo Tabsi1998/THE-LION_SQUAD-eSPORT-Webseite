@@ -223,6 +223,26 @@ Read-Metriken und Kompatibilitaet. Der Validator ist noch keine Schreibfreigabe:
 die folgende Preview/Validate/Apply-Transaktion muss einen fehlerfreien Report
 verlangen und ihre Schreibwirkung separat absichern.
 
+## Nicht-destruktiver Strukturplan v1
+
+`POST /api/tournaments/{id}/bracket/plan` erzeugt fuer berechtigte
+Turniermitarbeiter eine Classic- oder Graph-Struktur, ohne Matches, Stages,
+Versionen oder Auditdaten zu schreiben. Die Antwort enthaelt die geplante
+kanonische Struktur, den vollstaendigen Graphvalidierungsbericht, den sichtbaren
+Ersetzungsumfang und die Apply-Anforderungen.
+
+`competition.structure-plan.v1` bindet den Plan mit SHA-256 an den aktuellen
+kanonischen Strukturzustand, die relevanten Turnierregeln, die Request-Settings
+und den Teilnehmer-Snapshot. Zufallsseeding verwendet einen lokalen,
+plan-gebundenen Zufallsgenerator; Stage- und Match-IDs werden per UUIDv5 aus dem
+Plan abgeleitet. Derselbe Input auf demselben Basiszustand erzeugt deshalb
+denselben `plan_hash`, dieselben Teilnehmerpositionen und dieselben IDs.
+
+Der Plan ist noch kein Apply: Der folgende Schreibschritt muss
+`expected_plan_hash` und `expected_base_structure_hash` zwingend pruefen,
+zwischenzeitliche Aenderungen mit `409` ablehnen und erst danach den bereits
+validierten Dokumentensatz kontrolliert aktivieren.
+
 ## Abnahmematrix
 
 - Teilnehmerzahlen 0/1 sowie 3/5/63/64/65 und grosse Strukturen;
