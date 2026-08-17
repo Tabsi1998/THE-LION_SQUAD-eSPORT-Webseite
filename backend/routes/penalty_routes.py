@@ -13,6 +13,7 @@ from typing import Optional
 
 from database import get_db
 from auth import get_current_user, require_admin
+from services.competition_penalties import load_forfeit_penalties
 
 router = APIRouter(prefix="/api/penalties", tags=["penalties"])
 admin_router = APIRouter(prefix="/api/admin/penalties", tags=["penalties-admin"])
@@ -71,36 +72,29 @@ async def _collect_user_penalties(user_id: str) -> list[dict]:
             "ref_id": l.get("id"),
         })
 
-    # --- Tournament forfeits where this user is loser ---
-    # Find tournament_registrations where user_id matches, then find matches with that registration as loser
+    # --- Tournament forfeits across Legacy and Stage/FFA ---
     regs = await db.tournament_registrations.find(
         {"user_id": user_id}, {"_id": 0, "id": 1, "tournament_id": 1}
     ).to_list(500)
     reg_ids = [r["id"] for r in regs]
     if reg_ids:
-        matches = await db.matches.find(
-            {
-                "loser_id": {"$in": reg_ids},
-                "status": "forfeit",
-                "admin_decision_note": {"$exists": True, "$ne": None},
-            },
-            {"_id": 0},
-        ).sort("admin_decision_at", -1).to_list(500)
-        tour_ids = list({m["tournament_id"] for m in matches if m.get("tournament_id")})
+        forfeits = await load_forfeit_penalties(db, reg_ids, limit=500)
+        tour_ids = list({item["tournament_id"] for item in forfeits if item.get("tournament_id")})
         tours = {t["id"]: t for t in await db.tournaments.find(
             {"id": {"$in": tour_ids}}, {"_id": 0, "id": 1, "title": 1, "slug": 1}).to_list(200)}
-        for m in matches:
-            t = tours.get(m.get("tournament_id"), {})
+        for item in forfeits:
+            t = tours.get(item.get("tournament_id"), {})
             out.append({
                 "kind": "match_forfeit",
                 "label": "Match verloren (Forfeit)",
-                "reason": m.get("admin_decision_note") or "(keine Begründung)",
+                "reason": item.get("reason") or "(keine Begründung)",
                 "context_title": t.get("title") or "Turnier",
                 "context_url": f"/tournaments/{t.get('slug') or t.get('id') or ''}",
-                "context_subtitle": f"Match #{m.get('match_number') or m.get('id', '')[:6]}",
-                "issued_by": m.get("admin_decision_by"),
-                "issued_at": m.get("admin_decision_at") or m.get("updated_at"),
-                "ref_id": m.get("id"),
+                "context_subtitle": f"Match #{item.get('match_label') or ''}",
+                "issued_by": item.get("issued_by"),
+                "issued_at": item.get("issued_at"),
+                "ref_id": item.get("match_id"),
+                "match_source": item.get("source"),
             })
 
     # --- Negative achievement awards (admin-issued incidents) ---
@@ -161,16 +155,20 @@ async def all_penalties(
         ):
             if l.get("user_id"):
                 user_ids.add(l["user_id"])
-        # forfeit matches → loser registration → user
-        async for m in db.matches.find(
-            {"status": "forfeit", "admin_decision_note": {"$exists": True}},
-            {"_id": 0, "loser_id": 1},
-        ):
-            if m.get("loser_id"):
-                reg = await db.tournament_registrations.find_one(
-                    {"id": m["loser_id"]}, {"_id": 0, "user_id": 1})
-                if reg and reg.get("user_id"):
-                    user_ids.add(reg["user_id"])
+        # forfeit results → registrations → users, for both match stores
+        forfeits = await load_forfeit_penalties(db)
+        forfeit_registration_ids = sorted({
+            item["registration_id"]
+            for item in forfeits
+            if item.get("registration_id")
+        })
+        if forfeit_registration_ids:
+            for registration in await db.tournament_registrations.find(
+                {"id": {"$in": forfeit_registration_ids}},
+                {"_id": 0, "user_id": 1},
+            ).to_list(5000):
+                if registration.get("user_id"):
+                    user_ids.add(registration["user_id"])
         async for a in db.user_achievements.find({"is_negative": True}, {"_id": 0, "user_id": 1}):
             if a.get("user_id"):
                 user_ids.add(a["user_id"])
