@@ -46,9 +46,11 @@ class FakeCursor:
     def __init__(self, docs):
         self.docs = list(docs)
 
-    def sort(self, field, direction):
-        reverse = direction < 0
-        self.docs = sorted(self.docs, key=lambda doc: doc.get(field) or "", reverse=reverse)
+    def sort(self, field, direction=None):
+        fields = field if isinstance(field, list) else [(field, direction)]
+        for sort_field, sort_direction in reversed(fields):
+            reverse = sort_direction < 0
+            self.docs = sorted(self.docs, key=lambda doc: doc.get(sort_field) or "", reverse=reverse)
         return self
 
     async def to_list(self, limit):
@@ -80,6 +82,7 @@ class FakeDb:
             "tournament_registrations",
             "matches",
             "matches_v2",
+            "tournament_stages",
             "tournament_groups",
             "f1_lap_times",
         ]

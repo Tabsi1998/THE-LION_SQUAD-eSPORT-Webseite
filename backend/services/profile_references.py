@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from database import get_db
+from services.competition_read import load_competition_read_model, observe_structure_read
+from services.competition_standings import standings_for_structure
 from services.visibility import user_can_see
 
 RESULT_TOURNAMENT_STATUSES = {"completed", "results_published", "archived"}
@@ -125,218 +127,6 @@ async def _ranked_fastlap_entries(challenge_id: str, track_id: str, user_id: str
     return None
 
 
-def _v2_standings(matches_v2: list[dict], regs: list[dict]) -> list[dict]:
-    rank_map = {
-        r["id"]: {
-            "registration_id": r["id"],
-            "display_name": r.get("display_name") or r.get("ingame_name") or r.get("user", {}).get("display_name"),
-            "played": 0,
-            "won": 0,
-            "top2": 0,
-            "lost": 0,
-            "points": 0,
-            "rank_sum": 0,
-            "furthest_round": 0,
-            "best_rank": None,
-        }
-        for r in regs
-        if r.get("id")
-    }
-    for match in matches_v2:
-        if match.get("status") not in {"completed", "forfeit"}:
-            continue
-        for result in match.get("results") or []:
-            rid = result.get("registration_id")
-            if rid not in rank_map:
-                continue
-            rank = _safe_int(result.get("rank")) or 999
-            row = rank_map[rid]
-            row["played"] += 1
-            row["rank_sum"] += rank
-            row["furthest_round"] = max(row["furthest_round"], _safe_int(match.get("round")) or 0)
-            row["best_rank"] = rank if row["best_rank"] is None else min(row["best_rank"], rank)
-            if rank == 1:
-                row["won"] += 1
-            if rank <= 2:
-                row["top2"] += 1
-            else:
-                row["lost"] += 1
-            score = result.get("points")
-            if score is None:
-                score = result.get("score")
-            if isinstance(score, (int, float)):
-                row["points"] += score
-    rows = list(rank_map.values())
-    for row in rows:
-        row["avg_rank"] = round(row["rank_sum"] / row["played"], 2) if row["played"] else None
-    rows.sort(
-        key=lambda row: (
-            row["furthest_round"],
-            row["won"],
-            row["top2"],
-            row["points"],
-            -(row["avg_rank"] or 999),
-        ),
-        reverse=True,
-    )
-    for index, row in enumerate(rows, start=1):
-        row["rank"] = index
-    return rows
-
-
-def _legacy_elimination_standings(matches: list[dict], regs: list[dict]) -> list[dict]:
-    rank_map = {
-        r["id"]: {
-            "registration_id": r["id"],
-            "display_name": r.get("display_name") or r.get("ingame_name") or "Teilnehmer",
-            "furthest_round": 0,
-            "wins": 0,
-            "losses": 0,
-        }
-        for r in regs
-        if r.get("id")
-    }
-    for match in matches:
-        a = match.get("participant_a_id")
-        b = match.get("participant_b_id")
-        winner = match.get("winner_id")
-        round_number = _safe_int(match.get("round")) or 0
-        if a in rank_map:
-            rank_map[a]["furthest_round"] = max(rank_map[a]["furthest_round"], round_number)
-        if b in rank_map:
-            rank_map[b]["furthest_round"] = max(rank_map[b]["furthest_round"], round_number)
-        if match.get("status") in {"completed", "forfeit"} and winner:
-            loser = a if winner == b else b
-            if winner in rank_map:
-                rank_map[winner]["wins"] += 1
-            if loser in rank_map:
-                rank_map[loser]["losses"] += 1
-    rows = list(rank_map.values())
-    rows.sort(key=lambda row: (row["furthest_round"], row["wins"], -row["losses"]), reverse=True)
-    for index, row in enumerate(rows, start=1):
-        row["rank"] = index
-    return rows
-
-
-def _round_robin_standings(matches: list[dict], regs: list[dict]) -> list[dict]:
-    stats = {
-        r["id"]: {
-            "registration_id": r["id"],
-            "display_name": r.get("display_name") or r.get("ingame_name") or "Teilnehmer",
-            "played": 0,
-            "won": 0,
-            "lost": 0,
-            "drawn": 0,
-            "score_for": 0,
-            "score_against": 0,
-            "points": 0,
-        }
-        for r in regs
-        if r.get("id")
-    }
-    for match in matches:
-        if match.get("status") != "completed":
-            continue
-        a = match.get("participant_a_id")
-        b = match.get("participant_b_id")
-        score_a = _safe_int(match.get("score_a")) or 0
-        score_b = _safe_int(match.get("score_b")) or 0
-        if a in stats:
-            stats[a]["played"] += 1
-            stats[a]["score_for"] += score_a
-            stats[a]["score_against"] += score_b
-        if b in stats:
-            stats[b]["played"] += 1
-            stats[b]["score_for"] += score_b
-            stats[b]["score_against"] += score_a
-        winner = match.get("winner_id")
-        if winner == a and a in stats:
-            stats[a]["won"] += 1
-            stats[a]["points"] += 3
-            if b in stats:
-                stats[b]["lost"] += 1
-        elif winner == b and b in stats:
-            stats[b]["won"] += 1
-            stats[b]["points"] += 3
-            if a in stats:
-                stats[a]["lost"] += 1
-        else:
-            if a in stats:
-                stats[a]["drawn"] += 1
-                stats[a]["points"] += 1
-            if b in stats:
-                stats[b]["drawn"] += 1
-                stats[b]["points"] += 1
-    rows = list(stats.values())
-    rows.sort(key=lambda row: (row["points"], row["won"], row["score_for"] - row["score_against"]), reverse=True)
-    for index, row in enumerate(rows, start=1):
-        row["rank"] = index
-    return rows
-
-
-def _swiss_standings(regs: list[dict], matches: list[dict]) -> list[dict]:
-    stats = {
-        r["id"]: {
-            "registration_id": r["id"],
-            "display_name": r.get("display_name") or r.get("ingame_name") or "Teilnehmer",
-            "points": 0,
-            "played": 0,
-            "won": 0,
-            "drawn": 0,
-            "lost": 0,
-            "opponents": [],
-        }
-        for r in regs
-        if r.get("id")
-    }
-    for match in matches:
-        if match.get("status") != "completed":
-            continue
-        a = match.get("participant_a_id")
-        b = match.get("participant_b_id")
-        winner = match.get("winner_id")
-        if a not in stats or b not in stats:
-            continue
-        stats[a]["played"] += 1
-        stats[b]["played"] += 1
-        stats[a]["opponents"].append(b)
-        stats[b]["opponents"].append(a)
-        if winner == a:
-            stats[a]["won"] += 1
-            stats[a]["points"] += 1
-            stats[b]["lost"] += 1
-        elif winner == b:
-            stats[b]["won"] += 1
-            stats[b]["points"] += 1
-            stats[a]["lost"] += 1
-        else:
-            stats[a]["drawn"] += 1
-            stats[b]["drawn"] += 1
-            stats[a]["points"] += 0.5
-            stats[b]["points"] += 0.5
-    for row in stats.values():
-        row["buchholz"] = sum(stats[opponent]["points"] for opponent in row["opponents"] if opponent in stats)
-        row.pop("opponents", None)
-    rows = list(stats.values())
-    rows.sort(key=lambda row: (row["points"], row["buchholz"], row["won"]), reverse=True)
-    for index, row in enumerate(rows, start=1):
-        row["rank"] = index
-    return rows
-
-
-def _group_standings(groups: list[dict], matches: list[dict], reg_map: dict) -> list[dict]:
-    rows = []
-    for group in groups:
-        group_key = group.get("group_key")
-        bracket_key = f"group_{group_key}"
-        group_rows = _round_robin_standings(
-            [match for match in matches if match.get("bracket") == bracket_key],
-            [reg_map[pid] for pid in group.get("participant_ids", []) if pid in reg_map],
-        )
-        rows.extend(group_rows)
-    return rows
-
-
 def _rank_from_rows(rows: list[dict], registration_id: str) -> int | None:
     for row in rows:
         if row.get("registration_id") == registration_id:
@@ -377,31 +167,19 @@ async def _tournament_rank_for_user(tournament_id: str, user_id: str, team_ids: 
         if rank is not None:
             return rank, participant_count
 
-    matches_v2 = await db.matches_v2.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(3000)
-    if matches_v2:
-        rows = _v2_standings(matches_v2, regs)
-        for reg_id in reg_ids:
-            rank = _rank_from_rows(rows, reg_id)
-            if rank is not None:
-                return rank, participant_count
-        return None, participant_count
-
-    matches = await db.matches.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(3000)
-    if not matches:
+    read_model = await load_competition_read_model(db, tournament_id)
+    if not read_model.legacy_matches and not read_model.stage_matches:
         return None, participant_count
 
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "format": 1}) or {}
-    fmt = tournament.get("format")
-    if fmt in {"round_robin", "league"}:
-        rows = _round_robin_standings(matches, regs)
-    elif fmt == "swiss":
-        rows = _swiss_standings(regs, matches)
-    elif fmt == "groups":
+    groups = []
+    if tournament.get("format") == "groups":
         groups = await db.tournament_groups.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(100)
-        reg_map = {reg["id"]: reg for reg in regs if reg.get("id")}
-        rows = _group_standings(groups, matches, reg_map)
-    else:
-        rows = _legacy_elimination_standings(matches, regs)
+    structure = read_model.structure_snapshot()
+    observe_structure_read(structure, surface="profile_references")
+    rows = standings_for_structure(tournament, structure, regs, groups=groups)
+    if tournament.get("format") == "groups":
+        rows = [row for group in rows for row in group.get("standings") or []]
 
     for reg_id in reg_ids:
         rank = _rank_from_rows(rows, reg_id)

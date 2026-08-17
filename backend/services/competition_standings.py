@@ -301,3 +301,28 @@ def standings_for_structure(
     if format_key == "groups":
         return group_standings(legacy_matches, registrations, list(groups))
     return elimination_standings(legacy_matches, registrations)
+
+
+def registration_match_summary(matches: list[dict], registration_ids: set[str]) -> dict:
+    """Count terminal matches and wins once across canonical match shapes."""
+
+    played = 0
+    won = 0
+    for match in matches:
+        if match.get("status") not in TERMINAL_MATCH_STATUSES:
+            continue
+        participants = {
+            slot.get("registration_id")
+            for slot in match.get("slots") or []
+            if slot.get("registration_id")
+        }
+        if not participants.intersection(registration_ids):
+            continue
+        played += 1
+        if any(
+            result.get("registration_id") in registration_ids
+            and result.get("outcome") == "winner"
+            for result in match.get("results") or []
+        ):
+            won += 1
+    return {"matches_played": played, "matches_won": won}
