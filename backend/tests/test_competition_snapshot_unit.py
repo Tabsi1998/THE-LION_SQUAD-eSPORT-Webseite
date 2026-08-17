@@ -72,6 +72,7 @@ def _stage_fixture():
             "match_key": "A",
             "section": "WB",
             "match_type": "duel",
+            "settings": {"min_players": 2, "duration_minutes": 45},
             "slots": [
                 {"slot": 1, "source": {"type": "seed", "seed": 1}, "registration_id": "r1", "status": "filled"},
                 {"slot": 2, "source": {"type": "seed", "seed": 2}, "registration_id": "r2", "status": "filled"},
@@ -164,6 +165,7 @@ def test_stage_adapter_resolves_match_key_sources_to_stable_match_ids():
     final = adapted[2]
 
     assert adapted[0]["source"] == {"engine": "stage", "collection": "matches_v2"}
+    assert adapted[0]["settings"] == {"min_players": 2, "duration_minutes": 45}
     assert final["slots"][0]["source"]["match_id"] == "m1"
     assert final["slots"][1]["source"]["match_id"] == "m2"
     assert final["slots"][0]["source"]["outcome"] == "winner"

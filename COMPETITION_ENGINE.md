@@ -178,7 +178,7 @@ geschrieben.
 | Badges / Admin-Zaehler | kanonische Match-/Platzierungsreads bzw. beide Stores aktiv | keine Legacy-Sonderlogik mehr hinzufuegen |
 | Penalty-Transparenz | Legacy- und Stage-/FFA-Forfeits kanonisch sichtbar | Schreibregeln bleiben getrennt |
 | Disputes / Forfeit-Schreibpfad | weiterhin Legacy-lastig | in Package 3 fachlich vereinheitlichen |
-| Reminder / Notifications / Stationen | beide Formen mit Sonderzweigen | gemeinsame Match-Projektion verwenden |
+| Reminder / Notifications / Stationen | kanonische Match-Reads aktiv | Collection-spezifische Writes bleiben bis zum Schreibkern erhalten |
 
 Jede Datenmigration benoetigt Backup-/Restore-Nachweis, Migration-Ledger,
 Zielversion, ID-Mapping, Hash/Diff und Rollback-ID. Ein Fehler darf nie durch

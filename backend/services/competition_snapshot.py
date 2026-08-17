@@ -243,6 +243,7 @@ def _common_match_fields(match: dict, collection: str, engine: str) -> dict:
         "order": match.get("order") if match.get("order") is not None else match.get("match_index"),
         "is_preview": bool(match.get("is_preview") or match.get("status") == "preview"),
         "generation_mode": match.get("generation_mode"),
+        "settings": deepcopy(match.get("settings") or {}),
         "collection": collection,
         "source": {"engine": engine, "collection": collection},
     }

@@ -6,6 +6,7 @@ from services.competition_read import (
     find_match_source,
     load_competition_read_model,
     load_registration_matches,
+    load_scheduled_matches,
     observe_structure_read,
 )
 
@@ -48,8 +49,12 @@ class FakeCollection:
                     return False
                 continue
             values = self._values(row, key)
-            if isinstance(expected, dict) and "$in" in expected:
-                if not any(value in expected["$in"] for value in values):
+            if isinstance(expected, dict):
+                if "$in" in expected and not any(value in expected["$in"] for value in values):
+                    return False
+                if "$gte" in expected and not any(value is not None and value >= expected["$gte"] for value in values):
+                    return False
+                if "$lte" in expected and not any(value is not None and value <= expected["$lte"] for value in values):
                     return False
             elif expected not in values:
                 return False
@@ -74,6 +79,7 @@ class FakeDb:
             "participant_a_id": "r1",
             "participant_b_id": "r2",
             "status": "ready",
+            "scheduled_at": "2026-08-17T12:00:00+00:00",
         }])
         self.matches_v2 = FakeCollection([{
             "id": "stage-1",
@@ -84,6 +90,7 @@ class FakeDb:
             "results": [],
             "advancement": [],
             "status": "pending",
+            "scheduled_at": "2026-08-17T11:00:00+00:00",
         }])
         self.tournament_stages = FakeCollection([{
             "id": "s1",
@@ -136,3 +143,15 @@ def test_registration_read_and_status_counts_cover_both_stores():
     assert {match["id"] for match in matches} == {"legacy-1", "stage-1"}
     assert asyncio.run(count_matches_by_status(db, {"ready", "pending"})) == 2
     assert asyncio.run(count_matches_by_status(db, {"disputed"})) == 0
+
+
+def test_scheduled_match_read_covers_both_stores_and_sorts_canonically():
+    matches = asyncio.run(load_scheduled_matches(
+        FakeDb(),
+        scheduled_from="2026-08-17T10:00:00+00:00",
+        scheduled_until="2026-08-17T13:00:00+00:00",
+        statuses={"pending", "ready"},
+    ))
+
+    assert [match["id"] for match in matches] == ["stage-1", "legacy-1"]
+    assert [match["collection"] for match in matches] == ["matches_v2", "matches"]

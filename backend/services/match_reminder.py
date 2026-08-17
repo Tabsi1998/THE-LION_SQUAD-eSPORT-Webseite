@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from database import get_db
 from match_rules import participant_source_ids
 from models import now_utc
+from services.competition_read import load_scheduled_matches
 from services.user_notifications import build_public_url, create_user_notification
 
 logger = logging.getLogger("tls.match_reminders")
@@ -99,102 +100,97 @@ async def schedule_match_reminders() -> dict:
     db = get_db()
     now = now_utc()
     horizon = now + timedelta(hours=25)
-    queries = [
-        ("matches", db.matches.find({
-            "scheduled_at": {"$gte": now.isoformat(), "$lte": horizon.isoformat()},
-            "status": {"$in": ["pending", "scheduled", "ready", "in_progress"]},
-        })),
-        ("matches_v2", db.matches_v2.find({
-            "scheduled_at": {"$gte": now.isoformat(), "$lte": horizon.isoformat()},
-            "status": {"$in": ["pending", "scheduled", "ready", "in_progress"]},
-        })),
-    ]
+    matches = await load_scheduled_matches(
+        db,
+        scheduled_from=now.isoformat(),
+        scheduled_until=horizon.isoformat(),
+        statuses={"pending", "scheduled", "ready", "in_progress"},
+    )
     queued = 0
     notifications = 0
     actual_start_only = 0
-    for _collection_name, cursor in queries:
-        async for m in cursor:
-            try:
-                scheduled = datetime.fromisoformat(m["scheduled_at"].replace("Z", "+00:00"))
-            except Exception:
-                continue
-            if scheduled.tzinfo is None:
-                scheduled = scheduled.replace(tzinfo=timezone.utc)
-            diff_min = (scheduled - now).total_seconds() / 60
-            # Tournament + opponent context
-            t = await db.tournaments.find_one(
-                {"id": m.get("tournament_id")},
-                {
-                    "title": 1,
-                    "slug": 1,
-                    "event_mode": 1,
-                    "schedule_mode": 1,
-                    "location": 1,
-                    "stream_link": 1,
-                },
-            ) or {}
-            if _uses_actual_start_notifications(t):
-                actual_start_only += 1
-                continue
-            url = f"/matches/{m.get('id')}"
-            mail_url = await build_public_url(url)
-            when_str = scheduled.astimezone(ZoneInfo("Europe/Vienna")).strftime("%d.%m. %H:%M Uhr")
-            station = await _station_label(m)
+    for m in matches:
+        try:
+            scheduled = datetime.fromisoformat(m["scheduled_at"].replace("Z", "+00:00"))
+        except Exception:
+            continue
+        if scheduled.tzinfo is None:
+            scheduled = scheduled.replace(tzinfo=timezone.utc)
+        diff_min = (scheduled - now).total_seconds() / 60
+        # Tournament + opponent context
+        t = await db.tournaments.find_one(
+            {"id": m.get("tournament_id")},
+            {
+                "title": 1,
+                "slug": 1,
+                "event_mode": 1,
+                "schedule_mode": 1,
+                "location": 1,
+                "stream_link": 1,
+            },
+        ) or {}
+        if _uses_actual_start_notifications(t):
+            actual_start_only += 1
+            continue
+        url = f"/matches/{m.get('id')}"
+        mail_url = await build_public_url(url)
+        when_str = scheduled.astimezone(ZoneInfo("Europe/Vienna")).strftime("%d.%m. %H:%M Uhr")
+        station = await _station_label(m)
 
-            participants = await _participants_for_match(m)
-            if len(participants) < 1:
-                continue
-            for p in participants:
-                opp_name = _opponent_label(participants, p)
-                for tpl_key, label, lead_min, window in LEAD_TIMES:
-                    # Match this lead time? (within ±window)
-                    if abs(diff_min - lead_min) > window:
-                        continue
-                    if label == "10m":
-                        dedupe_notification = f"match_reminder:{m.get('id')}:{p.get('id')}:web:{label}"
-                        exists = await db.notifications.find_one(
-                            {
-                                "user_id": p.get("id"),
-                                "kind": "match_reminder",
-                                "meta.dedupe_key": dedupe_notification,
-                            },
-                            {"_id": 1},
-                        )
-                        if not exists:
-                            station_part = f" an {station}" if station else ""
-                            await create_user_notification(
-                                p.get("id"),
-                                "Match startet in 10 Minuten",
-                                f"{t.get('title', 'Turnier')} gegen {opp_name} um {when_str}{station_part}.",
-                                url=url,
-                                kind="match_reminder",
-                                meta={
-                                    "category": "match_reminders",
-                                    "dedupe_key": dedupe_notification,
-                                    "match_id": m.get("id"),
-                                    "tournament_id": m.get("tournament_id"),
-                                    "lead_time": label,
-                                    "station": station,
-                                },
-                            )
-                            notifications += 1
-                    if label not in EMAIL_LEAD_LABELS:
-                        continue
-                    if not p.get("email"):
-                        continue
-                    from services.notification_preferences import send_user_template
-                    dedupe = f"match_reminder:{m.get('id')}:{p.get('id')}:{label}"
-                    result = await send_user_template(
-                        p, tpl_key,
-                        tournament_title=t.get("title", "Turnier"),
-                        opponent=opp_name,
-                        when=when_str,
-                        url=mail_url,
-                        station=station,
-                        dedupe_key=dedupe,
+        participants = await _participants_for_match(m)
+        if len(participants) < 1:
+            continue
+        for p in participants:
+            opp_name = _opponent_label(participants, p)
+            for tpl_key, label, lead_min, window in LEAD_TIMES:
+                # Match this lead time? (within ±window)
+                if abs(diff_min - lead_min) > window:
+                    continue
+                if label == "10m":
+                    dedupe_notification = f"match_reminder:{m.get('id')}:{p.get('id')}:web:{label}"
+                    exists = await db.notifications.find_one(
+                        {
+                            "user_id": p.get("id"),
+                            "kind": "match_reminder",
+                            "meta.dedupe_key": dedupe_notification,
+                        },
+                        {"_id": 1},
                     )
-                    if result.get("ok") and not result.get("skipped") and not result.get("deduped"):
-                        queued += 1
+                    if not exists:
+                        station_part = f" an {station}" if station else ""
+                        await create_user_notification(
+                            p.get("id"),
+                            "Match startet in 10 Minuten",
+                            f"{t.get('title', 'Turnier')} gegen {opp_name} um {when_str}{station_part}.",
+                            url=url,
+                            kind="match_reminder",
+                            meta={
+                                "category": "match_reminders",
+                                "dedupe_key": dedupe_notification,
+                                "match_id": m.get("id"),
+                                "tournament_id": m.get("tournament_id"),
+                                "lead_time": label,
+                                "station": station,
+                            },
+                        )
+                        notifications += 1
+                if label not in EMAIL_LEAD_LABELS:
+                    continue
+                if not p.get("email"):
+                    continue
+                from services.notification_preferences import send_user_template
+                dedupe = f"match_reminder:{m.get('id')}:{p.get('id')}:{label}"
+                result = await send_user_template(
+                    p, tpl_key,
+                    tournament_title=t.get("title", "Turnier"),
+                    opponent=opp_name,
+                    when=when_str,
+                    url=mail_url,
+                    station=station,
+                    dedupe_key=dedupe,
+                )
+                if result.get("ok") and not result.get("skipped") and not result.get("deduped"):
+                    queued += 1
     if queued or notifications:
         logger.info(f"[match-reminders] queued {queued} mails, created {notifications} web notifications")
     return {
