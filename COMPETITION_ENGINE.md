@@ -176,7 +176,8 @@ geschrieben.
 | Preise / Saisonwertung | kanonische Platzierungsprojektion aktiv | RankingPolicy bleibt Teil des spaeteren Schreibkerns |
 | Widget / Match-PDF | kanonische Struktur bzw. variable Slots aktiv | alte Widget-Felder bis zum Frontend-Cutover behalten |
 | Badges / Admin-Zaehler | kanonische Match-/Platzierungsreads bzw. beide Stores aktiv | keine Legacy-Sonderlogik mehr hinzufuegen |
-| Penalties / Disputes | weiterhin Legacy-lastig | vor Engine-Cutover fachlich vereinheitlichen |
+| Penalty-Transparenz | Legacy- und Stage-/FFA-Forfeits kanonisch sichtbar | Schreibregeln bleiben getrennt |
+| Disputes / Forfeit-Schreibpfad | weiterhin Legacy-lastig | in Package 3 fachlich vereinheitlichen |
 | Reminder / Notifications / Stationen | beide Formen mit Sonderzweigen | gemeinsame Match-Projektion verwenden |
 
 Jede Datenmigration benoetigt Backup-/Restore-Nachweis, Migration-Ledger,
