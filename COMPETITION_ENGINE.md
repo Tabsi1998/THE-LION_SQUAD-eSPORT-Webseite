@@ -173,7 +173,7 @@ geschrieben.
 | Match-Detail | `canonical_match` zusaetzlich aktiv | UI nach Paritaet umstellen |
 | Turnier-Standings | kanonisch aktiv | konfigurierbare RankingPolicy folgt im Schreibkern |
 | Profile / DSGVO | kanonische Standings, Match-Stats, Export und Referenz-Anonymisierung aktiv | weitere Chat-/Termin-/Audit-Referenzen separat pruefen |
-| Preise / Saisonwertung | beide Stores, aber eigene Projektionen | kanonische Standings konsumieren |
+| Preise / Saisonwertung | kanonische Platzierungsprojektion aktiv | RankingPolicy bleibt Teil des spaeteren Schreibkerns |
 | Widget / Match-PDF | kanonische Struktur bzw. variable Slots aktiv | alte Widget-Felder bis zum Frontend-Cutover behalten |
 | Badges / Admin-Zaehler / Penalties | weiterhin Legacy-lastig | vor Engine-Cutover migrieren |
 | Reminder / Notifications / Stationen | beide Formen mit Sonderzweigen | gemeinsame Match-Projektion verwenden |

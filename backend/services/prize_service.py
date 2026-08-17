@@ -10,6 +10,8 @@ from typing import Optional
 
 from database import get_db
 from models import new_id, now_utc
+from services.competition_read import load_competition_read_model, observe_structure_read
+from services.competition_standings import placements_for_structure
 
 logger = logging.getLogger("tls.prizes")
 
@@ -22,110 +24,6 @@ def _log_safe(value, limit: int = 160) -> str:
 
 def _ordinal(rank: int) -> str:
     return f"{rank}."
-
-
-def _section_key(value) -> str:
-    return str(value or "").strip().lower()
-
-
-def _match_section(match: dict) -> str:
-    return _section_key(match.get("section") or match.get("bracket"))
-
-
-def _stage_standings(matches_v2: list[dict], regs: list[dict], sections: set[str] | None = None) -> list[dict]:
-    """Rank stage-engine registrations using the same public standings signals."""
-    rank_map = {
-        r["id"]: {
-            "registration_id": r["id"],
-            "played": 0,
-            "won": 0,
-            "top2": 0,
-            "lost": 0,
-            "points": 0,
-            "rank_sum": 0,
-            "furthest_round": 0,
-            "best_rank": None,
-        }
-        for r in regs
-        if r.get("id")
-    }
-    wanted_sections = {_section_key(section) for section in sections or set() if section}
-    for match in matches_v2:
-        if wanted_sections and _match_section(match) not in wanted_sections:
-            continue
-        if match.get("status") not in {"completed", "forfeit"}:
-            continue
-        for result in match.get("results") or []:
-            rid = result.get("registration_id")
-            if rid not in rank_map:
-                continue
-            rank = int(result.get("rank") or 999)
-            row = rank_map[rid]
-            row["played"] += 1
-            row["rank_sum"] += rank
-            row["furthest_round"] = max(row["furthest_round"], int(match.get("round") or 0))
-            row["best_rank"] = rank if row["best_rank"] is None else min(row["best_rank"], rank)
-            if rank == 1:
-                row["won"] += 1
-            if rank <= 2:
-                row["top2"] += 1
-            else:
-                row["lost"] += 1
-            score = result.get("points")
-            if score is None:
-                score = result.get("score")
-            if isinstance(score, (int, float)):
-                row["points"] += score
-    rows = list(rank_map.values())
-    for row in rows:
-        row["avg_rank"] = round(row["rank_sum"] / row["played"], 2) if row["played"] else None
-    rows.sort(key=lambda row: (
-        row["furthest_round"],
-        row["won"],
-        row["top2"],
-        row["points"],
-        -(row["avg_rank"] or 999),
-    ), reverse=True)
-    for index, row in enumerate(rows, start=1):
-        row["rank"] = index
-    return [row for row in rows if row.get("played")]
-
-
-def _placements_from_stage(matches_v2: list[dict], regs: list[dict], sections: set[str] | None = None) -> dict[int, dict]:
-    reg_map = {r["id"]: r for r in regs if r.get("id")}
-    placements: dict[int, dict] = {}
-    for row in _stage_standings(matches_v2, regs, sections):
-        rid = row.get("registration_id")
-        rank = row.get("rank")
-        reg = reg_map.get(rid)
-        if not rid or not rank or not reg or rank in placements:
-            continue
-        placements[int(rank)] = {
-            "user_id": reg.get("user_id"),
-            "team_id": reg.get("team_id"),
-        }
-    return placements
-
-
-def _placements_from_legacy(matches: list[dict], reg_map: dict[str, dict], sections: set[str] | None = None) -> dict[int, dict]:
-    placements: dict[int, dict] = {}
-    wanted_sections = {_section_key(section) for section in sections or set() if section}
-    for match in matches:
-        if wanted_sections and _match_section(match) not in wanted_sections:
-            continue
-        rid = match.get("winner_id")
-        rank = match.get("final_position")
-        if not rid or not rank or rid not in reg_map:
-            continue
-        rank = int(rank)
-        if rank in placements:
-            continue
-        reg = reg_map[rid]
-        placements[rank] = {
-            "user_id": reg.get("user_id"),
-            "team_id": reg.get("team_id"),
-        }
-    return placements
 
 
 def _resolve_prize_place(raw_place, placements: dict[int, dict]) -> int | None:
@@ -152,26 +50,18 @@ async def auto_create_for_tournament(tid: str) -> int:
         return 0
 
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
-    reg_map = {r["id"]: r for r in regs}
-    matches = await db.matches.find(
-        {"tournament_id": tid, "final_position": {"$ne": None}}, {"_id": 0}
-    ).to_list(500)
-    matches_v2 = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    read_model = await load_competition_read_model(db, tid)
+    snapshot = read_model.structure_snapshot()
+    observe_structure_read(snapshot, surface="prize_pickups")
 
-    overall = _placements_from_legacy(matches, reg_map)
-    if not overall and matches_v2:
-        overall = _placements_from_stage(matches_v2, regs)
+    overall = placements_for_structure(snapshot, regs)
 
     winner_sections = {"wb", "winner", "main", "final", "gf", "grand_final"}
     loser_sections = {"lb", "loser"}
-    winner = _placements_from_legacy(matches, reg_map, winner_sections)
-    if not winner and matches_v2:
-        winner = _placements_from_stage(matches_v2, regs, winner_sections)
+    winner = placements_for_structure(snapshot, regs, sections=winner_sections)
     if not winner:
         winner = overall
-    loser = _placements_from_legacy(matches, reg_map, loser_sections)
-    if not loser and matches_v2:
-        loser = _placements_from_stage(matches_v2, regs, loser_sections)
+    loser = placements_for_structure(snapshot, regs, sections=loser_sections)
     placements_by_group = {
         "overall": overall,
         "winner": winner,
