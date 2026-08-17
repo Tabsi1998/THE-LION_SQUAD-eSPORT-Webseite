@@ -31,6 +31,7 @@ from services.tournament_permissions import (
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.competition_formats import find_format_capability
+from services.competition_snapshot import build_structure_snapshot
 from services.match_v2_results import (
     MatchV2ResultError,
     build_v2_result_application,
@@ -3201,6 +3202,12 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
             r["user"] = {"id": u.get("id"), "username": u.get("username"),
                          "display_name": u.get("display_name"), "avatar_url": u.get("avatar_url")}
     t["can_view_display"] = bool(is_staff)
+    structure = build_structure_snapshot(
+        t["id"],
+        legacy_matches=matches,
+        stage_matches=matches_v2,
+        stages=stages,
+    )
     return {
         "tournament": t,
         "matches": matches,
@@ -3208,6 +3215,7 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
         "stages": stages,
         "matches_v2": matches_v2,
         "engine": "stage" if stages or matches_v2 else "legacy",
+        "structure": structure,
     }
 
 
