@@ -7,6 +7,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from routes.tournament_routes import (
     _can_create_initial_stage_preview,
+    _can_rebuild_bracket_from_format,
     _create_initial_bracket_preview,
     _finalize_bracket_for_checkin,
     _can_create_initial_legacy_preview,
@@ -94,6 +95,9 @@ def test_initial_preview_skips_unsupported_or_too_large_formats():
     assert _can_create_initial_stage_preview({"format": "battle_royale", "max_participants": 8}) is True
     assert _can_create_initial_stage_preview({"format": "custom_bracket", "max_participants": 8}) is True
     assert _can_create_initial_stage_preview({"format": "ffa_custom_bracket", "max_participants": 8}) is True
+    assert _can_rebuild_bracket_from_format({"format": "custom_bracket", "max_participants": 64}) is True
+    assert _can_rebuild_bracket_from_format({"format": "ffa_custom_bracket", "max_participants": 64}) is True
+    assert _can_rebuild_bracket_from_format({"format": "time_trial", "max_participants": 64}) is False
 
 
 def test_mixed_preview_fills_free_slots_with_preview_seeds():

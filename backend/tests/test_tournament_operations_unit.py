@@ -2,7 +2,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import HTTPException
@@ -14,6 +14,17 @@ from routes.station_routes import (
 )
 from services.match_reminder import _uses_actual_start_notifications
 from models import RegistrationUpdate, TournamentCreate, TournamentStageCreate
+
+
+class _Cursor:
+    def __init__(self, rows):
+        self.rows = list(rows)
+
+    def sort(self, *_args, **_kwargs):
+        return self
+
+    async def to_list(self, _limit):
+        return list(self.rows)
 
 
 def _legacy_match(**updates):
@@ -391,3 +402,194 @@ def test_tournament_stage_creation_replay_reuses_existing_document(monkeypatch):
     assert "creation_key" not in result
     stages.insert_one.assert_not_awaited()
     audit.assert_not_awaited()
+
+
+def _bracket_rebuild_db(*, tournament, legacy_matches=None, v2_matches=None,
+                        existing_stage=None, registrations=None):
+    matches = SimpleNamespace(
+        find=Mock(return_value=_Cursor(legacy_matches or [])),
+        delete_many=AsyncMock(),
+        insert_many=AsyncMock(),
+    )
+    matches_v2 = SimpleNamespace(
+        find=Mock(return_value=_Cursor(v2_matches or [])),
+        delete_many=AsyncMock(),
+        insert_many=AsyncMock(),
+    )
+    stages = SimpleNamespace(
+        find_one=AsyncMock(return_value=existing_stage),
+        insert_one=AsyncMock(),
+        delete_one=AsyncMock(),
+        delete_many=AsyncMock(),
+    )
+    tournament_registrations = SimpleNamespace(
+        find=Mock(return_value=_Cursor(registrations or [])),
+    )
+    return SimpleNamespace(
+        tournaments=SimpleNamespace(find_one=AsyncMock(return_value=tournament)),
+        matches=matches,
+        matches_v2=matches_v2,
+        tournament_stages=stages,
+        tournament_registrations=tournament_registrations,
+        match_reports_v2=SimpleNamespace(delete_many=AsyncMock()),
+    )
+
+
+def _patch_bracket_rebuild_dependencies(monkeypatch, db):
+    async def identity(value):
+        return value
+
+    async def unlocked(db_arg, tournament_id):
+        return await db_arg.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+
+    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_routes, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_routes, "_ensure_tournament_unlocked", unlocked)
+    monkeypatch.setattr(tournament_routes, "require_tournament_staff_permission", AsyncMock())
+    monkeypatch.setattr(tournament_routes, "_audit_tournament_action", AsyncMock())
+
+
+@pytest.mark.parametrize(("tournament_format", "stage_type", "match_type", "match_count"), [
+    ("custom_bracket", "custom_bracket", "duel", 63),
+    ("ffa_custom_bracket", "ffa_custom_bracket", "ffa", 17),
+])
+def test_rebuild_from_format_supports_64_player_custom_brackets(
+    monkeypatch,
+    tournament_format,
+    stage_type,
+    match_type,
+    match_count,
+):
+    tournament = {
+        "id": "t1",
+        "format": tournament_format,
+        "max_participants": 64,
+        "match_duration_minutes": 30,
+        "seeding_mode": "manual",
+        "status": "draft",
+    }
+    db = _bracket_rebuild_db(tournament=tournament)
+    _patch_bracket_rebuild_dependencies(monkeypatch, db)
+
+    result = asyncio.run(tournament_routes.rebuild_bracket_from_tournament_format(
+        "t1",
+        tournament_routes.TournamentBracketStructurePayload(
+            name="Turnierbaum",
+            stage_type=stage_type,
+            match_type=match_type,
+        ),
+        preview=True,
+        me={"id": "admin-1"},
+    ))
+
+    assert result["engine"] == "stages"
+    assert result["match_count"] == match_count
+    inserted_matches = db.matches_v2.insert_many.await_args.args[0]
+    assert len(inserted_matches) == match_count
+    assert all(match["is_preview"] for match in inserted_matches)
+    db.tournament_stages.insert_one.assert_awaited_once()
+
+
+def test_invalid_custom_schema_preserves_existing_bracket(monkeypatch):
+    tournament = {
+        "id": "t1",
+        "format": "ffa_custom_bracket",
+        "max_participants": 64,
+        "match_duration_minutes": 30,
+        "seeding_mode": "manual",
+        "status": "draft",
+    }
+    old_match = {
+        "id": "old-match",
+        "tournament_id": "t1",
+        "stage_id": "old-stage",
+        "is_preview": True,
+        "status": "preview",
+    }
+    old_stage = {
+        "id": "old-stage",
+        "tournament_id": "t1",
+        "number": 1,
+        "name": "Alter Baum",
+        "stage_type": "ffa_custom_bracket",
+        "match_type": "ffa",
+        "settings": {},
+    }
+    db = _bracket_rebuild_db(
+        tournament=tournament,
+        v2_matches=[old_match],
+        existing_stage=old_stage,
+    )
+    _patch_bracket_rebuild_dependencies(monkeypatch, db)
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(tournament_routes.rebuild_bracket_from_tournament_format(
+            "t1",
+            tournament_routes.TournamentBracketStructurePayload(
+                name="Neuer Baum",
+                stage_type="ffa_custom_bracket",
+                match_type="ffa",
+                settings={"schema": "[MAIN]\nA=[ungueltig]"},
+            ),
+            preview=True,
+            me={"id": "admin-1"},
+        ))
+
+    assert error.value.status_code == 400
+    assert "Ungültiger Slot-Ausdruck" in error.value.detail
+    db.matches.delete_many.assert_not_awaited()
+    db.matches_v2.delete_many.assert_not_awaited()
+    db.tournament_stages.delete_many.assert_not_awaited()
+    db.tournament_stages.insert_one.assert_not_awaited()
+    db.matches_v2.insert_many.assert_not_awaited()
+
+
+def test_custom_bracket_write_failure_cleans_new_generation_only(monkeypatch):
+    tournament = {
+        "id": "t1",
+        "format": "custom_bracket",
+        "max_participants": 8,
+        "match_duration_minutes": 30,
+        "seeding_mode": "manual",
+        "status": "draft",
+    }
+    old_match = {
+        "id": "old-match",
+        "tournament_id": "t1",
+        "stage_id": "old-stage",
+        "is_preview": True,
+        "status": "preview",
+    }
+    db = _bracket_rebuild_db(
+        tournament=tournament,
+        v2_matches=[old_match],
+        existing_stage={
+            "id": "old-stage",
+            "tournament_id": "t1",
+            "number": 1,
+            "stage_type": "custom_bracket",
+            "match_type": "duel",
+            "settings": {},
+        },
+    )
+    db.matches_v2.insert_many.side_effect = RuntimeError("database write failed")
+    _patch_bracket_rebuild_dependencies(monkeypatch, db)
+
+    with pytest.raises(RuntimeError, match="database write failed"):
+        asyncio.run(tournament_routes.rebuild_bracket_from_tournament_format(
+            "t1",
+            tournament_routes.TournamentBracketStructurePayload(
+                stage_type="custom_bracket",
+                match_type="duel",
+            ),
+            preview=True,
+            me={"id": "admin-1"},
+        ))
+
+    db.tournament_stages.insert_one.assert_awaited_once()
+    cleanup_query = db.matches_v2.delete_many.await_args.args[0]
+    assert cleanup_query.get("id", {}).get("$in")
+    db.tournament_stages.delete_one.assert_awaited_once()
+    db.matches.delete_many.assert_not_awaited()
+    db.tournament_stages.delete_many.assert_not_awaited()
+    db.match_reports_v2.delete_many.assert_not_awaited()

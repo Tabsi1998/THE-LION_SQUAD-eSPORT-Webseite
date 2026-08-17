@@ -190,6 +190,14 @@ def _can_create_initial_stage_preview(tournament: dict) -> bool:
     return (tournament.get("format") or "single_elim") in STAGE_AUTO_PREVIEW_FORMATS
 
 
+def _can_rebuild_bracket_from_format(tournament: dict) -> bool:
+    """Return whether either bracket engine supports the tournament format."""
+    return (
+        _can_create_initial_legacy_preview(tournament)
+        or _can_create_initial_stage_preview(tournament)
+    )
+
+
 def _legacy_plan_key(match: dict) -> tuple:
     return (
         "legacy",
@@ -2761,7 +2769,7 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
     tid = await _resolve_tid(tid)
     tournament = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
-    if not _can_create_initial_legacy_preview(tournament):
+    if not _can_rebuild_bracket_from_format(tournament):
         raise HTTPException(status_code=400, detail="Für dieses Format gibt es keinen automatischen Format-Bracket-Generator.")
     if tournament.get("status") in ("live", "paused", "completed", "results_published", "archived") and not force:
         raise HTTPException(status_code=409, detail="Laufende oder beendete Turniere brauchen force=true.")
@@ -2783,11 +2791,6 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
         raise HTTPException(status_code=409, detail="Es gibt bereits echte Spiele. Mit force=true neu aufbauen.")
 
     v2_match_ids = [match["id"] for match in v2_matches if match.get("id")]
-    await db.matches.delete_many({"tournament_id": tid})
-    await db.matches_v2.delete_many({"tournament_id": tid})
-    if v2_match_ids:
-        await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
-    await db.tournament_stages.delete_many({"tournament_id": tid})
 
     stage_defaults = _stage_defaults_for_tournament_format(tournament, body)
     if stage_defaults:
@@ -2810,8 +2813,28 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
         if not matches:
             raise HTTPException(status_code=400, detail="Die Struktur erzeugt keine Spiele.")
         _apply_match_plan(matches, match_plan, _v2_plan_key)
-        await db.tournament_stages.insert_one(stage)
-        await db.matches_v2.insert_many(matches)
+
+        # Build and validate the replacement before touching the active bracket.
+        # Insert the new generation first so a database write failure can be
+        # cleaned up without losing the previous structure.
+        new_match_ids = [match["id"] for match in matches if match.get("id")]
+        try:
+            await db.tournament_stages.insert_one(stage)
+            await db.matches_v2.insert_many(matches)
+        except Exception:
+            if new_match_ids:
+                await db.matches_v2.delete_many({"id": {"$in": new_match_ids}})
+            await db.tournament_stages.delete_one({"id": stage["id"]})
+            raise
+
+        await db.matches.delete_many({"tournament_id": tid})
+        if v2_match_ids:
+            await db.matches_v2.delete_many({"id": {"$in": v2_match_ids}})
+            await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
+        await db.tournament_stages.delete_many({
+            "tournament_id": tid,
+            "id": {"$ne": stage["id"]},
+        })
         await _audit_tournament_action(
             db,
             "tournament.bracket.rebuild_from_structure",
@@ -2840,9 +2863,13 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
         tournament,
         me.get("id"),
         preview=preview,
-        force=False,
+        force=force,
         set_live=False,
     )
+    if v2_match_ids:
+        await db.matches_v2.delete_many({"id": {"$in": v2_match_ids}})
+        await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
+    await db.tournament_stages.delete_many({"tournament_id": tid})
     await _audit_tournament_action(
         db,
         "tournament.bracket.rebuild_from_format",
