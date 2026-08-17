@@ -145,4 +145,5 @@ jobs:
         working-directory: mobile
         run: |
           npx expo install --check
-          npx expo-doctor
+          # Keep CI reproducible until the Expo SDK 57 migration in #117 is complete.
+          npx --yes expo-doctor@1.20.1
