@@ -5,6 +5,7 @@ from database import get_db
 from auth import hash_password
 from models import new_id, now_utc
 from runtime_config import resolve_app_environment
+from services.competition_versions import new_competition_version_fields
 
 
 async def seed_admin(admin_email: str, admin_password: str) -> bool:
@@ -234,6 +235,7 @@ async def seed_demo_data(demo_password: str):
     # Mario Kart Tournament (Single Elim, 16 players)
     mk_tid = new_id()
     await db.tournaments.insert_one({
+        **new_competition_version_fields("single_elim"),
         "id": mk_tid, "slug": "mario-kart-winter-cup",
         "title": "Mario Kart Winter Cup",
         "description": "Das klassische Mario Kart Turnier. Single Elimination, Best of 3.",
@@ -275,6 +277,7 @@ async def seed_demo_data(demo_password: str):
     # Smash Tournament - Double Elim, Draft
     smash_tid = new_id()
     await db.tournaments.insert_one({
+        **new_competition_version_fields("double_elim"),
         "id": smash_tid, "slug": "smash-showdown-q1",
         "title": "Smash Showdown Q1",
         "description": "Super Smash Bros. Ultimate. Double Elimination, Best of 5 im Finale.",

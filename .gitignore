@@ -31,6 +31,7 @@ yarn-error.log*
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest_tmp_*/
 .mypy_cache/
 .ruff_cache/
 .coverage

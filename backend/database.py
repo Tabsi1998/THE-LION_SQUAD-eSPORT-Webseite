@@ -56,6 +56,8 @@ async def init_indexes():
     await db.tournaments.create_index("status")
     await db.tournaments.create_index("game_id")
     await db.tournaments.create_index("event_id")
+    await db.tournaments.create_index("engine_version")
+    await db.tournaments.create_index("ruleset_version")
     # Registrations
     await db.tournament_registrations.create_index("id", unique=True)
     await db.tournament_registrations.create_index([("tournament_id", 1), ("user_id", 1)])
