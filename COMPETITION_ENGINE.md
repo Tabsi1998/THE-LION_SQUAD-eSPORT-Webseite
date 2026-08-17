@@ -139,6 +139,22 @@ Beweise/Disputes und konfigurierbare Punkte/Tiebreaker.
 9. Legacy-Schreibwege read-only schalten, Nutzung messen und spaeter separat
    entfernen.
 
+## Kanonischer Read-Vertrag v1
+
+`backend/services/competition_snapshot.py` projiziert beide aktiven
+Matchspeicher rein lesend auf `competition.structure.v1`. Der Vertrag enthaelt
+stabile Match-IDs, variable Slots, normalisierte Resultate und explizite
+Advancement-Kanten sowie Scheduling-/Stationsfelder und die Herkunft des
+Dokuments. Er schreibt weder in MongoDB noch veraendert er Quelldokumente.
+
+Der Match-Overview-Service ist der erste produktive Leser dieses Vertrags. Die
+bestehende Bracket-API liefert die Projektion zusaetzlich als `structure`, ohne
+`matches`, `matches_v2`, `stages` oder `engine` zu entfernen. `collection`
+bleibt fuer bestehende Deep Links erhalten, waehrend Legacy-A/B und Stage-Slots
+intern denselben Pfad verwenden. Golden-/Differentialtests vergleichen
+engine-unabhaengige Semantik; eine read-only Integritaetspruefung meldet
+doppelte IDs, fehlende Ziele/Slots, doppelte Slotquellen und Advancement-Zyklen.
+
 Jede Datenmigration benoetigt Backup-/Restore-Nachweis, Migration-Ledger,
 Zielversion, ID-Mapping, Hash/Diff und Rollback-ID. Ein Fehler darf nie durch
 erneute Bracket-Generierung "repariert" werden.

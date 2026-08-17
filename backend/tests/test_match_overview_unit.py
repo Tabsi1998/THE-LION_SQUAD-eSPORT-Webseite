@@ -121,3 +121,31 @@ def test_operational_overview_honors_exact_match_assignment():
     assert [row["id"] for row in rows] == ["m-live"]
     assert rows[0]["can_submit_result"] is True
     assert rows[0]["is_own_match"] is False
+
+
+def test_own_overview_uses_same_contract_for_stage_matches():
+    db = FakeDb()
+    db.matches = FakeCollection()
+    db.matches_v2 = FakeCollection([{
+        "id": "m-stage",
+        "tournament_id": "t1",
+        "stage_id": "s1",
+        "stage_number": 1,
+        "match_key": "A",
+        "round": 1,
+        "status": "in_progress",
+        "slots": [
+            {"slot": 1, "source": {"type": "seed", "seed": 1}, "registration_id": "r-own", "status": "filled"},
+            {"slot": 2, "source": {"type": "seed", "seed": 2}, "registration_id": "r-other", "status": "filled"},
+        ],
+        "results": [],
+        "advancement": [],
+    }])
+
+    rows, _registrations = asyncio.run(own_match_overviews(db, {"id": "u1", "role": "user"}))
+
+    assert [row["id"] for row in rows] == ["m-stage"]
+    assert rows[0]["collection"] == "matches_v2"
+    assert rows[0]["participant_names"] == ["Lion", "Opponent"]
+    assert rows[0]["opponent_name"] == "Opponent"
+    assert rows[0]["is_own_match"] is True
