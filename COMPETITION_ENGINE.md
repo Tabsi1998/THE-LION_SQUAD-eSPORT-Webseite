@@ -155,6 +155,29 @@ intern denselben Pfad verwenden. Golden-/Differentialtests vergleichen
 engine-unabhaengige Semantik; eine read-only Integritaetspruefung meldet
 doppelte IDs, fehlende Ziele/Slots, doppelte Slotquellen und Advancement-Zyklen.
 
+`backend/services/competition_read.py` ist die Datenbankgrenze fuer Struktur
+und Match-Detail. `backend/services/competition_standings.py` berechnet Stage-,
+Elimination-, Round-Robin-, Liga-, Swiss- und Gruppenstaende ausschliesslich
+aus der kanonischen Projektion. Jeder produktive Struktur-Read erzeugt
+niedrig-kardinale Counts fuer Quellen, Status, Resultate, Advancement und
+Integritaetsfehler; `compare_structure_snapshots` liefert begrenzte
+Shadow-Diffs fuer eine spaetere Bestandsmigration. Dabei wird nichts doppelt
+geschrieben.
+
+### Read-Consumer-Status
+
+| Consumer | Status | Naechster Schritt |
+| --- | --- | --- |
+| Bracket-API / Display | kanonische `structure` zusaetzlich aktiv | Frontend schrittweise auf `structure` umstellen |
+| Match-Overview | kanonisch aktiv | keine Legacy-Sonderlogik mehr hinzufuegen |
+| Match-Detail | `canonical_match` zusaetzlich aktiv | UI nach Paritaet umstellen |
+| Turnier-Standings | kanonisch aktiv | konfigurierbare RankingPolicy folgt im Schreibkern |
+| Profile / DSGVO | beide Stores, aber eigene Projektionen | auf Read-Service umstellen |
+| Preise / Saisonwertung | beide Stores, aber eigene Projektionen | kanonische Standings konsumieren |
+| Widget / Match-PDF | weiterhin Legacy-only | priorisierter naechster Read-Consumer |
+| Badges / Admin-Zaehler / Penalties | weiterhin Legacy-lastig | vor Engine-Cutover migrieren |
+| Reminder / Notifications / Stationen | beide Formen mit Sonderzweigen | gemeinsame Match-Projektion verwenden |
+
 Jede Datenmigration benoetigt Backup-/Restore-Nachweis, Migration-Ledger,
 Zielversion, ID-Mapping, Hash/Diff und Rollback-ID. Ein Fehler darf nie durch
 erneute Bracket-Generierung "repariert" werden.

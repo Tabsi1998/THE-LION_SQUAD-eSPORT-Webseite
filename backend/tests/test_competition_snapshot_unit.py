@@ -3,8 +3,10 @@ from services.competition_snapshot import (
     adapt_legacy_matches,
     adapt_stage_matches,
     build_structure_snapshot,
+    compare_structure_snapshots,
     semantic_match_projection,
     structure_snapshot_issues,
+    structure_snapshot_metrics,
 )
 
 
@@ -228,3 +230,22 @@ def test_structure_snapshot_validator_reports_broken_duplicate_and_cyclic_edges(
     codes = {issue["code"] for issue in structure_snapshot_issues(snapshot)}
 
     assert {"duplicate_match_id", "missing_advancement_target", "advancement_cycle"} <= codes
+
+
+def test_shadow_diff_and_metrics_are_bounded_and_machine_readable():
+    reference = build_structure_snapshot("t1", legacy_matches=_legacy_fixture())
+    equivalent = build_structure_snapshot("t1", stage_matches=_stage_fixture())
+    changed_fixture = _stage_fixture()
+    changed_fixture[0]["status"] = "in_progress"
+    candidate = build_structure_snapshot("t1", stage_matches=changed_fixture)
+
+    assert compare_structure_snapshots(reference, equivalent)["equivalent"] is True
+    diff = compare_structure_snapshots(reference, candidate)
+    metrics = structure_snapshot_metrics(reference)
+
+    assert diff["mismatch_count"] == 1
+    assert diff["mismatch_ids"] == ["m1"]
+    assert metrics["source_counts"] == {"legacy": 3}
+    assert metrics["result_count"] == 2
+    assert metrics["advancement_count"] == 2
+    assert metrics["integrity_issue_count"] == 0
