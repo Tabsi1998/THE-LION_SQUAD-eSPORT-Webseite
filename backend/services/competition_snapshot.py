@@ -232,6 +232,7 @@ def _common_match_fields(match: dict, collection: str, engine: str) -> dict:
         "match_type": match.get("match_type") or "duel",
         "status": match.get("status") or "pending",
         "scheduled_at": match.get("scheduled_at"),
+        "updated_at": match.get("updated_at"),
         "duration_minutes": match.get("duration_minutes"),
         "station_id": match.get("station_id"),
         "station": deepcopy(match.get("station")),

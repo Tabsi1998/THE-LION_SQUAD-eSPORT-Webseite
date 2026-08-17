@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from database import get_db
 from auth import require_admin, get_current_user
 from models import now_utc
+from services.competition_read import count_matches_by_status
 from services.user_notifications import create_user_notification
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -114,13 +115,15 @@ async def dashboard(me: dict = Depends(require_admin())):
     tournament_registrations = {
         "pending": await db.tournament_registrations.count_documents({"status": "pending"}),
     }
+    today_matches = await count_matches_by_status(db, {"ready", "in_progress"})
+    open_disputes = await count_matches_by_status(db, {"disputed"})
     return {
         "player_count": await db.users.count_documents({"is_active": True}),
         "team_count": await db.teams.count_documents({}),
         "active_tournaments": await db.tournaments.count_documents({"status": {"$in": ["live", "check_in"]}}),
         "registration_open": await db.tournaments.count_documents({"status": "registration_open"}),
-        "today_matches": await db.matches.count_documents({"status": {"$in": ["ready", "in_progress"]}}),
-        "open_disputes": await db.matches.count_documents({"status": "disputed"}),
+        "today_matches": today_matches,
+        "open_disputes": open_disputes,
         "active_f1": await db.f1_challenges.count_documents({"status": "live"}),
         "total_tournaments": await db.tournaments.count_documents({}),
         "total_f1_challenges": await db.f1_challenges.count_documents({}),

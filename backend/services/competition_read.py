@@ -11,7 +11,12 @@ import asyncio
 from dataclasses import dataclass
 import logging
 
-from services.competition_snapshot import build_structure_snapshot, structure_snapshot_metrics
+from services.competition_snapshot import (
+    adapt_legacy_matches,
+    adapt_stage_matches,
+    build_structure_snapshot,
+    structure_snapshot_metrics,
+)
 
 
 logger = logging.getLogger("tls.competition_read")
@@ -90,6 +95,54 @@ async def load_competition_read_model(
         stage_matches=stage_matches,
         stages=stages,
     )
+
+
+async def load_registration_matches(
+    db,
+    registration_ids: list[str] | set[str],
+    *,
+    limit: int = 5000,
+) -> list[dict]:
+    """Load canonical matches referencing any supplied registration."""
+
+    ids = sorted({registration_id for registration_id in registration_ids if registration_id})
+    if not ids:
+        return []
+    legacy_cursor = db.matches.find(
+        {"$or": [
+            {"participant_a_id": {"$in": ids}},
+            {"participant_b_id": {"$in": ids}},
+            {"winner_id": {"$in": ids}},
+            {"loser_id": {"$in": ids}},
+        ]},
+        {"_id": 0},
+    )
+    stage_cursor = db.matches_v2.find(
+        {"$or": [
+            {"slots.registration_id": {"$in": ids}},
+            {"results.registration_id": {"$in": ids}},
+        ]},
+        {"_id": 0},
+    )
+    legacy, stage = await asyncio.gather(
+        legacy_cursor.to_list(limit),
+        stage_cursor.to_list(limit),
+    )
+    return [*adapt_legacy_matches(legacy), *adapt_stage_matches(stage)]
+
+
+async def count_matches_by_status(db, statuses: set[str]) -> int:
+    """Count operational matches across both stores for dashboard surfaces."""
+
+    wanted = sorted({status for status in statuses if status})
+    if not wanted:
+        return 0
+    query = {"status": {"$in": wanted}}
+    legacy_count, stage_count = await asyncio.gather(
+        db.matches.count_documents(query),
+        db.matches_v2.count_documents(query),
+    )
+    return legacy_count + stage_count
 
 
 async def find_match_source(db, match_id: str) -> MatchSourceRecord | None:

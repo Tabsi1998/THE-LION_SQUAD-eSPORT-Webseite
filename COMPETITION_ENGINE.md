@@ -175,7 +175,8 @@ geschrieben.
 | Profile / DSGVO | kanonische Standings, Match-Stats, Export und Referenz-Anonymisierung aktiv | weitere Chat-/Termin-/Audit-Referenzen separat pruefen |
 | Preise / Saisonwertung | kanonische Platzierungsprojektion aktiv | RankingPolicy bleibt Teil des spaeteren Schreibkerns |
 | Widget / Match-PDF | kanonische Struktur bzw. variable Slots aktiv | alte Widget-Felder bis zum Frontend-Cutover behalten |
-| Badges / Admin-Zaehler / Penalties | weiterhin Legacy-lastig | vor Engine-Cutover migrieren |
+| Badges / Admin-Zaehler | kanonische Match-/Platzierungsreads bzw. beide Stores aktiv | keine Legacy-Sonderlogik mehr hinzufuegen |
+| Penalties / Disputes | weiterhin Legacy-lastig | vor Engine-Cutover fachlich vereinheitlichen |
 | Reminder / Notifications / Stationen | beide Formen mit Sonderzweigen | gemeinsame Match-Projektion verwenden |
 
 Jede Datenmigration benoetigt Backup-/Restore-Nachweis, Migration-Ledger,
