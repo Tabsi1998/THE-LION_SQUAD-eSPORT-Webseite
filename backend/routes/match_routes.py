@@ -25,6 +25,7 @@ from models import (
 )
 from bracket_engine import advance_match_winner
 from match_rules import loser_for_winner, match_allows_draw, validate_winner_id
+from services.competition_read import canonical_match_for_source, find_match_source
 from services.match_notifications import notify_match_result_confirmed
 from services.match_overview import operational_match_overviews, own_match_overviews
 from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
@@ -209,13 +210,9 @@ async def _audit_match_action(db, action: str, match: dict, actor_id: str | None
 
 
 async def _find_match_any(match_id: str) -> tuple[dict, str]:
-    db = get_db()
-    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
-    if match:
-        return match, "matches_v2"
-    match = await db.matches.find_one({"id": match_id}, {"_id": 0})
-    if match:
-        return match, "matches"
+    source = await find_match_source(get_db(), match_id)
+    if source:
+        return source.match, source.collection
     raise HTTPException(status_code=404, detail="Match nicht gefunden")
 
 
@@ -622,8 +619,10 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     if not matchday_label:
         prefix = "Spieltag" if league_like else "Runde"
         matchday_label = f"{prefix} {round_number}" if round_number else "Match"
+    canonical_match = await canonical_match_for_source(db, match, collection)
     return {
         "match": match,
+        "canonical_match": canonical_match,
         "tournament": tournament,
         "stage": stage,
         "participants": await _match_participants(match, user),

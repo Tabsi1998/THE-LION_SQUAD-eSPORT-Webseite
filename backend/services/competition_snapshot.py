@@ -7,6 +7,7 @@ specific fields before any tournament changes its source of truth.
 
 from __future__ import annotations
 
+from collections import Counter
 from copy import deepcopy
 from typing import Iterable
 
@@ -373,6 +374,44 @@ def semantic_match_projection(match: dict) -> dict:
     }
 
 
+def compare_structure_snapshots(reference: dict, candidate: dict) -> dict:
+    """Return bounded semantic diff metrics for migration shadow reads."""
+
+    reference_by_id = {
+        match.get("id"): semantic_match_projection(match)
+        for match in reference.get("matches") or []
+        if match.get("id")
+    }
+    candidate_by_id = {
+        match.get("id"): semantic_match_projection(match)
+        for match in candidate.get("matches") or []
+        if match.get("id")
+    }
+    reference_ids = set(reference_by_id)
+    candidate_ids = set(candidate_by_id)
+    shared_ids = reference_ids & candidate_ids
+    mismatches = sorted(
+        match_id
+        for match_id in shared_ids
+        if reference_by_id[match_id] != candidate_by_id[match_id]
+    )
+    missing_ids = sorted(reference_ids - candidate_ids)
+    extra_ids = sorted(candidate_ids - reference_ids)
+    return {
+        "reference_count": len(reference_ids),
+        "candidate_count": len(candidate_ids),
+        "shared_count": len(shared_ids),
+        "mismatch_count": len(mismatches),
+        "missing_count": len(missing_ids),
+        "extra_count": len(extra_ids),
+        "equivalent": not mismatches and not missing_ids and not extra_ids,
+        "mismatch_ids": mismatches[:25],
+        "missing_ids": missing_ids[:25],
+        "extra_ids": extra_ids[:25],
+        "truncated": any(len(items) > 25 for items in (mismatches, missing_ids, extra_ids)),
+    }
+
+
 def structure_snapshot_issues(snapshot: dict) -> list[dict]:
     """Validate read-side graph references without changing source data."""
 
@@ -438,3 +477,27 @@ def structure_snapshot_issues(snapshot: dict) -> list[dict]:
     if any(visit(match_id) for match_id in graph if match_id not in visited):
         issues.append({"code": "advancement_cycle"})
     return issues
+
+
+def structure_snapshot_metrics(snapshot: dict) -> dict:
+    """Build low-cardinality read metrics without persisting another model."""
+
+    matches = snapshot.get("matches") or []
+    issues = structure_snapshot_issues(snapshot)
+    source_counts = Counter(
+        match.get("source", {}).get("engine") or "unknown"
+        for match in matches
+    )
+    status_counts = Counter(str(match.get("status") or "unknown") for match in matches)
+    issue_counts = Counter(issue["code"] for issue in issues)
+    return {
+        "schema_version": snapshot.get("schema_version"),
+        "match_count": len(matches),
+        "stage_count": len(snapshot.get("stages") or []),
+        "source_counts": dict(sorted(source_counts.items())),
+        "status_counts": dict(sorted(status_counts.items())),
+        "result_count": sum(len(match.get("results") or []) for match in matches),
+        "advancement_count": sum(len(match.get("advancement") or []) for match in matches),
+        "integrity_issue_count": len(issues),
+        "integrity_issue_counts": dict(sorted(issue_counts.items())),
+    }

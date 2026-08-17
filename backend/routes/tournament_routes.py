@@ -31,7 +31,9 @@ from services.tournament_permissions import (
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.competition_formats import find_format_capability
-from services.competition_snapshot import build_structure_snapshot
+from services.competition_read import load_competition_read_model, observe_structure_read
+from services.competition_snapshot import adapt_stage_matches
+from services.competition_standings import stage_standings, standings_for_structure
 from services.match_v2_results import (
     MatchV2ResultError,
     build_v2_result_application,
@@ -46,9 +48,9 @@ from models import (
     TournamentStageCreate, TournamentStageUpdate,
     now_utc, new_id,
 )
-from bracket_engine import generate_bracket, compute_round_robin_standings
+from bracket_engine import generate_bracket
 from bracket_extensions import (
-    generate_swiss_round, compute_swiss_standings, generate_groups, compute_group_standings,
+    generate_swiss_round, generate_groups,
 )
 from services.user_notifications import create_user_notification
 
@@ -3027,7 +3029,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             if not placements:
                 matches_v2 = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
                 if matches_v2:
-                    for row in _v2_standings(matches_v2, regs):
+                    for row in stage_standings(adapt_stage_matches(matches_v2), regs):
                         rid = row.get("registration_id")
                         if not rid or rid not in reg_map or rid in placed_reg_ids or not row.get("played"):
                             continue
@@ -3176,9 +3178,10 @@ async def export_match_plan_csv(tid: str, me: dict = Depends(get_current_user)):
 
 async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool) -> dict:
     t["public_phase"] = derive_public_phase(t, "tournament")
-    matches = await db.matches.find({"tournament_id": t["id"]}, {"_id": 0}).sort("round", 1).to_list(1000)
-    stages = await db.tournament_stages.find({"tournament_id": t["id"]}, {"_id": 0}).sort("number", 1).to_list(200)
-    matches_v2 = await db.matches_v2.find({"tournament_id": t["id"]}, {"_id": 0}).sort([("stage_number", 1), ("round", 1), ("order", 1)]).to_list(3000)
+    read_model = await load_competition_read_model(db, t["id"])
+    matches = read_model.legacy_matches
+    stages = read_model.stages
+    matches_v2 = read_model.stage_matches
     await attach_station_info(db, matches)
     await attach_station_info(db, matches_v2)
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
@@ -3202,12 +3205,8 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
             r["user"] = {"id": u.get("id"), "username": u.get("username"),
                          "display_name": u.get("display_name"), "avatar_url": u.get("avatar_url")}
     t["can_view_display"] = bool(is_staff)
-    structure = build_structure_snapshot(
-        t["id"],
-        legacy_matches=matches,
-        stage_matches=matches_v2,
-        stages=stages,
-    )
+    structure = read_model.structure_snapshot()
+    observe_structure_read(structure, surface="bracket")
     return {
         "tournament": t,
         "matches": matches,
@@ -3245,61 +3244,6 @@ async def get_bracket_display(tid: str, me: dict = Depends(get_current_user)):
     return await _build_bracket_payload(db, t, me, True)
 
 
-def _v2_standings(matches_v2: list[dict], regs: list[dict]) -> list[dict]:
-    rank_map = {
-        r["id"]: {
-            "registration_id": r["id"],
-            "display_name": r.get("display_name") or r.get("ingame_name") or r.get("user", {}).get("display_name"),
-            "played": 0,
-            "won": 0,
-            "top2": 0,
-            "lost": 0,
-            "points": 0,
-            "rank_sum": 0,
-            "furthest_round": 0,
-            "best_rank": None,
-        }
-        for r in regs
-    }
-    for match in matches_v2:
-        if match.get("status") not in {"completed", "forfeit"}:
-            continue
-        for result in match.get("results") or []:
-            rid = result.get("registration_id")
-            if rid not in rank_map:
-                continue
-            rank = int(result.get("rank") or 999)
-            row = rank_map[rid]
-            row["played"] += 1
-            row["rank_sum"] += rank
-            row["furthest_round"] = max(row["furthest_round"], int(match.get("round") or 0))
-            row["best_rank"] = rank if row["best_rank"] is None else min(row["best_rank"], rank)
-            if rank == 1:
-                row["won"] += 1
-            if rank <= 2:
-                row["top2"] += 1
-            else:
-                row["lost"] += 1
-            score = result.get("points")
-            if score is None:
-                score = result.get("score")
-            if isinstance(score, (int, float)):
-                row["points"] += score
-    rows = list(rank_map.values())
-    for row in rows:
-        row["avg_rank"] = round(row["rank_sum"] / row["played"], 2) if row["played"] else None
-    rows.sort(key=lambda row: (
-        row["furthest_round"],
-        row["won"],
-        row["top2"],
-        row["points"],
-        -(row["avg_rank"] or 999),
-    ), reverse=True)
-    for i, row in enumerate(rows, start=1):
-        row["rank"] = i
-    return rows
-
-
 @router.get("/{tid}/standings")
 async def standings(tid: str, access: str | None = None, user=Depends(get_optional_user)):
     db = get_db()
@@ -3312,8 +3256,7 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
     else:
         t = await _get_visible_tournament(tid, user)
     is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
-    matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(1000)
-    matches_v2 = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    read_model = await load_competition_read_model(db, tid)
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
     regs = [_public_registration(r, user, is_staff) for r in regs]
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
@@ -3323,35 +3266,17 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
         u = users.get(r.get("user_id") or "", {})
         r["display_name"] = r.get("display_name") or u.get("display_name") or u.get("username")
         r["user"] = {"id": u.get("id"), "username": u.get("username"), "display_name": u.get("display_name"), "avatar_url": u.get("avatar_url")}
-    if matches_v2:
-        return _v2_standings(matches_v2, regs)
-    fmt = t.get("format")
-    if fmt in ("round_robin", "league"):
-        return compute_round_robin_standings(matches, regs)
-    if fmt == "swiss":
-        return compute_swiss_standings(regs, matches)
-    if fmt == "groups":
+    groups = []
+    if t.get("format") == "groups":
         groups = await db.tournament_groups.find({"tournament_id": tid}, {"_id": 0}).to_list(50)
-        reg_map = {r["id"]: r for r in regs}
-        return compute_group_standings(groups, matches, reg_map)
-    # Elimination fallback
-    rank_map = {r["id"]: {"registration_id": r["id"], "display_name": r["display_name"],
-                           "furthest_round": 0, "wins": 0, "losses": 0} for r in regs}
-    for m in matches:
-        a, b, w = m.get("participant_a_id"), m.get("participant_b_id"), m.get("winner_id")
-        if a in rank_map and m.get("round"):
-            rank_map[a]["furthest_round"] = max(rank_map[a]["furthest_round"], m["round"])
-        if b in rank_map and m.get("round"):
-            rank_map[b]["furthest_round"] = max(rank_map[b]["furthest_round"], m["round"])
-        if m.get("status") == "completed" and w:
-            loser = a if w == b else b
-            if w in rank_map: rank_map[w]["wins"] += 1
-            if loser in rank_map: rank_map[loser]["losses"] += 1
-    arr = list(rank_map.values())
-    arr.sort(key=lambda s: (s["furthest_round"], s["wins"]), reverse=True)
-    for i, s in enumerate(arr):
-        s["rank"] = i + 1
-    return arr
+    structure = read_model.structure_snapshot()
+    observe_structure_read(structure, surface="standings")
+    return standings_for_structure(
+        t,
+        structure,
+        regs,
+        groups=groups,
+    )
 
 
 # ---------- Swiss / Groups specific ----------
