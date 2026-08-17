@@ -81,7 +81,12 @@ def assert_upload_writable() -> None:
 
 def build_uvicorn_args() -> list[str]:
     port = os.environ.get("PORT", "8001")
-    args = ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", port]
+    # The SSE invalidation stream is currently in-process. Keep one worker
+    # explicit even if WEB_CONCURRENCY is present in the host environment.
+    args = [
+        "uvicorn", "server:app", "--host", "0.0.0.0", "--port", port,
+        "--workers", "1",
+    ]
     if env_flag("TRUST_PROXY_HEADERS"):
         args.extend([
             "--proxy-headers",

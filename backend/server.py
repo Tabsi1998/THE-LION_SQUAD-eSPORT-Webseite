@@ -7,7 +7,7 @@ load_dotenv(ROOT / ".env")
 import os
 import logging
 from urllib.parse import urlparse
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -56,7 +56,12 @@ from routes.search_routes import router as search_router
 from routes.extras_routes import (
     settings_router, season_router, widget_router, dsgvo_router, pdf_router, audit_router,
 )
-from services.change_events import change_event_stream, publish_api_change
+from services.change_events import (
+    change_event_stream,
+    publish_api_change,
+    visibility_scope_for_user,
+)
+from auth import get_optional_user
 from services.csrf import (
     UNSAFE_METHODS,
     csrf_rejection_detail,
@@ -355,9 +360,9 @@ async def health():
 
 
 @app.get("/api/changes/stream")
-async def changes_stream(request: Request):
+async def changes_stream(request: Request, user: dict | None = Depends(get_optional_user)):
     return StreamingResponse(
-        change_event_stream(request),
+        change_event_stream(request, visibility_scope_for_user(user)),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-store",

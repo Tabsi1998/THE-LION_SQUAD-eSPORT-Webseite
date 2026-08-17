@@ -60,6 +60,16 @@ def test_entrypoint_limits_forwarded_headers_to_configured_proxy_networks(monkey
     assert args[args.index("--forwarded-allow-ips") + 1] == "127.0.0.1/32,172.20.0.0/24"
 
 
+def test_entrypoint_pins_one_worker_for_in_process_live_events(monkeypatch):
+    fake_pwd = types.SimpleNamespace(struct_passwd=object)
+    monkeypatch.setitem(sys.modules, "pwd", fake_pwd)
+    monkeypatch.setenv("WEB_CONCURRENCY", "4")
+    entrypoint = runpy.run_path(str(Path(__file__).resolve().parents[1] / "docker-entrypoint.py"))
+
+    args = entrypoint["build_uvicorn_args"]()
+    assert args[args.index("--workers") + 1] == "1"
+
+
 def test_rate_limit_identity_ignores_unvalidated_forwarding_headers():
     from services.rate_limit import get_client_ip
 
