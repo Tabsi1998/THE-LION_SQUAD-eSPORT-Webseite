@@ -11,6 +11,8 @@ from collections import Counter
 from copy import deepcopy
 from typing import Iterable
 
+from services.competition_graph_validation import validate_competition_graph
+
 
 STRUCTURE_SNAPSHOT_VERSION = "competition.structure.v1"
 
@@ -30,6 +32,11 @@ def _slot_position(value) -> int | None:
     if normalized in {"b", "2"}:
         return 2
     return _positive_int(normalized)
+
+
+def _stage_outcome(value) -> str:
+    flow = str(value or "R").strip().upper()
+    return {"W": "winner", "L": "loser", "R": "rank"}.get(flow, flow.lower())
 
 
 def _legacy_advancement(match: dict) -> list[dict]:
@@ -54,11 +61,9 @@ def _legacy_advancement(match: dict) -> list[dict]:
 def _stage_advancement(match: dict) -> list[dict]:
     edges: list[dict] = []
     for edge in match.get("advancement") or []:
-        flow = str(edge.get("flow") or "R").upper()
-        outcome = {"W": "winner", "L": "loser", "R": "rank"}.get(flow, "rank")
         edges.append({
-            "outcome": outcome,
-            "rank": _positive_int(edge.get("rank"), 1),
+            "outcome": _stage_outcome(edge.get("flow")),
+            "rank": 1 if edge.get("rank") in (None, "") else edge.get("rank"),
             "to_match_id": edge.get("to_match_id"),
             "to_match_key": edge.get("to_match_key"),
             "to_position": _slot_position(edge.get("to_slot")),
@@ -209,15 +214,14 @@ def _stage_source(source: dict, match_ids_by_key: dict[tuple[str | None, str], s
     if source_type == "bye":
         return {"type": "bye"}
     if source_type == "rank":
-        flow = str(source.get("flow") or "R").upper()
         match_key = source.get("match_key")
         stage_id = source.get("stage_id")
         return {
             "type": "match_result",
             "match_id": source.get("match_id") or match_ids_by_key.get((stage_id, match_key)),
             "match_key": match_key,
-            "outcome": {"W": "winner", "L": "loser", "R": "rank"}.get(flow, "rank"),
-            "rank": _positive_int(source.get("rank"), 1),
+            "outcome": _stage_outcome(source.get("flow")),
+            "rank": 1 if source.get("rank") in (None, "") else source.get("rank"),
         }
     return deepcopy(source) if source else {"type": "unassigned"}
 
@@ -422,70 +426,9 @@ def compare_structure_snapshots(reference: dict, candidate: dict) -> dict:
 
 
 def structure_snapshot_issues(snapshot: dict) -> list[dict]:
-    """Validate read-side graph references without changing source data."""
+    """Return canonical graph issues without changing source data."""
 
-    issues: list[dict] = []
-    matches = snapshot.get("matches") or []
-    by_id: dict[str, dict] = {}
-    for match in matches:
-        match_id = match.get("id")
-        if not match_id:
-            issues.append({"code": "missing_match_id"})
-            continue
-        if match_id in by_id:
-            issues.append({"code": "duplicate_match_id", "match_id": match_id})
-            continue
-        by_id[match_id] = match
-
-    graph: dict[str, set[str]] = {match_id: set() for match_id in by_id}
-    incoming_slots: set[tuple[str, int]] = set()
-    for source_id, match in by_id.items():
-        for edge in match.get("advancement") or []:
-            target_id = edge.get("to_match_id")
-            position = edge.get("to_position")
-            if not target_id or target_id not in by_id:
-                issues.append({
-                    "code": "missing_advancement_target",
-                    "match_id": source_id,
-                    "target_id": target_id,
-                })
-                continue
-            valid_positions = {slot.get("position") for slot in by_id[target_id].get("slots") or []}
-            if position not in valid_positions:
-                issues.append({
-                    "code": "missing_target_slot",
-                    "match_id": source_id,
-                    "target_id": target_id,
-                    "position": position,
-                })
-                continue
-            slot_key = (target_id, position)
-            if slot_key in incoming_slots:
-                issues.append({
-                    "code": "duplicate_target_slot_source",
-                    "target_id": target_id,
-                    "position": position,
-                })
-            incoming_slots.add(slot_key)
-            graph[source_id].add(target_id)
-
-    visiting: set[str] = set()
-    visited: set[str] = set()
-
-    def visit(match_id: str) -> bool:
-        if match_id in visiting:
-            return True
-        if match_id in visited:
-            return False
-        visiting.add(match_id)
-        has_cycle = any(visit(target_id) for target_id in graph.get(match_id, set()))
-        visiting.remove(match_id)
-        visited.add(match_id)
-        return has_cycle
-
-    if any(visit(match_id) for match_id in graph if match_id not in visited):
-        issues.append({"code": "advancement_cycle"})
-    return issues
+    return validate_competition_graph(snapshot)["issues"]
 
 
 def structure_snapshot_metrics(snapshot: dict) -> dict:
