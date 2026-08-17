@@ -33,6 +33,11 @@ from services.custom_bracket import BracketSchemaError, build_matches_v2_from_sc
 from services.competition_formats import find_format_capability
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import placement_rows_for_structure, standings_for_structure
+from services.competition_versions import (
+    apply_competition_version_read_defaults,
+    new_competition_version_fields,
+    persist_competition_versions,
+)
 from services.match_v2_results import (
     MatchV2ResultError,
     build_v2_result_application,
@@ -100,6 +105,9 @@ def _compact_tournament(t: dict) -> dict:
         "registration_open_from": t.get("registration_open_from"),
         "registration_open_until": t.get("registration_open_until"),
         "is_invite_only": t.get("is_invite_only"),
+        "engine_version": t.get("engine_version"),
+        "ruleset_version": t.get("ruleset_version"),
+        "version_inferred": bool(t.get("version_inferred")),
         "game": {
             "id": game.get("id"),
             "name": game.get("name"),
@@ -874,6 +882,7 @@ async def _generate_legacy_bracket_docs(db, tournament: dict, actor_id: str | No
     if existing_matches:
         await db.matches.delete_many({"tournament_id": tid})
     await db.matches.insert_many(matches)
+    await persist_competition_versions(db, tournament, "classic")
     if set_live and not preview:
         await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live", "updated_at": now_utc().isoformat()}})
     await _audit_tournament_action(
@@ -926,6 +935,7 @@ async def _create_initial_stage_bracket_preview(db, tournament: dict, actor_id: 
 
     await db.tournament_stages.insert_one(stage)
     await db.matches_v2.insert_many(matches)
+    await persist_competition_versions(db, tournament, "graph")
     await _audit_tournament_action(
         db,
         "tournament.stage.preview_create",
@@ -991,6 +1001,7 @@ async def _refresh_preview_bracket_after_registration(db, tournament: dict, acto
     if existing_matches:
         await db.matches.delete_many({"tournament_id": tid})
     await db.matches.insert_many(matches)
+    await persist_competition_versions(db, tournament, "classic")
     await _audit_tournament_action(
         db,
         "tournament.bracket.preview_refresh",
@@ -1058,6 +1069,7 @@ async def _refresh_stage_previews_after_registration(db, tournament: dict, actor
     if not changed_stages:
         return None
 
+    await persist_competition_versions(db, tournament, "graph")
     await _audit_tournament_action(
         db,
         "tournament.stage.preview_refresh",
@@ -1150,6 +1162,7 @@ async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: s
 
     if not changed_stages:
         return None
+    await persist_competition_versions(db, tournament, "graph")
     await _audit_tournament_action(
         db,
         "tournament.stage.finalize_checkin",
@@ -1307,6 +1320,7 @@ async def _rebuild_checkin_bracket_after_staff_change(db, tournament: dict, acto
 
         if not changed_stages:
             return None
+        await persist_competition_versions(db, tournament, "graph")
         await _audit_tournament_action(
             db,
             "tournament.stage.checkin_rebuild_after_registration",
@@ -1456,6 +1470,7 @@ async def _apply_checked_in_badges(user_id: str, tid: str) -> None:
 async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
     db = get_db()
     t.pop("creation_key", None)
+    apply_competition_version_read_defaults(t)
     t["public_phase"] = derive_public_phase(t, "tournament")
     if t.get("game_id"):
         g = await db.games.find_one({"id": t["game_id"]}, {"_id": 0})
@@ -1683,6 +1698,7 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
             existing = await db.tournaments.find_one({"creation_key": creation_key}, {"_id": 0})
             if existing:
                 existing.pop("creation_key", None)
+                apply_competition_version_read_defaults(existing)
                 return {**existing, "auto_generated_bracket": None, "idempotent_replay": True}
             # Validate game
             if not await db.games.find_one({"id": body.game_id}):
@@ -1698,6 +1714,7 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
                       "check_in_until", "start_date", "end_date"]:
                 doc[k] = _iso(doc.get(k))
             doc["id"] = new_id()
+            doc.update(new_competition_version_fields(doc.get("format")))
             # Allow scheduling directly (announced) — fall back to draft.
             if not doc.get("status"):
                 doc["status"] = "draft"
@@ -1711,10 +1728,12 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
                 if not existing:
                     raise HTTPException(status_code=409, detail="Turnier konnte wegen einer parallelen Erstellung nicht angelegt werden")
                 existing.pop("creation_key", None)
+                apply_competition_version_read_defaults(existing)
                 return {**existing, "auto_generated_bracket": None, "idempotent_replay": True}
             auto_preview = await _create_initial_bracket_preview(db, doc, me.get("id"))
             doc.pop("_id", None)
             doc.pop("creation_key", None)
+            apply_competition_version_read_defaults(doc)
             doc["auto_generated_bracket"] = auto_preview
             doc["idempotent_replay"] = False
             return doc
@@ -1765,6 +1784,7 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     await db.tournaments.update_one({"id": tid}, {"$set": updates})
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     t.pop("creation_key", None)
+    apply_competition_version_read_defaults(t)
     return t
 
 
@@ -2680,6 +2700,7 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
         {"id": stage_id},
         {"$set": {"status": "pending" if preview else "ready", "updated_at": now_utc().isoformat()}},
     )
+    await persist_competition_versions(db, tournament, "graph")
     await _audit_tournament_action(
         db,
         "tournament.stage.generate",
@@ -2843,6 +2864,7 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
             "tournament_id": tid,
             "id": {"$ne": stage["id"]},
         })
+        await persist_competition_versions(db, tournament, "graph")
         await _audit_tournament_action(
             db,
             "tournament.bracket.rebuild_from_structure",
@@ -3281,6 +3303,7 @@ async def swiss_next_round(tid: str, me: dict = Depends(require_admin()),
     matches = generate_swiss_round(tid, regs, prev, next_round_num, t.get("best_of", 1))
     if matches:
         await db.matches.insert_many(matches)
+        await persist_competition_versions(db, t, "classic")
     if t.get("status") == "draft":
         await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live"}})
     return {"ok": True, "round": next_round_num, "match_count": len(matches)}
@@ -3310,6 +3333,7 @@ async def groups_generate(tid: str, body: dict, me: dict = Depends(require_admin
         await db.tournament_groups.insert_many(res["groups"])
     if res["matches"]:
         await db.matches.insert_many(res["matches"])
+        await persist_competition_versions(db, t, "classic")
     await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live"}})
     return {"ok": True, "group_count": len(res["groups"]), "match_count": len(res["matches"])}
 

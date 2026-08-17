@@ -36,24 +36,25 @@ def test_catalog_only_targets_known_stage_and_match_types():
 
 
 @pytest.mark.parametrize(
-    ("format_key", "initial_engine", "rebuild_engine", "stage_type", "match_type"),
+    ("format_key", "write_model", "initial_engine", "rebuild_engine", "stage_type", "match_type"),
     [
-        ("single_elim", "legacy", "stage", "single_elimination", "duel"),
-        ("double_elim", "legacy", "stage", "double_elimination", "duel"),
-        ("round_robin", "legacy", "legacy", "round_robin_groups", "duel"),
-        ("swiss", "none", "none", "swiss", "duel"),
-        ("groups", "none", "none", "round_robin_groups", "duel"),
-        ("ffa", "stage", "stage", "simple", "ffa"),
-        ("battle_royale", "stage", "stage", "simple", "ffa"),
-        ("league", "legacy", "legacy", "league", "duel"),
-        ("time_trial", "none", "none", "simple", "ffa"),
-        ("grand_prix", "none", "none", "ffa_league", "ffa"),
-        ("custom_bracket", "stage", "stage", "custom_bracket", "duel"),
-        ("ffa_custom_bracket", "stage", "stage", "ffa_custom_bracket", "ffa"),
+        ("single_elim", "classic", "legacy", "stage", "single_elimination", "duel"),
+        ("double_elim", "classic", "legacy", "stage", "double_elimination", "duel"),
+        ("round_robin", "classic", "legacy", "legacy", "round_robin_groups", "duel"),
+        ("swiss", "classic", "none", "none", "swiss", "duel"),
+        ("groups", "classic", "none", "none", "round_robin_groups", "duel"),
+        ("ffa", "graph", "stage", "stage", "simple", "ffa"),
+        ("battle_royale", "graph", "stage", "stage", "simple", "ffa"),
+        ("league", "classic", "legacy", "legacy", "league", "duel"),
+        ("time_trial", "external", "none", "none", "simple", "ffa"),
+        ("grand_prix", "external", "none", "none", "ffa_league", "ffa"),
+        ("custom_bracket", "graph", "stage", "stage", "custom_bracket", "duel"),
+        ("ffa_custom_bracket", "graph", "stage", "stage", "ffa_custom_bracket", "ffa"),
     ],
 )
 def test_catalog_records_current_routing_and_canonical_target(
     format_key,
+    write_model,
     initial_engine,
     rebuild_engine,
     stage_type,
@@ -61,6 +62,7 @@ def test_catalog_records_current_routing_and_canonical_target(
 ):
     entry = get_format_capability(format_key)
 
+    assert entry.current_write_model == write_model
     assert entry.initial_preview_engine == initial_engine
     assert entry.rebuild_engine == rebuild_engine
     assert entry.canonical_stage_type == stage_type

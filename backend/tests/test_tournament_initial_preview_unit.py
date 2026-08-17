@@ -72,6 +72,7 @@ class FakeCollection:
 
 class FakeDb:
     def __init__(self, registrations=None):
+        self.tournaments = FakeCollection([{"id": "t1"}])
         self.tournament_stages = FakeCollection()
         self.matches_v2 = FakeCollection()
         self.matches = FakeCollection()
@@ -151,6 +152,8 @@ def test_initial_preview_creates_stage_for_custom_bracket():
         assert len(db.tournament_stages.rows) == 1
         assert len(db.matches_v2.rows) == 3
         assert all(match["is_preview"] for match in db.matches_v2.rows)
+        assert db.tournaments.rows[0]["engine_version"] == "competition.graph.v1"
+        assert db.tournaments.rows[0]["ruleset_version"] == "competition.ruleset.v1"
 
     anyio.run(run)
 
@@ -256,6 +259,8 @@ def test_registration_refresh_replaces_legacy_preview_with_real_players():
         assert {"r1", "r2", "preview-seed-3", "preview-seed-4"} <= participant_ids
         assert "wait" not in participant_ids
         assert all(match["is_preview"] for match in db.matches.rows)
+        assert db.tournaments.rows[0]["engine_version"] == "competition.classic.v1"
+        assert db.tournaments.rows[0]["ruleset_version"] == "competition.ruleset.v1"
 
     anyio.run(run)
 

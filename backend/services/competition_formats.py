@@ -17,6 +17,7 @@ CanonicalMatchType = Literal["duel", "ffa"]
 ResultModel = Literal["duel_score", "ranking", "standings", "time"]
 PairingMode = Literal["static_graph", "scheduled_rounds", "dynamic_rounds", "ranking_series"]
 AutoMatchLimit = Literal["legacy_estimate", "none"]
+CurrentWriteModel = Literal["classic", "graph", "external"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +35,7 @@ class TournamentFormatCapability:
     canonical_match_type: CanonicalMatchType
     result_model: ResultModel
     pairing_mode: PairingMode
+    current_write_model: CurrentWriteModel
     initial_preview_engine: InitialPreviewEngine
     rebuild_engine: RebuildEngine
     stage_generator_available: bool
@@ -53,6 +55,7 @@ _FORMAT_CAPABILITIES = {
         canonical_match_type="duel",
         result_model="duel_score",
         pairing_mode="static_graph",
+        current_write_model="classic",
         initial_preview_engine="legacy",
         rebuild_engine="stage",
         stage_generator_available=True,
@@ -67,6 +70,7 @@ _FORMAT_CAPABILITIES = {
         canonical_match_type="duel",
         result_model="duel_score",
         pairing_mode="static_graph",
+        current_write_model="classic",
         initial_preview_engine="legacy",
         rebuild_engine="stage",
         stage_generator_available=True,
@@ -81,6 +85,7 @@ _FORMAT_CAPABILITIES = {
         canonical_match_type="duel",
         result_model="standings",
         pairing_mode="scheduled_rounds",
+        current_write_model="classic",
         initial_preview_engine="legacy",
         rebuild_engine="legacy",
         stage_generator_available=False,
@@ -95,6 +100,7 @@ _FORMAT_CAPABILITIES = {
         canonical_match_type="duel",
         result_model="standings",
         pairing_mode="dynamic_rounds",
+        current_write_model="classic",
         initial_preview_engine="none",
         rebuild_engine="none",
         stage_generator_available=False,
@@ -109,6 +115,7 @@ _FORMAT_CAPABILITIES = {
         canonical_match_type="duel",
         result_model="standings",
         pairing_mode="scheduled_rounds",
+        current_write_model="classic",
         initial_preview_engine="none",
         rebuild_engine="none",
         stage_generator_available=False,
@@ -123,6 +130,7 @@ _FORMAT_CAPABILITIES = {
         canonical_match_type="ffa",
         result_model="ranking",
         pairing_mode="ranking_series",
+        current_write_model="graph",
         initial_preview_engine="stage",
         rebuild_engine="stage",
         stage_generator_available=True,
@@ -137,6 +145,7 @@ _FORMAT_CAPABILITIES = {
         canonical_match_type="ffa",
         result_model="ranking",
         pairing_mode="ranking_series",
+        current_write_model="graph",
         initial_preview_engine="stage",
         rebuild_engine="stage",
         stage_generator_available=True,
@@ -151,6 +160,7 @@ _FORMAT_CAPABILITIES = {
         canonical_match_type="duel",
         result_model="standings",
         pairing_mode="scheduled_rounds",
+        current_write_model="classic",
         initial_preview_engine="legacy",
         rebuild_engine="legacy",
         stage_generator_available=False,
@@ -165,6 +175,7 @@ _FORMAT_CAPABILITIES = {
         canonical_match_type="ffa",
         result_model="time",
         pairing_mode="ranking_series",
+        current_write_model="external",
         initial_preview_engine="none",
         rebuild_engine="none",
         stage_generator_available=False,
@@ -179,6 +190,7 @@ _FORMAT_CAPABILITIES = {
         canonical_match_type="ffa",
         result_model="ranking",
         pairing_mode="ranking_series",
+        current_write_model="external",
         initial_preview_engine="none",
         rebuild_engine="none",
         stage_generator_available=False,
@@ -193,6 +205,7 @@ _FORMAT_CAPABILITIES = {
         canonical_match_type="duel",
         result_model="duel_score",
         pairing_mode="static_graph",
+        current_write_model="graph",
         initial_preview_engine="stage",
         rebuild_engine="stage",
         stage_generator_available=True,
@@ -207,6 +220,7 @@ _FORMAT_CAPABILITIES = {
         canonical_match_type="ffa",
         result_model="ranking",
         pairing_mode="static_graph",
+        current_write_model="graph",
         initial_preview_engine="stage",
         rebuild_engine="stage",
         stage_generator_available=True,

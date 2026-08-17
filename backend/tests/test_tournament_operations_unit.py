@@ -362,10 +362,40 @@ def test_tournament_creation_replay_reuses_existing_document(monkeypatch):
 
     assert result["id"] == "t1"
     assert result["idempotent_replay"] is True
+    assert result["engine_version"] == "competition.unversioned"
+    assert result["ruleset_version"] == "competition.ruleset.unversioned"
+    assert result["version_inferred"] is True
     assert "creation_key" not in result
     games.find_one.assert_not_awaited()
     tournaments.insert_one.assert_not_awaited()
     preview.assert_not_awaited()
+
+
+def test_tournament_creation_persists_engine_and_ruleset_versions(monkeypatch):
+    tournaments = SimpleNamespace(
+        find_one=AsyncMock(return_value=None),
+        insert_one=AsyncMock(),
+    )
+    games = SimpleNamespace(find_one=AsyncMock(return_value={"id": "game-1"}))
+    db = SimpleNamespace(tournaments=tournaments, games=games)
+    preview = AsyncMock(return_value={"ok": True, "engine": "legacy"})
+
+    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_routes, "mutation_lock", _uncontended_lock)
+    monkeypatch.setattr(tournament_routes, "_create_initial_bracket_preview", preview)
+
+    result = asyncio.run(tournament_routes.create_tournament(
+        TournamentCreate(title="Sommer-Cup", game_id="game-1", format="single_elim"),
+        {"id": "admin-1"},
+    ))
+
+    inserted = tournaments.insert_one.await_args.args[0]
+    assert inserted["engine_version"] == "competition.classic.v1"
+    assert inserted["ruleset_version"] == "competition.ruleset.v1"
+    assert result["engine_version"] == "competition.classic.v1"
+    assert result["ruleset_version"] == "competition.ruleset.v1"
+    assert result["version_inferred"] is False
+    preview.assert_awaited_once()
 
 
 def test_tournament_stage_creation_replay_reuses_existing_document(monkeypatch):
@@ -426,7 +456,10 @@ def _bracket_rebuild_db(*, tournament, legacy_matches=None, v2_matches=None,
         find=Mock(return_value=_Cursor(registrations or [])),
     )
     return SimpleNamespace(
-        tournaments=SimpleNamespace(find_one=AsyncMock(return_value=tournament)),
+        tournaments=SimpleNamespace(
+            find_one=AsyncMock(return_value=tournament),
+            update_one=AsyncMock(),
+        ),
         matches=matches,
         matches_v2=matches_v2,
         tournament_stages=stages,

@@ -185,6 +185,23 @@ Jede Datenmigration benoetigt Backup-/Restore-Nachweis, Migration-Ledger,
 Zielversion, ID-Mapping, Hash/Diff und Rollback-ID. Ein Fehler darf nie durch
 erneute Bracket-Generierung "repariert" werden.
 
+## Persistierter Versionsvertrag
+
+Neue Wettbewerbe speichern `engine_version` und `ruleset_version` im
+Turnierdokument. Die Engine-Namen beschreiben intern das aktuelle Schreibmodell,
+ohne neue oeffentliche Legacy-/V2-Produkte einzufuehren:
+
+- `competition.classic.v1`: aktuelles festes Duel-/Runden-Schreibmodell;
+- `competition.graph.v1`: aktuelles Slot-/Result-/Advancement-Graphmodell;
+- `competition.external.v1`: Wettbewerbsauswertung ausserhalb der Match-Engine;
+- `competition.ruleset.v1`: Schema des derzeitigen Turnier-Regelvertrags.
+
+Ein erfolgreicher Struktur-Write pinnt das tatsaechlich verwendete Schreibmodell.
+Historische Turniere ohne persistierte Angabe werden im Read-Vertrag bewusst als
+`competition.unversioned` bzw. `competition.ruleset.unversioned` gekennzeichnet;
+das Format allein darf die Engine nicht erraten. Eine persistierende
+Bestandszuordnung bleibt Teil des spaeteren Dry Runs mit Hash/Diff und Rollback.
+
 ## Abnahmematrix
 
 - Teilnehmerzahlen 0/1 sowie 3/5/63/64/65 und grosse Strukturen;
