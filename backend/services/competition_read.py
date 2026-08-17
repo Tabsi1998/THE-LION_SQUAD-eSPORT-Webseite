@@ -145,6 +145,33 @@ async def count_matches_by_status(db, statuses: set[str]) -> int:
     return legacy_count + stage_count
 
 
+async def load_scheduled_matches(
+    db,
+    *,
+    scheduled_from: str,
+    scheduled_until: str,
+    statuses: set[str],
+    per_store_limit: int = 5000,
+) -> list[dict]:
+    """Load upcoming canonical matches for reminder and operations readers."""
+
+    query = {
+        "scheduled_at": {"$gte": scheduled_from, "$lte": scheduled_until},
+        "status": {"$in": sorted(statuses)},
+    }
+    legacy_cursor = db.matches.find(query, {"_id": 0})
+    stage_cursor = db.matches_v2.find(query, {"_id": 0})
+    legacy, stage = await asyncio.gather(
+        legacy_cursor.to_list(per_store_limit),
+        stage_cursor.to_list(per_store_limit),
+    )
+    matches = [*adapt_legacy_matches(legacy), *adapt_stage_matches(stage)]
+    return sorted(matches, key=lambda match: (
+        str(match.get("scheduled_at") or ""),
+        str(match.get("id") or ""),
+    ))
+
+
 async def find_match_source(db, match_id: str) -> MatchSourceRecord | None:
     """Resolve a stable match ID while preserving the backing collection."""
 

@@ -11,6 +11,7 @@ from services.tournament_permissions import (
     require_tournament_staff_permission,
 )
 from services.station_runtime import notify_match_started
+from services.competition_read import find_match_source, load_competition_read_model
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
 TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
@@ -33,13 +34,8 @@ async def _require_station_permission(user: dict, tournament_id: str, station_id
 
 
 async def _find_match_for_station(db, match_id: str) -> tuple[str, dict | None]:
-    match = await db.matches.find_one({"id": match_id}, {"_id": 0})
-    if match:
-        return "matches", match
-    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
-    if match:
-        return "matches_v2", match
-    return "", None
+    source = await find_match_source(db, match_id)
+    return (source.collection, source.match) if source else ("", None)
 
 
 def _station_match_status(match: dict, start_now: bool) -> str:
@@ -252,17 +248,14 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
         return {"assigned": 0, "items": [], "planned": bool(plan and not start_now)}
     status_filter = ["ready", "scheduled"] if start_now else ["preview", "pending", "ready", "scheduled"]
     station_filter = {"$in": [None, ""]} if not start_now else {"$in": [None, "", *[station["id"] for station in stations]]}
-    matches = await db.matches.find({
-        "tournament_id": tournament_id,
-        "station_id": station_filter,
-        "status": {"$in": status_filter},
-    }, {"_id": 0}).to_list(1000)
-    matches_v2 = await db.matches_v2.find({
-        "tournament_id": tournament_id,
-        "station_id": station_filter,
-        "status": {"$in": status_filter},
-    }, {"_id": 0}).to_list(3000)
-    candidates = [("matches", m) for m in matches] + [("matches_v2", m) for m in matches_v2]
+    allowed_station_ids = set(station_filter["$in"])
+    read_model = await load_competition_read_model(db, tournament_id)
+    candidates = [
+        (match["collection"], match)
+        for match in read_model.structure_snapshot()["matches"]
+        if match.get("station_id") in allowed_station_ids
+        and match.get("status") in status_filter
+    ]
     candidates = [item for item in candidates if _match_has_minimum_participants(item[1])]
     candidates.sort(key=lambda item: _match_sort_key(item[1]))
 
