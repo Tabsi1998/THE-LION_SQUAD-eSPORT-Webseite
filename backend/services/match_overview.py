@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from services.competition_snapshot import adapt_legacy_matches, adapt_stage_matches
+from services.competition_read import load_matches_by_query
 from services.station_labels import attach_station_info
 from services.tournament_permissions import RESULT_STAFF_ROLES, is_global_tournament_staff
 
@@ -72,9 +72,7 @@ async def _active_registrations_for_user(db, user: dict) -> list[dict]:
 
 
 async def _matches_for_query(db, query: dict, per_collection_limit: int = 240) -> list[dict]:
-    legacy = await db.matches.find(query, {"_id": 0}).to_list(per_collection_limit)
-    v2 = await db.matches_v2.find(query, {"_id": 0}).to_list(per_collection_limit)
-    return [*adapt_legacy_matches(legacy), *adapt_stage_matches(v2)]
+    return await load_matches_by_query(db, query, per_store_limit=per_collection_limit)
 
 
 def _registration_label(registration: dict | None, team_map: dict[str, dict]) -> str:

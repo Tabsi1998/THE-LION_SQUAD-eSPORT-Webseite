@@ -5,6 +5,7 @@ from services.competition_read import (
     count_matches_by_status,
     find_match_source,
     load_competition_read_model,
+    load_matches_by_query,
     load_registration_matches,
     load_scheduled_matches,
     observe_structure_read,
@@ -155,3 +156,12 @@ def test_scheduled_match_read_covers_both_stores_and_sorts_canonically():
 
     assert [match["id"] for match in matches] == ["stage-1", "legacy-1"]
     assert [match["collection"] for match in matches] == ["matches_v2", "matches"]
+
+
+def test_compatible_query_read_is_centralized_for_both_stores():
+    matches = asyncio.run(load_matches_by_query(
+        FakeDb(),
+        {"tournament_id": "t1", "status": {"$in": ["pending", "ready"]}},
+    ))
+
+    assert {match["id"] for match in matches} == {"legacy-1", "stage-1"}

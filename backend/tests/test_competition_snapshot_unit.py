@@ -187,6 +187,28 @@ def test_adapter_tolerates_unset_scores_and_non_numeric_sort_fields():
     assert [result["outcome"] for result in legacy[0]["results"]] == [None, None]
 
 
+def test_legacy_adapter_preserves_orphaned_historical_winner_placement():
+    adapted = adapt_legacy_matches([{
+        "id": "historical-placement",
+        "tournament_id": "t1",
+        "winner_id": "r1",
+        "final_position": 2,
+        "status": "completed",
+    }])
+
+    assert adapted[0]["results"] == [{
+        "registration_id": "r1",
+        "rank": 1,
+        "score": None,
+        "points": None,
+        "time_ms": None,
+        "outcome": "winner",
+        "dnf": False,
+        "forfeit": False,
+        "note": None,
+    }]
+
+
 def test_legacy_and_stage_fixtures_have_equal_engine_independent_semantics():
     legacy = adapt_legacy_matches(_legacy_fixture())
     stage = adapt_stage_matches(_stage_fixture())

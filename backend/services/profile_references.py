@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from database import get_db
 from services.competition_read import load_competition_read_model, observe_structure_read
-from services.competition_standings import standings_for_structure
+from services.competition_standings import placements_for_structure, standings_for_structure
 from services.visibility import user_can_see
 
 RESULT_TOURNAMENT_STATUSES = {"completed", "results_published", "archived"}
@@ -158,15 +158,6 @@ async def _tournament_rank_for_user(tournament_id: str, user_id: str, team_ids: 
         if rank is not None:
             return rank, participant_count
 
-    placements = await db.matches.find(
-        {"tournament_id": tournament_id, "winner_id": {"$in": reg_ids}, "final_position": {"$ne": None}},
-        {"_id": 0, "winner_id": 1, "final_position": 1},
-    ).to_list(20)
-    for placement in placements:
-        rank = _safe_int(placement.get("final_position"))
-        if rank is not None:
-            return rank, participant_count
-
     read_model = await load_competition_read_model(db, tournament_id)
     if not read_model.legacy_matches and not read_model.stage_matches:
         return None, participant_count
@@ -177,6 +168,11 @@ async def _tournament_rank_for_user(tournament_id: str, user_id: str, team_ids: 
         groups = await db.tournament_groups.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(100)
     structure = read_model.structure_snapshot()
     observe_structure_read(structure, surface="profile_references")
+    placements = placements_for_structure(structure, regs)
+    for rank, placement in sorted(placements.items()):
+        if placement.get("registration_id") in reg_ids:
+            return rank, participant_count
+
     rows = standings_for_structure(tournament, structure, regs, groups=groups)
     if tournament.get("format") == "groups":
         rows = [row for group in rows for row in group.get("standings") or []]

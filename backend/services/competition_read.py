@@ -131,6 +131,23 @@ async def load_registration_matches(
     return [*adapt_legacy_matches(legacy), *adapt_stage_matches(stage)]
 
 
+async def load_matches_by_query(
+    db,
+    query: dict,
+    *,
+    per_store_limit: int = 5000,
+) -> list[dict]:
+    """Run one compatible filter against both stores and return canonical matches."""
+
+    legacy_cursor = db.matches.find(query, {"_id": 0})
+    stage_cursor = db.matches_v2.find(query, {"_id": 0})
+    legacy, stage = await asyncio.gather(
+        legacy_cursor.to_list(per_store_limit),
+        stage_cursor.to_list(per_store_limit),
+    )
+    return [*adapt_legacy_matches(legacy), *adapt_stage_matches(stage)]
+
+
 async def count_matches_by_status(db, statuses: set[str]) -> int:
     """Count operational matches across both stores for dashboard surfaces."""
 
@@ -159,13 +176,7 @@ async def load_scheduled_matches(
         "scheduled_at": {"$gte": scheduled_from, "$lte": scheduled_until},
         "status": {"$in": sorted(statuses)},
     }
-    legacy_cursor = db.matches.find(query, {"_id": 0})
-    stage_cursor = db.matches_v2.find(query, {"_id": 0})
-    legacy, stage = await asyncio.gather(
-        legacy_cursor.to_list(per_store_limit),
-        stage_cursor.to_list(per_store_limit),
-    )
-    matches = [*adapt_legacy_matches(legacy), *adapt_stage_matches(stage)]
+    matches = await load_matches_by_query(db, query, per_store_limit=per_store_limit)
     return sorted(matches, key=lambda match: (
         str(match.get("scheduled_at") or ""),
         str(match.get("id") or ""),

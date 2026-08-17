@@ -10,6 +10,8 @@ from services.visibility import user_can_see
 from services.access_links import public_access_link_payload, record_access_link_use, touch_access_link, validate_access_link
 from services.content_embed_service import resolve_content_embeds
 from services.public_phase import derive_public_phase
+from services.competition_read import load_competition_read_model, observe_structure_read
+from services.competition_standings import standings_for_structure
 from services.sponsor_utils import dedupe_public_sponsors
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
@@ -217,56 +219,38 @@ async def _event_registration_summary(event: dict, exclude_registration_id: str 
 async def _tournament_recap_podium(db, tournament: dict) -> list[dict]:
     regs = await db.tournament_registrations.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(1000)
     reg_map = {reg["id"]: reg for reg in regs}
-    matches_v2 = await db.matches_v2.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(3000)
-    scores: dict[str, dict] = {}
-    if matches_v2:
-        for match in matches_v2:
-            if match.get("status") not in {"completed", "forfeit"}:
-                continue
-            for result in match.get("results") or []:
-                reg_id = result.get("registration_id")
-                if not reg_id:
-                    continue
-                row = scores.setdefault(reg_id, {"registration_id": reg_id, "wins": 0, "top2": 0, "points": 0, "played": 0, "rank_sum": 0})
-                rank = int(result.get("rank") or 999)
-                row["played"] += 1
-                row["rank_sum"] += rank
-                row["wins"] += 1 if rank == 1 else 0
-                row["top2"] += 1 if rank <= 2 else 0
-                points = result.get("points")
-                if points is None:
-                    points = result.get("score")
-                if isinstance(points, (int, float)):
-                    row["points"] += points
-        rows = list(scores.values())
-        rows.sort(key=lambda row: (row["wins"], row["top2"], row["points"], -row["rank_sum"]), reverse=True)
-    else:
-        matches = await db.matches.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(1000)
-        for match in matches:
-            for reg_id in (match.get("participant_a_id"), match.get("participant_b_id")):
-                if reg_id:
-                    scores.setdefault(reg_id, {"registration_id": reg_id, "wins": 0, "losses": 0, "furthest_round": 0})
-                    scores[reg_id]["furthest_round"] = max(scores[reg_id]["furthest_round"], int(match.get("round") or 0))
-            if match.get("status") in {"completed", "forfeit"} and match.get("winner_id"):
-                winner_id = match.get("winner_id")
-                loser_id = match.get("participant_a_id") if winner_id == match.get("participant_b_id") else match.get("participant_b_id")
-                scores.setdefault(winner_id, {"registration_id": winner_id, "wins": 0, "losses": 0, "furthest_round": 0})
-                scores[winner_id]["wins"] += 1
-                if loser_id:
-                    scores.setdefault(loser_id, {"registration_id": loser_id, "wins": 0, "losses": 0, "furthest_round": 0})
-                    scores[loser_id]["losses"] += 1
-        rows = list(scores.values())
-        rows.sort(key=lambda row: (row.get("furthest_round") or 0, row.get("wins") or 0, -(row.get("losses") or 0)), reverse=True)
+    read_model = await load_competition_read_model(db, tournament["id"])
+    structure = read_model.structure_snapshot()
+    observe_structure_read(structure, surface="event_recap")
+    groups = []
+    if tournament.get("format") == "groups":
+        groups = await db.tournament_groups.find(
+            {"tournament_id": tournament["id"]},
+            {"_id": 0},
+        ).to_list(100)
+    rows = standings_for_structure(tournament, structure, regs, groups=groups)
+    if tournament.get("format") == "groups":
+        rows = [row for group in rows for row in group.get("standings") or []]
+    rows = [
+        row for row in rows
+        if row.get("played")
+        or row.get("furthest_round")
+        or row.get("wins")
+        or row.get("won")
+        or row.get("losses")
+    ]
     podium = []
     for index, row in enumerate(rows[:3], start=1):
         reg = reg_map.get(row.get("registration_id"))
         if not reg:
             continue
         detail_bits = []
-        if row.get("wins"):
-            detail_bits.append(f"{row['wins']} Siege")
-        if row.get("points"):
-            detail_bits.append(f"{row['points']} Punkte")
+        wins = row.get("wins") if row.get("wins") is not None else row.get("won")
+        if wins:
+            detail_bits.append(f"{wins} {'Sieg' if wins == 1 else 'Siege'}")
+        points = row.get("points")
+        if points:
+            detail_bits.append(f"{points} {'Punkt' if points == 1 else 'Punkte'}")
         podium.append({"rank": index, "name": _registration_name(reg), "detail": ", ".join(detail_bits)})
     return podium
 

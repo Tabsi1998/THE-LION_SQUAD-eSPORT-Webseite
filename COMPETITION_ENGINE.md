@@ -179,6 +179,7 @@ geschrieben.
 | Penalty-Transparenz | Legacy- und Stage-/FFA-Forfeits kanonisch sichtbar | Schreibregeln bleiben getrennt |
 | Disputes / Forfeit-Schreibpfad | weiterhin Legacy-lastig | in Package 3 fachlich vereinheitlichen |
 | Reminder / Notifications / Stationen | kanonische Match-Reads aktiv | Collection-spezifische Writes bleiben bis zum Schreibkern erhalten |
+| Event-Rekapitulation / Profilreferenzen | kanonische Standings- und Platzierungsprojektion aktiv | RankingPolicy folgt im Schreibkern |
 
 Jede Datenmigration benoetigt Backup-/Restore-Nachweis, Migration-Ledger,
 Zielversion, ID-Mapping, Hash/Diff und Rollback-ID. Ein Fehler darf nie durch
