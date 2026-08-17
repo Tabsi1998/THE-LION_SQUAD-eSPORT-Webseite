@@ -78,6 +78,12 @@ def _legacy_results(match: dict) -> list[dict]:
         (match.get("participant_a_id"), match.get("score_a")),
         (match.get("participant_b_id"), match.get("score_b")),
     ]
+    participant_ids = {registration_id for registration_id, _score in participants if registration_id}
+    if winner_id and winner_id not in participant_ids:
+        participants.append((winner_id, None))
+        participant_ids.add(winner_id)
+    if loser_id and loser_id not in participant_ids:
+        participants.append((loser_id, None))
     score_by_id = {registration_id: score for registration_id, score in participants if registration_id}
     if not winner_id and len(score_by_id) == 2:
         ordered = list(score_by_id.items())
