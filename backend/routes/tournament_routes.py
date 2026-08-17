@@ -30,6 +30,7 @@ from services.tournament_permissions import (
     require_tournament_staff_permission,
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
+from services.competition_formats import find_format_capability
 from services.match_v2_results import (
     MatchV2ResultError,
     build_v2_result_application,
@@ -54,8 +55,6 @@ router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 REGISTRATION_CHECKIN_STATUSES = {"approved", "checked_in", "no_show"}
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
-LEGACY_AUTO_PREVIEW_FORMATS = {"single_elim", "double_elim", "round_robin", "league"}
-STAGE_AUTO_PREVIEW_FORMATS = {"ffa", "battle_royale", "custom_bracket", "ffa_custom_bracket"}
 MAX_INITIAL_PREVIEW_MATCHES = 512
 BRACKET_REFRESH_LOCKED_STATUSES = {"check_in", "live", "paused", "completed", "results_published", "archived", "cancelled"}
 TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
@@ -181,21 +180,26 @@ def _estimate_legacy_preview_matches(tournament: dict) -> int:
 
 
 def _can_create_initial_legacy_preview(tournament: dict) -> bool:
-    if (tournament.get("format") or "single_elim") not in LEGACY_AUTO_PREVIEW_FORMATS:
+    capability = find_format_capability(tournament.get("format"))
+    if not capability or capability.initial_preview_engine != "legacy":
         return False
     return 0 < _estimate_legacy_preview_matches(tournament) <= MAX_INITIAL_PREVIEW_MATCHES
 
 
 def _can_create_initial_stage_preview(tournament: dict) -> bool:
-    return (tournament.get("format") or "single_elim") in STAGE_AUTO_PREVIEW_FORMATS
+    capability = find_format_capability(tournament.get("format"))
+    return bool(capability and capability.initial_preview_engine == "stage")
 
 
 def _can_rebuild_bracket_from_format(tournament: dict) -> bool:
     """Return whether either bracket engine supports the tournament format."""
-    return (
-        _can_create_initial_legacy_preview(tournament)
-        or _can_create_initial_stage_preview(tournament)
-    )
+    capability = find_format_capability(tournament.get("format"))
+    if not capability or capability.rebuild_engine == "none":
+        return False
+    if capability.auto_match_limit == "legacy_estimate":
+        estimate = _estimate_legacy_preview_matches(tournament)
+        return 0 < estimate <= MAX_INITIAL_PREVIEW_MATCHES
+    return True
 
 
 def _legacy_plan_key(match: dict) -> tuple:
@@ -460,18 +464,20 @@ def _live_start_blocker(report: dict, force: bool) -> dict | None:
 
 def _stage_defaults_for_tournament_format(tournament: dict, body: TournamentBracketStructurePayload | None = None) -> dict | None:
     fmt = (tournament.get("format") or "single_elim")
+    capability = find_format_capability(fmt)
     settings = dict((body.settings if body else {}) or {})
-    stage_type = (body.stage_type if body else None) or {
-        "single_elim": "single_elimination",
-        "double_elim": "double_elimination",
-        "ffa": "simple",
-        "battle_royale": "simple",
-        "custom_bracket": "custom_bracket",
-        "ffa_custom_bracket": "ffa_custom_bracket",
-    }.get(fmt)
+    default_stage_type = (
+        capability.canonical_stage_type
+        if capability and capability.stage_generator_available
+        else None
+    )
+    stage_type = (body.stage_type if body else None) or default_stage_type
     if not stage_type:
         return None
-    default_match_type = "ffa" if stage_type.startswith("ffa_") or stage_type == "simple" or fmt in {"ffa", "battle_royale"} else "duel"
+    if capability and stage_type == default_stage_type:
+        default_match_type = capability.canonical_match_type
+    else:
+        default_match_type = "ffa" if stage_type.startswith("ffa_") or stage_type == "simple" else "duel"
     match_type = (body.match_type if body else None) or default_match_type
     settings.setdefault("match_size", 4 if match_type == "ffa" else 2)
     settings.setdefault("min_players", 2)

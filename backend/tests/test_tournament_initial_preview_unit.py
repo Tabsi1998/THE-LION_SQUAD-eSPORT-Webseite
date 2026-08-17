@@ -98,6 +98,9 @@ def test_initial_preview_skips_unsupported_or_too_large_formats():
     assert _can_rebuild_bracket_from_format({"format": "custom_bracket", "max_participants": 64}) is True
     assert _can_rebuild_bracket_from_format({"format": "ffa_custom_bracket", "max_participants": 64}) is True
     assert _can_rebuild_bracket_from_format({"format": "time_trial", "max_participants": 64}) is False
+    assert _can_create_initial_legacy_preview({"format": "historical_unknown", "max_participants": 8}) is False
+    assert _can_create_initial_stage_preview({"format": "historical_unknown", "max_participants": 8}) is False
+    assert _can_rebuild_bracket_from_format({"format": "historical_unknown", "max_participants": 8}) is False
 
 
 def test_mixed_preview_fills_free_slots_with_preview_seeds():
