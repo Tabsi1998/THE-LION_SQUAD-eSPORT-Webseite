@@ -342,26 +342,128 @@ def pdf_f1_leaderboard(challenge: dict, track: dict, entries: list, pdf_sponsors
     return buf.getvalue()
 
 
+def _pdf_registration_name(registration: dict | None) -> str:
+    return str(
+        (registration or {}).get("display_name")
+        or (registration or {}).get("ingame_name")
+        or "TBD"
+    )
+
+
+def _pdf_slot_position(slot: dict) -> int:
+    try:
+        return int(slot.get("position") or slot.get("slot") or 999)
+    except (TypeError, ValueError):
+        return 999
+
+
+def _pdf_match_slots(match: dict) -> list[dict]:
+    if match.get("slots"):
+        return sorted(
+            match.get("slots") or [],
+            key=_pdf_slot_position,
+        )
+    return [
+        {"position": 1, "registration_id": match.get("participant_a_id")},
+        {"position": 2, "registration_id": match.get("participant_b_id")},
+    ]
+
+
+def _pdf_result_value(result: dict | None, *, include_rank: bool = False) -> str:
+    if not result:
+        return ""
+    value = result.get("points")
+    suffix = " P"
+    if value is None:
+        value = result.get("score")
+        suffix = ""
+    if value is None and result.get("time_ms") is not None:
+        value = f"{result['time_ms']} ms"
+        suffix = ""
+    rank = result.get("rank")
+    if value is not None and include_rank and rank is not None:
+        return f"#{rank} · {value}{suffix}"
+    if value is not None:
+        return f"{value}{suffix}"
+    return f"#{rank}" if rank is not None else ""
+
+
+def _pdf_duel_row(match: dict, reg_map: dict) -> list[str]:
+    slots = _pdf_match_slots(match)
+    slot_a = slots[0] if slots else {}
+    slot_b = slots[1] if len(slots) > 1 else {}
+    result_map = {
+        result.get("registration_id"): result
+        for result in match.get("results") or []
+        if result.get("registration_id")
+    }
+    registration_a = slot_a.get("registration_id")
+    registration_b = slot_b.get("registration_id")
+    score_a = _pdf_result_value(result_map.get(registration_a))
+    score_b = _pdf_result_value(result_map.get(registration_b))
+    if not match.get("slots"):
+        score_a = str(match.get("score_a", 0))
+        score_b = str(match.get("score_b", 0))
+    return [
+        match.get("round_name") or f"R{match.get('round')}",
+        _pdf_registration_name(reg_map.get(registration_a)),
+        f"{score_a or '—'} : {score_b or '—'}",
+        _pdf_registration_name(reg_map.get(registration_b)),
+        match.get("scheduled_at") or "—",
+        match.get("station_label") or match.get("station_name") or match.get("station_id") or "—",
+        match.get("status") or "—",
+    ]
+
+
+def _pdf_multi_slot_rows(match: dict, reg_map: dict) -> list[list[str]]:
+    result_map = {
+        result.get("registration_id"): result
+        for result in match.get("results") or []
+        if result.get("registration_id")
+    }
+    rows = []
+    slots = _pdf_match_slots(match)
+    for index, slot in enumerate(slots):
+        registration_id = slot.get("registration_id")
+        name = _pdf_registration_name(reg_map.get(registration_id))
+        value = _pdf_result_value(result_map.get(registration_id), include_rank=True)
+        rows.append([
+            (match.get("round_name") or f"R{match.get('round')}") if index == 0 else "",
+            f"{name} ({value})" if value else name,
+            (match.get("scheduled_at") or "—") if index == 0 else "",
+            (match.get("station_label") or match.get("station_name") or match.get("station_id") or "—") if index == 0 else "",
+            (match.get("status") or "—") if index == 0 else "",
+        ])
+    return rows or [[
+        match.get("round_name") or f"R{match.get('round')}",
+        "TBD",
+        match.get("scheduled_at") or "—",
+        match.get("station_label") or match.get("station_name") or match.get("station_id") or "—",
+        match.get("status") or "—",
+    ]]
+
+
+def _pdf_match_table(matches: list, reg_map: dict) -> tuple[list[str], list[list[str]], list]:
+    multi_slot = any(len(_pdf_match_slots(match)) > 2 for match in matches)
+    if multi_slot:
+        headers = ["Runde", "Teilnehmer / Ergebnis", "Zeit", "Station", "Status"]
+        rows = [row for match in matches for row in _pdf_multi_slot_rows(match, reg_map)]
+        widths = [3 * cm, 13 * cm, 3.25 * cm, 3 * cm, 3.25 * cm]
+    else:
+        headers = ["Runde", "Teilnehmer A", "vs", "Teilnehmer B", "Zeit", "Station", "Status"]
+        rows = [_pdf_duel_row(match, reg_map) for match in matches]
+        widths = [3.5 * cm, 6 * cm, 2.5 * cm, 6 * cm, 3 * cm, 2.5 * cm, 3 * cm]
+    return headers, rows, widths
+
+
 def pdf_matches(tournament: dict, matches: list, reg_map: dict, pdf_sponsors: list | None = None, pdf_branding: dict | None = None) -> bytes:
     buf = io.BytesIO()
     doc = _doc(buf, f"Matchplan - {tournament.get('title','')}", "landscape", sponsors=pdf_sponsors, branding=pdf_branding)
     styles = _base_styles()
     story = []
     _header(story, styles, "Matchplan", tournament.get("title", ""))
-    data = [["Runde", "Teilnehmer A", "vs", "Teilnehmer B", "Zeit", "Station", "Status"]]
-    for m in matches:
-        a = reg_map.get(m.get("participant_a_id"))
-        b = reg_map.get(m.get("participant_b_id"))
-        data.append([
-            m.get("round_name", f"R{m.get('round')}"),
-            (a or {}).get("display_name", "TBD"),
-            f"{m.get('score_a',0)} : {m.get('score_b',0)}",
-            (b or {}).get("display_name", "TBD"),
-            m.get("scheduled_at", "") or "—",
-            m.get("station_id", "") or "—",
-            m.get("status", "—"),
-        ])
-    t = Table(data, colWidths=[3.5 * cm, 6 * cm, 2.5 * cm, 6 * cm, 3 * cm, 2.5 * cm, 3 * cm], repeatRows=1)
+    headers, rows, widths = _pdf_match_table(matches, reg_map)
+    t = Table([headers, *rows], colWidths=widths, repeatRows=1)
     t.setStyle(_table_style())
     story.append(t)
     doc.build(story, onFirstPage=_page_bg, onLaterPages=_page_bg)

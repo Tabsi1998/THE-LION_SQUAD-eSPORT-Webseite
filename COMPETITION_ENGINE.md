@@ -174,7 +174,7 @@ geschrieben.
 | Turnier-Standings | kanonisch aktiv | konfigurierbare RankingPolicy folgt im Schreibkern |
 | Profile / DSGVO | beide Stores, aber eigene Projektionen | auf Read-Service umstellen |
 | Preise / Saisonwertung | beide Stores, aber eigene Projektionen | kanonische Standings konsumieren |
-| Widget / Match-PDF | weiterhin Legacy-only | priorisierter naechster Read-Consumer |
+| Widget / Match-PDF | kanonische Struktur bzw. variable Slots aktiv | alte Widget-Felder bis zum Frontend-Cutover behalten |
 | Badges / Admin-Zaehler / Penalties | weiterhin Legacy-lastig | vor Engine-Cutover migrieren |
 | Reminder / Notifications / Stationen | beide Formen mit Sonderzweigen | gemeinsame Match-Projektion verwenden |
 

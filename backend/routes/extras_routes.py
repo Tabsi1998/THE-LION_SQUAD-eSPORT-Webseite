@@ -14,6 +14,7 @@ from auth import require_admin, require_role, require_super, get_current_user, g
 from services.visibility import user_can_see
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services.access_links import validate_access_link
+from services.competition_read import load_competition_read_model, observe_structure_read
 from services.public_site_settings import PUBLIC_LEGAL_SOURCE_FIELDS, build_public_legal_settings
 from models import now_utc, new_id
 from email_service import send_template, _get_email_config
@@ -1537,6 +1538,25 @@ def _public_registration(reg: dict) -> dict:
     }
 
 
+def _public_widget_legacy_match(match: dict) -> dict:
+    return {
+        key: value
+        for key, value in match.items()
+        if key not in {"admin_note", "reports", "disputes"}
+    }
+
+
+def _public_widget_stage_match(match: dict) -> dict:
+    public_fields = {
+        "id", "tournament_id", "stage_id", "stage_number", "stage_type",
+        "match_type", "match_key", "section", "round", "round_name", "order",
+        "slots", "results", "advancement", "status", "is_preview",
+        "generation_mode", "scheduled_at", "duration_minutes", "station_id",
+        "station_label", "station_name", "map", "best_of",
+    }
+    return {key: value for key, value in match.items() if key in public_fields}
+
+
 def _public_challenge_summary(challenge: dict) -> dict:
     return {
         "id": challenge.get("id"),
@@ -1551,14 +1571,22 @@ async def widget_bracket(slug_or_id: str):
     """Read-only bracket data for widget embed."""
     db = get_db()
     t = await _public_tournament_or_404(slug_or_id)
-    matches = await db.matches.find({"tournament_id": t["id"]}, {"_id": 0, "admin_note": 0,
-                                                                    "reports": 0, "disputes": 0}).to_list(2000)
+    read_model = await load_competition_read_model(db, t["id"])
+    structure = read_model.structure_snapshot()
+    observe_structure_read(structure, surface="widget")
     regs = await db.tournament_registrations.find(
         {"tournament_id": t["id"]},
         {"_id": 0},
     ).to_list(500)
-    return {"tournament": {"id": t["id"], "title": t["title"], "format": t["format"], "status": t["status"]},
-            "matches": matches, "registrations": [_public_registration(r) for r in regs]}
+    return {
+        "tournament": {"id": t["id"], "title": t["title"], "format": t["format"], "status": t["status"]},
+        "matches": [_public_widget_legacy_match(match) for match in read_model.legacy_matches],
+        "matches_v2": [_public_widget_stage_match(match) for match in read_model.stage_matches],
+        "stages": read_model.stages,
+        "engine": "stage" if read_model.stages or read_model.stage_matches else "legacy",
+        "structure": structure,
+        "registrations": [_public_registration(r) for r in regs],
+    }
 
 
 @widget_router.get("/f1/{slug_or_id}/leaderboard")
@@ -1914,7 +1942,10 @@ async def pdf_tournament_matches(slug_or_id: str, me: dict = Depends(require_rol
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404)
-    matches = await db.matches.find({"tournament_id": t["id"]}, {"_id": 0}).sort("round", 1).to_list(2000)
+    read_model = await load_competition_read_model(db, t["id"])
+    structure = read_model.structure_snapshot()
+    observe_structure_read(structure, surface="match_pdf")
+    matches = structure["matches"]
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     reg_map = {r["id"]: r for r in regs}
     sponsors = await _pdf_sponsors(db)

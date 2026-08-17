@@ -1,6 +1,7 @@
 import re
 
 from pdf_service import (
+    _pdf_match_table,
     pdf_checkin,
     pdf_certificate,
     pdf_certificates,
@@ -130,3 +131,40 @@ def test_table_exports_generate_valid_pdfs():
 
     for payload in exports:
         assert_pdf_bytes(payload, minimum_size=20_000)
+
+
+def test_match_pdf_table_keeps_all_stage_ffa_slots_and_rank_results():
+    reg_map = {
+        "r1": {"display_name": "Alpha"},
+        "r2": {"display_name": "Bravo"},
+        "r3": {"display_name": "Charlie"},
+    }
+    matches = [{
+        "round_name": "Finale",
+        "slots": [
+            {"position": 1, "registration_id": "r1"},
+            {"position": 2, "registration_id": "r2"},
+            {"position": 3, "registration_id": "r3"},
+        ],
+        "results": [
+            {"registration_id": "r2", "rank": 1, "points": 10},
+            {"registration_id": "r1", "rank": 2, "points": 8},
+            {"registration_id": "r3", "rank": 3, "points": 6},
+        ],
+        "station_label": "Main Stage",
+        "status": "completed",
+    }]
+
+    headers, rows, _widths = _pdf_match_table(matches, reg_map)
+
+    assert headers == ["Runde", "Teilnehmer / Ergebnis", "Zeit", "Station", "Status"]
+    assert len(rows) == 3
+    assert rows[0][0] == "Finale"
+    assert [row[1] for row in rows] == [
+        "Alpha (#2 · 8 P)",
+        "Bravo (#1 · 10 P)",
+        "Charlie (#3 · 6 P)",
+    ]
+    assert rows[0][3] == "Main Stage"
+    assert rows[1][0] == ""
+    assert_pdf_bytes(pdf_matches(TOURNAMENT, matches, reg_map, SPONSORS, BRANDING), minimum_size=20_000)
