@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from copy import deepcopy
 
-from services.competition_snapshot import adapt_legacy_matches, adapt_stage_matches
+from services.competition_read import load_registration_matches
 
 
 TERMINAL_MATCH_STATUSES = {"completed", "forfeit", "cancelled", "archived", "bye"}
@@ -23,32 +23,9 @@ def _privacy_match_projection(match: dict) -> dict:
 async def registration_match_snapshot(db, registration_ids: list[str], *, limit: int = 5000) -> list[dict]:
     """Export every canonical match that references one of the registrations."""
 
-    ids = sorted({registration_id for registration_id in registration_ids if registration_id})
-    if not ids:
-        return []
-    legacy_cursor = db.matches.find(
-        {"$or": [
-            {"participant_a_id": {"$in": ids}},
-            {"participant_b_id": {"$in": ids}},
-            {"winner_id": {"$in": ids}},
-            {"loser_id": {"$in": ids}},
-        ]},
-        {"_id": 0},
-    )
-    stage_cursor = db.matches_v2.find(
-        {"$or": [
-            {"slots.registration_id": {"$in": ids}},
-            {"results.registration_id": {"$in": ids}},
-        ]},
-        {"_id": 0},
-    )
-    legacy, stage = await asyncio.gather(
-        legacy_cursor.to_list(limit),
-        stage_cursor.to_list(limit),
-    )
     return [
         _privacy_match_projection(match)
-        for match in [*adapt_legacy_matches(legacy), *adapt_stage_matches(stage)]
+        for match in await load_registration_matches(db, registration_ids, limit=limit)
     ]
 
 

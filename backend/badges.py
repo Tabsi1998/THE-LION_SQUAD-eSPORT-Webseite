@@ -23,6 +23,11 @@ from achievement_catalog import (
     CONDITION_KEY_STATUS,
 )
 from services.membership_service import get_membership, is_active_member
+from services.competition_read import load_competition_read_model, load_registration_matches
+from services.competition_standings import (
+    registration_badge_match_progress,
+    registration_tournament_achievement_progress,
+)
 
 logger = logging.getLogger("tls.achievements")
 
@@ -185,35 +190,39 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     formats = await db.tournaments.distinct("format", {"id": {"$in": tids}}) if tids else []
     p["distinct_formats"] = len([f for f in formats if f])
 
-    p["matches_played"] = await db.matches.count_documents({"$or": [{"winner_id": {"$in": list(reg_ids)}}, {"loser_id": {"$in": list(reg_ids)}}], "status": "completed"}) if reg_ids else 0
-    p["matches_won"] = await db.matches.count_documents({"winner_id": {"$in": list(reg_ids)}, "status": "completed"}) if reg_ids else 0
+    canonical_matches = await load_registration_matches(db, reg_ids)
+    p.update(registration_badge_match_progress(canonical_matches, reg_ids))
 
-    streak_max = 0
-    if reg_ids:
-        recent = await db.matches.find(
-            {"status": "completed", "$or": [{"winner_id": {"$in": list(reg_ids)}}, {"loser_id": {"$in": list(reg_ids)}}]},
-            {"_id": 0, "winner_id": 1, "loser_id": 1, "updated_at": 1},
-        ).sort("updated_at", 1).to_list(2000)
-        cur = 0
-        for m in recent:
-            if m.get("winner_id") in reg_ids:
-                cur += 1
-                streak_max = max(streak_max, cur)
-            else:
-                cur = 0
-    p["match_streak_max"] = streak_max
-
-    wins = podium = rank4 = 0
-    for r in regs:
-        if await db.matches.find_one({"tournament_id": r.get("tournament_id"), "winner_id": r["id"], "final_position": 1}):
-            wins += 1
-        if await db.matches.find_one({"tournament_id": r.get("tournament_id"), "winner_id": r["id"], "final_position": {"$lte": 3}}):
-            podium += 1
-        if await db.matches.find_one({"tournament_id": r.get("tournament_id"), "loser_id": r["id"], "final_position": 4}):
-            rank4 += 1
-    p["tournaments_won"] = wins
-    p["podium_finishes"] = podium
-    p["rank_4_count"] = rank4
+    placement_progress = {
+        "tournaments_won": 0,
+        "podium_finishes": 0,
+        "rank_4_count": 0,
+    }
+    registrations_by_tournament: dict[str, list[dict]] = {}
+    if tids:
+        all_registrations = await db.tournament_registrations.find(
+            {"tournament_id": {"$in": tids}},
+            {"_id": 0, "id": 1, "tournament_id": 1, "user_id": 1, "team_id": 1},
+        ).to_list(10000)
+        for registration in all_registrations:
+            tournament_id = registration.get("tournament_id")
+            if tournament_id:
+                registrations_by_tournament.setdefault(tournament_id, []).append(registration)
+    own_registration_ids_by_tournament: dict[str, set[str]] = {}
+    for registration in regs:
+        tournament_id = registration.get("tournament_id")
+        if tournament_id and registration.get("id"):
+            own_registration_ids_by_tournament.setdefault(tournament_id, set()).add(registration["id"])
+    for tournament_id, own_registration_ids in own_registration_ids_by_tournament.items():
+        read_model = await load_competition_read_model(db, tournament_id)
+        summary = registration_tournament_achievement_progress(
+            read_model.structure_snapshot(),
+            registrations_by_tournament.get(tournament_id) or [],
+            own_registration_ids,
+        )
+        for key, value in summary.items():
+            placement_progress[key] += value
+    p.update(placement_progress)
 
     official_lap_query = {
         "user_id": user_id,

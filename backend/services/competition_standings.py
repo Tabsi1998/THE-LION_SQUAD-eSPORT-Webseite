@@ -398,6 +398,83 @@ def placement_rows_for_structure(snapshot: dict, registrations: list[dict]) -> l
     ]
 
 
+def registration_badge_match_progress(matches: list[dict], registration_ids: set[str]) -> dict:
+    """Return completed-match badge counters over canonical match shapes."""
+
+    relevant = []
+    for match in matches:
+        if match.get("status") != "completed":
+            continue
+        participants = {
+            slot.get("registration_id")
+            for slot in match.get("slots") or []
+            if slot.get("registration_id")
+        } | {
+            result.get("registration_id")
+            for result in match.get("results") or []
+            if result.get("registration_id")
+        }
+        if participants.intersection(registration_ids):
+            relevant.append(match)
+    relevant.sort(key=lambda match: (
+        str(match.get("updated_at") or match.get("scheduled_at") or ""),
+        _safe_int(match.get("stage_number")),
+        _safe_int(match.get("round")),
+        _safe_int(match.get("order")),
+        str(match.get("id") or ""),
+    ))
+
+    won = 0
+    streak = 0
+    streak_max = 0
+    for match in relevant:
+        is_win = any(
+            result.get("registration_id") in registration_ids
+            and result.get("outcome") == "winner"
+            for result in match.get("results") or []
+        )
+        if is_win:
+            won += 1
+            streak += 1
+            streak_max = max(streak_max, streak)
+        else:
+            streak = 0
+    return {
+        "matches_played": len(relevant),
+        "matches_won": won,
+        "match_streak_max": streak_max,
+    }
+
+
+def registration_tournament_achievement_progress(
+    snapshot: dict,
+    registrations: list[dict],
+    registration_ids: set[str],
+) -> dict:
+    """Return one tournament's win/podium/fourth-place badge flags."""
+
+    ranks = {
+        rank
+        for rank, placement in placements_for_structure(snapshot, registrations).items()
+        if placement.get("registration_id") in registration_ids
+    }
+    legacy_fourth = any(
+        _safe_int(match.get("final_position")) == 4
+        and any(
+            result.get("registration_id") in registration_ids
+            and result.get("outcome") == "loser"
+            for result in match.get("results") or []
+        )
+        for match in snapshot.get("matches") or []
+        if match.get("source", {}).get("engine") == "legacy"
+    )
+    return {
+        "tournaments_won": int(1 in ranks),
+        "podium_finishes": int(any(1 <= rank <= 3 for rank in ranks)),
+        "rank_4_count": int(4 in ranks or legacy_fourth),
+    }
+
+
 def registration_match_summary(matches: list[dict], registration_ids: set[str]) -> dict:
     """Count terminal matches and wins once across canonical match shapes."""
 

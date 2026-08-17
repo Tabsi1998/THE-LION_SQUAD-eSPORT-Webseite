@@ -2,8 +2,10 @@ import asyncio
 
 from services.competition_read import (
     canonical_match_for_source,
+    count_matches_by_status,
     find_match_source,
     load_competition_read_model,
+    load_registration_matches,
     observe_structure_read,
 )
 
@@ -23,23 +25,45 @@ class FakeCollection:
     def __init__(self, rows=()):
         self.rows = list(rows)
 
+    @staticmethod
+    def _values(row, key):
+        values = [row]
+        for part in key.split("."):
+            values = [
+                child
+                for value in values
+                for child in (
+                    [item.get(part) for item in value if isinstance(item, dict)]
+                    if isinstance(value, list)
+                    else [value.get(part)] if isinstance(value, dict)
+                    else []
+                )
+            ]
+        return values
+
+    def _matches(self, row, query):
+        for key, expected in query.items():
+            if key == "$or":
+                if not any(self._matches(row, option) for option in expected):
+                    return False
+                continue
+            values = self._values(row, key)
+            if isinstance(expected, dict) and "$in" in expected:
+                if not any(value in expected["$in"] for value in values):
+                    return False
+            elif expected not in values:
+                return False
+        return True
+
     def find(self, query, _projection=None):
-        rows = [
-            row
-            for row in self.rows
-            if all(row.get(key) == value for key, value in query.items())
-        ]
+        rows = [row for row in self.rows if self._matches(row, query)]
         return FakeCursor(rows)
 
     async def find_one(self, query, _projection=None):
-        return next(
-            (
-                row
-                for row in self.rows
-                if all(row.get(key) == value for key, value in query.items())
-            ),
-            None,
-        )
+        return next((row for row in self.rows if self._matches(row, query)), None)
+
+    async def count_documents(self, query):
+        return sum(1 for row in self.rows if self._matches(row, query))
 
 
 class FakeDb:
@@ -56,7 +80,7 @@ class FakeDb:
             "tournament_id": "t1",
             "stage_id": "s1",
             "match_key": "A",
-            "slots": [],
+            "slots": [{"slot": 1, "registration_id": "r1", "status": "filled"}],
             "results": [],
             "advancement": [],
             "status": "pending",
@@ -102,3 +126,13 @@ def test_structure_read_observation_emits_bounded_metrics(caplog):
     assert metrics["source_counts"] == {"legacy": 1, "stage": 1}
     assert metrics["integrity_issue_count"] == 0
     assert "surface=unit" in caplog.text
+
+
+def test_registration_read_and_status_counts_cover_both_stores():
+    db = FakeDb()
+
+    matches = asyncio.run(load_registration_matches(db, {"r1"}))
+
+    assert {match["id"] for match in matches} == {"legacy-1", "stage-1"}
+    assert asyncio.run(count_matches_by_status(db, {"ready", "pending"})) == 2
+    assert asyncio.run(count_matches_by_status(db, {"disputed"})) == 0

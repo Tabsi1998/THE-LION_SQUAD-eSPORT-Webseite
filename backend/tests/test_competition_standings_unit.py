@@ -6,8 +6,10 @@ from services.competition_standings import (
     group_standings,
     placement_rows_for_structure,
     placements_for_structure,
+    registration_badge_match_progress,
     round_robin_standings,
     registration_match_summary,
+    registration_tournament_achievement_progress,
     stage_standings,
     standings_for_structure,
     swiss_standings,
@@ -240,3 +242,119 @@ def test_placements_filter_stage_bracket_sections_through_canonical_fields():
 
     assert winner[1]["registration_id"] == "r1"
     assert loser[1]["registration_id"] == "r3"
+
+
+def test_badge_match_progress_combines_engines_and_keeps_chronological_streak():
+    legacy = adapt_legacy_matches([{
+        "id": "legacy-win",
+        "tournament_id": "t1",
+        "round": 1,
+        "participant_a_id": "r1",
+        "participant_b_id": "r2",
+        "winner_id": "r1",
+        "loser_id": "r2",
+        "status": "completed",
+        "updated_at": "2026-08-17T10:00:00+00:00",
+    }])
+    stage = adapt_stage_matches([
+        {
+            "id": "stage-win",
+            "tournament_id": "t1",
+            "stage_id": "s1",
+            "round": 2,
+            "slots": [
+                {"slot": 1, "registration_id": "r1", "status": "filled"},
+                {"slot": 2, "registration_id": "r3", "status": "filled"},
+            ],
+            "results": [
+                {"registration_id": "r1", "rank": 1},
+                {"registration_id": "r3", "rank": 2},
+            ],
+            "status": "completed",
+            "updated_at": "2026-08-17T11:00:00+00:00",
+        },
+        {
+            "id": "stage-loss",
+            "tournament_id": "t1",
+            "stage_id": "s1",
+            "round": 3,
+            "slots": [
+                {"slot": 1, "registration_id": "r1", "status": "filled"},
+                {"slot": 2, "registration_id": "r2", "status": "filled"},
+            ],
+            "results": [
+                {"registration_id": "r2", "rank": 1},
+                {"registration_id": "r1", "rank": 2},
+            ],
+            "status": "completed",
+            "updated_at": "2026-08-17T12:00:00+00:00",
+        },
+    ])
+
+    assert registration_badge_match_progress([*legacy, *stage], {"r1"}) == {
+        "matches_played": 3,
+        "matches_won": 2,
+        "match_streak_max": 2,
+    }
+
+
+def test_tournament_achievement_progress_keeps_legacy_fourth_place_semantics():
+    snapshot = build_structure_snapshot("t1", legacy_matches=[
+        {
+            "id": "final",
+            "tournament_id": "t1",
+            "participant_a_id": "r1",
+            "participant_b_id": "r2",
+            "winner_id": "r1",
+            "loser_id": "r2",
+            "final_position": 1,
+            "status": "completed",
+        },
+        {
+            "id": "fourth-place",
+            "tournament_id": "t1",
+            "participant_a_id": "r3",
+            "participant_b_id": "r2",
+            "winner_id": "r3",
+            "loser_id": "r2",
+            "final_position": 4,
+            "status": "completed",
+        },
+    ])
+
+    assert registration_tournament_achievement_progress(snapshot, REGISTRATIONS, {"r1"}) == {
+        "tournaments_won": 1,
+        "podium_finishes": 1,
+        "rank_4_count": 0,
+    }
+    assert registration_tournament_achievement_progress(snapshot, REGISTRATIONS, {"r2"}) == {
+        "tournaments_won": 0,
+        "podium_finishes": 0,
+        "rank_4_count": 1,
+    }
+
+
+def test_tournament_achievement_progress_counts_stage_champion():
+    snapshot = build_structure_snapshot("t1", stage_matches=[{
+        "id": "stage-final",
+        "tournament_id": "t1",
+        "stage_id": "s1",
+        "round": 3,
+        "slots": [
+            {"slot": 1, "registration_id": "r1", "status": "filled"},
+            {"slot": 2, "registration_id": "r2", "status": "filled"},
+            {"slot": 3, "registration_id": "r3", "status": "filled"},
+        ],
+        "results": [
+            {"registration_id": "r1", "rank": 1},
+            {"registration_id": "r2", "rank": 2},
+            {"registration_id": "r3", "rank": 3},
+        ],
+        "status": "completed",
+    }])
+
+    assert registration_tournament_achievement_progress(snapshot, REGISTRATIONS, {"r1"}) == {
+        "tournaments_won": 1,
+        "podium_finishes": 1,
+        "rank_4_count": 0,
+    }
