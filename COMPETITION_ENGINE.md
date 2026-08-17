@@ -202,6 +202,27 @@ Historische Turniere ohne persistierte Angabe werden im Read-Vertrag bewusst als
 das Format allein darf die Engine nicht erraten. Eine persistierende
 Bestandszuordnung bleibt Teil des spaeteren Dry Runs mit Hash/Diff und Rollback.
 
+## Kanonischer Graphvalidator v1
+
+`backend/services/competition_graph_validation.py` validiert ausschliesslich den
+kanonischen Read-Vertrag und schreibt oder repariert keine Quelldaten. Der
+maschinenlesbare Bericht `competition.graph-validation.v1` enthaelt stabile
+Fehlercodes, Counts und Kontext fuer Preview, Shadow Read und Migrations-Dry-Run.
+
+Geprueft werden Match- und Slot-IDs, beide Seiten jeder
+Slot-Quelle/Advancement-Kante, fehlende Ziele und Quellen, Zyklen, unerreichbare
+Matches, doppelte Slot- oder Teilnehmerbelegung sowie Resultat-, Quell- und
+Advancement-Raenge. Mehrere unabhaengige Entry-Matches bleiben erlaubt, damit
+Round Robin, Liga, Gruppen und mehrere Bracket-Wurzeln keine falschen Fehler
+erzeugen. Als unerreichbar gilt nur ein Match, dessen deklarierte
+Match-Result-Abhaengigkeiten nicht bis zu einem Entry-Match aufgeloest werden
+koennen.
+
+Der bestehende `structure_snapshot_issues`-Adapter liefert dieselben Issues fuer
+Read-Metriken und Kompatibilitaet. Der Validator ist noch keine Schreibfreigabe:
+die folgende Preview/Validate/Apply-Transaktion muss einen fehlerfreien Report
+verlangen und ihre Schreibwirkung separat absichern.
+
 ## Abnahmematrix
 
 - Teilnehmerzahlen 0/1 sowie 3/5/63/64/65 und grosse Strukturen;

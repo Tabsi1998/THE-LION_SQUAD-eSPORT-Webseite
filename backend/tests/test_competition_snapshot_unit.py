@@ -171,6 +171,21 @@ def test_stage_adapter_resolves_match_key_sources_to_stable_match_ids():
     assert final["slots"][0]["source"]["outcome"] == "winner"
 
 
+def test_stage_adapter_preserves_invalid_explicit_ranks_for_validation():
+    source = _stage_fixture()
+    source[0]["advancement"][0]["rank"] = 0
+    source[0]["advancement"][0]["flow"] = "invalid-flow"
+    source[2]["slots"][0]["source"]["rank"] = 0
+    source[2]["slots"][0]["source"]["flow"] = "invalid-flow"
+
+    adapted = adapt_stage_matches(source)
+
+    assert adapted[0]["advancement"][0]["rank"] == 0
+    assert adapted[0]["advancement"][0]["outcome"] == "invalid-flow"
+    assert adapted[2]["slots"][0]["source"]["rank"] == 0
+    assert adapted[2]["slots"][0]["source"]["outcome"] == "invalid-flow"
+
+
 def test_adapter_tolerates_unset_scores_and_non_numeric_sort_fields():
     legacy = adapt_legacy_matches([{
         "id": "m-void",
