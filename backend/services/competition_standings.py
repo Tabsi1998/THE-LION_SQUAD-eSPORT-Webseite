@@ -303,6 +303,101 @@ def standings_for_structure(
     return elimination_standings(legacy_matches, registrations)
 
 
+def _section_key(value) -> str:
+    return str(value or "").strip().lower()
+
+
+def placements_for_structure(
+    snapshot: dict,
+    registrations: list[dict],
+    *,
+    sections: set[str] | None = None,
+) -> dict[int, dict]:
+    """Resolve prize/season placements through the canonical read contract.
+
+    Explicit legacy ``final_position`` values remain authoritative for historical
+    tournaments.  If none exist, Stage/FFA results use the shared standings
+    projection.  This preserves the old fallback behaviour while giving every
+    downstream consumer one engine-independent entry point.
+    """
+
+    registration_map = {
+        registration["id"]: registration
+        for registration in registrations
+        if registration.get("id")
+    }
+    wanted_sections = {
+        _section_key(section)
+        for section in sections or set()
+        if section
+    }
+
+    def wanted(match: dict) -> bool:
+        return not wanted_sections or _section_key(match.get("section")) in wanted_sections
+
+    legacy_matches = [
+        match
+        for match in snapshot.get("matches") or []
+        if match.get("source", {}).get("engine") == "legacy" and wanted(match)
+    ]
+    placements: dict[int, dict] = {}
+    placed_registration_ids: set[str] = set()
+    for match in legacy_matches:
+        registration_id = next(
+            (
+                result.get("registration_id")
+                for result in match.get("results") or []
+                if result.get("outcome") == "winner"
+            ),
+            None,
+        )
+        rank = _safe_int(match.get("final_position"))
+        registration = registration_map.get(registration_id)
+        if (
+            not registration_id
+            or not rank
+            or not registration
+            or rank in placements
+            or registration_id in placed_registration_ids
+        ):
+            continue
+        placements[rank] = {
+            "registration_id": registration_id,
+            "user_id": registration.get("user_id"),
+            "team_id": registration.get("team_id"),
+        }
+        placed_registration_ids.add(registration_id)
+    if placements:
+        return placements
+
+    stage_matches = [
+        match
+        for match in snapshot.get("matches") or []
+        if match.get("source", {}).get("engine") == "stage" and wanted(match)
+    ]
+    for row in stage_standings(stage_matches, registrations):
+        registration_id = row.get("registration_id")
+        rank = _safe_int(row.get("rank"))
+        registration = registration_map.get(registration_id)
+        if not registration_id or not rank or not row.get("played") or not registration or rank in placements:
+            continue
+        placements[rank] = {
+            "registration_id": registration_id,
+            "user_id": registration.get("user_id"),
+            "team_id": registration.get("team_id"),
+        }
+    return placements
+
+
+def placement_rows_for_structure(snapshot: dict, registrations: list[dict]) -> list[dict]:
+    """Return ordered placement rows suitable for season-point awards."""
+
+    return [
+        {**placement, "rank": rank}
+        for rank, placement in sorted(placements_for_structure(snapshot, registrations).items())
+    ]
+
+
 def registration_match_summary(matches: list[dict], registration_ids: set[str]) -> dict:
     """Count terminal matches and wins once across canonical match shapes."""
 

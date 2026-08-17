@@ -32,8 +32,7 @@ from services.tournament_permissions import (
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.competition_formats import find_format_capability
 from services.competition_read import load_competition_read_model, observe_structure_read
-from services.competition_snapshot import adapt_stage_matches
-from services.competition_standings import stage_standings, standings_for_structure
+from services.competition_standings import placement_rows_for_structure, standings_for_structure
 from services.match_v2_results import (
     MatchV2ResultError,
     build_v2_result_application,
@@ -3006,40 +3005,21 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         try:
             from services.season_service import award_points
             from badges import on_tournament_completed
-            # Build placements from published legacy finals or stage-engine results.
+            # Build placements once through the canonical Legacy/Stage projection.
             regs = await db.tournament_registrations.find(
                 {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
                 {"_id": 0},
             ).to_list(500)
-            reg_map = {r["id"]: r for r in regs}
             num_participants = len(regs)
-            matches = await db.matches.find({"tournament_id": tid, "final_position": {"$ne": None}}, {"_id": 0}).to_list(200)
-            placements = []
-            placed_reg_ids = set()
-            for m in matches:
-                rid = m.get("winner_id")
-                if rid and rid in reg_map and rid not in placed_reg_ids:
-                    reg = reg_map[rid]
-                    placements.append({
-                        "user_id": reg.get("user_id"),
-                        "team_id": reg.get("team_id"),
-                        "rank": m["final_position"],
-                    })
-                    placed_reg_ids.add(rid)
-            if not placements:
-                matches_v2 = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
-                if matches_v2:
-                    for row in stage_standings(adapt_stage_matches(matches_v2), regs):
-                        rid = row.get("registration_id")
-                        if not rid or rid not in reg_map or rid in placed_reg_ids or not row.get("played"):
-                            continue
-                        reg = reg_map[rid]
-                        placements.append({
-                            "user_id": reg.get("user_id"),
-                            "team_id": reg.get("team_id"),
-                            "rank": row.get("rank"),
-                        })
-                        placed_reg_ids.add(rid)
+            read_model = await load_competition_read_model(db, tid)
+            snapshot = read_model.structure_snapshot()
+            observe_structure_read(snapshot, surface="season_points")
+            placements = placement_rows_for_structure(snapshot, regs)
+            placed_reg_ids = {
+                placement["registration_id"]
+                for placement in placements
+                if placement.get("registration_id")
+            }
             # Source type by season weight: <=1.5 mini, <=2.5 normal, else major
             weight = float(t.get("season_weight") or 2.0)
             source_type = "mini" if weight < 1.5 else ("major" if weight >= 2.5 else "tournament")

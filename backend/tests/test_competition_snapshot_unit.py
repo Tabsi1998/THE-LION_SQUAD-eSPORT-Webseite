@@ -24,6 +24,7 @@ def _legacy_fixture():
             "score_b": 1,
             "winner_id": "r1",
             "loser_id": "r2",
+            "final_position": 1,
             "status": "completed",
             "scheduled_at": "2026-08-17T18:00:00+00:00",
             "station_id": "station-1",
@@ -135,6 +136,7 @@ def test_legacy_adapter_builds_slots_results_and_graph_sources_without_mutation(
 
     assert first["schema_version"] == STRUCTURE_SNAPSHOT_VERSION
     assert first["source"] == {"engine": "legacy", "collection": "matches"}
+    assert first["final_position"] == 1
     assert [slot["registration_id"] for slot in first["slots"]] == ["r1", "r2"]
     assert [(result["registration_id"], result["rank"], result["score"]) for result in first["results"]] == [
         ("r1", 1, 2),

@@ -4,6 +4,8 @@ from services.competition_snapshot import adapt_legacy_matches, adapt_stage_matc
 from services.competition_standings import (
     elimination_standings,
     group_standings,
+    placement_rows_for_structure,
+    placements_for_structure,
     round_robin_standings,
     registration_match_summary,
     stage_standings,
@@ -139,3 +141,102 @@ def test_registration_match_summary_counts_legacy_and_stage_wins_once():
         "matches_played": 2,
         "matches_won": 1,
     }
+
+
+def test_placements_keep_explicit_legacy_final_positions_authoritative():
+    legacy = [
+        {
+            "id": "legacy-first",
+            "tournament_id": "t1",
+            "round": 2,
+            "bracket": "winner",
+            "participant_a_id": "r1",
+            "participant_b_id": "r2",
+            "winner_id": "r1",
+            "loser_id": "r2",
+            "final_position": 1,
+            "status": "completed",
+        },
+        {
+            "id": "legacy-second",
+            "tournament_id": "t1",
+            "round": 2,
+            "bracket": "winner",
+            "participant_a_id": "r2",
+            "participant_b_id": "r3",
+            "winner_id": "r2",
+            "loser_id": "r3",
+            "final_position": 2,
+            "status": "completed",
+        },
+    ]
+    stage = [{
+        "id": "stage-conflict",
+        "tournament_id": "t1",
+        "stage_id": "s1",
+        "round": 3,
+        "slots": [
+            {"slot": 1, "registration_id": "r3", "status": "filled"},
+            {"slot": 2, "registration_id": "r1", "status": "filled"},
+        ],
+        "results": [
+            {"registration_id": "r3", "rank": 1},
+            {"registration_id": "r1", "rank": 2},
+        ],
+        "status": "completed",
+    }]
+    snapshot = build_structure_snapshot("t1", legacy_matches=legacy, stage_matches=stage)
+
+    placements = placements_for_structure(snapshot, REGISTRATIONS)
+
+    assert placements[1]["registration_id"] == "r1"
+    assert placements[1]["user_id"] == "u1"
+    assert placements[2]["registration_id"] == "r2"
+    assert placement_rows_for_structure(snapshot, REGISTRATIONS) == [
+        {"registration_id": "r1", "user_id": "u1", "team_id": None, "rank": 1},
+        {"registration_id": "r2", "user_id": "u2", "team_id": None, "rank": 2},
+    ]
+
+
+def test_placements_filter_stage_bracket_sections_through_canonical_fields():
+    stage = [
+        {
+            "id": "winner-bracket",
+            "tournament_id": "t1",
+            "stage_id": "s1",
+            "round": 2,
+            "section": "WB",
+            "slots": [
+                {"slot": 1, "registration_id": "r1", "status": "filled"},
+                {"slot": 2, "registration_id": "r2", "status": "filled"},
+            ],
+            "results": [
+                {"registration_id": "r1", "rank": 1},
+                {"registration_id": "r2", "rank": 2},
+            ],
+            "status": "completed",
+        },
+        {
+            "id": "loser-bracket",
+            "tournament_id": "t1",
+            "stage_id": "s1",
+            "round": 1,
+            "section": "LB",
+            "slots": [
+                {"slot": 1, "registration_id": "r3", "status": "filled"},
+                {"slot": 2, "registration_id": "r2", "status": "filled"},
+            ],
+            "results": [
+                {"registration_id": "r3", "rank": 1},
+                {"registration_id": "r2", "rank": 2},
+            ],
+            "status": "completed",
+        },
+    ]
+    snapshot = build_structure_snapshot("t1", stage_matches=stage)
+
+    winner = placements_for_structure(snapshot, REGISTRATIONS, sections={"winner", "wb"})
+    loser = placements_for_structure(snapshot, REGISTRATIONS, sections={"loser", "lb"})
+
+    assert winner[1]["registration_id"] == "r1"
+    assert loser[1]["registration_id"] == "r3"

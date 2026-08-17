@@ -228,6 +228,7 @@ def _common_match_fields(match: dict, collection: str, engine: str) -> dict:
         "round_name": match.get("round_name") or match.get("matchday_label"),
         "match_key": match.get("match_key"),
         "section": match.get("section") or match.get("bracket"),
+        "final_position": match.get("final_position"),
         "match_type": match.get("match_type") or "duel",
         "status": match.get("status") or "pending",
         "scheduled_at": match.get("scheduled_at"),

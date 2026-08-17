@@ -8,9 +8,12 @@ class FakeCursor:
     def __init__(self, items):
         self.items = list(items)
 
-    def sort(self, key, direction):
-        reverse = direction < 0
-        return FakeCursor(sorted(self.items, key=lambda item: item.get(key, 0), reverse=reverse))
+    def sort(self, key, direction=None):
+        specs = key if isinstance(key, list) else [(key, direction)]
+        items = list(self.items)
+        for field, sort_direction in reversed(specs):
+            items.sort(key=lambda item: item.get(field) or 0, reverse=sort_direction < 0)
+        return FakeCursor(items)
 
     async def to_list(self, _limit):
         return list(self.items)
@@ -56,6 +59,7 @@ class FakeDb:
         registrations=None,
         matches=None,
         matches_v2=None,
+        tournament_stages=None,
         prize_pickups=None,
         f1_challenges=None,
         f1_tracks=None,
@@ -68,6 +72,7 @@ class FakeDb:
         self.tournament_registrations = FakeCollection(registrations or [])
         self.matches = FakeCollection(matches or [])
         self.matches_v2 = FakeCollection(matches_v2 or [])
+        self.tournament_stages = FakeCollection(tournament_stages or [])
         self.prize_pickups = FakeCollection(prize_pickups or [])
 
 
