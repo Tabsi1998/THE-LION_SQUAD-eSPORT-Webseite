@@ -14,6 +14,7 @@ from auth import require_admin, require_role, require_super, get_current_user, g
 from services.visibility import user_can_see
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services.access_links import validate_access_link
+from services.competition_privacy import registration_match_snapshot
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.public_site_settings import PUBLIC_LEGAL_SOURCE_FIELDS, build_public_legal_settings
 from models import now_utc, new_id
@@ -1637,6 +1638,10 @@ async def export_my_data(me: dict = Depends(get_current_user)):
     db = get_db()
     u = await db.users.find_one({"id": me["id"]}, {"_id": 0, "password_hash": 0})
     regs = await db.tournament_registrations.find({"user_id": me["id"]}, {"_id": 0}).to_list(500)
+    competition_matches = await registration_match_snapshot(
+        db,
+        [registration.get("id") for registration in regs if registration.get("id")],
+    )
     lap_times = await db.f1_lap_times.find({"user_id": me["id"]}, {"_id": 0}).to_list(500)
     teams = await db.teams.find({"member_ids": me["id"]}, {"_id": 0}).to_list(100)
     emails = await db.email_logs.find({"to": u.get("email", "")}, {"_id": 0}).to_list(200)
@@ -1644,6 +1649,7 @@ async def export_my_data(me: dict = Depends(get_current_user)):
         "exported_at": now_utc().isoformat(),
         "user": u,
         "tournament_registrations": regs,
+        "competition_matches": competition_matches,
         "f1_lap_times": lap_times,
         "teams": teams,
         "email_logs": emails,

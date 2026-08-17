@@ -5,6 +5,7 @@ from services.competition_standings import (
     elimination_standings,
     group_standings,
     round_robin_standings,
+    registration_match_summary,
     stage_standings,
     standings_for_structure,
     swiss_standings,
@@ -109,3 +110,32 @@ def test_group_and_policy_selector_keep_public_shape():
         REGISTRATIONS,
         groups=groups,
     ) == grouped
+
+
+def test_registration_match_summary_counts_legacy_and_stage_wins_once():
+    legacy = adapt_legacy_matches(_legacy_matches())
+    stage = adapt_stage_matches([{
+        "id": "stage-win",
+        "tournament_id": "t1",
+        "stage_id": "s1",
+        "round": 3,
+        "slots": [
+            {"slot": 1, "registration_id": "r1", "status": "filled"},
+            {"slot": 2, "registration_id": "r2", "status": "filled"},
+        ],
+        "results": [
+            {"registration_id": "r2", "rank": 1},
+            {"registration_id": "r1", "rank": 2},
+        ],
+        "advancement": [],
+        "status": "completed",
+    }])
+
+    assert registration_match_summary([*legacy, *stage], {"r1"}) == {
+        "matches_played": 3,
+        "matches_won": 1,
+    }
+    assert registration_match_summary([*legacy, *stage], {"r2"}) == {
+        "matches_played": 2,
+        "matches_won": 1,
+    }

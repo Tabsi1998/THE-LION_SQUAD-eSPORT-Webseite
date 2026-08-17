@@ -8,6 +8,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import get_current_user, get_optional_user, require_admin, require_super, hash_password, hash_token
 from email_service import send_template
+from services.competition_privacy import anonymize_registration_match_references, registration_match_snapshot
+from services.competition_standings import registration_match_summary
 from services.membership_service import get_membership, derived_user_type, is_active_member
 from services.profile_references import empty_profile_references, personal_profile_references
 from services.visibility import user_can_see
@@ -662,16 +664,10 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
                 stats["wins"] += 1
             if final_pos and final_pos <= 3:
                 stats["top3"] += 1
-        # Match stats — look up by registration_id
-        reg_ids = visible_reg_ids
-        matches = await db.matches.find(
-            {"$or": [{"participant_a_id": {"$in": reg_ids}},
-                     {"participant_b_id": {"$in": reg_ids}}],
-             "status": "completed"}, {"_id": 0}).to_list(500)
-        for m in matches:
-            stats["matches_played"] += 1
-            if m.get("winner_id") in reg_ids:
-                stats["matches_won"] += 1
+        # Match stats use the canonical projection so Stage/FFA results count too.
+        canonical_matches = await registration_match_snapshot(db, visible_reg_ids, limit=500)
+        match_summary = registration_match_summary(canonical_matches, set(visible_reg_ids))
+        stats.update(match_summary)
         # F1 / Fast Lap
         from routes.f1_routes import _ms_to_time_str
         # Per track best
@@ -890,6 +886,11 @@ async def delete_user(user_id: str, me: dict = Depends(require_super())):
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
     regs = await db.tournament_registrations.find({"user_id": user_id}, {"_id": 0, "id": 1}).to_list(1000)
     reg_ids = [r["id"] for r in regs if r.get("id")]
+    match_anonymization = await anonymize_registration_match_references(
+        db,
+        reg_ids,
+        updated_at=now_utc().isoformat(),
+    )
     await db.users.delete_one({"id": user_id})
     await db.refresh_tokens.delete_many({"user_id": user_id})
     await db.login_attempts.delete_many({"identifier": user.get("email")})
@@ -899,12 +900,6 @@ async def delete_user(user_id: str, me: dict = Depends(require_super())):
     await db.tournament_registrations.delete_many({"user_id": user_id})
     await db.tournament_staff_assignments.delete_many({"user_id": user_id})
     await db.event_registrations.delete_many({"user_id": user_id})
-    if reg_ids:
-        for field in ("participant_a_id", "participant_b_id", "winner_id", "loser_id"):
-            await db.matches.update_many(
-                {field: {"$in": reg_ids}},
-                {"$set": {field: None, "status": "waiting_result", "updated_at": now_utc().isoformat()}},
-            )
     await db.f1_lap_times.delete_many({"user_id": user_id})
     await db.team_members.delete_many({"user_id": user_id})
     await db.teams.update_many({}, {"$pull": {"member_ids": user_id, "co_leader_ids": user_id}})
@@ -915,7 +910,11 @@ async def delete_user(user_id: str, me: dict = Depends(require_super())):
         "action": "user.delete",
         "target_id": user_id,
         "actor_id": me["id"],
-        "data": {"email": user.get("email"), "username": user.get("username")},
+        "data": {
+            "email": user.get("email"),
+            "username": user.get("username"),
+            "anonymized_match_references": match_anonymization,
+        },
         "created_at": now_utc().isoformat(),
     })
     return {"ok": True}
