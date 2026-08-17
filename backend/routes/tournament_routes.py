@@ -1,6 +1,7 @@
 """Tournament + bracket routes."""
 import csv
 import hashlib
+import hmac
 import io
 import json
 import random
@@ -44,6 +45,11 @@ from services.competition_structure_plan import (
     stabilize_stage_plan_matches,
     structure_plan_hash,
     structure_plan_seed,
+)
+from services.competition_structure_apply import (
+    StructureApplyError,
+    StructureApplyPreconditionError,
+    activate_structure_plan,
 )
 from services.competition_versions import (
     apply_competition_version_read_defaults,
@@ -144,6 +150,21 @@ class TournamentBracketStructurePayload(BaseModel):
 
 class TournamentStructurePlanPayload(TournamentBracketStructurePayload):
     preview: bool = True
+
+
+class TournamentStructureApplyPayload(TournamentStructurePlanPayload):
+    expected_plan_hash: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
+    expected_base_structure_hash: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
+
+
+def _structure_plan_request_payload(body: TournamentStructurePlanPayload) -> dict:
+    return {
+        "stage_type": body.stage_type,
+        "match_type": body.match_type,
+        "name": body.name,
+        "settings": body.settings,
+        "preview": body.preview,
+    }
 
 
 def _next_power_of_two(n: int) -> int:
@@ -2794,18 +2815,14 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
 
 
 # --- Bracket generation ---
-@router.post("/{tid}/bracket/plan")
-async def plan_bracket_from_tournament_format(
+async def _build_tournament_structure_plan(
+    db,
     tid: str,
+    tournament: dict,
     body: TournamentStructurePlanPayload,
-    me: dict = Depends(get_current_user),
 ):
     """Generate and validate a deterministic structure without writing it."""
 
-    db = get_db()
-    tid = await _resolve_tid(tid)
-    tournament = await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     if not _can_rebuild_bracket_from_format(tournament):
         raise HTTPException(
             status_code=400,
@@ -2834,7 +2851,7 @@ async def plan_bracket_from_tournament_format(
     if not body.preview and len(generator_registrations) < 2:
         raise HTTPException(status_code=400, detail="Mindestens 2 Teilnehmer benötigt")
 
-    request_payload = body.model_dump()
+    request_payload = _structure_plan_request_payload(body)
     seed_data = structure_plan_seed(
         tournament,
         request_payload,
@@ -2914,10 +2931,10 @@ async def plan_bracket_from_tournament_format(
     force_required = (
         any(not match.get("is_preview") for match in existing_matches)
         or tournament.get("status") in {
-            "live", "paused", "completed", "results_published", "archived",
+            "live", "paused", "completed", "results_published", "archived", "cancelled",
         }
     )
-    return {
+    response = {
         "ok": validation["valid"],
         "plan_version": STRUCTURE_PLAN_VERSION,
         "plan_hash": plan_hash,
@@ -2940,6 +2957,145 @@ async def plan_bracket_from_tournament_format(
             "stage_match_count": len(read_model.stage_matches),
             "stage_count": len(read_model.stages),
         },
+    }
+    return response, matches, stage, read_model
+
+
+@router.post("/{tid}/bracket/plan")
+async def plan_bracket_from_tournament_format(
+    tid: str,
+    body: TournamentStructurePlanPayload,
+    me: dict = Depends(get_current_user),
+):
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    tournament = await _ensure_tournament_unlocked(db, tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    response, _matches, _stage, _read_model = await _build_tournament_structure_plan(
+        db,
+        tid,
+        tournament,
+        body,
+    )
+    return response
+
+
+@router.post("/{tid}/bracket/apply")
+async def apply_tournament_structure_plan(
+    tid: str,
+    body: TournamentStructureApplyPayload,
+    me: dict = Depends(get_current_user),
+    _mutation_tid: str = Depends(_serialized_tournament_write),
+):
+    """Validate and activate exactly the structure that a caller previewed."""
+
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    tournament = await _ensure_tournament_unlocked(db, tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+
+    last_plan_hash = str(tournament.get("last_structure_plan_hash") or "")
+    if last_plan_hash and hmac.compare_digest(last_plan_hash, body.expected_plan_hash):
+        last_base_hash = str(tournament.get("last_structure_base_hash") or "")
+        if not hmac.compare_digest(last_base_hash, body.expected_base_structure_hash):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "structure_plan_stale",
+                    "message": "Der Basis-Hash gehört nicht zum bereits angewendeten Strukturplan.",
+                },
+            )
+        return {
+            "ok": True,
+            "idempotent_replay": True,
+            "plan_hash": last_plan_hash,
+            "base_structure_hash": last_base_hash,
+            "plan_version": tournament.get("last_structure_plan_version") or STRUCTURE_PLAN_VERSION,
+            "engine": tournament.get("last_structure_engine") or (
+                "graph" if tournament.get("engine_version") == "competition.graph.v1" else "classic"
+            ),
+            "structure_revision": int(tournament.get("structure_revision") or 0),
+        }
+
+    response, matches, stage, read_model = await _build_tournament_structure_plan(
+        db,
+        tid,
+        tournament,
+        body,
+    )
+    if not hmac.compare_digest(
+        response["base_structure_hash"],
+        body.expected_base_structure_hash,
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "structure_plan_stale",
+                "message": "Die Turnierstruktur wurde seit der Vorschau verändert. Bitte neu planen.",
+                "current_base_structure_hash": response["base_structure_hash"],
+            },
+        )
+    if not hmac.compare_digest(response["plan_hash"], body.expected_plan_hash):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "structure_plan_changed",
+                "message": "Die Eingaben oder Teilnehmer haben sich seit der Vorschau verändert. Bitte neu planen.",
+                "current_plan_hash": response["plan_hash"],
+            },
+        )
+    if not response["validation"]["valid"]:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "structure_plan_invalid",
+                "message": "Der Strukturplan ist ungültig und wurde nicht angewendet.",
+                "validation": response["validation"],
+            },
+        )
+    if response["apply_requirements"]["force_required"]:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "protected_existing_structure",
+                "message": (
+                    "Der sichere Apply-Weg ersetzt nur leere oder reine Preview-Strukturen. "
+                    "Reale Matches und laufende oder historische Turniere bleiben unverändert."
+                ),
+                "replacement_impact": response["replacement_impact"],
+            },
+        )
+
+    try:
+        result = await activate_structure_plan(
+            db,
+            tournament=tournament,
+            engine=response["engine"],
+            matches=matches,
+            stage=stage,
+            previous_legacy_matches=read_model.legacy_matches,
+            previous_stage_matches=read_model.stage_matches,
+            previous_stages=read_model.stages,
+            plan_hash=response["plan_hash"],
+            base_structure_hash=response["base_structure_hash"],
+            plan_version=STRUCTURE_PLAN_VERSION,
+            actor_id=me.get("id"),
+        )
+    except StructureApplyPreconditionError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "structure_apply_precondition", "message": str(exc)},
+        ) from exc
+    except StructureApplyError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "structure_apply_rollback_failed", "message": str(exc)},
+        ) from exc
+
+    return {
+        **result,
+        "plan_version": STRUCTURE_PLAN_VERSION,
+        "validation": response["validation"],
     }
 
 

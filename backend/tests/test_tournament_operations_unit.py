@@ -13,6 +13,7 @@ from routes.station_routes import (
     _match_has_minimum_participants,
 )
 from services.match_reminder import _uses_actual_start_notifications
+from services.competition_structure_apply import activate_structure_plan
 from models import RegistrationUpdate, TournamentCreate, TournamentStageCreate
 
 
@@ -440,11 +441,13 @@ def _bracket_rebuild_db(*, tournament, legacy_matches=None, v2_matches=None,
         find=Mock(return_value=_Cursor(legacy_matches or [])),
         delete_many=AsyncMock(),
         insert_many=AsyncMock(),
+        replace_one=AsyncMock(),
     )
     matches_v2 = SimpleNamespace(
         find=Mock(return_value=_Cursor(v2_matches or [])),
         delete_many=AsyncMock(),
         insert_many=AsyncMock(),
+        replace_one=AsyncMock(),
     )
     stages = SimpleNamespace(
         find_one=AsyncMock(return_value=existing_stage),
@@ -452,6 +455,7 @@ def _bracket_rebuild_db(*, tournament, legacy_matches=None, v2_matches=None,
         insert_one=AsyncMock(),
         delete_one=AsyncMock(),
         delete_many=AsyncMock(),
+        replace_one=AsyncMock(),
     )
     tournament_registrations = SimpleNamespace(
         find=Mock(return_value=_Cursor(registrations or [])),
@@ -465,7 +469,12 @@ def _bracket_rebuild_db(*, tournament, legacy_matches=None, v2_matches=None,
         matches_v2=matches_v2,
         tournament_stages=stages,
         tournament_registrations=tournament_registrations,
-        match_reports_v2=SimpleNamespace(delete_many=AsyncMock()),
+        match_reports_v2=SimpleNamespace(
+            find=Mock(return_value=_Cursor([])),
+            delete_many=AsyncMock(),
+            replace_one=AsyncMock(),
+        ),
+        audit_logs=SimpleNamespace(insert_one=AsyncMock()),
     )
 
 
@@ -725,3 +734,335 @@ def test_structure_plan_reports_replacement_impact_and_force_requirement(monkeyp
         "stage_match_count": 0,
         "stage_count": 0,
     }
+
+
+def _apply_payload_from_plan(plan, **updates):
+    values = {
+        "preview": False,
+        "expected_plan_hash": plan["plan_hash"],
+        "expected_base_structure_hash": plan["base_structure_hash"],
+        **updates,
+    }
+    return tournament_routes.TournamentStructureApplyPayload(**values)
+
+
+def test_structure_apply_rejects_stale_base_before_any_write(monkeypatch):
+    tournament = {
+        "id": "t1",
+        "format": "round_robin",
+        "max_participants": 4,
+        "seeding_mode": "manual",
+        "status": "draft",
+    }
+    registrations = [
+        {"id": f"r{seed}", "status": "approved", "seed": seed}
+        for seed in range(1, 5)
+    ]
+    db = _bracket_rebuild_db(tournament=tournament, registrations=registrations)
+    _patch_bracket_rebuild_dependencies(monkeypatch, db)
+    plan_request = tournament_routes.TournamentStructurePlanPayload(preview=False)
+    plan = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
+        "t1", plan_request, {"id": "admin-1"},
+    ))
+
+    db.matches.find.return_value = _Cursor([{
+        "id": "changed-after-preview",
+        "tournament_id": "t1",
+        "round": 1,
+        "match_index": 0,
+        "is_preview": True,
+        "status": "preview",
+    }])
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(tournament_routes.apply_tournament_structure_plan(
+            "t1",
+            _apply_payload_from_plan(plan),
+            {"id": "admin-1"},
+        ))
+
+    assert error.value.status_code == 409
+    assert error.value.detail["code"] == "structure_plan_stale"
+    db.matches.insert_many.assert_not_awaited()
+    db.matches.delete_many.assert_not_awaited()
+    db.matches_v2.insert_many.assert_not_awaited()
+    db.matches_v2.delete_many.assert_not_awaited()
+    db.tournament_stages.insert_one.assert_not_awaited()
+    db.tournament_stages.delete_many.assert_not_awaited()
+    db.tournaments.update_one.assert_not_awaited()
+    db.audit_logs.insert_one.assert_not_awaited()
+
+
+def test_structure_apply_activates_exact_valid_plan(monkeypatch):
+    tournament = {
+        "id": "t1",
+        "format": "round_robin",
+        "max_participants": 4,
+        "seeding_mode": "manual",
+        "status": "draft",
+        "structure_revision": 2,
+    }
+    registrations = [
+        {"id": f"r{seed}", "status": "approved", "seed": seed}
+        for seed in range(1, 5)
+    ]
+    db = _bracket_rebuild_db(tournament=tournament, registrations=registrations)
+    _patch_bracket_rebuild_dependencies(monkeypatch, db)
+    plan = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
+        "t1",
+        tournament_routes.TournamentStructurePlanPayload(preview=False),
+        {"id": "admin-1"},
+    ))
+
+    result = asyncio.run(tournament_routes.apply_tournament_structure_plan(
+        "t1",
+        _apply_payload_from_plan(plan),
+        {"id": "admin-1"},
+    ))
+
+    assert result["ok"] is True
+    assert result["idempotent_replay"] is False
+    assert result["plan_hash"] == plan["plan_hash"]
+    assert result["structure_revision"] == 3
+    assert result["validation"]["valid"] is True
+    inserted_matches = db.matches.insert_many.await_args.args[0]
+    assert len(inserted_matches) == plan["match_count"]
+    assert all(match["structure_plan_hash"] == plan["plan_hash"] for match in inserted_matches)
+    tournament_update = db.tournaments.update_one.await_args.args[1]["$set"]
+    assert tournament_update["last_structure_plan_hash"] == plan["plan_hash"]
+    assert tournament_update["last_structure_base_hash"] == plan["base_structure_hash"]
+    assert tournament_update["engine_version"] == "competition.classic.v1"
+    db.audit_logs.insert_one.assert_awaited_once()
+
+
+def test_structure_apply_activates_graph_plan_with_stage(monkeypatch):
+    tournament = {
+        "id": "t1",
+        "format": "custom_bracket",
+        "max_participants": 4,
+        "seeding_mode": "manual",
+        "status": "draft",
+    }
+    registrations = [
+        {"id": f"r{seed}", "status": "approved", "seed": seed}
+        for seed in range(1, 5)
+    ]
+    db = _bracket_rebuild_db(tournament=tournament, registrations=registrations)
+    _patch_bracket_rebuild_dependencies(monkeypatch, db)
+    request_values = {
+        "stage_type": "custom_bracket",
+        "match_type": "duel",
+        "preview": False,
+    }
+    plan = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
+        "t1",
+        tournament_routes.TournamentStructurePlanPayload(**request_values),
+        {"id": "admin-1"},
+    ))
+
+    result = asyncio.run(tournament_routes.apply_tournament_structure_plan(
+        "t1",
+        _apply_payload_from_plan(plan, **request_values),
+        {"id": "admin-1"},
+    ))
+
+    assert result["engine"] == "graph"
+    assert result["stage_id"] == plan["stage"]["id"]
+    db.tournament_stages.insert_one.assert_awaited_once()
+    db.matches_v2.insert_many.assert_awaited_once()
+    assert db.tournaments.update_one.await_args.args[1]["$set"]["engine_version"] == "competition.graph.v1"
+
+
+def test_structure_apply_rejects_invalid_validated_graph_before_write(monkeypatch):
+    plan_hash = "c" * 64
+    base_hash = "d" * 64
+    tournament = {
+        "id": "t1",
+        "format": "round_robin",
+        "max_participants": 4,
+        "status": "draft",
+    }
+    db = _bracket_rebuild_db(tournament=tournament)
+    _patch_bracket_rebuild_dependencies(monkeypatch, db)
+    build_plan = AsyncMock(return_value=(
+        {
+            "plan_hash": plan_hash,
+            "base_structure_hash": base_hash,
+            "engine": "classic",
+            "validation": {
+                "valid": False,
+                "issues": [{"code": "missing_match_target"}],
+            },
+            "apply_requirements": {"force_required": False},
+            "replacement_impact": {
+                "legacy_match_count": 0,
+                "stage_match_count": 0,
+                "stage_count": 0,
+            },
+        },
+        [{"id": "invalid", "tournament_id": "t1"}],
+        None,
+        SimpleNamespace(legacy_matches=[], stage_matches=[], stages=[]),
+    ))
+    monkeypatch.setattr(tournament_routes, "_build_tournament_structure_plan", build_plan)
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(tournament_routes.apply_tournament_structure_plan(
+            "t1",
+            tournament_routes.TournamentStructureApplyPayload(
+                preview=False,
+                expected_plan_hash=plan_hash,
+                expected_base_structure_hash=base_hash,
+            ),
+            {"id": "admin-1"},
+        ))
+
+    assert error.value.status_code == 422
+    assert error.value.detail["code"] == "structure_plan_invalid"
+    db.matches.insert_many.assert_not_awaited()
+    db.matches.delete_many.assert_not_awaited()
+    db.tournaments.update_one.assert_not_awaited()
+    db.audit_logs.insert_one.assert_not_awaited()
+
+
+def test_structure_apply_rejects_real_existing_matches_before_write(monkeypatch):
+    tournament = {
+        "id": "t1",
+        "format": "single_elim",
+        "max_participants": 4,
+        "seeding_mode": "manual",
+        "status": "draft",
+    }
+    existing = {
+        "id": "real-match",
+        "tournament_id": "t1",
+        "round": 1,
+        "match_index": 0,
+        "participant_a_id": "r1",
+        "participant_b_id": "r2",
+        "status": "pending",
+        "is_preview": False,
+    }
+    registrations = [
+        {"id": f"r{seed}", "status": "approved", "seed": seed}
+        for seed in range(1, 5)
+    ]
+    db = _bracket_rebuild_db(
+        tournament=tournament,
+        legacy_matches=[existing],
+        registrations=registrations,
+    )
+    _patch_bracket_rebuild_dependencies(monkeypatch, db)
+    plan = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
+        "t1",
+        tournament_routes.TournamentStructurePlanPayload(preview=False),
+        {"id": "admin-1"},
+    ))
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(tournament_routes.apply_tournament_structure_plan(
+            "t1",
+            _apply_payload_from_plan(plan),
+            {"id": "admin-1"},
+        ))
+
+    assert error.value.status_code == 409
+    assert error.value.detail["code"] == "protected_existing_structure"
+    db.matches.insert_many.assert_not_awaited()
+    db.matches.delete_many.assert_not_awaited()
+    db.tournaments.update_one.assert_not_awaited()
+    db.audit_logs.insert_one.assert_not_awaited()
+
+
+def test_structure_apply_exact_retry_is_idempotent_without_replanning(monkeypatch):
+    plan_hash = "a" * 64
+    base_hash = "b" * 64
+    tournament = {
+        "id": "t1",
+        "format": "round_robin",
+        "max_participants": 4,
+        "status": "draft",
+        "engine_version": "competition.classic.v1",
+        "structure_revision": 7,
+        "last_structure_plan_hash": plan_hash,
+        "last_structure_base_hash": base_hash,
+    }
+    db = _bracket_rebuild_db(tournament=tournament)
+    _patch_bracket_rebuild_dependencies(monkeypatch, db)
+
+    result = asyncio.run(tournament_routes.apply_tournament_structure_plan(
+        "t1",
+        tournament_routes.TournamentStructureApplyPayload(
+            preview=False,
+            expected_plan_hash=plan_hash,
+            expected_base_structure_hash=base_hash,
+        ),
+        {"id": "admin-1"},
+    ))
+
+    assert result == {
+        "ok": True,
+        "idempotent_replay": True,
+        "plan_hash": plan_hash,
+        "base_structure_hash": base_hash,
+        "plan_version": "competition.structure-plan.v1",
+        "engine": "classic",
+        "structure_revision": 7,
+    }
+    db.tournament_registrations.find.assert_not_called()
+    db.matches.insert_many.assert_not_awaited()
+    db.matches.delete_many.assert_not_awaited()
+    db.tournaments.update_one.assert_not_awaited()
+    db.audit_logs.insert_one.assert_not_awaited()
+
+
+def test_structure_apply_restores_previous_preview_after_late_failure():
+    tournament = {
+        "id": "t1",
+        "format": "round_robin",
+        "status": "draft",
+        "engine_version": "competition.classic.v1",
+        "ruleset_version": "competition.ruleset.v1",
+        "structure_revision": 2,
+        "last_structure_plan_hash": "1" * 64,
+        "last_structure_base_hash": "2" * 64,
+    }
+    previous_match = {
+        "id": "old-preview",
+        "tournament_id": "t1",
+        "is_preview": True,
+        "status": "preview",
+    }
+    db = _bracket_rebuild_db(tournament=tournament, legacy_matches=[previous_match])
+    db.audit_logs.insert_one.side_effect = RuntimeError("audit unavailable")
+
+    with pytest.raises(RuntimeError, match="audit unavailable"):
+        asyncio.run(activate_structure_plan(
+            db,
+            tournament=tournament,
+            engine="classic",
+            matches=[{
+                "id": "new-match",
+                "tournament_id": "t1",
+                "is_preview": False,
+                "status": "pending",
+            }],
+            stage=None,
+            previous_legacy_matches=[previous_match],
+            previous_stage_matches=[],
+            previous_stages=[],
+            plan_hash="a" * 64,
+            base_structure_hash="b" * 64,
+            plan_version="competition.structure-plan.v1",
+            actor_id="admin-1",
+        ))
+
+    db.matches.replace_one.assert_awaited_once_with(
+        {"id": "old-preview"},
+        previous_match,
+        upsert=True,
+    )
+    assert db.matches.delete_many.await_count == 2
+    assert db.tournaments.update_one.await_count == 2
+    rollback_update = db.tournaments.update_one.await_args_list[-1].args[1]
+    assert rollback_update["$set"]["structure_revision"] == 2
+    assert rollback_update["$set"]["last_structure_plan_hash"] == "1" * 64

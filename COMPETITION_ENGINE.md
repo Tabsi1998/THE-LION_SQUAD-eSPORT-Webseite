@@ -238,10 +238,36 @@ plan-gebundenen Zufallsgenerator; Stage- und Match-IDs werden per UUIDv5 aus dem
 Plan abgeleitet. Derselbe Input auf demselben Basiszustand erzeugt deshalb
 denselben `plan_hash`, dieselben Teilnehmerpositionen und dieselben IDs.
 
-Der Plan ist noch kein Apply: Der folgende Schreibschritt muss
-`expected_plan_hash` und `expected_base_structure_hash` zwingend pruefen,
-zwischenzeitliche Aenderungen mit `409` ablehnen und erst danach den bereits
-validierten Dokumentensatz kontrolliert aktivieren.
+## Hash-gebundenes Struktur-Apply v1
+
+`POST /api/tournaments/{id}/bracket/apply` nimmt dieselben Planparameter sowie
+`expected_plan_hash` und `expected_base_structure_hash` entgegen. Der gesamte
+Re-Plan-/Validate-/Apply-Ablauf laeuft unter dem pro Turnier verteilten
+Write-Lease. Der Server erzeugt den Plan aus dem aktuellen Datenstand erneut
+und vergleicht beide SHA-256-Hashes in konstanter Zeit. Eine veraenderte
+Basisstruktur liefert `409 structure_plan_stale`; geaenderte Regeln,
+Teilnehmer oder Request-Settings liefern `409 structure_plan_changed`. Vor
+diesen Pruefungen werden keine Match-, Stage-, Versions- oder Auditdaten
+geschrieben oder geloescht.
+
+Nur ein fehlerfreier Bericht von `competition.graph-validation.v1` darf
+aktiviert werden. Der erste produktive Apply-Sicherheitskorridor ersetzt
+ausschliesslich leere oder vollstaendig als Preview markierte Strukturen.
+Reale Matches sowie laufende, abgeschlossene, archivierte oder stornierte
+Turniere werden mit `409 protected_existing_structure` unveraendert belassen.
+Ein spaeterer Migrationspfad fuer reale Bestandsstrukturen braucht zuvor die
+Paritaet aller ID-abhaengigen Consumer und eigene Backup-/Restore-Nachweise.
+
+Die Produktion verwendet einen einzelnen MongoDB-Knoten ohne Replica Set und
+damit keine nativen Multi-Dokument-Transaktionen. Die Aktivierung ist deshalb
+eine kontrollierte, kompensierbare Schreibsequenz unter dem Write-Lease: neue
+Dokumente werden mit `structure_plan_hash` bereitgestellt, alte Preview-Daten
+werden erst danach entfernt und Tournament-Version, Revisionszaehler sowie
+Audit werden zum Abschluss geschrieben. Schlaegt ein Schritt fehl, entfernt
+der Service die neue Generation und stellt die zuvor gelesenen Preview-Matches,
+Stages, Reports und Tournament-Metadaten per stabiler ID wieder her. Ein
+erfolgreicher exakter Retry wird anhand des persistierten Plan-/Basis-Hashes
+ohne neue Writes als `idempotent_replay` beantwortet.
 
 ## Abnahmematrix
 
