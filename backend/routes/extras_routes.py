@@ -16,6 +16,7 @@ from services.slug_utils import apply_slug_history, find_by_slug_or_history, slu
 from services.access_links import validate_access_link
 from services.competition_privacy import registration_match_snapshot
 from services.competition_read import load_competition_read_model, observe_structure_read
+from services.competition_standings import standings_for_structure
 from services.public_site_settings import PUBLIC_LEGAL_SOURCE_FIELDS, build_public_legal_settings
 from models import now_utc, new_id
 from email_service import send_template, _get_email_config
@@ -1320,62 +1321,6 @@ async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
     return (explicit_t or auto_t), (explicit_f or auto_f)
 
 
-def _season_v2_standings(matches_v2: list[dict], regs: list[dict]) -> list[dict]:
-    rank_map = {
-        r["id"]: {
-            "registration_id": r["id"],
-            "played": 0,
-            "won": 0,
-            "top2": 0,
-            "points": 0,
-            "rank_sum": 0,
-            "furthest_round": 0,
-        }
-        for r in regs
-        if r.get("id")
-    }
-    for match in matches_v2:
-        if match.get("status") not in {"completed", "forfeit"}:
-            continue
-        for result in match.get("results") or []:
-            rid = result.get("registration_id")
-            if rid not in rank_map:
-                continue
-            try:
-                rank = int(result.get("rank") or 999)
-            except (TypeError, ValueError):
-                rank = 999
-            row = rank_map[rid]
-            row["played"] += 1
-            row["rank_sum"] += rank
-            row["furthest_round"] = max(row["furthest_round"], int(match.get("round") or 0))
-            if rank == 1:
-                row["won"] += 1
-            if rank <= 2:
-                row["top2"] += 1
-            score = result.get("points")
-            if score is None:
-                score = result.get("score")
-            if isinstance(score, (int, float)):
-                row["points"] += score
-    rows = list(rank_map.values())
-    for row in rows:
-        row["avg_rank"] = round(row["rank_sum"] / row["played"], 2) if row["played"] else None
-    rows.sort(
-        key=lambda row: (
-            row["furthest_round"],
-            row["won"],
-            row["top2"],
-            row["points"],
-            -(row["avg_rank"] or 999),
-        ),
-        reverse=True,
-    )
-    for index, row in enumerate(rows, start=1):
-        row["rank"] = index
-    return rows
-
-
 @season_router.get("/{slug_or_id}/standings")
 async def season_standings(slug_or_id: str):
     """Aggregate standings over all season point sources."""
@@ -1411,42 +1356,36 @@ async def season_standings(slug_or_id: str):
 
     tournament_ids, f1_ids = await _resolve_season_sources(s)
 
-    # Tournaments: use standings endpoint results (rank -> points)
+    # Tournaments: use the same canonical placement/standings projections.
     for tid in tournament_ids:
-        matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(2000)
         regs = await db.tournament_registrations.find(
             {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
             {"_id": 0},
         ).to_list(500)
         reg_user_map = {r["id"]: r.get("user_id") for r in regs}
-        matches_v2 = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
-        if matches_v2:
-            for row in _season_v2_standings(matches_v2, regs):
-                uid = reg_user_map.get(row.get("registration_id"))
-                if not uid or not row.get("played"):
-                    continue
-                pos = int(row.get("rank") or 999) - 1
-                pts = points_system[pos] if 0 <= pos < len(points_system) else 0
-                add_points(uid, pts, pos == 0)
-            continue
-        # compute rank via furthest round + wins
-        rank_map = {}
-        for r in regs:
-            rank_map[r["id"]] = {"rid": r["id"], "furthest_round": 0, "wins": 0}
-        for m in matches:
-            a, b, w = m.get("participant_a_id"), m.get("participant_b_id"), m.get("winner_id")
-            if a in rank_map and m.get("round"):
-                rank_map[a]["furthest_round"] = max(rank_map[a]["furthest_round"], m["round"])
-            if b in rank_map and m.get("round"):
-                rank_map[b]["furthest_round"] = max(rank_map[b]["furthest_round"], m["round"])
-            if m.get("status") == "completed" and w:
-                if w in rank_map: rank_map[w]["wins"] += 1
-        sorted_rs = sorted(rank_map.values(), key=lambda x: (x["furthest_round"], x["wins"]), reverse=True)
-        for pos, r in enumerate(sorted_rs):
-            uid = reg_user_map.get(r["rid"])
+        read_model = await load_competition_read_model(db, tid)
+        snapshot = read_model.structure_snapshot()
+        observe_structure_read(snapshot, surface="season_fallback")
+        tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "format": 1}) or {}
+        groups = []
+        if tournament.get("format") == "groups":
+            groups = await db.tournament_groups.find(
+                {"tournament_id": tid}, {"_id": 0}
+            ).sort("order_index", 1).to_list(100)
+        standings = standings_for_structure(tournament, snapshot, regs, groups=groups)
+        rows = [
+            group_row
+            for item in standings
+            for group_row in (item.get("standings") or [])
+        ] if tournament.get("format") == "groups" else standings
+        for row in rows:
+            if "played" in row and not row.get("played"):
+                continue
+            uid = reg_user_map.get(row.get("registration_id"))
             if not uid:
                 continue
-            pts = points_system[pos] if pos < len(points_system) else 0
+            pos = int(row.get("rank") or 999) - 1
+            pts = points_system[pos] if 0 <= pos < len(points_system) else 0
             add_points(uid, pts, pos == 0)
 
     # F1 Challenges: aggregate per-track then championship-style
