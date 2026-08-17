@@ -80,6 +80,27 @@ https://developers.cloudflare.com/cloudflare-challenges/challenge-types/javascri
 Externe Google-Fonts werden nicht geladen; die Seite verwendet lokale System-Fallbacks. Damit
 entsteht weder ein CSP-Fehler noch ein unangekuendigter Drittanbieter-Request fuer Schriften.
 
+## Live-Updates per SSE
+
+Web- und TV-Ansichten erhalten gezielte Aktualisierungssignale ueber
+`/api/changes/stream`. Der Stream laeuft hinter dem Reverse Proxy als Server-Sent Events (SSE):
+
+- Proxy-Buffering und Proxy-Cache muessen fuer genau diese Route deaktiviert bleiben.
+- Die Read-/Send-Timeouts muessen lang genug fuer dauerhafte Verbindungen sein.
+- `Last-Event-ID` muss unveraendert an das Backend weitergereicht werden.
+- Das Backend laeuft aktuell bewusst mit genau einem Uvicorn-Worker. Der Replay-Puffer und die
+  Subscriber sind in-process; mehrere Worker wuerden ohne gemeinsamen Event-Bus unterschiedliche
+  Live-Staende sehen. `backend/docker-entrypoint.py` erzwingt deshalb `--workers 1`, auch wenn der
+  Host `WEB_CONCURRENCY` setzt.
+
+Oeffentliche Clients erhalten nur redaktierte Ressourcen-Signale. Rohe Admin-/private API-Pfade
+werden ausschliesslich an authentifizierte Staff-Sessions ausgeliefert. Nach einem kurzen
+Verbindungsabbruch spielt das Backend noch gepufferte Events nach; bei einem zu alten Cursor oder
+nach einem Prozessneustart fordert ein `reset`-Event einen konsistenten Voll-Refetch an.
+
+Ein spaeterer Betrieb mit mehreren Backend-Workern setzt zuerst einen gemeinsamen Event-Bus mit
+workeruebergreifendem Replay voraus.
+
 ## Wenn `/community` alte Assets referenziert
 
 Symptom:
