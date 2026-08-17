@@ -5,12 +5,13 @@ from typing import List, Dict, Any, Optional
 from models import new_id, now_utc
 
 
-def _participant_list(registrations: List[dict], seeding_mode: str = "random") -> List[dict]:
+def _participant_list(registrations: List[dict], seeding_mode: str = "random",
+                      rng: random.Random | None = None) -> List[dict]:
     regs = [r for r in registrations if r.get("status") in ("approved", "checked_in")]
     if seeding_mode == "manual":
         regs.sort(key=lambda r: r.get("seed") or 99999)
     elif seeding_mode == "random":
-        random.shuffle(regs)
+        (rng or random).shuffle(regs)
     # ranking mode uses pre-set seed from admin (already handled)
     return regs
 
@@ -73,8 +74,9 @@ def _make_match(tournament_id: str, round_num: int, round_name: str, bracket: st
 def generate_single_elimination(tournament_id: str, registrations: List[dict],
                                  best_of: int = 1, bronze_match: bool = False,
                                  seeding_mode: str = "random",
-                                 duration_minutes: Optional[int] = None) -> List[dict]:
-    regs = _participant_list(registrations, seeding_mode)
+                                 duration_minutes: Optional[int] = None,
+                                 rng: random.Random | None = None) -> List[dict]:
+    regs = _participant_list(registrations, seeding_mode, rng)
     n = len(regs)
     if n < 2:
         return []
@@ -189,16 +191,17 @@ def _propagate_winner(match: dict, round_matches: List[List[dict]]):
 
 def generate_double_elimination(tournament_id: str, registrations: List[dict],
                                  best_of: int = 1, seeding_mode: str = "random",
-                                 duration_minutes: Optional[int] = None) -> List[dict]:
+                                 duration_minutes: Optional[int] = None,
+                                 rng: random.Random | None = None) -> List[dict]:
     """Simplified double elim: generate WB as single elim, LB and Grand Final as 'pending'."""
-    regs = _participant_list(registrations, seeding_mode)
+    regs = _participant_list(registrations, seeding_mode, rng)
     n = len(regs)
     if n < 2:
         return []
     # Winner Bracket
     wb = generate_single_elimination(tournament_id, registrations, best_of=best_of,
                                       bronze_match=False, seeding_mode=seeding_mode,
-                                      duration_minutes=duration_minutes)
+                                      duration_minutes=duration_minutes, rng=rng)
     for m in wb:
         m["bracket"] = "winner"
     bracket_size = _next_power_of_two(n)
@@ -282,7 +285,8 @@ def generate_round_robin(tournament_id: str, registrations: List[dict],
     return matches
 
 
-def generate_bracket(tournament: dict, registrations: List[dict], preview: bool = False) -> List[dict]:
+def generate_bracket(tournament: dict, registrations: List[dict], preview: bool = False,
+                     rng: random.Random | None = None) -> List[dict]:
     fmt = tournament.get("format", "single_elim")
     best_of = tournament.get("best_of", 1)
     bronze = tournament.get("bronze_match", False)
@@ -290,9 +294,13 @@ def generate_bracket(tournament: dict, registrations: List[dict], preview: bool 
     duration_minutes = tournament.get("match_duration_minutes") or 30
     tid = tournament["id"]
     if fmt == "single_elim":
-        matches = generate_single_elimination(tid, registrations, best_of, bronze, seeding, duration_minutes)
+        matches = generate_single_elimination(
+            tid, registrations, best_of, bronze, seeding, duration_minutes, rng,
+        )
     elif fmt == "double_elim":
-        matches = generate_double_elimination(tid, registrations, best_of, seeding, duration_minutes)
+        matches = generate_double_elimination(
+            tid, registrations, best_of, seeding, duration_minutes, rng,
+        )
     elif fmt == "round_robin":
         matches = generate_round_robin(tid, registrations, best_of, False, duration_minutes)
     elif fmt == "league":

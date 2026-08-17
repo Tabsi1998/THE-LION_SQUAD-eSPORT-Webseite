@@ -448,6 +448,7 @@ def _bracket_rebuild_db(*, tournament, legacy_matches=None, v2_matches=None,
     )
     stages = SimpleNamespace(
         find_one=AsyncMock(return_value=existing_stage),
+        find=Mock(return_value=_Cursor([existing_stage] if existing_stage else [])),
         insert_one=AsyncMock(),
         delete_one=AsyncMock(),
         delete_many=AsyncMock(),
@@ -626,3 +627,101 @@ def test_custom_bracket_write_failure_cleans_new_generation_only(monkeypatch):
     db.matches.delete_many.assert_not_awaited()
     db.tournament_stages.delete_many.assert_not_awaited()
     db.match_reports_v2.delete_many.assert_not_awaited()
+
+
+@pytest.mark.parametrize(("tournament_format", "stage_type", "engine"), [
+    ("round_robin", None, "classic"),
+    ("custom_bracket", "custom_bracket", "graph"),
+])
+def test_structure_plan_is_deterministic_valid_and_read_only(
+    monkeypatch,
+    tournament_format,
+    stage_type,
+    engine,
+):
+    tournament = {
+        "id": "t1",
+        "format": tournament_format,
+        "max_participants": 4,
+        "match_duration_minutes": 30,
+        "seeding_mode": "random",
+        "status": "draft",
+    }
+    registrations = [
+        {"id": "r4", "user_id": "u4", "status": "approved", "seed": 4},
+        {"id": "r2", "user_id": "u2", "status": "approved", "seed": 2},
+        {"id": "r1", "user_id": "u1", "status": "approved", "seed": 1},
+        {"id": "r3", "user_id": "u3", "status": "approved", "seed": 3},
+    ]
+    db = _bracket_rebuild_db(tournament=tournament, registrations=registrations)
+    _patch_bracket_rebuild_dependencies(monkeypatch, db)
+    payload = tournament_routes.TournamentStructurePlanPayload(
+        stage_type=stage_type,
+        match_type="duel" if stage_type else None,
+        preview=False,
+    )
+
+    first = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
+        "t1", payload, {"id": "admin-1"},
+    ))
+    second = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
+        "t1", payload, {"id": "admin-1"},
+    ))
+
+    assert first["ok"] is True
+    assert first["engine"] == engine
+    assert first["validation"]["valid"] is True
+    assert first["plan_hash"] == second["plan_hash"]
+    assert first["base_structure_hash"] == second["base_structure_hash"]
+    assert [match["id"] for match in first["structure"]["matches"]] == [
+        match["id"] for match in second["structure"]["matches"]
+    ]
+    assert first["apply_requirements"]["force_required"] is False
+    db.matches.insert_many.assert_not_awaited()
+    db.matches.delete_many.assert_not_awaited()
+    db.matches_v2.insert_many.assert_not_awaited()
+    db.matches_v2.delete_many.assert_not_awaited()
+    db.tournament_stages.insert_one.assert_not_awaited()
+    db.tournament_stages.delete_many.assert_not_awaited()
+    db.tournaments.update_one.assert_not_awaited()
+
+
+def test_structure_plan_reports_replacement_impact_and_force_requirement(monkeypatch):
+    tournament = {
+        "id": "t1",
+        "format": "single_elim",
+        "max_participants": 4,
+        "seeding_mode": "manual",
+        "status": "live",
+    }
+    old_match = {
+        "id": "old-match",
+        "tournament_id": "t1",
+        "round": 1,
+        "match_index": 0,
+        "participant_a_id": "r1",
+        "participant_b_id": "r2",
+        "status": "completed",
+    }
+    db = _bracket_rebuild_db(
+        tournament=tournament,
+        legacy_matches=[old_match],
+        registrations=[
+            {"id": "r1", "status": "approved", "seed": 1},
+            {"id": "r2", "status": "approved", "seed": 2},
+        ],
+    )
+    _patch_bracket_rebuild_dependencies(monkeypatch, db)
+
+    result = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
+        "t1",
+        tournament_routes.TournamentStructurePlanPayload(preview=False),
+        {"id": "admin-1"},
+    ))
+
+    assert result["apply_requirements"]["force_required"] is True
+    assert result["replacement_impact"] == {
+        "legacy_match_count": 1,
+        "stage_match_count": 0,
+        "stage_count": 0,
+    }
