@@ -184,13 +184,14 @@ def infer_rounds(matches: list[BracketMatchSpec]) -> dict[str, int]:
     return {match.key: depth(match.key) for match in matches}
 
 
-def _ordered_registrations(registrations: list[dict], seeding_mode: str) -> list[dict]:
+def _ordered_registrations(registrations: list[dict], seeding_mode: str,
+                           rng: random.Random | None = None) -> list[dict]:
     regs = [r for r in registrations if r.get("status") in ("approved", "checked_in")]
     if seeding_mode in {"manual", "ranking"}:
         regs.sort(key=lambda r: (r.get("seed") is None, r.get("seed") or 999999, r.get("created_at") or ""))
     elif seeding_mode == "random":
         regs = list(regs)
-        random.shuffle(regs)
+        (rng or random).shuffle(regs)
     else:
         regs.sort(key=lambda r: (r.get("seed") is None, r.get("seed") or 999999, r.get("created_at") or ""))
     return regs
@@ -614,13 +615,19 @@ def _apply_auto_byes(docs: list[dict]) -> None:
             target["updated_at"] = now
 
 
-def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: list[dict], preview: bool = False) -> list[dict]:
+def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: list[dict],
+                                 preview: bool = False,
+                                 rng: random.Random | None = None) -> list[dict]:
     settings = stage.get("settings") or {}
     schema = _resolve_schema(tournament, stage, registrations, preview)
     specs = parse_custom_bracket_schema(schema)
     _validate_stage_flow(tournament, stage, specs)
     rounds = infer_rounds(specs)
-    ordered_regs = _ordered_registrations(registrations, tournament.get("seeding_mode") or "random")
+    ordered_regs = _ordered_registrations(
+        registrations,
+        tournament.get("seeding_mode") or "random",
+        rng,
+    )
     seed_to_reg = {index + 1: reg for index, reg in enumerate(ordered_regs)}
     now = _now_utc().isoformat()
     match_type = stage.get("match_type") or settings.get("match_type") or "ffa"

@@ -3,6 +3,7 @@ import csv
 import hashlib
 import io
 import json
+import random
 import re
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse, StreamingResponse
@@ -31,8 +32,19 @@ from services.tournament_permissions import (
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.competition_formats import find_format_capability
+from services.competition_graph_validation import validate_competition_graph
 from services.competition_read import load_competition_read_model, observe_structure_read
+from services.competition_snapshot import build_structure_snapshot
 from services.competition_standings import placement_rows_for_structure, standings_for_structure
+from services.competition_structure_plan import (
+    STRUCTURE_PLAN_VERSION,
+    deterministic_structure_id,
+    ordered_plan_registrations,
+    stabilize_legacy_plan_matches,
+    stabilize_stage_plan_matches,
+    structure_plan_hash,
+    structure_plan_seed,
+)
 from services.competition_versions import (
     apply_competition_version_read_defaults,
     new_competition_version_fields,
@@ -63,6 +75,7 @@ STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 REGISTRATION_CHECKIN_STATUSES = {"approved", "checked_in", "no_show"}
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 MAX_INITIAL_PREVIEW_MATCHES = 512
+MAX_STRUCTURE_PLAN_MATCHES = 5000
 BRACKET_REFRESH_LOCKED_STATUSES = {"check_in", "live", "paused", "completed", "results_published", "archived", "cancelled"}
 TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
 LOCKABLE_TOURNAMENT_STATUSES = {"completed", "results_published", "archived", "cancelled"}
@@ -127,6 +140,10 @@ class TournamentBracketStructurePayload(BaseModel):
     match_type: Optional[str] = None
     name: Optional[str] = None
     settings: dict = Field(default_factory=dict)
+
+
+class TournamentStructurePlanPayload(TournamentBracketStructurePayload):
+    preview: bool = True
 
 
 def _next_power_of_two(n: int) -> int:
@@ -2777,6 +2794,155 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
 
 
 # --- Bracket generation ---
+@router.post("/{tid}/bracket/plan")
+async def plan_bracket_from_tournament_format(
+    tid: str,
+    body: TournamentStructurePlanPayload,
+    me: dict = Depends(get_current_user),
+):
+    """Generate and validate a deterministic structure without writing it."""
+
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    tournament = await _ensure_tournament_unlocked(db, tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    if not _can_rebuild_bracket_from_format(tournament):
+        raise HTTPException(
+            status_code=400,
+            detail="Für dieses Format gibt es keinen automatischen Format-Bracket-Generator.",
+        )
+
+    read_model = await load_competition_read_model(db, tid)
+    current_structure = read_model.structure_snapshot()
+    registrations = await db.tournament_registrations.find(
+        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+        {"_id": 0},
+    ).to_list(5000)
+    registrations = ordered_plan_registrations(registrations)
+
+    stage_defaults = _stage_defaults_for_tournament_format(tournament, body)
+    if stage_defaults:
+        generator_registrations = registrations
+        engine = "graph"
+    else:
+        generator_registrations = (
+            _preview_registrations_for_tournament(tournament)
+            if body.preview
+            else registrations
+        )
+        engine = "classic"
+    if not body.preview and len(generator_registrations) < 2:
+        raise HTTPException(status_code=400, detail="Mindestens 2 Teilnehmer benötigt")
+
+    request_payload = body.model_dump()
+    seed_data = structure_plan_seed(
+        tournament,
+        request_payload,
+        generator_registrations,
+        current_structure,
+    )
+    plan_seed = seed_data["seed"]
+    rng = random.Random(plan_seed)
+    match_plan = _collect_match_plan(
+        read_model.legacy_matches,
+        read_model.stage_matches,
+    )
+    stage = None
+
+    if stage_defaults:
+        stage_id = deterministic_structure_id(plan_seed, "stage", "1")
+        generated_at = now_utc().isoformat()
+        stage = {
+            **stage_defaults,
+            "id": stage_id,
+            "tournament_id": tid,
+            "created_at": generated_at,
+            "updated_at": generated_at,
+        }
+        try:
+            matches = build_matches_v2_from_schema(
+                tournament,
+                stage,
+                generator_registrations,
+                preview=body.preview,
+                rng=rng,
+            )
+        except BracketSchemaError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        if not matches:
+            raise HTTPException(status_code=400, detail="Die Struktur erzeugt keine Spiele.")
+        if len(matches) > MAX_STRUCTURE_PLAN_MATCHES:
+            raise HTTPException(status_code=400, detail="Die Struktur erzeugt zu viele Spiele.")
+        matches = stabilize_stage_plan_matches(
+            matches,
+            seed=plan_seed,
+            stage_id=stage_id,
+        )
+        _apply_match_plan(matches, match_plan, _v2_plan_key)
+        planned_structure = build_structure_snapshot(
+            tid,
+            stage_matches=matches,
+            stages=[stage],
+        )
+    else:
+        matches = generate_bracket(
+            tournament,
+            generator_registrations,
+            preview=body.preview,
+            rng=rng,
+        )
+        if not matches:
+            raise HTTPException(
+                status_code=400,
+                detail="Für dieses Format ist kein automatischer Bracket-Generator aktiv.",
+            )
+        if len(matches) > MAX_STRUCTURE_PLAN_MATCHES:
+            raise HTTPException(status_code=400, detail="Die Struktur erzeugt zu viele Spiele.")
+        matches = stabilize_legacy_plan_matches(matches, seed=plan_seed)
+        _apply_match_plan(matches, match_plan, _legacy_plan_key)
+        planned_structure = build_structure_snapshot(tid, legacy_matches=matches)
+
+    validation = validate_competition_graph(planned_structure)
+    plan_hash = structure_plan_hash(
+        engine=engine,
+        base_structure_hash=seed_data["base_structure_hash"],
+        input_hash=seed_data["input_hash"],
+        planned_structure=planned_structure,
+        stage=stage,
+    )
+    existing_matches = [*read_model.legacy_matches, *read_model.stage_matches]
+    force_required = (
+        any(not match.get("is_preview") for match in existing_matches)
+        or tournament.get("status") in {
+            "live", "paused", "completed", "results_published", "archived",
+        }
+    )
+    return {
+        "ok": validation["valid"],
+        "plan_version": STRUCTURE_PLAN_VERSION,
+        "plan_hash": plan_hash,
+        "base_structure_hash": seed_data["base_structure_hash"],
+        "input_hash": seed_data["input_hash"],
+        "engine": engine,
+        "preview": body.preview,
+        "match_count": len(matches),
+        "participant_count": len(registrations),
+        "stage": stage,
+        "structure": planned_structure,
+        "validation": validation,
+        "apply_requirements": {
+            "expected_plan_hash": plan_hash,
+            "expected_base_structure_hash": seed_data["base_structure_hash"],
+            "force_required": force_required,
+        },
+        "replacement_impact": {
+            "legacy_match_count": len(read_model.legacy_matches),
+            "stage_match_count": len(read_model.stage_matches),
+            "stage_count": len(read_model.stages),
+        },
+    }
+
+
 @router.post("/{tid}/generate-bracket")
 async def generate(tid: str, preview: bool = False, force: bool = False,
                    me: dict = Depends(get_current_user),
