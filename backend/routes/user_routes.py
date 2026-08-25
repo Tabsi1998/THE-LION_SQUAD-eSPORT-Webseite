@@ -772,6 +772,20 @@ async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
     return u
 
 
+@router.get("/me/level")
+async def get_my_level(me: dict = Depends(get_current_user)):
+    """Lightweight current achievement level for the logged-in user (level-up detection)."""
+    db = get_db()
+    neg_groups = {g["code"] async for g in db.achievement_groups.find({"is_negative": True}, {"_id": 0, "code": 1})}
+    tiers = await db.achievements.find({}, {"_id": 0, "code": 1, "points": 1}).to_list(4000)
+    points_map = {t["code"]: int(t.get("points", 0) or 0) for t in tiers}
+    awards = await db.user_achievements.find(
+        {"user_id": me["id"]}, {"_id": 0, "tier_code": 1, "group_code": 1}
+    ).to_list(2000)
+    total = sum(points_map.get(a["tier_code"], 0) for a in awards if a.get("group_code") not in neg_groups)
+    return _achievement_level(total)
+
+
 @router.get("/me/notification-preferences")
 async def get_my_notification_preferences(me: dict = Depends(get_current_user)):
     db = get_db()

@@ -4,6 +4,7 @@ import { Logo } from "@/components/tls/Logo";
 import { MainNav, MobileNav } from "@/components/tls/MainNav";
 import { NotificationBell } from "@/components/tls/NotificationBell";
 import { CrownCelebration } from "@/components/tls/CrownCelebration";
+import { LevelUpCelebration } from "@/components/tls/LevelUpCelebration";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { GlobalSearch } from "@/components/tls/GlobalSearch";
 import { openCookieSettings } from "@/components/tls/CookieConsent";
@@ -183,6 +184,7 @@ export function PublicLayout({ children }) {
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="below_nav" />
       <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 max-w-full overflow-x-clip">{children}</main>
       <CrownCelebration />
+      <LevelUpCelebration />
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="above_footer" />
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="bottom_fixed" />
       <footer className="border-t border-white/10 bg-[#0A0A0A] mt-24 min-w-0 max-w-full overflow-x-clip pb-16 lg:pb-0">

@@ -213,3 +213,16 @@ Getestet: iteration_10.json (Backend 100%, Frontend 100%) + Mobile typecheck/pre
 - HINWEIS: crown_events-Cache ist prozess-lokal (30s TTL) — bei >1 Uvicorn-Worker auf DB-Cache umstellen.
 - E2E selbst verifiziert: Transition hin+zurück (genau 4 Notifications, idempotent), Overlay bei neo_drift (Bronze) ja /
   Reload nein / leon_king (stale, keine Krone) nein.
+
+## SESSION Juni 2026 (Fork 3, Teil 2) — Team-Krone + Level-Aufstieg-Feier (self-tested, nicht user-confirmed)
+- **Team-Gold-Krone**: Das punktbeste Team (points>0, Tie-Break points→level→name) bekommt eine goldene Team-Krone
+  über dem Logo — analog zu Spielern. Backend: services/team_levels.top_team_id(); /api/teams/levels liefert jetzt
+  zusätzlich `crowns:{team_id:"gold"}`, /api/teams/{id}/level liefert `crown`. Frontend TeamsPage: TeamCard bekommt crown-Prop
+  (→ LevelAvatarFrame crown="gold" + Chip team-crown-chip-{TAG} „#1"), TeamDetail nutzt levelInfo.crown (+ Chip
+  team-detail-crown-chip „PUNKTEBESTES TEAM"). Verifiziert: Shadow Pride (102710 Pkt, LVL33) trägt die Goldkrone.
+- **Level-Aufstieg-Feier**: Neues Overlay LevelUpCelebration.jsx (in PublicLayout gemountet). Backend: GET /api/users/me/level
+  (leichtgewichtig, Achievement-Punkte→_achievement_level). Frontend vergleicht Level mit localStorage tls-level-seen:<userId>;
+  bei Anstieg → Feier mit Konfetti, Riesen-Vorschau des NEUEN Archetyp-Rahmens (LevelAvatarFrame) + Archetyp-Name
+  (levelFrameConfig.name). Refetch on mount / window focus / achievements-Invalidation. Erst-Login (kein prev) feiert NICHT;
+  nach Feier wird Level gespeichert → keine Wiederholung. Verifiziert: „LEVEL 2 ERREICHT / PULS".
+- Tests: test_iter14_team_levels_crowns 9/9 grün; Imports OK.

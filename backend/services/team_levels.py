@@ -116,6 +116,15 @@ async def compute_all_team_levels() -> dict[str, dict]:
     return out
 
 
+def top_team_id(data: dict[str, dict]) -> str | None:
+    """The single best team (by points) gets the golden team crown."""
+    ranked = [v for v in data.values() if int(v.get("points", 0) or 0) > 0]
+    if not ranked:
+        return None
+    ranked.sort(key=lambda v: (-int(v.get("points", 0)), -int(v.get("level", 0)), (v.get("name") or "").lower()))
+    return ranked[0]["team_id"]
+
+
 async def get_all_team_levels(force: bool = False) -> dict[str, dict]:
     now = datetime.now(timezone.utc)
     if not force and _cache["at"] and (now - _cache["at"]).total_seconds() < _CACHE_TTL and _cache["data"] is not None:
