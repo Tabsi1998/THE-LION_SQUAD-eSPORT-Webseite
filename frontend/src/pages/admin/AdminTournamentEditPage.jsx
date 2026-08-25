@@ -232,7 +232,7 @@ export default function AdminTournamentEditPage() {
   useEffect(() => {
     const nextTab = searchParams.get("tab") || "participants";
     if (nextTab !== tab) setTab(nextTab);
-  }, [searchParams]);
+  }, [searchParams, tab]);
 
   const selectTab = (nextTab) => {
     setTab(nextTab);
