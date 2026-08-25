@@ -42,8 +42,9 @@ function dimensionKey(item) {
 
 function itemRatio(item, dimensions) {
   const known = dimensions?.[dimensionKey(item)];
-  const width = Number(item?.width || known?.width || 0);
-  const height = Number(item?.height || known?.height || 0);
+  // Prefer the runtime-measured dimensions (always truthful) over stored metadata.
+  const width = Number(known?.width || item?.width || 0);
+  const height = Number(known?.height || item?.height || 0);
   return width > 0 && height > 0 ? width / height : 0;
 }
 

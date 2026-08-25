@@ -1,6 +1,7 @@
 """Authentication routes."""
 import os
 import secrets
+import httpx
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Response, Request, HTTPException, Depends
 from pydantic import BaseModel
@@ -356,6 +357,110 @@ async def login(body: UserLogin, request: Request, response: Response):
     # Attach membership for instant UI gating
     await _attach_membership(user)
     return user
+
+
+EMERGENT_SESSION_DATA_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
+
+
+async def _unique_username(db, base: str) -> str:
+    cleaned = "".join(ch for ch in (base or "").strip() if ch.isalnum() or ch in ("_", "-", " ")).replace(" ", "_")
+    cleaned = (cleaned or "player")[:20]
+    candidate = cleaned
+    suffix = 0
+    while await db.users.find_one({"username": candidate}):
+        suffix += 1
+        candidate = f"{cleaned}{suffix}"
+    return candidate
+
+
+def _google_user_doc(email: str, name: str, picture: str | None, google_id: str | None, username: str) -> dict:
+    display = (name or username).strip() or username
+    ts = now_utc().isoformat()
+    return {
+        "id": new_id(),
+        "email": email,
+        "username": username,
+        # Random unusable password; the account signs in via Google (or via reset).
+        "password_hash": hash_password(secrets.token_urlsafe(32)),
+        "display_name": display,
+        "avatar_url": picture or None, "banner_url": None,
+        "role": "player", "roles": ["player"], "user_type": "community_user",
+        "is_club_member": False,
+        "auth_provider": "google", "google_id": google_id,
+        "discord_name": None, "discord_id": None,
+        "switch_code": None, "steam_id": None, "epic_id": None,
+        "psn_id": None, "xbox_id": None, "riot_id": None,
+        "twitch_handle": None, "youtube_handle": None, "tiktok_handle": None,
+        "instagram_handle": None, "x_handle": None, "nintendo_fc": None,
+        "ea_id": None, "battlenet_id": None, "website": None,
+        "country": None, "state": None, "city": None,
+        "first_name": None, "last_name": None, "nickname": None,
+        "birth_date": None, "gender": None, "favorite_games": [],
+        "main_platform": None, "preferred_role": None, "input_device": None,
+        "privacy_public_profile": True, "profile_visibility": {}, "dm_privacy": "everyone",
+        "bio": None,
+        "is_active": True, "is_banned": False, "email_verified": True,
+        "accepted_privacy": True, "accepted_terms": True, "newsletter_consent": False,
+        "password_setup_required": False,
+        "created_at": ts, "updated_at": ts,
+    }
+
+
+@router.post("/google/session")
+async def google_session(request: Request, response: Response):
+    """Exchange an Emergent Google-OAuth session_id for an app session.
+    Creates a real user in the users collection (or links an existing one by email)."""
+    await enforce_rate_limit(request, "auth:google:ip", limit=30, window_seconds=3600)
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = None
+    session_id = (payload or {}).get("session_id") if isinstance(payload, dict) else None
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id fehlt")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(EMERGENT_SESSION_DATA_URL, headers={"X-Session-ID": session_id})
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="Google-Anmeldung derzeit nicht erreichbar")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail="Google-Anmeldung fehlgeschlagen")
+    data = resp.json()
+    email = (data.get("email") or "").lower().strip()
+    if not email:
+        raise HTTPException(status_code=400, detail="Keine E-Mail von Google erhalten")
+
+    db = get_db()
+    user = await db.users.find_one({"email": email})
+    created = False
+    if not user:
+        username = await _unique_username(db, data.get("name") or email.split("@")[0])
+        user = _google_user_doc(email, data.get("name"), data.get("picture"), data.get("id"), username)
+        await db.users.insert_one(user)
+        created = True
+        await send_template("registration", email, display_name=user["display_name"])
+    else:
+        updates = {
+            "google_id": data.get("id") or user.get("google_id"),
+            "auth_provider": user.get("auth_provider") or "google",
+            "email_verified": True,
+            "updated_at": now_utc().isoformat(),
+        }
+        if not user.get("avatar_url") and data.get("picture"):
+            updates["avatar_url"] = data["picture"]
+        await db.users.update_one({"id": user["id"]}, {"$set": updates})
+        user = {**user, **updates}
+
+    if user.get("is_active") is False:
+        raise HTTPException(status_code=403, detail="Account deaktiviert")
+    if user.get("is_banned"):
+        raise HTTPException(status_code=403, detail="Account gesperrt")
+
+    await _issue_session(db, response, user, request)
+    public = _public_user(user)
+    await _attach_membership(public)
+    public["_created"] = created
+    return public
 
 
 @router.post("/mobile/register")

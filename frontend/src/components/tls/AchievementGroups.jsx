@@ -14,21 +14,54 @@ import * as Icons from "lucide-react";
 import { ChevronDown, Lock } from "lucide-react";
 
 const LEVEL_META = {
-  1: { name: "Bronze", color: "#CD7F32", icon: "🥉" },
-  2: { name: "Silber", color: "#C0C0C0", icon: "🥈" },
-  3: { name: "Gold",   color: "#FFD700", icon: "🥇" },
-  4: { name: "Platin", color: "#29B6E8", icon: "💎" },
-  5: { name: "Legendär", color: "#FF3B30", icon: "★" },
+  1: { name: "Bronze",   color: "#CD7F32" },
+  2: { name: "Silber",   color: "#C0C0C0" },
+  3: { name: "Gold",     color: "#FFD700" },
+  4: { name: "Platin",   color: "#29B6E8" },
+  5: { name: "Legendär", color: "#FF3B30" },
 };
 
 const CATEGORY_META = {
-  match:      { label: "Spiel",      icon: "Swords",    accent: "#29B6E8" },
-  tournament: { label: "Turnier",    icon: "Trophy",    accent: "#FFD700" },
-  fastlap:    { label: "Fast Lap",   icon: "Flag",      accent: "#A855F7" },
-  club:       { label: "Verein",     icon: "Crown",     accent: "#FFD700" },
-  special:    { label: "Sonderauszeichnungen", icon: "Sparkles",  accent: "#FF3B30" },
-  negative:   { label: "Fun / Negative", icon: "AlertTriangle", accent: "#FF3B30" },
+  match:      { label: "Match",     icon: "Swords",        accent: "#29B6E8", order: 1 },
+  tournament: { label: "Turnier",   icon: "Trophy",        accent: "#FFD700", order: 2 },
+  fastlap:    { label: "Fast Lap",  icon: "Flag",          accent: "#A855F7", order: 3 },
+  team:       { label: "Team",      icon: "Users",         accent: "#00FF88", order: 4 },
+  community:  { label: "Community", icon: "MessagesSquare", accent: "#29B6E8", order: 5 },
+  content:    { label: "Streaming & Content", icon: "Radio", accent: "#9146FF", order: 6 },
+  progression:{ label: "Fortschritt", icon: "TrendingUp",  accent: "#00FF88", order: 7 },
+  club:       { label: "Verein",    icon: "Crown",         accent: "#FFD700", order: 8 },
+  special:    { label: "Sonderauszeichnungen", icon: "Sparkles",  accent: "#FF3B30", order: 9 },
+  negative:   { label: "Geheim / Fun", icon: "AlertTriangle", accent: "#FF3B30", order: 10 },
 };
+
+// Escalating, animated medal per tier level. No emoji — real iconography.
+// Gold+/Platin/Legendär get animated conic-gradient energy frames.
+function TierMedal({ level, icon, earned = true, size = "md" }) {
+  const lvl = LEVEL_META[level] || LEVEL_META[1];
+  const Icon = Icons[pascal(icon || "circle")] || Icons.Circle;
+  const dim = size === "lg" ? "w-12 h-12" : size === "sm" ? "w-8 h-8" : "w-9 h-9";
+  const iconDim = size === "lg" ? "w-5 h-5" : "w-4 h-4";
+  const framed = earned && level >= 3;
+  const frameClass = framed ? `tls-frame tls-frame--${level}` : "";
+  const staticStyle = framed
+    ? {}
+    : {
+        borderWidth: 1,
+        borderStyle: "solid",
+        borderColor: earned ? lvl.color + "66" : "rgba(255,255,255,0.07)",
+        backgroundColor: earned ? lvl.color + "14" : "transparent",
+      };
+  return (
+    <div
+      className={`${dim} rounded-sm flex items-center justify-center shrink-0 relative overflow-hidden ${frameClass}`}
+      style={staticStyle}
+    >
+      {earned
+        ? <Icon className={`${iconDim} relative z-[1]`} style={{ color: lvl.color, filter: framed ? `drop-shadow(0 0 4px ${lvl.color})` : undefined }} />
+        : <Lock className="w-3.5 h-3.5 text-white/25" />}
+    </div>
+  );
+}
 
 const SPECIAL_ACCENTS = [
   "#FF3B30", "#9146FF", "#29B6E8", "#FFD700", "#00FF88", "#FF8A3D", "#E4405F",
@@ -65,10 +98,12 @@ export function AchievementGroupsView({ groups = [], emptyText = "Noch keine Ach
         }))
         .filter((group) => group.tiers.length > 0)
     : groups;
-  // Group by category
+  // Group by category, ordered by CATEGORY_META.order
   const byCat = {};
   for (const g of visibleGroups) (byCat[g.category] ||= []).push(g);
-  const order = ["club", "tournament", "match", "fastlap", "special", "negative"];
+  const order = Object.keys(byCat).sort(
+    (a, b) => (CATEGORY_META[a]?.order ?? 99) - (CATEGORY_META[b]?.order ?? 99)
+  );
 
   if (!visibleGroups.length) {
     return (
@@ -120,7 +155,7 @@ function GroupCard({ group, earnedOnly = false }) {
     <motion.div
       layout
       data-testid={`achievement-group-${group.code}`}
-      className={`border rounded-sm bg-[#0F0F10] transition-all ${hasAny ? "border-white/15" : "border-white/5 opacity-80"} ${isNegative ? "bg-[#120A0A]" : ""} ${hasAny && !isNegative && highest?.level >= 5 ? "tls-achievement-card-legendary" : ""}`}
+      className={`border rounded-sm bg-[#0F0F10] transition-all ${hasAny ? "border-white/15" : "border-white/5"} ${isNegative ? "bg-[#120A0A]" : ""} ${hasAny && !isNegative && highest?.level >= 5 ? "tls-achievement-card-legendary" : ""}`}
       style={hasAny ? { boxShadow: `inset 0 0 0 1px ${accent}22` } : undefined}
       animate={prestige
         ? { boxShadow: [`inset 0 0 0 1px ${accent}22`, `inset 0 0 0 1px ${accent}55, 0 0 22px ${accent}18`, `inset 0 0 0 1px ${accent}22`] }
@@ -139,15 +174,13 @@ function GroupCard({ group, earnedOnly = false }) {
         onClick={() => setOpen(v => !v)}
         className="w-full flex items-center gap-4 p-4 text-left hover:bg-white/[0.02] transition"
       >
-        <div
-          className="w-12 h-12 rounded-sm flex items-center justify-center border shrink-0"
-          style={{
-            borderColor: hasAny ? accent + "60" : "rgba(255,255,255,0.08)",
-            backgroundColor: hasAny ? accent + "12" : "transparent",
-          }}
-        >
-          {hasAny ? <Icon className="w-5 h-5" style={{ color: accent }} /> : <Lock className="w-4 h-4 text-white/30" />}
-        </div>
+        {hasAny
+          ? <TierMedal level={highest.level} icon={group.icon} earned size="lg" />
+          : (
+            <div className="w-12 h-12 rounded-sm flex items-center justify-center border border-white/8 shrink-0">
+              <Lock className="w-4 h-4 text-white/30" />
+            </div>
+          )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="font-heading text-base md:text-lg font-bold uppercase truncate">{group.name}</div>
@@ -156,7 +189,7 @@ function GroupCard({ group, earnedOnly = false }) {
                 className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border"
                 style={{ color: LEVEL_META[highest.level].color, borderColor: LEVEL_META[highest.level].color + "55" }}
               >
-                {isNegative ? "Geheim" : `${LEVEL_META[highest.level]?.icon || ""} ${highestLabel}`}
+                {isNegative ? "Geheim" : highestLabel}
               </span>
             )}
             {!earnedOnly && !hasAny && nextLocked && (
@@ -207,38 +240,24 @@ function GroupCard({ group, earnedOnly = false }) {
 function TierRow({ tier, group, accent, isNegative = false }) {
   const lvl = LEVEL_META[tier.level] || LEVEL_META[1];
   const label = levelLabel(tier.level, group, tier);
-  const TierIcon = Icons[pascal(tier.icon || "circle")] || Icons.Circle;
+  const rowGlow = tier.earned && tier.level >= 4 && !isNegative ? `tls-tierrow--${tier.level}` : "";
   return (
     <motion.div
       data-testid={`achievement-tier-${tier.code}`}
-      className={`flex items-center gap-3 p-2 rounded-sm border transition ${tier.earned ? "border-white/10 bg-white/[0.02]" : "border-white/5 opacity-60"} ${tier.earned && tier.level >= 5 && !isNegative ? "tls-achievement-tier-legendary" : ""}`}
-      style={tier.earned ? { boxShadow: `inset 2px 0 0 ${lvl.color}` } : undefined}
-      animate={tier.earned && tier.level >= 4 && !isNegative
-        ? { borderColor: [`${lvl.color}22`, `${lvl.color}66`, `${lvl.color}22`] }
-        : !tier.earned && !isNegative
-          ? { borderColor: ["rgba(255,255,255,0.05)", `${accent}2b`, "rgba(255,255,255,0.05)"] }
-          : undefined}
-      transition={tier.earned && tier.level >= 4 && !isNegative
-        ? { duration: 2.8, repeat: Infinity, ease: "easeInOut" }
-        : !tier.earned && !isNegative
-          ? { duration: 6, repeat: Infinity, ease: "easeInOut" }
-          : undefined}
+      className={`flex items-center gap-3 p-2 rounded-sm border transition ${tier.earned ? "border-white/10 bg-white/[0.02]" : "border-white/5 opacity-95"} ${rowGlow}`}
+      style={tier.earned ? { "--tier": lvl.color, boxShadow: rowGlow ? undefined : `inset 2px 0 0 ${lvl.color}` } : undefined}
+      animate={!tier.earned && !isNegative
+        ? { borderColor: ["rgba(255,255,255,0.05)", `${accent}2b`, "rgba(255,255,255,0.05)"] }
+        : undefined}
+      transition={!tier.earned && !isNegative
+        ? { duration: 6, repeat: Infinity, ease: "easeInOut" }
+        : undefined}
     >
-      <div
-        className="w-8 h-8 rounded-sm flex items-center justify-center border shrink-0"
-        style={{
-          borderColor: tier.earned ? lvl.color + "55" : "rgba(255,255,255,0.06)",
-          backgroundColor: tier.earned ? lvl.color + "10" : "transparent",
-        }}
-      >
-        {tier.earned
-          ? <TierIcon className="w-4 h-4" style={{ color: lvl.color }} />
-          : <Lock className="w-3.5 h-3.5 text-white/25" />}
-      </div>
+      <TierMedal level={tier.level} icon={tier.icon} earned={tier.earned} size="sm" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: lvl.color }}>
-            {isNegative ? "Geheim" : `${lvl.icon} ${label}`}
+            {isNegative ? "Geheim" : label}
           </span>
           <span className={`text-sm font-semibold truncate ${tier.earned ? "text-white" : "text-white/55"}`}>{tier.name}</span>
           {tier.member_only && (
@@ -252,7 +271,7 @@ function TierRow({ tier, group, accent, isNegative = false }) {
             </span>
           )}
         </div>
-        <div className="text-xs text-white/45 mt-0.5">{tier.description}</div>
+        <div className="text-xs text-white/65 mt-0.5">{tier.description}</div>
         {!tier.earned && tier.target > 0 && !tier.manual_only && tier.condition_status !== "planned" && (
           <div className="mt-1.5 flex items-center gap-2">
             <div className="flex-1 h-1 bg-white/5 rounded-sm overflow-hidden">
@@ -270,12 +289,12 @@ function TierRow({ tier, group, accent, isNegative = false }) {
       </div>
       <div className="shrink-0 text-right">
         {tier.earned ? (
-          <div className="text-[10px] uppercase tracking-widest text-white/45">
+          <div className="text-[10px] uppercase tracking-widest text-white/70">
             +{tier.points} Pkt.
-            {tier.earned_at && <div className="text-white/30">{new Date(tier.earned_at).toLocaleDateString("de-DE")}</div>}
+            {tier.earned_at && <div className="text-white/45">{new Date(tier.earned_at).toLocaleDateString("de-DE")}</div>}
           </div>
         ) : (
-          <div className="text-[10px] uppercase tracking-widest text-white/30">+{tier.points}</div>
+          <div className="text-[10px] uppercase tracking-widest text-white/50">+{tier.points}</div>
         )}
       </div>
     </motion.div>

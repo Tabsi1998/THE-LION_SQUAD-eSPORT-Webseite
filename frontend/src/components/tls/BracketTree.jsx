@@ -191,6 +191,16 @@ function getStationLabel(match) {
   return /^station\b/i.test(station) ? station : `Station ${station}`;
 }
 
+function LiveStatus({ status }) {
+  const isLive = ["running", "in_progress"].includes(String(status || "").toLowerCase());
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {isLive && <span className="w-1.5 h-1.5 rounded-full bg-[#00FF88] tv-live-dot" />}
+      {formatMatchStatus(status)}
+    </span>
+  );
+}
+
 function MatchMeta({ match, compact = false }) {
   const time = formatNodeDateTime(match?.scheduled_at);
   const station = getStationLabel(match);
@@ -240,7 +250,7 @@ function V2DuelNode({ match, regMap, podiumMap, compact = false, onClick }) {
       <MatchMeta match={match} compact={compact} />
       <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-white/40 border-t border-white/5 flex items-center justify-between font-display">
         <span>{match.match_key || "Spiel"}</span>
-        <span>{formatMatchStatus(match.status)}</span>
+        <span><LiveStatus status={match.status} /></span>
       </div>
     </button>
   );
@@ -261,7 +271,7 @@ function HeatNode({ match, regMap, podiumMap, compact = false, onClick }) {
           <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{match.match_key || "Spiel"}</div>
           <div className="text-xs text-white/45">{match.match_type === "ffa" ? "Durchgang" : "Spiel"}</div>
         </div>
-        <span className="text-[10px] uppercase tracking-wider text-white/45">{formatMatchStatus(match.status)}</span>
+        <span className="text-[10px] uppercase tracking-wider text-white/45"><LiveStatus status={match.status} /></span>
       </div>
       <MatchMeta match={match} compact={compact} />
       {(match.slots || []).map((slot) => {
@@ -344,7 +354,7 @@ function BracketNode({ match, regMap, podiumMap, compact = false, onClick }) {
       <MatchMeta match={match} compact={compact} />
       <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-white/40 border-t border-white/5 flex items-center justify-between font-display">
         <span>Spiel #{match.match_index + 1}</span>
-        <span>{formatMatchStatus(match.status)}</span>
+        <span><LiveStatus status={match.status} /></span>
       </div>
     </button>
   );

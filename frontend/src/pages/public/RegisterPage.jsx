@@ -11,6 +11,7 @@ import {
   AuthSelectField,
   AuthTextField,
 } from "@/components/tls/AuthFormFields";
+import { GoogleAuthButton } from "@/components/tls/GoogleAuthButton";
 import { toast } from "sonner";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -215,6 +216,7 @@ export default function RegisterPage() {
             {loading ? "Registriere ..." : "Account erstellen"}
           </button>
         </form>
+        <GoogleAuthButton label="Mit Google registrieren" returnPath="/dashboard" />
         <div className="mt-6 text-sm text-white/60 text-center">
           Bereits registriert? <Link to="/login" className="text-[#29B6E8] hover:text-white font-bold">Login</Link>
         </div>

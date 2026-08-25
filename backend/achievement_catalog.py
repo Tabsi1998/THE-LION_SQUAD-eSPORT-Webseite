@@ -183,7 +183,7 @@ ACHIEVEMENT_TIERS = [
        condition_key="match_streak_max", progress_target=5, points=30, icon="flame"),
     _t("win_streak_g", "win_streak", 3, "Unaufhaltsam", "Gewinne 8 Matches am Stück.",
        condition_key="match_streak_max", progress_target=8, points=80, icon="flame"),
-    _t("win_streak_p", "win_streak", 4, "Legendär", "Gewinne 12 Matches am Stück.",
+    _t("win_streak_p", "win_streak", 4, "Sturmreihe", "Gewinne 12 Matches am Stück.",
        condition_key="match_streak_max", progress_target=12, points=200, icon="flame"),
 
     # --- clutch_master: 1/3/7/15 clutches (event-driven) ---
@@ -1057,3 +1057,41 @@ CONDITION_KEY_STATUS.update({
 
 GROUP_BY_CODE = {g["code"]: g for g in ACHIEVEMENT_GROUPS}
 TIER_BY_CODE = {t["code"]: t for t in ACHIEVEMENT_TIERS}
+
+
+# ---------- Taxonomy rework: sensible category assignment ----------
+# Display-only override applied at seed time (does not touch tier->group links
+# or existing awards). Splits the former catch-all "club" bucket into Verein /
+# Team / Community so groups land in a meaningful section.
+CATEGORY_OVERRIDES = {
+    # Team membership & loyalty
+    "team_founder": "team",
+    "team_loyalty": "team",
+    # Community: social graph, chat, helping, hosting, presence
+    "discord_active": "community",
+    "community_helper": "community",
+    "event_host": "community",
+    "community_presence": "community",
+    "social_network": "community",
+    "platform_chat": "community",
+    "mentor_path": "community",
+    # Streaming & content creation — NOT the club
+    "stream_growth": "content",
+    "streamer_path": "content",
+    "creator_spirit": "content",
+    # Profile / account progression
+    "level_progression": "progression",
+    "achievement_collector": "progression",
+    "platform_identity": "progression",
+    "profile_completeness": "progression",
+    "platform_diversity": "progression",
+    # "club" (Verein) now only real club membership: membership_tenure, event_attendance
+}
+
+
+def apply_category_overrides(group: dict) -> dict:
+    """Return the group with its category remapped per CATEGORY_OVERRIDES."""
+    override = CATEGORY_OVERRIDES.get(group.get("code"))
+    if override:
+        return {**group, "category": override}
+    return group

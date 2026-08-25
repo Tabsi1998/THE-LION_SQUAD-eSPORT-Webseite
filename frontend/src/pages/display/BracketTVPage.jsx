@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { Trophy } from "lucide-react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { MascotBadge } from "@/components/tls/Logo";
@@ -17,7 +19,7 @@ import {
 } from "@/lib/tournamentLabels";
 
 const MAX_COLUMNS_PER_VIEW = 4;
-const MAX_DUEL_MATCHES_PER_COLUMN = 6;
+const MAX_DUEL_MATCHES_PER_COLUMN = 4;
 const MAX_HEAT_MATCHES_PER_COLUMN = 4;
 const MAX_LARGE_HEAT_MATCHES_PER_COLUMN = 2;
 const DONE_STATUSES = new Set(["completed", "archived", "forfeit", "bye", "cancelled"]);
@@ -47,6 +49,7 @@ export default function BracketTVPage() {
     return () => clearInterval(iv);
   }, [load]);
   useApiInvalidation(load, ["tournaments", "matches", "stations"]);
+  const flashMap = useMatchFlash(data);
 
   const views = useMemo(() => buildTvViews(data, boardMode), [data, boardMode]);
   useEffect(() => {
@@ -75,11 +78,14 @@ export default function BracketTVPage() {
 
   return (
     <div className="h-screen tv-bg text-white flex flex-col overflow-hidden">
-      <header className="shrink-0 flex items-center justify-between gap-4 px-6 lg:px-8 py-3 lg:py-4 border-b border-white/10">
+      <header className="tls-header-sweep relative shrink-0 flex items-center justify-between gap-4 px-6 lg:px-8 py-3 lg:py-4 border-b border-white/10 overflow-hidden">
         <div className="flex items-center gap-4 min-w-0 flex-1">
           <MascotBadge className="w-12 h-12 shrink-0" />
           <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">THE LION SQUAD · LIVE</div>
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">
+              <span className="w-2 h-2 rounded-full bg-[#00FF88] tv-live-dot" />
+              THE LION SQUAD · LIVE
+            </div>
             <h1 className="font-heading text-xl md:text-3xl 2xl:text-4xl font-black uppercase truncate">{t.title}</h1>
             {hasMatches && <div className="mt-1 text-xs uppercase tracking-[0.25em] text-white/50 truncate">{activeView.title}</div>}
           </div>
@@ -112,7 +118,18 @@ export default function BracketTVPage() {
             Turnierbaum wurde noch nicht generiert
           </div>
         ) : (
-          <TvMatchBoard view={activeView} />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeView.key || viewIndex}
+              className="h-full"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -14 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+            >
+              <TvMatchBoard view={activeView} flashMap={flashMap} />
+            </motion.div>
+          </AnimatePresence>
         )}
       </main>
 
@@ -145,7 +162,7 @@ export default function BracketTVPage() {
   );
 }
 
-function TvMatchBoard({ view }) {
+function TvMatchBoard({ view, flashMap }) {
   const regMap = useMemo(() => new Map((view.registrations || []).map((reg) => [reg.id, reg])), [view.registrations]);
   if (!(view.columns || []).length) {
     return (
@@ -157,20 +174,26 @@ function TvMatchBoard({ view }) {
 
   return (
     <div className="h-full grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2.5 2xl:gap-3">
-      {(view.columns || []).map((column) => (
-        <RoundColumn key={column.key} column={column} regMap={regMap} />
+      {(view.columns || []).map((column, index) => (
+        <RoundColumn key={column.key} column={column} regMap={regMap} flashMap={flashMap} index={index} />
       ))}
     </div>
   );
 }
 
-function RoundColumn({ column, regMap }) {
+function RoundColumn({ column, regMap, flashMap, index = 0 }) {
   const shown = column.matches.slice(0, column.displayLimit || matchLimitForColumn(column));
   const hiddenCount = Math.max(0, column.matches.length - shown.length);
   const progress = `${column.doneCount}/${column.totalCount}`;
 
   return (
-    <section className="min-h-0 border border-white/10 bg-[#0A0A0A]/82 rounded-sm overflow-hidden flex flex-col">
+    <motion.section
+      layout
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, delay: Math.min(index * 0.08, 0.4), ease: "easeOut" }}
+      className="min-h-0 border border-white/10 bg-[#0A0A0A]/82 rounded-sm overflow-hidden flex flex-col"
+    >
       <div className="shrink-0 px-3 py-2 border-b border-white/10 bg-white/[0.03] flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[10px] uppercase tracking-[0.22em] text-[#29B6E8] font-bold truncate">{column.sectionLabel}</div>
@@ -180,31 +203,45 @@ function RoundColumn({ column, regMap }) {
           {column.isFallback ? "Fertig" : progress}
         </div>
       </div>
-      <div className="flex-1 min-h-0 p-2 grid content-start gap-1.5 2xl:gap-2 overflow-hidden">
-        {shown.map((match) => (
-          <TvMatchCard key={match.id} match={match} regMap={regMap} />
-        ))}
+      <div className="flex-1 min-h-0 p-2 flex flex-col gap-1.5 2xl:gap-2 overflow-y-auto tls-hide-scrollbar">
+        <AnimatePresence initial={false}>
+          {shown.map((match, mIndex) => (
+            <TvMatchCard key={match.id} match={match} regMap={regMap} flash={flashMap?.[match.id]} index={mIndex} />
+          ))}
+        </AnimatePresence>
         {hiddenCount > 0 && (
           <div className="border border-dashed border-white/15 px-3 py-2 text-center text-[11px] uppercase tracking-[0.18em] text-white/45">
             + {hiddenCount} weitere Spiele
           </div>
         )}
       </div>
-    </section>
+    </motion.section>
   );
 }
 
-function TvMatchCard({ match, regMap }) {
+function TvMatchCard({ match, regMap, flash, index = 0 }) {
   const isV2 = Array.isArray(match.slots);
   const statusTone = getStatusTone(match.status);
   const station = stationLabel(match);
+  const isLive = ["running", "in_progress"].includes(match.status);
+  const flashClass = flash === "finished" ? "tls-flash-finished" : "";
 
   return (
-    <article className={`border ${statusTone.border} ${statusTone.bg} rounded-sm overflow-hidden`}>
+    <motion.article
+      layout
+      initial={{ opacity: 0, scale: 0.94 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      transition={{ duration: 0.35, delay: Math.min(index * 0.05, 0.25), ease: "easeOut" }}
+      className={`border ${statusTone.border} ${statusTone.bg} rounded-sm overflow-hidden shrink-0 ${flashClass}`}
+    >
       <div className="px-2.5 py-1.5 border-b border-white/5 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="text-[10px] uppercase tracking-[0.18em] text-[#29B6E8] font-bold truncate">{match.match_key || matchLabel(match)}</div>
-          <div className="text-[10px] uppercase tracking-wider text-white/38 truncate">{formatMatchKind(match)} · {formatMatchStatus(match.status)}</div>
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-white/38 truncate">
+            {isLive && <span className="w-1.5 h-1.5 rounded-full bg-[#00FF88] tv-live-dot shrink-0" />}
+            <span className="truncate">{formatMatchKind(match)} · {formatMatchStatus(match.status)}</span>
+          </div>
         </div>
         {match.scheduled_at && <div className="shrink-0 text-right text-[10px] text-white/55">{formatDateTime(match.scheduled_at).replace(", ", " ")}</div>}
       </div>
@@ -213,7 +250,7 @@ function TvMatchCard({ match, regMap }) {
         {isV2 ? (
           (match.slots || []).map((slot) => {
             const result = (match.results || []).find((row) => row.registration_id === slot.registration_id);
-            return <ParticipantRow key={slot.slot} participant={participantInfo(slot, regMap)} result={result} position={slot.slot} />;
+            return <ParticipantRow key={slot.slot} participant={participantInfo(slot, regMap)} result={result} position={slot.slot} scoreFlash={flash === "score"} />;
           })
         ) : (
           <>
@@ -222,12 +259,14 @@ function TvMatchCard({ match, regMap }) {
               score={match.score_a}
               isWinner={match.winner_id && match.winner_id === match.participant_a_id}
               side="A"
+              scoreFlash={flash === "score"}
             />
             <ParticipantRow
               participant={legacyParticipantInfo(match.participant_b_id, regMap)}
               score={match.score_b}
               isWinner={match.winner_id && match.winner_id === match.participant_b_id}
               side="B"
+              scoreFlash={flash === "score"}
             />
           </>
         )}
@@ -239,19 +278,20 @@ function TvMatchCard({ match, regMap }) {
           {match.duration_minutes && <span className="shrink-0">{match.duration_minutes} Min.</span>}
         </div>
       )}
-    </article>
+    </motion.article>
   );
 }
 
-function ParticipantRow({ participant, result, score, isWinner, position, side }) {
+function ParticipantRow({ participant, result, score, isWinner, position, side, scoreFlash }) {
   const rowScore = result?.score ?? result?.points ?? score;
   const rank = result?.rank ? `#${result.rank}` : null;
   const avatar = participant?.avatar ? resolveMediaUrl(participant.avatar) : null;
   const label = participant?.label || "Offen";
   const subtitle = participant?.subtitle;
   const initial = label.trim().charAt(0).toUpperCase() || side || position || "?";
+  const won = isWinner || result?.qualified;
   return (
-    <div className={`flex items-center justify-between gap-2 px-2.5 py-1.5 border-b border-white/5 last:border-b-0 ${isWinner || result?.qualified ? "bg-[#29B6E8]/10" : ""}`}>
+    <div className={`flex items-center justify-between gap-2 px-2.5 py-1.5 border-b border-white/5 last:border-b-0 ${won ? "bg-[#29B6E8]/10 tls-winner-row" : ""}`}>
       <div className="flex items-center gap-2 min-w-0">
         <div className="relative shrink-0">
           {avatar ? (
@@ -266,12 +306,15 @@ function ParticipantRow({ participant, result, score, isWinner, position, side }
           </span>
         </div>
         <div className="min-w-0">
-          <div className={`truncate text-xs 2xl:text-sm leading-tight ${isWinner || result?.qualified ? "text-[#29B6E8] font-semibold" : "text-white/84"}`}>{label}</div>
+          <div className={`truncate text-xs 2xl:text-sm leading-tight flex items-center gap-1 ${won ? "text-[#29B6E8] font-semibold" : "text-white/84"}`}>
+            {won && <Trophy className="w-3 h-3 text-[#FFD700] shrink-0" />}
+            <span className="truncate">{label}</span>
+          </div>
           {subtitle && <div className="truncate text-[10px] uppercase tracking-wider text-white/35">{subtitle}</div>}
         </div>
       </div>
       <div className="shrink-0 text-right font-display font-bold text-white/75">
-        {rank || (rowScore != null ? rowScore : "—")}
+        <span key={rowScore} className={scoreFlash ? "tls-flash-score" : ""}>{rank || (rowScore != null ? rowScore : "—")}</span>
         {rank && rowScore != null && <div className="text-[10px] font-sans font-normal text-white/45">{rowScore} Pkt.</div>}
       </div>
     </div>
@@ -519,4 +562,54 @@ function chunk(items, size) {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+}
+
+function scoreSignature(match) {
+  if (Array.isArray(match.slots)) {
+    return (match.results || [])
+      .map((row) => `${row.registration_id}:${row.rank ?? ""}:${row.score ?? row.points ?? ""}`)
+      .sort()
+      .join("|");
+  }
+  return `${match.score_a ?? ""}:${match.score_b ?? ""}:${match.winner_id ?? ""}`;
+}
+
+// Detects matches that just finished or had a score change between SSE-driven reloads,
+// so the TV board can flash them. Returns a map of matchId -> "finished" | "score".
+function useMatchFlash(data) {
+  const prevRef = useRef(null);
+  const [flashes, setFlashes] = useState({});
+
+  useEffect(() => {
+    if (!data) return undefined;
+    const all = [...(data.matches || []), ...(data.matches_v2 || [])];
+    const snapshot = {};
+    const fresh = {};
+    for (const match of all) {
+      const done = isMatchDone(match);
+      const sig = scoreSignature(match);
+      snapshot[match.id] = { done, sig };
+      const prev = prevRef.current?.[match.id];
+      if (prev) {
+        if (!prev.done && done) fresh[match.id] = "finished";
+        else if (prev.sig !== sig) fresh[match.id] = "score";
+      }
+    }
+    const isFirstRun = prevRef.current === null;
+    prevRef.current = snapshot;
+    if (isFirstRun || !Object.keys(fresh).length) return undefined;
+
+    setFlashes((current) => ({ ...current, ...fresh }));
+    const ids = Object.keys(fresh);
+    const timer = setTimeout(() => {
+      setFlashes((current) => {
+        const next = { ...current };
+        ids.forEach((id) => delete next[id]);
+        return next;
+      });
+    }, 2300);
+    return () => clearTimeout(timer);
+  }, [data]);
+
+  return flashes;
 }

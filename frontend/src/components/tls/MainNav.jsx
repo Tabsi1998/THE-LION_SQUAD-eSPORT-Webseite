@@ -38,6 +38,7 @@ export const NAV_STRUCTURE = [
       { to: "/esports", label: "Übersicht" },
       { to: "/tournaments", label: "Turniere" },
       { to: "/fastlap", label: "Fast Lap" },
+      { to: "/achievements", label: "Achievements" },
       { to: "/seasons/current", label: "Jahreswertung" },
     ],
   },

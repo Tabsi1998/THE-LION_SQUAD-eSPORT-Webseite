@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { normalizeApiPath } from "@/lib/apiInvalidation";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -6,9 +6,19 @@ import { toast } from "sonner";
 
 const AuthContext = createContext(null);
 
+// REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+export function startGoogleLogin(returnPath = "/profile") {
+  const redirectUrl = window.location.origin + returnPath;
+  window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(undefined);
   const [error, setError] = useState(null);
+  const [googleProcessing, setGoogleProcessing] = useState(
+    () => typeof window !== "undefined" && window.location.hash.includes("session_id=")
+  );
+  const googleHandled = useRef(false);
 
   const fetchMe = useCallback(async () => {
     try {
@@ -23,7 +33,31 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  useEffect(() => { fetchMe(); }, [fetchMe]);
+  // Handle Emergent Google-OAuth callback (#session_id=...) BEFORE the normal /auth/me check.
+  useEffect(() => {
+    const hash = window.location.hash || "";
+    if (hash.includes("session_id=")) {
+      if (googleHandled.current) return;
+      googleHandled.current = true;
+      const sessionId = new URLSearchParams(hash.replace(/^#/, "")).get("session_id");
+      (async () => {
+        try {
+          const { data } = await api.post("/auth/google/session", { session_id: sessionId });
+          setUser(data);
+          toast.success(data?._created ? "Willkommen im Rudel! Account erstellt." : "Erfolgreich angemeldet.");
+        } catch (e) {
+          setUser(null);
+          toast.error(formatApiError(e.response?.data?.detail) || "Google-Anmeldung fehlgeschlagen.");
+        } finally {
+          // Strip the session_id fragment from the URL.
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+          setGoogleProcessing(false);
+        }
+      })();
+      return;
+    }
+    fetchMe();
+  }, [fetchMe]);
   const refreshCurrentUser = useCallback((event) => {
     const path = normalizeApiPath(event?.path);
     if (path === "auth/me" || path === "users/me" || path.startsWith("auth/")) {
@@ -85,7 +119,7 @@ export function AuthProvider({ children }) {
   const userType = user?.user_type || (user ? "community_user" : "guest");
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, register, logout, error, isAdmin, isModerator, isSuperAdmin, isClubMember, userType, refresh: fetchMe }}>
+    <AuthContext.Provider value={{ user, setUser, login, register, logout, error, isAdmin, isModerator, isSuperAdmin, isClubMember, userType, refresh: fetchMe, startGoogleLogin, googleProcessing }}>
       {children}
     </AuthContext.Provider>
   );

@@ -140,6 +140,143 @@ img, video, canvas, svg {
 }
 .animate-live { animation: tls-pulse 1.6s ease-in-out infinite; }
 
+/* --- Live bracket "wow" effects --- */
+@keyframes tls-live-dot {
+  0% { box-shadow: 0 0 0 0 rgba(0,255,136,0.55); }
+  70% { box-shadow: 0 0 0 10px rgba(0,255,136,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,255,136,0); }
+}
+.tv-live-dot { animation: tls-live-dot 1.8s ease-out infinite; }
+
+@keyframes tls-winner-glow {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(41,182,232,0.25), 0 0 12px rgba(41,182,232,0.10); }
+  50% { box-shadow: inset 0 0 0 1px rgba(41,182,232,0.55), 0 0 22px rgba(41,182,232,0.28); }
+}
+.tls-winner-row { animation: tls-winner-glow 2.4s ease-in-out infinite; }
+
+@keyframes tls-just-finished {
+  0% { box-shadow: 0 0 0 0 rgba(255,215,0,0), inset 0 0 0 0 rgba(255,215,0,0); border-color: rgba(255,215,0,0.9); }
+  15% { box-shadow: 0 0 34px 6px rgba(255,215,0,0.55), inset 0 0 26px rgba(255,215,0,0.18); border-color: rgba(255,215,0,1); }
+  100% { box-shadow: 0 0 0 0 rgba(255,215,0,0); border-color: inherit; }
+}
+.tls-flash-finished { animation: tls-just-finished 2.2s ease-out 1; }
+
+@keyframes tls-score-pop {
+  0% { transform: scale(1); color: #fff; }
+  30% { transform: scale(1.45); color: #29B6E8; }
+  100% { transform: scale(1); }
+}
+.tls-flash-score { animation: tls-score-pop 0.8s ease-out 1; display: inline-block; }
+
+@keyframes tls-sweep {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+.tls-header-sweep::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 40%, rgba(41,182,232,0.10) 50%, transparent 60%);
+  animation: tls-sweep 6s ease-in-out infinite;
+}
+
+/* --- Achievement tier medal system (per level, escalating) --- */
+.tls-medal { position: relative; overflow: hidden; }
+/* Level 3 Gold: gentle glow */
+.tls-medal--3 { animation: tls-medal-gold 3s ease-in-out infinite; }
+@keyframes tls-medal-gold {
+  0%,100% { box-shadow: 0 0 6px rgba(255,215,0,0.25); }
+  50% { box-shadow: 0 0 16px rgba(255,215,0,0.55); }
+}
+/* Level 4 Platin: cyan pulse + shine sweep */
+.tls-medal--4 { animation: tls-medal-platin 2.6s ease-in-out infinite; }
+@keyframes tls-medal-platin {
+  0%,100% { box-shadow: 0 0 8px rgba(41,182,232,0.30); }
+  50% { box-shadow: 0 0 20px rgba(41,182,232,0.65); }
+}
+/* Level 5 Legendär: red/gold glow + rotating conic sheen */
+.tls-medal--5 { animation: tls-medal-legend 2.2s ease-in-out infinite; }
+@keyframes tls-medal-legend {
+  0%,100% { box-shadow: 0 0 10px rgba(255,59,48,0.35), 0 0 18px rgba(255,215,0,0.18); }
+  50% { box-shadow: 0 0 26px rgba(255,59,48,0.7), 0 0 34px rgba(255,215,0,0.4); }
+}
+.tls-medal--5::before {
+  content: ""; position: absolute; inset: -40%;
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(255,215,0,0.28) 40deg, transparent 90deg, transparent 270deg, rgba(255,59,48,0.28) 320deg, transparent 360deg);
+  animation: tls-spin 4s linear infinite; pointer-events: none;
+}
+@keyframes tls-spin { to { transform: rotate(360deg); } }
+/* Shine sweep for gold+ medals */
+.tls-medal--shine::after {
+  content: ""; position: absolute; top: 0; left: -80%; width: 60%; height: 100%;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,0.35), transparent);
+  transform: skewX(-18deg); animation: tls-medal-shine 3.4s ease-in-out infinite;
+}
+@keyframes tls-medal-shine { 0% { left: -80%; } 55%,100% { left: 130%; } }
+
+/* Tier row escalating left accent glow */
+.tls-tierrow--4 { box-shadow: inset 3px 0 0 var(--tier), 0 0 14px -6px var(--tier); }
+.tls-tierrow--5 { box-shadow: inset 3px 0 0 var(--tier), 0 0 22px -6px var(--tier); }
+
+/* Level progress shimmer */
+.tls-level-fill { position: relative; overflow: hidden; }
+.tls-level-fill::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
+  animation: tls-sweep 2.6s ease-in-out infinite;
+}
+.tls-level-ring { animation: tls-medal-platin 2.8s ease-in-out infinite; }
+
+.tls-hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.tls-hide-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* ===== Premium rarity frames (animated conic-gradient borders) ===== */
+@property --tls-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+@keyframes tls-rotate { to { --tls-angle: 360deg; } }
+
+/* Shared: dark fill (padding-box) + rotating conic ring (border-box) */
+.tls-frame { border: 2px solid transparent; background-clip: padding-box, border-box; background-origin: padding-box, border-box; position: relative; }
+/* Gold (Lvl 3) */
+.tls-frame--3 {
+  background:
+    linear-gradient(#0d0d0f,#0d0d0f) padding-box,
+    conic-gradient(from var(--tls-angle), #7a5a12, #FFD700, #fff3b0, #FFD700, #7a5a12) border-box;
+  animation: tls-rotate 5s linear infinite;
+}
+/* Platinum (Lvl 4) */
+.tls-frame--4 {
+  background:
+    linear-gradient(#0d0d0f,#0d0d0f) padding-box,
+    conic-gradient(from var(--tls-angle), #0e4a5e, #29B6E8, #d6f4ff, #29B6E8, #0e4a5e) border-box;
+  animation: tls-rotate 3.6s linear infinite;
+  box-shadow: 0 0 14px -4px rgba(41,182,232,0.6);
+}
+/* Legendary (Lvl 5) — dual red/gold + neon halo */
+.tls-frame--5 {
+  background:
+    linear-gradient(#0d0d0f,#0d0d0f) padding-box,
+    conic-gradient(from var(--tls-angle), #FF3B30, #FFD700, #FF3B30, #ff8a3d, #FF3B30) border-box;
+  animation: tls-rotate 2.4s linear infinite;
+}
+.tls-frame--5::after {
+  content: ""; position: absolute; inset: -6px; border-radius: inherit; z-index: -1;
+  background: conic-gradient(from var(--tls-angle), #FF3B30, #FFD700, #FF3B30);
+  filter: blur(11px); opacity: 0.55; animation: tls-rotate 2.4s linear infinite;
+}
+
+/* Circular level ring (profile medallion) */
+.tls-lvlring {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(#0b0b0d,#0b0b0d) padding-box,
+    conic-gradient(from var(--tls-angle), var(--ring), transparent 42%, var(--ring)) border-box;
+  animation: tls-rotate 3.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-frame--3, .tls-frame--4, .tls-frame--5, .tls-frame--5::after, .tls-lvlring,
+  .tls-medal--3, .tls-medal--4, .tls-medal--5, .tls-medal--5::before, .tls-medal--shine::after,
+  .tv-live-dot, .tls-level-fill::after, .tls-header-sweep::after { animation: none !important; }
+}
+
 .tls-account-frame {
   box-shadow: 0 0 0 1px rgba(41,182,232,0.18), 0 0 18px rgba(41,182,232,0.08);
 }

@@ -20,7 +20,7 @@ from database import get_db
 from models import now_utc, new_id
 from achievement_catalog import (
     ACHIEVEMENT_GROUPS, ACHIEVEMENT_TIERS, GROUP_BY_CODE, TIER_BY_CODE,
-    CONDITION_KEY_STATUS,
+    CONDITION_KEY_STATUS, apply_category_overrides,
 )
 from services.membership_service import get_membership, is_active_member
 from services.competition_read import load_competition_read_model, load_registration_matches
@@ -51,6 +51,7 @@ async def seed_badges():
         logger.info("[achievements] v4 migration complete — legacy collections dropped.")
 
     for g in ACHIEVEMENT_GROUPS:
+        g = apply_category_overrides(g)
         await db.achievement_groups.update_one(
             {"code": g["code"]},
             {"$set": {**g, "id": g["code"]},

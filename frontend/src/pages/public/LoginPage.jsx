@@ -5,6 +5,7 @@ import { Logo } from "@/components/tls/Logo";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { AuthFormAlert, AuthPasswordField, AuthTextField } from "@/components/tls/AuthFormFields";
+import { GoogleAuthButton } from "@/components/tls/GoogleAuthButton";
 import { toast } from "sonner";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -103,6 +104,7 @@ export default function LoginPage() {
             {loading ? "Login ..." : "Einloggen"}
           </button>
         </form>
+        <GoogleAuthButton label="Mit Google einloggen" returnPath={next} />
         <div className="mt-6 text-sm text-white/60 text-center space-y-2">
           <div>Kein Account? <Link to="/register" className="text-[#29B6E8] hover:text-white font-bold">Registrieren</Link></div>
           <div><Link to="/forgot-password" className="text-white/45 hover:text-[#29B6E8]">Passwort vergessen?</Link></div>

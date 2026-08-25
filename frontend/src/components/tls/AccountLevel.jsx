@@ -1,4 +1,5 @@
 import { Zap } from "lucide-react";
+import { motion } from "framer-motion";
 
 export function accountLevelTier(level) {
   const value = Number(level || 1);
@@ -58,20 +59,49 @@ export function AccountLevelPill({ level, className = "" }) {
 
 export function AccountLevelProgress({ level, points = 0, nextLevelPoints = 100, progress = 0, compact = false }) {
   const tier = accountLevelTier(level);
+  const pct = Math.max(0, Math.min(100, Number(progress || 0)));
+  const lvlNum = Number(level || 1);
   return (
     <div data-testid="account-level-progress">
       {!compact && (
-        <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/45 font-bold">
-          <span>Achievement-Level</span>
-          <span>{points} / {nextLevelPoints} Punkte · {tier.title}</span>
+        <div className="flex items-center gap-3">
+          <motion.div
+            className="tls-lvlring relative w-11 h-11 rounded-full flex items-center justify-center shrink-0 font-display font-black"
+            style={{ "--ring": tier.color, color: tier.color }}
+            initial={{ scale: 0.6, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 240, damping: 16 }}
+          >
+            {lvlNum}
+          </motion.div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/45 font-bold">
+              <span style={{ color: tier.color }}>{tier.title}</span>
+              <span className="tabular-nums">{points} / {nextLevelPoints} Punkte</span>
+            </div>
+            <div className="mt-2 h-2.5 rounded-sm bg-white/10 overflow-hidden">
+              <motion.div
+                className="h-full tls-level-fill"
+                style={{ backgroundColor: tier.progressColor }}
+                initial={{ width: 0 }}
+                animate={{ width: `${pct}%` }}
+                transition={{ duration: 1, ease: "easeOut" }}
+              />
+            </div>
+          </div>
         </div>
       )}
-      <div className={`${compact ? "h-1" : "mt-2 h-2"} rounded-sm bg-white/10 overflow-hidden`}>
-        <div
-          className={`h-full ${tier.key === "legendary" || tier.key === "champion" ? "tls-account-progress-prestige" : ""}`}
-          style={{ width: `${Math.max(0, Math.min(100, Number(progress || 0)))}%`, backgroundColor: tier.progressColor, color: tier.progressColor }}
-        />
-      </div>
+      {compact && (
+        <div className="h-1 rounded-sm bg-white/10 overflow-hidden">
+          <motion.div
+            className="h-full tls-level-fill"
+            style={{ backgroundColor: tier.progressColor }}
+            initial={{ width: 0 }}
+            animate={{ width: `${pct}%` }}
+            transition={{ duration: 0.9, ease: "easeOut" }}
+          />
+        </div>
+      )}
     </div>
   );
 }

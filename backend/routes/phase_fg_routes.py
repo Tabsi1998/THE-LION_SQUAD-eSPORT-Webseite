@@ -461,6 +461,7 @@ DEFAULT_NAV = {
             {"key": "esports_overview", "to": "/esports", "label": "Übersicht", "visible": True},
             {"key": "tournaments", "to": "/tournaments", "label": "Turniere", "visible": True},
             {"key": "fastlap", "to": "/fastlap", "label": "Fast Lap", "visible": True},
+            {"key": "achievements", "to": "/achievements", "label": "Achievements", "visible": True},
             {"key": "season", "to": "/seasons/current", "label": "Jahreswertung", "visible": True},
         ]},
         {"key": "community", "label": "Community", "visible": True, "order": 5, "children": [

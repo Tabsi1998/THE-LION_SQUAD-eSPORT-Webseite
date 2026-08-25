@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
 import { Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil, Target, RefreshCw, Sparkles, Bell, Check, X, UserPlus, MessageSquare, Send, Search } from "lucide-react";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
+import { AchievementUnlockOverlay } from "@/components/tls/AchievementUnlockOverlay";
 
 const TABS = [
   { k: "basic", label: "Grunddaten", icon: User },
@@ -240,6 +241,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [evaluatingAchievements, setEvaluatingAchievements] = useState(false);
   const [achData, setAchData] = useState(null);
+  const [unlockedTiers, setUnlockedTiers] = useState([]);
   const [completeness, setCompleteness] = useState(null);
   const [games, setGames] = useState([]);
   const initialProfileFormRef = useRef(null);
@@ -372,9 +374,23 @@ export default function ProfilePage() {
     setEvaluatingAchievements(true);
     try {
       const { data } = await api.post("/achievements/evaluate");
+      const fresh = await api.get("/achievements/me").catch(() => null);
+      if (fresh) setAchData(fresh.data);
       await loadAchievements();
       await refresh();
-      toast.success(data?.newly_awarded ? `${data.newly_awarded} neue Achievements freigeschaltet.` : "Achievements aktualisiert.");
+      if (data?.newly_awarded > 0 && fresh?.data?.groups) {
+        const earned = [];
+        for (const group of fresh.data.groups) {
+          if (group.is_negative) continue;
+          for (const tier of group.tiers || []) {
+            if (tier.earned && tier.earned_at) earned.push(tier);
+          }
+        }
+        earned.sort((a, b) => new Date(b.earned_at) - new Date(a.earned_at));
+        setUnlockedTiers(earned.slice(0, data.newly_awarded));
+      } else {
+        toast.success("Achievements aktualisiert.");
+      }
     } catch (err) {
       toast.error(formatRequestError(err, "Achievements konnten nicht aktualisiert werden."));
     } finally {
@@ -387,6 +403,7 @@ export default function ProfilePage() {
   const achInsights = achData ? achievementInsights(achData) : null;
   return (
     <PublicLayout>
+      <AchievementUnlockOverlay tiers={unlockedTiers} onClose={() => setUnlockedTiers([])} />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div>
           <div>

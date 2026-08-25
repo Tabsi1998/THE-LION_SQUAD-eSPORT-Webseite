@@ -72,6 +72,49 @@ async def evaluate_self(user: dict = Depends(get_current_user)):
     return {"newly_awarded": n}
 
 
+@router.get("/leaderboard")
+async def achievements_leaderboard(limit: int = 24, viewer: dict | None = Depends(get_optional_user)):
+    """Public grind leaderboard ranked by achievement points (excl. negative groups)."""
+    db = get_db()
+    tiers = await db.achievements.find({}, {"_id": 0, "code": 1, "points": 1}).to_list(4000)
+    points_map = {t["code"]: int(t.get("points", 0) or 0) for t in tiers}
+    neg_groups = {g["code"] async for g in db.achievement_groups.find({"is_negative": True}, {"_id": 0, "code": 1})}
+    awards = await db.user_achievements.find({}, {"_id": 0, "user_id": 1, "tier_code": 1, "group_code": 1}).to_list(50000)
+
+    agg: dict = {}
+    for a in awards:
+        if a.get("group_code") in neg_groups:
+            continue
+        entry = agg.setdefault(a["user_id"], {"count": 0, "points": 0})
+        entry["count"] += 1
+        entry["points"] += points_map.get(a["tier_code"], 0)
+
+    if not agg:
+        return []
+    users = await db.users.find(
+        {"id": {"$in": list(agg.keys())}},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "privacy_public_profile": 1},
+    ).to_list(5000)
+    rows = []
+    for u in users:
+        if not u.get("privacy_public_profile"):
+            continue
+        stats = agg.get(u["id"], {})
+        rows.append({
+            "user_id": u["id"],
+            "username": u.get("username"),
+            "display_name": u.get("display_name") or u.get("username") or "Spieler",
+            "avatar_url": u.get("avatar_url"),
+            "count": stats.get("count", 0),
+            "points": stats.get("points", 0),
+        })
+    rows.sort(key=lambda r: (-r["points"], -r["count"], (r["display_name"] or "").lower()))
+    capped = max(1, min(int(limit or 24), 100))
+    for index, row in enumerate(rows[:capped]):
+        row["rank"] = index + 1
+    return rows[:capped]
+
+
 # ============ Admin CRUD ============
 admin_router = APIRouter(prefix="/api/admin/achievements", tags=["achievements-admin"])
 

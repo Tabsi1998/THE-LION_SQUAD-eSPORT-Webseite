@@ -112,6 +112,7 @@ import SponsorsPage from "@/pages/public/SponsorsPage";
 import PartnersPage from "@/pages/public/PartnersPage";
 import ReferencesPage, { ReferenceDetailPage } from "@/pages/public/ReferencesPage";
 import PlayersPage from "@/pages/public/PlayersPage";
+import AchievementsShowcasePage from "@/pages/public/AchievementsShowcasePage";
 import CommunityPage from "@/pages/public/CommunityPage";
 import ServersPage from "@/pages/public/ServersPage";
 import MembersDirectoryPage from "@/pages/public/MembersDirectoryPage";
@@ -170,6 +171,7 @@ function App() {
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/servers" element={<ServersPage />} />
           <Route path="/players" element={<PlayersPage />} />
+          <Route path="/achievements" element={<AchievementsShowcasePage />} />
           <Route path="/members" element={<MembersDirectoryPage />} />
           <Route path="/members/:slug" element={<MemberProfilePage />} />
           <Route path="/membership/join" element={<JoinMembershipPage />} />
