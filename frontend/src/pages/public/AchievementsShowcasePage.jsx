@@ -5,6 +5,7 @@ import { Trophy, Crown, Medal, Sparkles, Target, Flame } from "lucide-react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
+import { LevelAvatarFrame, useCrownFor } from "@/components/tls/LevelAvatarFrame";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useAuth } from "@/context/AuthContext";
@@ -209,9 +210,17 @@ function StatCard({ icon: Icon, label, value, accent, testId }) {
   );
 }
 
+function levelFromPoints(points) {
+  let level = 1;
+  const p = Math.max(0, Number(points || 0));
+  while (p >= level * level * 100) level += 1;
+  return level;
+}
+
 function PodiumCard({ entry, index }) {
   const style = RANK_STYLES[entry.rank] || RANK_STYLES[3];
   const isFirst = entry.rank === 1;
+  const crown = useCrownFor(entry.user_id);
   return (
     <motion.div
       data-testid={`podium-${entry.rank}`}
@@ -227,8 +236,16 @@ function PodiumCard({ entry, index }) {
       >
         {entry.rank}
       </div>
-      <div className="mx-auto mb-3">
-        <Avatar entry={entry} size={16} ring={style.ring} center />
+      <div className={`mx-auto mb-3 flex justify-center ${crown ? "pt-4" : ""}`}>
+        <LevelAvatarFrame level={levelFromPoints(entry.points)} crown={crown} compact className="w-16 h-16">
+          {entry.avatar_url ? (
+            <img src={resolveMediaUrl(entry.avatar_url)} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center font-bold text-white/60">
+              {(entry.display_name || "?").trim().charAt(0).toUpperCase()}
+            </div>
+          )}
+        </LevelAvatarFrame>
       </div>
       <Link
         to={entry.username ? `/u/${entry.username}` : "#"}
@@ -240,7 +257,6 @@ function PodiumCard({ entry, index }) {
         {entry.points}
       </div>
       <div className="text-[10px] uppercase tracking-widest text-white/55">{entry.count} Erfolge</div>
-      {isFirst && <Crown className="absolute top-3 right-3 w-5 h-5 text-[#FFD700]" />}
     </motion.div>
   );
 }

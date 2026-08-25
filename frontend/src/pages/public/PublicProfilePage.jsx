@@ -7,7 +7,8 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { AccountLevelPill, AccountLevelProgress } from "@/components/tls/AccountLevel";
-import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
+import { LevelAvatarFrame, useCrownFor } from "@/components/tls/LevelAvatarFrame";
+import { SeasonHighlightCard } from "@/components/tls/SeasonHighlightCard";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -260,6 +261,8 @@ export default function PublicProfilePage() {
   }, [username]);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["users", "achievements", "tournaments", "f1", "teams"]);
+  const crown = useCrownFor(profile?.id);
+  const [showHighlight, setShowHighlight] = useState(false);
 
   if (loading) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE PROFIL …</div></PublicLayout>;
   if (!profile) return <PublicLayout><div className="p-20 text-center">
@@ -324,6 +327,16 @@ export default function PublicProfilePage() {
 
   return (
     <PublicLayout>
+      {showHighlight && (
+        <SeasonHighlightCard
+          profile={profile}
+          level={level}
+          stats={s}
+          awards={achievementsData?.awards}
+          crown={crown}
+          onClose={() => setShowHighlight(false)}
+        />
+      )}
       {/* Hero */}
       <div className="relative border-b border-white/10 overflow-hidden">
         {profile.banner_url && (
@@ -341,8 +354,8 @@ export default function PublicProfilePage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
           <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Spieler", to: "/players" }, { label: profile.display_name || profile.username }]} className="mb-6" />
           <div className="flex flex-col md:flex-row gap-8 items-start">
-            <div className="shrink-0 pt-7 pb-3">
-              <LevelAvatarFrame level={level.level} className="w-32 h-32 md:w-40 md:h-40" testId="profile-avatar-frame">
+            <div className="shrink-0 pt-10 pb-3">
+              <LevelAvatarFrame level={level.level} crown={crown} className="w-32 h-32 md:w-40 md:h-40" testId="profile-avatar-frame">
                 {profile.avatar_url ? (
                   <img src={resolveMediaUrl(profile.avatar_url)} alt={profile.display_name} className="w-full h-full object-cover" />
                 ) : (
@@ -394,6 +407,16 @@ export default function PublicProfilePage() {
               <div className="mt-4 max-w-md" data-testid="profile-level-progress">
                 <AccountLevelProgress level={level.level} points={level.points} nextLevelPoints={level.next_level_points} progress={level.progress} />
               </div>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowHighlight(true)}
+                  data-testid="highlight-card-open"
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-[#FFD700]/40 text-[#FFD700] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#FFD700]/10"
+                >
+                  <Trophy className="w-3.5 h-3.5" /> Highlight-Karte
+                </button>
+              </div>
               {!isOwnProfile && (
                 <div className="mt-5 flex flex-wrap gap-2" data-testid="profile-actions">
                   <button
@@ -435,8 +458,8 @@ export default function PublicProfilePage() {
                   <QuickStat icon={Radio} label="Streams" value={s.twitch_live_sessions || 0} color="#9146FF" testId="profile-stat-streams" />
                 )}
                 <QuickStat icon={Zap} label="Punkte" value={s.points || 0} color="#29B6E8" testId="profile-stat-points" />
-                <QuickStat icon={Trophy} label="Siege" value={s.wins || 0} color="#FFD700" testId="profile-stat-wins" />
-                <QuickStat icon={Medal} label="Podium" value={s.top3 || 0} color="#C0C0C0" testId="profile-stat-top3" />
+                <QuickStat icon={Trophy} label="Siege" value={s.wins || 0} color="#FFD700" glory testId="profile-stat-wins" />
+                <QuickStat icon={Medal} label="Podium" value={s.top3 || 0} color="#C0C0C0" glory testId="profile-stat-top3" />
                 <QuickStat icon={TrendingUp} label="Fast Laps" value={s.fast_laps || 0} testId="profile-stat-fastlaps" />
               </div>
             </div>
@@ -927,9 +950,14 @@ function ReferenceRow({ item, expanded = false }) {
   return <Link to={target} className="block">{content}</Link>;
 }
 
-function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", testId }) {
+function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", glory = false, testId }) {
+  const glorious = glory && Number(value) > 0;
   return (
-    <div data-testid={testId} className="border border-white/10 rounded-sm bg-[#121212] px-3 py-3 min-w-0">
+    <div
+      data-testid={testId}
+      className={`border border-white/10 rounded-sm bg-[#121212] px-3 py-3 min-w-0 ${glorious ? "tls-stat-glory" : ""}`}
+      style={glorious ? { "--glory-c": color } : undefined}
+    >
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-white/40 min-w-0"><Icon className="w-3 h-3 shrink-0" /> <span className="truncate">{label}</span></div>
       <div className="mt-1 font-display font-bold text-xl sm:text-2xl tabular-nums break-words" style={{ color }}>{value}</div>
     </div>
