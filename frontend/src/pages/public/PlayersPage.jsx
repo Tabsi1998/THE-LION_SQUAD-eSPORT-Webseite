@@ -6,7 +6,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Search, Crown } from "lucide-react";
 import { AccountLevelPill, accountLevelFrameClass } from "@/components/tls/AccountLevel";
-import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
+import { LevelAvatarFrame, useCrowns } from "@/components/tls/LevelAvatarFrame";
 
 const PAGE_SIZE = 48;
 
@@ -44,6 +44,7 @@ export default function PlayersPage() {
   useApiInvalidation(load, ["users", "membership", "achievements"]);
 
   const memberUsernames = new Set(members.map((m) => m.username));
+  const crowns = useCrowns();
   const filtered = (tab === "members" ? members : list).filter((p) => {
     if (tab === "all") return true;
     if (!q) return true;
@@ -97,7 +98,7 @@ export default function PlayersPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <LevelAvatarFrame level={accountLevel} compact className="w-12 h-12">
+                        <LevelAvatarFrame level={accountLevel} crown={crowns?.[p.id] || null} compact className="w-12 h-12">
                           {p.avatar_url ? (
                             <img src={resolveMediaUrl(p.avatar_url)} alt={p.display_name} className="w-full h-full object-cover" />
                           ) : (

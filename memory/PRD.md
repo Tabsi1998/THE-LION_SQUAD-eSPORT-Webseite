@@ -166,3 +166,24 @@ Getestet: iteration_10.json (Backend 100%, Frontend 100%) + Mobile typecheck/pre
 - OFFEN unverändert: Echter Google-OAuth-Provider E2E, Mobile Google-Login (Deep-Link), EAS/Store-Builds + Device-Tests,
   Production-Härtung (Domain/Secrets/Cookies), E-Mail-Provider, User-Abnahme der neuen Level-Optik.
 - Review-Backlog (P2): auth_routes.py (>900 Zeilen) modularisieren; growth_stats setzt users.created_at als ISO-String voraus.
+
+## SESSION Juni 2026 (Fork 2, Teil 2) — Level-Rahmen v2 (30 Stufen), dynamische Kronen, Highlight-Karte (getestet: iteration_13.json Backend 100% 9/9 + Frontend 100%; Pytest gesamt 509+ grün nach Testanpassung)
+- **LevelAvatarFrame v2**: LEVEL_STYLES-Tabelle — JEDES Level 1-30 eigener Stil (Farbe + Effektmix). Neue CSS-Primitives in
+  index.css: tls-lvf-corners (Corner-Brackets), -echo (Puls-Ringe), -dashed (rotierender Strich-Ring), -scan (Scanline),
+  -flames (Flammen-Glow), -glitch, -stars (Twinkle), --hue (Hue-Shift). Kein hartes Max: 30+ = Apex (TLS-Blau, alles an).
+  Compact-Variante zeigt Farbe+Sweep/Dashed/Corners+Krone (Spielerliste unterscheidbar pro Level).
+- **Dynamische Kronen** (GET /api/achievements/crowns, 60s TTL-Cache, badge_routes.py): Level 30+ (>=84100 Punkte) = Obsidian;
+  die besten DREI Nicht-Obsidian-Spieler = Gold/Silber/Bronze (Gold verschwindet nicht, wenn #1 Obsidian ist).
+  Kronen deutlich größer/brutaler: Glow-Burst, Twinkle-Stern, Float+Rotate; Obsidian mit Blau-Surge. useCrowns/useCrownFor
+  (Modul-Cache) in PublicProfilePage, PlayersPage, AchievementsShowcase-Podium (Podium nutzt jetzt Frames+Kronen statt Platzhalter).
+- **Leistungs-Akzente**: QuickStat glory-Prop (tls-stat-glory Puls) für Siege/Podium > 0 auf dem öffentlichen Profil.
+- **Season-Highlight-Karte** (SeasonHighlightCard.jsx, html-to-image): Button auf jedem Public-Profil → Modal-Karte
+  (Avatar+Rahmen+Krone, Level-Pill, 4 Stats, Top-3-Erfolge, Branding) mit PNG-Download + Web-Share; responsive
+  (w-[min(380px,calc(100vw-2rem))]), Escape/role=dialog. Mobile 360px verifiziert.
+- **Demo-Spreizung**: Achievement-Gruppe "Season-Bonus 2026" (6 manuelle Tiers 12k-86k Punkte) an 6 Demo-Spieler vergeben →
+  Level 11/15/18/21/25/30 sichtbar inkl. Obsidian (max_chrome). Alte ace_racer-Top1-Tests datenrobust umgeschrieben.
+- Datenhygiene: TEST-Automation-Accounts erneut entfernt.
+- LESSON: Webpack-Hot-Reload liefert nach mehreren Edits teils stale Bundles ("X is not defined" trotz korrekter Quelle) →
+  frontend restart löst es.
+- NÄCHSTER GROSSER BAUSTEIN (User-Wunsch): **Team-Level-System** — Teamlevel, Team-Achievements, Freischaltungen,
+  Team-Rahmen/Animationen analog zum Spieler-System.
