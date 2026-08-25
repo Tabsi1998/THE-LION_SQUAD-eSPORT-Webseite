@@ -9,7 +9,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
-import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye, Search, Plus, Share2 } from "lucide-react";
+import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye, Search, Plus, Share2, LogIn } from "lucide-react";
 
 const MAIL_TEMPLATE_LABELS = {
   user_invite: "Einladungsmail",
@@ -45,6 +45,7 @@ const STATUS_LABELS = {
 };
 
 const SETTINGS_TABS = [
+  ["auth", "Login & Google", LogIn],
   ["email", "Resend", Mail],
   ["smtp", "SMTP", Server],
   ["newsletter", "Newsletter", Mail],
@@ -232,6 +233,8 @@ export default function AdminSettingsPage() {
     site_banner_starts_at: "", site_banner_ends_at: "",
   });
   const [discord, setDiscord] = useState({ webhook_url: "", username: "", avatar_url: "", enabled: true, configured: false, webhook_url_masked: "", last_status: "", last_error: "", last_event_key: "", last_checked_at: "" });
+  const [authConfig, setAuthConfig] = useState({ password_login_enabled: true, registration_enabled: true, google_login_enabled: true, google_linking_enabled: true });
+  const [savingAuth, setSavingAuth] = useState(false);
   const [discordCounters, setDiscordCounters] = useState([]);
   const [discordCounterQuery, setDiscordCounterQuery] = useState("");
   const [discordCounterValues, setDiscordCounterValues] = useState({});
@@ -292,11 +295,12 @@ export default function AdminSettingsPage() {
       { key: "twitch", label: "Twitch-Status", critical: false, request: () => api.get("/admin/streams/status") },
       { key: "discord_counters", label: "Discord-Zähler", critical: false, request: () => api.get("/admin/discord/counters?limit=50") },
       { key: "site_banners", label: "Hinweisleisten", critical: false, request: () => api.get("/settings/site-banners/admin") },
+      { key: "auth", label: "Login & Google", critical: false, request: () => api.get("/settings/auth") },
     ];
     const requests = await Promise.allSettled(requestDefs.map((entry) => entry.request()));
     if (seq !== loadSeqRef.current) return;
     const value = (i) => requests[i].status === "fulfilled" ? requests[i].value.data : null;
-    const e = value(0), b = value(1), d = value(2), l = value(3), sm = value(4), q = value(5), qs = value(6), st = value(7), tw = value(8), dc = value(9), sb = value(10);
+    const e = value(0), b = value(1), d = value(2), l = value(3), sm = value(4), q = value(5), qs = value(6), st = value(7), tw = value(8), dc = value(9), sb = value(10), ac = value(11);
     if (e) setEmail((prev) => {
       const next = { ...prev, ...e, resend_api_key: "" };
       originalEmailRef.current = emailPayload(next);
@@ -324,6 +328,7 @@ export default function AdminSettingsPage() {
     if (tw) setTwitchStatus(tw);
     if (dc) setDiscordCounters(dc);
     if (sb) setSiteBanners(Array.isArray(sb) ? sb : []);
+    if (ac) setAuthConfig((prev) => ({ ...prev, ...ac }));
     const failed = requests
       .map((result, index) => ({ result, def: requestDefs[index] }))
       .filter(({ result }) => result.status === "rejected");
@@ -435,8 +440,25 @@ export default function AdminSettingsPage() {
     } catch {}
   };
 
-  const saveEmail = async () => {
-    if (savingEmail) return;
+  const saveAuth = async (next) => {
+    if (savingAuth) return;
+    setSavingAuth(true);
+    const previous = authConfig;
+    setAuthConfig(next);
+    try {
+      const { data } = await api.put("/settings/auth", next);
+      setAuthConfig((prev) => ({ ...prev, ...data }));
+      toast.success("Login-Einstellungen gespeichert.");
+    } catch (e) {
+      setAuthConfig(previous);
+      toast.error(formatApiError(e.response?.data?.detail) || "Login-Einstellungen konnten nicht gespeichert werden.");
+    } finally {
+      setSavingAuth(false);
+    }
+  };
+  const toggleAuth = (key) => saveAuth({ ...authConfig, [key]: !authConfig[key] });
+
+  const saveEmail = async () => {    if (savingEmail) return;
     const payload = buildDirtyPayload(emailPayload(email), originalEmailRef.current);
     if (!hasPayloadChanges(payload)) return toast.info("Keine Änderungen zum Speichern.");
     setSavingEmail(true);
@@ -817,6 +839,44 @@ export default function AdminSettingsPage() {
           );
         })}
       </div>
+
+      {tab === "auth" && (
+        <div className="max-w-2xl space-y-4" data-testid="auth-settings">
+          <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4 text-sm text-white/70">
+            <div className="font-heading font-bold uppercase text-[#29B6E8] mb-1">Login & Google</div>
+            <p>Steuere zentral, wie sich Nutzer anmelden und registrieren. Änderungen greifen sofort auf Web und in der App. Google nutzt die sichere Emergent-Anmeldung – es sind keine Schlüssel nötig.</p>
+          </div>
+          <div className="border border-white/10 bg-[#121212] rounded-sm divide-y divide-white/5">
+            {[
+              ["password_login_enabled", "E-Mail & Passwort Login", "Klassische Anmeldung mit E-Mail und Passwort."],
+              ["registration_enabled", "Registrierung offen", "Neue Nutzer können selbst einen Community-Account erstellen."],
+              ["google_login_enabled", "Google-Login & Registrierung", "Zeigt den \"Mit Google\"-Button auf Login und Registrierung."],
+              ["google_linking_enabled", "Google nachträglich verknüpfen", "Eingeloggte Nutzer können Google mit ihrem bestehenden Konto verbinden."],
+            ].map(([key, label, hint]) => (
+              <label key={key} className="flex items-start justify-between gap-4 p-5 cursor-pointer group" data-testid={`auth-toggle-${key}`}>
+                <div>
+                  <div className="font-heading font-bold uppercase text-sm group-hover:text-[#29B6E8] transition">{label}</div>
+                  <p className="text-xs text-white/50 mt-1">{hint}</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!authConfig[key]}
+                  disabled={savingAuth}
+                  onClick={() => toggleAuth(key)}
+                  data-testid={`auth-switch-${key}`}
+                  className={`relative w-12 h-6 rounded-full shrink-0 transition-colors disabled:opacity-50 ${authConfig[key] ? "bg-[#29B6E8]" : "bg-white/15"}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${authConfig[key] ? "translate-x-6" : ""}`} />
+                </button>
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-white/40">
+            Hinweis: Deaktivierte Optionen werden auch serverseitig blockiert. Der echte Google-Login mit Produktions-Domain wird beim Deployment final verifiziert.
+          </p>
+        </div>
+      )}
 
       {tab === "email" && (
         <div className="max-w-2xl space-y-4">

@@ -19,6 +19,7 @@ from models import (
     now_utc, new_id,
 )
 from services.rate_limit import enforce_rate_limit, get_client_ip
+from services.auth_settings import load_auth_settings
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -282,6 +283,8 @@ async def _revoke_refresh(db, token: str):
 async def register(body: UserRegister, request: Request, response: Response):
     await enforce_rate_limit(request, "auth:register:ip", limit=5, window_seconds=3600)
     db = get_db()
+    if not (await load_auth_settings(db))["registration_enabled"]:
+        raise HTTPException(status_code=403, detail="Die Registrierung ist derzeit deaktiviert.")
     if not body.accept_privacy or not body.accept_terms:
         raise HTTPException(status_code=400, detail="Datenschutz und Nutzungsbedingungen müssen akzeptiert werden.")
     email = body.email.lower().strip()
@@ -362,6 +365,26 @@ async def login(body: UserLogin, request: Request, response: Response):
 EMERGENT_SESSION_DATA_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
 
 
+async def _resolve_google_identity(request: Request) -> dict:
+    """Read the session_id from the request body and resolve the Google identity server-side."""
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = None
+    session_id = (payload or {}).get("session_id") if isinstance(payload, dict) else None
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id fehlt")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(EMERGENT_SESSION_DATA_URL, headers={"X-Session-ID": session_id})
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="Google-Anmeldung derzeit nicht erreichbar")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail="Google-Anmeldung fehlgeschlagen")
+    return resp.json()
+
+
+
 async def _unique_username(db, base: str) -> str:
     cleaned = "".join(ch for ch in (base or "").strip() if ch.isalnum() or ch in ("_", "-", " ")).replace(" ", "_")
     cleaned = (cleaned or "player")[:20]
@@ -411,26 +434,14 @@ async def google_session(request: Request, response: Response):
     """Exchange an Emergent Google-OAuth session_id for an app session.
     Creates a real user in the users collection (or links an existing one by email)."""
     await enforce_rate_limit(request, "auth:google:ip", limit=30, window_seconds=3600)
-    try:
-        payload = await request.json()
-    except Exception:
-        payload = None
-    session_id = (payload or {}).get("session_id") if isinstance(payload, dict) else None
-    if not session_id:
-        raise HTTPException(status_code=400, detail="session_id fehlt")
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(EMERGENT_SESSION_DATA_URL, headers={"X-Session-ID": session_id})
-    except httpx.HTTPError:
-        raise HTTPException(status_code=502, detail="Google-Anmeldung derzeit nicht erreichbar")
-    if resp.status_code != 200:
-        raise HTTPException(status_code=401, detail="Google-Anmeldung fehlgeschlagen")
-    data = resp.json()
+    db = get_db()
+    if not (await load_auth_settings(db))["google_login_enabled"]:
+        raise HTTPException(status_code=403, detail="Google-Login ist derzeit deaktiviert.")
+    data = await _resolve_google_identity(request)
     email = (data.get("email") or "").lower().strip()
     if not email:
         raise HTTPException(status_code=400, detail="Keine E-Mail von Google erhalten")
 
-    db = get_db()
     user = await db.users.find_one({"email": email})
     created = False
     if not user:
@@ -442,6 +453,7 @@ async def google_session(request: Request, response: Response):
     else:
         updates = {
             "google_id": data.get("id") or user.get("google_id"),
+            "google_linked": True,
             "auth_provider": user.get("auth_provider") or "google",
             "email_verified": True,
             "updated_at": now_utc().isoformat(),
@@ -461,6 +473,61 @@ async def google_session(request: Request, response: Response):
     await _attach_membership(public)
     public["_created"] = created
     return public
+
+
+@router.post("/google/link")
+async def google_link(request: Request, user: dict = Depends(get_current_user)):
+    """Link a Google identity to the CURRENTLY authenticated local account.
+
+    Secure account linking: requires an active session, re-verifies the Google
+    identity server-side and refuses to hijack a Google account or email that
+    already belongs to another user.
+    """
+    await enforce_rate_limit(request, "auth:google-link:ip", limit=30, window_seconds=3600)
+    db = get_db()
+    if not (await load_auth_settings(db))["google_linking_enabled"]:
+        raise HTTPException(status_code=403, detail="Google-Verknüpfung ist derzeit deaktiviert.")
+    data = await _resolve_google_identity(request)
+    google_id = data.get("id")
+    google_email = (data.get("email") or "").lower().strip()
+    if not google_id or not google_email:
+        raise HTTPException(status_code=400, detail="Keine gültigen Google-Daten erhalten")
+
+    existing_by_google = await db.users.find_one({"google_id": google_id})
+    if existing_by_google and existing_by_google["id"] != user["id"]:
+        raise HTTPException(status_code=409, detail="Dieses Google-Konto ist bereits mit einem anderen Account verknüpft.")
+    existing_by_email = await db.users.find_one({"email": google_email})
+    if existing_by_email and existing_by_email["id"] != user["id"]:
+        raise HTTPException(status_code=409, detail="Diese Google-E-Mail gehört bereits zu einem anderen Account.")
+
+    updates = {
+        "google_id": google_id,
+        "google_email": google_email,
+        "google_linked": True,
+        "email_verified": True,
+        "updated_at": now_utc().isoformat(),
+    }
+    await db.users.update_one({"id": user["id"]}, {"$set": updates})
+    return {"ok": True, "google_email": google_email}
+
+
+@router.post("/google/unlink")
+async def google_unlink(user: dict = Depends(get_current_user)):
+    """Remove the Google link from the current account (blocked for Google-only accounts to avoid lockout)."""
+    db = get_db()
+    full = await db.users.find_one({"id": user["id"]})
+    if not full:
+        raise HTTPException(status_code=404, detail="Account nicht gefunden")
+    if full.get("auth_provider") == "google":
+        raise HTTPException(
+            status_code=400,
+            detail="Dieser Account nutzt nur Google-Login. Setze zuerst über \"Passwort vergessen\" ein Passwort, dann kannst du Google trennen.",
+        )
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"google_id": None, "google_email": None, "google_linked": False, "updated_at": now_utc().isoformat()}},
+    )
+    return {"ok": True}
 
 
 @router.post("/mobile/register")

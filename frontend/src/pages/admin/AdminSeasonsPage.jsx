@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { GermanDateField } from "@/components/tls/GermanDateField";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -391,8 +392,8 @@ function SeasonModal({ season, tournaments, challenges, onClose, onSaved }) {
               <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Banner" testId="season-banner" variant="wide" allowLibrary />
 
               <div className="grid md:grid-cols-2 gap-4">
-                <Field label="Start"><Input type="date" value={form.start_date} onChange={(v) => set("start_date", v)} /></Field>
-                <Field label="Ende"><Input type="date" value={form.end_date} onChange={(v) => set("end_date", v)} /></Field>
+                <Field label="Start"><GermanDateField id="season-start-date" value={(form.start_date || "").slice(0, 10)} onChange={(v) => set("start_date", v)} testId="season-start-date" allowFuture /></Field>
+                <Field label="Ende"><GermanDateField id="season-end-date" value={(form.end_date || "").slice(0, 10)} onChange={(v) => set("end_date", v)} testId="season-end-date" allowFuture /></Field>
               </div>
 
               <Field label="Beschreibung">

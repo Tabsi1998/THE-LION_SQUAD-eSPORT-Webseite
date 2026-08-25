@@ -14,6 +14,8 @@ import { Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pe
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 import { AchievementUnlockOverlay } from "@/components/tls/AchievementUnlockOverlay";
 import { GermanDateField } from "@/components/tls/GermanDateField";
+import { startGoogleLink } from "@/context/AuthContext";
+import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 
 const TABS = [
   { k: "basic", label: "Grunddaten", icon: User },
@@ -230,6 +232,24 @@ function achievementInsights(data) {
 
 export default function ProfilePage() {
   const { user, refresh, isClubMember } = useAuth();
+  const siteSettings = usePublicSiteSettings();
+  const confirmGoogle = useConfirm();
+  const googleLinked = !!(user?.google_linked || user?.google_id);
+  const googleOnly = user?.auth_provider === "google";
+  const unlinkGoogle = async () => {
+    if (!await confirmGoogle({
+      title: "Google trennen?",
+      description: "Du kannst dich danach wieder mit E-Mail und Passwort anmelden.",
+      confirmLabel: "Trennen",
+    })) return;
+    try {
+      await api.post("/auth/google/unlink");
+      await refresh();
+      toast.success("Google-Verknüpfung entfernt.");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Google konnte nicht getrennt werden.");
+    }
+  };
   const [params, setParams] = useSearchParams();
   const requestedTab = params.get("tab") || "basic";
   const tab = TABS.some((item) => item.k === requestedTab) ? requestedTab : "basic";
@@ -463,6 +483,45 @@ export default function ProfilePage() {
                 <Field label="Avatar"><ImageUpload value={form.avatar_url} onChange={(v) => set("avatar_url", v)} testId="profile-avatar" variant="square" allowLibrary /></Field>
                 <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="profile-banner" variant="wide" allowLibrary /></Field>
               </Row>
+
+              {siteSettings.google_linking_enabled !== false && (
+                <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]" data-testid="profile-google-link">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <svg className="w-6 h-6 mt-0.5 shrink-0" viewBox="0 0 24 24" aria-hidden="true"><path fill="#EA4335" d="M12 10.2v3.9h5.5c-.24 1.4-1.66 4.1-5.5 4.1-3.3 0-6-2.73-6-6.1s2.7-6.1 6-6.1c1.88 0 3.14.8 3.86 1.49l2.63-2.53C16.86 3.1 14.66 2.1 12 2.1 6.98 2.1 2.9 6.18 2.9 11.2S6.98 20.3 12 20.3c5.78 0 9.6-4.06 9.6-9.78 0-.66-.07-1.16-.16-1.66H12z"/></svg>
+                      <div>
+                        <h3 className="font-heading font-black uppercase mb-1">Google-Konto</h3>
+                        {googleLinked ? (
+                          <p className="text-xs text-[#00FF88]" data-testid="profile-google-status">Verknüpft{user?.google_email ? ` · ${user.google_email}` : ""} · schneller Login mit einem Klick.</p>
+                        ) : (
+                          <p className="text-xs text-white/50" data-testid="profile-google-status">Verbinde dein Google-Konto, um dich künftig mit einem Klick anzumelden.</p>
+                        )}
+                      </div>
+                    </div>
+                    {googleLinked ? (
+                      <button
+                        type="button"
+                        onClick={unlinkGoogle}
+                        disabled={googleOnly}
+                        title={googleOnly ? "Setze zuerst ein Passwort, dann kannst du Google trennen." : undefined}
+                        data-testid="profile-google-unlink"
+                        className="px-4 py-2.5 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] text-xs font-bold uppercase tracking-wider hover:bg-[#FF3B30]/10 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                      >
+                        Trennen
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startGoogleLink("/profile")}
+                        data-testid="profile-google-link-button"
+                        className="px-4 py-2.5 rounded-sm bg-white text-[#1f1f1f] text-xs font-bold uppercase tracking-wider hover:bg-white/90 shrink-0"
+                      >
+                        Google verknüpfen
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </Section>
           )}
 

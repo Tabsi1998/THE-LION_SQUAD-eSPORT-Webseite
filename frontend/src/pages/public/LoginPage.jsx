@@ -6,6 +6,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { AuthFormAlert, AuthPasswordField, AuthTextField } from "@/components/tls/AuthFormFields";
 import { GoogleAuthButton } from "@/components/tls/GoogleAuthButton";
+import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { toast } from "sonner";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -14,6 +15,7 @@ export default function LoginPage() {
   useDocumentTitle("Login", "Login für Mitglieder und Community-User von THE LION SQUAD eSports.", { robots: "noindex, follow" });
 
   const { login } = useAuth();
+  const settings = usePublicSiteSettings();
   const [params] = useSearchParams();
   const next = params.get("next") || "/dashboard";
   const nav = useNavigate();
@@ -106,7 +108,9 @@ export default function LoginPage() {
         </form>
         <GoogleAuthButton label="Mit Google einloggen" returnPath={next} />
         <div className="mt-6 text-sm text-white/60 text-center space-y-2">
-          <div>Kein Account? <Link to="/register" className="text-[#29B6E8] hover:text-white font-bold">Registrieren</Link></div>
+          {settings.registration_enabled !== false && (
+            <div>Kein Account? <Link to="/register" className="text-[#29B6E8] hover:text-white font-bold">Registrieren</Link></div>
+          )}
           <div><Link to="/forgot-password" className="text-white/45 hover:text-[#29B6E8]">Passwort vergessen?</Link></div>
         </div>
       </div>

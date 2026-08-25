@@ -100,3 +100,30 @@ Gesamtzustand analysieren, aufräumen, verbessern und "Wow"-Features ergänzen.
 - Offen/Backlog unverändert: Google OAuth E2E, Production-Härtung, Mobile-Release-Preflight,
   Achievement-Optik-Abnahme durch User, ResizeObserver fürs TV-Bracket, Weg-B-Migration.
 - Mobile-App (Expo) hat diese Animationen NICHT erhalten — separates Vorhaben.
+
+## SESSION Juni 2026 (Fork) — Admin-Zentralisierung, Google-Link, Sounds, Datums-Vereinheitlichung, Mobile-Zeremonie
+Getestet: iteration_10.json (Backend 100%, Frontend 100%) + Mobile typecheck/preflight/security.
+- **Admin „Login & Google"-Tab** (AdminSettingsPage, tab=auth): zentrale Toggles password_login_enabled,
+  registration_enabled, google_login_enabled, google_linking_enabled. Backend: services/auth_settings.py
+  (fail-open Defaults=true), GET/PUT /api/settings/auth (admin+CSRF+Audit), Flags in /api/settings/public gespiegelt.
+  Serverseitige Durchsetzung: register→403 wenn zu, google/session→403 wenn Google aus.
+- **Google mit bestehendem Konto verknüpfen**: POST /api/auth/google/link (auth-gated, re-verify server-side,
+  409 bei fremdem google_id/E-Mail), /api/auth/google/unlink (blockt google-only Accounts gegen Lockout).
+  Frontend: AuthContext.startGoogleLink + glink=1-Callback; ProfilePage „Grunddaten" Google-Karte (verknüpfen/trennen).
+  GoogleAuthButton/Login/Register respektieren die Flags (Button versteckt / „Registrierung geschlossen"-Screen).
+- **Unlock-Sounds (Web, synthetisch)**: lib/unlockSounds.js (Web Audio API, KEINE Dateien/Lizenzprobleme) —
+  je Rarität eigener Cue, Legendär = epische Brass-Fanfare. Mute-Toggle im AchievementUnlockOverlay (localStorage tls_sound_muted).
+- **Datums-Vereinheitlichung**: GermanDateField bekam allowFuture-Prop + Default-Kalenderansicht = aktueller Monat.
+  Alle restlichen nativen Datumsfelder auf GermanDateField umgestellt: AdminSeasons/Sponsors/Benefits/References
+  (allowFuture), AdminGallery (taken_at). Geburtsdatum (Register/Profile) bleibt ohne Zukunft.
+- **Mobile Achievement-Zeremonie**: mobile/src/components/AchievementUnlock.tsx (RN Modal + Animated + Konfetti,
+  Rarität-Farben) + AchievementCatchUpOverlay.tsx (SecureStore-Marker tls_ach_seen_<id>, „Während du weg warst!").
+  In AppNavigator gemountet (signedIn). **Vibration via expo-haptics** je Rarität (Legendär = Success + 3x Heavy-Impulse).
+  typecheck grün, release:preflight grün, test:security 3/3.
+- **Media-Audit**: Homepage/Logo/Mascot (Assets 1949²/3508px, object-contain), Galerie (measured-first tileAspect,
+  Video mit Poster/Controls/Consent, iframe aspect-video) — Code sauber, keine Bugs; Qualitätsprobleme nur bei
+  admin-hochgeladenen Low-Res-Assets (Daten, nicht Code).
+- Testing-Agent-Fix nebenbei: services/mail_queue.py mail_queue_stats() gemischte Projektion → 500 behoben.
+- OFFEN: Echter Google-OAuth E2E (Prod-Domain), **Mobile Google-Login** (expo-web-browser Deep-Link-Flow +
+  mobile Session-Exchange, im Preview nicht testbar → nächster Mobile-Schritt), echter EAS/Store-Build (User-Zugang/Geräte).
+  audit:ci schlägt fehl (ruft `npm audit` in yarn-Projekt — Umgebungsquirk, kein Codefehler).

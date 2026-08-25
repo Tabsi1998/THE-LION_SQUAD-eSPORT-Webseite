@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { GermanDateField } from "@/components/tls/GermanDateField";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameOptionLabel } from "@/lib/gameLabels";
@@ -421,8 +422,8 @@ function ReferenceForm({ reference, games, memberProfiles, suggestions, onClose,
           <Field label="Teams" type="number" value={form.team_count} onChange={(v) => set("team_count", v)} />
         </div>
         <div className="grid md:grid-cols-4 gap-3">
-          <Field label="Start" type="date" value={form.start_date} onChange={(v) => set("start_date", v)} />
-          <Field label="Ende" type="date" value={form.end_date} onChange={(v) => set("end_date", v)} />
+          <GermanDateField id="reference-start-date" label="Start" value={(form.start_date || "").slice(0, 10)} onChange={(v) => set("start_date", v)} testId="reference-start-date" allowFuture />
+          <GermanDateField id="reference-end-date" label="Ende" value={(form.end_date || "").slice(0, 10)} onChange={(v) => set("end_date", v)} testId="reference-end-date" allowFuture />
           <Field label="Ort" value={form.location} onChange={(v) => set("location", v)} suggestions={suggestions.locations} />
           <Select label="Modus" value={form.mode} onChange={(v) => set("mode", v)} options={MODE_OPTIONS} />
         </div>

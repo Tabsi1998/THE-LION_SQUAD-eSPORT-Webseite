@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, formatRequestError, formatUploadError, resolveMediaUrl, uploadApi } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { GermanDateField } from "@/components/tls/GermanDateField";
 import { ImageUpload, prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { UploadProgressPanel } from "@/components/tls/UploadProgressPanel";
@@ -262,7 +263,7 @@ function AlbumModal({ album, events, onClose, onSaved }) {
                 {events.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
             </Field>
-            <Field label="Aufgenommen am"><input type="date" value={form.taken_at} onChange={(e) => set("taken_at", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
+            <Field label="Aufgenommen am"><GermanDateField id="gallery-taken-at" value={(form.taken_at || "").slice(0, 10)} onChange={(v) => set("taken_at", v)} testId="gallery-taken-at" /></Field>
             <Field label="Sichtbarkeit">
               <select value={form.visibility} onChange={(e) => set("visibility", e.target.value)} data-testid="album-visibility" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
                 <option value="public">Öffentlich</option>
