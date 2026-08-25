@@ -16,6 +16,9 @@ Public/profile listing rules:
 """
 import logging
 from datetime import datetime, timezone
+
+from pymongo.errors import DuplicateKeyError
+
 from database import get_db
 from models import now_utc, new_id
 from achievement_catalog import (
@@ -104,8 +107,17 @@ async def award_achievement(user_id: str, tier_code: str, context: dict | None =
         "context": context or {},
         "awarded_by": awarded_by,
     }
-    await db.user_achievements.insert_one(doc)
+    try:
+        await db.user_achievements.insert_one(doc)
+    except DuplicateKeyError:
+        # concurrent evaluation already awarded this tier — not an error
+        return False
     if not group.get("is_negative"):
+        try:
+            from services.crown_events import schedule_crown_sync
+            schedule_crown_sync()
+        except Exception as e:
+            logger.debug(f"crown sync scheduling failed: {e}")
         try:
             from discord_service import send_discord
             user = await db.users.find_one({"id": user_id},

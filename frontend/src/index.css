@@ -1265,13 +1265,36 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 /* Crowns — rank based (gold/silver/bronze) + obsidian, big & loud */
 .tls-lvf-crown {
   position: absolute;
-  top: -38px;
+  top: -52px;
   left: 50%;
   z-index: 4;
-  width: 72px;
-  margin-left: -36px;
+  width: 96px;
+  margin-left: -48px;
   pointer-events: auto;
-  animation: tls-lvf-crown-float 3.2s ease-in-out infinite;
+  animation: tls-lvf-crown-drop 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) both, tls-lvf-crown-float 3.2s ease-in-out 0.7s infinite;
+}
+.tls-lvf-crown-rays {
+  position: absolute;
+  inset: -46% -34%;
+  z-index: -2;
+  pointer-events: none;
+  background: repeating-conic-gradient(
+    from 0deg,
+    var(--crown-glow, rgba(255, 215, 0, 0.8)) 0deg 7deg,
+    transparent 7deg 30deg
+  );
+  -webkit-mask: radial-gradient(closest-side, transparent 28%, #000 34%, transparent 78%);
+  mask: radial-gradient(closest-side, transparent 28%, #000 34%, transparent 78%);
+  opacity: 0.7;
+  animation: tls-lvf-crown-rays-spin 9s linear infinite;
+}
+@keyframes tls-lvf-crown-rays-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes tls-lvf-crown-drop {
+  0% { transform: translateY(-26px) scale(0.6); opacity: 0; }
+  60% { transform: translateY(4px) scale(1.08); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 .tls-lvf-crown::before {
   content: "";
@@ -1361,12 +1384,13 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .tls-lvf--compact .tls-lvf-ring { inset: -3.5px; border-radius: 6px; padding: 1.6px; }
 .tls-lvf--compact::before { inset: -7px; filter: blur(6px); }
 .tls-lvf--compact .tls-lvf-crown {
-  top: -17px;
-  width: 30px;
-  margin-left: -15px;
-  animation-duration: 3s;
+  top: -20px;
+  width: 38px;
+  margin-left: -19px;
+  animation-duration: 0.7s, 3s;
 }
 .tls-lvf--compact .tls-lvf-crown::after { display: none; }
+.tls-lvf--compact .tls-lvf-crown-rays { display: none; }
 .tls-lvf--compact .tls-lvf-dashed { inset: -3.5px; border-radius: 6px; padding: 1.4px; }
 .tls-lvf--compact .tls-lvf-corners i { width: 8px; height: 8px; border-width: 1.5px; }
 
@@ -1524,4 +1548,366 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
     animation: none !important;
   }
   .tls-lvf-bolt { opacity: 0.65; }
+}
+
+/* ===== Level Frame v3 — archetype effect primitives ===== */
+
+/* Reticle: rotating dashed target circle + crosshair ticks */
+.tls-lvf-reticle {
+  position: absolute;
+  inset: -9px;
+  z-index: 1;
+  pointer-events: none;
+  border: 1.6px dashed color-mix(in srgb, var(--lvf-c) 75%, transparent);
+  border-radius: 50%;
+  animation: tls-lvf-orbit-spin calc(var(--lvf-speed) * 1.3) linear infinite;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--lvf-c) 55%, transparent));
+}
+.tls-lvf-reticle i {
+  position: absolute;
+  background: var(--lvf-c);
+  box-shadow: 0 0 6px var(--lvf-c);
+}
+.tls-lvf-reticle i:nth-child(1) { top: -5px; left: 50%; width: 2px; height: 10px; margin-left: -1px; }
+.tls-lvf-reticle i:nth-child(2) { bottom: -5px; left: 50%; width: 2px; height: 10px; margin-left: -1px; }
+.tls-lvf-reticle i:nth-child(3) { left: -5px; top: 50%; width: 10px; height: 2px; margin-top: -1px; }
+.tls-lvf-reticle i:nth-child(4) { right: -5px; top: 50%; width: 10px; height: 2px; margin-top: -1px; }
+
+/* Radar: sweeping wedge over the avatar */
+.tls-lvf-radar {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: conic-gradient(from 0deg, color-mix(in srgb, var(--lvf-c) 45%, transparent), transparent 24%);
+  mix-blend-mode: screen;
+  animation: tls-lvf-orbit-spin calc(var(--lvf-speed) * 0.9) linear infinite;
+  opacity: 0.75;
+}
+
+/* Comet: orbiting head with a fading tail */
+.tls-lvf-comet {
+  position: absolute;
+  inset: -12px;
+  z-index: 1;
+  pointer-events: none;
+  animation: tls-lvf-orbit-spin calc(var(--lvf-speed) * 0.55) linear infinite;
+}
+.tls-lvf-comet i {
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 34px;
+  height: 7px;
+  margin-left: -30px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lvf-c) 80%, transparent), #ffffff);
+  filter: drop-shadow(0 0 8px var(--lvf-c));
+}
+
+/* Runes: glowing tick ring, slow ceremonial rotation */
+.tls-lvf-runes {
+  position: absolute;
+  inset: -8px;
+  z-index: 1;
+  border-radius: 11px;
+  padding: 3px;
+  pointer-events: none;
+  background: repeating-conic-gradient(from var(--lvf-a), var(--lvf-c2) 0deg 2.4deg, transparent 2.4deg 12deg, var(--lvf-c) 12deg 13.6deg, transparent 13.6deg 24deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: tls-lvf-rot calc(var(--lvf-speed) * 2.2) linear infinite;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--lvf-c) 70%, transparent));
+}
+
+/* Hexagon shield outline pulsing */
+.tls-lvf-hexa {
+  position: absolute;
+  inset: -12px;
+  z-index: 1;
+  width: calc(100% + 24px);
+  height: calc(100% + 24px);
+  pointer-events: none;
+  filter: drop-shadow(0 0 6px var(--lvf-c));
+  animation: tls-lvf-hexa-pulse calc(var(--lvf-speed) * 0.5) ease-in-out infinite;
+}
+@keyframes tls-lvf-hexa-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.05) rotate(2deg); }
+}
+
+/* RGB split border flicker */
+.tls-lvf-inner--rgb { animation: tls-lvf-rgb-split 3.6s steps(1) infinite; }
+@keyframes tls-lvf-rgb-split {
+  0%, 86%, 100% { box-shadow: 0 0 14px color-mix(in srgb, var(--lvf-c) 26%, transparent); }
+  88% { box-shadow: -3px 0 0 rgba(255, 0, 80, 0.8), 3px 0 0 rgba(0, 220, 255, 0.8); }
+  91% { box-shadow: 3px 0 0 rgba(255, 0, 80, 0.7), -3px 0 0 rgba(0, 220, 255, 0.7); }
+  94% { box-shadow: 0 0 14px color-mix(in srgb, var(--lvf-c) 26%, transparent); }
+}
+
+/* Rising particles (embers / stardust) */
+.tls-lvf-rise { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
+.tls-lvf-rise i {
+  position: absolute;
+  bottom: -6px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--lvf-c2);
+  box-shadow: 0 0 6px var(--lvf-c);
+  animation: tls-lvf-rise-up 3s linear infinite;
+}
+@keyframes tls-lvf-rise-up {
+  0% { transform: translateY(0) scale(1); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translateY(-110px) scale(0.4); opacity: 0; }
+}
+
+/* Falling particles (frost / snow) */
+.tls-lvf-fall { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
+.tls-lvf-fall i {
+  position: absolute;
+  top: -6px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 6px var(--lvf-c);
+  animation: tls-lvf-fall-down 3.6s linear infinite;
+}
+@keyframes tls-lvf-fall-down {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 0.95; }
+  50% { transform: translateY(55px) translateX(5px); }
+  100% { transform: translateY(115px) translateX(-4px); opacity: 0; }
+}
+
+/* Solar flare: rotating rays behind the frame */
+.tls-lvf-flare {
+  position: absolute;
+  inset: -22%;
+  z-index: 0;
+  pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--lvf-c) 55%, transparent) 0deg 6deg, transparent 6deg 32deg);
+  -webkit-mask: radial-gradient(closest-side, transparent 48%, #000 56%, transparent 88%);
+  mask: radial-gradient(closest-side, transparent 48%, #000 56%, transparent 88%);
+  opacity: 0.75;
+  animation: tls-lvf-orbit-spin calc(var(--lvf-speed) * 3) linear infinite;
+}
+
+/* Eclipse: crescent glow arcing around the frame */
+.tls-lvf-eclipse {
+  position: absolute;
+  inset: -8px;
+  z-index: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(from var(--lvf-a), transparent 0 55%, color-mix(in srgb, var(--lvf-c) 85%, transparent) 72%, var(--lvf-c2) 80%, color-mix(in srgb, var(--lvf-c) 85%, transparent) 88%, transparent 100%);
+  -webkit-mask: radial-gradient(closest-side, transparent 78%, #000 82%);
+  mask: radial-gradient(closest-side, transparent 78%, #000 82%);
+  filter: blur(1px) drop-shadow(0 0 8px var(--lvf-c));
+  animation: tls-lvf-rot calc(var(--lvf-speed) * 1.6) linear infinite;
+}
+
+/* Speed streaks racing across */
+.tls-lvf-speed { position: absolute; inset: 0; z-index: 3; overflow: hidden; pointer-events: none; mix-blend-mode: screen; }
+.tls-lvf-speed i {
+  position: absolute;
+  left: -60%;
+  height: 2px;
+  width: 55%;
+  background: linear-gradient(90deg, transparent, var(--lvf-c), #ffffff);
+  filter: drop-shadow(0 0 5px var(--lvf-c));
+  animation: tls-lvf-speed-dash 1.4s linear infinite;
+}
+.tls-lvf-speed i:nth-child(1) { top: 22%; }
+.tls-lvf-speed i:nth-child(2) { top: 52%; animation-delay: 0.45s; }
+.tls-lvf-speed i:nth-child(3) { top: 78%; animation-delay: 0.9s; }
+@keyframes tls-lvf-speed-dash {
+  0% { transform: translateX(0); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translateX(320%); opacity: 0; }
+}
+
+/* Plasma orbs drifting inside */
+.tls-lvf-plasma { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
+.tls-lvf-plasma i {
+  position: absolute;
+  width: 46%;
+  height: 46%;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--lvf-c) 55%, transparent), transparent 70%);
+  filter: blur(6px);
+  mix-blend-mode: screen;
+  animation: tls-lvf-plasma-drift 4.4s ease-in-out infinite;
+}
+.tls-lvf-plasma i:nth-child(1) { top: -8%; left: -8%; }
+.tls-lvf-plasma i:nth-child(2) { bottom: -8%; right: -8%; animation-delay: -2.2s; }
+@keyframes tls-lvf-plasma-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(55%, 55%) scale(1.25); }
+}
+
+/* Vortex: spiraling energy behind the avatar content */
+.tls-lvf-vortex {
+  position: absolute;
+  inset: -30%;
+  z-index: 0;
+  pointer-events: none;
+  background: conic-gradient(from 0deg, transparent 0 12%, color-mix(in srgb, var(--lvf-c) 45%, transparent) 22%, transparent 34%, transparent 46%, color-mix(in srgb, var(--lvf-c2) 40%, transparent) 60%, transparent 72%, color-mix(in srgb, var(--lvf-c) 35%, transparent) 88%, transparent 100%);
+  border-radius: 50%;
+  mix-blend-mode: screen;
+  filter: blur(4px);
+  animation: tls-lvf-orbit-spin calc(var(--lvf-speed) * 1.4) linear infinite;
+}
+
+/* Aurora: drifting light bands at the top */
+.tls-lvf-aurora {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  top: -6%;
+  height: 55%;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 100% at 30% 0%, color-mix(in srgb, #22d3ee 55%, transparent), transparent 70%),
+    radial-gradient(55% 90% at 70% 0%, color-mix(in srgb, #a855f7 50%, transparent), transparent 70%),
+    radial-gradient(40% 80% at 50% 0%, color-mix(in srgb, #00ff88 45%, transparent), transparent 70%);
+  filter: blur(8px);
+  mix-blend-mode: screen;
+  animation: tls-lvf-aurora-wave 5s ease-in-out infinite;
+}
+@keyframes tls-lvf-aurora-wave {
+  0%, 100% { transform: translateX(-6%) skewX(-6deg); opacity: 0.65; }
+  50% { transform: translateX(6%) skewX(6deg); opacity: 1; }
+}
+
+/* Prism: rainbow conic ring */
+.tls-lvf-prism {
+  position: absolute;
+  inset: -7px;
+  z-index: 1;
+  border-radius: 10px;
+  padding: 2.6px;
+  pointer-events: none;
+  background: conic-gradient(from var(--lvf-a), #ff5f6d, #ffc371, #fffb7d, #6ef195, #22d3ee, #a855f7, #ff5f6d);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: tls-lvf-rot calc(var(--lvf-speed) * 1.8) linear infinite;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.55)) saturate(1.4);
+}
+
+/* Storm shake: subtle frame tremor */
+.tls-lvf--shake { animation: tls-lvf-shake 5s steps(2) infinite; }
+@keyframes tls-lvf-shake {
+  0%, 89%, 100% { transform: translate(0, 0); }
+  90% { transform: translate(-1.5px, 1px); }
+  92% { transform: translate(1.5px, -1px); }
+  94% { transform: translate(-1px, -1px); }
+  96% { transform: translate(1px, 1px); }
+}
+
+/* Counter-rotating dashed ring */
+.tls-lvf-dashed--rev {
+  inset: -11px;
+  border-radius: 13px;
+  opacity: 0.6;
+  animation-direction: reverse;
+  animation-duration: calc(var(--lvf-speed) * 2);
+}
+
+/* Team frames: octagon-ish clip vibe via bigger radius + tag styling */
+.tls-lvf--team .tls-lvf-inner { border-radius: 10px; }
+.tls-lvf--team { border-radius: 12px; }
+.tls-lvf--team .tls-lvf-badge {
+  border-radius: 9999px;
+  padding: 2px 12px;
+  letter-spacing: 0.2em;
+}
+
+/* ===== Crown celebration overlay + confetti ===== */
+.tls-crown-celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 7, 10, 0.82);
+  backdrop-filter: blur(6px);
+  animation: tls-crown-cele-fade 0.4s ease-out both;
+}
+@keyframes tls-crown-cele-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.tls-crown-celebration-card {
+  position: relative;
+  text-align: center;
+  padding: 3rem 2.5rem;
+  animation: tls-crown-cele-pop 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes tls-crown-cele-pop {
+  0% { transform: scale(0.6) translateY(30px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+.tls-crown-celebration-crown {
+  width: 150px;
+  margin: 0 auto;
+  animation: tls-lvf-crown-float 2.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 30px var(--crown-glow, rgba(255, 215, 0, 0.9)));
+}
+.tls-crown-celebration-rays {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 520px;
+  height: 520px;
+  margin: -260px 0 0 -260px;
+  pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, var(--crown-glow, rgba(255, 215, 0, 0.5)) 0deg 5deg, transparent 5deg 24deg);
+  -webkit-mask: radial-gradient(closest-side, transparent 18%, #000 26%, transparent 72%);
+  mask: radial-gradient(closest-side, transparent 18%, #000 26%, transparent 72%);
+  opacity: 0.4;
+  animation: tls-lvf-crown-rays-spin 14s linear infinite;
+}
+.tls-confetti {
+  position: absolute;
+  top: -4vh;
+  width: 9px;
+  height: 15px;
+  opacity: 0.95;
+  animation: tls-confetti-fall linear both;
+}
+@keyframes tls-confetti-fall {
+  0% { transform: translateY(0) rotate(0deg) rotateY(0deg); opacity: 1; }
+  100% { transform: translateY(108vh) rotate(680deg) rotateY(540deg); opacity: 0.75; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-lvf-reticle,
+  .tls-lvf-radar,
+  .tls-lvf-comet,
+  .tls-lvf-runes,
+  .tls-lvf-hexa,
+  .tls-lvf-inner--rgb,
+  .tls-lvf-rise i,
+  .tls-lvf-fall i,
+  .tls-lvf-flare,
+  .tls-lvf-eclipse,
+  .tls-lvf-speed i,
+  .tls-lvf-plasma i,
+  .tls-lvf-vortex,
+  .tls-lvf-aurora,
+  .tls-lvf-prism,
+  .tls-lvf--shake,
+  .tls-lvf-crown-rays,
+  .tls-crown-celebration-rays,
+  .tls-crown-celebration-crown {
+    animation: none !important;
+  }
+  .tls-confetti { display: none; }
 }
