@@ -19,6 +19,7 @@ Admin endpoints (prefix /api/admin/achievements):
   DELETE /award                           — revoke {user_id, tier_code}
   GET    /negative/awards                 — admin-only list of negative awards
 """
+import logging
 import re
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -33,6 +34,9 @@ from badges import (
 )
 from models import now_utc, new_id
 from achievement_catalog import CONDITION_KEY_STATUS
+
+
+logger = logging.getLogger(__name__)
 
 # ============ Public/User ============
 router = APIRouter(prefix="/api/achievements", tags=["achievements"])
@@ -321,7 +325,7 @@ async def admin_revoke(body: AwardBody, me: dict = Depends(require_admin())):
         from services.crown_events import schedule_crown_sync
         schedule_crown_sync()
     except Exception:
-        pass
+        logger.warning("Crown sync could not be scheduled after revoking an achievement", exc_info=True)
     await db.audit_logs.insert_one({
         "id": new_id(),
         "action": "achievement.manual_revoke",

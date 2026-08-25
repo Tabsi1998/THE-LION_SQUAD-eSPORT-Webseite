@@ -2,11 +2,14 @@
 import os
 import re
 import time
+import logging
 from pathlib import Path
 
 import pytest
 import requests
 from dotenv import dotenv_values
+
+logger = logging.getLogger(__name__)
 
 _env = dotenv_values("/app/frontend/.env")
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or _env.get("REACT_APP_BACKEND_URL") or "").rstrip("/")
@@ -68,7 +71,7 @@ def admin():
     try:
         s.post(f"{BASE_URL}/api/auth/logout", headers=_csrf(s), timeout=30)
     except Exception:
-        pass
+        logger.debug("Best-effort fixture logout failed", exc_info=True)
 
 
 # ---- GET /api/teams/levels ----
@@ -259,7 +262,7 @@ class TestConcurrentEvaluate:
         try:
             s.post(f"{BASE_URL}/api/auth/logout", headers=headers, timeout=30)
         except Exception:
-            pass
+            logger.debug("Best-effort concurrency-test logout failed", exc_info=True)
         assert all(c == 200 for c in codes), f"non-200 responses under concurrency: {codes}"
 
 
@@ -271,7 +274,7 @@ def _username_for(client, board, user_id):
     for row in r:
         if row["user_id"] == user_id:
             return row["username"]
-    pytest.fail(f"username for {user_id} not found on leaderboard")
+    raise AssertionError(f"username for {user_id} not found on leaderboard")
 
 
 def _crown_notifs(username, kind):
@@ -286,7 +289,7 @@ def _crown_notifs(username, kind):
         try:
             s.post(f"{BASE_URL}/api/auth/logout", headers=_csrf(s), timeout=30)
         except Exception:
-            pass
+            logger.debug("Best-effort notification-test logout failed", exc_info=True)
 
 
 def _versions(notifs):
