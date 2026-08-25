@@ -9,7 +9,7 @@ import os
 import requests
 import pytest
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://fast-lap-mgmt.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://esports-hub-rebuild.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 ADMIN_EMAIL = os.environ.get("TEST_ADMIN_EMAIL", "")
 ADMIN_PW = os.environ.get("TEST_ADMIN_PASSWORD", "")
