@@ -169,14 +169,27 @@ async def _issue_mobile_session(db, user: dict, request: Request) -> tuple[str, 
     return await _issue_tokens(db, user, request, client="mobile")
 
 
-def _recent_same_client_rotation(stored: dict, request: Request, now: datetime) -> bool:
+def _within_rotation_grace(stored: dict, now: datetime) -> bool:
+    """Benign concurrent-refresh detection.
+
+    A refresh token that was JUST rotated (within the grace window) and has a
+    recorded replacement is a normal concurrent/duplicate refresh from the same
+    client (React StrictMode double-effects, parallel first-load requests, quick
+    retries). We must NOT treat this as token theft, otherwise the whole session
+    family gets revoked and the user is logged out immediately after login.
+
+    Genuine reuse (a token replayed long after rotation, or one that was revoked
+    for any reason other than a clean rotation) still falls through to revocation.
+    """
+    if stored.get("revocation_reason") not in (None, "rotated"):
+        return False
     rotated_at = as_utc_datetime(stored.get("rotated_at"))
     if not rotated_at or now - rotated_at > timedelta(seconds=REFRESH_REPLAY_GRACE_SECONDS):
         return False
-    user_agent, ip = _request_identity(request)
-    return (
-        stored.get("rotation_user_agent", "") == user_agent
-        and stored.get("rotation_ip", "") == ip
+    return bool(
+        stored.get("replacement_jti")
+        and stored.get("replacement_id")
+        and stored.get("replacement_expires_at")
     )
 
 
@@ -237,7 +250,7 @@ async def _rotate_session(
             "jti": token_id,
             "token_hash": hash_token(token),
         })
-        if not stored or not _recent_same_client_rotation(stored, request, now):
+        if not stored or not _within_rotation_grace(stored, now):
             await _revoke_refresh_family(db, user_id, family_id, "refresh_reuse")
             raise HTTPException(status_code=401, detail="Invalid refresh token")
         replacement_jti = stored.get("replacement_jti")

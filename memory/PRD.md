@@ -132,3 +132,13 @@ Getestet: iteration_10.json (Backend 100%, Frontend 100%) + Mobile typecheck/pre
 - Live-System-Leiste (Ampel-Punkte) aus /admin/system-status: Datenbank, Mail/SMTP, Discord, Scheduler, Mail-Queue, Push-Tokens.
 - „Einstellungen-Zentrale": Direktlinks zu allen Settings-Tabs (inkl. Login & Google) mit Live-Status aus /settings/auth + /settings/public + system-status.
 - 30-Sekunden-Auto-Refresh + manueller Refresh-Button mit Zeitstempel. KPIs/Aufgaben/Audit-Logs bleiben erhalten.
+
+## BUGFIX: „Sofort nach Login ausgeloggt" (getestet: iteration_11.json, 12/12 Backend + Frontend 100%)
+- Ursache: get_current_user validiert den Access-Token über refresh_tokens.sid (revoked!=True). Ein Refresh rotiert
+  J0→J1 und markiert J0 als revoked. Bei ZWEI gleichzeitigen Refreshes desselben Clients (React StrictMode,
+  parallele First-Load-Requests) verfehlte der zweite die Grace-Prüfung → _revoke_refresh_family('refresh_reuse')
+  widerrief die GANZE Familie → der frische Access-Token starb sofort → /auth/me=null → Logout.
+- Fix (auth_routes.py): _recent_same_client_rotation (strikte UA/IP-Gleichheit) ersetzt durch _within_rotation_grace():
+  ein innerhalb REFRESH_REPLAY_GRACE_SECONDS (10s) sauber rotierter Token mit vorhandenem Replacement gilt als
+  gutartiger Nebenläufigkeits-Refresh → gibt dieselben Replacement-Tokens idempotent zurück (200), OHNE Familie zu
+  widerrufen. Echter Reuse (>10s oder anderer revocation_reason) widerruft weiterhin (Theft-Detection erhalten).
