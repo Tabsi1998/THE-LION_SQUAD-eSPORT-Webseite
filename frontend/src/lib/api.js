@@ -159,14 +159,17 @@ attachResponseInterceptors(uploadApi);
 
 export function formatApiError(detail) {
   if (detail == null) return "Ein Fehler ist aufgetreten.";
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail))
-    return detail
+  let message;
+  if (typeof detail === "string") message = detail;
+  else if (Array.isArray(detail))
+    message = detail
       .map((e) => (e && typeof e.msg === "string" ? e.msg : JSON.stringify(e)))
       .filter(Boolean)
       .join(" | ");
-  if (detail && typeof detail.msg === "string") return detail.msg;
-  return String(detail);
+  else if (detail && typeof detail.msg === "string") message = detail.msg;
+  else message = String(detail);
+  if (/valid email/i.test(message)) return "Bitte gib eine gültige E-Mail-Adresse ein.";
+  return message;
 }
 
 export function suggestSlug(value) {

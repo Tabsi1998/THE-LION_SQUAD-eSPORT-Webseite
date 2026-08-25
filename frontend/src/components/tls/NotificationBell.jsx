@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Bell, Check, Inbox, Trash2, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -31,6 +32,7 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("unread");
   const [items, setItems] = useState([]);
+  const [shake, setShake] = useState(false);
   const boxRef = useRef(null);
   const knownIdsRef = useRef(new Set());
   const didPrimeRef = useRef(false);
@@ -56,8 +58,12 @@ export function NotificationBell() {
       const rows = Array.isArray(data) ? data : [];
       setItems(rows);
       if (didPrimeRef.current) {
-        rows
-          .filter((item) => !item.read && item.id && !knownIdsRef.current.has(item.id))
+        const freshRows = rows.filter((item) => !item.read && item.id && !knownIdsRef.current.has(item.id));
+        if (freshRows.length) {
+          setShake(true);
+          setTimeout(() => setShake(false), 1900);
+        }
+        freshRows
           .slice(0, 4)
           .forEach((item) => {
             toast.info(item.title || "Benachrichtigung", {
@@ -149,18 +155,33 @@ export function NotificationBell() {
         aria-label="Benachrichtigungen"
         aria-expanded={open}
       >
-        <Bell className="w-4 h-4" />
-        {unread > 0 && (
-          <span
-            className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-sm bg-[#FF3B30] text-white text-[10px] font-black inline-flex items-center justify-center"
-            aria-label={`${unread > 99 ? "99+" : unread} ungelesene Benachrichtigungen`}
-          >
-            {unread > 99 ? "99+" : unread}
-          </span>
-        )}
+        <Bell className={`w-4 h-4 ${shake ? "tls-bell-shake" : ""}`} />
+        <AnimatePresence>
+          {unread > 0 && (
+            <motion.span
+              key={unread}
+              data-testid="notification-unread-badge"
+              className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-sm bg-[#FF3B30] text-white text-[10px] font-black inline-flex items-center justify-center"
+              aria-label={`${unread > 99 ? "99+" : unread} ungelesene Benachrichtigungen`}
+              initial={{ scale: 0, rotate: -18 }}
+              animate={{ scale: 1, rotate: 0 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 420, damping: 16 }}
+            >
+              {unread > 99 ? "99+" : unread}
+            </motion.span>
+          )}
+        </AnimatePresence>
       </button>
-      {open && (
-        <div className="fixed inset-x-2 top-16 z-[70] sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[24rem] max-h-[calc(100vh-5rem)] border border-white/10 bg-[#0F0F10] rounded-sm shadow-2xl shadow-black/70 overflow-hidden flex flex-col">
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            className="fixed inset-x-2 top-16 z-[70] sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[24rem] max-h-[calc(100vh-5rem)] border border-white/10 bg-[#0F0F10] rounded-sm shadow-2xl shadow-black/70 overflow-hidden flex flex-col"
+            initial={{ opacity: 0, y: -10, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.97 }}
+            transition={{ duration: 0.16, ease: "easeOut" }}
+          >
           <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10">
             <div className="min-w-0">
               <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">Inbox</div>
@@ -206,10 +227,11 @@ export function NotificationBell() {
                 <div className="text-sm">{tab === "unread" ? "Keine ungelesenen Benachrichtigungen." : "Keine Benachrichtigungen."}</div>
               </div>
             ) : (
-              visibleItems.map((item) => (
+              visibleItems.map((item, index) => (
                 <NotificationRow
                   key={item.id}
                   item={item}
+                  index={index}
                   onRead={markRead}
                   onDelete={deleteItem}
                   onClose={() => setOpen(false)}
@@ -217,13 +239,14 @@ export function NotificationBell() {
               ))
             )}
           </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-function NotificationRow({ item, onRead, onDelete, onClose }) {
+function NotificationRow({ item, index = 0, onRead, onDelete, onClose }) {
   const content = (
     <div className="flex items-start gap-2 min-w-0">
       {!item.read && <span className="mt-1.5 w-2 h-2 rounded-full bg-[#29B6E8] shrink-0" />}
@@ -240,7 +263,13 @@ function NotificationRow({ item, onRead, onDelete, onClose }) {
     onClose();
   };
   return (
-    <div className="group border-b border-white/5 flex items-stretch">
+    <motion.div
+      data-testid={`notification-row-${item.id}`}
+      className="group border-b border-white/5 flex items-stretch"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(index * 0.045, 0.4), duration: 0.2, ease: "easeOut" }}
+    >
       {item.url && isExternalUrl(item.url) ? (
         <a href={item.url} onClick={handleOpen} className={className}>
           {content}
@@ -263,6 +292,6 @@ function NotificationRow({ item, onRead, onDelete, onClose }) {
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
-    </div>
+    </motion.div>
   );
 }

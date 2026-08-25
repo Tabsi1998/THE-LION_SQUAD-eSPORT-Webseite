@@ -9,6 +9,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { api, formatRequestError, resolveMediaUrl, suggestSlug } from "@/lib/api";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { GermanDateField } from "@/components/tls/GermanDateField";
 
 const emptyForm = {
   display_name: "",
@@ -258,7 +259,7 @@ function ProfileModal({ entry, users = [], onClose, onSaved }) {
               <Field label="Vor- und Nachname"><input required value={form.display_name} onChange={(e) => set("display_name", e.target.value)} placeholder="z.B. Fabian Tabelander" className="input" /></Field>
               <Field label="Öffentlicher Realname"><input value={form.real_name} onChange={(e) => set("real_name", e.target.value)} placeholder="leer = Vor- und Nachname" className="input" /></Field>
               <Field label="URL-Slug"><input value={form.slug} onChange={(e) => set("slug", e.target.value)} placeholder="wird aus Gamertag erstellt" className="input font-mono" /></Field>
-              <Field label="Geburtsdatum"><input type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} className="input" /></Field>
+              <Field label="Geburtsdatum"><GermanDateField id="member-birth-date" value={form.birth_date} onChange={(v) => set("birth_date", v)} testId="member-birth-date" /></Field>
               <Field label="Geschlecht"><select value={form.gender || ""} onChange={(e) => set("gender", e.target.value)} className="input">
                 <option value="">Keine Angabe</option>
                 <option value="male">Männlich</option>

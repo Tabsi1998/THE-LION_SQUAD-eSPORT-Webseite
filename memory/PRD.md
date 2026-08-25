@@ -80,3 +80,23 @@ Gesamtzustand analysieren, aufräumen, verbessern und "Wow"-Features ergänzen.
 - P2 (Wow): Live-Bracket-Animationen, Twitch-Live-Hero, Achievements-Showcase, animierte Landing.
 - P3: AdminTournamentEditPage (2260 Zeilen) in Module splitten; data-testids für Match-Controls.
 - P3: Doku-Aufräumen (.md-Reports im Root → /docs).
+
+## Update Juni 2026 — Premium-Animationspaket + Kalender + Masonry (getestet: iteration_8 + iteration_9)
+- Deutscher Kalender (GermanDateField.jsx): Registrierung, /profile Grunddaten, Admin-Mitgliederprofil-Modal.
+  Monats-/Jahres-Dropdowns (1930–heute), Zukunft gesperrt, Format "12. Mai 1995", clear-Button, z-[130] über Modals.
+- Galerie: Masonry (columns-2/3/4) statt Raster — natürliche Bildproportionen (tileAspect, measured-first,
+  clamp 0.55–2.35), keine Grid-Löcher/Beschnitte mehr. LOW (kosmetisch): bei nur 6 Bildern endet Spalte 4 höher.
+- Achievements: Raritäts-Idle-Animationen je Level (Bronze-Glut, Silber-Sheen, Gold+-Orbit-Funken,
+  Platin-Float, Legendär-Flamme), Karten-Hover-Lift, "Fast geschafft!"-Chips bei >=80%,
+  lockedPulse nur noch bei >=80% (Perf: Karten sofort klickbar).
+- Unlock-Zeremonie (AchievementUnlockOverlay.jsx) komplett neu: raritätsgesteuert (Schockwellen-Ringe,
+  Partikel-Burst, Medal-Slam, Beams, Konfetti ab Gold, Screen-Shake bei Legendär), Auto-Close 9s pausiert bei Hover.
+- Catch-up (AchievementCatchUp.jsx, in App.js gemountet): "Während du weg warst!"-Overlay bei neuen
+  Achievements seit letztem Besuch; localStorage tls_ach_seen:<userId>, Marker erst beim Schließen fortgeschrieben.
+- NotificationBell: Shake bei neuen Meldungen, Badge-Pop, animiertes Dropdown, Row-Stagger,
+  testids notification-unread-badge / notification-row-<id> (Runtime mit echten Notifications noch ungetestet).
+- AccountLevel: Punkte-Count-up + Funken-Punkt am Balkenende, Orbit-Funke am Level-Ring (elite+).
+- E-Mail-Validierungsfehler jetzt deutsch (Mapping in formatApiError, greift auch in AuthContext).
+- Offen/Backlog unverändert: Google OAuth E2E, Production-Härtung, Mobile-Release-Preflight,
+  Achievement-Optik-Abnahme durch User, ResizeObserver fürs TV-Bracket, Weg-B-Migration.
+- Mobile-App (Expo) hat diese Animationen NICHT erhalten — separates Vorhaben.

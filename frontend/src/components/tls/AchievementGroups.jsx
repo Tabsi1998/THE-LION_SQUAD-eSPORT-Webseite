@@ -34,15 +34,21 @@ const CATEGORY_META = {
   negative:   { label: "Geheim / Fun", icon: "AlertTriangle", accent: "#FF3B30", order: 10 },
 };
 
-// Escalating, animated medal per tier level. No emoji — real iconography.
-// Gold+/Platin/Legendär get animated conic-gradient energy frames.
+// Escalating, animated medal per tier level. Every rarity has its own signature:
+// Bronze ember, Silver sheen, Gold spark orbit, Platinum float+ring, Legendary flames.
 function TierMedal({ level, icon, earned = true, size = "md" }) {
   const lvl = LEVEL_META[level] || LEVEL_META[1];
   const Icon = Icons[pascal(icon || "circle")] || Icons.Circle;
   const dim = size === "lg" ? "w-12 h-12" : size === "sm" ? "w-8 h-8" : "w-9 h-9";
   const iconDim = size === "lg" ? "w-5 h-5" : "w-4 h-4";
   const framed = earned && level >= 3;
-  const frameClass = framed ? `tls-frame tls-frame--${level}` : "";
+  const innerClass = framed
+    ? `tls-frame tls-frame--${level}`
+    : earned && level === 2
+      ? "tls-medal-silver"
+      : earned && level === 1
+        ? "tls-medal-bronze"
+        : "";
   const staticStyle = framed
     ? {}
     : {
@@ -51,15 +57,25 @@ function TierMedal({ level, icon, earned = true, size = "md" }) {
         borderColor: earned ? lvl.color + "66" : "rgba(255,255,255,0.07)",
         backgroundColor: earned ? lvl.color + "14" : "transparent",
       };
+  const orbitColor = level === 5 ? "#FFD700" : level === 4 ? "#7FDBFF" : "#FFE58A";
   return (
-    <div
-      className={`${dim} rounded-sm flex items-center justify-center shrink-0 relative overflow-hidden ${frameClass}`}
-      style={staticStyle}
+    <motion.div
+      className={`${dim} relative shrink-0 ${earned && level === 4 ? "tls-float" : ""}`}
+      whileHover={earned ? { scale: 1.14, rotate: -6 } : undefined}
+      transition={{ type: "spring", stiffness: 320, damping: 14 }}
     >
-      {earned
-        ? <Icon className={`${iconDim} relative z-[1]`} style={{ color: lvl.color, filter: framed ? `drop-shadow(0 0 4px ${lvl.color})` : undefined }} />
-        : <Lock className="w-3.5 h-3.5 text-white/25" />}
-    </div>
+      <div className={`w-full h-full rounded-sm flex items-center justify-center overflow-hidden relative ${innerClass}`} style={staticStyle}>
+        {earned
+          ? <Icon className={`${iconDim} relative z-[1] ${level >= 5 ? "tls-flame" : ""}`} style={{ color: lvl.color, filter: framed && level < 5 ? `drop-shadow(0 0 4px ${lvl.color})` : undefined }} />
+          : <Lock className="w-3.5 h-3.5 text-white/25" />}
+      </div>
+      {framed && (
+        <span className="tls-orbit" style={{ "--orbit-color": orbitColor, "--orbit-speed": level === 5 ? "2.6s" : level === 4 ? "3.6s" : "4.6s" }} aria-hidden="true"><i /></span>
+      )}
+      {earned && level === 5 && (
+        <span className="tls-orbit tls-orbit--rev" style={{ "--orbit-color": "#FF3B30", "--orbit-speed": "3.8s" }} aria-hidden="true"><i /></span>
+      )}
+    </motion.div>
   );
 }
 
@@ -148,7 +164,7 @@ function GroupCard({ group, earnedOnly = false }) {
   const accent = groupAccent(group);
   const isNegative = Boolean(group.is_negative || group.category === "negative");
   const prestige = hasAny && !isNegative && highest?.level >= 4;
-  const lockedPulse = !earnedOnly && !hasAny && !isNegative;
+  const lockedPulse = !earnedOnly && !hasAny && !isNegative && Number(nextLocked?.percent || 0) >= 80;
   const highestLabel = highest ? levelLabel(highest.level, group, highest) : "";
 
   return (
@@ -157,6 +173,7 @@ function GroupCard({ group, earnedOnly = false }) {
       data-testid={`achievement-group-${group.code}`}
       className={`border rounded-sm bg-[#0F0F10] transition-all ${hasAny ? "border-white/15" : "border-white/5"} ${isNegative ? "bg-[#120A0A]" : ""} ${hasAny && !isNegative && highest?.level >= 5 ? "tls-achievement-card-legendary" : ""}`}
       style={hasAny ? { boxShadow: `inset 0 0 0 1px ${accent}22` } : undefined}
+      whileHover={{ y: -3 }}
       animate={prestige
         ? { boxShadow: [`inset 0 0 0 1px ${accent}22`, `inset 0 0 0 1px ${accent}55, 0 0 22px ${accent}18`, `inset 0 0 0 1px ${accent}22`] }
         : lockedPulse
@@ -203,9 +220,12 @@ function GroupCard({ group, earnedOnly = false }) {
           {!earnedOnly && !isNegative && !hasAny && nextLocked && nextLocked.target > 0 && nextLocked.condition_status !== "planned" && (
             <div className="mt-2 flex items-center gap-2">
               <div className="flex-1 h-1 bg-white/5 rounded-sm overflow-hidden max-w-[200px]">
-                <div className="h-full" style={{ width: `${nextLocked.percent}%`, backgroundColor: accent }} />
+                <div className={`h-full ${nextLocked.percent >= 80 ? "tls-near-fill" : ""}`} style={{ width: `${nextLocked.percent}%`, backgroundColor: accent, color: accent }} />
               </div>
               <span className="text-[10px] text-white/40 tabular-nums">{nextLocked.current}/{nextLocked.target}</span>
+              {nextLocked.percent >= 80 && (
+                <span className="tls-near-chip text-[9px] font-black uppercase tracking-widest shrink-0" style={{ color: accent }}>Fast geschafft!</span>
+              )}
             </div>
           )}
         </div>
@@ -275,9 +295,12 @@ function TierRow({ tier, group, accent, isNegative = false }) {
         {!tier.earned && tier.target > 0 && !tier.manual_only && tier.condition_status !== "planned" && (
           <div className="mt-1.5 flex items-center gap-2">
             <div className="flex-1 h-1 bg-white/5 rounded-sm overflow-hidden">
-              <div className="h-full" style={{ width: `${tier.percent}%`, backgroundColor: accent }} />
+              <div className={`h-full ${tier.percent >= 80 ? "tls-near-fill" : ""}`} style={{ width: `${tier.percent}%`, backgroundColor: accent, color: accent }} />
             </div>
             <span className="text-[10px] text-white/40 tabular-nums">{tier.current}/{tier.target}</span>
+            {tier.percent >= 80 && (
+              <span className="tls-near-chip text-[9px] font-black uppercase tracking-widest shrink-0" style={{ color: accent }}>Fast geschafft!</span>
+            )}
           </div>
         )}
         {!tier.earned && tier.condition_status === "planned" && !tier.manual_only && (

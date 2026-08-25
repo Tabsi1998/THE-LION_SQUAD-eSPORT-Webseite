@@ -1,5 +1,24 @@
+import { useEffect, useState } from "react";
 import { Zap } from "lucide-react";
 import { motion } from "framer-motion";
+
+function useCountUp(target, duration = 950) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    const to = Number(target || 0);
+    let raf;
+    const start = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setValue(Math.round(to * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration]);
+  return value;
+}
 
 export function accountLevelTier(level) {
   const value = Number(level || 1);
@@ -61,6 +80,7 @@ export function AccountLevelProgress({ level, points = 0, nextLevelPoints = 100,
   const tier = accountLevelTier(level);
   const pct = Math.max(0, Math.min(100, Number(progress || 0)));
   const lvlNum = Number(level || 1);
+  const shownPoints = useCountUp(points);
   return (
     <div data-testid="account-level-progress">
       {!compact && (
@@ -73,13 +93,16 @@ export function AccountLevelProgress({ level, points = 0, nextLevelPoints = 100,
             transition={{ type: "spring", stiffness: 240, damping: 16 }}
           >
             {lvlNum}
+            {["elite", "champion", "legendary"].includes(tier.key) && (
+              <span className="tls-orbit rounded-full" style={{ "--orbit-color": tier.color, "--orbit-speed": "3.2s" }} aria-hidden="true"><i /></span>
+            )}
           </motion.div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/45 font-bold">
               <span style={{ color: tier.color }}>{tier.title}</span>
-              <span className="tabular-nums">{points} / {nextLevelPoints} Punkte</span>
+              <span className="tabular-nums">{shownPoints} / {nextLevelPoints} Punkte</span>
             </div>
-            <div className="mt-2 h-2.5 rounded-sm bg-white/10 overflow-hidden">
+            <div className="mt-2 h-2.5 rounded-sm bg-white/10 overflow-hidden relative">
               <motion.div
                 className="h-full tls-level-fill"
                 style={{ backgroundColor: tier.progressColor }}
@@ -87,6 +110,15 @@ export function AccountLevelProgress({ level, points = 0, nextLevelPoints = 100,
                 animate={{ width: `${pct}%` }}
                 transition={{ duration: 1, ease: "easeOut" }}
               />
+              {pct > 4 && (
+                <motion.span
+                  className="tls-bar-spark absolute top-1/2 w-1.5 h-1.5 rounded-full pointer-events-none"
+                  style={{ backgroundColor: tier.progressColor, boxShadow: `0 0 8px ${tier.progressColor}, 0 0 14px ${tier.progressColor}` }}
+                  initial={{ left: 0, opacity: 0 }}
+                  animate={{ left: `calc(${pct}% - 3px)`, opacity: 1 }}
+                  transition={{ duration: 1, ease: "easeOut" }}
+                />
+              )}
             </div>
           </div>
         </div>

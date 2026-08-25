@@ -21,21 +21,6 @@ import {
 } from "@/lib/galleryMedia";
 import { ArrowLeft, X, ChevronLeft, ChevronRight, Calendar, Play, Film, ExternalLink, Layers, Download } from "lucide-react";
 
-const PINBOARD_TILE_CLASSES = [
-  "col-span-1 row-span-1",
-  "col-span-1 row-span-2",
-  "col-span-2 row-span-1",
-  "col-span-1 row-span-1",
-  "col-span-2 row-span-2",
-  "col-span-1 row-span-1",
-  "col-span-1 row-span-2",
-  "col-span-2 row-span-1",
-  "col-span-1 row-span-1",
-  "col-span-1 sm:col-span-2 row-span-2",
-  "col-span-1 row-span-1",
-  "col-span-2 row-span-1",
-];
-
 function dimensionKey(item) {
   return item?.id || galleryMediaUrl(item) || item?.image_url || "";
 }
@@ -48,15 +33,12 @@ function itemRatio(item, dimensions) {
   return width > 0 && height > 0 ? width / height : 0;
 }
 
-function pinboardTileClass(item, index, dimensions = {}) {
+// Masonry: every tile keeps its natural aspect ratio (clamped for extremes),
+// so images are never brutally cropped and the column flow leaves no holes.
+function tileAspect(item, dimensions) {
   const ratio = itemRatio(item, dimensions);
-  if (ratio > 2.2) return "col-span-2 sm:col-span-3 row-span-1";
-  if (ratio > 1.25) return index % 4 === 0 ? "col-span-2 row-span-2" : "col-span-2 row-span-1";
-  if (ratio > 0 && ratio < 0.55) return "col-span-1 row-span-3";
-  if (ratio > 0 && ratio < 0.82) return index % 5 === 0 ? "col-span-2 row-span-3" : "col-span-1 row-span-2";
-  if (index === 0) return "col-span-2 row-span-2";
-  if (isVideoLike(item) && index % 3 === 0) return "col-span-2 row-span-2";
-  return PINBOARD_TILE_CLASSES[index % PINBOARD_TILE_CLASSES.length];
+  if (ratio > 0) return Math.min(2.35, Math.max(0.55, ratio));
+  return isVideoLike(item) ? 16 / 9 : 4 / 3;
 }
 
 function sortSections(sections) {
@@ -200,13 +182,14 @@ export default function GalleryAlbumPage() {
                     <span className="text-[10px] uppercase tracking-widest text-white/40">{group.items.length} Medien</span>
                   </div>
                 )}
-                <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-6 auto-rows-[7.5rem] sm:auto-rows-[8.5rem] lg:auto-rows-[9.5rem] grid-flow-dense gap-3">
-                  {group.items.map(({ item, index }, localIndex) => (
+                <div className="columns-2 sm:columns-3 xl:columns-4 gap-3">
+                  {group.items.map(({ item, index }) => (
                     <button
                       key={item.id}
                       onClick={() => setActive(index)}
                       data-testid={`gallery-photo-${index}`}
-                      className={`${pinboardTileClass(item, hasSections ? localIndex : index, dimensions)} min-h-0 overflow-hidden bg-[#0A0A0A] border border-white/5 hover:border-[#29B6E8]/45 transition group relative rounded-sm shadow-sm shadow-black/30 hover:-translate-y-0.5`}
+                      className="mb-3 block w-full break-inside-avoid overflow-hidden bg-[#0A0A0A] border border-white/5 hover:border-[#29B6E8]/45 transition group relative rounded-sm shadow-sm shadow-black/30 hover:-translate-y-0.5"
+                      style={{ aspectRatio: tileAspect(item, dimensions) }}
                       aria-label={isVideoLike(item) ? "Video öffnen" : "Bild öffnen"}
                     >
                       <GalleryTile item={item} onDimensions={rememberDimensions} />

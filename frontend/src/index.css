@@ -501,6 +501,75 @@ img, video, canvas, svg {
   }
 }
 
+/* ===== Rarity idle animations v2 — every level gets its own signature ===== */
+/* Bronze: warm ember glow */
+.tls-medal-bronze { animation: tls-ember 4.5s ease-in-out infinite; }
+@keyframes tls-ember {
+  0%, 100% { box-shadow: inset 0 0 6px rgba(205,127,50,0.12), 0 0 4px rgba(205,127,50,0.10); }
+  50% { box-shadow: inset 0 0 12px rgba(205,127,50,0.32), 0 0 11px rgba(205,127,50,0.30); }
+}
+/* Silver: slow metallic sheen sweep */
+.tls-medal-silver { position: relative; overflow: hidden; }
+.tls-medal-silver::after {
+  content: ""; position: absolute; top: 0; left: -90%; width: 55%; height: 100%;
+  background: linear-gradient(105deg, transparent, rgba(230,235,245,0.42), transparent);
+  transform: skewX(-16deg); animation: tls-medal-shine 4.8s ease-in-out infinite;
+}
+/* Orbiting spark satellites (gold+) */
+.tls-orbit { position: absolute; inset: -5px; pointer-events: none; animation: tls-spin var(--orbit-speed, 4s) linear infinite; }
+.tls-orbit > i {
+  position: absolute; top: -2px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 9999px;
+  background: var(--orbit-color, #FFD700);
+  box-shadow: 0 0 6px var(--orbit-color, #FFD700), 0 0 12px var(--orbit-color, #FFD700);
+}
+.tls-orbit--rev { animation-direction: reverse; inset: -8px; }
+/* Platinum: gentle levitation */
+.tls-float { animation: tls-float 3.4s ease-in-out infinite; }
+@keyframes tls-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+/* Legendary: flame flicker on the icon */
+.tls-flame { animation: tls-flame 1.6s ease-in-out infinite; }
+@keyframes tls-flame {
+  0%, 100% { filter: drop-shadow(0 0 4px #FF3B30) drop-shadow(0 0 8px rgba(255,215,0,0.5)); }
+  30% { filter: drop-shadow(0 0 7px #FF6A3D) drop-shadow(0 0 14px rgba(255,215,0,0.85)); }
+  60% { filter: drop-shadow(0 0 5px #FF3B30) drop-shadow(0 0 9px rgba(255,215,0,0.6)); }
+}
+/* "Fast geschafft!" — near-unlock shimmer + pulsing chip */
+.tls-near-fill {
+  background-image: linear-gradient(90deg, currentColor, rgba(255,255,255,0.9), currentColor);
+  background-size: 200% 100%;
+  animation: tls-account-progress-sheen 1.7s ease-in-out infinite;
+}
+.tls-near-chip { animation: tls-near-pulse 1.6s ease-in-out infinite; }
+@keyframes tls-near-pulse {
+  0%, 100% { opacity: 0.7; text-shadow: 0 0 4px currentColor; }
+  50% { opacity: 1; text-shadow: 0 0 11px currentColor; }
+}
+/* Notification bell shake on fresh arrivals */
+.tls-bell-shake { animation: tls-bell 0.9s cubic-bezier(0.36,0.07,0.19,0.97) 2; transform-origin: top center; }
+@keyframes tls-bell {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(16deg); }
+  30% { transform: rotate(-13deg); }
+  45% { transform: rotate(9deg); }
+  60% { transform: rotate(-6deg); }
+  75% { transform: rotate(3deg); }
+}
+/* Unlock ceremony rotating light beams */
+.tls-unlock-beams {
+  background: repeating-conic-gradient(from 0deg, transparent 0deg 14deg, var(--beam, rgba(255,215,0,0.06)) 14deg 22deg);
+  animation: tls-spin 16s linear infinite;
+}
+/* Level bar tip spark */
+.tls-bar-spark { animation: tls-spark-pulse 1.8s ease-in-out infinite; }
+@keyframes tls-spark-pulse {
+  0%, 100% { transform: translateY(-50%) scale(1); opacity: 0.85; }
+  50% { transform: translateY(-50%) scale(1.6); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tls-medal-bronze, .tls-medal-silver::after, .tls-orbit, .tls-float, .tls-flame,
+  .tls-near-fill, .tls-near-chip, .tls-bell-shake, .tls-unlock-beams, .tls-bar-spark { animation: none !important; }
+}
+
 .tls-maintenance-tape {
   position: absolute;
   inset: 0;

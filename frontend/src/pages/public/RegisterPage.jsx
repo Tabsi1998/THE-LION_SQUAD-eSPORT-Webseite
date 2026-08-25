@@ -12,6 +12,7 @@ import {
   AuthTextField,
 } from "@/components/tls/AuthFormFields";
 import { GoogleAuthButton } from "@/components/tls/GoogleAuthButton";
+import { GermanDateField } from "@/components/tls/GermanDateField";
 import { toast } from "sonner";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -187,7 +188,7 @@ export default function RegisterPage() {
 
           <div className="grid sm:grid-cols-2 gap-4">
             <AuthTextField id="register-discord" label="Discord" value={form.discord_name} onChange={set("discord_name")} autoComplete="off" description="Optional" />
-            <AuthTextField id="register-birth-date" label="Geburtsdatum" type="date" value={form.birth_date} onChange={set("birth_date")} autoComplete="bday" description="Optional" />
+            <GermanDateField id="register-birth-date" label="Geburtsdatum" value={form.birth_date} onChange={set("birth_date")} description="Optional" testId="register-birth-date" />
           </div>
           <AuthSelectField id="register-gender" label="Geschlecht" value={form.gender} onChange={set("gender")} description="Optional">
             <option value="">Keine Angabe</option>

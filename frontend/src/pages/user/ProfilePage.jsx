@@ -13,6 +13,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Save, Crown, User, Globe, Gamepad2, Eye, Medal, Users, Plus, Trash2, Pencil, Target, RefreshCw, Sparkles, Bell, Check, X, UserPlus, MessageSquare, Send, Search } from "lucide-react";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 import { AchievementUnlockOverlay } from "@/components/tls/AchievementUnlockOverlay";
+import { GermanDateField } from "@/components/tls/GermanDateField";
 
 const TABS = [
   { k: "basic", label: "Grunddaten", icon: User },
@@ -449,7 +450,7 @@ export default function ProfilePage() {
                 <textarea value={form.bio || ""} onChange={(e) => set("bio", e.target.value)} rows={4} data-testid="profile-bio" className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white" />
               </Field>
               <Row>
-                <Field label="Geburtsdatum"><input type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
+                <Field label="Geburtsdatum"><GermanDateField id="profile-birth-date" value={form.birth_date} onChange={(v) => set("birth_date", v)} testId="profile-birth-date" /></Field>
                 <Field label="Geschlecht"><select value={form.gender || ""} onChange={(e) => set("gender", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white">
                   {GENDER_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select></Field>

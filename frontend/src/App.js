@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/tls/ProtectedRoute";
 import { BrandingHead } from "@/components/tls/BrandingHead";
 import { ApiInvalidationBridge } from "@/components/tls/ApiInvalidationBridge";
 import { ScrollManager } from "@/components/tls/ScrollManager";
+import { AchievementCatchUp } from "@/components/tls/AchievementCatchUp";
 import { CookieConsentProvider } from "@/components/tls/CookieConsent";
 import { AnalyticsHead } from "@/components/tls/AnalyticsHead";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
@@ -153,6 +154,7 @@ function App() {
             <AnalyticsHead />
             <ApiInvalidationBridge />
             <ScrollManager />
+            <AchievementCatchUp />
             <Toaster theme="dark" position="top-right" richColors />
             <AppErrorBoundary>
             <BottomNav />
