@@ -68,12 +68,18 @@ class _Documents:
                     return before
         return None
 
-    async def update_one(self, query, update):
+    async def update_one(self, query, update, upsert=False):
         async with self.lock:
             for document in self.documents:
                 if self._matches(document, query):
-                    document.update(deepcopy(update["$set"]))
+                    document.update(deepcopy(update.get("$set", {})))
                     return SimpleNamespace(matched_count=1)
+            if upsert:
+                new_doc = {k: v for k, v in query.items() if not isinstance(v, dict)}
+                new_doc.update(deepcopy(update.get("$setOnInsert", {})))
+                new_doc.update(deepcopy(update.get("$set", {})))
+                self.documents.append(new_doc)
+                return SimpleNamespace(matched_count=0, upserted_id=new_doc.get("id"))
         return SimpleNamespace(matched_count=0)
 
     async def update_many(self, query, update):
@@ -202,7 +208,7 @@ def test_parallel_refresh_replays_return_one_deterministic_successor():
             "revoked": False,
             "expires_at": expiry,
         }])
-        db = SimpleNamespace(refresh_tokens=sessions, users=_Users(user))
+        db = SimpleNamespace(refresh_tokens=sessions, auth_sessions=_Documents(), users=_Users(user))
         request = _request(refresh=old_token)
 
         first, second = await asyncio.gather(
@@ -245,7 +251,7 @@ def test_legacy_refresh_token_is_migrated_into_a_session_family():
             "revoked": False,
             "expires_at": expiry,
         }])
-        db = SimpleNamespace(refresh_tokens=sessions, users=_Users(user))
+        db = SimpleNamespace(refresh_tokens=sessions, auth_sessions=_Documents(), users=_Users(user))
 
         _user, access, refresh = await _rotate_session(db, legacy_token, _request(refresh=legacy_token))
 
@@ -287,7 +293,7 @@ def test_refresh_reuse_outside_the_same_client_grace_revokes_only_that_family():
                 "expires_at": expiry,
             },
         ])
-        db = SimpleNamespace(refresh_tokens=sessions, users=_Users(user))
+        db = SimpleNamespace(refresh_tokens=sessions, auth_sessions=_Documents(), users=_Users(user))
         await _rotate_session(db, token, _request(refresh=token, user_agent="browser-a"))
 
         with pytest.raises(HTTPException) as exc:

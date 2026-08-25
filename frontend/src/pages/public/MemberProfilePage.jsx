@@ -5,7 +5,8 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
-import { AccountLevelPill, AccountLevelProgress, accountAvatarFrameClass, accountLevelFrameClass } from "@/components/tls/AccountLevel";
+import { AccountLevelPill, AccountLevelProgress, accountLevelFrameClass } from "@/components/tls/AccountLevel";
+import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { gameLabel } from "@/lib/gameLabels";
 import { seoTextPreview } from "@/lib/textPreview";
@@ -264,13 +265,13 @@ function LinkedAccountCard({ account }) {
         className={`mt-2 group block border ${accountLevelFrameClass(level)} bg-[#08151A] rounded-sm p-3 hover:border-[#29B6E8] hover:bg-[#0B1D24] transition`}
       >
         <div className="flex items-center gap-3">
-          <div className={`w-14 h-14 rounded-sm border ${accountAvatarFrameClass(level)} bg-[#0A0A0A] overflow-hidden shrink-0`}>
+          <LevelAvatarFrame level={level} compact className="w-14 h-14 shrink-0">
             {account.avatar_url ? (
               <img src={resolveMediaUrl(account.avatar_url)} alt="" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-white/25"><UserIcon className="w-6 h-6" /></div>
             )}
-          </div>
+          </LevelAvatarFrame>
           <div className="min-w-0 flex-1">
             <div className="font-heading font-black uppercase truncate text-white group-hover:text-[#29B6E8]">{account.display_name || account.username}</div>
             <div className="text-xs text-white/45 truncate">@{account.username}</div>

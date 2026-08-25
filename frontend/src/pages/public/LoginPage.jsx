@@ -68,7 +68,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center p-6 bg-grid">
       <div className="w-full max-w-md border border-white/10 rounded-sm bg-[#121212] p-8 md:p-10">
-        <div className="flex justify-center mb-8"><Logo size="md" /></div>
+        <div className="flex justify-center mb-8"><Logo size="xl" /></div>
         <h1 className="font-heading text-2xl font-black uppercase text-center">Login</h1>
         <p className="text-sm text-white/60 text-center mt-1">Willkommen bei THE LION SQUAD.</p>
 
