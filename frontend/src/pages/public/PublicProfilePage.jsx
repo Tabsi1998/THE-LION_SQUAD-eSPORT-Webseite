@@ -6,7 +6,8 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 import { StatusBadge } from "@/components/tls/StatusBadge";
-import { AccountLevelPill, AccountLevelProgress, accountLevelFrameClass, accountLevelAuraClass } from "@/components/tls/AccountLevel";
+import { AccountLevelPill, AccountLevelProgress } from "@/components/tls/AccountLevel";
+import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -270,8 +271,6 @@ export default function PublicProfilePage() {
   const level = profile.achievement_level || { level: s.level || 1, progress: 0, points: s.points || 0, next_level_points: 100 };
   const isPrivate = profile.privacy_public_profile === false;
   const joinedDate = profile.created_at ? new Date(profile.created_at) : null;
-  const avatarFrame = accountLevelFrameClass(level.level);
-  const avatarAura = accountLevelAuraClass(level.level);
   const twitchChannel = normalizeTwitchChannel(profile.twitch_handle);
   const twitchUrl = twitchChannel ? `https://www.twitch.tv/${twitchChannel}` : "";
   const liveStream = twitchChannel
@@ -342,16 +341,16 @@ export default function PublicProfilePage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
           <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Spieler", to: "/players" }, { label: profile.display_name || profile.username }]} className="mb-6" />
           <div className="flex flex-col md:flex-row gap-8 items-start">
-            <div className="shrink-0">
-              <div className={avatarAura}>
+            <div className="shrink-0 pt-7 pb-3">
+              <LevelAvatarFrame level={level.level} className="w-32 h-32 md:w-40 md:h-40" testId="profile-avatar-frame">
                 {profile.avatar_url ? (
-                  <img src={resolveMediaUrl(profile.avatar_url)} alt={profile.display_name} className={`relative z-[1] w-32 h-32 md:w-40 md:h-40 rounded-sm border-2 ${avatarFrame} object-cover`} />
+                  <img src={resolveMediaUrl(profile.avatar_url)} alt={profile.display_name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className={`relative z-[1] w-32 h-32 md:w-40 md:h-40 rounded-sm border-2 ${avatarFrame} bg-gradient-to-br from-[#29B6E8]/20 to-[#121212] flex items-center justify-center font-display font-black text-5xl text-[#29B6E8]`}>
+                  <div className="w-full h-full bg-gradient-to-br from-[#29B6E8]/20 to-[#121212] flex items-center justify-center font-display font-black text-5xl text-[#29B6E8]">
                     {(profile.display_name || profile.username || "?").slice(0, 2).toUpperCase()}
                   </div>
                 )}
-              </div>
+              </LevelAvatarFrame>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">

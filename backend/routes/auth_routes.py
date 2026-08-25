@@ -94,7 +94,7 @@ async def _store_session(
 ) -> tuple[str, str]:
     refresh = create_refresh_token(user["id"], token_id, family_id, expires_at)
     access = create_access_token(
-        user["id"], user["email"], user.get("role", "player"), token_id,
+        user["id"], user["email"], user.get("role", "player"), token_id, family_id,
     )
     user_agent, ip = _request_identity(request)
     document = {
@@ -117,6 +117,16 @@ async def _store_session(
         existing = await db.refresh_tokens.find_one({"jti": token_id})
         if not existing or existing.get("token_hash") != document["token_hash"] or existing.get("revoked") is True:
             raise HTTPException(status_code=401, detail="Invalid refresh token")
+    await _touch_auth_session(
+        db,
+        user_id=user["id"],
+        family_id=family_id,
+        token_id=token_id,
+        expires_at=expires_at,
+        user_agent=user_agent,
+        ip=ip,
+        client=client,
+    )
     return access, refresh
 
 
@@ -169,28 +179,84 @@ async def _issue_mobile_session(db, user: dict, request: Request) -> tuple[str, 
     return await _issue_tokens(db, user, request, client="mobile")
 
 
-def _within_rotation_grace(stored: dict, now: datetime) -> bool:
+def _ua_fingerprint(user_agent: str) -> tuple[str, str]:
+    """Coarse browser+OS fingerprint so minor UA mutations (Chrome UA reduction,
+    proxy rewrites) don't break the benign-refresh grace, while a different
+    browser/OS still counts as a different client."""
+    ua = (user_agent or "").lower()
+    browser = next((b for b in ("edg/", "opr/", "fxios", "firefox", "crios", "chrome", "safari") if b in ua), None)
+    os_name = next((o for o in ("windows", "android", "iphone", "ipad", "mac os", "linux") if o in ua), None)
+    if not browser and not os_name:
+        return (ua, "")
+    return (browser or "", os_name or "")
+
+
+def _within_rotation_grace(stored: dict, now: datetime, user_agent: str) -> bool:
     """Benign concurrent-refresh detection.
 
-    A refresh token that was JUST rotated (within the grace window) and has a
-    recorded replacement is a normal concurrent/duplicate refresh from the same
-    client (React StrictMode double-effects, parallel first-load requests, quick
-    retries). We must NOT treat this as token theft, otherwise the whole session
-    family gets revoked and the user is logged out immediately after login.
+    A refresh token that was JUST rotated (within the grace window) by the SAME
+    client (identical user agent) and has a recorded replacement is a normal
+    concurrent/duplicate refresh (React StrictMode double-effects, parallel
+    first-load requests, quick retries). We must NOT treat this as token theft,
+    otherwise the whole session family gets revoked and the user is logged out
+    immediately after login.
 
-    Genuine reuse (a token replayed long after rotation, or one that was revoked
-    for any reason other than a clean rotation) still falls through to revocation.
+    Genuine reuse (a token replayed long after rotation, from a different
+    client, or one that was revoked for any reason other than a clean rotation)
+    still falls through to revocation.
     """
     if stored.get("revocation_reason") not in (None, "rotated"):
         return False
     rotated_at = as_utc_datetime(stored.get("rotated_at"))
     if not rotated_at or now - rotated_at > timedelta(seconds=REFRESH_REPLAY_GRACE_SECONDS):
         return False
+    if _ua_fingerprint(stored.get("rotation_user_agent")) != _ua_fingerprint(user_agent):
+        return False
     return bool(
         stored.get("replacement_jti")
         and stored.get("replacement_id")
         and stored.get("replacement_expires_at")
     )
+
+
+async def _touch_auth_session(
+    db,
+    *,
+    user_id: str,
+    family_id: str,
+    token_id: str,
+    expires_at: datetime,
+    user_agent: str,
+    ip: str,
+    client: str | None = None,
+) -> None:
+    """Keep one device/session document per refresh-token family."""
+    update = {
+        "user_id": user_id,
+        "current_jti": token_id,
+        "last_active": now_utc(),
+        "expires_at": expires_at,
+        "user_agent": user_agent,
+        "ip": ip,
+    }
+    if client:
+        update["client"] = client
+    try:
+        await db.auth_sessions.update_one(
+            {"family_id": family_id},
+            {
+                "$set": update,
+                "$setOnInsert": {
+                    "id": new_id(),
+                    "family_id": family_id,
+                    "created_at": now_utc(),
+                    "revoked": False,
+                },
+            },
+            upsert=True,
+        )
+    except DuplicateKeyError:
+        await db.auth_sessions.update_one({"family_id": family_id}, {"$set": update})
 
 
 async def _revoke_refresh_family(db, user_id: str, family_id: str, reason: str):
@@ -201,6 +267,24 @@ async def _revoke_refresh_family(db, user_id: str, family_id: str, reason: str):
             "revoked_at": now_utc(),
             "revocation_reason": reason,
         }},
+    )
+    await db.auth_sessions.update_many(
+        {"user_id": user_id, "family_id": family_id, "revoked": {"$ne": True}},
+        {"$set": {
+            "revoked": True,
+            "revoked_at": now_utc(),
+            "revocation_reason": reason,
+        }},
+    )
+
+
+async def _revoke_all_auth_sessions(db, user_id: str, reason: str, *, exclude_family: str | None = None):
+    query = {"user_id": user_id, "revoked": {"$ne": True}}
+    if exclude_family:
+        query["family_id"] = {"$ne": exclude_family}
+    await db.auth_sessions.update_many(
+        query,
+        {"$set": {"revoked": True, "revoked_at": now_utc(), "revocation_reason": reason}},
     )
 
 
@@ -250,7 +334,7 @@ async def _rotate_session(
             "jti": token_id,
             "token_hash": hash_token(token),
         })
-        if not stored or not _within_rotation_grace(stored, now):
+        if not stored or not _within_rotation_grace(stored, now, user_agent):
             await _revoke_refresh_family(db, user_id, family_id, "refresh_reuse")
             raise HTTPException(status_code=401, detail="Invalid refresh token")
         replacement_jti = stored.get("replacement_jti")
@@ -290,6 +374,12 @@ async def _revoke_refresh(db, token: str):
         {"jti": token_id, "token_hash": hash_token(token)},
         {"$set": {"revoked": True, "revoked_at": now_utc()}},
     )
+    # A logout ends the whole device session (family), so lingering access
+    # tokens bound to this family die immediately too.
+    user_id = payload.get("sub")
+    family_id = payload.get("fid") or token_id
+    if user_id:
+        await _revoke_refresh_family(db, user_id, family_id, "logout")
 
 
 @router.post("/register")
@@ -675,6 +765,93 @@ async def refresh(request: Request, response: Response):
     return {"ok": True}
 
 
+async def _current_session_family(db, request: Request) -> str | None:
+    token = request.cookies.get("access_token")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+    if not token:
+        return None
+    try:
+        payload = _decode(token)
+    except HTTPException:
+        return None
+    family = payload.get("fam")
+    if family:
+        return family
+    sid = payload.get("sid")
+    if not sid:
+        return None
+    doc = await db.refresh_tokens.find_one({"jti": sid}, {"_id": 0, "family_id": 1})
+    return (doc or {}).get("family_id") or sid
+
+
+@router.get("/sessions")
+async def list_sessions(request: Request, user: dict = Depends(get_current_user)):
+    """Active sessions/devices of the current user."""
+    db = get_db()
+    current_family = await _current_session_family(db, request)
+    now = datetime.now(timezone.utc)
+    rows = await db.auth_sessions.find(
+        {"user_id": user["id"], "revoked": {"$ne": True}}, {"_id": 0}
+    ).sort("last_active", -1).to_list(100)
+    sessions = []
+    for row in rows:
+        expires_at = as_utc_datetime(row.get("expires_at"))
+        if expires_at and expires_at <= now:
+            continue
+        created_at = as_utc_datetime(row.get("created_at"))
+        last_active = as_utc_datetime(row.get("last_active"))
+        sessions.append({
+            "id": row.get("id"),
+            "created_at": created_at.isoformat() if created_at else None,
+            "last_active": last_active.isoformat() if last_active else None,
+            "user_agent": row.get("user_agent") or "",
+            "ip": row.get("ip") or "",
+            "client": row.get("client") or "web",
+            "current": bool(current_family and row.get("family_id") == current_family),
+        })
+    return sessions
+
+
+@router.delete("/sessions/{session_id}")
+async def revoke_session(session_id: str, request: Request, user: dict = Depends(get_current_user)):
+    """Log out a single device/session of the current user."""
+    db = get_db()
+    row = await db.auth_sessions.find_one({"id": session_id, "user_id": user["id"]}, {"_id": 0})
+    if not row:
+        raise HTTPException(status_code=404, detail="Sitzung nicht gefunden")
+    await _revoke_refresh_family(db, user["id"], row["family_id"], "user_revoked")
+    current_family = await _current_session_family(db, request)
+    return {"ok": True, "current": bool(current_family and row["family_id"] == current_family)}
+
+
+@router.post("/sessions/logout-all")
+async def logout_all_sessions(request: Request, user: dict = Depends(get_current_user)):
+    """Log out every other device; the current session stays alive."""
+    db = get_db()
+    current_family = await _current_session_family(db, request)
+    if not current_family:
+        raise HTTPException(status_code=400, detail="Aktuelle Sitzung konnte nicht bestimmt werden. Bitte neu einloggen.")
+    rows = await db.auth_sessions.find(
+        {"user_id": user["id"], "revoked": {"$ne": True}}, {"_id": 0, "family_id": 1}
+    ).to_list(500)
+    revoked = 0
+    for row in rows:
+        family_id = row.get("family_id")
+        if not family_id or family_id == current_family:
+            continue
+        await _revoke_refresh_family(db, user["id"], family_id, "user_revoked")
+        revoked += 1
+    # Sweep legacy refresh tokens that never got a session document.
+    await db.refresh_tokens.update_many(
+        {"user_id": user["id"], "revoked": {"$ne": True}, "family_id": {"$ne": current_family}},
+        {"$set": {"revoked": True, "revoked_at": now_utc(), "revocation_reason": "user_revoked"}},
+    )
+    return {"ok": True, "revoked_sessions": revoked}
+
+
 @router.post("/forgot-password")
 async def forgot_password(body: ForgotPasswordBody, request: Request):
     db = get_db()
@@ -727,6 +904,7 @@ async def reset_password(body: ResetPasswordBody, request: Request):
             "revocation_reason": "password_reset",
         }},
     )
+    await _revoke_all_auth_sessions(db, doc["user_id"], "password_reset")
     return {"ok": True}
 
 
@@ -749,4 +927,5 @@ async def change_password(body: ChangePasswordBody, user: dict = Depends(get_cur
             "revocation_reason": "password_change",
         }},
     )
+    await _revoke_all_auth_sessions(db, user["id"], "password_change")
     return {"ok": True}

@@ -3,6 +3,7 @@ import os
 import pathlib
 import logging
 import json
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from database import get_db
@@ -89,6 +90,40 @@ def _source_summary(key: str, label: str, href: str, *, total: int, problem_coun
         "tone": tone,
         "items": items,
     }
+
+
+@router.get("/growth-stats")
+async def growth_stats(days: int = 30, me: dict = Depends(require_admin())):
+    """Login + member growth for the dashboard mini chart (last N days)."""
+    days = max(7, min(int(days or 30), 90))
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    start = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    start_iso = start.isoformat()
+    login_rows = await db.refresh_tokens.aggregate([
+        {"$match": {"created_at": {"$gte": start, "$type": "date"}, "$expr": {"$eq": ["$family_id", "$jti"]}}},
+        {"$group": {"_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$created_at"}}, "count": {"$sum": 1}}},
+    ]).to_list(200)
+    user_rows = await db.users.aggregate([
+        {"$match": {"created_at": {"$gte": start_iso}}},
+        {"$group": {"_id": {"$substrBytes": ["$created_at", 0, 10]}, "count": {"$sum": 1}}},
+    ]).to_list(200)
+    base_users = await db.users.count_documents({"created_at": {"$lt": start_iso}})
+    logins_by_day = {row["_id"]: row["count"] for row in login_rows}
+    users_by_day = {row["_id"]: row["count"] for row in user_rows}
+    out = []
+    total = base_users
+    for i in range(days):
+        day = (start + timedelta(days=i)).strftime("%Y-%m-%d")
+        new_users = users_by_day.get(day, 0)
+        total += new_users
+        out.append({
+            "date": day,
+            "logins": logins_by_day.get(day, 0),
+            "new_users": new_users,
+            "total_users": total,
+        })
+    return {"days": out, "window_days": days}
 
 
 @router.get("/dashboard")

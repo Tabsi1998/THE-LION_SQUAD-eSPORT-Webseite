@@ -140,6 +140,10 @@ async def init_indexes():
     await db.refresh_tokens.create_index("user_id")
     await db.refresh_tokens.create_index([("family_id", 1), ("revoked", 1)])
     await db.refresh_tokens.create_index("expires_at", expireAfterSeconds=0)
+    await db.auth_sessions.create_index("family_id", unique=True)
+    await db.auth_sessions.create_index("id", unique=True)
+    await db.auth_sessions.create_index("user_id")
+    await db.auth_sessions.create_index("expires_at", expireAfterSeconds=0)
     # Phase 2/3 collections
     await db.settings.create_index("id", unique=True)
     await db.site_banners.create_index("id", unique=True)

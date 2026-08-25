@@ -13,6 +13,10 @@ JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_MINUTES = 60 * 12  # 12h
 REFRESH_TOKEN_DAYS = 14
 CSRF_TOKEN_BYTES = 32
+# Short grace so in-flight actions are not hard-killed mid-request by benign
+# security revocations (password reset / admin action). Theft & logout stay immediate.
+ACCESS_REVOCATION_GRACE_SECONDS = 30
+GRACEABLE_REVOCATION_REASONS = {"password_reset", "password_change", "admin_revoked"}
 
 # Hierarchy for role checks (higher number = more permissions)
 ROLE_LEVELS = {
@@ -40,7 +44,7 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-def create_access_token(user_id: str, email: str, role: str, session_id: str) -> str:
+def create_access_token(user_id: str, email: str, role: str, session_id: str, family_id: str | None = None) -> str:
     payload = {
         "sub": user_id,
         "email": email,
@@ -49,6 +53,8 @@ def create_access_token(user_id: str, email: str, role: str, session_id: str) ->
         "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_MINUTES),
         "type": "access",
     }
+    if family_id:
+        payload["fam"] = family_id
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
@@ -178,15 +184,42 @@ async def get_current_user(request: Request) -> dict:
     session_id = payload.get("sid")
     if not user_id or not session_id:
         raise HTTPException(status_code=401, detail="Session expired")
-    session = await db.refresh_tokens.find_one({
-        "jti": session_id,
-        "user_id": user_id,
-        "revoked": {"$ne": True},
-    }, {"_id": 0, "expires_at": 1})
-    if not session:
-        raise HTTPException(status_code=401, detail="Session expired")
-    expires_at = as_utc_datetime(session.get("expires_at"))
-    if expires_at and expires_at <= datetime.now(timezone.utc):
+    now = datetime.now(timezone.utc)
+    session_ok = False
+    family_id = payload.get("fam")
+    if family_id:
+        # New tokens validate against the family session document. Access tokens
+        # survive benign refresh rotations; only a real family revocation ends them.
+        session = await db.auth_sessions.find_one(
+            {"family_id": family_id, "user_id": user_id},
+            {"_id": 0, "revoked": 1, "revoked_at": 1, "revocation_reason": 1, "expires_at": 1},
+        )
+        if session:
+            expires_at = as_utc_datetime(session.get("expires_at"))
+            if not expires_at or expires_at > now:
+                if not session.get("revoked"):
+                    session_ok = True
+                else:
+                    reason = session.get("revocation_reason")
+                    revoked_at = as_utc_datetime(session.get("revoked_at"))
+                    if (
+                        reason in GRACEABLE_REVOCATION_REASONS
+                        and revoked_at
+                        and now - revoked_at <= timedelta(seconds=ACCESS_REVOCATION_GRACE_SECONDS)
+                    ):
+                        session_ok = True
+    else:
+        # Legacy tokens (issued before family sessions) keep the jti check.
+        legacy = await db.refresh_tokens.find_one({
+            "jti": session_id,
+            "user_id": user_id,
+            "revoked": {"$ne": True},
+        }, {"_id": 0, "expires_at": 1})
+        if legacy:
+            expires_at = as_utc_datetime(legacy.get("expires_at"))
+            if not expires_at or expires_at > now:
+                session_ok = True
+    if not session_ok:
         raise HTTPException(status_code=401, detail="Session expired")
     user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
     if not user:

@@ -44,8 +44,8 @@ export function Logo({ variant = "wordmark", size = "md", asLink = true, classNa
   const sizes = {
     sm: "h-8",
     md: "h-10",
-    lg: "h-14",
-    xl: "h-20",
+    lg: "h-12 md:h-14",
+    xl: "h-16 md:h-20",
   };
   const src = variant === "mascot"
     ? (branding.mascot_url || branding.logo_dark_url || branding.logo_url || TLS_MASCOT)
