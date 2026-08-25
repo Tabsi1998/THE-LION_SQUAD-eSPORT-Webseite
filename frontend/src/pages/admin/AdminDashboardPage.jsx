@@ -3,17 +3,61 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search } from "lucide-react";
+import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2 } from "lucide-react";
+
+function StatusDot({ ok }) {
+  const color = ok === true ? "#00FF88" : ok === false ? "#FF3B30" : "#FFD700";
+  return <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }} />;
+}
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
   const [setupStatus, setSetupStatus] = useState(null);
+  const [sys, setSys] = useState(null);
+  const [authFlags, setAuthFlags] = useState(null);
+  const [publicCfg, setPublicCfg] = useState(null);
+  const [refreshedAt, setRefreshedAt] = useState(null);
   const load = useCallback(() => {
-    api.get("/admin/dashboard").then(({ data }) => setData(data));
+    api.get("/admin/dashboard").then(({ data }) => { setData(data); setRefreshedAt(new Date()); });
     api.get("/setup/status").then(({ data }) => setSetupStatus(data)).catch(() => {});
+    api.get("/admin/system-status").then(({ data }) => setSys(data)).catch(() => {});
+    api.get("/settings/auth").then(({ data }) => setAuthFlags(data)).catch(() => {});
+    api.get("/settings/public").then(({ data }) => setPublicCfg(data)).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const id = window.setInterval(load, 30000);
+    return () => window.clearInterval(id);
+  }, [load]);
   useApiInvalidation(load);
+
+  const queuePending = Number(sys?.mail_queue?.pending || 0);
+  const queueFailed = Number(sys?.mail_queue?.failed || 0);
+  const liveChips = [
+    { label: "Datenbank", ok: sys?.database?.ok, detail: sys?.database?.ok ? "verbunden" : "Problem", icon: Database, to: "/admin/settings?tab=system" },
+    { label: "Mail / SMTP", ok: sys?.smtp?.ok, detail: sys?.smtp?.ok ? (sys?.smtp?.provider || "aktiv") : "nicht konfiguriert", icon: Mail, to: "/admin/settings?tab=smtp" },
+    { label: "Discord", ok: sys?.discord?.ok, detail: sys?.discord?.ok ? "aktiv" : "aus", icon: MessageSquare, to: "/admin/settings?tab=discord" },
+    { label: "Scheduler", ok: sys?.scheduler?.running, detail: sys?.scheduler?.running ? `${(sys?.scheduler?.jobs || []).length} Jobs` : "gestoppt", icon: Activity, to: "/admin/settings?tab=system" },
+    { label: "Mail-Queue", ok: queueFailed ? false : queuePending ? null : true, detail: `${queuePending} offen · ${queueFailed} Fehler`, icon: Server, to: "/admin/settings?tab=queue" },
+    { label: "Push-Tokens", ok: Number(data?.mobile_push?.active_tokens || 0) > 0 ? true : null, detail: `${data?.mobile_push?.active_tokens ?? 0} aktiv`, icon: BellRing, to: "/admin/mobile-push" },
+  ];
+
+  const onFlag = (v) => v === true ? "an" : v === false ? "aus" : "—";
+  const settingsHub = [
+    { label: "Login & Google", detail: authFlags ? `${onFlag(authFlags.google_login_enabled)} · Reg. ${onFlag(authFlags.registration_enabled)}` : "Login-Optionen", to: "/admin/settings?tab=auth", icon: LogIn, ok: authFlags ? (authFlags.password_login_enabled || authFlags.google_login_enabled) : undefined },
+    { label: "Branding", detail: publicCfg?.club_name || "Logo, Farben, Name", to: "/admin/settings?tab=brand", icon: Palette, ok: undefined },
+    { label: "E-Mail (Resend)", detail: sys?.smtp?.provider === "resend" && sys?.smtp?.ok ? "konfiguriert" : "prüfen", to: "/admin/settings?tab=email", icon: Mail, ok: sys?.smtp?.provider === "resend" ? sys?.smtp?.ok : undefined },
+    { label: "SMTP-Server", detail: sys?.smtp?.host || "eigener Mailserver", to: "/admin/settings?tab=smtp", icon: Server, ok: sys?.smtp?.provider === "smtp" ? sys?.smtp?.ok : undefined },
+    { label: "Newsletter", detail: "News & Event-Mails", to: "/admin/settings?tab=newsletter", icon: Mail, ok: undefined },
+    { label: "Discord", detail: sys?.discord?.ok ? "Webhook aktiv" : "nicht verbunden", to: "/admin/settings?tab=discord", icon: MessageSquare, ok: sys?.discord?.ok },
+    { label: "Twitch", detail: publicCfg?.twitch_channel ? `@${publicCfg.twitch_channel}` : "Live-Erkennung", to: "/admin/settings?tab=twitch", icon: Radio, ok: undefined },
+    { label: "Socials", detail: "Kanäle & Links", to: "/admin/settings?tab=socials", icon: Share2, ok: undefined },
+    { label: "SEO & Analytics", detail: publicCfg?.analytics_provider ? publicCfg.analytics_provider : "Tracking & IndexNow", to: "/admin/settings?tab=seo", icon: Search, ok: publicCfg?.analytics_provider ? true : undefined },
+    { label: "Rechtliches", detail: "Impressum & Datenschutz", to: "/admin/settings?tab=legal", icon: ShieldCheck, ok: undefined },
+    { label: "Navigation", detail: "Menüs steuern", to: "/admin/nav", icon: SettingsIcon, ok: undefined },
+    { label: "Systemstatus", detail: "Queue, Uploads, Scheduler", to: "/admin/settings?tab=system", icon: Activity, ok: undefined },
+  ];
+
 
   const kpis = [
     { label: "Spieler", value: data?.player_count, icon: UsersIcon, color: "#29B6E8" },
@@ -140,9 +184,36 @@ export default function AdminDashboardPage() {
 
   return (
     <AdminLayout>
-      <div className="mb-8">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Control Room</span>
-        <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Dashboard</h1>
+      <div className="mb-8 flex items-end justify-between gap-4">
+        <div>
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Control Room</span>
+          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Kommandozentrale</h1>
+        </div>
+        <button
+          type="button"
+          onClick={load}
+          data-testid="dashboard-refresh"
+          className="inline-flex items-center gap-2 rounded-sm border border-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-[#29B6E8]/50 hover:text-white transition"
+          title="Live-Zahlen aktualisieren"
+        >
+          <RefreshCw className="w-3.5 h-3.5 text-[#29B6E8]" />
+          {refreshedAt ? refreshedAt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "Aktualisieren"}
+        </button>
+      </div>
+
+      {/* Live system health strip */}
+      <div className="mb-6 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3" data-testid="dashboard-live-status">
+        {liveChips.map((c) => (
+          <Link key={c.label} to={c.to} className="border border-white/10 bg-[#121212] rounded-sm p-3 hover:border-[#29B6E8]/40 transition group">
+            <div className="flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/55">
+                <c.icon className="w-3.5 h-3.5 text-white/45 group-hover:text-[#29B6E8] transition" />{c.label}
+              </span>
+              <StatusDot ok={c.ok} />
+            </div>
+            <div className="mt-2 text-xs text-white/70 truncate">{c.detail}</div>
+          </Link>
+        ))}
       </div>
 
       {setupStatus && (!setupStatus.completed || (setupStatus.health_score || 0) < 100) && (
@@ -176,6 +247,28 @@ export default function AdminDashboardPage() {
             <div className="mt-3 font-display font-bold text-4xl text-white">{k.value ?? "—"}</div>
           </div>
         ))}
+      </div>
+
+      <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-settings-hub">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.28em] text-[#29B6E8] font-bold">Einstellungen-Zentrale</div>
+            <h2 className="font-heading font-bold uppercase text-lg mt-1">Alles konfigurieren</h2>
+          </div>
+          <Link to="/admin/settings" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Einstellungen</Link>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+          {settingsHub.map((s) => (
+            <Link key={s.label} to={s.to} data-testid={`settings-hub-${s.label}`} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 hover:border-[#29B6E8]/50 transition group">
+              <div className="flex items-center justify-between gap-2">
+                <s.icon className="w-4 h-4 text-[#29B6E8]" />
+                {s.ok !== undefined ? <StatusDot ok={s.ok} /> : <span className="text-[#29B6E8] opacity-0 group-hover:opacity-100 transition">→</span>}
+              </div>
+              <div className="mt-3 text-xs font-bold uppercase tracking-wider text-white">{s.label}</div>
+              <div className="mt-1 text-xs text-white/45 leading-relaxed truncate">{s.detail}</div>
+            </Link>
+          ))}
+        </div>
       </div>
 
       <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5">
