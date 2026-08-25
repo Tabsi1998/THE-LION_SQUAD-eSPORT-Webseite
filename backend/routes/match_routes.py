@@ -7,10 +7,12 @@ from database import get_db
 from auth import get_current_user, get_optional_user
 from services.visibility import user_can_see
 from services.tournament_permissions import (
+    CHECKIN_STAFF_ROLES,
     READ_STAFF_ROLES,
     RESULT_STAFF_ROLES,
     has_match_result_permission,
     has_tournament_staff_permission,
+    require_tournament_staff_permission,
 )
 from models import (
     MatchChatCreate,
@@ -952,6 +954,31 @@ async def get_match(match_id: str, user: dict | None = Depends(get_optional_user
 async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_current_user),
                        _mutation: None = Depends(_serialized_match_write)):
     db = get_db()
+    # Canonical, engine-aware update: multi-slot (v2) matches are updated in place
+    # for operational fields; scores/winners for v2 are set via POST /{id}/result.
+    v2_collection = getattr(db, "matches_v2", None)
+    v2_match = await v2_collection.find_one({"id": match_id}, {"_id": 0}) if v2_collection is not None else None
+    if v2_match:
+        await _ensure_match_tournament_unlocked(db, v2_match)
+        await require_tournament_staff_permission(
+            me, v2_match["tournament_id"], CHECKIN_STAFF_ROLES, "match", match_id
+        )
+        nullable_fields = {"scheduled_at", "station_id", "admin_note", "map", "best_of", "duration_minutes"}
+        raw = body.model_dump(exclude_unset=True)
+        for result_field in ("score_a", "score_b", "winner_id"):
+            raw.pop(result_field, None)
+        updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+        if "scheduled_at" in updates:
+            updates["scheduled_at"] = updates["scheduled_at"].isoformat() if updates["scheduled_at"] else None
+        if updates.get("scheduled_at") and v2_match.get("status") in {"pending", "ready", "preview"} and "status" not in updates:
+            updates["status"] = "scheduled"
+        await ensure_station_slot_available(db, v2_match, updates, "matches_v2")
+        if updates and all(v2_match.get(key) == value for key, value in updates.items()):
+            return {**v2_match, "idempotent_replay": True}
+        updates["updated_at"] = now_utc().isoformat()
+        await db.matches_v2.update_one({"id": match_id}, {"$set": updates})
+        updated = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+        return {**updated, "idempotent_replay": False}
     m = await db.matches.find_one({"id": match_id})
     if not m:
         raise HTTPException(status_code=404)

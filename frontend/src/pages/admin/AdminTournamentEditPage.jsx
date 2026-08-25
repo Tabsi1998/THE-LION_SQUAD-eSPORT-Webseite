@@ -7,6 +7,7 @@ import { BracketTree } from "@/components/tls/BracketTree";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
+import { TournamentFlowStepper } from "@/components/tls/TournamentFlowStepper";
 import { formatDateTime, fromDateTimeLocal, normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
@@ -229,9 +230,9 @@ export default function AdminTournamentEditPage() {
   const prompt = usePrompt();
 
   useEffect(() => {
-    const nextTab = searchParams.get("tab");
-    if (nextTab && nextTab !== tab) setTab(nextTab);
-  }, [searchParams, tab]);
+    const nextTab = searchParams.get("tab") || "participants";
+    if (nextTab !== tab) setTab(nextTab);
+  }, [searchParams]);
 
   const selectTab = (nextTab) => {
     setTab(nextTab);
@@ -541,7 +542,7 @@ export default function AdminTournamentEditPage() {
   };
   const updateMatchV2Schedule = async (match, payload) => {
     try {
-      await api.patch(`/matches-v2/${match.id}`, {
+      await api.patch(`/matches/${match.id}`, {
         scheduled_at: payload.scheduled_at ? fromDateTimeLocal(payload.scheduled_at) : null,
         duration_minutes: payload.duration_minutes === "" ? null : Number(payload.duration_minutes),
         station_id: payload.station_id || null,
@@ -555,7 +556,7 @@ export default function AdminTournamentEditPage() {
   const updateMatchV2Result = async (match, results, meta = {}) => {
     try {
       const suffix = meta.force ? "?force=true" : "";
-      await api.post(`/matches-v2/${match.id}/result${suffix}`, {
+      await api.post(`/matches/${match.id}/result${suffix}`, {
         results,
         proof_url: meta.proof_url || null,
         note: meta.note || null,
@@ -707,6 +708,14 @@ export default function AdminTournamentEditPage() {
       </div>
 
       {isAdmin && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister /></div>}
+
+      <TournamentFlowStepper
+        tournament={t}
+        registrations={regs}
+        bracket={bracket}
+        matchesV2={matchesV2}
+        onNavigate={(key) => selectTab(key)}
+      />
 
       <div className="flex gap-2 mb-5 border-b border-white/10 overflow-x-auto">
         {availableTabs.map(([s, label]) => (
