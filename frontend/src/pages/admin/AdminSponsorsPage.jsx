@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { GermanDateField } from "@/components/tls/GermanDateField";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -320,8 +321,8 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
               {CONTRACT_STATUSES.map((status) => <option key={status} value={status}>{CONTRACT_LABELS[status]}</option>)}
             </select>
           </label>
-          <Field label="Start" type="date" value={form.contract_start} onChange={(v) => set("contract_start", v)} testId="sponsor-contract-start" />
-          <Field label="Ende" type="date" value={form.contract_end} onChange={(v) => set("contract_end", v)} testId="sponsor-contract-end" />
+          <GermanDateField id="sponsor-contract-start" label="Start" value={(form.contract_start || "").slice(0, 10)} onChange={(v) => set("contract_start", v)} testId="sponsor-contract-start" allowFuture />
+          <GermanDateField id="sponsor-contract-end" label="Ende" value={(form.contract_end || "").slice(0, 10)} onChange={(v) => set("contract_end", v)} testId="sponsor-contract-end" allowFuture />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Field label="Ansprechpartner" value={form.contact_name} onChange={(v) => set("contact_name", v)} testId="sponsor-contact-name" />

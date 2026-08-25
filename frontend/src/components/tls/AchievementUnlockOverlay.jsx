@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import * as Icons from "lucide-react";
-import { Trophy, X } from "lucide-react";
+import { Trophy, X, Volume2, VolumeX } from "lucide-react";
+import { playUnlockSound, isSoundMuted, setSoundMuted } from "@/lib/unlockSounds";
 
 const LEVEL_META = {
   1: { name: "Bronze", color: "#CD7F32" },
@@ -35,9 +36,24 @@ const CONFETTI_COLORS = ["#29B6E8", "#FFD700", "#00FF88", "#FF3B30", "#A855F7"];
 export function AchievementUnlockOverlay({ tiers = [], onClose, heading, sub }) {
   const open = tiers && tiers.length > 0;
   const [paused, setPaused] = useState(false);
+  const [muted, setMuted] = useState(() => isSoundMuted());
   const maxLevel = useMemo(() => tiers.reduce((m, t) => Math.max(m, Number(t.level) || 1), 1), [tiers]);
   const R = RARITY[Math.min(5, Math.max(1, maxLevel))];
   const totalPoints = useMemo(() => tiers.reduce((sum, t) => sum + (Number(t.points) || 0), 0), [tiers]);
+
+  // Play the rarity-based unlock cue once when the ceremony opens.
+  useEffect(() => {
+    if (!open) return;
+    playUnlockSound(maxLevel);
+  }, [open, maxLevel]);
+
+  const toggleMute = (e) => {
+    e.stopPropagation();
+    const next = !muted;
+    setMuted(next);
+    setSoundMuted(next);
+    if (!next) playUnlockSound(maxLevel);
+  };
 
   const burst = useMemo(() => Array.from({ length: R.particles }, (_, i) => {
     const angle = (i / R.particles) * Math.PI * 2 + (i % 2) * 0.2;
@@ -130,6 +146,16 @@ export function AchievementUnlockOverlay({ tiers = [], onClose, heading, sub }) 
                 </div>
               )}
 
+              <button
+                type="button"
+                onClick={toggleMute}
+                data-testid="achievement-unlock-mute"
+                className="absolute top-3 right-12 text-white/40 hover:text-white z-10"
+                aria-label={muted ? "Ton einschalten" : "Ton ausschalten"}
+                title={muted ? "Ton einschalten" : "Ton ausschalten"}
+              >
+                {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              </button>
               <button
                 type="button"
                 onClick={onClose}

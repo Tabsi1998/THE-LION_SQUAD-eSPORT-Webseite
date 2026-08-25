@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { BootScreen } from "../screens/BootScreen";
+import { AchievementCatchUpOverlay } from "../components/AchievementCatchUpOverlay";
 import { LoginScreen } from "../screens/auth/LoginScreen";
 import { RegisterScreen } from "../screens/auth/RegisterScreen";
 import { DashboardScreen } from "../screens/main/DashboardScreen";
@@ -70,6 +71,7 @@ export function AppNavigator() {
     <NavigationContainer ref={navigationRef} theme={theme} onReady={flushPendingNotification}>
       {user ? <MainTabs /> : <AuthScreens />}
       {signedIn ? <NotificationBellOverlay /> : null}
+      {signedIn ? <AchievementCatchUpOverlay /> : null}
     </NavigationContainer>
   );
 }
