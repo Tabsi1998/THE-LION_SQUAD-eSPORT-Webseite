@@ -7,6 +7,9 @@ from dotenv import dotenv_values
 
 _env = dotenv_values("/app/frontend/.env")
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or _env.get("REACT_APP_BACKEND_URL") or "").rstrip("/")
+pytestmark = pytest.mark.live
+if not BASE_URL:
+    pytest.skip("REACT_APP_BACKEND_URL not configured; skipping live preview tests", allow_module_level=True)
 
 DEMO_EMAIL = "leon_king@demo.lionsquad.at"
 DEMO_PASSWORD = "DemoLion2026!!"

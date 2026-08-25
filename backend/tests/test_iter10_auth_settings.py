@@ -14,8 +14,9 @@ from dotenv import dotenv_values
 
 _env = dotenv_values("/app/frontend/.env")
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or _env.get("REACT_APP_BACKEND_URL") or "").rstrip("/")
+pytestmark = pytest.mark.live
 if not BASE_URL:
-    raise RuntimeError("REACT_APP_BACKEND_URL missing")
+    pytest.skip("REACT_APP_BACKEND_URL not configured; skipping live preview tests", allow_module_level=True)
 
 AUTH_KEYS = ["password_login_enabled", "registration_enabled", "google_login_enabled", "google_linking_enabled"]
 
