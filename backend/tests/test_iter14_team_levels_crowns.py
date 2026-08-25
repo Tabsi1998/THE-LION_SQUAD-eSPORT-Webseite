@@ -10,8 +10,9 @@ from dotenv import dotenv_values
 
 _env = dotenv_values("/app/frontend/.env")
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or _env.get("REACT_APP_BACKEND_URL") or "").rstrip("/")
+pytestmark = pytest.mark.live
 if not BASE_URL:
-    raise RuntimeError("REACT_APP_BACKEND_URL missing")
+    pytest.skip("REACT_APP_BACKEND_URL not configured; skipping live preview tests", allow_module_level=True)
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) TLSIter14Agent/1.0"
 DEMO_PASSWORD = "DemoLion2026!!"
