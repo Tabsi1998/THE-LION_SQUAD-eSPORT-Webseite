@@ -115,6 +115,38 @@ async def achievements_leaderboard(limit: int = 24, viewer: dict | None = Depend
     return rows[:capped]
 
 
+_CROWNS_CACHE: dict = {"at": None, "data": None}
+_CROWNS_TTL_SECONDS = 60
+
+
+@router.get("/crowns")
+async def achievement_crowns():
+    """Dynamic crowns: best three non-obsidian players get gold/silver/bronze,
+    players at level 30+ (points curve from user_routes._achievement_level)
+    get the obsidian crown."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    cached_at = _CROWNS_CACHE["at"]
+    if cached_at and (now - cached_at).total_seconds() < _CROWNS_TTL_SECONDS and _CROWNS_CACHE["data"] is not None:
+        return {"crowns": _CROWNS_CACHE["data"]}
+    rows = await achievements_leaderboard(limit=100, viewer=None)
+    crowns: dict[str, str] = {}
+    obsidian_floor = 29 * 29 * 100  # points needed for level 30
+    for row in rows:
+        if int(row.get("points", 0)) >= obsidian_floor:
+            crowns[row["user_id"]] = "obsidian"
+    rank_variants = ["gold", "silver", "bronze"]
+    for row in rows:
+        if not rank_variants:
+            break
+        if crowns.get(row["user_id"]) == "obsidian":
+            continue
+        crowns[row["user_id"]] = rank_variants.pop(0)
+    _CROWNS_CACHE["at"] = now
+    _CROWNS_CACHE["data"] = crowns
+    return {"crowns": crowns}
+
+
 # ============ Admin CRUD ============
 admin_router = APIRouter(prefix="/api/admin/achievements", tags=["achievements-admin"])
 
