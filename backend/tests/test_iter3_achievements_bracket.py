@@ -15,10 +15,12 @@ import pytest
 import requests
 from dotenv import dotenv_values
 
+pytestmark = pytest.mark.live
+
 frontend_env = dotenv_values("/app/frontend/.env")
 base_url = os.environ.get("REACT_APP_BACKEND_URL") or frontend_env.get("REACT_APP_BACKEND_URL")
 if not base_url:
-    raise RuntimeError("REACT_APP_BACKEND_URL missing")
+    pytest.skip("REACT_APP_BACKEND_URL not configured; skipping live preview tests", allow_module_level=True)
 BASE_URL = base_url.rstrip("/")
 
 MK_TOURNAMENT_ID = "ed1ec3cb-08b8-4ea3-8cd1-3da539e3a90f"

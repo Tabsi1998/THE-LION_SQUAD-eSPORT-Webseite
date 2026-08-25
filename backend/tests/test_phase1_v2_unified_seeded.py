@@ -12,11 +12,13 @@ import requests
 from dotenv import dotenv_values
 from motor.motor_asyncio import AsyncIOMotorClient
 
+pytestmark = pytest.mark.live
+
 frontend_env = dotenv_values("/app/frontend/.env")
 backend_env = dotenv_values("/app/backend/.env")
 _base = os.environ.get("REACT_APP_BACKEND_URL") or frontend_env.get("REACT_APP_BACKEND_URL")
 if not _base:
-    raise RuntimeError("REACT_APP_BACKEND_URL missing")
+    pytest.skip("REACT_APP_BACKEND_URL not configured; skipping live preview tests", allow_module_level=True)
 BASE_URL = _base.rstrip("/")
 MONGO_URL = os.environ.get("MONGO_URL") or backend_env.get("MONGO_URL")
 DB_NAME = os.environ.get("DB_NAME") or backend_env.get("DB_NAME")
