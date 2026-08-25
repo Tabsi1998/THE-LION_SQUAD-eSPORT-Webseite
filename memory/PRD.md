@@ -127,3 +127,8 @@ Getestet: iteration_10.json (Backend 100%, Frontend 100%) + Mobile typecheck/pre
 - OFFEN: Echter Google-OAuth E2E (Prod-Domain), **Mobile Google-Login** (expo-web-browser Deep-Link-Flow +
   mobile Session-Exchange, im Preview nicht testbar → nächster Mobile-Schritt), echter EAS/Store-Build (User-Zugang/Geräte).
   audit:ci schlägt fehl (ruft `npm audit` in yarn-Projekt — Umgebungsquirk, kein Codefehler).
+
+## Nachtrag: Admin-Dashboard = Kommandozentrale (AdminDashboardPage.jsx, verifiziert per Screenshot)
+- Live-System-Leiste (Ampel-Punkte) aus /admin/system-status: Datenbank, Mail/SMTP, Discord, Scheduler, Mail-Queue, Push-Tokens.
+- „Einstellungen-Zentrale": Direktlinks zu allen Settings-Tabs (inkl. Login & Google) mit Live-Status aus /settings/auth + /settings/public + system-status.
+- 30-Sekunden-Auto-Refresh + manueller Refresh-Button mit Zeitstempel. KPIs/Aufgaben/Audit-Logs bleiben erhalten.
