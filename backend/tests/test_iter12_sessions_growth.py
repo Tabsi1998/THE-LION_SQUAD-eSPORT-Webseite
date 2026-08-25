@@ -1,6 +1,7 @@
 """Iteration 12: active sessions/devices API, access-token decoupling,
 logout-all / single revoke, growth-stats, video upload recheck."""
 import concurrent.futures
+import logging
 import os
 import re
 from pathlib import Path
@@ -8,6 +9,8 @@ from pathlib import Path
 import pytest
 import requests
 from dotenv import dotenv_values
+
+logger = logging.getLogger(__name__)
 
 _env = dotenv_values("/app/frontend/.env")
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or _env.get("REACT_APP_BACKEND_URL") or "").rstrip("/")
@@ -71,7 +74,7 @@ def admin_a():
     try:
         s.post(f"{BASE_URL}/api/auth/logout", headers=csrf_headers(s), timeout=30)
     except Exception:
-        pass
+        logger.debug("Best-effort fixture logout failed", exc_info=True)
 
 
 # --- Sessions listing ---

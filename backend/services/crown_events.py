@@ -13,7 +13,7 @@ OBSIDIAN_FLOOR = 29 * 29 * 100
 
 _cache: dict = {"at": None, "data": None}
 _CACHE_TTL = 30
-_sync_pending = False
+_sync_state = {"pending": False}
 
 
 async def _points_rows() -> list[dict]:
@@ -149,22 +149,20 @@ async def get_crowns(force: bool = False) -> dict[str, str]:
 
 def schedule_crown_sync() -> None:
     """Debounced fire-and-forget crown recompute + transition notifications."""
-    global _sync_pending
-    if _sync_pending:
+    if _sync_state["pending"]:
         return
 
     async def run():
-        global _sync_pending
         try:
             await asyncio.sleep(2)
             await get_crowns(force=True)
         except Exception as e:
             logger.debug(f"crown sync skipped: {e}")
         finally:
-            _sync_pending = False
+            _sync_state["pending"] = False
 
     try:
         asyncio.get_running_loop().create_task(run())
-        _sync_pending = True
+        _sync_state["pending"] = True
     except RuntimeError:
-        pass
+        logger.debug("crown sync not scheduled because no event loop is running")
