@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { refreshCrowns } from "@/components/tls/LevelAvatarFrame";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 const TABS = [
@@ -24,6 +25,30 @@ function notificationDate(value) {
 
 function isExternalUrl(url) {
   return /^https?:\/\//i.test(String(url || ""));
+}
+
+const CROWN_KINDS = new Set(["crown_gained", "crown_lost", "crown_changed"]);
+
+function handleCrownNotifications(rows, userId) {
+  const crownRows = rows.filter((item) => !item.read && CROWN_KINDS.has(item.kind));
+  if (!crownRows.length) return;
+  let seen = [];
+  try { seen = JSON.parse(localStorage.getItem("tls-crowns-celebrated") || "[]"); } catch {}
+  const fresh = crownRows.filter((item) => item.kind === "crown_gained" && item.id && !seen.includes(item.id));
+  refreshCrowns().then((crowns) => {
+    if (!fresh.length) return;
+    const current = userId ? (crowns || {})[userId] : null;
+    fresh.forEach((item) => {
+      seen.push(item.id);
+      // only celebrate if the user still holds a crown right now (skip stale wins)
+      if (!current) return;
+      const variant = ["gold", "silver", "bronze"].includes(current) ? current : (item.meta?.variant || "gold");
+      window.dispatchEvent(new CustomEvent("tls-crown-celebration", {
+        detail: { id: item.id, variant, title: item.title, body: item.body },
+      }));
+    });
+    try { localStorage.setItem("tls-crowns-celebrated", JSON.stringify(seen.slice(-50))); } catch {}
+  });
 }
 
 export function NotificationBell() {
@@ -57,6 +82,7 @@ export function NotificationBell() {
       const { data } = await api.get("/admin/notifications");
       const rows = Array.isArray(data) ? data : [];
       setItems(rows);
+      handleCrownNotifications(rows, user?.id);
       if (didPrimeRef.current) {
         const freshRows = rows.filter((item) => !item.read && item.id && !knownIdsRef.current.has(item.id));
         if (freshRows.length) {

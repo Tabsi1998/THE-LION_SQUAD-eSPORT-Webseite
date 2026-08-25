@@ -18,6 +18,7 @@ from badges import seed_badges
 from routes.auth_routes import router as auth_router
 from routes.user_routes import router as user_router
 from routes.team_routes import router as team_router
+from routes.team_level_routes import router as team_level_router
 from routes.message_routes import router as message_router
 from routes.friend_routes import router as friend_router
 from routes.game_routes import router as game_router
@@ -187,6 +188,7 @@ else:
 # Include all routers
 app.include_router(auth_router)
 app.include_router(user_router)
+app.include_router(team_level_router)
 app.include_router(team_router)
 app.include_router(message_router)
 app.include_router(friend_router)

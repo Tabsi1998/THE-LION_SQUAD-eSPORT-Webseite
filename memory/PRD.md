@@ -187,3 +187,29 @@ Getestet: iteration_10.json (Backend 100%, Frontend 100%) + Mobile typecheck/pre
   frontend restart löst es.
 - NÄCHSTER GROSSER BAUSTEIN (User-Wunsch): **Team-Level-System** — Teamlevel, Team-Achievements, Freischaltungen,
   Team-Rahmen/Animationen analog zum Spieler-System.
+
+## SESSION Juni 2026 (Fork 3) — Rahmen v3 (30 Archetypen), Team-Level-System, Kronen-Wechsel-Feier (getestet: iteration_14.json Backend 100% + Frontend 100%; Pytest 519 passed)
+- **LevelAvatarFrame v3 (Archetypen)**: LEVEL_ARCHETYPES — jedes Level 1-30 hat einen BENANNTEN Archetyp mit eigener
+  Geometrie (Rookie, Puls, Fokus, Radar, Scanline, Komet, Rotor, Arkanum, Hex-Schild, Doppelhelix, Glitch-Core, Gold-Zirkel,
+  Sternenstaub, Solar-Flare, Krongold, Blutmond, Sturmjäger, Inferno, Neon-Raser, Magma, Plasma, Vortex, Nachtklinge, Frost,
+  Diamant, Toxin, Aurora, Quantum, Galaxis, Apex). 16 neue CSS-Primitives in index.css: reticle, radar, comet, runes, hexa,
+  rgb-split, rise/fall-Partikel, flare, eclipse, speed, plasma, vortex, aurora, prism, shake. data-archetype am Frame.
+  Kronen v3: 96px (vorher 72), Drop-Entrance, rotierende Strahlen (tls-lvf-crown-rays). prefers-reduced-motion erweitert.
+- **Team-Level-System** (services/team_levels.py + routes/team_level_routes.py, Router VOR team_routes registriert!):
+  Punkte = Summe Mitglieder-Achievement-Punkte + 100/Turnierteilnahme + 500/Sieg (winner_team_id). Gleiche Level-Kurve wie
+  Spieler. 12 dynamisch evaluierte Team-Achievements (Gegründet, Trio, Full Squad, Punkte 500/2500/10000, Turnier 1/3,
+  Champions, Level 5/10/20). GET /api/teams/levels + GET /api/teams/{id}/level (60s Cache). Frontend: TeamCard mit
+  team-frame-{TAG} + team-level-chip-{TAG}; TeamDetail mit team-detail-frame, TeamLevelPanel (Progress, Breakdown,
+  Achievements-Grid mit data-earned).
+- **Kronen-Wechsel-Feier** (services/crown_events.py): persistierter crown_state (id=current, holders, version) mit
+  optimistischem Versions-Update (race-safe). Transitionen → Notifications crown_gained/crown_lost/crown_changed mit
+  dedupe_key crown-v{version}-{user_id}. schedule_crown_sync (2s debounce) gehookt in badges.award_achievement + Admin-Revoke.
+  Frontend: NotificationBell erkennt unread crown_gained → prüft via refreshCrowns ob User die Krone AKTUELL hält (keine
+  Stale-Feier) → CustomEvent tls-crown-celebration → CrownCelebration-Overlay (PublicLayout) mit 90 CSS-Konfetti,
+  Riesenkrone + Strahlen, localStorage tls-crowns-celebrated verhindert Wiederholung. Kronen refreshen live ohne Reload.
+- **Bugfix (vom Testing-Agent)**: badges.award_achievement Race → DuplicateKeyError → 500 auf /api/users/me/profile-completeness;
+  jetzt try/except DuplicateKeyError → return False. Concurrency-Test in tests/test_iter14_team_levels_crowns.py.
+- Datenhygiene: 3 TESTreg*-Accounts + Sessions entfernt; temporäre Test-Tiers restlos aufgeräumt.
+- HINWEIS: crown_events-Cache ist prozess-lokal (30s TTL) — bei >1 Uvicorn-Worker auf DB-Cache umstellen.
+- E2E selbst verifiziert: Transition hin+zurück (genau 4 Notifications, idempotent), Overlay bei neo_drift (Bronze) ja /
+  Reload nein / leon_king (stale, keine Krone) nein.
