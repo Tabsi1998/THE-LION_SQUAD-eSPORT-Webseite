@@ -13,6 +13,7 @@ import {
 } from "@/components/tls/AuthFormFields";
 import { GoogleAuthButton } from "@/components/tls/GoogleAuthButton";
 import { GermanDateField } from "@/components/tls/GermanDateField";
+import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { toast } from "sonner";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -39,6 +40,7 @@ export default function RegisterPage() {
   );
 
   const { register } = useAuth();
+  const settings = usePublicSiteSettings();
   const nav = useNavigate();
   const [form, setForm] = useState({
     username: "",
@@ -124,6 +126,23 @@ export default function RegisterPage() {
   };
 
   const pwStrength = getPasswordStrength(form.password);
+
+  if (settings.registration_enabled === false) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center p-6 bg-grid">
+        <div className="w-full max-w-md border border-white/10 rounded-sm bg-[#121212] p-8 md:p-10 text-center" data-testid="registration-closed">
+          <div className="flex justify-center mb-8"><Logo size="md" /></div>
+          <h1 className="font-heading text-2xl font-black uppercase">Registrierung geschlossen</h1>
+          <p className="text-sm text-white/60 mt-3">
+            Aktuell sind keine neuen Registrierungen möglich. Schau bald wieder vorbei oder melde dich mit einem bestehenden Account an.
+          </p>
+          <Link to="/login" className="inline-block mt-6 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition" data-testid="registration-closed-login">
+            Zum Login
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center p-6 bg-grid">

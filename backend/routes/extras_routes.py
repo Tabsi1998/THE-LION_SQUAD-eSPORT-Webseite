@@ -18,6 +18,7 @@ from services.competition_privacy import registration_match_snapshot
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import standings_for_structure
 from services.public_site_settings import PUBLIC_LEGAL_SOURCE_FIELDS, build_public_legal_settings
+from services.auth_settings import load_auth_settings
 from models import now_utc, new_id
 from email_service import send_template, _get_email_config
 from pdf_service import (
@@ -234,6 +235,13 @@ class DiscordSettings(BaseModel):
     username: Optional[str] = None
     avatar_url: Optional[str] = None
     enabled: bool = True
+
+
+class AuthSettings(BaseModel):
+    password_login_enabled: Optional[bool] = None
+    registration_enabled: Optional[bool] = None
+    google_login_enabled: Optional[bool] = None
+    google_linking_enabled: Optional[bool] = None
 
 
 SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "webhook_url", "twitch_client_secret"}
@@ -573,6 +581,7 @@ async def public_settings(response: Response):
         "tiktok_url": b.get("tiktok_url") or "https://www.tiktok.com/@thelionsquadesports",
         "youtube_url": b.get("youtube_url") or "https://www.youtube.com/@TheLionSquadeSports",
         "social_links": _social_links_from_branding(b),
+        **(await load_auth_settings(db)),
     }
 
 
@@ -968,6 +977,32 @@ async def update_branding(body: BrandingSettings, me: dict = Depends(require_adm
     await _audit_settings_change(db, "settings.branding.update", "branding", me["id"], changed_fields)
     saved = await db.settings.find_one({"id": "branding"}, {"_id": 0})
     return _hide_branding_secrets(saved) if saved else {"ok": True}
+
+
+@settings_router.get("/auth")
+async def get_auth_settings(response: Response, me: dict = Depends(require_admin())):
+    """Central login & Google configuration for the admin area."""
+    response.headers["Cache-Control"] = "no-store"
+    db = get_db()
+    return await load_auth_settings(db)
+
+
+@settings_router.put("/auth")
+async def update_auth_settings(body: AuthSettings, me: dict = Depends(require_admin())):
+    db = get_db()
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if isinstance(v, bool)}
+    if not updates:
+        return await load_auth_settings(db)
+    current = await db.settings.find_one({"id": "auth"}, {"_id": 0}) or {}
+    changed_fields = _changed_setting_fields(current, updates)
+    if not changed_fields:
+        return await load_auth_settings(db)
+    updates["updated_at"] = now_utc().isoformat()
+    await db.settings.update_one(
+        {"id": "auth"}, {"$set": updates, "$setOnInsert": {"id": "auth"}}, upsert=True,
+    )
+    await _audit_settings_change(db, "settings.auth.update", "auth", me["id"], changed_fields)
+    return await load_auth_settings(db)
 
 
 @settings_router.post("/indexnow/submit")

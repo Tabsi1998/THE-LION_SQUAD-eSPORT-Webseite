@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { GermanDateField } from "@/components/tls/GermanDateField";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -143,8 +144,8 @@ function BenefitModal({ benefit, meta, onClose, onSaved }) {
           <ImageUpload value={form.image_url} onChange={(v) => set("image_url", v)} label="Bild" testId="benefit-image" variant="wide" allowLibrary />
           <Field label="Link URL"><input value={form.link_url} onChange={(e) => set("link_url", e.target.value)} placeholder="https://…" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Gültig von"><input type="date" value={form.valid_from?.slice(0, 10) || ""} onChange={(e) => set("valid_from", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-            <Field label="Gültig bis"><input type="date" value={form.valid_until?.slice(0, 10) || ""} onChange={(e) => set("valid_until", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
+            <Field label="Gültig von"><GermanDateField id="benefit-valid-from" value={form.valid_from?.slice(0, 10) || ""} onChange={(v) => set("valid_from", v)} testId="benefit-valid-from" allowFuture /></Field>
+            <Field label="Gültig bis"><GermanDateField id="benefit-valid-until" value={form.valid_until?.slice(0, 10) || ""} onChange={(v) => set("valid_until", v)} testId="benefit-valid-until" allowFuture /></Field>
           </div>
           <Field label="Sichtbar für Mitgliedsarten (leer = alle)">
             <div className="flex flex-wrap gap-2">

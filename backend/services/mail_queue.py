@@ -595,7 +595,7 @@ async def mail_queue_stats() -> dict:
     )
     next_pending = await db.mail_jobs.find_one(
         {"status": "pending"},
-        {"_id": 0, "html": 0, "id": 1, "to": 1, "template_key": 1, "next_attempt_at": 1},
+        {"_id": 0, "id": 1, "to": 1, "template_key": 1, "next_attempt_at": 1},
         sort=[("next_attempt_at", 1)],
     )
     return {

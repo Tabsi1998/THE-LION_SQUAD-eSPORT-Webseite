@@ -1,4 +1,5 @@
 import { startGoogleLogin } from "@/context/AuthContext";
+import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 
 // Official Google "G" mark.
 function GoogleG({ className = "w-5 h-5" }) {
@@ -10,6 +11,8 @@ function GoogleG({ className = "w-5 h-5" }) {
 }
 
 export function GoogleAuthButton({ label = "Mit Google fortfahren", returnPath = "/dashboard" }) {
+  const settings = usePublicSiteSettings();
+  if (settings.google_login_enabled === false) return null;
   return (
     <div className="mt-5" data-testid="google-auth-block">
       <div className="flex items-center gap-3 my-4">

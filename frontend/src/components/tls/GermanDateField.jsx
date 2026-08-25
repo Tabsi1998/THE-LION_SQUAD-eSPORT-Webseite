@@ -26,17 +26,19 @@ export function GermanDateField({
   error,
   required = false,
   minYear = 1930,
-  maxYear = new Date().getFullYear(),
+  maxYear = null,
+  allowFuture = false,
   testId,
 }) {
   const [open, setOpen] = useState(false);
   const selected = parseIso(value);
-  const [view, setView] = useState(() => selected ? { year: selected.year, month: selected.month } : { year: 2000, month: 0 });
+  const [view, setView] = useState(() => selected ? { year: selected.year, month: selected.month } : { year: new Date().getFullYear(), month: new Date().getMonth() });
 
   const today = new Date();
   const todayIso = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  const effMaxYear = maxYear ?? (allowFuture ? today.getFullYear() + 10 : today.getFullYear());
   const years = [];
-  for (let y = maxYear; y >= minYear; y--) years.push(y);
+  for (let y = effMaxYear; y >= minYear; y--) years.push(y);
 
   const firstWeekday = (new Date(view.year, view.month, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(view.year, view.month + 1, 0).getDate();
@@ -48,7 +50,7 @@ export function GermanDateField({
       let year = v.year;
       if (month < 0) { month = 11; year -= 1; }
       if (month > 11) { month = 0; year += 1; }
-      if (year < minYear || year > maxYear) return v;
+      if (year < minYear || year > effMaxYear) return v;
       return { year, month };
     });
   };
@@ -160,7 +162,7 @@ export function GermanDateField({
                 const iso = `${view.year}-${pad(view.month + 1)}-${pad(day)}`;
                 const isSelected = value === iso;
                 const isToday = iso === todayIso;
-                const isFuture = iso > todayIso;
+                const isFuture = !allowFuture && iso > todayIso;
                 return (
                   <button
                     key={iso}
