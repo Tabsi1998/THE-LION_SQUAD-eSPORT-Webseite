@@ -5,7 +5,8 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Search, Crown } from "lucide-react";
-import { AccountLevelPill, accountAvatarFrameClass, accountLevelFrameClass } from "@/components/tls/AccountLevel";
+import { AccountLevelPill, accountLevelFrameClass } from "@/components/tls/AccountLevel";
+import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
 
 const PAGE_SIZE = 48;
 
@@ -96,13 +97,15 @@ export default function PlayersPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <div className={`w-12 h-12 rounded-sm border ${accountAvatarFrameClass(accountLevel, isMember)} bg-[#0A0A0A] flex items-center justify-center overflow-hidden`}>
+                        <LevelAvatarFrame level={accountLevel} compact className="w-12 h-12">
                           {p.avatar_url ? (
                             <img src={resolveMediaUrl(p.avatar_url)} alt={p.display_name} className="w-full h-full object-cover" />
                           ) : (
-                            <span className={`font-heading font-black ${isMember ? "text-[#FFD700]" : "text-white/40"}`}>{(p.display_name || p.username)[0]}</span>
+                            <div className="w-full h-full flex items-center justify-center">
+                              <span className={`font-heading font-black ${isMember ? "text-[#FFD700]" : "text-white/40"}`}>{(p.display_name || p.username)[0]}</span>
+                            </div>
                           )}
-                        </div>
+                        </LevelAvatarFrame>
                         {p.profile_completeness != null && (
                           <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#0A0A0A] border border-white/20 flex items-center justify-center" title={`Profil ${p.profile_completeness}% komplett`}>
                             <span className="text-[8px] font-bold tabular-nums text-white/70">{p.profile_completeness}</span>

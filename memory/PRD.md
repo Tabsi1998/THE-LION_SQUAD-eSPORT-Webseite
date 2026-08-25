@@ -142,3 +142,27 @@ Getestet: iteration_10.json (Backend 100%, Frontend 100%) + Mobile typecheck/pre
   ein innerhalb REFRESH_REPLAY_GRACE_SECONDS (10s) sauber rotierter Token mit vorhandenem Replacement gilt als
   gutartiger Nebenläufigkeits-Refresh → gibt dieselben Replacement-Tokens idempotent zurück (200), OHNE Familie zu
   widerrufen. Echter Reuse (>10s oder anderer revocation_reason) widerruft weiterhin (Theft-Detection erhalten).
+
+## SESSION Juni 2026 (Fork 2) — Level-Rahmen, Session-Härtung, Sitzungen-UI, Wachstumsgraph, Logos (getestet: iteration_12.json, Backend 100% 17/17 + 25/25 Regression, Frontend 100%; Pytest gesamt 484+)
+- **LevelAvatarFrame** (components/tls/LevelAvatarFrame.jsx + CSS-Block „Level Avatar Frames" in index.css):
+  ~25 eskalierende Rahmen-Stufen pro exaktem Level — Glow(1-2) → Grün-Puls(3-4) → Blau-Sweep(5-7) → Lila-Aura/Orbits(8-11)
+  → Gold-Laser(12-15) → Rot-Blitzsturm(16-19) → KRONEN: Bronze(20-21), Silber(22-23), Gold(24), MAX ab 25 = Obsidian-Krone
+  in TLS-Blau mit vollem Sturm (Dual-Ring, Laser, 6 Blitze, Puls). LVL-Badge unten, compact-Variante für Karten.
+  Eingebaut: PublicProfilePage (Hero, testid profile-avatar-frame), PlayersPage + MemberProfilePage (compact).
+  Visuell verifiziert für Level 10/20/25 (Kronen ok). @property-basierte Conic-Rotation, prefers-reduced-motion beachtet.
+- **Session-Härtung**: Neue Collection auth_sessions (1 Dokument pro Refresh-Familie, unique family_id, TTL expires_at).
+  Access-Token trägt jetzt fam-Claim; get_current_user validiert gegen die Familie → Access-Tokens überleben benigne
+  Rotationen. Graceable Reasons (password_reset/password_change/admin_revoked) haben 30s Grace
+  (ACCESS_REVOCATION_GRACE_SECONDS); logout/user_revoked/refresh_reuse töten sofort. Logout widerruft die ganze Familie.
+  _within_rotation_grace prüft zusätzlich groben UA-Fingerprint (Browser+OS) → fremder Client im Grace-Fenster = Theft (401 + Familienwiderruf).
+- **Sitzungen-UI**: GET/DELETE /api/auth/sessions, POST /api/auth/sessions/logout-all (aktuelle Sitzung bleibt; 400 wenn
+  Familie nicht bestimmbar). Profil-Tab „Sitzungen" (SessionsPanel in ProfilePage.jsx): Geräteliste (UA-Parsing, „Dieses
+  Gerät"-Badge, IP, Zeiten), Einzel-Abmelden + „Überall abmelden", ConfirmDialog hat jetzt data-testids.
+- **Admin-Wachstumsgraph**: GET /api/admin/growth-stats?days=30 (Logins/Tag aus refresh_tokens-Roots, neue Mitglieder/Tag
+  + kumulierte Gesamtzahl aus users.created_at). Dashboard-Widget (dashboard-growth-widget) mit recharts ComposedChart.
+- **Logos größer**: Logo-Sizes lg=h-12/14, xl=h-16/20; Navbar (PublicLayout) auf lg, Login/Register auf xl.
+- **Video-Upload E2E verifiziert**: POST /api/uploads/video (Admin) + statischer Abruf 200 (mp4-Sniffing, Streaming-Limit 1536MB).
+- Datenhygiene: 12 TEST_/TESTreg-Automation-Accounts + zzt aus users (+ abhängige Collections) entfernt.
+- OFFEN unverändert: Echter Google-OAuth-Provider E2E, Mobile Google-Login (Deep-Link), EAS/Store-Builds + Device-Tests,
+  Production-Härtung (Domain/Secrets/Cookies), E-Mail-Provider, User-Abnahme der neuen Level-Optik.
+- Review-Backlog (P2): auth_routes.py (>900 Zeilen) modularisieren; growth_stats setzt users.created_at als ISO-String voraus.

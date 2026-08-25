@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2 } from "lucide-react";
+import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2, TrendingUp } from "lucide-react";
 
 function StatusDot({ ok }) {
   const color = ok === true ? "#00FF88" : ok === false ? "#FF3B30" : "#FFD700";
@@ -16,6 +17,7 @@ export default function AdminDashboardPage() {
   const [sys, setSys] = useState(null);
   const [authFlags, setAuthFlags] = useState(null);
   const [publicCfg, setPublicCfg] = useState(null);
+  const [growth, setGrowth] = useState(null);
   const [refreshedAt, setRefreshedAt] = useState(null);
   const load = useCallback(() => {
     api.get("/admin/dashboard").then(({ data }) => { setData(data); setRefreshedAt(new Date()); });
@@ -23,6 +25,7 @@ export default function AdminDashboardPage() {
     api.get("/admin/system-status").then(({ data }) => setSys(data)).catch(() => {});
     api.get("/settings/auth").then(({ data }) => setAuthFlags(data)).catch(() => {});
     api.get("/settings/public").then(({ data }) => setPublicCfg(data)).catch(() => {});
+    api.get("/admin/growth-stats?days=30").then(({ data }) => setGrowth(data)).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -182,6 +185,13 @@ export default function AdminDashboardPage() {
   const primaryTaskItems = activeTaskItems.length ? activeTaskItems : fallbackTaskItems;
   const secondaryTaskItems = taskItems.filter((item) => !primaryTaskItems.includes(item));
 
+  const growthData = (growth?.days || []).map((d) => ({
+    ...d,
+    label: `${d.date.slice(8, 10)}.${d.date.slice(5, 7)}.`,
+  }));
+  const totalLogins30d = growthData.reduce((sum, d) => sum + (d.logins || 0), 0);
+  const newUsers30d = growthData.reduce((sum, d) => sum + (d.new_users || 0), 0);
+
   return (
     <AdminLayout>
       <div className="mb-8 flex items-end justify-between gap-4">
@@ -247,6 +257,64 @@ export default function AdminDashboardPage() {
             <div className="mt-3 font-display font-bold text-4xl text-white">{k.value ?? "—"}</div>
           </div>
         ))}
+      </div>
+
+      <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-growth-widget">
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.28em] text-[#29B6E8] font-bold inline-flex items-center gap-2">
+              <TrendingUp className="w-3.5 h-3.5" /> Wachstum · letzte 30 Tage
+            </div>
+            <h2 className="font-heading font-bold uppercase text-lg mt-1">Logins & Mitglieder</h2>
+          </div>
+          <div className="flex gap-5 text-right">
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Logins</div>
+              <div className="font-display font-bold text-2xl text-[#29B6E8] tabular-nums">{totalLogins30d}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Neue Mitglieder</div>
+              <div className="font-display font-bold text-2xl text-[#00FF88] tabular-nums">{newUsers30d}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Gesamt</div>
+              <div className="font-display font-bold text-2xl text-[#FFD700] tabular-nums">{growthData.length ? growthData[growthData.length - 1].total_users : "—"}</div>
+            </div>
+          </div>
+        </div>
+        <div className="h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={growthData} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
+              <defs>
+                <linearGradient id="growthLogins" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#29B6E8" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#29B6E8" stopOpacity={0.02} />
+                </linearGradient>
+                <linearGradient id="growthUsers" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#00FF88" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#00FF88" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} tickLine={false} axisLine={{ stroke: "rgba(255,255,255,0.1)" }} interval="preserveStartEnd" minTickGap={26} />
+              <YAxis yAxisId="left" allowDecimals={false} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} tickLine={false} axisLine={false} />
+              <YAxis yAxisId="right" orientation="right" allowDecimals={false} tick={{ fill: "rgba(255,215,0,0.55)", fontSize: 10 }} tickLine={false} axisLine={false} width={40} domain={["auto", "auto"]} />
+              <Tooltip
+                contentStyle={{ background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 4, fontSize: 12 }}
+                labelStyle={{ color: "rgba(255,255,255,0.6)", fontWeight: 700 }}
+                formatter={(value, name) => [value, name === "logins" ? "Logins" : name === "new_users" ? "Neue Mitglieder" : "Mitglieder gesamt"]}
+              />
+              <Area yAxisId="left" type="monotone" dataKey="logins" name="logins" stroke="#29B6E8" strokeWidth={2} fill="url(#growthLogins)" />
+              <Area yAxisId="left" type="monotone" dataKey="new_users" name="new_users" stroke="#00FF88" strokeWidth={1.5} fill="url(#growthUsers)" />
+              <Line yAxisId="right" type="monotone" dataKey="total_users" name="total_users" stroke="#FFD700" strokeWidth={2} dot={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-4 text-[10px] uppercase tracking-widest font-bold">
+          <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-[#29B6E8]" /> Logins / Tag</span>
+          <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-[#00FF88]" /> Neue Mitglieder / Tag</span>
+          <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-[#FFD700]" /> Mitglieder gesamt</span>
+        </div>
       </div>
 
       <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-settings-hub">
