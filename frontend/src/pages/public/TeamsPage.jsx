@@ -9,11 +9,12 @@ import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
+import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
-import { Copy, Edit, MessageSquare, Plus, Search, Send, Shield, Trash2, Users, UserPlus } from "lucide-react";
+import { Copy, Edit, Lock, MessageSquare, Plus, Search, Send, Shield, Star, Swords, Trash2, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
 
 const emptyTeam = { name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "" };
 const TEAM_ROLE_LABELS = { leader: "Leader", co_leader: "Co-Leader", member: "Mitglied" };
@@ -31,11 +32,16 @@ function TeamList() {
 
   const { user } = useAuth();
   const [list, setList] = useState([]);
+  const [levels, setLevels] = useState({});
   const [editing, setEditing] = useState(null);
 
   const load = useCallback(async () => {
     const { data } = await api.get("/teams?limit=90");
     setList(data);
+    try {
+      const { data: lvl } = await api.get("/teams/levels");
+      setLevels(lvl?.levels || {});
+    } catch {}
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -60,7 +66,7 @@ function TeamList() {
         </div>
 
         <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {list.map((t) => <TeamCard key={t.id} team={t} />)}
+          {list.map((t) => <TeamCard key={t.id} team={t} levelInfo={levels[t.id]} />)}
           {list.length === 0 && <div className="col-span-full text-center py-20 text-white/40 font-display tracking-widest">KEINE TEAMS</div>}
         </div>
       </div>
@@ -69,7 +75,7 @@ function TeamList() {
   );
 }
 
-function TeamCard({ team: t }) {
+function TeamCard({ team: t, levelInfo }) {
   return (
     <Link to={`/teams/${t.id}`} data-testid={`team-card-${t.tag}`} className="group block border border-white/10 hover:border-[#29B6E8]/60 rounded-sm bg-[#121212] overflow-hidden transition">
       <div className="relative h-28 bg-[#0A0A0A] border-b border-white/10 overflow-hidden">
@@ -82,12 +88,24 @@ function TeamCard({ team: t }) {
       </div>
       <div className="relative -mt-8 p-5">
         <div className="flex items-center gap-4">
-          <TeamLogo team={t} size="md" />
+          {levelInfo ? (
+            <LevelAvatarFrame level={levelInfo.level} compact team showBadge={false} testId={`team-frame-${t.tag}`} className="w-16 h-16 shrink-0">
+              <TeamLogo team={t} bare />
+            </LevelAvatarFrame>
+          ) : (
+            <TeamLogo team={t} size="md" />
+          )}
           <div className="flex-1 min-w-0">
-            <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">[{t.tag}]</div>
+            <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold flex items-center gap-2">
+              <span>[{t.tag}]</span>
+              {levelInfo && (
+                <span data-testid={`team-level-chip-${t.tag}`} className="px-1.5 py-0.5 border border-[#29B6E8]/40 rounded-full text-[9px] font-black bg-[#29B6E8]/10">LVL {levelInfo.level}</span>
+              )}
+            </div>
             <h3 className="font-heading text-xl font-bold group-hover:text-[#29B6E8] transition truncate">{t.name}</h3>
             <div className="text-xs text-white/50 inline-flex items-center gap-1 mt-0.5">
               <Users className="w-3.5 h-3.5" /> {t.member_count ?? t.member_ids?.length ?? 0} Mitglieder
+              {levelInfo && <span className="text-white/35">· {levelInfo.points} Pkt.</span>}
             </div>
           </div>
         </div>
@@ -107,6 +125,7 @@ function TeamDetail({ id }) {
   const nav = useNavigate();
   const { user, isAdmin } = useAuth();
   const [team, setTeam] = useState(null);
+  const [levelInfo, setLevelInfo] = useState(null);
   const [editing, setEditing] = useState(null);
   const [joinCode, setJoinCode] = useState("");
   const { submitting: mutating, submitOnce } = useSubmissionGuard();
@@ -116,6 +135,10 @@ function TeamDetail({ id }) {
   const load = useCallback(async () => {
     const { data } = await api.get(`/teams/${id}`);
     setTeam(data);
+    try {
+      const { data: lvl } = await api.get(`/teams/${id}/level`);
+      setLevelInfo(lvl);
+    } catch {}
   }, [id]);
   const refresh = useCallback(() => load().catch(() => setTeam(null)), [load]);
 
@@ -218,9 +241,20 @@ function TeamDetail({ id }) {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <Link to="/teams" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Teams</Link>
           <div className="mt-5 flex flex-col md:flex-row gap-6 md:items-center">
-            <TeamLogo team={team} size="lg" />
+            {levelInfo ? (
+              <LevelAvatarFrame level={levelInfo.level} team testId="team-detail-frame" className="w-28 h-28 shrink-0 mt-8 md:mt-4">
+                <TeamLogo team={team} bare />
+              </LevelAvatarFrame>
+            ) : (
+              <TeamLogo team={team} size="lg" />
+            )}
             <div className="flex-1 min-w-0">
-              <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">[{team.tag}]</div>
+              <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold flex items-center gap-2 flex-wrap">
+                <span>[{team.tag}]</span>
+                {levelInfo && (
+                  <span data-testid="team-detail-level-chip" className="px-2 py-0.5 border border-[#29B6E8]/40 rounded-full text-[10px] font-black bg-[#29B6E8]/10 tracking-widest">TEAM-LEVEL {levelInfo.level}</span>
+                )}
+              </div>
               <h1 className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{team.name}</h1>
               {team.description && <p className="mt-3 text-white/70 max-w-2xl">{team.description}</p>}
               <div className="mt-4 flex flex-wrap gap-2">
@@ -240,6 +274,7 @@ function TeamDetail({ id }) {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
+          {levelInfo && <TeamLevelPanel info={levelInfo} />}
           <section>
             <div className="mb-4">
               <h2 className="font-heading text-2xl font-bold uppercase">Mitglieder</h2>
@@ -561,12 +596,74 @@ function TeamModal({ team, onClose, onSaved }) {
   );
 }
 
-function TeamLogo({ team, size = "md" }) {
-  const cls = size === "lg" ? "w-28 h-28 text-3xl" : "w-16 h-16 text-xl";
+function TeamLogo({ team, size = "md", bare = false }) {
+  const cls = bare ? "w-full h-full" : `${size === "lg" ? "w-28 h-28 text-3xl" : "w-16 h-16 text-xl"} bg-[#0A0A0A] border border-white/10 rounded-sm`;
   return (
-    <div className={`${cls} bg-[#0A0A0A] border border-white/10 rounded-sm flex items-center justify-center shrink-0 overflow-hidden`}>
+    <div className={`${cls} flex items-center justify-center shrink-0 overflow-hidden ${bare ? "text-xl bg-[#0A0A0A]" : ""}`}>
       {team.logo_url ? <img src={resolveMediaUrl(team.logo_url)} alt={team.name} className="w-full h-full object-cover" /> : <span className="font-heading font-black text-[#29B6E8]">{team.tag}</span>}
     </div>
+  );
+}
+
+const TEAM_ACH_ICONS = {
+  flag: Shield, users: Users, zap: Zap, swords: Swords, trophy: Trophy,
+  "trending-up": TrendingUp, shield: Shield, crown: Star,
+};
+
+function TeamLevelPanel({ info }) {
+  const span = Math.max((info.next_level_points || 1) - (info.current_level_points || 0), 1);
+  const inLevel = Math.max((info.points || 0) - (info.current_level_points || 0), 0);
+  return (
+    <section data-testid="team-level-panel" className="border border-[#29B6E8]/25 bg-[#121212] rounded-sm p-5">
+      <div className="flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Team-Level</div>
+          <div className="mt-1 font-heading text-3xl font-black" data-testid="team-level-value">LEVEL {info.level}</div>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-black text-white" data-testid="team-points-value">{info.points} <span className="text-sm text-white/40 font-bold">PUNKTE</span></div>
+          <div className="text-[11px] text-white/40">{inLevel} / {span} bis Level {info.level + 1}</div>
+        </div>
+      </div>
+      <div className="mt-3 h-2.5 bg-black/50 border border-white/10 rounded-full overflow-hidden">
+        <div
+          data-testid="team-level-progress"
+          className="h-full bg-gradient-to-r from-[#29B6E8] to-[#7FDBFF] rounded-full transition-all duration-700"
+          style={{ width: `${info.progress || 0}%` }}
+        />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-white/50">
+        <span className="px-2 py-1 border border-white/10 rounded-sm">Mitglieder-Achievements: <b className="text-white/80">{info.member_points}</b></span>
+        <span className="px-2 py-1 border border-white/10 rounded-sm">Turniere: <b className="text-white/80">{info.tournament_points}</b> ({info.tournaments} Teilnahmen{info.wins ? `, ${info.wins} Siege` : ""})</span>
+      </div>
+      <div className="mt-5">
+        <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-2">Team-Achievements</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {(info.achievements || []).map((a) => {
+            const Icon = a.earned ? (TEAM_ACH_ICONS[a.icon] || Trophy) : Lock;
+            return (
+              <div
+                key={a.code}
+                data-testid={`team-achievement-${a.code}`}
+                data-earned={a.earned ? "true" : "false"}
+                title={a.description}
+                className={`px-3 py-2.5 border rounded-sm flex items-center gap-2.5 transition ${
+                  a.earned
+                    ? "border-[#FFD700]/35 bg-[#FFD700]/5 text-white"
+                    : "border-white/15 bg-black/30 text-white/45"
+                }`}
+              >
+                <Icon className={`w-4 h-4 shrink-0 ${a.earned ? "text-[#FFD700]" : "text-white/35"}`} />
+                <div className="min-w-0">
+                  <div className="text-xs font-bold truncate">{a.name}</div>
+                  <div className="text-[10px] truncate opacity-70">{a.description}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 }
 
