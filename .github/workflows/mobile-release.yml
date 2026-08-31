@@ -110,7 +110,7 @@ jobs:
           node scripts/prepare-google-services.cjs
           npx expo prebuild --platform android --clean
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
