@@ -2881,6 +2881,11 @@
   resolved "https://registry.yarnpkg.com/@tiptap/core/-/core-3.30.1.tgz#74e7fca7dfdf3b1cc878ce7647aded90f885d63f"
   integrity sha512-HWEO6Qi8fI8Zt8X4atVV6GxthJx7Vrjr6L5YFq4OkjYJ7HG2/bFw6IKsDA3jOYgY4DM9lv8IadaiWUQ2JJRIBA==
 
+"@tiptap/core@3.30.4":
+  version "3.30.4"
+  resolved "https://registry.yarnpkg.com/@tiptap/core/-/core-3.30.4.tgz#9e0847c5f4dd53750ae3accc6b83223e37f693b3"
+  integrity sha512-V9yKuUfV8qC9WBrnVxkFWmYLBomc3d1CwXoFSjED5DRu5q2oyxv07F+jOJSRogJAY+feHjuxvjhixwxeHm2DXQ==
+
 "@tiptap/extension-blockquote@3.30.1":
   version "3.30.1"
   resolved "https://registry.yarnpkg.com/@tiptap/extension-blockquote/-/extension-blockquote-3.30.1.tgz#d7d0fb8e4f00f4d162375017ff40a6d5d80ec66b"
