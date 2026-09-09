@@ -45,7 +45,14 @@ def results_for_forfeit(match: dict, forfeiting_registration_id: str) -> list[di
 
     remaining = [item for item in participants if item != forfeiting_registration_id]
     results = [{"registration_id": item, "rank": index + 1} for index, item in enumerate(remaining)]
-    results.append({"registration_id": forfeiting_registration_id, "rank": len(participants)})
+    # Ausdrücklich als Aufgabe gekennzeichnet: sonst sähe die Platzierung aus wie
+    # ein normales Ergebnis ohne Punktstand - und wäre dort, wo Unentschieden
+    # erlaubt sind, von einem geteilten Platz nicht zu unterscheiden.
+    results.append({
+        "registration_id": forfeiting_registration_id,
+        "rank": len(participants),
+        "forfeit": True,
+    })
     return results
 
 

@@ -5,6 +5,23 @@ Schreibende Tests ausschließlich auf dem vorbereiteten Staging mit Testkonten a
 nicht ersatzweise auf Produktion. `staging.example.at` ist ein Platzhalter; die tatsächliche
 Domain und Freigabe werden in [STAGING_ABNAHME.md](STAGING_ABNAHME.md) festgehalten.
 
+## Vorher: die Ablauf-Tests
+
+Bevor du hier einsteigst, lohnt der Blick auf `backend/tests/test_tournament_flows.py`.
+Diese Tests fahren die **echte Anwendung** gegen eine Datenbank im Arbeitsspeicher und
+spielen die Abläufe durch, die eine einzelne Person im Livesystem nicht prüfen kann:
+
+- beide Teilnehmer melden dasselbe Ergebnis — Match wird fertig, Sieger rückt weiter
+- beide melden Unterschiedliches — Match wartet auf die Turnierleitung
+- Einspruch, Forfeit mit und ohne Begründung
+- Schweizer Runden nacheinander, mit wanderndem Freilos
+- Gruppenphase, Liga und Unentschieden in der Tabelle
+
+Sie brauchen **keinen Server, keinen Container und keine Zugangsdaten** und laufen mit
+`python -m pytest backend/tests/test_tournament_flows.py`. Was sie nicht abdecken:
+Indizes, Transaktionen und Aggregationen — dafür braucht es eine echte MongoDB, also
+die Live-Tests unten.
+
 ## Zweck
 
 Live-Tests pruefen Dinge, die lokal ohne Server, MongoDB, Upload-Volume oder echte Cookies nicht voll beweisbar sind.

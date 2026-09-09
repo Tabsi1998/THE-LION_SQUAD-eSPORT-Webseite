@@ -31,9 +31,23 @@ def participant_source_ids(match: dict) -> list[str]:
     return out
 
 
+# Wo ein Spiel unentschieden enden darf. Im klassischen Speicher steht das in
+# `bracket`, im Graph-Speicher in `section` - dieselbe Frage, zwei Feldnamen.
+DRAW_SECTIONS = {"round_robin", "swiss", "liga", "league"}
+
+
 def match_allows_draw(match: dict) -> bool:
-    bracket = str(match.get("bracket") or "")
-    return bracket in {"round_robin", "swiss"} or bracket.startswith("group_")
+    """Whether this match may end level.
+
+    A knockout match may not: somebody has to advance. Everything played in a
+    table - league, round robin, groups, Swiss - may, and until now could not,
+    which silently turned every draw into a win for whoever was listed first.
+    """
+    for field in ("bracket", "section"):
+        value = str(match.get(field) or "").strip().lower()
+        if value in DRAW_SECTIONS or value.startswith("group_"):
+            return True
+    return False
 
 
 def validate_winner_id(match: dict, winner_id: str | None) -> None:

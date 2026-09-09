@@ -414,3 +414,116 @@ def test_v2_randomized_advancement_uses_any_free_target_slot(monkeypatch):
     slots = application["target_sets"]["m-b"]["slots"]
     assert slots[3]["registration_id"] == "r2"
     assert slots[2]["registration_id"] == "r1"
+
+
+# ---------------------------------------------------------------- Unentschieden
+
+def duel(section, first="a", second="b"):
+    return {
+        "section": section,
+        "settings": {"match_size": 2},
+        "slots": [
+            {"slot": 1, "registration_id": first, "status": "filled", "user_id": "u1"},
+            {"slot": 2, "registration_id": second, "status": "filled", "user_id": "u2"},
+        ],
+    }
+
+
+def places(results):
+    return {entry["registration_id"]: entry["rank"] for entry in results}
+
+
+@pytest.mark.parametrize("section", ["LIGA", "round_robin", "swiss", "group_A", "group_b"])
+def test_a_table_format_may_end_level(section):
+    """Vor diesem Fund wurde jedes Unentschieden zum Sieg des Erstgenannten."""
+    results = normalize_v2_results(duel(section), [
+        {"registration_id": "a", "rank": 1},
+        {"registration_id": "b", "rank": 1},
+    ])
+
+    assert places(results) == {"a": 1, "b": 1}
+
+
+@pytest.mark.parametrize("section", ["WB", "LB", "GF", "MAIN", "BRONZE"])
+def test_a_knockout_match_may_not(section):
+    """Irgendwer muss weiterkommen - sonst bleibt der Folgeplatz für immer leer."""
+    with pytest.raises(MatchV2ResultError):
+        normalize_v2_results(duel(section), [
+            {"registration_id": "a", "rank": 1},
+            {"registration_id": "b", "rank": 1},
+        ])
+
+
+def test_equal_scores_become_a_shared_place_where_that_is_allowed():
+    results = normalize_v2_results(duel("LIGA"), [
+        {"registration_id": "a", "score": 2},
+        {"registration_id": "b", "score": 2},
+    ])
+
+    assert places(results) == {"a": 1, "b": 1}
+
+
+def test_equal_scores_are_still_separated_in_a_knockout():
+    results = normalize_v2_results(duel("WB"), [
+        {"registration_id": "a", "score": 2},
+        {"registration_id": "b", "score": 2},
+    ])
+
+    assert sorted(places(results).values()) == [1, 2]
+
+
+def test_a_clear_win_stays_a_clear_win():
+    results = normalize_v2_results(duel("LIGA"), [
+        {"registration_id": "a", "score": 1},
+        {"registration_id": "b", "score": 3},
+    ])
+
+    assert places(results) == {"a": 2, "b": 1}
+
+
+def test_a_reported_placement_is_not_overwritten_by_the_scores():
+    """Ein Forfeit nennt die Platzierung und hat keine Punkte - die muss halten."""
+    results = normalize_v2_results(duel("LIGA"), [
+        {"registration_id": "a", "rank": 1},
+        {"registration_id": "b", "rank": 2},
+    ])
+
+    assert places(results) == {"a": 1, "b": 2}
+
+
+def test_a_tie_pushes_the_next_place_back():
+    """Übliche Zählweise: 1, 1, 3 - nicht 1, 1, 2."""
+    heat = {
+        "section": "group_A",
+        "settings": {"match_size": 3},
+        "slots": [
+            {"slot": index, "registration_id": item, "status": "filled"}
+            for index, item in enumerate(["a", "b", "c"], start=1)
+        ],
+    }
+
+    results = normalize_v2_results(heat, [
+        {"registration_id": "a", "score": 5},
+        {"registration_id": "b", "score": 5},
+        {"registration_id": "c", "score": 1},
+    ])
+
+    assert places(results) == {"a": 1, "b": 1, "c": 3}
+
+
+def test_a_ranking_that_skips_wrongly_is_refused():
+    heat = {
+        "section": "group_A",
+        "settings": {"match_size": 3},
+        "slots": [
+            {"slot": index, "registration_id": item, "status": "filled"}
+            for index, item in enumerate(["a", "b", "c"], start=1)
+        ],
+    }
+
+    with pytest.raises(MatchV2ResultError, match="Gleichstand"):
+        normalize_v2_results(heat, [
+            {"registration_id": "a", "rank": 1},
+            {"registration_id": "b", "rank": 1},
+            {"registration_id": "c", "rank": 2},
+        ])
