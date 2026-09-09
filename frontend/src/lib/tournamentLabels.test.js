@@ -3,10 +3,17 @@ import { describe, expect, it } from "vitest";
 import { formatBracketSection } from "./tournamentLabels";
 
 describe("formatBracketSection", () => {
-  it("benennt die klassischen Baumteile auf Deutsch", () => {
-    expect(formatBracketSection("WB")).toBe("Siegerbaum");
-    expect(formatBracketSection("LB")).toBe("Hoffnungsbaum");
-    expect(formatBracketSection("GF")).toBe("Großes Finale");
+  it("nutzt die eingefuehrten eSports-Begriffe statt Uebersetzungen", () => {
+    expect(formatBracketSection("WB")).toBe("Winner Bracket");
+    expect(formatBracketSection("LB")).toBe("Loser Bracket");
+    expect(formatBracketSection("GF")).toBe("Grand Final");
+    expect(formatBracketSection("winner")).toBe("Winner Bracket");
+    expect(formatBracketSection("loser")).toBe("Loser Bracket");
+  });
+
+  it("beschriftet Round Robin als Spieltage statt als Gruppe", () => {
+    expect(formatBracketSection("round_robin")).toBe("Spieltage");
+    expect(formatBracketSection("LIGA")).toBe("Spieltage");
   });
 
   it("übersetzt die Gruppenabschnitte, statt group_A anzuzeigen", () => {
