@@ -22,7 +22,6 @@ type Props = NativeStackScreenProps<TournamentStackParamList, "TournamentDetail"
 type TabKey = "overview" | "bracket" | "matches" | "standings" | "participants" | "rules";
 type BracketPayload = {
   tournament?: Tournament;
-  matches?: any[];
   matches_v2?: any[];
   stages?: any[];
   registrations?: any[];
@@ -118,9 +117,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     registrations.forEach((registration) => map.set(registration.id, registration));
     return map;
   }, [registrations]);
-  const legacyMatches = bracket.matches || tournament?.matches || [];
-  const v2Matches = bracket.matches_v2 || [];
-  const allMatches = v2Matches.length ? v2Matches : legacyMatches;
+  const allMatches = bracket.matches_v2 || [];
   const upcomingMatches = useMemo(() => {
     const open = allMatches.filter((match) => OPEN_MATCH_STATUSES.has(String(match.status || "")));
     if (!ownRegistration?.id) return open.slice(0, 5);
@@ -310,7 +307,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
               <View style={styles.statGrid}>
                 <Stat label="Matches" value={String(allMatches.length)} />
                 <Stat label="Spieler" value={String(registrations.length || tournament.participant_count || 0)} tone="gold" />
-                <Stat label="Engine" value={bracket.engine || "legacy"} />
+                <Stat label="Engine" value={bracket.engine || "—"} />
               </View>
               <Info label="Event" value={tournament.event?.name || "-"} />
               <Info label="Ort" value={tournament.event?.location || "-"} />
@@ -536,9 +533,8 @@ function RegistrationModal({
 
 function BracketView({ payload, regMap, onOpenMatch }: { payload: BracketPayload; regMap: Map<string, any>; onOpenMatch?: (id: string) => void }) {
   const matchesV2 = payload.matches_v2 || [];
-  const legacy = payload.matches || [];
   const sections = useMemo(() => {
-    const source = matchesV2.length ? matchesV2 : legacy;
+    const source = matchesV2;
     const grouped = new Map<string, Map<number, any[]>>();
     source.forEach((match) => {
       const section = match.section || match.bracket || "MAIN";
@@ -551,7 +547,7 @@ function BracketView({ payload, regMap, onOpenMatch }: { payload: BracketPayload
       section,
       rounds: Array.from(roundMap.entries()).sort((a, b) => a[0] - b[0]),
     }));
-  }, [legacy, matchesV2]);
+  }, [matchesV2]);
 
   return (
     <View style={styles.bracketWrap}>

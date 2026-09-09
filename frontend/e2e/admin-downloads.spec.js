@@ -121,8 +121,15 @@ async function mockDownloadsData(page, options = {}) {
           { id: "r1", display_name: "Koblauchgeist" },
           { id: "r2", display_name: "DerSushi" },
         ],
-        matches: [{ id: "m1", participant_a_id: "r1", participant_b_id: "r2", station_id: "station-a", station_label: "Station A" }],
-        matches_v2: [],
+        matches_v2: [{
+          id: "m1",
+          station_id: "station-a",
+          station_label: "Station A",
+          slots: [
+            { slot: 1, registration_id: "r1" },
+            { slot: 2, registration_id: "r2" },
+          ],
+        }],
       }),
     });
   });

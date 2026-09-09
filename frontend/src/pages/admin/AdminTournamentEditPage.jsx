@@ -505,34 +505,6 @@ export default function AdminTournamentEditPage() {
       toast.error(formatRequestError(e, locked ? "Turnier konnte nicht gesperrt werden." : "Turnier konnte nicht entsperrt werden."));
     }
   };
-  const updateMatchResult = async (m, scoreA, scoreB, winnerId) => {
-    try {
-      await api.patch(`/matches/${m.id}`, {
-        score_a: Number(scoreA) || 0,
-        score_b: Number(scoreB) || 0,
-        winner_id: winnerId || null,
-        status: winnerId ? "completed" : "waiting_result",
-      });
-      toast.success("Ergebnis gespeichert.");
-      load();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
-  };
-  const updateMatchSchedule = async (match, payload) => {
-    try {
-      const scheduledAt = payload.scheduled_at ? fromDateTimeLocal(payload.scheduled_at) : null;
-      const body = {
-        scheduled_at: scheduledAt,
-        duration_minutes: payload.duration_minutes === "" ? null : Number(payload.duration_minutes),
-        station_id: payload.station_id || null,
-      };
-      if (scheduledAt && ["pending", "ready", "preview"].includes(match.status)) body.status = "scheduled";
-      await api.patch(`/matches/${match.id}`, body);
-      toast.success("Matchplanung gespeichert.");
-      load();
-    } catch (err) {
-      toast.error(formatRequestError(err, "Matchplanung konnte nicht gespeichert werden."));
-    }
-  };
   const updateMatchV2Schedule = async (match, payload) => {
     try {
       await api.patch(`/matches/${match.id}`, {
@@ -602,7 +574,6 @@ export default function AdminTournamentEditPage() {
         : <div className="p-10 text-white/40">Lade…</div>}
     </AdminLayout>
   );
-  const hasFlexibleStructure = stages.length > 0 || matchesV2.length > 0;
   const canRecordResults = ["live", "paused"].includes(t.status);
   const availableTabs = [
     ["participants", "Teilnehmer"],
@@ -711,7 +682,6 @@ export default function AdminTournamentEditPage() {
       <TournamentFlowStepper
         tournament={t}
         registrations={regs}
-        bracket={bracket}
         matchesV2={matchesV2}
         onNavigate={(key) => selectTab(key)}
       />
@@ -854,7 +824,7 @@ export default function AdminTournamentEditPage() {
 
       {activeTab === "bracket" && bracket && (
         <div className="bg-[#0A0A0A] rounded-sm p-4 border border-white/10">
-          {(bracket.matches?.length || 0) + (bracket.matches_v2?.length || 0) === 0 ? (
+          {(bracket.matches_v2?.length || 0) === 0 ? (
             <EmptyBracketNotice tournament={t} />
           ) : (
             <BracketTree data={bracket} />
@@ -862,84 +832,7 @@ export default function AdminTournamentEditPage() {
         </div>
       )}
 
-      {activeTab === "stages" && !hasFlexibleStructure && bracket?.matches && (
-        <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-          <div className="lg:hidden divide-y divide-white/5">
-            {bracket.matches.map((m) => {
-              const a = bracket.registrations.find((r) => r.id === m.participant_a_id);
-              const b = bracket.registrations.find((r) => r.id === m.participant_b_id);
-              return (
-                <div key={m.id} className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-[10px] uppercase tracking-widest text-white/35">{m.round_name || m.round}</div>
-                      <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-sm">
-                        <span className="truncate">{a?.display_name || "Offen"}</span>
-                        <span className="font-display font-bold tabular-nums">{m.score_a}</span>
-                        <span className="truncate">{b?.display_name || "Offen"}</span>
-                        <span className="font-display font-bold tabular-nums">{m.score_b}</span>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2 text-[10px] uppercase tracking-wider text-white/45">
-                        <span>{stationDisplay(m, stations) ? `Station ${stationDisplay(m, stations)}` : "Station offen"}</span>
-                        {m.scheduled_at && <span>{formatDateTime(m.scheduled_at)}</span>}
-                      </div>
-                    </div>
-                    <StatusBadge status={m.status} />
-                  </div>
-                  <div className="space-y-2">
-                    {isModerator && canRecordResults && a && b && (
-                      <MatchResultControls match={m} a={a} b={b} onSave={updateMatchResult} />
-                    )}
-                    {isModerator && <MatchScheduleControls match={m} stations={stations} defaultScheduledAt={t.start_date} onSave={updateMatchSchedule} />}
-                    <Link to={`/matches/${m.id}`} className="inline-flex text-[#29B6E8] text-xs font-bold uppercase hover:text-white">Öffnen</Link>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full text-sm min-w-[720px]">
-            <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
-              <tr>
-                <th className="text-left px-4 py-3">Runde</th>
-                <th className="text-left px-4 py-3">Teilnehmer A</th>
-                <th className="text-left px-4 py-3">Teilnehmer B</th>
-                <th className="text-center px-4 py-3">Ergebnis</th>
-                <th className="text-left px-4 py-3">Station</th>
-                <th className="text-left px-4 py-3">Status</th>
-                <th className="text-right px-4 py-3">Aktion</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {bracket.matches.map((m) => {
-                const a = bracket.registrations.find((r) => r.id === m.participant_a_id);
-                const b = bracket.registrations.find((r) => r.id === m.participant_b_id);
-                return (
-                  <tr key={m.id}>
-                    <td className="px-4 py-3 text-white/70">{m.round_name || m.round}</td>
-                    <td className="px-4 py-3">{a?.display_name || "Offen"}</td>
-                    <td className="px-4 py-3">{b?.display_name || "Offen"}</td>
-                    <td className="px-4 py-3 text-center font-display font-bold">{m.score_a} : {m.score_b}</td>
-                    <td className="px-4 py-3 text-white/60">{stationDisplay(m, stations) || "Offen"}</td>
-                    <td className="px-4 py-3"><StatusBadge status={m.status} /></td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex flex-col items-end gap-2">
-                        {isModerator && canRecordResults && a && b && (
-                          <MatchResultControls match={m} a={a} b={b} onSave={updateMatchResult} />
-                        )}
-                        {isModerator && <MatchScheduleControls match={m} stations={stations} defaultScheduledAt={t.start_date} onSave={updateMatchSchedule} />}
-                        <Link to={`/matches/${m.id}`} className="text-[#29B6E8] text-xs font-bold uppercase hover:text-white">Öffnen →</Link>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          </div>
-        </div>
-      )}
-      {activeTab === "stages" && hasFlexibleStructure && (
+      {activeTab === "stages" && (
         <TournamentStagesPanel
           tournamentId={t.id}
           stages={stages}
@@ -2223,34 +2116,6 @@ function TournamentStaffPanel({ tournamentId, staff, users, onChanged }) {
           </table>
         </div>
       </div>
-    </div>
-  );
-}
-
-function MatchResultControls({ match, a, b, onSave }) {
-  const [scoreA, setScoreA] = useState(match.score_a ?? 0);
-  const [scoreB, setScoreB] = useState(match.score_b ?? 0);
-  const winnerId = Number(scoreA) > Number(scoreB)
-    ? a.id
-    : Number(scoreB) > Number(scoreA)
-      ? b.id
-      : "";
-  return (
-    <div className="w-full min-w-[18rem] grid sm:grid-cols-[minmax(6rem,1fr)_minmax(6rem,1fr)_minmax(9rem,1fr)_auto] items-end gap-2">
-      <label className="block">
-        <span className="block text-[10px] text-white/45 mb-1 break-words">{a.display_name || "Spieler A"}</span>
-        <input type="number" min="0" value={scoreA} onChange={(e)=>setScoreA(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Punkte A" placeholder="Punkte" />
-      </label>
-      <label className="block">
-        <span className="block text-[10px] text-white/45 mb-1 break-words">{b.display_name || "Spieler B"}</span>
-        <input type="number" min="0" value={scoreB} onChange={(e)=>setScoreB(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs text-center" aria-label="Punkte B" placeholder="Punkte" />
-      </label>
-      <select value={winnerId} onChange={(e)=>onSave(match, scoreA, scoreB, e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs" aria-label="Gewinner">
-        <option value="">Gewinner wählen</option>
-        <option value={a.id}>{a.display_name || "A"}</option>
-        <option value={b.id}>{b.display_name || "B"}</option>
-      </select>
-      <button type="button" onClick={()=>onSave(match, scoreA, scoreB, winnerId)} className="px-3 py-1 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase">Speichern</button>
     </div>
   );
 }

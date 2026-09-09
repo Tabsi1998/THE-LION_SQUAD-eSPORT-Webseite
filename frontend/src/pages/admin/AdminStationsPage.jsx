@@ -95,9 +95,7 @@ export default function AdminStationsPage() {
       const { data } = await api.get(`/tournaments/${activeTid}/bracket`);
       if (matchesRequestRef.current !== requestId) return;
       const tournament = data?.tournament || {};
-      const duelMatches = safeArray(data?.matches).map((m) => ({ ...m, is_multi_slot: false, tournament }));
-      const multiSlotMatches = safeArray(data?.matches_v2).map((m) => ({ ...m, is_multi_slot: true, tournament }));
-      setMatches([...duelMatches, ...multiSlotMatches]);
+      setMatches(safeArray(data?.matches_v2).map((m) => ({ ...m, is_multi_slot: true, tournament })));
       setRegs(safeArray(data?.registrations));
       setPageError("");
     } catch (e) {

@@ -56,14 +56,19 @@ async function mockBracketDisplay(page) {
   }));
   const matches = Array.from({ length: 12 }, (_, index) => ({
     id: `m${index + 1}`,
+    stage_id: "stage-1",
+    stage_type: "single_elimination",
+    match_type: "duel",
+    section: "WB",
+    match_key: `M${index + 1}`,
     round: index < 6 ? 1 : index < 10 ? 2 : 3,
     round_name: index < 6 ? "Runde 1" : index < 10 ? "Viertelfinale" : "Halbfinale",
-    bracket: "winner",
-    match_index: index,
-    participant_a_id: registrations[(index * 2) % registrations.length].id,
-    participant_b_id: registrations[(index * 2 + 1) % registrations.length].id,
-    score_a: 0,
-    score_b: 0,
+    order: index,
+    slots: [
+      { slot: 1, registration_id: registrations[(index * 2) % registrations.length].id, status: "filled" },
+      { slot: 2, registration_id: registrations[(index * 2 + 1) % registrations.length].id, status: "filled" },
+    ],
+    results: [],
     status: index % 3 === 0 ? "ready" : "scheduled",
     scheduled_at: "2026-06-21T13:00:00+02:00",
     station_id: index % 2 === 0 ? "A" : "B",
@@ -82,9 +87,8 @@ async function mockBracketDisplay(page) {
           status: "registration_open",
         },
         registrations,
-        matches,
-        matches_v2: [],
-        stages: [],
+        matches_v2: matches,
+        stages: [{ id: "stage-1", name: "Turnierbaum", number: 1, stage_type: "single_elimination" }],
       }),
     });
   });

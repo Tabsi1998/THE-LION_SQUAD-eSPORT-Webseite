@@ -229,16 +229,6 @@ export default function AdminWidgetsPage() {
 function qrMatchesFromBracket(payload) {
   const registrations = new Map((payload?.registrations || []).map((registration) => [registration.id, registration]));
   const tournament = payload?.tournament || {};
-  const legacy = (payload?.matches || []).map((match) => ({
-    id: match.id,
-    tournamentTitle: tournament.title,
-    stationId: match.station_id,
-    stationLabel: match.station_label || match.station_name || match.station?.name || match.station_id,
-    label: [registrations.get(match.participant_a_id), registrations.get(match.participant_b_id)]
-      .map((registration) => registration?.display_name || registration?.ingame_name)
-      .filter(Boolean)
-      .join(" vs. ") || match.round_name || `Match ${match.match_key || match.id}`,
-  }));
   const multi = (payload?.matches_v2 || []).map((match) => ({
     id: match.id,
     tournamentTitle: tournament.title,
@@ -249,7 +239,7 @@ function qrMatchesFromBracket(payload) {
       .filter(Boolean)
       .join(" vs. ") || match.round_name || `Match ${match.match_key || match.id}`,
   }));
-  return [...legacy, ...multi].filter((match) => match.id).slice(0, 80);
+  return multi.filter((match) => match.id).slice(0, 80);
 }
 
 function buildQrLinks({ event, stations, matches, albums, base }) {
