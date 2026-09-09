@@ -17,30 +17,60 @@ transactions or aggregation pipelines.
 """
 from __future__ import annotations
 
+import contextlib
 import os
 import uuid
 
-os.environ.setdefault("APP_ENV", "test")
-os.environ.setdefault("JWT_SECRET", "flow-tests-secret-with-at-least-32-characters")
-os.environ.setdefault("FRONTEND_URL", "http://localhost:3000")
-os.environ.setdefault("CORS_ORIGINS", "http://localhost:3000")
-os.environ.setdefault("MONGO_URL", "mongodb://127.0.0.1:27017")
-os.environ.setdefault("DB_NAME", "tls_flow_tests")
-os.environ.setdefault("DISABLE_SCHEDULER", "true")
-os.environ.setdefault("SETTINGS_ENCRYPTION_KEY", "NQBHeGtQg5HYMo1HzvJtSQPN7X8YpJrZDvw-XMz0Bm8=")
-# Die Host-Prüfung der App bleibt aktiv - der Testhost wird angemeldet statt
-# die Prüfung abzuschalten, damit sie mitgetestet wird.
-os.environ.setdefault("TRUSTED_HOSTS", "testserver")
-
-import database  # noqa: E402
-from httpx import ASGITransport, AsyncClient  # noqa: E402
-from mongomock_motor import AsyncMongoMockClient  # noqa: E402
-
-import server  # noqa: E402
-from auth import get_current_user, get_optional_user  # noqa: E402
+from httpx import ASGITransport, AsyncClient
+from mongomock_motor import AsyncMongoMockClient
 
 
 STAFF_ROLE = "superadmin"
+
+# Was die Anwendung beim Import verlangt. Diese Werte gelten ausschließlich
+# während des Imports und werden danach wieder entfernt: ein Test, der prüft,
+# dass beim Lesen einer .env keine Geheimnisse in die Shell auslaufen, bekäme
+# sonst diese hier zu sehen und schlüge fehl - zu Recht.
+IMPORT_ENV = {
+    "APP_ENV": "test",
+    "JWT_SECRET": "flow-tests-secret-with-at-least-32-characters",
+    "FRONTEND_URL": "http://localhost:3000",
+    "CORS_ORIGINS": "http://localhost:3000",
+    "MONGO_URL": "mongodb://127.0.0.1:27017",
+    "DB_NAME": "tls_flow_tests",
+    "DISABLE_SCHEDULER": "true",
+    "SETTINGS_ENCRYPTION_KEY": "NQBHeGtQg5HYMo1HzvJtSQPN7X8YpJrZDvw-XMz0Bm8=",
+    # Die Host-Prüfung der App bleibt aktiv - der Testhost wird angemeldet,
+    # statt die Prüfung abzuschalten, damit sie mitgeprüft wird.
+    "TRUSTED_HOSTS": "testserver",
+}
+
+_application = None
+
+
+@contextlib.contextmanager
+def _borrowed_environment(values: dict):
+    """Lend the process these settings and take them back afterwards."""
+    previous = dict(os.environ)
+    os.environ.update(values)
+    try:
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(previous)
+
+
+def load_application():
+    """Import the application once, leaving no trace in the environment."""
+    global _application
+    if _application is None:
+        with _borrowed_environment(IMPORT_ENV):
+            import database
+            import server
+            from auth import get_current_user, get_optional_user
+
+            _application = (database, server, get_current_user, get_optional_user)
+    return _application
 
 
 def new_id() -> str:
@@ -68,7 +98,7 @@ class Flow:
             # Der Adminbereich verlangt bestätigte Zwei-Faktor-Anmeldung.
             "mfa_enabled": True,
             "auth_mfa_verified": True,
-            "privacy_policy_version": os.environ.get("PRIVACY_POLICY_VERSION", "2026-08-26"),
+            "privacy_policy_version": "2026-08-26",
         }
         await self.db.users.insert_one(dict(user))
         return user
@@ -186,6 +216,8 @@ def make_flow():
 
     Returns the flow and a shutdown callable; the fixture owns the lifetime.
     """
+    database, server, get_current_user, get_optional_user = load_application()
+
     db = AsyncMongoMockClient()["tls_flow_tests"]
     previous_db = database._db
     database._db = db
