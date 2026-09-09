@@ -23,7 +23,7 @@ function rank(status) {
   return STATUS_RANK[status] ?? 0;
 }
 
-export function TournamentFlowStepper({ tournament, registrations = [], bracket, matchesV2 = [], onNavigate }) {
+export function TournamentFlowStepper({ tournament, registrations = [], matchesV2 = [], onNavigate }) {
   const status = tournament?.status || "draft";
   const r = rank(status);
 
@@ -31,9 +31,8 @@ export function TournamentFlowStepper({ tournament, registrations = [], bracket,
   const checkedIn = registrations.filter(
     (x) => CHECKED_IN.has(x.status) || x.checked_in_at
   ).length;
-  const bracketMatches = bracket?.matches?.length || 0;
-  const totalMatches = bracketMatches + (matchesV2?.length || 0);
-  const allMatches = [...(bracket?.matches || []), ...(matchesV2 || [])];
+  const allMatches = matchesV2 || [];
+  const totalMatches = allMatches.length;
   const completedMatches = allMatches.filter((m) => DONE_MATCH.has(m.status)).length;
   const hasBracket = totalMatches > 0;
   const published = status === "results_published" || status === "archived";

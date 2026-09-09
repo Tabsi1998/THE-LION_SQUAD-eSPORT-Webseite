@@ -272,7 +272,7 @@ function buildStationMatchLookup(bracketPayloads) {
   for (const payload of bracketPayloads || []) {
     const registrations = new Map((payload?.registrations || []).map((registration) => [registration.id, registration]));
     const tournamentTitle = payload?.tournament?.title || "Turnier";
-    for (const match of [...(payload?.matches_v2 || []), ...(payload?.matches || [])]) {
+    for (const match of payload?.matches_v2 || []) {
       if (!match?.id || isDoneMatch(match)) continue;
       const detail = stationMatchDetail(match, registrations, tournamentTitle);
       entries.push(detail);

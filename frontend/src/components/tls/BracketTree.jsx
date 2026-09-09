@@ -3,81 +3,43 @@ import { resolveMediaUrl } from "@/lib/api";
 import { formatBracketSection, formatMatchStatus, formatRoundName } from "@/lib/tournamentLabels";
 
 /**
- * Renders classic 1v1 brackets and flexible multiplayer heats.
+ * Renders a tournament structure: knockout brackets, group and league
+ * matchdays, and multiplayer heats.
  * `data` is the response from /api/tournaments/:id/bracket.
  */
 export function BracketTree({ data, compact = false, viewMode = "standard", onMatchClick }) {
-  const { matches = [], matches_v2 = [], stages = [], registrations = [] } = data || {};
-  const isTv = viewMode === "tv";
-  const podiumMap = useMemo(() => buildPodiumMap(matches, matches_v2), [matches, matches_v2]);
+  const { matches_v2 = [], stages = [], registrations = [] } = data || {};
+  const podiumMap = useMemo(() => buildPodiumMap(matches_v2), [matches_v2]);
   const regMap = useMemo(() => {
     const m = new Map();
     for (const r of registrations) m.set(r.id, r);
     return m;
   }, [registrations]);
 
-  const grouped = useMemo(() => {
-    const g = {};
-    for (const m of matches) {
-      const key = m.bracket || "winner";
-      g[key] = g[key] || {};
-      g[key][m.round] = g[key][m.round] || [];
-      g[key][m.round].push(m);
-    }
-    for (const b of Object.keys(g)) {
-      for (const r of Object.keys(g[b])) {
-        g[b][r].sort((a, c) => a.match_index - c.match_index);
-      }
-    }
-    return g;
-  }, [matches]);
-
-  if (matches_v2.length > 0 || stages.length > 0) {
-    return <StageBracketTree stages={stages} matches={matches_v2} regMap={regMap} podiumMap={podiumMap} compact={compact} viewMode={viewMode} onMatchClick={onMatchClick} />;
-  }
-
-  const renderBracket = (bracketKey, label) => {
-    const rounds = grouped[bracketKey];
-    if (!rounds) return null;
-    const roundNums = Object.keys(rounds).map(Number).sort((a, b) => a - b);
-    return (
-      <div className="space-y-3" key={bracketKey}>
-        {label && (
-          <div className="flex items-center gap-2 uppercase tracking-[0.2em] text-xs font-bold">
-            <span className="w-2 h-2 bg-[#29B6E8]" />
-            <span className="text-white/80">{label}</span>
-          </div>
-        )}
-        <div className={isTv
-          ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 overflow-hidden"
-          : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:flex gap-4 md:gap-6 xl:overflow-x-auto pb-4"
-        }>
-          {roundNums.map((rn) => (
-            <div key={rn} className={isTv ? "flex flex-col min-w-0 gap-2" : "flex flex-col min-w-0 xl:min-w-[240px] gap-4"}>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 px-2">
-                {formatRoundName(rounds[rn][0].round_name, rn)}
-              </div>
-              <div className={isTv ? "flex flex-col gap-2" : "flex flex-col justify-around flex-1 gap-3"}>
-                {rounds[rn].map((m) => (
-                  <BracketNode key={m.id} match={m} regMap={regMap} podiumMap={podiumMap} compact={compact || isTv} onClick={onMatchClick} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
   return (
-    <div className={isTv ? "space-y-4 h-full overflow-hidden" : "space-y-8"}>
-      {renderBracket("winner", grouped.loser ? formatBracketSection("winner") : null)}
-      {renderBracket("loser", formatBracketSection("loser"))}
-      {renderBracket("grand_final", formatBracketSection("grand_final"))}
-      {renderBracket("bronze", formatBracketSection("bronze"))}
-      {renderBracket("round_robin", formatBracketSection("round_robin"))}
-    </div>
+    <StageBracketTree
+      stages={stages}
+      matches={matches_v2}
+      regMap={regMap}
+      podiumMap={podiumMap}
+      compact={compact}
+      viewMode={viewMode}
+      onMatchClick={onMatchClick}
+    />
   );
+}
+
+// Formate, die in einer Tabelle ausgespielt werden statt in einem Baum. Sie
+// laufen über Spieltage, an denen alle gleichzeitig spielen - nebeneinander
+// scrollende Runden wären dafür die falsche Form, besonders am Telefon.
+const TABLE_STAGE_TYPES = new Set(["round_robin_groups", "league", "swiss"]);
+const TABLE_SECTION_RE = /^(round_robin|liga|league|swiss|group_.+)$/i;
+
+export function isTableFormat(matches = []) {
+  const first = matches.find(Boolean);
+  if (!first) return false;
+  if (first.stage_type) return TABLE_STAGE_TYPES.has(String(first.stage_type));
+  return TABLE_SECTION_RE.test(String(first.section || ""));
 }
 
 function StageBracketTree({ stages, matches, regMap, podiumMap, compact = false, viewMode = "standard", onMatchClick }) {
@@ -143,37 +105,65 @@ function StageBracketTree({ stages, matches, regMap, podiumMap, compact = false,
   );
 }
 
+function MatchNode({ match, regMap, podiumMap, compact, onMatchClick }) {
+  const isDuel = (match.match_type || "duel") === "duel" && (match.slots || []).length <= 2;
+  const Node = isDuel ? V2DuelNode : HeatNode;
+  return <Node match={match} regMap={regMap} podiumMap={podiumMap} compact={compact} onClick={onMatchClick} />;
+}
+
 function StageSection({ section, rounds, regMap, podiumMap, compact, viewMode, onMatchClick }) {
   const isTv = viewMode === "tv";
   const roundNums = Object.keys(rounds).map(Number).sort((a, b) => a - b);
+  const asTable = isTableFormat(roundNums.flatMap((rn) => rounds[rn]));
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 uppercase tracking-[0.2em] text-xs font-bold">
         <span className="w-2 h-2 bg-[#FFD700]" />
         <span className="text-white/80">{formatBracketSection(section)}</span>
       </div>
-      <div className={isTv
-        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 overflow-hidden"
-        : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:flex gap-4 md:gap-6 xl:overflow-x-auto pb-4"
-      }>
-        {roundNums.map((rn) => (
-          <div key={rn} className={isTv ? "flex flex-col min-w-0 gap-2" : `flex flex-col min-w-0 self-stretch ${compact ? "xl:min-w-[220px]" : "xl:min-w-[280px]"} gap-4`}>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 px-2">
-              {formatRoundName(rounds[rn][0].round_name, rn)}
+
+      {asTable ? (
+        // Spieltage untereinander: an einem Spieltag spielen alle gleichzeitig,
+        // es gibt keinen Fluss von links nach rechts.
+        <div className="space-y-5">
+          {roundNums.map((rn) => (
+            <div key={rn} className="space-y-2">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 px-2">
+                {formatRoundName(rounds[rn][0].round_name, rn)}
+              </div>
+              <div className={isTv
+                ? "grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3"
+                : "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4"
+              }>
+                {rounds[rn].map((match) => (
+                  <MatchNode key={match.id} match={match} regMap={regMap} podiumMap={podiumMap}
+                             compact={compact || isTv} onMatchClick={onMatchClick} />
+                ))}
+              </div>
             </div>
-            <div className={isTv ? "flex flex-col gap-2" : "flex flex-col justify-around flex-1 gap-3"}>
-              {rounds[rn].map((match) => {
-                const isDuel = (match.match_type || "duel") === "duel" && (match.slots || []).length <= 2;
-                return isDuel ? (
-                  <V2DuelNode key={match.id} match={match} regMap={regMap} podiumMap={podiumMap} compact={compact || isTv} onClick={onMatchClick} />
-                ) : (
-                  <HeatNode key={match.id} match={match} regMap={regMap} podiumMap={podiumMap} compact={compact || isTv} onClick={onMatchClick} />
-                );
-              })}
+          ))}
+        </div>
+      ) : (
+        <div className={isTv
+          ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 overflow-hidden"
+          : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:flex gap-4 md:gap-6 xl:overflow-x-auto pb-4"
+        }>
+          {roundNums.map((rn) => (
+            <div key={rn} className={isTv ? "flex flex-col min-w-0 gap-2" : `flex flex-col min-w-0 self-stretch ${compact ? "xl:min-w-[220px]" : "xl:min-w-[280px]"} gap-4`}>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 px-2">
+                {formatRoundName(rounds[rn][0].round_name, rn)}
+              </div>
+              <div className={isTv ? "flex flex-col gap-2" : "flex flex-col justify-around flex-1 gap-3"}>
+                {rounds[rn].map((match) => (
+                  <MatchNode key={match.id} match={match} regMap={regMap} podiumMap={podiumMap}
+                             compact={compact || isTv} onMatchClick={onMatchClick} />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -320,46 +310,6 @@ function HeatRow({ slot, registration, result, qualified, podiumRank, compact = 
   );
 }
 
-function BracketNode({ match, regMap, podiumMap, compact = false, onClick }) {
-  const a = regMap.get(match.participant_a_id);
-  const b = regMap.get(match.participant_b_id);
-  const winnerA = match.winner_id && match.winner_id === match.participant_a_id;
-  const winnerB = match.winner_id && match.winner_id === match.participant_b_id;
-  const nodePodium = topPodiumRank([match.participant_a_id, match.participant_b_id], podiumMap);
-
-  return (
-    <button
-      type="button"
-      onClick={() => onClick?.(match)}
-      data-testid={`bracket-match-${match.id}`}
-      className={`tls-bracket-node relative text-left rounded-sm overflow-hidden border ${podiumBorderClass(nodePodium)} hover:border-[#29B6E8]/60 transition-all group`}
-    >
-      <Row
-        label={a?.display_name || a?.user?.display_name || a?.ingame_name || (match.participant_a_id ? "-" : "Offen")}
-        score={match.score_a}
-        isWinner={winnerA}
-        podiumRank={podiumMap?.get(match.participant_a_id)}
-        avatar={a?.user?.avatar_url}
-        compact={compact}
-      />
-      <div className="h-px bg-white/5" />
-      <Row
-        label={b?.display_name || b?.user?.display_name || b?.ingame_name || (match.participant_b_id ? "-" : "Offen")}
-        score={match.score_b}
-        isWinner={winnerB}
-        podiumRank={podiumMap?.get(match.participant_b_id)}
-        avatar={b?.user?.avatar_url}
-        compact={compact}
-      />
-      <MatchMeta match={match} compact={compact} />
-      <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-white/40 border-t border-white/5 flex items-center justify-between font-display">
-        <span>Spiel #{match.match_index + 1}</span>
-        <span><LiveStatus status={match.status} /></span>
-      </div>
-    </button>
-  );
-}
-
 function Row({ label, score, isWinner, podiumRank, avatar, compact = false }) {
   const podium = podiumMeta(podiumRank);
   return (
@@ -403,7 +353,7 @@ function isBronzeMatch(match) {
   return haystack.includes("bronze") || haystack.includes("platz 3") || haystack.includes("third");
 }
 
-function buildPodiumMap(matches = [], matchesV2 = []) {
+function buildPodiumMap(matchesV2 = []) {
   const podium = new Map();
   const place = (id, rank) => {
     if (!id || ![1, 2, 3].includes(rank)) return;
@@ -443,26 +393,6 @@ function buildPodiumMap(matches = [], matchesV2 = []) {
     if (lowerFinal) {
       const loser = (match.results || []).find((result) => Number(result.rank) === 2);
       place(loser?.registration_id, 3);
-    }
-  }
-
-  const maxRoundByBracket = new Map();
-  for (const match of matches) {
-    const bracket = normalizeSection(match.bracket || "winner");
-    const round = Number(match.round || 1);
-    maxRoundByBracket.set(bracket, Math.max(maxRoundByBracket.get(bracket) || 0, round));
-  }
-  const hasLegacyGrandFinal = matches.some((match) => ["gf", "grand_final"].includes(normalizeSection(match.bracket)));
-  for (const match of matches) {
-    if (!isCompleted(match) && !match.winner_id) continue;
-    const bracket = normalizeSection(match.bracket || "winner");
-    const finalMatch = ["gf", "grand_final"].includes(bracket) || (!hasLegacyGrandFinal && ["winner", "main"].includes(bracket) && Number(match.round || 1) === maxRoundByBracket.get(bracket));
-    if (isBronzeMatch(match)) {
-      place(match.winner_id, 3);
-    } else if (finalMatch) {
-      place(match.winner_id, 1);
-      const loserId = match.participant_a_id === match.winner_id ? match.participant_b_id : match.participant_a_id;
-      place(loserId, 2);
     }
   }
 

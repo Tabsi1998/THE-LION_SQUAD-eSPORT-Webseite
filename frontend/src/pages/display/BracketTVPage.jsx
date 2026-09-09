@@ -14,7 +14,6 @@ import {
   formatBracketSection,
   formatMatchKind,
   formatMatchStatus,
-  formatRoundName,
   formatScheduleGroupLabel,
 } from "@/lib/tournamentLabels";
 
@@ -74,7 +73,7 @@ export default function BracketTVPage() {
   const t = data.tournament;
   const publicUrl = `${window.location.origin}/tournaments/${t.slug || t.id}/bracket`;
   const activeView = views[viewIndex % Math.max(views.length, 1)] || { title: "Turnierbaum", columns: [], registrations: [] };
-  const hasMatches = (data.matches?.length || 0) + (data.matches_v2?.length || 0) > 0;
+  const hasMatches = (data.matches_v2?.length || 0) > 0;
 
   return (
     <div className="h-screen tv-bg text-white flex flex-col overflow-hidden">
@@ -330,9 +329,7 @@ function stationLabel(match) {
 function buildTvViews(data, mode = "active") {
   if (!data) return [];
   const registrations = data.registrations || [];
-  const columns = (data.matches_v2 || []).length > 0
-    ? buildV2Columns(data)
-    : buildLegacyColumns(data);
+  const columns = buildV2Columns(data);
   if (mode === "tree") {
     const pages = chunk(expandColumnsForDisplay(columns), MAX_COLUMNS_PER_VIEW);
     return pages.map((page, index) => ({
@@ -386,34 +383,6 @@ function buildV2Columns(data) {
         round,
         sectionLabel: [stage.name || "Phase", formatBracketSection(section)].filter(Boolean).join(" · "),
         roundLabel: formatScheduleGroupLabel(sortedMatches[0], data.tournament),
-        matches: sortedMatches,
-      });
-    })
-    .sort(sortColumns);
-}
-
-function buildLegacyColumns(data) {
-  const groups = new Map();
-  for (const match of data.matches || []) {
-    const round = Number(match.round || 1);
-    const section = match.bracket || "winner";
-    const key = `${section}::${round}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(match);
-  }
-
-  return [...groups.entries()]
-    .map(([key, matches]) => {
-      const [section, roundValue] = key.split("::");
-      const round = Number(roundValue || 1);
-      const sortedMatches = sortMatches(matches);
-      return makeColumn({
-        key,
-        stageNumber: 1,
-        section,
-        round,
-        sectionLabel: formatBracketSection(section),
-        roundLabel: formatRoundName(sortedMatches[0]?.round_name, round),
         matches: sortedMatches,
       });
     })
@@ -480,7 +449,7 @@ function isMatchDone(match) {
 }
 
 function buildUpcomingViews(data, registrations) {
-  const matches = [...(data.matches_v2 || []), ...(data.matches || [])]
+  const matches = [...(data.matches_v2 || [])]
     .filter((match) => !isMatchDone(match))
     .sort((a, b) => {
       const ad = Date.parse(a.scheduled_at || "") || Number.MAX_SAFE_INTEGER;
@@ -572,7 +541,7 @@ function useMatchFlash(data) {
 
   useEffect(() => {
     if (!data) return undefined;
-    const all = [...(data.matches || []), ...(data.matches_v2 || [])];
+    const all = data.matches_v2 || [];
     const snapshot = {};
     const fresh = {};
     for (const match of all) {

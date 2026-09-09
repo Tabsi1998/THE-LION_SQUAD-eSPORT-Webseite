@@ -46,13 +46,6 @@ function slotLabel(slot, registrationMap) {
   return participantLabel(registration) || slot.source?.raw || "Offen";
 }
 
-function legacyLabels(match, registrationMap) {
-  return [
-    participantLabel(registrationMap.get(match.participant_a_id)),
-    participantLabel(registrationMap.get(match.participant_b_id)),
-  ];
-}
-
 function resultLine(match, registrationMap) {
   if (Array.isArray(match.results) && match.results.length) {
     return match.results
@@ -85,16 +78,7 @@ function normalizeBracketRows(payload) {
     source: "v2",
   }));
 
-  const legacyRows = (payload?.matches || []).map((match) => ({
-    ...match,
-    tournament,
-    labels: legacyLabels(match, registrationMap),
-    groupLabel: match.round_name || (match.round ? `Runde ${match.round}` : "Runde"),
-    resultText: resultLine(match, registrationMap),
-    source: "legacy",
-  }));
-
-  return [...v2Rows, ...legacyRows].map((match) => ({
+  return v2Rows.map((match) => ({
     ...match,
     sortTime: matchSortValue(match),
     publicUrl: `/matches/${match.id}`,
