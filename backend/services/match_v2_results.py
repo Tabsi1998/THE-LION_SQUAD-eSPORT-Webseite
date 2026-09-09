@@ -5,6 +5,7 @@ import random
 from typing import Any
 from collections import defaultdict
 
+from match_rules import match_allows_draw
 from services.match_result_errors import MatchResultError
 
 # Derselbe Fehler, unter dem Namen, unter dem ihn der Graph-Zweig eingeführt hat.
@@ -88,43 +89,76 @@ def _ranking_mode(match: dict) -> str:
     return "higher_score"
 
 
-def _auto_rank_results(match: dict, raw_results: list[dict]) -> list[dict]:
-    mode = _ranking_mode(match)
+def _placement_key(mode: str, entry: dict) -> tuple:
+    """How good this entry is, without any tiebreaker.
 
-    def sort_key(item: tuple[int, dict]) -> tuple:
-        index, entry = item
-        if mode == "time":
-            time_ms = _time_for_ranking(entry)
-            return (
-                bool(entry.get("forfeit")),
-                bool(entry.get("dnf")),
-                time_ms is None,
-                time_ms if time_ms is not None else float("inf"),
-                -_result_score_for_ranking(entry),
-                index,
-            )
-        if mode == "lower_score":
-            score = _result_score_for_ranking(entry)
-            return (
-                bool(entry.get("forfeit")),
-                bool(entry.get("dnf")),
-                score,
-                index,
-            )
+    Deliberately without the list position: two entries with the same key are
+    genuinely level, and the caller decides whether that is a draw or has to be
+    broken.
+    """
+    if mode == "time":
+        time_ms = _time_for_ranking(entry)
         return (
             bool(entry.get("forfeit")),
             bool(entry.get("dnf")),
+            time_ms is None,
+            time_ms if time_ms is not None else float("inf"),
             -_result_score_for_ranking(entry),
-            index,
         )
-
-    ranked = sorted(
-        enumerate(raw_results),
-        key=sort_key,
+    if mode == "lower_score":
+        return (
+            bool(entry.get("forfeit")),
+            bool(entry.get("dnf")),
+            _result_score_for_ranking(entry),
+        )
+    return (
+        bool(entry.get("forfeit")),
+        bool(entry.get("dnf")),
+        -_result_score_for_ranking(entry),
     )
+
+
+def _is_measured(entry: dict) -> bool:
+    return (
+        entry.get("points") is not None
+        or entry.get("score") is not None
+        or entry.get("time_ms") not in (None, "")
+        or bool(entry.get("forfeit"))
+        or bool(entry.get("dnf"))
+    )
+
+
+def _auto_rank_results(match: dict, raw_results: list[dict]) -> list[dict]:
+    """Derive placements from what was measured.
+
+    The score decides wherever there is one - a reported placement that
+    contradicts its own score must not stand, otherwise anyone could rank
+    themselves first. But when nothing was measured at all, the reported
+    placement is the only information there is; without this a walkover, which
+    names the ranking and carries no scores, would come back out as a draw.
+    """
+    if raw_results and not any(_is_measured(entry) for entry in raw_results) \
+            and all(entry.get("rank") is not None for entry in raw_results):
+        return [dict(entry) for entry in raw_results]
+
+    mode = _ranking_mode(match)
+    allow_draw = match_allows_draw(match)
+    ordered = sorted(
+        enumerate(raw_results),
+        key=lambda item: (_placement_key(mode, item[1]), item[0]),
+    )
+
     next_rows = [dict(entry) for entry in raw_results]
-    for rank, (idx, _) in enumerate(ranked, start=1):
-        next_rows[idx]["rank"] = rank
+    rank = 0
+    previous_key = None
+    for position, (index, entry) in enumerate(ordered, start=1):
+        key = _placement_key(mode, entry)
+        # Gleichstand teilt sich den Platz, der nächste rückt entsprechend nach
+        # hinten - 1, 1, 3 und nicht 1, 1, 2.
+        if not (allow_draw and previous_key is not None and key == previous_key):
+            rank = position
+        next_rows[index]["rank"] = rank
+        previous_key = key
     return next_rows
 
 
@@ -136,8 +170,9 @@ def normalize_v2_results(match: dict, raw_results: list[dict]) -> list[dict]:
         raise MatchV2ResultError("Ergebnisliste muss alle belegten Teilnehmer enthalten")
     raw_results = _auto_rank_results(match, raw_results)
 
+    allow_draw = match_allows_draw(match)
     seen_regs: set[str] = set()
-    seen_ranks: set[int] = set()
+    seen_ranks: list[int] = []
     normalized: list[dict] = []
     for entry in raw_results:
         registration_id = (entry.get("registration_id") or "").strip()
@@ -154,9 +189,9 @@ def normalize_v2_results(match: dict, raw_results: list[dict]) -> list[dict]:
             raise MatchV2ResultError("Rank muss eine Zahl sein")
         if rank < 1:
             raise MatchV2ResultError("Rank muss größer 0 sein")
-        if rank in seen_ranks:
+        if rank in seen_ranks and not allow_draw:
             raise MatchV2ResultError(f"Rank {rank} ist mehrfach vergeben")
-        seen_ranks.add(rank)
+        seen_ranks.append(rank)
         time_ms = int(entry["time_ms"]) if entry.get("time_ms") not in (None, "") else None
         if time_ms is not None and time_ms < 0:
             raise MatchV2ResultError("time_ms darf nicht negativ sein")
@@ -173,11 +208,35 @@ def normalize_v2_results(match: dict, raw_results: list[dict]) -> list[dict]:
             "note": (entry.get("note") or "").strip() or None,
         })
 
-    expected_ranks = set(range(1, len(participants) + 1))
-    if seen_ranks != expected_ranks:
-        missing = ", ".join(str(r) for r in sorted(expected_ranks - seen_ranks))
-        raise MatchV2ResultError(f"Ranks müssen fortlaufend 1-{len(participants)} sein; fehlt: {missing}")
+    _validate_placements(seen_ranks, len(participants), allow_draw)
     return sorted(normalized, key=lambda item: item["rank"])
+
+
+def _validate_placements(ranks: list[int], participant_count: int, allow_draw: bool) -> None:
+    """Check the placements form a ranking, with or without shared places.
+
+    Without draws that means exactly 1..n. With draws it means the usual
+    convention: whoever ties shares a place and the next one skips ahead, so
+    1, 1, 3 is a ranking and 1, 1, 2 is not.
+    """
+    if not allow_draw:
+        expected = set(range(1, participant_count + 1))
+        missing = ", ".join(str(rank) for rank in sorted(expected - set(ranks)))
+        if set(ranks) != expected:
+            raise MatchV2ResultError(
+                f"Ranks müssen fortlaufend 1-{participant_count} sein; fehlt: {missing}")
+        return
+
+    previous = None
+    for position, rank in enumerate(sorted(ranks), start=1):
+        if previous is not None and rank == previous:
+            continue
+        if rank != position:
+            raise MatchV2ResultError(
+                f"Platz {rank} passt nicht: bei Gleichstand teilen sich die Beteiligten "
+                "den Platz und der nächste rückt entsprechend nach hinten."
+            )
+        previous = rank
 
 
 def is_v2_result_replay(

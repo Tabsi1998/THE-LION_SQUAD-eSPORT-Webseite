@@ -38,7 +38,10 @@ def test_the_forfeiting_participant_is_ranked_last():
 
     assert results == [
         {"registration_id": "reg-a", "rank": 1},
-        {"registration_id": "reg-b", "rank": 2},
+        # Ausdrücklich als Aufgabe gekennzeichnet - sonst wäre die Platzierung
+        # dort, wo Unentschieden erlaubt sind, von einem geteilten Platz nicht
+        # zu unterscheiden.
+        {"registration_id": "reg-b", "rank": 2, "forfeit": True},
     ]
 
 
