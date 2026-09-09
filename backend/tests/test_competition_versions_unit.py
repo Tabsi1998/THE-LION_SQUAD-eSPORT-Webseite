@@ -15,7 +15,7 @@ from services.competition_versions import (
 
 def test_new_competitions_pin_the_catalog_write_model():
     assert new_competition_version_fields("single_elim") == {
-        "engine_version": ENGINE_VERSION_BY_WRITE_MODEL["classic"],
+        "engine_version": ENGINE_VERSION_BY_WRITE_MODEL["graph"],
         "ruleset_version": CURRENT_RULESET_VERSION,
     }
     assert new_competition_version_fields("ffa_custom_bracket")["engine_version"] == (

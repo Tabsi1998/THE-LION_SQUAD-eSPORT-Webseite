@@ -20,7 +20,7 @@ from services.custom_bracket import (
     infer_rounds,
     parse_custom_bracket_schema,
 )
-from services.custom_bracket import _auto_groups_schema
+from services.custom_bracket import _auto_groups_schema, _auto_league_schema
 from services.graph_swiss import (
     bye_history,
     next_round_number,
@@ -453,3 +453,70 @@ def test_a_group_tournament_in_the_graph_keeps_one_table_per_group():
     assert len(rows) == 2
     assert [entry["group"]["group_key"] for entry in rows] == ["A", "B"]
     assert rows[0]["standings"][0]["registration_id"] == "a"
+
+
+# ---------------------------------------------------------------- Liga
+
+def test_a_league_is_a_round_robin_played_twice():
+    """Das ist der Unterschied zur Gruppe: Hin- und Rückrunde."""
+    specs = parse_custom_bracket_schema(_auto_league_schema(4))
+
+    assert len(specs) == 4 * 3  # jeder gegen jeden, zweimal
+
+
+def test_the_return_leg_swaps_the_sides():
+    """Wer zuerst steht, belegt Slot eins - das soll sich in der Rückrunde drehen."""
+    specs = parse_custom_bracket_schema(_auto_league_schema(4))
+    pairings = [tuple(source["seed"] for source in spec.sources) for spec in specs]
+
+    first_half = pairings[: len(pairings) // 2]
+    for home, away in first_half:
+        assert (away, home) in pairings[len(pairings) // 2:], f"Rückspiel {away}-{home} fehlt"
+
+
+def test_every_pairing_happens_exactly_twice():
+    specs = parse_custom_bracket_schema(_auto_league_schema(6))
+    seen: dict[frozenset, int] = {}
+    for spec in specs:
+        key = frozenset(source["seed"] for source in spec.sources)
+        seen[key] = seen.get(key, 0) + 1
+
+    assert set(seen.values()) == {2}
+    assert len(seen) == 6 * 5 // 2
+
+
+def test_nobody_plays_twice_on_the_same_league_matchday():
+    specs = parse_custom_bracket_schema(_auto_league_schema(6))
+    rounds = infer_rounds(specs)
+
+    per_matchday: dict[int, list[int]] = {}
+    for spec in specs:
+        per_matchday.setdefault(rounds[spec.key], []).extend(
+            source["seed"] for source in spec.sources)
+
+    for matchday, seeds in per_matchday.items():
+        assert len(seeds) == len(set(seeds)), f"Setzplatz doppelt an Spieltag {matchday}"
+
+
+def test_an_odd_league_gives_everyone_a_rest_day():
+    """Bei ungerader Teilnehmerzahl setzt pro Spieltag genau einer aus."""
+    specs = parse_custom_bracket_schema(_auto_league_schema(5))
+    rounds = infer_rounds(specs)
+    matchdays = max(rounds.values())
+
+    assert len(specs) == 5 * 4
+    for matchday in range(1, matchdays + 1):
+        playing = [
+            source["seed"] for spec in specs if rounds[spec.key] == matchday
+            for source in spec.sources
+        ]
+        assert len(playing) == 4, f"Spieltag {matchday} hat {len(playing)} Startplätze"
+
+
+@pytest.mark.parametrize("size", [2, 3, 4, 5, 8, 11])
+def test_generated_league_schemas_are_valid(size):
+    specs = parse_custom_bracket_schema(_auto_league_schema(size))
+
+    assert len(specs) == size * (size - 1)
+    for spec in specs:
+        assert len(spec.sources) == 2

@@ -87,15 +87,32 @@ def test_initial_preview_uses_selected_tournament_format():
     assert _estimate_legacy_preview_matches({"format": "round_robin", "max_participants": 8}) == 28
 
 
-def test_initial_preview_skips_unsupported_or_too_large_formats():
-    assert _can_create_initial_legacy_preview({"format": "single_elim", "max_participants": 64}) is True
-    assert _can_create_initial_legacy_preview({"format": "ffa", "max_participants": 16}) is False
-    assert _can_create_initial_legacy_preview({"format": "league", "max_participants": 32}) is False
-    assert _can_create_initial_legacy_preview({"format": "custom_bracket", "max_participants": 8}) is False
-    assert _can_create_initial_stage_preview({"format": "ffa", "max_participants": 8}) is True
-    assert _can_create_initial_stage_preview({"format": "battle_royale", "max_participants": 8}) is True
-    assert _can_create_initial_stage_preview({"format": "custom_bracket", "max_participants": 8}) is True
-    assert _can_create_initial_stage_preview({"format": "ffa_custom_bracket", "max_participants": 8}) is True
+def test_no_format_draws_its_first_preview_in_the_classic_store_any_more():
+    """Der klassische Entwurfsweg ist tot - dort startet nichts mehr."""
+    for fmt in ("single_elim", "double_elim", "round_robin", "league", "ffa", "custom_bracket"):
+        assert _can_create_initial_legacy_preview({"format": fmt, "max_participants": 16}) is False, fmt
+
+
+def test_every_bracket_format_previews_in_the_graph_store():
+    for fmt in ("single_elim", "double_elim", "round_robin", "league", "groups",
+                "ffa", "battle_royale", "custom_bracket", "ffa_custom_bracket"):
+        assert _can_create_initial_stage_preview({"format": fmt, "max_participants": 8}) is True, fmt
+
+
+def test_a_league_too_large_to_draw_is_still_refused():
+    """Jeder gegen jeden, zweimal: 64 Teilnehmer waeren ueber viertausend Spiele.
+
+    Die Obergrenze galt im klassischen Speicher und muss im Graph genauso gelten,
+    sonst legt eine Turniererstellung die Datenbank lahm.
+    """
+    assert _can_create_initial_stage_preview({"format": "league", "max_participants": 16}) is True
+    assert _can_create_initial_stage_preview({"format": "league", "max_participants": 64}) is False
+    assert _can_create_initial_stage_preview({"format": "round_robin", "max_participants": 64}) is False
+    # Formate ohne quadratisches Wachstum bleiben unbegrenzt.
+    assert _can_create_initial_stage_preview({"format": "ffa", "max_participants": 512}) is True
+
+
+def test_formats_without_a_bracket_stay_out():
     assert _can_rebuild_bracket_from_format({"format": "custom_bracket", "max_participants": 64}) is True
     assert _can_rebuild_bracket_from_format({"format": "ffa_custom_bracket", "max_participants": 64}) is True
     assert _can_rebuild_bracket_from_format({"format": "time_trial", "max_participants": 64}) is False
@@ -224,7 +241,18 @@ def test_finalize_creates_stage_for_existing_custom_tournament_without_preview()
     anyio.run(run)
 
 
-def test_registration_refresh_replaces_legacy_preview_with_real_players():
+
+def stage_participant_ids(db) -> set:
+    """Wer steckt in den Slots - das Gegenstueck zu participant_a/b im alten Speicher."""
+    return {
+        slot.get("registration_id")
+        for match in db.matches_v2.rows
+        for slot in match.get("slots") or []
+        if slot.get("registration_id")
+    }
+
+
+def test_registration_refresh_fills_draft_slots_with_real_players():
     async def run():
         tournament = {
             "id": "t1",
@@ -237,7 +265,7 @@ def test_registration_refresh_replaces_legacy_preview_with_real_players():
 
         preview = await _create_initial_bracket_preview(db, tournament, "admin-1")
         assert preview["preview"] is True
-        assert all(match["is_preview"] for match in db.matches.rows)
+        assert all(match["is_preview"] for match in db.matches_v2.rows)
 
         db.tournament_registrations.rows.extend([
             {"id": "r1", "user_id": "u1", "tournament_id": "t1", "status": "approved", "seed": 1},
@@ -246,26 +274,21 @@ def test_registration_refresh_replaces_legacy_preview_with_real_players():
         ])
 
         refreshed = await _refresh_tournament_previews_after_registration(db, tournament, "admin-1")
-        participant_ids = {
-            pid
-            for match in db.matches.rows
-            for pid in (match.get("participant_a_id"), match.get("participant_b_id"))
-            if pid
-        }
+        participant_ids = stage_participant_ids(db)
 
-        assert refreshed["engine"] == "legacy"
+        assert refreshed["engine"] == "stages"
         assert refreshed["preview"] is True
         assert refreshed["participant_count"] == 2
-        assert {"r1", "r2", "preview-seed-3", "preview-seed-4"} <= participant_ids
-        assert "wait" not in participant_ids
-        assert all(match["is_preview"] for match in db.matches.rows)
-        assert db.tournaments.rows[0]["engine_version"] == "competition.classic.v1"
+        assert {"r1", "r2"} <= participant_ids
+        assert "wait" not in participant_ids, "Warteliste gehoert nicht in den Entwurf"
+        assert all(match["is_preview"] for match in db.matches_v2.rows)
+        assert db.tournaments.rows[0]["engine_version"] == "competition.graph.v1"
         assert db.tournaments.rows[0]["ruleset_version"] == "competition.ruleset.v1"
 
     anyio.run(run)
 
 
-def test_checkin_finalization_turns_preview_into_fixed_legacy_matches():
+def test_checkin_finalization_turns_the_draft_into_a_fixed_bracket():
     async def run():
         tournament = {
             "id": "t1",
@@ -284,19 +307,14 @@ def test_checkin_finalization_turns_preview_into_fixed_legacy_matches():
         ])
 
         finalized = await _finalize_bracket_for_checkin(db, tournament, "admin-1")
-        participant_ids = {
-            pid
-            for match in db.matches.rows
-            for pid in (match.get("participant_a_id"), match.get("participant_b_id"))
-            if pid
-        }
+        participant_ids = stage_participant_ids(db)
 
-        assert finalized["engine"] == "legacy"
+        assert finalized["engine"] == "stages"
         assert finalized["participant_count"] == 4
         assert finalized["preview"] is False
         assert {"r1", "r2", "r3", "r4"} <= participant_ids
         assert not any(str(pid).startswith("preview-seed-") for pid in participant_ids)
-        assert all(not match["is_preview"] for match in db.matches.rows)
+        assert all(not match["is_preview"] for match in db.matches_v2.rows)
 
     anyio.run(run)
 
@@ -322,14 +340,9 @@ def test_checkin_registration_change_keeps_bracket_fixed():
         ])
 
         rebuilt = await _refresh_tournament_previews_after_registration(db, tournament, "admin-1")
-        participant_ids = {
-            pid
-            for match in db.matches.rows
-            for pid in (match.get("participant_a_id"), match.get("participant_b_id"))
-            if pid
-        }
+        participant_ids = stage_participant_ids(db)
 
-        assert rebuilt is None
+        assert rebuilt is None, "Nach dem Check-in wird nicht mehr neu gezeichnet"
         assert {"r1", "r2"} <= participant_ids
         assert "r3" not in participant_ids
         assert "r4" not in participant_ids
