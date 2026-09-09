@@ -36,6 +36,7 @@ Das ersetzt keine manuelle Prüfung externer Links oder der fachlichen Abnahme.
 
 ## Turniere und Entwicklungshistorie
 
+- [UMBAUPLAN](UMBAUPLAN.md): laufender Arbeitsstand des Turnier- und Übersichtlichkeitsumbaus — welcher Block steht, welcher offen ist.
 - [COMPETITION_ENGINE](COMPETITION_ENGINE.md): eigenständiger künftiger Umbau mit Abnahmekriterien.
 - [TOURNAMENT_CUSTOM_BRACKETS](TOURNAMENT_CUSTOM_BRACKETS.md): vorhandene Strukturen und Bedienung.
 - [TOURNAMENT_MIGRATION_DRYRUN](TOURNAMENT_MIGRATION_DRYRUN.md): Bestandsaufnahme vor der Zusammenführung — liest nur, schreibt nichts.
