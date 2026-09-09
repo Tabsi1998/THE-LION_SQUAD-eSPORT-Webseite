@@ -76,6 +76,9 @@ C=[W:A:1,W:A:2,W:B:1,W:B:2]
 # Runde 1
 LA=[L:A:1,L:A:2,L:B:1,L:B:2]`;
 const CUSTOM_STAGE_TYPES = new Set(["custom_bracket", "ffa_custom_bracket"]);
+// Die beiden Turnierformate, bei denen die Turnierleitung den Baum selbst
+// schreibt. Nur hier hat das Bearbeiten-Formular überhaupt Strukturfelder.
+const CUSTOM_BRACKET_FORMATS = new Set(["custom_bracket", "ffa_custom_bracket"]);
 // Strukturen, die das Backend aus dem Format bauen kann. Schweizer Runden
 // fehlen hier bewusst: die entstehen einzeln über "Schweizer Runde".
 const AUTO_STAGE_TYPES = new Set([
@@ -1606,8 +1609,11 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
   const firstStage = stages[0] || null;
   const stageSettings = firstStage?.settings || {};
   const [structure, setStructure] = useState({
-    stage_type: firstStage?.stage_type || (tournament.format === "double_elim" ? "double_elimination" : tournament.format === "ffa_custom_bracket" ? "ffa_custom_bracket" : tournament.format === "custom_bracket" ? "custom_bracket" : "single_elimination"),
-    match_type: firstStage?.match_type || (tournament.format === "ffa_custom_bracket" ? "ffa" : "duel"),
+    // Ohne vorhandene Phase bleibt der Strukturtyp leer: welcher zu welchem
+    // Format gehört, weiß das Backend (services/competition_formats.py). Hier
+    // stand früher eine zweite, unvollständige Zuordnung.
+    stage_type: firstStage?.stage_type || null,
+    match_type: firstStage?.match_type || null,
     match_size: stageSettings.match_size || (tournament.format === "ffa_custom_bracket" ? 4 : 2),
     min_players: stageSettings.min_players || 2,
     qualifiers_per_match: stageSettings.qualifiers_per_match || (tournament.format === "ffa_custom_bracket" ? 2 : 1),
@@ -1621,14 +1627,23 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const applyRulePreset = (preset) => setF((x) => ({ ...x, ...preset.values }));
   const setStructureField = (k, v) => setStructure((x) => ({ ...x, [k]: v }));
+  // Nach einem Formatwechsel folgt die Struktur wieder dem Format: der eigene
+  // Vorschlag wird gelöscht, nicht neu geraten. Vorher landete hier alles außer
+  // drei Sonderfällen auf "single_elimination" - aus einer Liga, Gruppen, Round
+  // Robin oder FFA wurde beim Anwenden stillschweigend eine Einzelausscheidung.
   const setFormat = (value) => {
     setF((current) => ({ ...current, format: value, bronze_match: BRONZE_FORMATS.has(value) ? current.bronze_match : false }));
-    setStructure((current) => {
-      if (value === "double_elim") return { ...current, stage_type: "double_elimination", match_type: "duel", match_size: 2, min_players: 2, qualifiers_per_match: 1 };
-      if (value === "custom_bracket") return { ...current, stage_type: "custom_bracket", match_type: "duel", match_size: 2, min_players: 2, qualifiers_per_match: 1 };
-      if (value === "ffa_custom_bracket") return { ...current, stage_type: "ffa_custom_bracket", match_type: "ffa", match_size: current.match_size || 4, min_players: 2, qualifiers_per_match: current.qualifiers_per_match || 2, schema: current.schema || DEFAULT_FFA_SCHEMA };
-      return { ...current, stage_type: "single_elimination", match_type: "duel", match_size: 2, min_players: 2, qualifiers_per_match: 1 };
-    });
+    setStructure((current) => ({
+      ...current,
+      stage_type: null,
+      match_type: null,
+      match_size: value === "ffa_custom_bracket" ? (current.match_size || 4) : 2,
+      min_players: 2,
+      qualifiers_per_match: value === "ffa_custom_bracket" ? (current.qualifiers_per_match || 2) : 1,
+      schema: value === "ffa_custom_bracket" ? (current.schema || DEFAULT_FFA_SCHEMA)
+        : value === "custom_bracket" ? current.schema
+          : "",
+    }));
   };
   const normalizeTournamentPayload = (source) => {
     const payload = { ...source };
@@ -1654,20 +1669,30 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     if (payload.prize_places.length === 0) payload.prize_places = null;
     return payload;
   };
-  const structurePayload = () => ({
-    name: "Turnierbaum",
-    stage_type: structure.stage_type,
-    match_type: structure.match_type,
-    settings: {
-      match_size: Number(structure.match_size) || (structure.match_type === "ffa" ? 4 : 2),
-      min_players: Number(structure.min_players) || 2,
-      qualifiers_per_match: Number(structure.qualifiers_per_match) || (structure.match_type === "ffa" ? 2 : 1),
+  // Mitgeschickt wird nur, was hier wirklich gewählt wurde. Was fehlt, leitet
+  // das Backend aus dem Turnierformat ab; ein mitgeschickter Strukturtyp würde
+  // diese Ableitung überstimmen. Spielgrößen und Schema gibt es nur bei den
+  // freien Turnierbäumen - bei allen anderen Formaten sind sie nicht bedienbar
+  // und würden nur die passenden Vorgaben überschreiben.
+  const structurePayload = () => {
+    const custom = CUSTOM_BRACKET_FORMATS.has(f.format);
+    const settings = {
       duration_minutes: Number(f.match_duration_minutes) || 30,
-      schema: structure.schema || "",
       score_type: "points",
       calculation: "points",
-    },
-  });
+    };
+    if (custom) {
+      const ffa = f.format === "ffa_custom_bracket";
+      settings.schema = structure.schema || "";
+      settings.match_size = Number(structure.match_size) || (ffa ? 4 : 2);
+      settings.min_players = Number(structure.min_players) || 2;
+      settings.qualifiers_per_match = Number(structure.qualifiers_per_match) || (ffa ? 2 : 1);
+    }
+    const payload = { name: "Turnierbaum", settings };
+    if (structure.stage_type) payload.stage_type = structure.stage_type;
+    if (structure.match_type) payload.match_type = structure.match_type;
+    return payload;
+  };
   const setTeamMode = (value) => setF((current) => ({
     ...current,
     team_mode: value,
@@ -1781,7 +1806,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.substitutes_allowed} onChange={(e)=>set("substitutes_allowed",e.target.checked)} className="accent-[#29B6E8]"/><span>Ersatzspieler erlauben</span></label>
           </div>
         </Details>
-        {["custom_bracket", "ffa_custom_bracket"].includes(f.format) && (
+        {CUSTOM_BRACKET_FORMATS.has(f.format) && (
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
             <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Freier Turnierbaum</div>
             <div className="grid md:grid-cols-3 gap-3">
