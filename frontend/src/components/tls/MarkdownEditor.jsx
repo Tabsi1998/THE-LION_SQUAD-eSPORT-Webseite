@@ -341,8 +341,12 @@ export function MarkdownEditor({
     },
   });
 
+  // Auf einen zerstörten Editor darf nichts mehr zugreifen. React baut Effekte
+  // im Entwicklungsmodus doppelt auf; dabei wird der Editor zwischendurch
+  // zerstört, und ein Aufruf auf dem alten Exemplar findet kein Schema mehr
+  // vor - die ganze Seite fiel dann in die Fehlerbehandlung.
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
     const current = htmlToMarkdownLite(editor.getHTML());
     const next = normalizeMarkdown(value);
     if (current === next) return;
@@ -352,12 +356,12 @@ export function MarkdownEditor({
   }, [editor, value]);
 
   const run = (command) => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
     command(editor.chain().focus()).run();
   };
 
   const setLink = async () => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
     const previous = editor.getAttributes("link").href || "";
     const href = await prompt({
       title: "Link einfügen",
@@ -376,7 +380,7 @@ export function MarkdownEditor({
   };
 
   const setImageUrl = async () => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
     const src = await prompt({
       title: "Bild per URL einfügen",
       description: "Direkte Bild-URL einfügen. Für eigene Bilder besser die Medienbibliothek verwenden.",
@@ -423,13 +427,13 @@ export function MarkdownEditor({
   };
 
   const insertMedia = (item) => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
     editor.chain().focus().setImage({ src: item.url, alt: item.alt_text || item.filename || "Bild" }).run();
     setMediaOpen(false);
   };
 
   const importHtml = (append = false) => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
     const raw = htmlInput.trim();
     if (!raw) {
       toast.error("Kein HTML-Inhalt zum Umwandeln gefunden.");
