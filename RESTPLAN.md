@@ -205,5 +205,10 @@ Archive und aktive Turniere zuletzt → alte Writes read-only, Nullnutzung messe
 erst danach entfernen. Fachliche Details und Abnahmematrix stehen ausschließlich
 in [COMPETITION_ENGINE.md](COMPETITION_ENGINE.md).
 
+R5 wird seit dem 8. September 2026 in nummerierten Blöcken abgearbeitet. Der laufende
+Arbeitsstand — welcher Block umgesetzt ist, welcher offen — steht in
+[UMBAUPLAN.md](UMBAUPLAN.md). Dort sind auch die später hinzugekommenen Themen
+aufgenommen: Spielwochen, PDF-Ausgabe, Live-Aktualisierung, Galerie und App.
+
 Mobile-Gerätetests, SDK-Umstieg und weitere UX-/Feature-Wünsche bleiben sichtbar im
 Backlog, werden aber nicht still in dieses Stabilisierungspaket hineingemischt.
