@@ -142,35 +142,37 @@ def test_the_duplicated_match_router_stays_gone():
 
 # ---------------------------------------------------------------- Format-Abgleich
 
-def test_no_format_claims_to_be_write_ready_yet():
-    """Guards the migration order: a format may only be marked ready once its
+def test_the_formats_that_run_over_the_engines_are_write_ready():
+    """Umgekehrte Fassung der frueheren Pruefung.
 
-    gaps are closed. If this fails, somebody flipped the flag ahead of the work.
+    Solange Luecken offen waren, durfte kein Format als schreibfertig gelten.
+    Die Luecken sind zu, der klassische Speicher ist leer - jetzt waere das
+    Gegenteil der Fehler: ein Format, das ueber die Engines laeuft und trotzdem
+    als unfertig markiert ist.
     """
-    premature = [key for key, cap in FORMAT_CAPABILITIES.items() if cap.canonical_write_ready]
-    assert premature == [], (
-        "Diese Formate sind als schreibfertig markiert, obwohl die Vereinheitlichung laeuft: "
-        f"{premature}. Vor dem Setzen müssen die Lücken aus EXPECTED_GAPS geschlossen sein."
-    )
-
-
-def test_the_format_table_alone_no_longer_decides_the_store():
-    """Single/Double still declare two different engines - legacy for the first
-    draft, the stage graph for a rebuild. That combination used to be enough to
-    move a played tournament. Since Block 4 it is not: the decision runs through
-    ``decide_rebuild_engine``, which lets the tournament's own matches override
-    the table. This test guards that the override is still reachable for exactly
-    the formats that need it.
-    """
-    declared_switch = sorted(
+    unfinished = sorted(
         key for key, cap in FORMAT_CAPABILITIES.items()
-        if cap.initial_preview_engine == "legacy" and cap.rebuild_engine == "stage"
-    )
-    assert declared_switch == ["double_elim", "single_elim"]
+        if not cap.canonical_write_ready and cap.current_write_model != "external")
 
-    for key in declared_switch:
-        decision = decide_rebuild_engine(
-            key, preferred=ENGINE_GRAPH, legacy_matches=[{"id": "m1", "is_preview": False}])
-        assert decision.engine == ENGINE_CLASSIC, (
-            f"{key} wuerde beim Neuaufbau wieder den Speicher wechseln."
-        )
+    assert unfinished == [], (
+        f"Diese Formate laufen ueber die Engines, gelten aber als unfertig: {unfinished}."
+    )
+
+
+def test_the_silent_store_switch_has_become_impossible():
+    """Frueher genuegte die Formattabelle, um ein gespieltes Turnier zu verschieben.
+
+    Block 4 hat die Entscheidung an die vorhandenen Dokumente gebunden. Jetzt
+    startet zusaetzlich kein Format mehr im klassischen Speicher - damit kann
+    der Wechsel gar nicht mehr entstehen, statt nur abgefangen zu werden.
+    """
+    starts_classic = sorted(
+        key for key, cap in FORMAT_CAPABILITIES.items()
+        if cap.initial_preview_engine == "legacy" or cap.rebuild_engine == "legacy")
+    assert starts_classic == []
+
+    # Und selbst wenn: ein gespieltes Turnier bleibt, wo es liegt.
+    decision = decide_rebuild_engine(
+        "single_elim", preferred=ENGINE_GRAPH,
+        legacy_matches=[{"id": "m1", "is_preview": False}])
+    assert decision.engine == ENGINE_CLASSIC

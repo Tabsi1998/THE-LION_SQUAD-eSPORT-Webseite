@@ -391,9 +391,10 @@ def test_tournament_creation_persists_engine_and_ruleset_versions(monkeypatch):
     ))
 
     inserted = tournaments.insert_one.await_args.args[0]
-    assert inserted["engine_version"] == "competition.classic.v1"
+    # Neue Turniere starten im Graph-Speicher - unabhaengig vom Format.
+    assert inserted["engine_version"] == "competition.graph.v1"
     assert inserted["ruleset_version"] == "competition.ruleset.v1"
-    assert result["engine_version"] == "competition.classic.v1"
+    assert result["engine_version"] == "competition.graph.v1"
     assert result["ruleset_version"] == "competition.ruleset.v1"
     assert result["version_inferred"] is False
     preview.assert_awaited_once()
@@ -639,7 +640,7 @@ def test_custom_bracket_write_failure_cleans_new_generation_only(monkeypatch):
 
 
 @pytest.mark.parametrize(("tournament_format", "stage_type", "engine"), [
-    ("round_robin", None, "classic"),
+    ("round_robin", None, "graph"),
     ("custom_bracket", "custom_bracket", "graph"),
 ])
 def test_structure_plan_is_deterministic_valid_and_read_only(
@@ -792,7 +793,18 @@ def test_structure_apply_rejects_stale_base_before_any_write(monkeypatch):
     db.audit_logs.insert_one.assert_not_awaited()
 
 
-def test_structure_apply_activates_exact_valid_plan(monkeypatch):
+def test_a_tournament_in_the_classic_store_is_planned_there_and_protected(monkeypatch):
+    """Zwei Schutzmechanismen auf einmal - und ein Nebenbefund.
+
+    Ein Turnier mit echten Spielen im alten Speicher wird weiter dort geplant;
+    es wandert nicht beim Neuaufbau. Angewendet wird der Plan trotzdem nicht,
+    weil der sichere Weg reale Strukturen grundsaetzlich nicht ersetzt.
+
+    Daraus folgt: seit kein Format mehr klassisch startet, ist der klassische
+    Anwendungsweg praktisch unerreichbar - Entwuerfe binden die Engine nicht,
+    und alles mit echten Spielen ist geschuetzt. Das macht ihn zum Kandidaten
+    fuer die Stilllegung des alten Speichers.
+    """
     tournament = {
         "id": "t1",
         "format": "round_robin",
@@ -805,34 +817,33 @@ def test_structure_apply_activates_exact_valid_plan(monkeypatch):
         {"id": f"r{seed}", "status": "approved", "seed": seed}
         for seed in range(1, 5)
     ]
-    db = _bracket_rebuild_db(tournament=tournament, registrations=registrations)
+    played = [{
+        "id": "alt-1", "tournament_id": "t1", "round": 1, "match_index": 0,
+        "bracket": "round_robin", "is_preview": False, "status": "completed",
+        "participant_a_id": "r1", "participant_b_id": "r2", "winner_id": "r1",
+    }]
+    db = _bracket_rebuild_db(
+        tournament=tournament, registrations=registrations, legacy_matches=played)
     _patch_bracket_rebuild_dependencies(monkeypatch, db)
+
     plan = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
         "t1",
         tournament_routes.TournamentStructurePlanPayload(preview=False),
         {"id": "admin-1"},
     ))
+    assert plan["engine"] == "classic", "Bestand im alten Speicher gibt die Engine vor"
 
-    result = asyncio.run(tournament_routes.apply_tournament_structure_plan(
-        "t1",
-        _apply_payload_from_plan(plan),
-        {"id": "admin-1"},
-    ))
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(tournament_routes.apply_tournament_structure_plan(
+            "t1",
+            _apply_payload_from_plan(plan),
+            {"id": "admin-1"},
+        ))
 
-    assert result["ok"] is True
-    assert result["idempotent_replay"] is False
-    assert result["plan_hash"] == plan["plan_hash"]
-    assert result["structure_revision"] == 3
-    assert result["validation"]["valid"] is True
-    inserted_matches = db.matches.insert_many.await_args.args[0]
-    assert len(inserted_matches) == plan["match_count"]
-    assert all(match["structure_plan_hash"] == plan["plan_hash"] for match in inserted_matches)
-    tournament_update = db.tournaments.update_one.await_args.args[1]["$set"]
-    assert tournament_update["last_structure_plan_hash"] == plan["plan_hash"]
-    assert tournament_update["last_structure_base_hash"] == plan["base_structure_hash"]
-    assert tournament_update["engine_version"] == "competition.classic.v1"
-    db.audit_logs.insert_one.assert_awaited_once()
-
+    assert error.value.status_code == 409
+    assert error.value.detail["code"] == "protected_existing_structure"
+    db.matches.insert_many.assert_not_awaited()
+    db.matches.delete_many.assert_not_awaited()
 
 def test_structure_apply_activates_graph_plan_with_stage(monkeypatch):
     tournament = {

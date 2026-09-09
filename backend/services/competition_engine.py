@@ -65,12 +65,21 @@ def engine_of_record(legacy_matches=(), stage_matches=()) -> str | None:
     return None
 
 
-def preferred_engine(format_key: str | None, *, stage_generator_available: bool | None = None) -> str:
-    """The store this format would choose for a tournament that has none yet."""
-    if stage_generator_available is None:
-        capability = find_format_capability(format_key)
-        stage_generator_available = bool(capability and capability.stage_generator_available)
-    return GRAPH if stage_generator_available else CLASSIC
+def preferred_engine(format_key: str | None) -> str:
+    """The store this format would choose for a tournament that has none yet.
+
+    Read from the write model, not from whether a schema generator exists. The
+    Swiss system has no schema on purpose - its rounds are computed one at a
+    time - but it writes into the graph store like everything else. Confusing
+    the two would send new Swiss tournaments back into the store being retired.
+    """
+    capability = find_format_capability(format_key)
+    if capability is None:
+        return CLASSIC
+    # Formate ohne Turnierbaum (Zeitfahren, Grand Prix) schreiben gar keine
+    # Matches. Sie bekommen trotzdem den Graph genannt, damit nichts mehr im
+    # abzuschaltenden Speicher landet.
+    return CLASSIC if capability.current_write_model == CLASSIC else GRAPH
 
 
 def classic_can_rebuild(format_key: str | None) -> bool:

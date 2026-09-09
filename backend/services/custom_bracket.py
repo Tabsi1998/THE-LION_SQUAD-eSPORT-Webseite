@@ -425,6 +425,29 @@ def _auto_groups_schema(slot_count: int, group_count: int) -> str:
     return "\n".join(lines).strip()
 
 
+def _auto_league_schema(slot_count: int) -> str:
+    """Build a league: everyone against everyone, home and away.
+
+    The second half repeats the first with the sides swapped, which is what
+    makes it a league rather than a round robin - and it keeps the fixture list
+    fair, because the home side of a duel decides who is listed first and who
+    fills slot two.
+    """
+    seeds = list(range(1, max(2, int(slot_count or 2)) + 1))
+    first_leg = _round_robin_rounds(seeds)
+    return_leg = [[(away, home) for home, away in pairs] for pairs in first_leg]
+
+    lines = ["[LIGA]"]
+    key_index = 0
+    for matchday, pairs in enumerate(first_leg + return_leg, start=1):
+        lines.append(f"# Runde {matchday}")
+        for home, away in pairs:
+            key = _match_key(key_index)
+            key_index += 1
+            lines.append(f"{key}=[{home},{away}]")
+    return "\n".join(lines)
+
+
 def groups_from_generated_matches(matches: list[dict]) -> list[dict]:
     """Read back which participant ended up in which group.
 
@@ -526,6 +549,9 @@ def _resolve_schema(tournament: dict, stage: dict, registrations: list[dict], pr
     if (stage.get("stage_type") or "") == "round_robin_groups":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
         return _auto_groups_schema(size, int(settings.get("group_count") or 2))
+    if (stage.get("stage_type") or "") == "league":
+        size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
+        return _auto_league_schema(size)
     if (stage.get("stage_type") or "") == "simple":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
         return _auto_ffa_single_match_schema(size)

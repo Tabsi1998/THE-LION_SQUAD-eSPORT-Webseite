@@ -42,6 +42,7 @@ from services.competition_engine import (
     GRAPH,
     EngineSwitchRequired,
     decide_rebuild_engine,
+    preferred_engine,
 )
 from services.competition_formats import find_format_capability
 from services.graph_swiss import (
@@ -251,7 +252,13 @@ def _can_create_initial_legacy_preview(tournament: dict) -> bool:
 
 def _can_create_initial_stage_preview(tournament: dict) -> bool:
     capability = find_format_capability(tournament.get("format"))
-    return bool(capability and capability.initial_preview_engine == "stage")
+    if not capability or capability.initial_preview_engine != "stage":
+        return False
+    if capability.auto_match_limit != "legacy_estimate":
+        return True
+    # Jeder gegen jeden wächst quadratisch: eine Liga mit 64 Teilnehmern wären
+    # über viertausend Spiele. Die Obergrenze gilt unabhängig vom Speicher.
+    return 0 < _estimate_legacy_preview_matches(tournament) <= MAX_INITIAL_PREVIEW_MATCHES
 
 
 def _can_rebuild_bracket_from_format(tournament: dict) -> bool:
@@ -3667,20 +3674,25 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
 
 
 # ---------- Swiss / Groups specific ----------
-async def _competition_engine(db, tid: str) -> str:
-    """Which store this tournament already writes to.
+async def _competition_engine(db, tid: str, tournament: dict | None = None) -> str:
+    """Which store this tournament writes to.
 
-    Deliberately reads the existing documents instead of the format: a
-    tournament stays in the engine it was built in until it is migrated, so
-    neither generator can move a running tournament to the other store behind
-    the organiser's back. A stage without matches already counts - it is the
-    structure the next round will be written into.
+    Existing documents decide first: a tournament stays in the engine it was
+    built in, so neither generator can move a running one behind the organiser's
+    back. A stage without matches already counts - it is the structure the next
+    round will be written into.
+
+    Only a tournament that has nothing yet follows its format, and every format
+    now points at the graph. That is what stops the classic store from filling
+    up again while it is being retired.
     """
     if await db.tournament_stages.count_documents({"tournament_id": tid}):
         return GRAPH
     if await db.matches_v2.count_documents({"tournament_id": tid}):
         return GRAPH
-    return CLASSIC
+    if await db.matches.count_documents({"tournament_id": tid}):
+        return CLASSIC
+    return preferred_engine((tournament or {}).get("format"))
 
 
 async def _dedicated_stage(db, tournament: dict, stage_type: str, settings: dict,
@@ -3773,7 +3785,7 @@ async def swiss_next_round(tid: str, me: dict = Depends(require_admin()),
     t = await db.tournaments.find_one({"id": tid})
     if not t or t.get("format") != "swiss":
         raise HTTPException(status_code=400, detail="Nur für Swiss-Turniere")
-    if await _competition_engine(db, tid) == "graph":
+    if await _competition_engine(db, tid, t) == GRAPH:
         return await _swiss_next_round_graph(db, t, me.get("id"))
     prev = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(2000)
     # Check open matches
@@ -3857,7 +3869,7 @@ async def groups_generate(tid: str, body: dict, me: dict = Depends(require_admin
     if not t or t.get("format") != "groups":
         raise HTTPException(status_code=400, detail="Nur für Group-Stage")
     group_count = int(body.get("group_count", 4))
-    if await _competition_engine(db, tid) == "graph":
+    if await _competition_engine(db, tid, t) == GRAPH:
         return await _groups_generate_graph(db, t, group_count, me.get("id"))
     regs = await db.tournament_registrations.find(
         {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},

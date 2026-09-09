@@ -118,10 +118,12 @@ def groups_db(participant_count=8):
 
 # ---------------------------------------------------------------- Enginewahl
 
-def test_a_tournament_without_structure_stays_classic():
+def test_a_tournament_without_structure_follows_its_format():
+    """Neue Turniere starten im Graph-Speicher - sonst fuellt sich der alte wieder."""
     db = FakeDb(tournaments=[{"id": "t1"}])
 
-    assert run(_competition_engine(db, "t1")) == "classic"
+    assert run(_competition_engine(db, "t1", {"format": "swiss"})) == "graph"
+    assert run(_competition_engine(db, "t1", {"format": "groups"})) == "graph"
 
 
 def test_an_existing_stage_decides_for_the_graph():
@@ -137,10 +139,11 @@ def test_existing_graph_matches_decide_even_without_a_stage():
 
 
 def test_classic_matches_do_not_pull_a_tournament_into_the_graph():
-    """Ein laufendes Turnier darf nicht den Speicher wechseln."""
+    """Ein laufendes Turnier darf nicht den Speicher wechseln - auch jetzt nicht,
+    wo jedes Format auf den Graph zeigt."""
     db = FakeDb(matches=[{"id": "m1", "tournament_id": "t1"}])
 
-    assert run(_competition_engine(db, "t1")) == "classic"
+    assert run(_competition_engine(db, "t1", {"format": "single_elim"})) == "classic"
 
 
 # ---------------------------------------------------------------- Schweizer Runden

@@ -129,9 +129,9 @@ def test_the_store_it_already_lives_in_needs_no_confirmation():
 # ---------------------------------------------------------------- Randfragen
 
 def test_the_format_preference_follows_the_catalog():
-    assert preferred_engine("ffa") == GRAPH
-    assert preferred_engine("league") == CLASSIC
-    assert preferred_engine("groups") == GRAPH
+    """Jedes Format zeigt inzwischen auf den Graph-Speicher."""
+    for key in ("ffa", "league", "groups", "single_elim", "round_robin"):
+        assert preferred_engine(key) == GRAPH, key
 
 
 def test_an_unknown_format_does_not_crash_the_decision():
