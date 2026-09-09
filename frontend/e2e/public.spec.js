@@ -221,8 +221,16 @@ test("logout keeps the visible session when server revocation fails", async ({ p
   await acceptCookies(page);
   await expect(page.getByTestId("nav-logout")).toBeVisible();
   await page.getByTestId("nav-logout").click();
-  await expect(page.getByText("Logout derzeit nicht möglich")).toBeVisible();
+  const errorToast = page.getByText("Logout derzeit nicht möglich");
+  await expect(errorToast).toBeVisible();
   await expect(page.getByTestId("nav-logout")).toBeVisible();
+
+  // Der Toast liegt oben rechts über der Navigation. Für den zweiten Klick
+  // fährt Playwright mit dem Zeiger dorthin, und Sonner hält das Ausblenden
+  // an, solange der Zeiger darauf steht - der Klick käme nie an. Also den
+  // Zeiger wegstellen und den Toast von selbst verschwinden lassen.
+  await page.mouse.move(0, 0);
+  await expect(errorToast).toBeHidden({ timeout: 15_000 });
 
   await page.getByTestId("nav-logout").click();
   await expect(page.getByTestId("nav-logout")).toHaveCount(0);
