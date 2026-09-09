@@ -11,11 +11,9 @@ from routes.tournament_routes import (
     _create_initial_bracket_preview,
     _finalize_bracket_for_checkin,
     _can_create_initial_legacy_preview,
-    _estimate_legacy_preview_matches,
-    _mixed_preview_registrations_for_tournament,
+    _estimated_match_count,
     _refresh_tournament_previews_after_registration,
 )
-from bracket_engine import generate_bracket
 
 
 class FakeCursor:
@@ -82,9 +80,9 @@ class FakeDb:
 
 
 def test_initial_preview_uses_selected_tournament_format():
-    assert _estimate_legacy_preview_matches({"format": "single_elim", "max_participants": 16}) == 15
-    assert _estimate_legacy_preview_matches({"format": "double_elim", "max_participants": 8}) == 15
-    assert _estimate_legacy_preview_matches({"format": "round_robin", "max_participants": 8}) == 28
+    assert _estimated_match_count({"format": "single_elim", "max_participants": 16}) == 15
+    assert _estimated_match_count({"format": "double_elim", "max_participants": 8}) == 15
+    assert _estimated_match_count({"format": "round_robin", "max_participants": 8}) == 28
 
 
 def test_no_format_draws_its_first_preview_in_the_classic_store_any_more():
@@ -119,42 +117,6 @@ def test_formats_without_a_bracket_stay_out():
     assert _can_create_initial_legacy_preview({"format": "historical_unknown", "max_participants": 8}) is False
     assert _can_create_initial_stage_preview({"format": "historical_unknown", "max_participants": 8}) is False
     assert _can_rebuild_bracket_from_format({"format": "historical_unknown", "max_participants": 8}) is False
-
-
-def test_mixed_preview_fills_free_slots_with_preview_seeds():
-    tournament = {"id": "t1", "format": "single_elim", "max_participants": 4}
-    registrations = [
-        {"id": "r1", "status": "approved", "display_name": "One"},
-        {"id": "r-wait", "status": "waitlist", "display_name": "Wait"},
-        {"id": "r2", "status": "checked_in", "display_name": "Two"},
-    ]
-
-    mixed = _mixed_preview_registrations_for_tournament(tournament, registrations)
-
-    assert [reg["id"] for reg in mixed] == ["r1", "r2", "preview-seed-3", "preview-seed-4"]
-    assert all(reg["status"] in {"approved", "checked_in"} for reg in mixed)
-    assert [reg.get("is_preview", False) for reg in mixed] == [False, False, True, True]
-
-
-def test_mixed_preview_can_generate_bracket_with_real_and_free_slots():
-    tournament = {"id": "t1", "format": "single_elim", "max_participants": 4, "seeding_mode": "manual"}
-    registrations = [
-        {"id": "r1", "status": "approved", "display_name": "One", "seed": 1},
-        {"id": "r2", "status": "approved", "display_name": "Two", "seed": 2},
-    ]
-
-    mixed = _mixed_preview_registrations_for_tournament(tournament, registrations)
-    matches = generate_bracket(tournament, mixed, preview=True)
-    participant_ids = {
-        pid
-        for match in matches
-        for pid in (match.get("participant_a_id"), match.get("participant_b_id"))
-        if pid
-    }
-
-    assert len(matches) == 3
-    assert {"r1", "r2", "preview-seed-3", "preview-seed-4"} <= participant_ids
-    assert all(match["is_preview"] for match in matches)
 
 
 def test_initial_preview_creates_stage_for_custom_bracket():

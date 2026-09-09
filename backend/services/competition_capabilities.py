@@ -86,13 +86,10 @@ CAPABILITIES: tuple[Capability, ...] = (
         "DELETE /api/tournaments/{tid}/staff/{assignment_id}"], [ENGINE_NEUTRAL]),
 
     # ---------- Struktur erzeugen ----------
-    _c("structure.generate.classic", "Turnierbaum erzeugen (klassisch)",
-       ["POST /api/tournaments/{tid}/generate-bracket"], [CLASSIC]),
     _c("structure.from_format", "Struktur aus Format aufbauen",
-       ["POST /api/tournaments/{tid}/bracket/from-format"], [CLASSIC, GRAPH],
-       note="Block 4: baut im Speicher neu auf, in dem das Turnier bereits liegt. Ein Wechsel "
-            "würde alle Match-IDs ersetzen und wird deshalb abgelehnt, bis er ausdrücklich "
-            "bestätigt wird (allow_engine_switch)."),
+       ["POST /api/tournaments/{tid}/bracket/from-format"], [GRAPH],
+       note="Block 8: der klassische Generator-Endpunkt ist mit seiner Engine entfallen. "
+            "Was er konnte, kann dieser hier - für jedes Format, das einen Generator hat."),
     _c("structure.reset", "Struktur zurücksetzen",
        ["POST /api/tournaments/{tid}/reset-bracket"], [CLASSIC, GRAPH]),
     _c("structure.plan_apply", "Struktur planen und anwenden",
