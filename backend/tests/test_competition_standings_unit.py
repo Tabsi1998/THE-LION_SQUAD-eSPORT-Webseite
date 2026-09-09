@@ -1,5 +1,3 @@
-from bracket_engine import compute_round_robin_standings
-from bracket_extensions import compute_swiss_standings
 from services.competition_snapshot import adapt_legacy_matches, adapt_stage_matches, build_structure_snapshot
 from services.competition_standings import (
     elimination_standings,
@@ -52,14 +50,6 @@ def _legacy_matches():
             "status": "completed",
         },
     ]
-
-
-def test_round_robin_and_swiss_match_existing_legacy_calculators():
-    raw = _legacy_matches()
-    canonical = adapt_legacy_matches(raw)
-
-    assert round_robin_standings(canonical, REGISTRATIONS) == compute_round_robin_standings(raw, REGISTRATIONS)
-    assert swiss_standings(canonical, REGISTRATIONS) == compute_swiss_standings(REGISTRATIONS, raw)
 
 
 def test_elimination_standings_uses_canonical_slots_and_results():

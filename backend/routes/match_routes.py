@@ -1,4 +1,5 @@
 """Match/Score/Dispute routes."""
+import logging
 import re
 from datetime import datetime, timedelta
 
@@ -25,11 +26,9 @@ from models import (
     now_utc,
     new_id,
 )
-from match_rules import loser_for_winner, match_allows_draw, validate_winner_id
 from services.competition_read import canonical_match_for_source, find_match_source
 from services.match_overview import operational_match_overviews, own_match_overviews
 from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
-from services.match_results import MatchOutcome, apply_match_result
 from services.match_v2_results import MatchV2ResultError
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from services.rate_limit import enforce_rate_limit
@@ -48,6 +47,7 @@ from services.v2_match_flows import (
 from services.competition_usage import engine_for_match, record_write
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
+logger = logging.getLogger("tls.match")
 STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 EVENT_MODES = {"local", "online", "hybrid"}
 RESULT_ENTRY_MODES = {"staff_only", "player_confirmed", "hybrid"}
@@ -150,57 +150,6 @@ def _players_can_report(policy: dict) -> bool:
 
 def _schedule_proposals_enabled(policy: dict) -> bool:
     return policy.get("schedule_mode") in {"player_proposal", "hybrid"}
-
-
-def _score_report_resolution(match: dict, reports: list[dict]) -> dict | None:
-    latest_by_reporter = {}
-    reporter_order = []
-    for report in reports:
-        reporter_key = report.get("registration_id") or report.get("user_id")
-        if not reporter_key:
-            continue
-        if reporter_key not in latest_by_reporter:
-            reporter_order.append(reporter_key)
-        latest_by_reporter[reporter_key] = report
-    if len(latest_by_reporter) < 2:
-        return None
-    latest_distinct_reports = [
-        latest_by_reporter[reporter_key]
-        for reporter_key in reporter_order
-        if reporter_key in latest_by_reporter
-    ]
-    first, second = latest_distinct_reports[-2:]
-    score_a = second.get("score_a")
-    score_b = second.get("score_b")
-    if first.get("score_a") != score_a or first.get("score_b") != score_b:
-        return {
-            "status": "disputed",
-            "admin_note": match.get("admin_note") or "Abweichende Ergebnisberichte; bitte durch Turnierleitung prüfen.",
-            "updated_at": now_utc().isoformat(),
-        }
-    winner = None
-    if score_a > score_b:
-        winner = match.get("participant_a_id")
-    elif score_b > score_a:
-        winner = match.get("participant_b_id")
-    if not winner and not match_allows_draw(match):
-        return {
-            "score_a": score_a,
-            "score_b": score_b,
-            "winner_id": None,
-            "loser_id": None,
-            "status": "disputed",
-            "admin_note": match.get("admin_note") or "Unentschieden gemeldet; Gewinnerentscheidung erforderlich.",
-            "updated_at": now_utc().isoformat(),
-        }
-    return {
-        "score_a": score_a,
-        "score_b": score_b,
-        "winner_id": winner,
-        "loser_id": loser_for_winner(match, winner),
-        "status": "completed",
-        "updated_at": now_utc().isoformat(),
-    }
 
 
 async def _audit_match_action(db, action: str, match: dict, actor_id: str | None, data: dict | None = None) -> None:
@@ -948,20 +897,8 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
 
 @router.get("/{match_id}")
 async def get_match(match_id: str, user: dict | None = Depends(get_optional_user)):
-    db = get_db()
-    m, collection = await _find_match_any(match_id)
+    m, _collection = await _find_match_any(match_id)
     await _assert_match_visible(m, user)
-    if collection == "matches_v2":
-        return m
-    # Enrich participants
-    reg_ids = [x for x in [m.get("participant_a_id"), m.get("participant_b_id")] if x]
-    regs = await db.tournament_registrations.find({"id": {"$in": reg_ids}}, {"_id": 0}).to_list(10)
-    user_ids = [r["user_id"] for r in regs if r.get("user_id")]
-    users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, USER_PUBLIC_PROJECTION).to_list(10)}
-    regs_dict = {r["id"]: {**r, "user": users.get(r.get("user_id"))} for r in regs}
-    m["participant_a"] = _public_registration(regs_dict.get(m.get("participant_a_id")), user)
-    m["participant_b"] = _public_registration(regs_dict.get(m.get("participant_b_id")), user)
     return m
 
 
@@ -995,85 +932,7 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         await db.matches_v2.update_one({"id": match_id}, {"$set": updates})
         updated = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
         return {**updated, "idempotent_replay": False}
-    m = await db.matches.find_one({"id": match_id})
-    if not m:
-        raise HTTPException(status_code=404)
-    await _ensure_match_tournament_unlocked(db, m)
-    previous_result_signature = (
-        m.get("status"),
-        m.get("winner_id"),
-        m.get("score_a"),
-        m.get("score_b"),
-    )
-    allowed = await has_match_result_permission(me, m)
-    if not allowed:
-        raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")
-    nullable_fields = {"winner_id", "scheduled_at", "station_id", "admin_note", "map", "best_of", "duration_minutes"}
-    raw = body.model_dump(exclude_unset=True)
-    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
-    if "scheduled_at" in updates:
-        updates["scheduled_at"] = updates["scheduled_at"].isoformat() if updates["scheduled_at"] else None
-    if updates.get("scheduled_at") and m.get("status") in {"pending", "ready", "preview"} and "status" not in updates:
-        updates["status"] = "scheduled"
-    if "winner_id" in updates:
-        validate_winner_id(m, updates.get("winner_id"))
-        updates["loser_id"] = loser_for_winner(m, updates.get("winner_id"))
-        if updates.get("winner_id"):
-            updates["status"] = "completed"
-    final_status = updates.get("status", m.get("status"))
-    final_winner = updates.get("winner_id", m.get("winner_id"))
-    if final_status == "completed" and not final_winner and not match_allows_draw(m):
-        raise HTTPException(status_code=400, detail="Dieses Match braucht einen Gewinner")
-    if final_status == "completed" and final_winner:
-        validate_winner_id(m, final_winner)
-        updates["loser_id"] = loser_for_winner(m, final_winner)
-    result_fields = {"winner_id", "score_a", "score_b"}
-    if final_status in {"completed", "waiting_result", "forfeit"} or result_fields.intersection(updates):
-        await ensure_tournament_accepts_results(db, m["tournament_id"])
-    await ensure_station_slot_available(db, m, updates, "matches")
-    if not final_winner and "winner_id" in updates:
-        updates["loser_id"] = None
-    if updates and all(m.get(key) == value for key, value in updates.items()):
-        m.pop("_id", None)
-        m["idempotent_replay"] = True
-        return m
-
-    next_result_signature = (
-        final_status,
-        updates.get("winner_id", m.get("winner_id")),
-        updates.get("score_a", m.get("score_a")),
-        updates.get("score_b", m.get("score_b")),
-    )
-    if next_result_signature == previous_result_signature:
-        # Reine Betriebsdaten - Termin, Station, Notiz. Das ist keine
-        # Ergebnismeldung und läuft deshalb auch nicht über den Ergebniskern.
-        updates["updated_at"] = now_utc().isoformat()
-        await db.matches.update_one({"id": match_id}, {"$set": updates})
-        updated = await db.matches.find_one({"id": match_id}, {"_id": 0})
-        return {**updated, "idempotent_replay": False}
-
-    operational = {
-        key: value for key, value in updates.items()
-        if key not in {"status", "winner_id", "loser_id", "score_a", "score_b"}
-    }
-    outcome = await apply_match_result(
-        db, m, "matches",
-        MatchOutcome(
-            status=final_status,
-            winner_id=next_result_signature[1],
-            score_a=next_result_signature[2],
-            score_b=next_result_signature[3],
-            extra_set=operational,
-        ),
-        actor_id=me.get("id"),
-        audit_action="match.result.update",
-        audit_data={
-            "changed_fields": sorted(updates.keys()),
-            "previous": dict(zip(("status", "winner_id", "score_a", "score_b"), previous_result_signature)),
-            "current": dict(zip(("status", "winner_id", "score_a", "score_b"), next_result_signature)),
-        },
-    )
-    return {**outcome["match"], "idempotent_replay": outcome["idempotent_replay"]}
+    raise HTTPException(status_code=404, detail="Match nicht gefunden")
 
 
 async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict) -> dict:
@@ -1144,85 +1003,9 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
     tournament = await db.tournaments.find_one({"id": m.get("tournament_id")}, {"_id": 0})
     stage = await db.tournament_stages.find_one({"id": m.get("stage_id")}, {"_id": 0}) if m.get("stage_id") else None
     policy = _match_policy(m, collection, tournament, stage)
-    if collection == "matches_v2":
-        if not _players_can_report(policy):
-            raise HTTPException(status_code=403, detail="Ergebnisse werden für dieses Match durch die Turnierleitung eingetragen")
-        return await _report_v2(db, m, body, me)
     if not _players_can_report(policy):
         raise HTTPException(status_code=403, detail="Ergebnisse werden für dieses Match durch die Turnierleitung eingetragen")
-    # Verify user is participant
-    reg_ids = [m.get("participant_a_id"), m.get("participant_b_id")]
-    my_reg = await db.tournament_registrations.find_one(
-        {"id": {"$in": reg_ids}, "user_id": me["id"]})
-    if not my_reg:
-        raise HTTPException(status_code=403, detail="Nicht Teilnehmer dieses Matches")
-    report_signature = {
-        "registration_id": my_reg["id"],
-        "score_a": body.score_a,
-        "score_b": body.score_b,
-        "screenshot_url": body.screenshot_url,
-        "note": body.note,
-    }
-    if any(
-        all(report.get(key) == value for key, value in report_signature.items())
-        for report in m.get("reports") or []
-    ):
-        m.pop("_id", None)
-        m["idempotent_replay"] = True
-        return m
-    report = {
-        "id": new_id(),
-        "user_id": me["id"],
-        "registration_id": my_reg["id"],
-        "score_a": body.score_a,
-        "score_b": body.score_b,
-        "screenshot_url": body.screenshot_url,
-        "note": body.note,
-        "at": now_utc().isoformat(),
-    }
-    await db.matches.update_one({"id": match_id}, {
-        "$push": {"reports": report},
-        "$set": {"status": "waiting_result", "updated_at": now_utc().isoformat()},
-    })
-    await _audit_match_action(db, "match.result.report", m, me.get("id"), {
-        "report_id": report["id"],
-        "registration_id": my_reg["id"],
-        "score_a": body.score_a,
-        "score_b": body.score_b,
-    })
-    # Check consensus - if 2 reports match, auto-complete
-    m = await db.matches.find_one({"id": match_id}, {"_id": 0})
-    reports = m.get("reports", [])
-    resolution = _score_report_resolution(m, reports)
-    if resolution:
-        # Derselbe Ergebniskern wie bei der Eintragung durch die Turnierleitung.
-        # Vorher entschied der Weg, ob es Abzeichen und eine Ankuendigung gab -
-        # bei gleichem Ergebnis.
-        await apply_match_result(
-            db, m, "matches",
-            MatchOutcome(
-                status=resolution["status"],
-                winner_id=resolution.get("winner_id"),
-                score_a=resolution.get("score_a"),
-                score_b=resolution.get("score_b"),
-                extra_set={
-                    key: value for key, value in resolution.items()
-                    if key in {"admin_note"}
-                },
-            ),
-            actor_id=me.get("id"),
-            audit_action="match.result.auto_resolution",
-            audit_data={
-                "report_count": len(reports),
-                "status": resolution.get("status"),
-                "winner_id": resolution.get("winner_id"),
-                "score_a": resolution.get("score_a"),
-                "score_b": resolution.get("score_b"),
-            },
-        )
-    m = await db.matches.find_one({"id": match_id}, {"_id": 0})
-    m["idempotent_replay"] = False
-    return m
+    return await _report_v2(db, m, body, me)
 
 
 @router.post("/{match_id}/dispute")
@@ -1302,7 +1085,29 @@ async def _forfeit_v2(db, match: dict, body: dict, me: dict, force: bool) -> dic
     }})
     result = await getattr(db, "matches_v2").find_one({"id": match["id"]}, {"_id": 0}) or updated
     result["idempotent_replay"] = bool(outcome.get("idempotent_replay"))
+    await _record_walkover_incident(db, match, forfeiting, me)
     return result
+
+
+async def _record_walkover_incident(db, match: dict, forfeiting_registration_id: str, me: dict) -> None:
+    """Note the walkover against the participant who gave up.
+
+    Came from the classic path and would have quietly disappeared with it. A
+    walkover is a sanction, so it belongs in the record the affected member can
+    see under their penalties.
+    """
+    try:
+        from badges import trigger_negative_incident
+
+        registration = await db.tournament_registrations.find_one(
+            {"id": forfeiting_registration_id}, {"_id": 0, "user_id": 1})
+        if registration and registration.get("user_id"):
+            await trigger_negative_incident(
+                registration["user_id"], "no_show",
+                {"match_id": match["id"], "reason": "forfeit"}, awarded_by=me["id"])
+    except Exception as exc:
+        logger.warning("Walkover incident failed for match=%s type=%s",
+                       match.get("id"), type(exc).__name__)
 
 
 @router.post("/{match_id}/forfeit")
@@ -1323,54 +1128,4 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(get_current_user
     await _ensure_match_tournament_unlocked(db, m)
     await ensure_tournament_accepts_results(db, m["tournament_id"])
     await _require_result_permission(me, m)
-    if collection == "matches_v2":
-        return await _forfeit_v2(db, m, body, me, force)
-    note = (body.get("note") or body.get("reason") or "").strip()
-    if len(note) < 5:
-        raise HTTPException(
-            status_code=422,
-            detail="Bei einem Forfeit ist eine Begründung (mind. 5 Zeichen) Pflicht.",
-        )
-    winner_id = body.get("winner_id")
-    validate_winner_id(m, winner_id)
-    loser_id = loser_for_winner(m, winner_id)
-    if (
-        m.get("status") == "forfeit"
-        and m.get("winner_id") == winner_id
-        and m.get("admin_decision_note") == note
-    ):
-        m.pop("_id", None)
-        m["idempotent_replay"] = True
-        return m
-    if m.get("status") == "forfeit" and not force:
-        raise HTTPException(status_code=409, detail="Forfeit ist bereits gesetzt. Abweichende Korrektur braucht force=true.")
-    outcome = await apply_match_result(
-        db, m, "matches",
-        MatchOutcome(
-            status="forfeit",
-            winner_id=winner_id,
-            note=note,
-            extra_set={
-                "admin_decision_note": note,
-                "admin_decision_by": me["id"],
-                "admin_decision_at": now_utc().isoformat(),
-            },
-        ),
-        actor_id=me.get("id"),
-        audit_action="match.forfeit",
-        audit_data={"winner_id": winner_id, "loser_id": loser_id, "note_length": len(note)},
-    )
-    m = dict(outcome["match"])
-    m["idempotent_replay"] = outcome["idempotent_replay"]
-    # Phase B v4.1: forfeit ⇒ no_show for the loser
-    try:
-        from badges import trigger_negative_incident
-        # Resolve loser registration → user_id
-        if loser_id:
-            reg = await db.tournament_registrations.find_one({"id": loser_id}, {"_id": 0, "user_id": 1})
-            if reg and reg.get("user_id"):
-                await trigger_negative_incident(reg["user_id"], "no_show",
-                    {"match_id": match_id, "reason": "forfeit"}, awarded_by=me["id"])
-    except Exception:
-        pass
-    return m
+    return await _forfeit_v2(db, m, body, me, force)

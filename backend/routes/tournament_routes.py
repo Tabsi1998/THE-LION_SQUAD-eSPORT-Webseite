@@ -58,7 +58,6 @@ from services.competition_structure_plan import (
     STRUCTURE_PLAN_VERSION,
     deterministic_structure_id,
     ordered_plan_registrations,
-    stabilize_legacy_plan_matches,
     stabilize_stage_plan_matches,
     structure_plan_hash,
     structure_plan_seed,
@@ -86,10 +85,6 @@ from models import (
     TournamentStaffAssignmentCreate, TournamentStaffAssignmentUpdate,
     TournamentStageCreate, TournamentStageUpdate,
     now_utc, new_id,
-)
-from bracket_engine import generate_bracket
-from bracket_extensions import (
-    generate_swiss_round, generate_groups,
 )
 from services.user_notifications import create_user_notification
 from services.query_filters import safe_regex
@@ -187,41 +182,7 @@ def _next_power_of_two(n: int) -> int:
     return 1 if n <= 1 else 2 ** math.ceil(math.log2(n))
 
 
-def _preview_seed_reg(seed: int, tid: str) -> dict:
-    return {
-        "id": f"preview-seed-{seed}",
-        "tournament_id": tid,
-        "user_id": None,
-        "team_id": None,
-        "status": "approved",
-        "preview_status": "preview",
-        "display_name": f"Seed {seed}",
-        "ingame_name": f"Seed {seed}",
-        "seed": seed,
-        "is_preview": True,
-    }
-
-
-def _preview_registrations_for_tournament(t: dict) -> list[dict]:
-    count = _next_power_of_two(max(2, int(t.get("max_participants") or 2)))
-    return [_preview_seed_reg(seed, t["id"]) for seed in range(1, count + 1)]
-
-
-def _mixed_preview_registrations_for_tournament(t: dict, registrations: list[dict]) -> list[dict]:
-    """Fill the configured bracket size with real approved entries plus preview seeds."""
-    count = _next_power_of_two(max(2, int(t.get("max_participants") or 2)))
-    real_regs = [
-        reg
-        for reg in registrations
-        if reg.get("status") in {"approved", "checked_in"} and not reg.get("is_preview")
-    ][:count]
-    mixed = [dict(reg) for reg in real_regs]
-    for seed in range(len(mixed) + 1, count + 1):
-        mixed.append(_preview_seed_reg(seed, t["id"]))
-    return mixed
-
-
-def _estimate_legacy_preview_matches(tournament: dict) -> int:
+def _estimated_match_count(tournament: dict) -> int:
     fmt = tournament.get("format") or "single_elim"
     count = _next_power_of_two(max(2, int(tournament.get("max_participants") or 2)))
     if fmt == "single_elim":
@@ -247,7 +208,7 @@ def _can_create_initial_legacy_preview(tournament: dict) -> bool:
     capability = find_format_capability(tournament.get("format"))
     if not capability or capability.initial_preview_engine != "legacy":
         return False
-    return 0 < _estimate_legacy_preview_matches(tournament) <= MAX_INITIAL_PREVIEW_MATCHES
+    return 0 < _estimated_match_count(tournament) <= MAX_INITIAL_PREVIEW_MATCHES
 
 
 GROUP_TARGET_SIZE = 4
@@ -273,7 +234,7 @@ def _can_create_initial_stage_preview(tournament: dict) -> bool:
         return True
     # Jeder gegen jeden wächst quadratisch: eine Liga mit 64 Teilnehmern wären
     # über viertausend Spiele. Die Obergrenze gilt unabhängig vom Speicher.
-    return 0 < _estimate_legacy_preview_matches(tournament) <= MAX_INITIAL_PREVIEW_MATCHES
+    return 0 < _estimated_match_count(tournament) <= MAX_INITIAL_PREVIEW_MATCHES
 
 
 def _can_rebuild_bracket_from_format(tournament: dict) -> bool:
@@ -282,7 +243,7 @@ def _can_rebuild_bracket_from_format(tournament: dict) -> bool:
     if not capability or capability.rebuild_engine == "none":
         return False
     if capability.auto_match_limit == "legacy_estimate":
-        estimate = _estimate_legacy_preview_matches(tournament)
+        estimate = _estimated_match_count(tournament)
         return 0 < estimate <= MAX_INITIAL_PREVIEW_MATCHES
     return True
 
@@ -940,53 +901,6 @@ async def _audit_tournament_action(db, action: str, actor_id: str | None,
     })
 
 
-async def _generate_legacy_bracket_docs(db, tournament: dict, actor_id: str | None,
-                                        preview: bool = False, force: bool = False,
-                                        set_live: bool = False) -> dict:
-    tid = tournament["id"]
-    existing_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
-    match_plan = _collect_match_plan(existing_matches, [])
-    can_replace_preview = bool(existing_matches) and all(m.get("is_preview") for m in existing_matches)
-    if existing_matches and not force and not can_replace_preview:
-        raise HTTPException(status_code=409, detail="Bracket hat bereits Matches. Mit force=true neu generieren.")
-
-    if preview:
-        registrations = _preview_registrations_for_tournament(tournament)
-    else:
-        registrations = await db.tournament_registrations.find(
-            {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
-            {"_id": 0},
-        ).to_list(5000)
-        if len(registrations) < 2:
-            raise HTTPException(status_code=400, detail="Mindestens 2 Teilnehmer benötigt")
-
-    matches = generate_bracket(tournament, registrations, preview=preview)
-    if not matches:
-        raise HTTPException(status_code=400, detail="Für dieses Format ist kein automatischer Bracket-Generator aktiv.")
-    _apply_match_plan(matches, match_plan, _legacy_plan_key)
-
-    if existing_matches:
-        await db.matches.delete_many({"tournament_id": tid})
-    await db.matches.insert_many(matches)
-    await persist_competition_versions(db, tournament, "classic")
-    if set_live and not preview:
-        await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live", "updated_at": now_utc().isoformat()}})
-    await _audit_tournament_action(
-        db,
-        "tournament.bracket.generate",
-        actor_id,
-        tid,
-        {
-            "match_count": len(matches),
-            "format": tournament.get("format"),
-            "participant_count": len(registrations),
-            "preview": preview,
-            "force": force,
-        },
-    )
-    return {"ok": True, "match_count": len(matches), "preview": preview}
-
-
 async def _create_initial_stage_bracket_preview(db, tournament: dict, actor_id: str | None) -> dict | None:
     """Create a V2 preview stage for free/custom bracket formats."""
     if not _can_create_initial_stage_preview(tournament):
@@ -1047,59 +961,7 @@ async def _create_initial_stage_bracket_preview(db, tournament: dict, actor_id: 
 
 async def _create_initial_bracket_preview(db, tournament: dict, actor_id: str | None) -> dict | None:
     """Create a non-destructive empty bracket preview right after tournament creation."""
-    if _can_create_initial_stage_preview(tournament):
-        return await _create_initial_stage_bracket_preview(db, tournament, actor_id)
-    if not _can_create_initial_legacy_preview(tournament):
-        return None
-    try:
-        return await _generate_legacy_bracket_docs(
-            db,
-            tournament,
-            actor_id,
-            preview=True,
-            force=False,
-            set_live=False,
-        )
-    except HTTPException:
-        return None
-
-
-async def _refresh_preview_bracket_after_registration(db, tournament: dict, actor_id: str | None) -> dict | None:
-    """Rebuild only an existing preview bracket so new registrations occupy draft slots."""
-    if not _can_create_initial_legacy_preview(tournament):
-        return None
-    tid = tournament["id"]
-    existing_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
-    match_plan = _collect_match_plan(existing_matches, [])
-    if existing_matches and not all(m.get("is_preview") for m in existing_matches):
-        return None
-    registrations = await db.tournament_registrations.find(
-        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
-        {"_id": 0},
-    ).to_list(5000)
-    if not existing_matches and not registrations:
-        return None
-    preview_regs = _mixed_preview_registrations_for_tournament(tournament, registrations)
-    matches = generate_bracket(tournament, preview_regs, preview=True)
-    if not matches:
-        return None
-    _apply_match_plan(matches, match_plan, _legacy_plan_key)
-    if existing_matches:
-        await db.matches.delete_many({"tournament_id": tid})
-    await db.matches.insert_many(matches)
-    await persist_competition_versions(db, tournament, "classic")
-    await _audit_tournament_action(
-        db,
-        "tournament.bracket.preview_refresh",
-        actor_id,
-        tid,
-        {
-            "match_count": len(matches),
-            "participant_count": len(registrations),
-            "format": tournament.get("format"),
-        },
-    )
-    return {"ok": True, "match_count": len(matches), "preview": True, "participant_count": len(registrations)}
+    return await _create_initial_stage_bracket_preview(db, tournament, actor_id)
 
 
 async def _refresh_stage_previews_after_registration(db, tournament: dict, actor_id: str | None) -> dict | None:
@@ -1191,14 +1053,7 @@ async def _refresh_tournament_previews_after_registration(db, tournament: dict, 
                 await db.matches.delete_many({"tournament_id": tid})
         return stage_update
 
-    stage_preview = await _create_initial_stage_bracket_preview(db, tournament, actor_id)
-    if stage_preview:
-        return stage_preview
-
-    legacy_update = await _refresh_preview_bracket_after_registration(db, tournament, actor_id)
-    if legacy_update:
-        return {**legacy_update, "engine": legacy_update.get("engine") or "legacy"}
-    return None
+    return await _create_initial_stage_bracket_preview(db, tournament, actor_id)
 
 
 async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: str | None) -> dict | None:
@@ -1299,21 +1154,7 @@ async def _finalize_bracket_for_checkin(db, tournament: dict, actor_id: str | No
             await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
         await db.matches_v2.delete_many({"tournament_id": tid})
 
-    try:
-        result = await _generate_legacy_bracket_docs(
-            db,
-            tournament,
-            actor_id,
-            preview=False,
-            force=can_replace_preview,
-            set_live=False,
-        )
-    except HTTPException:
-        return None
-    return {**result, "engine": "legacy", "participant_count": await db.tournament_registrations.count_documents({
-        "tournament_id": tid,
-        "status": {"$in": ["approved", "checked_in"]},
-    })}
+    return None
 
 
 def _legacy_match_can_be_rebuilt(match: dict) -> bool:
@@ -1428,29 +1269,7 @@ async def _rebuild_checkin_bracket_after_staff_change(db, tournament: dict, acto
             "reason": "checkin_rebuild",
         }
 
-    try:
-        result = await _generate_legacy_bracket_docs(
-            db,
-            tournament,
-            actor_id,
-            preview=False,
-            force=bool(legacy_matches),
-            set_live=False,
-        )
-    except HTTPException as exc:
-        return {
-            "ok": False,
-            "reason": "generator_error",
-            "detail": exc.detail,
-            "preview": False,
-            "participant_count": len(registrations),
-        }
-    return {
-        **result,
-        "engine": "legacy",
-        "participant_count": len(registrations),
-        "reason": "checkin_rebuild",
-    }
+    return None
 
 
 async def _replace_registration_in_open_matches(db, tid: str, old_reg_id: str, new_reg: dict,
@@ -2902,17 +2721,13 @@ async def _build_tournament_structure_plan(
             "to_engine": exc.to_engine,
         })
 
-    if decision.is_graph and stage_defaults:
-        generator_registrations = registrations
-        engine = "graph"
-    else:
-        stage_defaults = None
-        generator_registrations = (
-            _preview_registrations_for_tournament(tournament)
-            if body.preview
-            else registrations
+    if not stage_defaults:
+        raise HTTPException(
+            status_code=400,
+            detail="Für dieses Format ist kein Struktur-Generator aktiv.",
         )
-        engine = "classic"
+    generator_registrations = registrations
+    engine = decision.engine
     if not body.preview and len(generator_registrations) < 2:
         raise HTTPException(status_code=400, detail="Mindestens 2 Teilnehmer benötigt")
 
@@ -2966,23 +2781,6 @@ async def _build_tournament_structure_plan(
             stage_matches=matches,
             stages=[stage],
         )
-    else:
-        matches = generate_bracket(
-            tournament,
-            generator_registrations,
-            preview=body.preview,
-            rng=rng,
-        )
-        if not matches:
-            raise HTTPException(
-                status_code=400,
-                detail="Für dieses Format ist kein automatischer Bracket-Generator aktiv.",
-            )
-        if len(matches) > MAX_STRUCTURE_PLAN_MATCHES:
-            raise HTTPException(status_code=400, detail="Die Struktur erzeugt zu viele Spiele.")
-        matches = stabilize_legacy_plan_matches(matches, seed=plan_seed)
-        _apply_match_plan(matches, match_plan, _legacy_plan_key)
-        planned_structure = build_structure_snapshot(tid, legacy_matches=matches)
 
     validation = validate_competition_graph(planned_structure)
     plan_hash = structure_plan_hash(
@@ -3164,17 +2962,6 @@ async def apply_tournament_structure_plan(
     }
 
 
-@router.post("/{tid}/generate-bracket")
-async def generate(tid: str, preview: bool = False, force: bool = False,
-                   me: dict = Depends(get_current_user),
-                   _mutation_tid: str = Depends(_serialized_tournament_write)):
-    db = get_db()
-    tid = await _resolve_tid(tid)
-    t = await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
-    return await _generate_legacy_bracket_docs(db, t, me.get("id"), preview=preview, force=force, set_live=not preview)
-
-
 @router.post("/{tid}/bracket/from-format")
 async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBracketStructurePayload | None = None,
                                                  preview: bool = True, force: bool = False,
@@ -3294,27 +3081,10 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
             "participant_count": len(registrations),
         }
 
-    result = await _generate_legacy_bracket_docs(
-        db,
-        tournament,
-        me.get("id"),
-        preview=preview,
-        force=force,
-        set_live=False,
+    raise HTTPException(
+        status_code=400,
+        detail="Für dieses Format ist kein Struktur-Generator aktiv.",
     )
-    if v2_match_ids:
-        await db.matches_v2.delete_many({"id": {"$in": v2_match_ids}})
-        await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
-    await db.tournament_stages.delete_many({"tournament_id": tid})
-    await _audit_tournament_action(
-        db,
-        "tournament.bracket.rebuild_from_format",
-        me.get("id"),
-        tid,
-        {"format": tournament.get("format"), "preview": preview, "force": force,
-         "match_count": result.get("match_count"), "engine_switched": decision.switched},
-    )
-    return {**result, "engine": "legacy", "engine_switched": decision.switched}
 
 
 @router.post("/{tid}/reset-bracket")
@@ -3377,20 +3147,6 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             fresh_t = {**t, "status": status}
             if prev != status:
                 auto_generated_bracket = await _finalize_bracket_for_checkin(db, fresh_t, me.get("id"))
-            if not auto_generated_bracket:
-                stage_count = await db.tournament_stages.count_documents({"tournament_id": tid})
-                v2_count = await db.matches_v2.count_documents({"tournament_id": tid})
-                legacy_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
-                can_auto_replace = bool(legacy_matches) and all(m.get("is_preview") for m in legacy_matches)
-                if stage_count == 0 and v2_count == 0 and (not legacy_matches or can_auto_replace):
-                    auto_generated_bracket = await _generate_legacy_bracket_docs(
-                        db,
-                        fresh_t,
-                        me.get("id"),
-                        preview=False,
-                        force=can_auto_replace,
-                        set_live=False,
-                    )
         except HTTPException as exc:
             auto_generated_bracket = {"ok": False, "reason": "generator_error", "detail": exc.detail}
 
@@ -3595,16 +3351,6 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
     await attach_station_info(db, matches_v2)
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     regs = [_public_registration(r, user, is_staff) for r in regs]
-    known_reg_ids = {r.get("id") for r in regs}
-    preview_ids = sorted({
-        pid
-        for match in matches
-        for pid in (match.get("participant_a_id"), match.get("participant_b_id"))
-        if isinstance(pid, str) and pid.startswith("preview-seed-") and pid not in known_reg_ids
-    }, key=lambda value: int(value.rsplit("-", 1)[-1]) if value.rsplit("-", 1)[-1].isdigit() else 999999)
-    for pid in preview_ids:
-        seed = int(pid.rsplit("-", 1)[-1]) if pid.rsplit("-", 1)[-1].isdigit() else len(regs) + 1
-        regs.append(_preview_seed_reg(seed, t["id"]))
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0}).to_list(500)}
@@ -3800,25 +3546,7 @@ async def swiss_next_round(tid: str, me: dict = Depends(require_admin()),
     t = await db.tournaments.find_one({"id": tid})
     if not t or t.get("format") != "swiss":
         raise HTTPException(status_code=400, detail="Nur für Swiss-Turniere")
-    if await _competition_engine(db, tid, t) == GRAPH:
-        return await _swiss_next_round_graph(db, t, me.get("id"))
-    prev = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(2000)
-    # Check open matches
-    open_count = sum(1 for m in prev if m.get("status") not in ("completed", "forfeit", "cancelled"))
-    if open_count > 0:
-        raise HTTPException(status_code=400, detail=f"{open_count} Matches sind noch offen")
-    regs = await db.tournament_registrations.find(
-        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
-        {"_id": 0},
-    ).to_list(500)
-    next_round_num = (max((m.get("round") or 0) for m in prev) + 1) if prev else 1
-    matches = generate_swiss_round(tid, regs, prev, next_round_num, t.get("best_of", 1))
-    if matches:
-        await db.matches.insert_many(matches)
-        await persist_competition_versions(db, t, "classic")
-    if t.get("status") == "draft":
-        await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live"}})
-    return {"ok": True, "engine": "classic", "round": next_round_num, "match_count": len(matches)}
+    return await _swiss_next_round_graph(db, t, me.get("id"))
 
 
 async def _groups_generate_graph(db, tournament: dict, group_count: int, actor_id: str | None) -> dict:
@@ -3883,27 +3611,8 @@ async def groups_generate(tid: str, body: dict, me: dict = Depends(require_admin
     t = await db.tournaments.find_one({"id": tid})
     if not t or t.get("format") != "groups":
         raise HTTPException(status_code=400, detail="Nur für Group-Stage")
-    group_count = int(body.get("group_count", 4))
-    if await _competition_engine(db, tid, t) == GRAPH:
-        return await _groups_generate_graph(db, t, group_count, me.get("id"))
-    regs = await db.tournament_registrations.find(
-        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
-        {"_id": 0},
-    ).to_list(500)
-    # Reset
-    await db.matches.delete_many({"tournament_id": tid})
-    await db.tournament_groups.delete_many({"tournament_id": tid})
-    res = generate_groups(tid, regs, group_count, t.get("best_of", 1))
-    if res["groups"]:
-        for g in res["groups"]:
-            g["tournament_id"] = tid
-            g["created_at"] = now_utc().isoformat()
-        await db.tournament_groups.insert_many(res["groups"])
-    if res["matches"]:
-        await db.matches.insert_many(res["matches"])
-        await persist_competition_versions(db, t, "classic")
-    await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live"}})
-    return {"ok": True, "engine": "classic", "group_count": len(res["groups"]), "match_count": len(res["matches"])}
+    group_count = int(body.get("group_count", _default_group_count(t)))
+    return await _groups_generate_graph(db, t, group_count, me.get("id"))
 
 
 @router.get("/{tid}/groups")

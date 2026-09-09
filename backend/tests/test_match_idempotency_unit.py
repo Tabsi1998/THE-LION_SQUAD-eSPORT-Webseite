@@ -10,8 +10,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from models import MatchDispute, MatchScheduleProposalCreate, MatchScoreReport, MatchUpdate, MatchV2Update
 import routes.match_routes as match_routes
-import services.classic_result_submission as classic_submission
-import services.classic_results as classic_results
 
 
 class _MutableMatchCollection:
@@ -42,7 +40,7 @@ def test_dispute_exact_replay_skips_write_audit_and_badge(monkeypatch):
         "disputes": [{"user_id": "user-1", "reason": "Falsches Ergebnis"}],
     }
     matches = _MutableMatchCollection(match)
-    db = SimpleNamespace(matches=matches, matches_v2=_EmptyCollection())
+    db = SimpleNamespace(matches_v2=matches, matches=_EmptyCollection())
     audit = AsyncMock()
 
     monkeypatch.setattr(match_routes, "get_db", lambda: db)
@@ -53,131 +51,6 @@ def test_dispute_exact_replay_skips_write_audit_and_badge(monkeypatch):
     result = asyncio.run(match_routes.dispute(
         "match-1",
         MatchDispute(reason="  Falsches Ergebnis  "),
-        {"id": "user-1", "role": "player"},
-    ))
-
-    assert result["idempotent_replay"] is True
-    assert matches.update_count == 0
-    audit.assert_not_awaited()
-
-
-def test_forfeit_exact_replay_skips_advancement_and_notifications(monkeypatch):
-    match = {
-        "id": "match-1",
-        "tournament_id": "t1",
-        "participant_a_id": "reg-a",
-        "participant_b_id": "reg-b",
-        "winner_id": "reg-a",
-        "loser_id": "reg-b",
-        "status": "forfeit",
-        "admin_decision_note": "Nicht erschienen",
-    }
-    matches = _MutableMatchCollection(match)
-    db = SimpleNamespace(matches=matches, matches_v2=_EmptyCollection())
-    advance = Mock(side_effect=AssertionError("replay must not advance again"))
-    notify = AsyncMock()
-
-    monkeypatch.setattr(match_routes, "get_db", lambda: db)
-    monkeypatch.setattr(match_routes, "_ensure_match_tournament_unlocked", AsyncMock())
-    monkeypatch.setattr(match_routes, "ensure_tournament_accepts_results", AsyncMock())
-    monkeypatch.setattr(match_routes, "_require_result_permission", AsyncMock())
-    # Weiterleitung und Benachrichtigung liegen seit dem gemeinsamen
-    # Ergebniskern nicht mehr im Routenmodul - die Zusage bleibt dieselbe.
-    monkeypatch.setattr(classic_results, "advance_match_winner", advance)
-    monkeypatch.setattr(classic_submission, "notify_match_result_confirmed", notify)
-
-    result = asyncio.run(match_routes.forfeit(
-        "match-1",
-        {"winner_id": "reg-a", "note": " Nicht erschienen "},
-        {"id": "admin-1", "role": "tournament_admin"},
-    ))
-
-    assert result["idempotent_replay"] is True
-    assert matches.update_count == 0
-    advance.assert_not_called()
-    notify.assert_not_awaited()
-
-
-def test_non_result_update_on_completed_match_does_not_repeat_completion_hooks(monkeypatch):
-    match = {
-        "id": "match-1",
-        "tournament_id": "t1",
-        "participant_a_id": "reg-a",
-        "participant_b_id": "reg-b",
-        "winner_id": "reg-a",
-        "loser_id": "reg-b",
-        "score_a": 2,
-        "score_b": 0,
-        "status": "completed",
-        "admin_note": None,
-    }
-    matches = _MutableMatchCollection(match)
-    db = SimpleNamespace(matches=matches, matches_v2=_EmptyCollection())
-    advance = Mock(side_effect=AssertionError("non-result update must not advance again"))
-    audit = AsyncMock()
-
-    monkeypatch.setattr(match_routes, "get_db", lambda: db)
-    monkeypatch.setattr(match_routes, "_ensure_match_tournament_unlocked", AsyncMock())
-    monkeypatch.setattr(match_routes, "has_match_result_permission", AsyncMock(return_value=True))
-    monkeypatch.setattr(match_routes, "ensure_tournament_accepts_results", AsyncMock())
-    monkeypatch.setattr(match_routes, "ensure_station_slot_available", AsyncMock())
-    monkeypatch.setattr(classic_results, "advance_match_winner", advance)
-    monkeypatch.setattr(match_routes, "_audit_match_action", audit)
-
-    result = asyncio.run(match_routes.update_match(
-        "match-1",
-        MatchUpdate(admin_note="Nur eine Notiz"),
-        {"id": "admin-1", "role": "tournament_admin"},
-    ))
-
-    assert result["admin_note"] == "Nur eine Notiz"
-    assert result["idempotent_replay"] is False
-    assert matches.update_count == 1
-    advance.assert_not_called()
-    audit.assert_not_awaited()
-
-
-def test_score_report_exact_replay_skips_second_report_and_audit(monkeypatch):
-    report = {
-        "id": "report-1",
-        "registration_id": "reg-a",
-        "user_id": "user-1",
-        "score_a": 2,
-        "score_b": 1,
-        "screenshot_url": "https://example.test/proof",
-        "note": "final",
-    }
-    match = {
-        "id": "match-1",
-        "tournament_id": "t1",
-        "participant_a_id": "reg-a",
-        "participant_b_id": "reg-b",
-        "status": "waiting_result",
-        "reports": [report],
-    }
-    matches = _MutableMatchCollection(match)
-    db = SimpleNamespace(
-        matches=matches,
-        matches_v2=_EmptyCollection(),
-        tournaments=SimpleNamespace(find_one=AsyncMock(return_value={})),
-        tournament_stages=SimpleNamespace(find_one=AsyncMock()),
-        tournament_registrations=SimpleNamespace(find_one=AsyncMock(return_value={"id": "reg-a"})),
-    )
-    audit = AsyncMock()
-
-    monkeypatch.setattr(match_routes, "get_db", lambda: db)
-    monkeypatch.setattr(match_routes, "_ensure_match_tournament_unlocked", AsyncMock())
-    monkeypatch.setattr(match_routes, "ensure_tournament_accepts_results", AsyncMock())
-    monkeypatch.setattr(match_routes, "_audit_match_action", audit)
-
-    result = asyncio.run(match_routes.report_score(
-        "match-1",
-        MatchScoreReport(
-            score_a=2,
-            score_b=1,
-            screenshot_url="https://example.test/proof",
-            note="final",
-        ),
         {"id": "user-1", "role": "player"},
     ))
 

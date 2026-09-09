@@ -116,10 +116,10 @@ class TestTournaments:
         assert t.get("game") is not None
 
     def test_generate_bracket_single_elim_16(self, admin_client, api):
-        # Get tournament UUID (slug not supported by generate-bracket)
         t = api.get(f"{BASE_URL}/api/tournaments/mario-kart-winter-cup").json()
         tid = t["id"]
-        r = admin_client.post(f"{BASE_URL}/api/tournaments/{tid}/generate-bracket")
+        r = admin_client.post(
+            f"{BASE_URL}/api/tournaments/{tid}/bracket/from-format?preview=false&force=true")
         assert r.status_code in (200, 201), r.text
         body = r.json()
         assert body.get("match_count", 0) >= 15, f"match_count={body}"
@@ -128,14 +128,17 @@ class TestTournaments:
         b = admin_client.get(f"{BASE_URL}/api/tournaments/{tid}/bracket")
         assert b.status_code == 200
         bracket = b.json()
-        matches = bracket.get("matches", [])
+        matches = bracket.get("matches_v2", [])
         # Single elim 16 = 15 matches + 1 bronze = 16
         assert len(matches) >= 15, f"got {len(matches)} matches"
         # Round 1 should have 8 matches
         r1 = [m for m in matches if m.get("round") == 1]
         assert len(r1) == 8, f"R1 expected 8, got {len(r1)}"
         # Each R1 match has both participants
-        populated = sum(1 for m in r1 if m.get("participant_a_id") and m.get("participant_b_id"))
+        populated = sum(
+            1 for m in r1
+            if len([s for s in m.get("slots") or [] if s.get("registration_id")]) == 2
+        )
         assert populated == 8, f"R1 fully populated: {populated}/8"
 
     def test_register_and_checkin(self, api):
