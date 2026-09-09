@@ -152,57 +152,36 @@ export default function AdminTournamentNewPage() {
   return (
     <AdminLayout>
       <div className="mb-6">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Wizard</span>
+        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Turniere</span>
         <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">Neues Turnier</h1>
+        <p className="mt-2 text-sm text-white/50 max-w-2xl">
+          Titel und Spiel genügen zum Anlegen. Alles Weitere lässt sich danach in Ruhe
+          einstellen — das Turnier startet als Entwurf und ist noch nicht öffentlich.
+        </p>
       </div>
       <form onSubmit={submit} className="max-w-3xl space-y-5">
-        <Row>
-          <Field label="Titel" value={form.title} onChange={(v) => { set("title", v); if (!form.slug) set("slug", autoSlug(v)); }} required testId="new-tr-title" />
-          <Select label="Spiel *" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} required testId="new-tr-game" />
-        </Row>
-        <Row>
-          <Select label="Format" value={form.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} testId="new-tr-format" />
-          <Field label="Format-Anzeigename" value={form.format_label} onChange={(v) => set("format_label", v)} placeholder="z.B. Gamers Heaven F1 Heat" testId="new-tr-format-label" />
-          <Select label="Teilnahme" value={form.team_mode} onChange={setTeamMode} options={[["solo", "Einzelspieler"], ["team", "Team"]]} testId="new-tr-mode" />
-        </Row>
-        <Row>
-          {isTeam && <Field label="Spieler pro Team" type="number" min="2" max="6" value={form.team_size} onChange={(v) => set("team_size", Number(v))} testId="new-tr-team-size" />}
-          <Field label={isTeam ? "Max Teams" : "Max Spieler"} type="number" value={form.max_participants} onChange={(v) => set("max_participants", Number(v))} testId="new-tr-max" />
-          <Field label={isTeam ? "Min Teams" : "Min Spieler"} type="number" value={form.min_participants} onChange={(v) => set("min_participants", Number(v))} testId="new-tr-min" />
-        </Row>
-        <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeitplan & Anmeldung</div>
+        <Section title="Das Turnier" hint="Mehr als das braucht es nicht zum Anlegen — alles Weitere lässt sich danach in Ruhe einstellen.">
+          <Row>
+            <Field label="Titel" value={form.title} onChange={(v) => { set("title", v); if (!form.slug) set("slug", autoSlug(v)); }} required testId="new-tr-title" />
+            <Select label="Spiel" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} required testId="new-tr-game" />
+          </Row>
+          <Row>
+            <Select label="Format" value={form.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} testId="new-tr-format" />
+            <Select label="Teilnahme" value={form.team_mode} onChange={setTeamMode} options={[["solo", "Einzelspieler"], ["team", "Team"]]} testId="new-tr-mode" />
+          </Row>
+          <Row>
+            {isTeam && <Field label="Spieler pro Team" type="number" min="2" max="6" value={form.team_size} onChange={(v) => set("team_size", Number(v))} testId="new-tr-team-size" />}
+            <Field label={isTeam ? "Max Teams" : "Max Spieler"} type="number" value={form.max_participants} onChange={(v) => set("max_participants", Number(v))} testId="new-tr-max" />
+            <Field label={isTeam ? "Min Teams" : "Min Spieler"} type="number" value={form.min_participants} onChange={(v) => set("min_participants", Number(v))} testId="new-tr-min" />
+          </Row>
+        </Section>
+
+        <Section title="Wann" hint="Anmeldung und Check-in wechseln zeitgesteuert. Der Live-Start bleibt bei der Turnierleitung, solange du unten nichts anderes einstellst.">
           <Row>
             <Select label="Veröffentlichung" value={form.status} onChange={(v) => set("status", v)} options={CREATE_STATUS_OPTIONS} testId="new-tr-status" />
             <Field label="Start Event/Turnier" type="datetime-local" value={form.start_date} onChange={(v) => set("start_date", v)} testId="new-tr-start" />
             <Field label="Anmeldung endet" type="datetime-local" value={form.registration_open_until} onChange={(v) => set("registration_open_until", v)} testId="new-tr-reg-until" />
           </Row>
-          <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
-            Anmeldung und Check-in können zeitgesteuert wechseln. Live-Start und echte Matchstarts bleiben standardmäßig bei der Turnierleitung.
-          </div>
-          <Row>
-            <Select label="Austragung" value={form.event_mode} onChange={(v) => set("event_mode", v)} options={EVENT_MODE_OPTIONS} testId="new-tr-event-mode" />
-            <Select label="Ergebniserfassung" value={form.result_entry_mode || ""} onChange={(v) => set("result_entry_mode", v || null)} options={RESULT_ENTRY_MODE_OPTIONS} testId="new-tr-result-entry-mode" />
-            <Select label="Terminplanung" value={form.schedule_mode || ""} onChange={(v) => set("schedule_mode", v || null)} options={SCHEDULE_MODE_OPTIONS} testId="new-tr-schedule-mode" />
-          </Row>
-          <RulePresetPicker form={form} onApply={applyRulePreset} />
-          <div className="border border-white/10 bg-black/20 rounded-sm p-3 text-xs text-white/55">
-            Vor-Ort-Turniere werden standardmäßig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmäßig Ergebnisberichte beider Parteien und Terminvorschläge.
-          </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <label className="flex items-start gap-2 text-sm text-white/75">
-              <input type="checkbox" checked={form.registration_enabled} onChange={(e) => set("registration_enabled", e.target.checked)} data-testid="new-tr-reg-enabled" className="accent-[#29B6E8] mt-1" />
-              <span>Öffentliche Anmeldung grundsätzlich erlauben</span>
-            </label>
-            <label className="flex items-start gap-2 text-sm text-white/75">
-              <input type="checkbox" checked={form.site_banner_enabled} onChange={(e) => set("site_banner_enabled", e.target.checked)} data-testid="new-tr-site-banner" className="accent-[#FFD700] mt-1" />
-              <span>Automatisches Turnier-Hinweisbanner für dieses Turnier anzeigen</span>
-            </label>
-            <label className="flex items-start gap-2 text-sm text-white/75 sm:col-span-2">
-              <input type="checkbox" checked={form.auto_start_enabled} onChange={(e) => set("auto_start_enabled", e.target.checked)} data-testid="new-tr-auto-start" className="accent-[#29B6E8] mt-1" />
-              <span>Turnier anhand Start-/Endzeit automatisch live/beendet schalten. Für Vor-Ort-Turniere ausgeschaltet lassen.</span>
-            </label>
-          </div>
           <Details title="Weitere Zeiten und Sonderfälle">
             <Row>
               <Field label="Ende Event/Turnier" type="datetime-local" value={form.end_date} onChange={(v) => set("end_date", v)} testId="new-tr-end" />
@@ -219,13 +198,43 @@ export default function AdminTournamentNewPage() {
               <span>Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten</span>
             </label>
           </Details>
-        </div>
+        </Section>
+
+        <Section title="Wie gespielt wird">
+          {/* Die drei Auswahllisten dahinter standen bisher direkt darüber - drei
+              Listen und drei Knöpfe für dieselben drei Werte. Jetzt entscheidet
+              man einmal und weicht nur ab, wenn man es wirklich braucht. */}
+          <RulePresetPicker form={form} onApply={applyRulePreset} />
+          <Details title="Abweichend einstellen">
+            <Row>
+              <Select label="Austragung" value={form.event_mode} onChange={(v) => set("event_mode", v)} options={EVENT_MODE_OPTIONS} testId="new-tr-event-mode" />
+              <Select label="Ergebniserfassung" value={form.result_entry_mode || ""} onChange={(v) => set("result_entry_mode", v || null)} options={RESULT_ENTRY_MODE_OPTIONS} testId="new-tr-result-entry-mode" />
+              <Select label="Terminplanung" value={form.schedule_mode || ""} onChange={(v) => set("schedule_mode", v || null)} options={SCHEDULE_MODE_OPTIONS} testId="new-tr-schedule-mode" />
+            </Row>
+          </Details>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="flex items-start gap-2 text-sm text-white/75">
+              <input type="checkbox" checked={form.registration_enabled} onChange={(e) => set("registration_enabled", e.target.checked)} data-testid="new-tr-reg-enabled" className="accent-[#29B6E8] mt-1" />
+              <span>Öffentliche Anmeldung grundsätzlich erlauben</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-white/75">
+              <input type="checkbox" checked={form.site_banner_enabled} onChange={(e) => set("site_banner_enabled", e.target.checked)} data-testid="new-tr-site-banner" className="accent-[#FFD700] mt-1" />
+              <span>Automatisches Turnier-Hinweisbanner für dieses Turnier anzeigen</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-white/75 sm:col-span-2">
+              <input type="checkbox" checked={form.auto_start_enabled} onChange={(e) => set("auto_start_enabled", e.target.checked)} data-testid="new-tr-auto-start" className="accent-[#29B6E8] mt-1" />
+              <span>Turnier anhand Start-/Endzeit automatisch live/beendet schalten. Für Vor-Ort-Turniere ausgeschaltet lassen.</span>
+            </label>
+          </div>
+        </Section>
+
         <Details title="Darstellung und Regeln">
           <Row>
             <Field label="Slug (URL)" value={form.slug} onChange={(v) => set("slug", autoSlug(v))} required testId="new-tr-slug" />
             <Field label="Plattform" value={form.platform} onChange={(v) => set("platform", v)} placeholder="z.B. Nintendo Switch" testId="new-tr-platform" />
             <Select label="Event" value={form.event_id || ""} onChange={(v) => set("event_id", v)} options={[["", "— keins —"], ...events.map((e) => [e.id, e.name])]} testId="new-tr-event" />
           </Row>
+          <Field label="Format-Anzeigename" value={form.format_label} onChange={(v) => set("format_label", v)} placeholder="z.B. Gamers Heaven F1 Heat" testId="new-tr-format-label" />
           <Textarea label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="new-tr-description" />
           <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Turnier-Banner" testId="new-tr-banner-upload" variant="wide" allowLibrary />
           <Textarea label="Regeln" value={form.rules} onChange={(v) => set("rules", v)} testId="new-tr-rules" />
@@ -326,6 +335,22 @@ export default function AdminTournamentNewPage() {
 }
 
 function Row({ children }) { return <div className="grid md:grid-cols-2 gap-4">{children}</div>; }
+
+// Ein benannter Abschnitt mit optionaler Erklärung. Die Erklärung steht in der
+// Überschrift statt als eigener Kasten dazwischen - so unterbricht sie den
+// Lesefluss nicht und man weiß trotzdem, worum es in dem Block geht.
+function Section({ title, hint, children }) {
+  return (
+    <section className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">{title}</div>
+        {hint && <p className="mt-1 text-xs text-white/45">{hint}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function Details({ title, children }) {
   return (
     <details className="border border-white/10 bg-[#121212] rounded-sm p-4 group">
@@ -334,10 +359,16 @@ function Details({ title, children }) {
     </details>
   );
 }
+function RequiredMark() {
+  // Bisher stand das Sternchen im Beschriftungstext eines einzigen Feldes. So
+  // sieht man an jedem Pflichtfeld, dass es eines ist.
+  return <span className="text-[#FF3B30] ml-1" title="Pflichtfeld">*</span>;
+}
+
 function Field({ label, value, onChange, type = "text", required, placeholder, testId, min, max }) {
   return (
     <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}{required && <RequiredMark />}</div>
       <input type={type} min={min} max={max} value={value ?? ""} onChange={(e) => onChange(e.target.value)} required={required} placeholder={placeholder} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white focus:outline-none" />
     </label>
   );
@@ -345,7 +376,7 @@ function Field({ label, value, onChange, type = "text", required, placeholder, t
 function Select({ label, value, onChange, options, required, testId }) {
   return (
     <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}{required && <RequiredMark />}</div>
       <select value={value} onChange={(e) => onChange(e.target.value)} required={required} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white focus:outline-none">
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
