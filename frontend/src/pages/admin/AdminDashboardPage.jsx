@@ -62,19 +62,17 @@ export default function AdminDashboardPage() {
   ];
 
 
+  // Nur Zahlen zum Nachschauen. Alles, wo jemand etwas tun muss - Einsprüche,
+  // Mitgliedsanträge, Gewinne, Push-Fehler, Logs - steht in den offenen
+  // Aufgaben und stand hier bisher ein zweites Mal.
   const kpis = [
     { label: "Spieler", value: data?.player_count, icon: UsersIcon, color: "#29B6E8" },
     { label: "Teams", value: data?.team_count, icon: UsersIcon, color: "#29B6E8" },
     { label: "Aktive Turniere", value: data?.active_tournaments, icon: Trophy, color: "#FF3B30" },
     { label: "Anmeldung offen", value: data?.registration_open, icon: GamepadIcon, color: "#00FF88" },
     { label: "Spiele heute", value: data?.today_matches, icon: Radio, color: "#FFD700" },
-    { label: "Offene Disputes", value: data?.open_disputes, icon: AlertTriangle, color: "#FF3B30" },
     { label: "Fast Lap Live", value: data?.active_f1, icon: Flag, color: "#29B6E8" },
     { label: "Events Gesamt", value: data?.total_events, icon: CalendarDays, color: "#29B6E8" },
-    { label: "Mitgliedsanträge", value: data?.membership_applications?.pending, icon: Inbox, color: "#FFD700" },
-    { label: "Gewinne offen", value: data?.prize_pickups?.pending, icon: Award, color: "#FFD700" },
-    { label: "Push aktiv", value: data?.mobile_push?.active_tokens, icon: BellRing, color: "#00FF88" },
-    { label: "Offene Logs", value: data?.client_logs?.open, icon: Bug, color: "#FFD700" },
   ];
   const pushErrors = Number(data?.mobile_push?.ticket_errors || 0) + Number(data?.mobile_push?.receipt_errors || 0);
   const pendingApplications = Number(data?.membership_applications?.pending || 0);
@@ -179,11 +177,10 @@ export default function AdminDashboardPage() {
     if (item.to === "/admin/mobile-logs") return Number(data?.client_logs?.open || 0) > 0;
     return false;
   };
-  const fallbackTaskRoutes = ["/admin/media", "/admin/audit", "/admin/settings?tab=system", "/admin/settings?tab=seo"];
+  // Steht nichts an, wird das gesagt. Früher rückten hier vier Routinelinks
+  // nach und sahen aus wie echte offene Aufgaben.
   const activeTaskItems = taskItems.filter(taskIsActive);
-  const fallbackTaskItems = taskItems.filter((item) => fallbackTaskRoutes.includes(item.to));
-  const primaryTaskItems = activeTaskItems.length ? activeTaskItems : fallbackTaskItems;
-  const secondaryTaskItems = taskItems.filter((item) => !primaryTaskItems.includes(item));
+  const secondaryTaskItems = taskItems.filter((item) => !activeTaskItems.includes(item));
 
   const growthData = (growth?.days || []).map((d) => ({
     ...d,
@@ -247,16 +244,80 @@ export default function AdminDashboardPage() {
           </div>
         </Link>
       )}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {kpis.map((k) => (
-          <div key={k.label} data-testid={`kpi-${k.label}`} className="border border-white/10 rounded-sm bg-[#121212] p-4 hover:border-[#29B6E8]/40 transition">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-widest text-white/50 font-bold">{k.label}</span>
-              <k.icon className="w-4 h-4" style={{ color: k.color }} />
-            </div>
-            <div className="mt-3 font-display font-bold text-4xl text-white">{k.value ?? "—"}</div>
+      {/* Arbeit vor Statistik: was jemand anfassen muss, steht oben. */}
+      <div className="mb-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-tasks">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.28em] text-[#29B6E8] font-bold">Tageszentrale</div>
+            <h2 className="font-heading font-bold uppercase text-lg mt-1">
+              Offene Aufgaben{activeTaskItems.length > 0 ? ` · ${activeTaskItems.length}` : ""}
+            </h2>
           </div>
-        ))}
+          <span className="text-xs text-white/40">{new Date().toLocaleDateString("de-DE")}</span>
+        </div>
+        {activeTaskItems.length > 0 ? (
+          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
+            {activeTaskItems.map((item) => (
+              <Link key={item.label} to={item.to} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 hover:border-[#29B6E8]/50 transition group">
+                <div className="flex items-center justify-between gap-3">
+                  <item.icon className="w-4 h-4" style={{ color: item.tone }} />
+                  <span className="text-[#29B6E8] group-hover:translate-x-0.5 transition-transform">→</span>
+                </div>
+                <div className="mt-3 text-xs font-bold uppercase tracking-wider text-white">{item.label}</div>
+                <div className="mt-1 text-xs text-white/45 leading-relaxed">{item.detail}</div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div data-testid="dashboard-tasks-empty" className="flex items-start gap-3 rounded-sm border border-[#00FF88]/25 bg-[#00FF88]/5 px-4 py-3">
+            <ShieldCheck className="w-4 h-4 text-[#00FF88] shrink-0 mt-0.5" />
+            <span className="text-sm text-white/70">Nichts offen. Keine Konflikte, Anträge, Gewinne oder Fehler warten gerade auf dich.</span>
+          </div>
+        )}
+        {secondaryTaskItems.length > 0 && (
+          <details className="mt-4 border-t border-white/10 pt-4 group">
+            <summary className="cursor-pointer list-none text-[10px] font-bold uppercase tracking-[0.25em] text-white/45 hover:text-white inline-flex items-center gap-2">
+              Weitere Werkzeuge <span className="text-[#29B6E8] group-open:rotate-90 transition-transform">→</span>
+            </summary>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {secondaryTaskItems.map((item) => (
+                <Link
+                  key={item.label}
+                  to={item.to}
+                  className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-[#29B6E8]/50 hover:text-white"
+                >
+                  <item.icon className="w-3.5 h-3.5" style={{ color: item.tone }} />
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </details>
+        )}
+      </div>
+
+      <div className="mb-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-quick-actions">
+        <h2 className="font-heading font-bold uppercase text-lg mb-3">Schnellzugriff</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <Link to="/admin/tournaments/new" data-testid="quick-new-tournament" className="px-4 py-3 border border-[#29B6E8]/40 text-[#29B6E8] text-sm uppercase tracking-wider font-bold rounded-sm hover:bg-[#29B6E8]/10">+ Turnier</Link>
+          <Link to="/admin/f1/new" data-testid="quick-new-f1" className="px-4 py-3 border border-[#29B6E8]/40 text-[#29B6E8] text-sm uppercase tracking-wider font-bold rounded-sm hover:bg-[#29B6E8]/10">+ Fast-Lap-Challenge</Link>
+          <Link to="/admin/events" className="px-4 py-3 border border-white/10 text-white text-sm uppercase tracking-wider font-bold rounded-sm hover:border-[#29B6E8]/40">Events</Link>
+          <Link to="/admin/stations" className="px-4 py-3 border border-white/10 text-white text-sm uppercase tracking-wider font-bold rounded-sm hover:border-[#29B6E8]/40">Stationen</Link>
+        </div>
+      </div>
+
+      <div data-testid="dashboard-kpis">
+        <h2 className="font-heading font-bold uppercase text-lg mb-3">Zahlen im Überblick</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {kpis.map((k) => (
+            <div key={k.label} data-testid={`kpi-${k.label}`} className="border border-white/10 rounded-sm bg-[#121212] p-4 hover:border-[#29B6E8]/40 transition">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-widest text-white/50 font-bold">{k.label}</span>
+                <k.icon className="w-4 h-4" style={{ color: k.color }} />
+              </div>
+              <div className="mt-3 font-display font-bold text-4xl text-white">{k.value ?? "—"}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-growth-widget">
@@ -339,71 +400,19 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.28em] text-[#29B6E8] font-bold">Tageszentrale</div>
-            <h2 className="font-heading font-bold uppercase text-lg mt-1">Offene Aufgaben</h2>
-          </div>
-          <span className="text-xs text-white/40">{new Date().toLocaleDateString("de-DE")}</span>
+      <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-audit-log">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="font-heading font-bold uppercase text-lg flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Letzte Adminaktionen</h2>
+          <Link to="/admin/logs" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Logs</Link>
         </div>
-        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
-          {primaryTaskItems.map((item) => (
-            <Link key={item.label} to={item.to} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 hover:border-[#29B6E8]/50 transition group">
-              <div className="flex items-center justify-between gap-3">
-                <item.icon className="w-4 h-4" style={{ color: item.tone }} />
-                <span className="text-[#29B6E8] group-hover:translate-x-0.5 transition-transform">→</span>
-              </div>
-              <div className="mt-3 text-xs font-bold uppercase tracking-wider text-white">{item.label}</div>
-              <div className="mt-1 text-xs text-white/45 leading-relaxed">{item.detail}</div>
-            </Link>
-          ))}
-        </div>
-        {secondaryTaskItems.length > 0 && (
-          <details className="mt-4 border-t border-white/10 pt-4 group">
-            <summary className="cursor-pointer list-none text-[10px] font-bold uppercase tracking-[0.25em] text-white/45 hover:text-white inline-flex items-center gap-2">
-              Weitere Werkzeuge <span className="text-[#29B6E8] group-open:rotate-90 transition-transform">→</span>
-            </summary>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {secondaryTaskItems.map((item) => (
-                <Link
-                  key={item.label}
-                  to={item.to}
-                  className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-[#29B6E8]/50 hover:text-white"
-                >
-                  <item.icon className="w-3.5 h-3.5" style={{ color: item.tone }} />
-                  {item.label}
-                </Link>
-              ))}
+        <div className="space-y-2 text-sm">
+          {(data?.recent_audit_logs || []).slice(0, 8).map((l, i) => (
+            <div key={i} className="flex items-center justify-between gap-3 border-b border-white/5 pb-2">
+              <span className="text-white/80 min-w-0 truncate">{l.action}</span>
+              <span className="text-white/40 text-xs shrink-0">{l.created_at && new Date(l.created_at).toLocaleString("de-DE")}</span>
             </div>
-          </details>
-        )}
-      </div>
-
-      <div className="mt-10 grid md:grid-cols-2 gap-6">
-        <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
-          <h2 className="font-heading font-bold uppercase text-lg mb-3">Schnellzugriff</h2>
-          <div className="grid grid-cols-2 gap-2">
-            <Link to="/admin/tournaments/new" data-testid="quick-new-tournament" className="px-4 py-3 border border-[#29B6E8]/40 text-[#29B6E8] text-sm uppercase tracking-wider font-bold rounded-sm hover:bg-[#29B6E8]/10">+ Turnier</Link>
-            <Link to="/admin/f1/new" data-testid="quick-new-f1" className="px-4 py-3 border border-[#29B6E8]/40 text-[#29B6E8] text-sm uppercase tracking-wider font-bold rounded-sm hover:bg-[#29B6E8]/10">+ Fast-Lap-Challenge</Link>
-            <Link to="/admin/events" className="px-4 py-3 border border-white/10 text-white text-sm uppercase tracking-wider font-bold rounded-sm hover:border-[#29B6E8]/40">Events</Link>
-            <Link to="/admin/stations" className="px-4 py-3 border border-white/10 text-white text-sm uppercase tracking-wider font-bold rounded-sm hover:border-[#29B6E8]/40">Stationen</Link>
-          </div>
-        </div>
-        <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="font-heading font-bold uppercase text-lg flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Letzte Adminaktionen</h2>
-            <Link to="/admin/logs" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Logs</Link>
-          </div>
-          <div className="space-y-2 text-sm">
-            {(data?.recent_audit_logs || []).slice(0, 8).map((l, i) => (
-              <div key={i} className="flex items-center justify-between border-b border-white/5 pb-2">
-                <span className="text-white/80">{l.action}</span>
-                <span className="text-white/40 text-xs">{l.created_at && new Date(l.created_at).toLocaleString("de-DE")}</span>
-              </div>
-            ))}
-            {(!data || data.recent_audit_logs?.length === 0) && <div className="text-white/40">Keine Einträge.</div>}
-          </div>
+          ))}
+          {(!data || data.recent_audit_logs?.length === 0) && <div className="text-white/40">Keine Einträge.</div>}
         </div>
       </div>
     </AdminLayout>
