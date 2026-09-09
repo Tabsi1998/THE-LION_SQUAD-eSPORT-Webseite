@@ -146,7 +146,13 @@ export const BRACKET_SECTION_LABELS = {
   grand_final: "Großes Finale",
   bronze: "Spiel um Platz 3",
   round_robin: "Spieltage",
+  LIGA: "Spieltage",
+  swiss: "Schweizer Runden",
 };
+
+// Gruppen heißen im Turnierbaum group_A, group_B … - so findet die
+// Gruppentabelle ihre Spiele. Angezeigt wird das nicht.
+const GROUP_SECTION_RE = /^group_([A-Za-z0-9]+)$/;
 
 export const DEVICE_TYPE_LABELS = {
   switch: "Switch",
@@ -202,7 +208,10 @@ export function formatRegistrationStatus(value) {
 }
 
 export function formatBracketSection(value) {
-  return BRACKET_SECTION_LABELS[value] || value || "Turnierbaum";
+  if (BRACKET_SECTION_LABELS[value]) return BRACKET_SECTION_LABELS[value];
+  const group = GROUP_SECTION_RE.exec(String(value || ""));
+  if (group) return `Gruppe ${group[1].toUpperCase()}`;
+  return value || "Turnierbaum";
 }
 
 export function formatDeviceType(value) {
