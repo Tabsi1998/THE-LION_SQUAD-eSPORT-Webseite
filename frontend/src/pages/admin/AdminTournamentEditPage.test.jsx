@@ -147,6 +147,88 @@ test("ein Ladefehler wird angezeigt statt endlos zu laden", async () => {
   expect(screen.queryByRole("heading", { name: "Winter Cup 2026" })).not.toBeInTheDocument();
 });
 
+// Die Turnierstruktur ist das einzige Strukturfeld, das im Bearbeiten-Formular
+// sichtbar ist. Welcher Strukturtyp daraus folgt, entscheidet das Backend
+// (services/competition_formats.py). Schickt das Formular dabei einen eigenen
+// Strukturtyp mit, gewinnt dieser - deshalb darf es nur mitschicken, was
+// wirklich gewählt wurde.
+function renderPageWithFormat(format) {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/tournaments/t-1") && !path.includes("/registrations") && !path.includes("/bracket")
+      && !path.includes("/stages") && !path.includes("/matches-v2") && !path.includes("/groups")
+      && !path.includes("/staff") && !path.includes("/stations")) {
+      return Promise.resolve({ data: { ...TOURNAMENT, format } });
+    }
+    return Promise.resolve(routeFor(path));
+  });
+  return renderPage();
+}
+
+async function applyStructure(user) {
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+  apiMock.post.mockClear();
+  await user.click(await screen.findByTestId("tr-edit-save-rebuild"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(
+    expect.stringContaining("/bracket/from-format"),
+    expect.anything()
+  ));
+  const [, body] = apiMock.post.mock.calls.find(([url]) => String(url).includes("/bracket/from-format"));
+  return body;
+}
+
+test.each([
+  ["league", "single_elimination"],
+  ["round_robin", "single_elimination"],
+  ["groups", "single_elimination"],
+  ["ffa", "single_elimination"],
+])("Struktur anwenden macht aus %s keine Einzelausscheidung", async (format) => {
+  const user = userEvent.setup();
+  renderPageWithFormat(format);
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+
+  const body = await applyStructure(user);
+
+  expect(body.stage_type).not.toBe("single_elimination");
+});
+
+test("ein Formatwechsel im Formular überschreibt den Strukturtyp nicht mehr selbst", async () => {
+  const user = userEvent.setup();
+  renderPageWithFormat("single_elim");
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+
+  const formatSelect = await screen.findByLabelText("Turnierstruktur");
+  await user.selectOptions(formatSelect, "league");
+
+  apiMock.post.mockClear();
+  await user.click(screen.getByTestId("tr-edit-save-rebuild"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(
+    expect.stringContaining("/bracket/from-format"),
+    expect.anything()
+  ));
+  const [, body] = apiMock.post.mock.calls.find(([url]) => String(url).includes("/bracket/from-format"));
+
+  expect(body.stage_type).not.toBe("single_elimination");
+});
+
+test("eine vorhandene Phase behält ihren Strukturtyp", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/stages")) {
+      return Promise.resolve({ data: [{ id: "s-1", stage_type: "round_robin_groups", match_type: "duel", settings: {} }] });
+    }
+    return Promise.resolve(routeFor(path));
+  });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+
+  const body = await applyStructure(user);
+
+  expect(body.stage_type).toBe("round_robin_groups");
+});
+
 test("ein Ausfall der Nebendaten blockiert das Turnier nicht", async () => {
   // Nur Personal-, Nutzer- und Teamlisten fallen aus: die Seite muss trotzdem stehen.
   apiMock.get.mockImplementation((url) => {

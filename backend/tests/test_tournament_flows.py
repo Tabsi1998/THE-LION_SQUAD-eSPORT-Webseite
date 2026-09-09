@@ -349,3 +349,36 @@ async def test_a_drawn_league_match_gives_both_sides_a_point(flow):
     assert rows[first]["points"] == 1
     assert rows[second]["points"] == 1
     assert rows[first]["drawn"] == 1
+
+
+# ---------------------------------------------------------------- Format -> Struktur
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tournament_format,expected_stage_type", [
+    ("single_elim", "single_elimination"),
+    ("double_elim", "double_elimination"),
+    ("round_robin", "round_robin_groups"),
+    ("groups", "round_robin_groups"),
+    ("league", "league"),
+    ("ffa", "simple"),
+    ("battle_royale", "simple"),
+])
+async def test_the_format_alone_decides_the_structure(flow, tournament_format, expected_stage_type):
+    """Ohne mitgeschickten Strukturtyp gilt die Zuordnung aus competition_formats.
+
+    Das Bearbeiten-Formular verlaesst sich darauf: es schickt keinen eigenen
+    Strukturtyp mehr mit, wenn die Turnierleitung keinen gewaehlt hat. Frueher
+    schickte es fuer neun von zwoelf Formaten "single_elimination" - eine Liga
+    wurde damit beim Anwenden zur Einzelausscheidung.
+    """
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(4, format=tournament_format)
+
+    response = await flow.post(
+        f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=false")
+    assert response.status_code == 200, response.text
+
+    stages = (await flow.get(f"/api/tournaments/{tournament['id']}/stages")).json()
+    assert stages, "Es muss eine Phase entstanden sein"
+    assert stages[0]["stage_type"] == expected_stage_type
