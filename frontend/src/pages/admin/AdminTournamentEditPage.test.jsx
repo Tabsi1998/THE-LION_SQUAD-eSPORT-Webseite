@@ -147,6 +147,59 @@ test("ein Ladefehler wird angezeigt statt endlos zu laden", async () => {
   expect(screen.queryByRole("heading", { name: "Winter Cup 2026" })).not.toBeInTheDocument();
 });
 
+// Der Kopf trug dreizehn Bedienelemente in einer Reihe: nächster Schritt,
+// Status, Sperren, Stationen, Planung, Zurücksetzen, Format-Aktion und fünf
+// Downloads. Die Tests halten fest, dass oben nur noch steht, was das Turnier
+// weiterschiebt, und der Rest hinter benannten Gruppen liegt.
+
+test("der Kopf zeigt nur die Ablaufaktionen, Werkzeuge liegen in einer Gruppe", async () => {
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+
+  expect(screen.getByTestId("admin-tr-primary-action")).toBeInTheDocument();
+  expect(screen.getByTestId("admin-tr-status-select")).toBeInTheDocument();
+
+  const tools = screen.getByTestId("admin-tr-tools");
+  expect(tools).not.toHaveAttribute("open");
+  expect(tools).toContainElement(screen.getByTestId("admin-tr-planning-check"));
+  expect(tools).toContainElement(screen.getByTestId("admin-tr-reset"));
+});
+
+test("die Werkzeuggruppe lässt sich öffnen und nennt ihre Anzahl", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+
+  const tools = screen.getByTestId("admin-tr-tools");
+  // Ohne Stationen bleiben Planung prüfen und Zurücksetzen.
+  expect(tools.querySelector("summary")).toHaveTextContent(/Werkzeuge\s*2/);
+
+  await user.click(tools.querySelector("summary"));
+
+  expect(tools).toHaveAttribute("open");
+});
+
+test("die Downloads liegen vollständig in ihrer eigenen Gruppe", async () => {
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+
+  const downloads = screen.getByTestId("admin-tr-downloads");
+  expect(downloads).not.toHaveAttribute("open");
+  for (const key of ["participants", "checkin", "registration-qr", "matches", "match-plan"]) {
+    expect(downloads).toContainElement(screen.getByTestId(`admin-tr-download-${key}`));
+  }
+});
+
+test("die Format-Aktion steht oben und nicht in den Werkzeugen", async () => {
+  renderPageWithFormat("swiss");
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+
+  const swiss = screen.getByTestId("admin-tr-swiss-next");
+  expect(swiss).toBeInTheDocument();
+  expect(screen.getByTestId("admin-tr-tools")).not.toContainElement(swiss);
+  expect(screen.getByTestId("admin-tr-downloads")).not.toContainElement(swiss);
+});
+
 // Die Turnierstruktur ist das einzige Strukturfeld, das im Bearbeiten-Formular
 // sichtbar ist. Welcher Strukturtyp daraus folgt, entscheidet das Backend
 // (services/competition_formats.py). Schickt das Formular dabei einen eigenen
