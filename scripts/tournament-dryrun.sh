@@ -22,6 +22,17 @@ ok() { printf "\033[1;32m==> %s\033[0m\n" "$*" >&2; }
 OUT_FILE="${1:-}"
 COMPARE_FILE="${2:-}"
 
+if [ -n "$COMPARE_FILE" ] && [ ! -f "$COMPARE_FILE" ]; then
+  fail "Vergleichsdatei nicht gefunden: ${COMPARE_FILE}
+    Ein Vergleich braucht eine frühere Aufnahme. Die entsteht nur, wenn beim
+    Lauf ein Dateiname mitgegeben wurde:
+
+      bash scripts/tournament-dryrun.sh ${COMPARE_FILE}
+
+    Ohne Vorher-Aufnahme einfach ohne zweiten Namen laufen lassen - der Bericht
+    zeigt den Bestand auch so."
+fi
+
 command -v docker >/dev/null || fail "docker wurde nicht gefunden."
 docker compose ps backend >/dev/null 2>&1 || fail \
   "Der Backend-Dienst ist über docker compose nicht erreichbar. Im Verzeichnis der docker-compose.yml ausführen."
@@ -30,7 +41,6 @@ ARGS=(--json)
 MOUNTS=(-v "${ROOT}/scripts:/app/scripts:ro")
 
 if [ -n "$COMPARE_FILE" ]; then
-  [ -f "$COMPARE_FILE" ] || fail "Vergleichsdatei nicht gefunden: ${COMPARE_FILE}"
   COMPARE_ABS="$(cd "$(dirname "$COMPARE_FILE")" && pwd)/$(basename "$COMPARE_FILE")"
   MOUNTS+=(-v "${COMPARE_ABS}:/app/vergleich.json:ro")
   ARGS+=(--compare /app/vergleich.json)

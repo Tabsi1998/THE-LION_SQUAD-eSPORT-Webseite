@@ -21,6 +21,10 @@ bash scripts/tournament-dryrun.sh                # Bericht in die Konsole
 bash scripts/tournament-dryrun.sh vorher.json    # zusätzlich als JSON ablegen
 ```
 
+Der zweite Aufruf legt die **Vergleichsbasis** an. Ohne ihn gibt es später
+nichts zu vergleichen — der Bericht in der Konsole allein wird nicht
+gespeichert.
+
 **Warum ein Wrapper und nicht direkt `python3`:** MongoDB hat bewusst keinen
 veröffentlichten Port und ist nur im Docker-Netz erreichbar. Auf dem Host gibt es
 also weder eine Verbindung noch die Python-Abhängigkeiten des Backends. Der
