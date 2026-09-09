@@ -24,7 +24,7 @@ from typing import Any
 ASSIGNMENT_RE = re.compile(r"^(?P<key>[A-Za-z0-9_.-]+)\s*=\s*\[(?P<slots>.*)\]\s*$")
 SECTION_RE = re.compile(r"^\[(?P<section>[A-Za-z0-9_. -]+)\]\s*$")
 SOURCE_RE = re.compile(r"^(?P<flow>[WLR]):(?P<match>[A-Za-z0-9_.-]+):(?P<rank>[1-9][0-9]*)$")
-ROUND_RE = re.compile(r"\b(?:round|runde)\s+([0-9]+)\b", re.IGNORECASE)
+ROUND_RE = re.compile(r"\b(?:round|runde|spieltag)\s+([0-9]+)\b", re.IGNORECASE)
 
 
 class BracketSchemaError(ValueError):
@@ -410,13 +410,16 @@ def _auto_groups_schema(slot_count: int, group_count: int) -> str:
     any result - so it fits the declarative schema without a dynamic generator.
     """
     groups = distribute_into_groups(slot_count, group_count)
+    # Eine einzige Gruppe ist keine Gruppenphase, sondern ein Round Robin. Sie
+    # bekommt deshalb keinen Gruppennamen - sonst stünde über jedem Spielplan
+    # ein "Gruppe A", das sich von keiner Gruppe B unterscheidet.
+    single = len(groups) == 1
     lines: list[str] = []
     key_index = 0
     for number, seeds in enumerate(groups, start=1):
-        label = group_label(number)
-        lines.append(f"[{group_section(number)}]")
+        lines.append(f"[{'round_robin' if single else group_section(number)}]")
         for matchday, pairs in enumerate(_round_robin_rounds(seeds), start=1):
-            lines.append(f"# Gruppe {label} - Runde {matchday}")
+            lines.append(f"# Spieltag {matchday}")
             for left, right in pairs:
                 key = _match_key(key_index)
                 key_index += 1
@@ -440,7 +443,7 @@ def _auto_league_schema(slot_count: int) -> str:
     lines = ["[LIGA]"]
     key_index = 0
     for matchday, pairs in enumerate(first_leg + return_leg, start=1):
-        lines.append(f"# Runde {matchday}")
+        lines.append(f"# Spieltag {matchday}")
         for home, away in pairs:
             key = _match_key(key_index)
             key_index += 1

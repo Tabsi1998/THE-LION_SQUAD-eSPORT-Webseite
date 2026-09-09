@@ -250,6 +250,21 @@ def _can_create_initial_legacy_preview(tournament: dict) -> bool:
     return 0 < _estimate_legacy_preview_matches(tournament) <= MAX_INITIAL_PREVIEW_MATCHES
 
 
+GROUP_TARGET_SIZE = 4
+
+
+def _default_group_count(tournament: dict) -> int:
+    """How many groups a group stage starts with, from the field size.
+
+    A fixed default of four turned eight participants into four pairs - four
+    "groups" of two, where every group is decided by a single match. Aiming for
+    groups of about four keeps a group stage what it is: a few matches inside
+    each group before anyone advances.
+    """
+    size = max(2, int(tournament.get("max_participants") or 0) or 2)
+    return max(1, min(size // GROUP_TARGET_SIZE, size // 2))
+
+
 def _can_create_initial_stage_preview(tournament: dict) -> bool:
     capability = find_format_capability(tournament.get("format"))
     if not capability or capability.initial_preview_engine != "stage":
@@ -553,7 +568,7 @@ def _stage_defaults_for_tournament_format(tournament: dict, body: TournamentBrac
     settings.setdefault("min_players", 2)
     if stage_type == "round_robin_groups":
         # Eine Gruppe ist ein Round Robin, mehrere sind eine Gruppenphase.
-        settings.setdefault("group_count", 4 if fmt == "groups" else 1)
+        settings.setdefault("group_count", _default_group_count(tournament) if fmt == "groups" else 1)
     settings.setdefault("qualifiers_per_match", 2 if match_type == "ffa" else 1)
     settings.setdefault("duration_minutes", int(tournament.get("match_duration_minutes") or 30))
     settings.setdefault("score_type", "points")

@@ -19,6 +19,8 @@ import { gameOptionLabel } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
 import {
   REGISTRATION_STATUS_OPTIONS,
+  STAGE_TYPE_OPTIONS,
+  TOURNAMENT_FORMAT_OPTIONS,
   STAFF_ROLE_OPTIONS,
   STAFF_SCOPE_OPTIONS,
   STAGE_STATUS_OPTIONS,
@@ -45,21 +47,6 @@ const TOURNAMENT_STATUS_OPTIONS = [
 ];
 const OPERATIONAL_STATUS_VALUES = new Set(["check_in", "live", "paused", "completed"]);
 
-const TOURNAMENT_FORMAT_OPTIONS = [
-  ["single_elim", "Einzelausscheidung"],
-  ["double_elim", "Doppelausscheidung"],
-  ["round_robin", "Jeder gegen jeden"],
-  ["swiss", "Schweizer System"],
-  ["groups", "Gruppen"],
-  ["ffa", "Mehrspieler frei"],
-  ["battle_royale", "Überlebensmodus"],
-  ["league", "Liga"],
-  ["time_trial", "Zeitfahren"],
-  ["grand_prix", "Rennserie"],
-  ["custom_bracket", "Freier Turnierbaum"],
-  ["ffa_custom_bracket", "Mehrspieler freier Turnierbaum"],
-];
-
 const TEAM_MODE_OPTIONS = [["solo", "Einzelspieler"], ["team", "Team"]];
 const SEEDING_OPTIONS = [["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]];
 const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
@@ -77,18 +64,6 @@ const TOURNAMENT_SEASON_WEIGHT_OPTIONS = [
   ["0", "Keine Jahreswertung (x0.00)"],
 ];
 
-const STAGE_TYPES = [
-  ["single_elimination", "Einzelausscheidung"],
-  ["double_elimination", "Doppelausscheidung"],
-  ["custom_bracket", "Freier Turnierbaum"],
-  ["round_robin_groups", "Jeder-gegen-jeden-Gruppen"],
-  ["swiss", "Schweizer System"],
-  ["league", "Liga"],
-  ["simple", "Einzelrunde"],
-  ["ffa_single_elimination", "Mehrspieler-Einzelausscheidung"],
-  ["ffa_custom_bracket", "Mehrspieler freier Turnierbaum"],
-  ["ffa_league", "Mehrspieler-Liga"],
-];
 const DEFAULT_FFA_SCHEMA = `[WB]
 # Runde 1
 A=[1,2,3,4]
@@ -101,7 +76,12 @@ C=[W:A:1,W:A:2,W:B:1,W:B:2]
 # Runde 1
 LA=[L:A:1,L:A:2,L:B:1,L:B:2]`;
 const CUSTOM_STAGE_TYPES = new Set(["custom_bracket", "ffa_custom_bracket"]);
-const AUTO_STAGE_TYPES = new Set(["single_elimination", "double_elimination", "custom_bracket", "ffa_custom_bracket"]);
+// Strukturen, die das Backend aus dem Format bauen kann. Schweizer Runden
+// fehlen hier bewusst: die entstehen einzeln über "Schweizer Runde".
+const AUTO_STAGE_TYPES = new Set([
+  "single_elimination", "double_elimination", "custom_bracket", "ffa_custom_bracket",
+  "round_robin_groups", "league", "simple",
+]);
 const FFA_STAGE_TYPES = new Set(["simple", "ffa_single_elimination", "ffa_custom_bracket", "ffa_league"]);
 const BRONZE_FORMATS = new Set(["single_elim"]);
 const MATCH_SECTION_ORDER = ["WB", "winner", "MAIN", "main", "LB", "loser", "BRONZE", "bronze", "GF", "grand_final", "FINAL", "final", "round_robin"];
@@ -875,7 +855,7 @@ export default function AdminTournamentEditPage() {
       {activeTab === "bracket" && bracket && (
         <div className="bg-[#0A0A0A] rounded-sm p-4 border border-white/10">
           {(bracket.matches?.length || 0) + (bracket.matches_v2?.length || 0) === 0 ? (
-            <div className="text-center py-16 text-white/40 font-display tracking-widest">TURNIERBAUM NICHT GENERIERT</div>
+            <EmptyBracketNotice tournament={t} />
           ) : (
             <BracketTree data={bracket} />
           )}
@@ -1129,7 +1109,7 @@ function TournamentStagesPanel({ tournamentId, stages, matches, registrations, s
           {createOpen && (
             <form onSubmit={createStage} className="border-t border-white/10 p-5 grid md:grid-cols-3 gap-3">
               <Fld label="Name" value={form.name} onChange={(v)=>set("name", v)} testId="stage-new-name" />
-              <SelectField label="Struktur-Typ" value={form.stage_type} onChange={setStageType} options={STAGE_TYPES} />
+              <SelectField label="Struktur-Typ" value={form.stage_type} onChange={setStageType} options={STAGE_TYPE_OPTIONS} />
               <div className="block">
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spieltyp</div>
                 <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{formatMatchType(form.match_type)}</div>
@@ -1338,7 +1318,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
             <div className="grid sm:grid-cols-2 gap-3">
               <Fld label="Name" value={form.name} onChange={(v)=>set("name", v)} testId={`stage-name-${stage.id}`} />
               <SelectField label="Status" value={form.status} onChange={(v)=>set("status", v)} options={STAGE_STATUS_OPTIONS} />
-              <SelectField label="Struktur-Typ" value={form.stage_type} onChange={setStageType} options={STAGE_TYPES} />
+              <SelectField label="Struktur-Typ" value={form.stage_type} onChange={setStageType} options={STAGE_TYPE_OPTIONS} />
               <div className="block">
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spieltyp</div>
                 <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{formatMatchType(form.match_type)}</div>
@@ -1996,6 +1976,58 @@ function SelectField({ label, value, onChange, options }) {
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
     </label>
+  );
+}
+
+// Ein leerer Turnierbaum hat je nach Format einen ganz anderen Grund. "Nicht
+// generiert" ließ offen, ob etwas fehlt, kaputt ist oder so sein soll.
+const MAX_PREVIEW_MATCHES = 512;
+
+function emptyBracketReason(tournament) {
+  const format = tournament?.format;
+  const size = Number(tournament?.max_participants) || 0;
+
+  if (format === "swiss") {
+    return {
+      title: "Noch keine Runde erzeugt",
+      detail: "Beim Schweizer System gibt es keine Vorschau: wer gegen wen spielt, "
+        + "ergibt sich erst aus den Ergebnissen der Vorrunde.",
+      action: "Teilnehmer bestätigen, dann „Schweizer Runde“ drücken.",
+    };
+  }
+  if (format === "time_trial" || format === "grand_prix") {
+    return {
+      title: "Kein Turnierbaum vorgesehen",
+      detail: "Dieses Format wird über Rundenzeiten gewertet, nicht über Spielpaarungen.",
+      action: null,
+    };
+  }
+  const pairings = format === "league" ? size * (size - 1)
+    : format === "round_robin" ? (size * (size - 1)) / 2
+      : 0;
+  if (pairings > MAX_PREVIEW_MATCHES) {
+    return {
+      title: "Zu viele Begegnungen für eine Vorschau",
+      detail: `Jeder gegen jeden ergibt bei ${size} Teilnehmern ${pairings} Spiele. `
+        + `Ab ${MAX_PREVIEW_MATCHES} Spielen wird kein Entwurf mehr gezeichnet.`,
+      action: "Teilnehmerzahl senken oder in Gruppen aufteilen.",
+    };
+  }
+  return {
+    title: "Turnierbaum noch nicht erzeugt",
+    detail: "Für dieses Turnier liegt noch keine Struktur vor.",
+    action: "Unter „Struktur“ erzeugen oder Teilnehmer bestätigen.",
+  };
+}
+
+function EmptyBracketNotice({ tournament }) {
+  const { title, detail, action } = emptyBracketReason(tournament);
+  return (
+    <div className="text-center py-14 px-6 space-y-2">
+      <div className="text-white/60 font-display tracking-widest uppercase">{title}</div>
+      <p className="text-white/40 text-sm max-w-lg mx-auto">{detail}</p>
+      {action && <p className="text-[#29B6E8]/70 text-sm">{action}</p>}
+    </div>
   );
 }
 

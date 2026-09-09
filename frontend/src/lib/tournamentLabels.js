@@ -1,6 +1,6 @@
 export const TOURNAMENT_FORMAT_LABELS = {
-  single_elim: "Einzelausscheidung",
-  double_elim: "Doppelausscheidung",
+  single_elim: "Single Elimination",
+  double_elim: "Double Elimination",
   round_robin: "Jeder gegen jeden",
   swiss: "Schweizer System",
   groups: "Gruppenphase",
@@ -29,14 +29,14 @@ export const TOURNAMENT_FORMAT_OPTIONS = [
 ];
 
 export const STAGE_TYPE_LABELS = {
-  single_elimination: "Einzelausscheidung",
-  double_elimination: "Doppelausscheidung",
+  single_elimination: "Single Elimination",
+  double_elimination: "Double Elimination",
   custom_bracket: "Freier Turnierbaum",
   round_robin_groups: "Jeder-gegen-jeden-Gruppen",
   swiss: "Schweizer System",
   league: "Liga",
   simple: "Einzelrunde",
-  ffa_single_elimination: "Mehrspieler-Einzelausscheidung",
+  ffa_single_elimination: "FFA Single Elimination",
   ffa_custom_bracket: "Mehrspieler freier Turnierbaum",
   ffa_league: "Mehrspieler-Liga",
 };
@@ -136,17 +136,23 @@ export const STAFF_SCOPE_OPTIONS = [
 ];
 
 export const BRACKET_SECTION_LABELS = {
-  WB: "Siegerbaum",
-  LB: "Hoffnungsbaum",
-  GF: "Großes Finale",
+  WB: "Winner Bracket",
+  LB: "Loser Bracket",
+  GF: "Grand Final",
   MAIN: "Hauptfeld",
   FINAL: "Finale",
-  winner: "Siegerbaum",
-  loser: "Hoffnungsbaum",
-  grand_final: "Großes Finale",
+  winner: "Winner Bracket",
+  loser: "Loser Bracket",
+  grand_final: "Grand Final",
   bronze: "Spiel um Platz 3",
   round_robin: "Spieltage",
+  LIGA: "Spieltage",
+  swiss: "Schweizer Runden",
 };
+
+// Gruppen heißen im Turnierbaum group_A, group_B … - so findet die
+// Gruppentabelle ihre Spiele. Angezeigt wird das nicht.
+const GROUP_SECTION_RE = /^group_([A-Za-z0-9]+)$/;
 
 export const DEVICE_TYPE_LABELS = {
   switch: "Switch",
@@ -202,7 +208,10 @@ export function formatRegistrationStatus(value) {
 }
 
 export function formatBracketSection(value) {
-  return BRACKET_SECTION_LABELS[value] || value || "Turnierbaum";
+  if (BRACKET_SECTION_LABELS[value]) return BRACKET_SECTION_LABELS[value];
+  const group = GROUP_SECTION_RE.exec(String(value || ""));
+  if (group) return `Gruppe ${group[1].toUpperCase()}`;
+  return value || "Turnierbaum";
 }
 
 export function formatDeviceType(value) {
@@ -217,9 +226,8 @@ export function formatRoundName(value, number) {
   if (!value) return number ? `Runde ${number}` : "Runde";
   return String(value)
     .replace(/^Round\b/i, "Runde")
-    .replace(/^Winner Final$/i, "Sieger-Finale")
-    .replace(/^Loser Final$/i, "Hoffnungs-Finale")
-    .replace(/^Grand Final$/i, "Großes Finale")
+    .replace(/^Winner Final$/i, "Winner Final")
+    .replace(/^Loser Final$/i, "Loser Final")
     .replace(/^Bronze Match$/i, "Spiel um Platz 3");
 }
 
