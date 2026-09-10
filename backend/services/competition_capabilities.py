@@ -120,6 +120,10 @@ CAPABILITIES: tuple[Capability, ...] = (
        note="Liefert bereits die gemeinsame Struktur mit; das Frontend liest sie noch nicht."),
     _c("standings.read", "Tabelle lesen",
        ["GET /api/tournaments/{tid}/standings"], [CLASSIC, GRAPH]),
+    _c("matchday.read", "Spielwochen und geltende Termine lesen",
+       ["GET /api/tournaments/{tid}/matchdays"], [GRAPH],
+       note="Nur Liga, Round Robin und Gruppen spielen in Wochen; andere Formate "
+            "antworten mit applies=false. Rein lesend, die Termine werden berechnet."),
     _c("planning.check", "Planungsprüfung und Spielplan-Export",
        ["GET /api/tournaments/{tid}/planning-check", "GET /api/tournaments/{tid}/match-plan.csv"], [CLASSIC, GRAPH]),
 

@@ -199,3 +199,115 @@ def resolve_matchday_time(match: dict, proposals, window: MatchdayWindow, *,
     if fallback is None:
         return None
     return ScheduleResolution(fallback, "default", None)
+
+
+# Only these formats play in weekly matchdays. A knockout bracket has rounds,
+# but a round is not a week - saying so keeps the caller from inventing weeks
+# for a single elimination tree.
+MATCHDAY_FORMATS = frozenset({"league", "round_robin", "groups"})
+
+
+def plays_in_matchdays(tournament: dict) -> bool:
+    return (tournament or {}).get("format") in MATCHDAY_FORMATS
+
+
+def matchday_settings(tournament: dict) -> dict:
+    """Week length and fallback time, with the operator's defaults filled in."""
+    tournament = tournament or {}
+    days = tournament.get("matchday_days")
+    try:
+        days = int(days)
+    except (TypeError, ValueError):
+        days = MATCHDAY_DAYS
+    if days < 1:
+        days = MATCHDAY_DAYS
+
+    weekday = tournament.get("default_match_weekday")
+    try:
+        weekday = int(weekday)
+    except (TypeError, ValueError):
+        weekday = DEFAULT_WEEKDAY
+    if not 0 <= weekday <= 6:
+        weekday = DEFAULT_WEEKDAY
+
+    hour, minute = DEFAULT_HOUR, DEFAULT_MINUTE
+    raw_time = str(tournament.get("default_match_time") or "").strip()
+    if raw_time:
+        parts = raw_time.split(":")
+        try:
+            candidate_hour = int(parts[0])
+            candidate_minute = int(parts[1]) if len(parts) > 1 else 0
+            if 0 <= candidate_hour <= 23 and 0 <= candidate_minute <= 59:
+                hour, minute = candidate_hour, candidate_minute
+        except (ValueError, IndexError):
+            pass
+
+    return {"days": days, "weekday": weekday, "hour": hour, "minute": minute}
+
+
+def build_matchday_plan(tournament: dict, matches, proposals=None) -> dict:
+    """Group the fixtures into weeks and say what time each one counts as.
+
+    Returns ``applies: False`` for formats that have rounds rather than weeks,
+    so the caller can fall back to its existing grouping instead of pretending
+    a single elimination bracket has matchdays.
+    """
+    settings = matchday_settings(tournament)
+    start = _parse((tournament or {}).get("start_date"))
+    if not plays_in_matchdays(tournament) or start is None:
+        return {"applies": False, "settings": settings, "matchdays": []}
+
+    by_proposal: dict[str, list] = {}
+    for proposal in proposals or []:
+        by_proposal.setdefault((proposal or {}).get("match_id"), []).append(proposal)
+
+    numbered: dict[int, list] = {}
+    for match in matches or []:
+        number = matchday_number_of(match)
+        if number is None:
+            continue
+        numbered.setdefault(number, []).append(match)
+
+    plan = []
+    for number in sorted(numbered):
+        window = matchday_window(start, number, days=settings["days"])
+        entries = []
+        for match in numbered[number]:
+            resolution = resolve_matchday_time(
+                match, by_proposal.get(match.get("id"), []), window,
+                weekday=settings["weekday"], hour=settings["hour"], minute=settings["minute"],
+            )
+            entries.append({
+                "match_id": match.get("id"),
+                "scheduled_at": resolution.scheduled_at.isoformat() if resolution else None,
+                "schedule_source": resolution.source if resolution else None,
+                "home_registration_id": home_registration_id(match),
+            })
+        plan.append({
+            "number": number,
+            "starts_at": window.start.isoformat(),
+            "ends_at": window.end.isoformat(),
+            "matches": entries,
+        })
+    return {"applies": True, "settings": settings, "matchdays": plan}
+
+
+def current_matchday_number(plan: dict, now: datetime | None = None) -> int | None:
+    """The week we are in right now, or the nearest one otherwise.
+
+    Opening the schedule should land on the week that is being played, not on
+    matchday one of a league that started in March.
+    """
+    matchdays = (plan or {}).get("matchdays") or []
+    if not matchdays:
+        return None
+    moment = _aware(now or datetime.now(timezone.utc))
+    for entry in matchdays:
+        starts = _parse(entry.get("starts_at"))
+        ends = _parse(entry.get("ends_at"))
+        if starts and ends and starts <= moment < ends:
+            return entry["number"]
+    first = _parse(matchdays[0].get("starts_at"))
+    if first and moment < first:
+        return matchdays[0]["number"]
+    return matchdays[-1]["number"]

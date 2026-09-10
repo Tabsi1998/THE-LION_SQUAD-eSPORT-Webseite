@@ -45,6 +45,7 @@ from services.competition_engine import (
     preferred_engine,
 )
 from services.competition_formats import find_format_capability
+from services.matchday_schedule import build_matchday_plan, current_matchday_number
 from services.graph_swiss import (
     next_round_number,
     open_matches as open_swiss_matches,
@@ -3397,6 +3398,35 @@ async def get_bracket_display(tid: str, me: dict = Depends(get_current_user)):
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     return await _build_bracket_payload(db, t, me, True)
+
+
+@router.get("/{tid}/matchdays")
+async def matchdays(tid: str, access: str | None = None, user=Depends(get_optional_user)):
+    """Die Spieltage als Wochen, mit dem Termin, der je Partie gilt.
+
+    Wer eine Liga spielt, denkt in Spielwochen: Spieltag 3 ist eine Woche, nicht
+    ein Zeitpunkt. Diese Antwort liefert das Fenster je Spieltag und dazu, welcher
+    Termin je Partie gilt und warum - vereinbart, per Heimrecht oder als
+    eingestellte Standardzeit. Formate mit Runden statt Wochen bekommen
+    "applies": false und behalten ihre bisherige Gruppierung.
+    """
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    access_link = await validate_access_link(db, access, "tournament", tid, user, "view")
+    if access_link:
+        t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+        if not t:
+            raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    else:
+        t = await _get_visible_tournament(tid, user)
+
+    matches = await db.matches_v2.find(
+        {"tournament_id": tid, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(3000)
+    proposals = await db.match_schedule_proposals.find(
+        {"tournament_id": tid}, {"_id": 0, "match_collection": 0}).to_list(3000)
+    plan = build_matchday_plan(t, matches, proposals)
+    plan["current"] = current_matchday_number(plan)
+    return plan
 
 
 @router.get("/{tid}/standings")

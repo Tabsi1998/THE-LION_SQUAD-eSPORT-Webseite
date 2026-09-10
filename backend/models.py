@@ -457,6 +457,11 @@ class TournamentCreate(BaseModel):
     event_mode: TournamentEventMode = "online"
     result_entry_mode: Optional[TournamentResultEntryMode] = None
     schedule_mode: Optional[TournamentScheduleMode] = None
+    # Spielwochen: ein Spieltag dauert so viele Tage, und wenn sich niemand auf
+    # eine Zeit einigt, gilt dieser Wochentag (0 = Montag) zu dieser Uhrzeit.
+    matchday_days: int = Field(default=7, ge=1, le=31)
+    default_match_weekday: int = Field(default=6, ge=0, le=6)
+    default_match_time: str = "20:00"
     auto_start_enabled: bool = False
     # Phase 7
     season_weight: float = 2.0
@@ -515,6 +520,9 @@ class TournamentUpdate(BaseModel):
     event_mode: Optional[TournamentEventMode] = None
     result_entry_mode: Optional[TournamentResultEntryMode] = None
     schedule_mode: Optional[TournamentScheduleMode] = None
+    matchday_days: Optional[int] = Field(default=None, ge=1, le=31)
+    default_match_weekday: Optional[int] = Field(default=None, ge=0, le=6)
+    default_match_time: Optional[str] = None
     auto_start_enabled: Optional[bool] = None
     season_weight: Optional[float] = None
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None
