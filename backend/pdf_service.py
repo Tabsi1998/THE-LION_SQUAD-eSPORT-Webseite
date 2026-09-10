@@ -617,8 +617,8 @@ def _pdf_match_table(matches: list, reg_map: dict) -> tuple[list[str], list[list
     else:
         headers = ["Runde", "Teilnehmer A", "vs", "Teilnehmer B", "Zeit", "Station", "Status"]
         rows = [_pdf_duel_row(match, reg_map) for match in matches]
-        # Die Zeitspalte braucht Platz fuer "13.09.2026 21:30"; mit 3 cm blieb
-        # davon "13.09.2026 21:..." uebrig.
+        # Die Zeitspalte muss "13.09.2026 21:30" ganz fassen; mit 3 cm blieb
+        # davon "13.09.2026 21:..." stehen.
         widths = [3 * cm, 5.7 * cm, 2.2 * cm, 5.7 * cm, 3.7 * cm, 2.6 * cm, 3.2 * cm]
     return headers, _fit_rows_to_columns(rows, widths), widths
 
