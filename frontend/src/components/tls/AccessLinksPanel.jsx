@@ -33,7 +33,7 @@ async function copyText(value) {
   await navigator.clipboard?.writeText(value).catch(() => null);
 }
 
-export function AccessLinksPanel({ targetType, targetId, allowRegister = false }) {
+export function AccessLinksPanel({ targetType, targetId, allowRegister = false, collapsible = false }) {
   const [links, setLinks] = useState([]);
   const [users, setUsers] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -126,27 +126,30 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false }
     }
   };
 
-  return (
-    <section className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest font-bold text-[#FFD700]">
-            <Link2 className="w-3.5 h-3.5" /> Speziallinks
-          </div>
-          <p className="mt-1 text-xs text-white/50">
-            Gezielt Zugriff auf gesperrte oder interne {TARGET_LABELS[targetType] || "Inhalte"} geben.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={create}
-          disabled={busy}
-          className="inline-flex items-center gap-2 px-3 py-2 bg-[#FFD700] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50"
-        >
-          <Plus className="w-3.5 h-3.5" /> Erstellen
-        </button>
+  const title = (
+    <div>
+      <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest font-bold text-[#FFD700]">
+        <Link2 className="w-3.5 h-3.5" /> Speziallinks
       </div>
+      <p className="mt-1 text-xs text-white/50">
+        Gezielt Zugriff auf gesperrte oder interne {TARGET_LABELS[targetType] || "Inhalte"} geben.
+      </p>
+    </div>
+  );
+  const createButton = (
+    <button
+      type="button"
+      onClick={create}
+      disabled={busy}
+      className="inline-flex items-center gap-2 px-3 py-2 bg-[#FFD700] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50"
+    >
+      <Plus className="w-3.5 h-3.5" /> Erstellen
+    </button>
+  );
 
+  const body = (
+    <>
+      {collapsible && <div className="flex justify-end">{createButton}</div>}
       <div className="flex flex-wrap items-center justify-between gap-2 border border-white/10 bg-[#0A0A0A]/50 rounded-sm px-3 py-2">
         <label className="inline-flex items-center gap-2 text-xs text-white/65">
           <input type="checkbox" checked={includeInactive} onChange={(event) => setIncludeInactive(event.target.checked)} className="accent-[#FFD700]" />
@@ -300,6 +303,33 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false }
         ))}
         {links.length === 0 && <div className="text-xs text-white/40 border border-dashed border-white/10 rounded-sm p-3">Noch keine aktiven Speziallinks.</div>}
       </div>
+    </>
+  );
+
+  // Eingeklappt braucht die Tafel rund 40 statt 700 Pixel. Auf der
+  // Turnierseite stand sie am Telefon zwischen Kopf und Reitern und schob
+  // damit die eigentliche Arbeit unter den Bildschirmrand. Der Knopf
+  // "Erstellen" wandert dabei in den Inhalt: ein Knopf in der Aufklappzeile
+  // würde beim Drücken auch die Tafel zuklappen.
+  if (collapsible) {
+    return (
+      <details className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 group" data-testid="access-links-details">
+        <summary className="cursor-pointer list-none flex items-start justify-between gap-3">
+          {title}
+          <span className="text-[#FFD700] shrink-0 transition-transform group-open:rotate-90">→</span>
+        </summary>
+        <div className="mt-4 space-y-4">{body}</div>
+      </details>
+    );
+  }
+
+  return (
+    <section className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        {title}
+        {createButton}
+      </div>
+      {body}
     </section>
   );
 }

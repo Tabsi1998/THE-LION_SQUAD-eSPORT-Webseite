@@ -569,6 +569,15 @@ export default function AdminTournamentEditPage() {
       toast.error(formatRequestError(e, "Gruppen konnten nicht generiert werden."));
     }
   };
+  const generateSwissRound = async () => {
+    try {
+      const { data } = await api.post(`/tournaments/${id}/swiss/next-round`);
+      toast.success(`Runde ${data.round} mit ${data.match_count} Spielen generiert`);
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Schweizer Runde konnte nicht generiert werden."));
+    }
+  };
 
   if (!t) return (
     <AdminLayout>
@@ -611,76 +620,109 @@ export default function AdminTournamentEditPage() {
   const visibleStatusOptions = isAdmin
     ? TOURNAMENT_STATUS_OPTIONS
     : TOURNAMENT_STATUS_OPTIONS.filter(([value]) => OPERATIONAL_STATUS_VALUES.has(value));
+  // Werkzeuge: braucht man gelegentlich, nicht bei jedem Blick auf die Seite.
+  // "Zurücksetzen" steht bewusst zuletzt und rot, weil es den Baum verwirft.
+  const canLockTournament = isAdmin && ["completed", "results_published", "archived", "cancelled"].includes(t.status);
+  const toolActions = [
+    isModerator && stations.length > 0 && (
+      <button key="stations" type="button" onClick={() => autoAssignStations()} data-testid="admin-tr-auto-stations" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
+        <Zap className="w-3.5 h-3.5" /> Stationen automatisch
+      </button>
+    ),
+    isModerator && (
+      <button key="planning" type="button" onClick={() => runPlanningCheck()} data-testid="admin-tr-planning-check" className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FFD700]/10 inline-flex items-center gap-2">
+        <Eye className="w-3.5 h-3.5" /> Planung prüfen
+      </button>
+    ),
+    canLockTournament && (
+      <button key="lock" type="button" onClick={() => setTournamentLock(!t.locked_at)} data-testid="admin-tr-lock" className={`px-3 py-2 border font-bold uppercase tracking-wider rounded-sm text-xs ${t.locked_at ? "border-[#00FF88]/40 text-[#00FF88] hover:bg-[#00FF88]/10" : "border-[#FFD700]/50 text-[#FFD700] hover:bg-[#FFD700]/10"}`}>
+        {t.locked_at ? "Entsperren" : "Sperren"}
+      </button>
+    ),
+    isModerator && (
+      <button key="reset" type="button" onClick={reset} data-testid="admin-tr-reset" className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10 inline-flex items-center gap-2">
+        <RefreshCw className="w-3.5 h-3.5" /> Zurücksetzen
+      </button>
+    ),
+  ].filter(Boolean);
+  const downloadActions = [
+    { key: "participants", href: `${API}/exports/tournaments/${t.id}/participants.pdf`, label: "PDF Teilnehmer" },
+    { key: "checkin", href: `${API}/exports/tournaments/${t.id}/checkin.pdf`, label: "PDF Check-in" },
+    { key: "registration-qr", href: `${API}/exports/tournaments/${t.id}/registration-qr.pdf`, label: "PDF Anmeldung QR", highlight: true },
+    { key: "matches", href: `${API}/exports/tournaments/${t.id}/matches.pdf`, label: "PDF Spiele" },
+    isModerator && { key: "match-plan", href: `${API}/tournaments/${t.id}/match-plan.csv`, label: "CSV Matchplan" },
+  ].filter(Boolean);
 
   return (
     <AdminLayout>
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
-        <div>
-          <Link to="/admin/tournaments" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Turniere</Link>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">{t.title}</h1>
-          <div className="mt-2 flex items-center gap-3 flex-wrap">
-            <StatusBadge status={t.status} />
-            {t.locked_at && <span className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700] text-[10px] font-bold uppercase tracking-widest rounded-sm">Gesperrt</span>}
-            <span className="text-white/60 text-sm">{formatTournamentDisplay(t)}</span>
-            <Link to={`/tournaments/${t.slug || t.id}`} target="_blank" className="text-[#29B6E8] text-xs uppercase tracking-wider font-bold hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Öffentliche Seite</Link>
+      <div className="mb-6 space-y-4">
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <Link to="/admin/tournaments" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Turniere</Link>
+            <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">{t.title}</h1>
+            <div className="mt-2 flex items-center gap-3 flex-wrap">
+              <StatusBadge status={t.status} />
+              {t.locked_at && <span className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700] text-[10px] font-bold uppercase tracking-widest rounded-sm">Gesperrt</span>}
+              <span className="text-white/60 text-sm">{formatTournamentDisplay(t)}</span>
+              <Link to={`/tournaments/${t.slug || t.id}`} target="_blank" className="text-[#29B6E8] text-xs uppercase tracking-wider font-bold hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Öffentliche Seite</Link>
+            </div>
+          </div>
+          {/* Hier steht nur, was das Turnier weiterschiebt: der nächste Schritt,
+              die Runde für Formate die eine brauchen, und der Status. Alles
+              andere liegt unten in den Gruppen. */}
+          <div className="flex items-start gap-2 flex-wrap">
+            {canOperateTournament && primaryAction && (
+              <button
+                type="button"
+                onClick={() => setTournStatus(primaryAction.status)}
+                data-testid="admin-tr-primary-action"
+                className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2"
+              >
+                <Zap className="w-3.5 h-3.5" /> {primaryAction.label}
+              </button>
+            )}
+            {isAdmin && t.format === "swiss" && (
+              <button type="button" onClick={generateSwissRound} data-testid="admin-tr-swiss-next" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10">Schweizer Runde</button>
+            )}
+            {isAdmin && t.format === "groups" && (
+              <button type="button" onClick={generateGroups} data-testid="admin-tr-groups" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10">Gruppen generieren</button>
+            )}
+            {canOperateTournament && (
+              <div>
+                <select value={t.status} onChange={(e) => setTournStatus(e.target.value)} data-testid="admin-tr-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
+                  {!visibleStatusOptions.some(([value]) => value === t.status) && <option key={t.status} value={t.status}>{TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === t.status)?.[1] || t.status}</option>}
+                  {visibleStatusOptions.map(([s, label]) => <option key={s} value={s}>{label}</option>)}
+                </select>
+                <div className="mt-1 max-w-[16rem] text-[10px] text-white/40">Operativ durch Turnierleitung; Zeitautomatik nur wenn ausdrücklich aktiviert.</div>
+              </div>
+            )}
           </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {canOperateTournament && primaryAction && (
-            <button
-              type="button"
-              onClick={() => setTournStatus(primaryAction.status)}
-              data-testid="admin-tr-primary-action"
-              className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2"
-            >
-              <Zap className="w-3.5 h-3.5" /> {primaryAction.label}
-            </button>
+
+        <div className="flex flex-wrap gap-2" data-testid="admin-tr-toolbar">
+          {toolActions.length > 0 && (
+            <ActionGroup title="Werkzeuge" count={toolActions.length} testId="admin-tr-tools">
+              {toolActions}
+            </ActionGroup>
           )}
-          {canOperateTournament && (
-            <div>
-              <select value={t.status} onChange={(e) => setTournStatus(e.target.value)} data-testid="admin-tr-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
-                {!visibleStatusOptions.some(([value]) => value === t.status) && <option key={t.status} value={t.status}>{TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === t.status)?.[1] || t.status}</option>}
-                {visibleStatusOptions.map(([s, label]) => <option key={s} value={s}>{label}</option>)}
-              </select>
-              <div className="mt-1 text-[10px] text-white/40">Operativ durch Turnierleitung; Zeitautomatik nur wenn ausdrücklich aktiviert.</div>
-            </div>
-          )}
-          {isAdmin && ["completed", "results_published", "archived", "cancelled"].includes(t.status) && (
-            <button
-              type="button"
-              onClick={() => setTournamentLock(!t.locked_at)}
-              data-testid="admin-tr-lock"
-              className={`px-4 py-2 border font-bold uppercase tracking-wider rounded-sm text-sm ${t.locked_at ? "border-[#00FF88]/40 text-[#00FF88] hover:bg-[#00FF88]/10" : "border-[#FFD700]/50 text-[#FFD700] hover:bg-[#FFD700]/10"}`}
-            >
-              {t.locked_at ? "Entsperren" : "Sperren"}
-            </button>
-          )}
-          {isModerator && stations.length > 0 && <button onClick={() => autoAssignStations()} data-testid="admin-tr-auto-stations" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
-            <Zap className="w-3.5 h-3.5" /> Stationen automatisch
-          </button>}
-          {isModerator && <button onClick={() => runPlanningCheck()} data-testid="admin-tr-planning-check" className="px-4 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#FFD700]/10 inline-flex items-center gap-2">
-            <Eye className="w-3.5 h-3.5" /> Planung prüfen
-          </button>}
-          {isModerator && <button onClick={reset} data-testid="admin-tr-reset" className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-sm hover:border-[#FF3B30]/60 hover:text-[#FF3B30] inline-flex items-center gap-2">
-            <RefreshCw className="w-3.5 h-3.5" /> Zurücksetzen
-          </button>}
-          {isAdmin && t.format === "swiss" && (
-            <button onClick={async()=>{ try{ const {data} = await api.post(`/tournaments/${id}/swiss/next-round`); toast.success(`Runde ${data.round} mit ${data.match_count} Spielen generiert`); load(); }catch(e){ toast.error(formatRequestError(e, "Schweizer Runde konnte nicht generiert werden.")); } }} data-testid="admin-tr-swiss-next" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Schweizer Runde</button>
-          )}
-          {isAdmin && t.format === "groups" && (
-            <button onClick={generateGroups} data-testid="admin-tr-groups" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm">Gruppen generieren</button>
-          )}
-          <div className="grid grid-cols-2 sm:flex gap-1 w-full sm:w-auto">
-            <a href={`${API}/exports/tournaments/${t.id}/participants.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">PDF Teilnehmer</a>
-            <a href={`${API}/exports/tournaments/${t.id}/checkin.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">PDF Check-in</a>
-            <a href={`${API}/exports/tournaments/${t.id}/registration-qr.pdf`} className="px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] text-xs uppercase font-bold rounded-sm hover:bg-[#FFD700]/10 text-center" target="_blank" rel="noreferrer">PDF Anmeldung QR</a>
-            <a href={`${API}/exports/tournaments/${t.id}/matches.pdf`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">PDF Spiele</a>
-            {isModerator && <a href={`${API}/tournaments/${t.id}/match-plan.csv`} className="px-3 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40 text-center" target="_blank" rel="noreferrer">CSV Matchplan</a>}
-          </div>
+          <ActionGroup title="Downloads" count={downloadActions.length} testId="admin-tr-downloads">
+            {downloadActions.map((item) => (
+              <a
+                key={item.key}
+                href={item.href}
+                target="_blank"
+                rel="noreferrer"
+                data-testid={`admin-tr-download-${item.key}`}
+                className={`px-3 py-2 border text-xs uppercase font-bold rounded-sm text-center ${item.highlight ? "border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10" : "border-white/20 text-white/80 hover:border-[#29B6E8]/40"}`}
+              >
+                {item.label}
+              </a>
+            ))}
+          </ActionGroup>
         </div>
       </div>
 
-      {isAdmin && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister /></div>}
+      {isAdmin && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister collapsible /></div>}
 
       <TournamentFlowStepper
         tournament={t}
@@ -1997,6 +2039,25 @@ function Details({ title, children }) {
     <details className="border border-white/10 bg-[#121212] rounded-sm p-4 group">
       <summary className="cursor-pointer select-none text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">{title}</summary>
       <div className="mt-4 space-y-4">{children}</div>
+    </details>
+  );
+}
+
+// Werkzeuge und Downloads lagen bisher offen im Kopf, zusammen mit den
+// Ablaufaktionen: dreizehn Bedienelemente in einer Reihe. Sie sind selten nötig
+// und stehen jetzt hinter einer Beschriftung, die sagt, was drin ist und wie
+// viel. Bewusst ein <details> statt eines Menüs - das ist die Form, die diese
+// Anwendung überall verwendet, und sie funktioniert ohne weiteres Zutun mit
+// Tastatur und Vorlesehilfen.
+function ActionGroup({ title, count, testId, children }) {
+  return (
+    <details className="group" data-testid={testId}>
+      <summary className="cursor-pointer list-none inline-flex items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:border-[#29B6E8]/50 hover:text-white">
+        {title}
+        <span className="text-white/35 tabular-nums">{count}</span>
+        <span className="text-[#29B6E8] transition-transform group-open:rotate-90">→</span>
+      </summary>
+      <div className="mt-2 flex flex-wrap gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] p-3">{children}</div>
     </details>
   );
 }
