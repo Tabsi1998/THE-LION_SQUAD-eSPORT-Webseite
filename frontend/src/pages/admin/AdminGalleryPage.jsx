@@ -18,6 +18,7 @@ import {
   providerLabel,
 } from "@/lib/galleryMedia";
 import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
+import { captureVideoPoster } from "@/lib/videoPoster";
 import { toast } from "sonner";
 import { Plus, Save, X, Trash2, Image as ImageIcon, ArrowLeft, Upload, Link as LinkIcon, Play, Film, Layers, Pencil } from "lucide-react";
 
@@ -349,10 +350,28 @@ function AlbumPhotos({ album, onBack }) {
         }
         uploadProgress.setPhase("Zum Album hinzufügen");
         if (data.media_type === "video") {
+          // Standbild aus dem Video, solange es noch im Browser liegt. Ohne das
+          // zeigt die Kachel ein graues Filmsymbol - oder muss das Video laden,
+          // nur um ein Bild zu haben. Schlaegt es fehl, laeuft der Upload weiter.
+          uploadProgress.setPhase("Vorschaubild erzeugen");
+          let thumbnailUrl = "";
+          try {
+            const poster = await captureVideoPoster(file);
+            if (poster) {
+              const posterForm = new FormData();
+              posterForm.append("file", poster);
+              const { data: posterData } = await uploadApi.post("/uploads/media?media_scope=gallery", posterForm);
+              thumbnailUrl = posterData?.url || "";
+            }
+          } catch {
+            thumbnailUrl = "";
+          }
+          uploadProgress.setPhase("Zum Album hinzufügen");
           await api.post(`/gallery/${album.id}/photos`, {
             media_type: "video",
             source_type: "upload",
             video_url: data.url,
+            thumbnail_url: thumbnailUrl,
             caption: captionFromFilename(file.name, "Video"),
             order_index: nextOrderIndex(targetSectionId, ok - originals),
             section_id: targetSectionId || null,

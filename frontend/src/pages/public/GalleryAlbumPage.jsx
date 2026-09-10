@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
+import { LazyImg } from "@/components/tls/LazyImg";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
@@ -212,33 +213,34 @@ export default function GalleryAlbumPage() {
   );
 }
 
+// Was eine Kachel tatsaechlich breit ist. Ohne diese Angabe nimmt der Browser
+// die volle Fensterbreite an und laedt eine groessere Fassung als noetig.
+const GRID_SIZES = "(min-width: 1280px) 25vw, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw";
+
+
 function GalleryTile({ item, onDimensions }) {
   const type = mediaTypeFromItem(item);
   const poster = galleryPosterUrl(item);
   const url = galleryMediaUrl(item);
   if (type === "image") {
     return (
-      <img
-        src={resolveMediaUrl(poster || url)}
+      <LazyImg
+        src={poster || url}
         alt={item.caption || ""}
         className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-        loading="lazy"
-        decoding="async"
+        sizes={GRID_SIZES}
         onLoad={(event) => onDimensions?.(item, event.currentTarget.naturalWidth, event.currentTarget.naturalHeight)}
       />
     );
   }
   return (
     <>
-      {type === "video" && url && !isExternalGalleryMedia(item) ? (
-        <CenterPreviewVideo src={resolveMediaUrl(url)} poster={poster ? resolveMediaUrl(poster) : ""} onDimensions={(width, height) => onDimensions?.(item, width, height)} />
-      ) : poster ? (
-        <img
-          src={resolveMediaUrl(poster)}
+      {poster ? (
+        <LazyImg
+          src={poster}
           alt={item.caption || ""}
           className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-          loading="lazy"
-          decoding="async"
+          sizes={GRID_SIZES}
           onLoad={(event) => onDimensions?.(item, event.currentTarget.naturalWidth, event.currentTarget.naturalHeight)}
         />
       ) : (
@@ -252,36 +254,6 @@ function GalleryTile({ item, onDimensions }) {
         <Play className="w-3 h-3 fill-current" /> {item.embed_provider ? providerLabel(item.embed_provider) : "Video"}
       </span>
     </>
-  );
-}
-
-function CenterPreviewVideo({ src, poster, onDimensions }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    const node = ref.current;
-    if (!node || typeof IntersectionObserver === "undefined") return undefined;
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        node.play().catch(() => {});
-      } else {
-        node.pause();
-      }
-    }, { rootMargin: "-35% 0px -35% 0px", threshold: 0.15 });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-  return (
-    <video
-      ref={ref}
-      src={src}
-      poster={poster || undefined}
-      muted
-      loop
-      playsInline
-      preload="metadata"
-      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-      onLoadedMetadata={(event) => onDimensions?.(event.currentTarget.videoWidth, event.currentTarget.videoHeight)}
-    />
   );
 }
 
@@ -308,11 +280,11 @@ function LightboxImage({ item }) {
   const originalUrl = item.original_url ? resolveMediaUrl(item.original_url) : "";
   return (
     <div className="flex max-h-[85vh] flex-col items-center gap-3">
-      <img
-        src={resolveMediaUrl(item.image_url)}
+      <LazyImg
+        src={item.image_url}
         alt={item.caption || ""}
-        loading="lazy"
-        decoding="async"
+        priority
+        sizes="90vw"
         className="max-w-[90vw] max-h-[78vh] object-contain"
       />
       {originalUrl && (

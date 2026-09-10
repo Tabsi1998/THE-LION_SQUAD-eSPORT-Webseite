@@ -62,6 +62,7 @@ from routes.widget_routes import widget_router
 from routes.dsgvo_routes import dsgvo_router
 from routes.export_routes import pdf_router
 from routes.audit_routes import audit_router
+from services.image_variants import resolve_variant as resolve_image_variant
 from services.change_events import (
     change_event_stream,
     publish_api_change,
@@ -269,7 +270,7 @@ def _iter_file_range(path: Path, start: int, end: int):
 
 
 @app.get("/api/static/uploads/{filename}")
-async def public_upload(filename: str, request: Request):
+async def public_upload(filename: str, request: Request, w: int | None = None):
     if "/" in filename or "\\" in filename or ".." in filename or filename.startswith("."):
         raise HTTPException(status_code=400, detail="Invalid filename")
     suffix = Path(filename).suffix.lower()
@@ -280,6 +281,14 @@ async def public_upload(filename: str, request: Request):
         if path.exists() and path.is_file():
             media_type = PUBLIC_MEDIA_TYPES.get(suffix) or "application/octet-stream"
             headers = {"Accept-Ranges": "bytes", "X-Content-Type-Options": "nosniff"}
+            # Eine Rasterkachel ist rund 400 Pixel breit und bekam bisher das
+            # gespeicherte Bild mit bis zu 4096 Pixeln. Die kleinere Fassung
+            # entsteht beim ersten Abruf und liegt danach auf der Platte - so
+            # wirkt das auch für alles, was längst hochgeladen ist.
+            if w is not None:
+                variant = resolve_image_variant(path, w)
+                if variant is not None:
+                    return FileResponse(variant, media_type="image/webp", headers=headers)
             range_header = request.headers.get("range", "")
             if suffix in VIDEO_MEDIA_EXTS and range_header.startswith("bytes="):
                 size = path.stat().st_size
@@ -305,8 +314,8 @@ async def public_upload(filename: str, request: Request):
 
 
 @app.get("/uploads/{filename}")
-async def legacy_public_upload(filename: str, request: Request):
-    return await public_upload(filename, request)
+async def legacy_public_upload(filename: str, request: Request, w: int | None = None):
+    return await public_upload(filename, request, w=w)
 
 
 CSRF_EXEMPT_PATHS = {
