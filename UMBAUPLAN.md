@@ -1,6 +1,6 @@
 # Umbauplan: Turniere, Übersichtlichkeit und die offenen Wünsche
 
-Stand: 9. September 2026.
+Stand: 10. September 2026.
 
 Dieser Plan führt das in [RESTPLAN.md](RESTPLAN.md) als **R5** angekündigte Turnierpaket
 aus und nimmt die später dazugekommenen Themen auf (Spielwochen, PDF, Live-Aktualisierung,
@@ -34,8 +34,8 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 6 | Ablauf-Tests: echte Anwendung gegen Datenbank im Speicher | umgesetzt | #174 |
 | 7 | Ein Turnierbaum statt zwei, Spieltage als Spieltage | umgesetzt | #176 |
 | 8 | Klassischer Schreibweg stillgelegt | umgesetzt | #177 |
-| 9 | **Übersichtlichkeit** (läuft) | teilweise | #178, #179, #181, #182 |
-| 10 | Spielwochen und Terminfindung | offen | — |
+| 9 | **Übersichtlichkeit** | umgesetzt | #178, #179, #181, #183, #185, #186, #188 |
+| 10 | **Spielwochen und Terminfindung** | offen zum Mergen | #189 |
 | 11 | PDF-Ausgabe | offen | — |
 | 12 | Galerie und Medien: Tempo, Videos überall | offen | — |
 | 13 | Entflechtung und Tempo | offen | — |
@@ -54,7 +54,7 @@ Eine Sache ist dabei **nicht** systemunabhängig und deshalb ausdrücklich festg
 **Platzierungen**. Sie speisen Preise, Profilhistorie, Abzeichen und Saisonpunkte. Der
 Trockenlauf meldet sie als Hinweis, statt sie blind umzuschreiben.
 
-## Block 9 — Übersichtlichkeit (läuft)
+## Block 9 — Übersichtlichkeit
 
 Dein Befund: „das Admin-Config- und Bearbeitungsmenü ist einfach zu unübersichtlich".
 Ziel ist eine logische, wartbare Struktur, die auf **PC-Browser, Handy-Browser und in der
@@ -63,14 +63,16 @@ App** funktioniert.
 | Schritt | Was | Stand |
 | --- | --- | --- |
 | 9.1 | Turnier anlegen: erst das Nötige, dann der Rest | umgesetzt (#178) |
-| 9.2 | Dashboard: erst was ansteht, dann die Zahlen | offen zum Mergen (#179) |
-| 9.3 | Formatwechsel: aus einer Liga wurde eine Einzelausscheidung | offen zum Mergen (#181) |
-| 9.4 | Turnierseite: dreizehn Knöpfe im Kopf werden vier | offen zum Mergen (#182) |
-| 9.5 | Turnier bearbeiten aufteilen — `AdminTournamentEditPage.jsx`, **2175 Zeilen** | offen |
-| 9.6 | Adminmenü — **34 Einträge in 6 Gruppen** | offen |
-| 9.7 | Einstellungen — **13 Reiter, davon 5 rund um Mail** | offen |
-| 9.8 | Handy-Browser gleichwertig zum PC | angefangen |
-| 9.9 | `backend/routes/tournament_routes.py` aufteilen — **3623 Zeilen** | offen |
+| 9.2 | Dashboard: erst was ansteht, dann die Zahlen | umgesetzt (#179) |
+| 9.3 | Formatwechsel: aus einer Liga wurde eine Einzelausscheidung | umgesetzt (#181) |
+| 9.4 | Turnierseite: dreizehn Knöpfe im Kopf werden vier | umgesetzt (#183) |
+| 9.5 | Adminmenü: 34 Einträge, von denen zwölf sichtbar waren | umgesetzt (#185, #188) |
+| 9.6 | Einstellungen: dreizehn gleiche Chips, fünf davon Mail | umgesetzt (#186) |
+| 9.7 | Handy-Browser: Turnierseite und Einstellungen vermessen | umgesetzt |
+
+**Das Aufteilen der großen Dateien war ursprünglich Teil dieses Blocks und steht jetzt in
+Block 13.** Es ist Umbau ohne sichtbare Änderung und gehört deshalb nicht in einen Block,
+der Übersichtlichkeit herstellt.
 
 ### Was hinter 9.3 steckte
 
@@ -85,13 +87,27 @@ drückte, baute einen Einzelausscheidungs-Baum.
 „Struktur anwenden" neu gebaut hast, können deren Turnierbäume falsch angelegt sein. Bei
 laufenden Turnieren erst nachsehen — das Anwenden ersetzt den Baum.
 
-### Was 9.8 heißt
+### Was gemessen wurde
 
-Die Turnierseite ist am Telefon (390 px) nachgemessen: die Reiter, über die die Arbeit
-läuft, begannen bei **1290 px**. Grund war nicht der Kopf (301 px), sondern die
-Speziallink-Tafel mit **696 px** dazwischen. Eingeklappt sind es 78 px, die Reiter
-beginnen bei 673 px, die Seite ist 1688 statt 2305 px hoch. Die übrigen Adminseiten sind
-noch nicht vermessen.
+Nicht geschätzt, sondern im Browser nachgemessen — zweimal lag die Ursache woanders, als
+sie aussah.
+
+| Ort | vorher | nachher |
+| --- | --- | --- |
+| Turnierseite am Telefon: Reiter beginnen bei | 1290 px | **673 px** |
+| davon die Speziallink-Tafel | 696 px | **78 px** |
+| Turnierseite gesamte Höhe | 2305 px | **1688 px** |
+| Adminmenü: Höhe der Liste | 1689 px | zuklappbar, gemerkt |
+| Adminmenü: gleichzeitig sichtbar | 12 von 34 | unverändert 34, vier Gruppen zugeklappt halbieren sie |
+
+Beim Adminmenü kam ein zweiter Befund dazu: auf `/admin/mobile-push` stand die Liste bei
+`scrollTop: 0` — man war auf „Push-Tests" und sah im Menü nur „Übersicht". Der aktive
+Eintrag wird jetzt in den Blick geholt.
+
+Die Voreinstellung im Menü ist **offen** (#188): eine Voreinstellung, die etwas wegräumt,
+trifft genau die Leute, die das Zuklappen noch nicht kennen.
+
+Die übrigen Adminseiten sind noch nicht vermessen.
 
 ## Block 10 — Spielwochen und Terminfindung
 
@@ -106,8 +122,36 @@ Nach dem Vorbild von desbl.de. Deine Regeln, damit sie nicht verlorengehen:
 - Spieltage werden **mit Pfeilen durchgeblättert**, mit Wochendatum von–bis — nicht mehr
   alle untereinander.
 
-Der letzte Punkt betrifft auch die bereits gebaute Spieltagsansicht aus Block 7: die
-Erzeugung läuft sauber, die Darstellung stapelt aber noch.
+### Was davon schon da war
+
+Vor dem Bauen nachgesehen — es war mehr vorhanden, als dieser Plan behauptet hat.
+`match_routes.py` konnte bereits **vorschlagen, annehmen, ablehnen und gegenvorschlagen**,
+samt Frist. Auch die Regel „der eigene Vorschlag muss von der Gegenseite bestätigt werden"
+war dort schon erzwungen.
+
+Und das **Heimrecht steckte schon im Spielplan**: der Ligagenerator schreibt jede Paarung
+als `[heim, auswärts]` und dreht sie in der Rückrunde um. Deine Regel „jeder soll einmal
+heim sein" war strukturell erfüllt — nur benutzte sie niemand.
+
+### Was gefehlt hat und mit #189 kommt
+
+- Das **Wochenfenster** je Spieltag, Dauer einstellbar (Vorgabe 7 Tage).
+- Die **Standardzeit** je Turnier: Wochentag und Uhrzeit, Vorgabe Sonntag 20:00.
+- Das **Heimrecht** als Entscheidungsregel — auch gegen einen unbeantworteten
+  Auswärtsvorschlag, sonst wäre es wertlos.
+- Der **Spielplan blättert** statt zu stapeln, mit Zeitraum in der Kopfzeile, und öffnet
+  auf der Woche, die gerade läuft.
+- An jeder Partie steht, **warum** dieser Termin gilt: vereinbart, Heimrecht oder
+  Standardzeit.
+
+### Bewusst offen geblieben
+
+Die Termine werden **berechnet, nicht geschrieben**. Damit wirkt die Regel sofort überall,
+ohne Datenwanderung und ohne Hintergrundjob, der an laufenden Turnieren schreibt.
+
+Wenn der berechnete Termin auch in `scheduled_at` landen soll — für Erinnerungen,
+Stationen und die TV-Anzeigen — ist das ein eigener kleiner Schritt. Er schreibt an
+Bestandsdaten und braucht deshalb deine Zustimmung.
 
 ## Block 11 — PDF-Ausgabe
 
@@ -133,13 +177,28 @@ Vorschaubilder. Das ist die Hauptursache der Wartezeiten.
 
 Die großen Dateien, die Änderungen langsam und riskant machen:
 
-| Datei | Zeilen |
-| --- | --- |
-| `backend/routes/tournament_routes.py` | 3623 |
-| `frontend/src/pages/admin/AdminTournamentEditPage.jsx` | 2175 |
-| `frontend/src/pages/admin/AdminSettingsPage.jsx` | 2101 |
-| `frontend/src/pages/user/ProfilePage.jsx` | 1803 |
-| `backend/routes/news_routes.py` | 1453 |
+| Datei | Zeilen | Lohnt sich das Aufteilen? |
+| --- | --- | --- |
+| `backend/routes/tournament_routes.py` | 3623 | **Ja.** Jeder weitere Block fasst sie an |
+| `frontend/src/pages/admin/AdminTournamentEditPage.jsx` | 2175 | **Nebenbei**, wenn ohnehin daran gearbeitet wird |
+| `frontend/src/pages/admin/AdminSettingsPage.jsx` | 2101 | **Eher nicht.** Unabhängige Reiter, die selten gemeinsam geändert werden |
+| `frontend/src/pages/user/ProfilePage.jsx` | 1803 | **Eher nicht**, aus demselben Grund |
+| `backend/routes/news_routes.py` | 1453 | **Eher nicht** |
+
+### Die Empfehlung
+
+Aufteilen bringt dir als Betreiber **nichts Sichtbares**. Es senkt das Risiko künftiger
+Änderungen und macht sie schneller — mehr nicht. Deshalb nicht als eigenes Projekt,
+sondern dort, wo es Arbeit tatsächlich blockiert.
+
+Die eine Ausnahme ist `tournament_routes.py`. Sie mischt Struktur, Anmeldungen, Tabellen,
+Exporte und jetzt Spielwochen, und **jeder verbleibende Block fasst sie erneut an**. Dafür
+gibt es im Projekt bereits ein erfolgreiches Vorbild: PR #163 hat `extras_routes` nach
+Domänen aufgeteilt.
+
+**Vorschlag für die Reihenfolge:** erst die Blöcke, die du siehst — PDF und Galerie —, dann
+`tournament_routes.py` aufteilen, bevor App und Abschluss kommen. Die übrigen Dateien nur
+anfassen, wenn ohnehin dort gearbeitet wird.
 
 ## Block 14 — LionsAPP in den Store
 
@@ -156,10 +215,23 @@ Alle CI-Prüfungen grün, automatischer App-Build, README auf Stand.
 Läuft ein Turnier und wird ein Ergebnis eingetragen, muss sich **alles sofort
 aktualisieren, ohne die Seite neu zu laden** — PC-Web, Turnierbaum, Handy-Web und App.
 
-Die Grundlage steht: der Änderungsstrom `/api/changes/stream` mit Wiederaufnahme über
-`Last-Event-ID` und der Haken `useApiInvalidation`. Was fehlt, ist die **flächendeckende
-Anwendung**: jede Ansicht, die Ergebnisse zeigt, muss daran hängen. Das wird in den
-Blöcken 9 bis 12 jeweils mitgezogen und in Block 14 für die App abgeschlossen.
+**Im Web ist das erledigt.** Nachgeprüft statt vermutet — dieser Plan hat die Lücke
+vorher überzeichnet:
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Hängen die Ansichten am Änderungsstrom? | Praktisch alle |
+| Sendet das Backend beim Ergebniseintrag? | Ja, für jeden erfolgreichen schreibenden Aufruf |
+| Erreicht das auch Zuschauer, nicht nur Personal? | Ja — `matches`, `matches-v2` und `tournaments` sind öffentliche Ressourcen |
+| Vorbedingung „genau ein API-Arbeiter"? | Eingehalten, `--workers 1` steht fest im Entrypoint |
+
+Dabei fiel ein Filtereintrag auf, der nie zutreffen konnte (`matches_v2` mit Unterstrich
+statt `matches-v2`); folgenlos, aber eine Falle für die nächste Ansicht. Behoben mit #187,
+samt Prüftest über alle Filternamen.
+
+**Offen ist die App.** Sie hat keine SSE-Anbindung und fragt in Intervallen ab: Chat alle
+7 s, Dashboard und Turnierdetail alle 10 s, Turnierliste alle 30 s. „Sofort live" heißt
+dort also bis zu einer halben Minute. Das ist Block 14.
 
 ## Noch offen und bewusst getrennt
 
