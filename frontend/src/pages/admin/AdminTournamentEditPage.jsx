@@ -87,6 +87,13 @@ const AUTO_STAGE_TYPES = new Set([
 ]);
 const FFA_STAGE_TYPES = new Set(["simple", "ffa_single_elimination", "ffa_custom_bracket", "ffa_league"]);
 const BRONZE_FORMATS = new Set(["single_elim"]);
+// Nur diese Formate spielen in Wochen; ein K.-o.-Baum hat Runden, keine Woche.
+// Muss zu MATCHDAY_FORMATS in services/matchday_schedule.py passen.
+const MATCHDAY_FORMATS = new Set(["league", "round_robin", "groups"]);
+const WEEKDAY_OPTIONS = [
+  ["0", "Montag"], ["1", "Dienstag"], ["2", "Mittwoch"], ["3", "Donnerstag"],
+  ["4", "Freitag"], ["5", "Samstag"], ["6", "Sonntag"],
+];
 const MATCH_SECTION_ORDER = ["WB", "winner", "MAIN", "main", "LB", "loser", "BRONZE", "bronze", "GF", "grand_final", "FINAL", "final", "round_robin"];
 
 function matchSectionKey(match) {
@@ -1587,6 +1594,9 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     event_mode: source.event_mode || "online",
     result_entry_mode: source.result_entry_mode || "",
     schedule_mode: source.schedule_mode || "",
+    matchday_days: source.matchday_days ?? 7,
+    default_match_weekday: source.default_match_weekday ?? 6,
+    default_match_time: source.default_match_time || "20:00",
     twitch_channel: source.twitch_channel || "",
     twitch_enabled: !!source.twitch_enabled,
     has_live_stream: !!source.has_live_stream,
@@ -1639,6 +1649,9 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     event_mode: tournament.event_mode || "online",
     result_entry_mode: tournament.result_entry_mode || "",
     schedule_mode: tournament.schedule_mode || "",
+    matchday_days: tournament.matchday_days ?? 7,
+    default_match_weekday: tournament.default_match_weekday ?? 6,
+    default_match_time: tournament.default_match_time || "20:00",
     twitch_channel: tournament.twitch_channel || "",
     twitch_enabled: !!tournament.twitch_enabled,
     has_live_stream: !!tournament.has_live_stream,
@@ -1696,7 +1709,8 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     payload.format_label = (payload.format_label || "").trim() || null;
     if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
     normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
-    ["team_size", "max_participants", "min_participants", "best_of", "match_duration_minutes"].forEach((key) => {
+    ["team_size", "max_participants", "min_participants", "best_of", "match_duration_minutes",
+      "matchday_days", "default_match_weekday"].forEach((key) => {
       if (payload[key] !== "" && payload[key] != null) payload[key] = Number(payload[key]);
     });
     payload.season_weight = Number(payload.season_weight || 0);
@@ -1807,6 +1821,21 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
           <SelectField label="Ergebniserfassung" value={f.result_entry_mode || ""} onChange={(v)=>set("result_entry_mode",v || "")} options={RESULT_ENTRY_MODE_OPTIONS} />
           <SelectField label="Terminplanung" value={f.schedule_mode || ""} onChange={(v)=>set("schedule_mode",v || "")} options={SCHEDULE_MODE_OPTIONS} />
         </div>
+        {MATCHDAY_FORMATS.has(f.format) && (
+          <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3" data-testid="tr-edit-matchdays">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spielwochen</div>
+            <p className="text-xs text-white/55">
+              Ein Spieltag ist ein Zeitraum, kein Zeitpunkt. Beide Seiten dürfen darin Termine vorschlagen;
+              was die Gegenseite annimmt, gilt. Schlägt nur die Heimseite vor, gilt ihre Zeit. Wählt niemand,
+              greift die Standardzeit unten.
+            </p>
+            <div className="grid md:grid-cols-3 gap-3">
+              <Fld label="Spieltag dauert (Tage)" type="number" min="1" max="31" value={f.matchday_days} onChange={(v)=>set("matchday_days", v)} testId="tr-edit-matchday-days" />
+              <SelectField label="Standardtag" value={String(f.default_match_weekday ?? 6)} onChange={(v)=>set("default_match_weekday", Number(v))} options={WEEKDAY_OPTIONS} />
+              <Fld label="Standarduhrzeit" type="time" value={f.default_match_time} onChange={(v)=>set("default_match_time", v)} testId="tr-edit-matchday-time" />
+            </div>
+          </div>
+        )}
         <RulePresetPicker form={f} onApply={applyRulePreset} />
         <div className="border border-white/10 bg-black/20 rounded-sm p-3 text-xs text-white/55">
           Vor-Ort-Turniere werden standardmäßig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmäßig Ergebnisberichte beider Parteien und Terminvorschläge.
