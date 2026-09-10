@@ -289,3 +289,34 @@ def test_a_certificate_no_longer_carries_the_banner_text():
     # Ein gekacheltes Muster verwendet dieselbe Vorlage mehrfach; ein
     # seitenfuellendes Banner waere genau ein grosses Bild.
     assert images, "die Urkunde traegt ein Wasserzeichen"
+
+
+# ---------------------------------------------------------------- QR-Mitte
+
+def test_the_qr_badge_prefers_an_image_made_for_a_light_background():
+    """Der Kreis in der Mitte ist weiss; ein weisses Logo zeigt dort nichts."""
+    from pdf_service import qr_badge_sources
+
+    logo, silhouette = qr_badge_sources({"qr_logo_url": "/assets/brand/tls-favicon-light.png"})
+    assert logo is not None and silhouette is None
+
+    logo, silhouette = qr_badge_sources({"favicon_light_url": "/assets/brand/tls-favicon-light.png"})
+    assert logo is not None and silhouette is None
+
+
+def test_without_a_light_variant_the_qr_badge_falls_back_to_a_silhouette():
+    """Vorher blieb der Kreis leer: die Rueckfaelle waren alle fuer Dunkel gedacht."""
+    from pdf_service import qr_badge_sources
+
+    logo, silhouette = qr_badge_sources({"mascot_url": "/assets/brand/tls-mascot.png"})
+
+    assert logo is None, "das weisse Maskottchen darf nicht unveraendert gezeichnet werden"
+    assert silhouette is not None, "als Silhouette traegt es"
+
+
+def test_the_qr_badge_is_never_empty():
+    from pdf_service import qr_badge_sources
+
+    logo, silhouette = qr_badge_sources({})
+
+    assert (logo or silhouette) is not None
