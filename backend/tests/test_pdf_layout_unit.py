@@ -230,3 +230,62 @@ def test_a_printed_match_plan_shows_a_readable_time_not_an_iso_stamp():
     assert _pdf_datetime_label("kein datum") == "kein datum"
     assert _match_status_label("completed") == "Beendet"
     assert _match_status_label("waiting_result") == "Wartet auf Ergebnis"
+
+
+# ---------------------------------------------------------------- Wasserzeichen
+
+def test_a_long_metric_value_shrinks_instead_of_being_cut_off():
+    """Auf der echten Urkunde stand "Spielberg | Red B..." statt der Strecke."""
+    import pdf_service
+
+    data = pdf_service.pdf_certificates([{
+        "source": TURNIER,
+        "row": {"display_name": "buma_70", "rank": 1},
+        "category": "Streckenwertung",
+        "metrics": [
+            {"label": "Strecke", "value": "Spielberg | Red Bull Ring"},
+            {"label": "Beste Zeit", "value": "1:06.258"},
+        ],
+    }])
+
+    document = pymupdf.open(stream=data, filetype="pdf")
+    try:
+        text = document[0].get_text()
+    finally:
+        document.close()
+    assert "Spielberg | Red Bull Ring" in text
+    assert "Red B..." not in text
+
+
+def test_the_watermark_is_tiled_and_survives_a_missing_file(tmp_path):
+    """Das Muster stammt aus der Silhouette, nicht aus der Farbe der Vorlage."""
+    import pdf_service
+    from reportlab.pdfgen import canvas as pdf_canvas
+
+    mascot = pdf_service._brand_asset_path("/assets/brand/tls-mascot.png")
+    assert mascot is not None, "das Maskottchen gehoert zum Quellstand"
+
+    page = pdf_canvas.Canvas(str(tmp_path / "probe.pdf"), pagesize=A4)
+    assert pdf_service._draw_tiled_watermark(page, mascot, PAGE_W, PAGE_H) is True
+    assert pdf_service._draw_tiled_watermark(page, tmp_path / "gibtsnicht.png", PAGE_W, PAGE_H) is False
+
+
+def test_a_certificate_no_longer_carries_the_banner_text():
+    """Quer ueber der Urkunde stand vorher die Werbeschrift des Banners."""
+    import pdf_service
+
+    data = pdf_service.pdf_certificates([{
+        "source": {**TURNIER, "banner_url": "/assets/brand/og-default.png"},
+        "row": {"display_name": "buma_70", "rank": 1},
+        "category": "Gesamtwertung",
+        "metrics": [],
+    }])
+
+    document = pymupdf.open(stream=data, filetype="pdf")
+    try:
+        images = document[0].get_images(full=True)
+    finally:
+        document.close()
+    # Ein gekacheltes Muster verwendet dieselbe Vorlage mehrfach; ein
+    # seitenfuellendes Banner waere genau ein grosses Bild.
+    assert images, "die Urkunde traegt ein Wasserzeichen"
