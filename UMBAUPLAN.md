@@ -34,7 +34,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 6 | Ablauf-Tests: echte Anwendung gegen Datenbank im Speicher | umgesetzt | #174 |
 | 7 | Ein Turnierbaum statt zwei, Spieltage als Spieltage | umgesetzt | #176 |
 | 8 | Klassischer Schreibweg stillgelegt | umgesetzt | #177 |
-| 9 | **Übersichtlichkeit** (läuft) | teilweise | #178, #179 |
+| 9 | **Übersichtlichkeit** (läuft) | teilweise | #178, #179, #181, #182 |
 | 10 | Spielwochen und Terminfindung | offen | — |
 | 11 | PDF-Ausgabe | offen | — |
 | 12 | Galerie und Medien: Tempo, Videos überall | offen | — |
@@ -63,16 +63,35 @@ App** funktioniert.
 | Schritt | Was | Stand |
 | --- | --- | --- |
 | 9.1 | Turnier anlegen: erst das Nötige, dann der Rest | umgesetzt (#178) |
-| 9.2 | Dashboard: erst was ansteht, dann die Zahlen | in Prüfung (#179) |
-| 9.3 | Turnier bearbeiten — `AdminTournamentEditPage.jsx`, **2175 Zeilen** | offen |
-| 9.4 | Turnierverwaltung als eigener Arbeitsbereich (Bracket bearbeiten, Format wechseln) | offen |
-| 9.5 | Adminmenü — **34 Einträge in 6 Gruppen** | offen |
-| 9.6 | Einstellungen — **13 Reiter, davon 5 rund um Mail** | offen |
-| 9.7 | Handy-Browser gleichwertig zum PC | offen |
-| 9.8 | `backend/routes/tournament_routes.py` aufteilen — **3623 Zeilen** | offen |
+| 9.2 | Dashboard: erst was ansteht, dann die Zahlen | offen zum Mergen (#179) |
+| 9.3 | Formatwechsel: aus einer Liga wurde eine Einzelausscheidung | offen zum Mergen (#181) |
+| 9.4 | Turnierseite: dreizehn Knöpfe im Kopf werden vier | offen zum Mergen (#182) |
+| 9.5 | Turnier bearbeiten aufteilen — `AdminTournamentEditPage.jsx`, **2175 Zeilen** | offen |
+| 9.6 | Adminmenü — **34 Einträge in 6 Gruppen** | offen |
+| 9.7 | Einstellungen — **13 Reiter, davon 5 rund um Mail** | offen |
+| 9.8 | Handy-Browser gleichwertig zum PC | angefangen |
+| 9.9 | `backend/routes/tournament_routes.py` aufteilen — **3623 Zeilen** | offen |
 
-Zu 9.4 gehört dein konkreter Befund, dass „die Bearbeitung des Brackets, dann z. B. auf
-Einzelausscheidung umstellen" nicht sauber läuft.
+### Was hinter 9.3 steckte
+
+Dein Befund „die Bearbeitung des Brackets, dann z. B. auf Einzelausscheidung umstellen
+geht nicht sauber" war ein echter Fehler, kein Bedienproblem. Das Bearbeiten-Formular
+setzte hinter dem sichtbaren Feld „Turnierstruktur" einen zweiten, unsichtbaren Wert —
+mit einer Zuordnung, die **drei von zwölf** Formaten kannte. Die übrigen neun landeten
+auf `single_elimination`. Wer eine Liga bearbeitete und „Speichern & Struktur anwenden"
+drückte, baute einen Einzelausscheidungs-Baum.
+
+**Praktische Folge für dich:** falls du zuletzt Liga-, Gruppen- oder FFA-Turniere über
+„Struktur anwenden" neu gebaut hast, können deren Turnierbäume falsch angelegt sein. Bei
+laufenden Turnieren erst nachsehen — das Anwenden ersetzt den Baum.
+
+### Was 9.8 heißt
+
+Die Turnierseite ist am Telefon (390 px) nachgemessen: die Reiter, über die die Arbeit
+läuft, begannen bei **1290 px**. Grund war nicht der Kopf (301 px), sondern die
+Speziallink-Tafel mit **696 px** dazwischen. Eingeklappt sind es 78 px, die Reiter
+beginnen bei 673 px, die Seite ist 1688 statt 2305 px hoch. Die übrigen Adminseiten sind
+noch nicht vermessen.
 
 ## Block 10 — Spielwochen und Terminfindung
 
