@@ -277,11 +277,36 @@ Ein eigener Eintrag im Adminmenü, sichtbar für die Turnierleitung. Bilder übe
 vorhandene Medienverwaltung. Der Text wird mit der Software ausgeliefert, damit er nicht
 auseinanderläuft, wenn sich Felder ändern.
 
-### Offene Frage an dich
+### Entschieden: universell, nach Turnierform sortiert
 
-Welche Spiele spielt ihr wirklich? Die Tabelle oben ist recherchiert, nicht eure Realität.
-Sag mir eure Titel, dann steht im Leitfaden, was ihr braucht — und nicht, was anderswo
-gespielt wird.
+Der Betreiber will **vorbereitet sein, nicht abbilden, was gerade gespielt wird**. Der
+Leitfaden deckt deshalb alles ab, was sich als Turnier eignet — unabhängig davon, ob der
+Verein den Titel heute spielt.
+
+Sortiert wird nicht nach Spiel, sondern nach **Turnierform**, denn die entscheidet, welches
+Format hier passt. Ein Battle Royale gehört nicht in einen Turnierbaum, ein Zeitfahren
+ebenso wenig:
+
+| Form | Beispiele | Passendes Format hier |
+| --- | --- | --- |
+| Team-Shooter 5v5 | CS2, Valorant, Rainbow Six, Overwatch 2 | Gruppen oder Schweizer System, dann Double Elimination |
+| MOBA 5v5 | League of Legends, Dota 2 | Gruppen, dann Turnierbaum |
+| Arcade-Sport 3v3 | Rocket League | Round Robin oder Gruppen, Playoffs Best of 5 |
+| Team-Shooter 4v4 | Call of Duty | Best of 5 mit fester Modusfolge |
+| Squad-Battle-Royale | Fortnite, Apex Legends, PUBG, Warzone | **kein Baum** — Battle Royale mit Punkten über mehrere Runden |
+| 1v1 Sport | EA SPORTS FC, NBA 2K, Madden | Liga mit Spielwochen, Hin- und Rückspiel |
+| 1v1 Strategie | Age of Empires II und IV, StarCraft II | Best of 3, Map-Pool ohne Wiederholung |
+| 1v1 Fighting | Street Fighter 6, Tekken 8, Super Smash Bros. | Double Elimination, kurze Sätze |
+| Rennen auf Zeit | F1, Trackmania, Gran Turismo, iRacing | Fast Lap beziehungsweise Grand Prix — über Rundenzeiten, nicht über Paarungen |
+| Mobil | Clash Royale, Brawl Stars | Einzelausscheidung an einem Abend |
+| Party und LAN | Mario Kart, Fall Guys | Free for All mit Rangwertung |
+
+Diese Zuordnung ist der eigentliche Wert des Leitfadens: sie verbindet die Welt draußen mit
+den **zwölf Formaten**, die diese Plattform kennt. Wer „Fortnite" sucht, landet nicht im
+Turnierbaum, sondern bei Battle Royale mit Punktewertung — und wer „F1" sucht, bei den
+Rundenzeiten statt bei Spielpaarungen.
+
+Die Liste wächst weiter; neue Titel sind eine Zeile, kein Umbau.
 
 ## Querschnitt: Live-Aktualisierung überall
 
