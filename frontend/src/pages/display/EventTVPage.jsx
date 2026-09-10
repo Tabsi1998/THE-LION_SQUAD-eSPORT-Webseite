@@ -60,7 +60,7 @@ export default function EventTVPage() {
     const interval = setInterval(load, 15000);
     return () => clearInterval(interval);
   }, [load]);
-  useApiInvalidation(load, ["events", "tournaments", "matches", "matches_v2", "stations", "f1"]);
+  useApiInvalidation(load, ["events", "tournaments", "matches", "matches-v2", "stations", "f1"]);
 
   const activity = useMemo(() => {
     if (!event) return [];

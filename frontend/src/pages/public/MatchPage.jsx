@@ -120,7 +120,7 @@ export default function MatchPage() {
       document.removeEventListener("visibilitychange", refreshVisible);
     };
   }, [load]);
-  useApiInvalidation(load, ["matches", "matches_v2", "tournaments"]);
+  useApiInvalidation(load, ["matches", "matches-v2", "tournaments"]);
 
   const title = data?.tournament?.title ? `${data.matchday_label} - ${data.tournament.title}` : "Match";
   const description = data?.tournament?.title

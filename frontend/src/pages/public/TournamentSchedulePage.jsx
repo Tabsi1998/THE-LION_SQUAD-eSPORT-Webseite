@@ -52,7 +52,7 @@ export default function TournamentSchedulePage() {
     const interval = setInterval(load, 7000);
     return () => clearInterval(interval);
   }, [load]);
-  useApiInvalidation(load, ["tournaments", "matches", "matches_v2"]);
+  useApiInvalidation(load, ["tournaments", "matches", "matches-v2"]);
 
   const groups = useMemo(() => {
     const tournament = data?.tournament || {};

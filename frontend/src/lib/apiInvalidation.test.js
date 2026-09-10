@@ -22,6 +22,39 @@ describe("API invalidation stream", () => {
     expect(invalidationMatches(event, ["news"])).toBe(false);
   });
 
+  // Der Server leitet die Ressource aus dem Pfad ab: /api/matches-v2/... wird
+  // zu "matches-v2" mit Bindestrich. Drei Ansichten filterten auf
+  // "matches_v2" mit Unterstrich - eine Zeichenkette, die nie zutreffen kann.
+  // Gerettet hat sie nur, dass sie zusaetzlich "matches" auffuehrten; eine
+  // Ansicht, die allein darauf gesetzt haette, waere nie aktualisiert worden.
+  test("a v2 match change reaches the views that ask for it", () => {
+    const event = { path: "/api/matches-v2/m-1/result", resource: "matches-v2" };
+
+    expect(invalidationMatches(event, ["matches-v2"])).toBe(true);
+    expect(invalidationMatches(event, ["matches"])).toBe(true);
+    expect(invalidationMatches(event, ["tournaments"])).toBe(true);
+    expect(invalidationMatches(event, ["matches_v2"])).toBe(false);
+  });
+
+  test("no view filters on a resource key the server never emits", async () => {
+    const modules = import.meta.glob("../pages/**/*.jsx", { query: "?raw", import: "default", eager: true });
+    const used = new Set();
+    for (const source of Object.values(modules)) {
+      for (const call of String(source).matchAll(/useApiInvalidation\([^)]*?\[([^\]]*)\]/g)) {
+        for (const part of call[1].split(",")) {
+          const name = part.trim().replace(/^["'`]|["'`]$/g, "");
+          if (name) used.add(name);
+        }
+      }
+    }
+    expect(used.size).toBeGreaterThan(10);
+
+    // Unterstriche gibt es in keinem API-Pfad; sie sind das verlaessliche
+    // Kennzeichen einer Zeichenkette, die nie zutrifft.
+    const impossible = [...used].filter((name) => name.includes("_"));
+    expect(impossible).toEqual([]);
+  });
+
   test("the same server event is emitted only once", () => {
     const received = [];
     const unsubscribe = subscribeApiInvalidation((event) => received.push(event));
