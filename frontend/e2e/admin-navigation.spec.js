@@ -79,32 +79,44 @@ test.describe("Adminmenü", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
   });
 
-  test("beim ersten Besuch ist nur die aktuelle Gruppe offen", async ({ page }) => {
+  test("beim ersten Besuch ist alles offen, nichts ist weggeräumt", async ({ page }) => {
     await page.goto("/admin");
     await expect(page.getByTestId("admin-nav-search")).toBeVisible();
 
-    await expect(page.getByTestId("admin-nav-group-Übersicht")).toHaveAttribute("aria-expanded", "true");
-    for (const group of ["Mitglieder", "eSports", "Content", "Verein", "System"]) {
-      await expect(page.getByTestId(`admin-nav-group-${group}`)).toHaveAttribute("aria-expanded", "false");
+    // Wer das Zuklappen noch nicht kennt, soll nichts vermissen.
+    for (const group of ["Übersicht", "Mitglieder", "eSports", "Content", "Verein", "System"]) {
+      await expect(page.getByTestId(`admin-nav-group-${group}`)).toHaveAttribute("aria-expanded", "true");
     }
-
-    // Alle sechs Gruppennamen sind da; die Liste passt jetzt in den Bereich.
-    const metrics = await navMetrics(page);
-    expect(metrics.contentHeight).toBeLessThanOrEqual(metrics.visibleHeight);
+    await expect(page.getByTestId("admin-nav-tournaments")).toBeVisible();
+    expect((await navMetrics(page)).entries).toBe(34);
   });
 
-  test("eine Gruppe lässt sich öffnen und der Zustand überlebt das Neuladen", async ({ page }) => {
+  test("eine Gruppe lässt sich zuklappen und bleibt es nach dem Neuladen", async ({ page }) => {
     await page.goto("/admin");
     await expect(page.getByTestId("admin-nav-search")).toBeVisible();
 
-    const esports = page.getByTestId("admin-nav-group-eSports");
-    await expect(page.getByTestId("admin-nav-tournaments")).toBeHidden();
-    await esports.click();
-    await expect(page.getByTestId("admin-nav-tournaments")).toBeVisible();
+    const content = page.getByTestId("admin-nav-group-Content");
+    await expect(page.getByTestId("admin-nav-news")).toBeVisible();
+    await content.click();
+    await expect(page.getByTestId("admin-nav-news")).toBeHidden();
 
     await page.reload();
     await expect(page.getByTestId("admin-nav-search")).toBeVisible();
-    await expect(page.getByTestId("admin-nav-tournaments")).toBeVisible();
+    await expect(page.getByTestId("admin-nav-news")).toBeHidden();
+    await expect(page.getByTestId("admin-nav-group-Content")).toHaveAttribute("aria-expanded", "false");
+  });
+
+  test("zuklappen verkürzt die Liste spürbar", async ({ page }) => {
+    await page.goto("/admin");
+    await expect(page.getByTestId("admin-nav-search")).toBeVisible();
+    const before = await navMetrics(page);
+
+    for (const group of ["Mitglieder", "Content", "Verein", "System"]) {
+      await page.getByTestId(`admin-nav-group-${group}`).click();
+    }
+
+    const after = await navMetrics(page);
+    expect(after.contentHeight).toBeLessThan(before.contentHeight / 2);
   });
 
   test("wer tief unten landet, sieht seinen Eintrag im Menü", async ({ page }) => {
@@ -120,6 +132,7 @@ test.describe("Adminmenü", () => {
   test("die Suche zeigt Treffer aus zugeklappten Gruppen", async ({ page }) => {
     await page.goto("/admin");
     await expect(page.getByTestId("admin-nav-search")).toBeVisible();
+    await page.getByTestId("admin-nav-group-Verein").click();
     await expect(page.getByTestId("admin-nav-sponsors")).toBeHidden();
 
     await page.getByTestId("admin-nav-search").fill("sponsor");

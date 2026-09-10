@@ -218,10 +218,11 @@ export function AdminLayout({ children }) {
   const activeGroup = groupLabelForPath(location.pathname);
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
     const stored = readCollapsedGroups();
-    if (stored) return new Set(stored);
-    // Beim ersten Mal ist nur die Gruppe offen, in der man gerade steht.
-    const current = groupLabelForPath(location.pathname);
-    return new Set(ADMIN_GROUPS.map((group) => group.label).filter((label) => label !== current));
+    // Voreinstellung: alles offen. Eine Voreinstellung, die etwas wegräumt,
+    // trifft genau die Leute, die das Zuklappen noch nicht kennen - und "wo
+    // bin ich gerade" beantwortet ohnehin das Nachführen zum aktiven Eintrag.
+    // Wer es kompakt will, klappt einmal zu; das wird gemerkt.
+    return new Set(stored || []);
   });
 
   const toggleGroup = useCallback((label) => {
