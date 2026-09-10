@@ -295,6 +295,68 @@ def _draw_cover_image(canvas, path: Path, page_w: float, page_h: float, opacity:
         return False
 
 
+def _watermark_shape(path: Path, tint=(118, 130, 143)):
+    """Die Silhouette einer Vorlage, eingefärbt und auf ihren Inhalt beschnitten.
+
+    Die Farbe der Vorlage spielt keine Rolle: das Maskottchen ist reinweiß und
+    auf Papier sonst unsichtbar.
+    """
+    with Image.open(str(path)).convert("RGBA") as source:
+        alpha = source.getchannel("A")
+        bbox = alpha.getbbox()
+        if bbox:
+            alpha = alpha.crop(bbox)
+        shape = Image.new("RGBA", alpha.size, tuple(tint) + (0,))
+        shape.putalpha(alpha)
+        return ImageReader(shape)
+
+
+def _draw_tiled_watermark(canvas, path: Path, page_w: float, page_h: float, *,
+                          size: float = 3.4 * cm, gap: float = 2.4 * cm,
+                          opacity: float = 0.055, angle: float = 18.0) -> bool:
+    """Das Maskottchen als versetztes Muster über die ganze Seite.
+
+    Ein Turnierbanner taugt schlecht als Wasserzeichen: es trägt meist selbst
+    Schrift, und die liest sich quer über der Urkunde als zweiter Text. Ein
+    wiederholtes Zeichen trägt keine Bedeutung und stört deshalb nicht - es
+    bleibt Papier mit Muster.
+
+    Jede zweite Reihe ist versetzt, damit kein Gitter entsteht.
+    """
+    try:
+        reader = _watermark_shape(path)
+        width, height = reader.getSize()
+        if not width or not height:
+            return False
+        ratio = min(size / width, size / height)
+        tile_w, tile_h = width * ratio, height * ratio
+        step_x = tile_w + gap
+        step_y = tile_h + gap
+
+        canvas.saveState()
+        if hasattr(canvas, "setFillAlpha"):
+            canvas.setFillAlpha(opacity)
+        canvas.translate(page_w / 2, page_h / 2)
+        canvas.rotate(angle)
+        # Gedreht wird um die Seitenmitte, deshalb muss das Muster über die
+        # Diagonale hinausreichen, damit keine Ecke leer bleibt.
+        reach = (page_w + page_h) / 1.6
+        row = 0
+        y = -reach
+        while y < reach:
+            offset = (step_x / 2) if row % 2 else 0.0
+            x = -reach + offset
+            while x < reach:
+                canvas.drawImage(reader, x, y, tile_w, tile_h, mask="auto")
+                x += step_x
+            y += step_y
+            row += 1
+        canvas.restoreState()
+        return True
+    except Exception:
+        return False
+
+
 def _draw_watermark_logo(canvas, path: Path, center_x: float, center_y: float,
                          max_size: float, opacity: float = 0.12,
                          tint=(118, 130, 143)) -> bool:
@@ -958,12 +1020,12 @@ def _certificate_page(canvas, doc, certificate: dict, branding: dict | None, spo
     recipient = _normalize_pdf_text(row.get("display_name") or certificate.get("display_name") or "Teilnehmer")
     category = _normalize_pdf_text(certificate.get("category") or "Gesamtwertung")
     subtitle = _normalize_pdf_text(certificate.get("subtitle") or source.get("subtitle") or "eSports")
-    background_path = (
-        _brand_asset_path(source.get("certificate_image_url"))
-        or _brand_asset_path(source.get("banner_url"))
-        or _brand_asset_path(source.get("image_url"))
-        or _brand_asset_path(source.get("seo_image_url"))
-        or _brand_asset_path((branding or {}).get("share_banner_url"))
+    # Ein eigenes Urkundenbild bleibt möglich; ohne das wird gekachelt.
+    watermark_path = (
+        _brand_asset_path(source.get("certificate_watermark_url"))
+        or _brand_asset_path((branding or {}).get("mascot_url"))
+        or _brand_asset_path((branding or {}).get("qr_logo_url"))
+        or _brand_asset_path("/assets/brand/tls-mascot.png")
     )
     # Beim Wasserzeichen darf es das Maskottchen sein: gezeichnet wird dort nur
     # seine Form, die Farbe der Vorlage spielt keine Rolle.
@@ -978,18 +1040,13 @@ def _certificate_page(canvas, doc, certificate: dict, branding: dict | None, spo
     # Banner war praktisch unsichtbar und die Urkunde eine schwarze Fläche.
     canvas.setFillColor(PAPER)
     canvas.rect(0, 0, page_w, page_h, fill=1, stroke=0)
-    if background_path:
-        # Geringe Deckkraft direkt auf Weiß statt Bild plus Schleier: ein
-        # Schleier darüber hätte den Beitrag des Banners wieder auf ein Zehntel
-        # gedrückt und es unsichtbar gemacht.
-        #
-        # 0.08 ist bewusst niedrig. Ein dunkles Banner färbt die Seite sonst
-        # flächig grau ein, und Banner tragen oft selbst Schrift, die sich mit
-        # der Urkunde beißt. So bleibt eine Andeutung, die den Anlass zeigt und
-        # weder den Text stört noch den Drucker beschäftigt.
-        _draw_cover_image(canvas, background_path, page_w, page_h, opacity=0.08)
-    elif mascot_path:
-        _draw_watermark_logo(canvas, mascot_path, page_w / 2, page_h / 2, 12.0 * cm, opacity=0.10)
+    # Das Maskottchen als versetztes Muster über die ganze Seite. Ein
+    # Turnierbanner als Wasserzeichen sah quer über der Urkunde nach einem
+    # zweiten Text aus - man las Fragmente wie "BEWEISE DEIN KÖNNEN" mitten
+    # durch den Namen. Ein wiederholtes Zeichen trägt keine Bedeutung und
+    # bleibt deshalb Hintergrund.
+    if watermark_path:
+        _draw_tiled_watermark(canvas, watermark_path, page_w, page_h)
     canvas.setFillColor(CYAN)
     canvas.rect(0, page_h - 4, page_w, 4, fill=1, stroke=0)
     canvas.setFillColor(GOLD)
@@ -1044,7 +1101,7 @@ def _certificate_page(canvas, doc, certificate: dict, branding: dict | None, spo
     )
     # Nach oben nachrücken, aber nie so weit, dass die Kennzahlen darunter
     # bedrängt werden.
-    medal_cy = min(stack[-1]["bottom"] - 2.05 * cm, 13.35 * cm)
+    medal_cy = min(stack[-1]["bottom"] - 1.75 * cm, 13.9 * cm)
     medal_cy = max(medal_cy, medal_floor)
     _draw_text_block(canvas, stack[0], page_w / 2, CYAN_INK)
     _draw_text_block(canvas, stack[1], page_w / 2, INK)
@@ -1094,9 +1151,18 @@ def _certificate_page(canvas, doc, certificate: dict, branding: dict | None, spo
             canvas.setFillColor(GOLD_INK)
             canvas.setFont("Helvetica-Bold", 5.8)
             canvas.drawCentredString(x + slot_w / 2, metric_y + 0.78 * cm, str(metric.get("label") or "").upper()[:20])
+            # "Spielberg | Red Bull Ring" wurde vorher hart auf
+            # "Spielberg | Red B..." gekürzt. Erst verkleinern, dann kürzen -
+            # ein Streckenname gehört ganz auf die Urkunde.
+            value = _normalize_pdf_text(str(metric.get("value")))
+            value_size = 11
+            while value_size > 7 and stringWidth(value, "Helvetica-Bold", value_size) > slot_w - 0.30 * cm:
+                value_size -= 0.5
             canvas.setFillColor(INK)
-            canvas.setFont("Helvetica-Bold", 11)
-            canvas.drawCentredString(x + slot_w / 2, metric_y + 0.30 * cm, _truncate_to_width(str(metric.get("value")), slot_w - 0.35 * cm, "Helvetica-Bold", 11))
+            canvas.setFont("Helvetica-Bold", value_size)
+            canvas.drawCentredString(
+                x + slot_w / 2, metric_y + 0.30 * cm,
+                _truncate_to_width(value, slot_w - 0.30 * cm, "Helvetica-Bold", value_size))
 
     issued = _normalize_pdf_text(certificate.get("issued_label") or datetime.now().strftime("%d.%m.%Y"))
     canvas.setStrokeColor(INK_FAINT)
