@@ -8,9 +8,9 @@ import {
   ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon,
   Award, Inbox, UserCheck, Medal,
   FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing,
-  Search, Server, QrCode, Activity, MessagesSquare,
+  Search, Server, QrCode, Activity, MessagesSquare, ChevronDown,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // Sidebar-Gruppen für bessere Übersicht
 const ADMIN_GROUPS = [
@@ -144,6 +144,44 @@ const MODERATOR_ROUTES = [
   "/admin/moderation",
 ];
 
+// 34 Einträge ergaben eine 1689 Pixel hohe Liste, von der bei 1440x900 genau
+// zwölf gleichzeitig sichtbar waren. Wer auf "Push-Tests" stand, sah im Menü
+// nicht, wo er ist: die Liste blieb oben stehen. Gruppen lassen sich deshalb
+// zuklappen, und die Gruppe der aktuellen Seite geht beim Navigieren auf.
+const NAV_GROUPS_STORAGE_KEY = "tls_admin_nav_collapsed_v1";
+
+function readCollapsedGroups() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(NAV_GROUPS_STORAGE_KEY));
+    return Array.isArray(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCollapsedGroups(labels) {
+  try {
+    window.localStorage.setItem(NAV_GROUPS_STORAGE_KEY, JSON.stringify(labels));
+  } catch {
+    // Privates Fenster oder gesperrter Speicher: dann wird es eben nicht gemerkt.
+  }
+}
+
+// Der längste passende Eintrag gewinnt, damit "/admin" nicht jede Unterseite
+// für sich beansprucht.
+function groupLabelForPath(pathname) {
+  let best = null;
+  for (const group of ADMIN_GROUPS) {
+    for (const item of group.items) {
+      const hit = pathname === item.to || (!item.end && pathname.startsWith(`${item.to}/`));
+      if (hit && (!best || item.to.length > best.route.length)) {
+        best = { route: item.to, label: group.label };
+      }
+    }
+  }
+  return best ? best.label : null;
+}
+
 export function AdminLayout({ children }) {
   const { user, logout, isAdmin } = useAuth();
   const nav = useNavigate();
@@ -176,6 +214,48 @@ export function AdminLayout({ children }) {
       items: group.items.filter((item) => (!item.clubOnly || canSeeClub) && itemMatchesQuery(item, group.label, searchQuery)),
     })).filter((group) => group.items.length > 0);
   }, [isAdmin, searchQuery, user?.role]);
+
+  const activeGroup = groupLabelForPath(location.pathname);
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    const stored = readCollapsedGroups();
+    if (stored) return new Set(stored);
+    // Beim ersten Mal ist nur die Gruppe offen, in der man gerade steht.
+    const current = groupLabelForPath(location.pathname);
+    return new Set(ADMIN_GROUPS.map((group) => group.label).filter((label) => label !== current));
+  });
+
+  const toggleGroup = useCallback((label) => {
+    setCollapsedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      writeCollapsedGroups([...next]);
+      return next;
+    });
+  }, []);
+
+  // Beim Seitenwechsel geht die zugehörige Gruppe auf. Zuklappen darf man sie
+  // danach wieder - beim nächsten Wechsel dorthin steht sie erneut offen.
+  useEffect(() => {
+    if (!activeGroup) return;
+    setCollapsedGroups((current) => {
+      if (!current.has(activeGroup)) return current;
+      const next = new Set(current);
+      next.delete(activeGroup);
+      writeCollapsedGroups([...next]);
+      return next;
+    });
+  }, [activeGroup]);
+
+  // Während einer Suche sind alle Treffer offen, sonst zählt der gemerkte Zustand.
+  const groupIsOpen = (label) => Boolean(searchQuery) || !collapsedGroups.has(label);
+
+  // Ohne das blieb die Liste beim Seitenwechsel oben stehen: man war auf
+  // "Push-Tests" und sah im Menü nur die Gruppe "Übersicht".
+  const navRef = useRef(null);
+  useEffect(() => {
+    navRef.current?.querySelector("[aria-current='page']")?.scrollIntoView({ block: "nearest" });
+  }, [location.pathname, collapsedGroups, searchQuery]);
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex">
@@ -218,35 +298,51 @@ export function AdminLayout({ children }) {
           </label>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-3 admin-scroll">
-          {visibleGroups.map((group) => (
-            <div key={group.label} className="mb-4">
-              <div className="px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.25em] text-white/25 select-none">
-                {group.label}
+        <nav ref={navRef} className="flex-1 overflow-y-auto p-3 admin-scroll">
+          {visibleGroups.map((group) => {
+            const open = groupIsOpen(group.label);
+            return (
+              <div key={group.label} className="mb-3">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.label)}
+                  aria-expanded={open}
+                  data-testid={`admin-nav-group-${group.label}`}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.25em] text-white/25 hover:text-white/60 transition-colors"
+                >
+                  <span className="truncate">{group.label}</span>
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    {!open && <span className="tabular-nums tracking-normal text-white/20">{group.items.length}</span>}
+                    {group.label === activeGroup && !open && <span className="w-1.5 h-1.5 rounded-full bg-[#29B6E8]" />}
+                    <ChevronDown className={`w-3 h-3 transition-transform ${open ? "" : "-rotate-90"}`} />
+                  </span>
+                </button>
+                {open && (
+                  <div className="space-y-0.5">
+                    {group.items.map((it) => (
+                      <NavLink
+                        key={it.to}
+                        to={it.to}
+                        end={it.end}
+                        onClick={() => setOpenMobile(false)}
+                        data-testid={`admin-nav-${it.to.split("/").pop() || "dashboard"}`}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-semibold transition-all ${
+                            isActive
+                              ? "bg-[#29B6E8]/15 text-[#29B6E8] border-l-2 border-[#29B6E8]"
+                              : "text-white/70 hover:text-white hover:bg-white/5"
+                          }`
+                        }
+                      >
+                        <it.icon className="w-4 h-4 shrink-0" />
+                        <span className="truncate">{it.label}</span>
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="space-y-0.5">
-                {group.items.map((it) => (
-                  <NavLink
-                    key={it.to}
-                    to={it.to}
-                    end={it.end}
-                    onClick={() => setOpenMobile(false)}
-                    data-testid={`admin-nav-${it.to.split("/").pop() || "dashboard"}`}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-semibold transition-all ${
-                        isActive
-                          ? "bg-[#29B6E8]/15 text-[#29B6E8] border-l-2 border-[#29B6E8]"
-                          : "text-white/70 hover:text-white hover:bg-white/5"
-                      }`
-                    }
-                  >
-                    <it.icon className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{it.label}</span>
-                  </NavLink>
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {visibleGroups.length === 0 && (
             <div className="px-3 py-8 text-center text-xs text-white/40">
               <div>Keine Admin-Seite gefunden.</div>
