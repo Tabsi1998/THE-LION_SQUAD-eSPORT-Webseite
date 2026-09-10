@@ -98,8 +98,18 @@ async def _pdf_branding(db):
             "club_name": 1,
         },
     ) or {}
+    # PDFs werden auf Papier gedruckt und haben deshalb einen hellen Grund. Ein
+    # Logo für dunklen Hintergrund ist meist weiß und dort unsichtbar - also
+    # zuerst die helle Variante. Solange die PDFs schwarz waren, galt genau
+    # die umgekehrte Reihenfolge; sie stand hier auch so.
+    branding["pdf_logo_url"] = (
+        branding.get("logo_light_url")
+        or branding.get("favicon_light_url")
+        or branding.get("logo_url")
+        or branding.get("logo_dark_url")
+    )
     if not branding.get("logo_url"):
-        branding["logo_url"] = branding.get("logo_dark_url") or branding.get("logo_light_url")
+        branding["logo_url"] = branding.get("logo_light_url") or branding.get("logo_dark_url")
     return branding
 
 
