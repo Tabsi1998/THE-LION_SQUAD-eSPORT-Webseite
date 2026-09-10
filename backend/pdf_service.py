@@ -3,7 +3,8 @@ import io
 import os
 import re
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
+from zoneinfo import ZoneInfo
 from urllib.parse import urlparse
 from xml.sax.saxutils import escape
 from reportlab.lib import colors
@@ -21,30 +22,122 @@ from reportlab.platypus import (
 )
 from PIL import Image
 
+# Bildschirmfarben der Plattform. Sie bleiben als schmale Linien und Akzente,
+# tragen aber keinen Text auf hellem Grund.
 CYAN = colors.HexColor("#29B6E8")
 GOLD = colors.HexColor("#D6B45F")
 BLACK = colors.HexColor("#0A0A0A")
 WHITE = colors.white
-DARK = colors.HexColor("#121212")
-MUTED = colors.HexColor("#A1A1AA")
+
+# Druckfarben. Diese Dateien landen auf Papier: heller Grund, dunkle Schrift,
+# Akzente als schmale Linien statt als Flächen. Eine ganzseitig schwarze A4
+# kostet eine Menge Toner und liest sich ausgedruckt schlechter, nicht besser.
+PAPER = colors.white
+INK = colors.HexColor("#14181D")
+INK_SOFT = colors.HexColor("#5A6472")
+INK_FAINT = colors.HexColor("#8B95A3")
+RULE = colors.HexColor("#D7DDE4")
+TINT = colors.HexColor("#F3F6F9")
+# Das Cyan des Bildschirms hat auf hellem Grund zu wenig Kontrast: Text nimmt
+# die dunklere Variante, Linien weiter die helle.
+CYAN_INK = colors.HexColor("#10688A")
+GOLD_INK = colors.HexColor("#8A6D22")
+MUTED = INK_SOFT
+DARK = TINT
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_BRAND_DIR = REPO_ROOT / "frontend" / "public" / "assets" / "brand"
 
 
+# Die Liste ging bisher von einem Feld "tag" aus, das Teams gar nicht führen -
+# die Spalte blieb deshalb immer leer. Name zuerst, Kürzel als Rückfall.
+def _team_label(team) -> str:
+    if not isinstance(team, dict):
+        return "—"
+    for key in ("name", "tag", "title"):
+        value = (team.get(key) or "").strip() if isinstance(team.get(key), str) else team.get(key)
+        if value:
+            return str(value)
+    return "—"
+
+
+# Auf einer ausgedruckten Liste stand bisher "checked_in".
+REGISTRATION_STATUS_LABELS = {
+    "pending": "Offen",
+    "approved": "Bestätigt",
+    "rejected": "Abgelehnt",
+    "waitlist": "Warteliste",
+    "checked_in": "Eingecheckt",
+    "no_show": "Nicht erschienen",
+    "cancelled": "Abgemeldet",
+    "registered": "Angemeldet",
+}
+
+
+def _registration_status_label(status) -> str:
+    key = str(status or "").strip()
+    if not key:
+        return "—"
+    return REGISTRATION_STATUS_LABELS.get(key, key.replace("_", " ").capitalize())
+
+
+# Im Matchplan stand die Uhrzeit als roher ISO-Zeitstempel
+# ("2026-09-13T19:30:00+00:00"). Der ist doppelt so breit wie die Spalte und
+# lief deshalb in die Nachbarspalte - eine der Ueberlappungen, die gemeldet
+# wurden. Gespeichert wird in UTC; gedruckt wird die Zeit des Vereins.
+MATCH_STATUS_LABELS = {
+    "pending": "Offen",
+    "ready": "Bereit",
+    "scheduled": "Angesetzt",
+    "in_progress": "Läuft",
+    "waiting_result": "Wartet auf Ergebnis",
+    "disputed": "Strittig",
+    "completed": "Beendet",
+    "forfeit": "Gewertet",
+    "cancelled": "Abgesagt",
+}
+
+
+def _match_status_label(status) -> str:
+    key = str(status or "").strip()
+    if not key:
+        return "—"
+    return MATCH_STATUS_LABELS.get(key, key.replace("_", " ").capitalize())
+
+
+def _pdf_datetime_label(value, tz_name: str | None = None) -> str:
+    """Ein Termin, wie er auf Papier lesbar ist: 13.09.2026 21:30."""
+    if not value:
+        return "—"
+    if isinstance(value, datetime):
+        moment = value
+    else:
+        try:
+            moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return _normalize_pdf_text(str(value))
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=dt_timezone.utc)
+    try:
+        moment = moment.astimezone(ZoneInfo(tz_name or "Europe/Vienna"))
+    except Exception:
+        moment = moment.astimezone(dt_timezone.utc)
+    return moment.strftime("%d.%m.%Y %H:%M")
+
+
 def _base_styles():
     s = getSampleStyleSheet()
     s.add(ParagraphStyle(name="TLSTitle", fontName="Helvetica-Bold", fontSize=20,
-                          textColor=WHITE, leading=24, spaceAfter=8))
+                          textColor=INK, leading=24, spaceAfter=8))
     s.add(ParagraphStyle(name="TLSSubtitle", fontName="Helvetica-Bold", fontSize=8.5,
-                          textColor=CYAN, leading=12, letterSpacing=1, spaceAfter=10))
+                          textColor=CYAN_INK, leading=12, letterSpacing=1, spaceAfter=10))
     s.add(ParagraphStyle(name="TLSSection", fontName="Helvetica-Bold", fontSize=12,
-                          textColor=CYAN, leading=16, spaceBefore=12, spaceAfter=6))
+                          textColor=CYAN_INK, leading=16, spaceBefore=12, spaceAfter=6))
     s.add(ParagraphStyle(name="TLSBody", fontName="Helvetica", fontSize=9,
-                          textColor=colors.HexColor("#CCCCCC"), leading=12))
+                          textColor=INK, leading=12))
     s.add(ParagraphStyle(name="TLSFoot", fontName="Helvetica", fontSize=7,
-                          textColor=MUTED, leading=9))
+                          textColor=INK_SOFT, leading=9))
     return s
 
 
@@ -66,15 +159,15 @@ def _normalize_pdf_text(text: str | None, *, strip_trailing_separator: bool = Tr
 
 def _page_bg(canvas, doc):
     canvas.saveState()
-    canvas.setFillColor(BLACK)
+    canvas.setFillColor(PAPER)
     canvas.rect(0, 0, doc.pagesize[0], doc.pagesize[1], fill=1, stroke=0)
-    # Thin cyan line top
+    # Schmale Akzentlinie oben statt einer schwarzen Fläche über die ganze Seite.
     canvas.setFillColor(CYAN)
-    canvas.rect(0, doc.pagesize[1] - 4, doc.pagesize[0], 4, fill=1, stroke=0)
+    canvas.rect(0, doc.pagesize[1] - 3, doc.pagesize[0], 3, fill=1, stroke=0)
     _draw_brand_header(canvas, doc, getattr(doc, "tls_pdf_branding", {}))
     _draw_sponsor_footer(canvas, doc, getattr(doc, "tls_pdf_sponsors", []))
     # Footer
-    canvas.setFillColor(MUTED)
+    canvas.setFillColor(INK_FAINT)
     canvas.setFont("Helvetica", 7)
     canvas.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
     canvas.drawRightString(doc.pagesize[0] - 2 * cm, 0.72 * cm, f"Page {doc.page}")
@@ -138,29 +231,47 @@ def _draw_logo(canvas, path: Path, x: float, y: float, max_w: float, max_h: floa
         return False
 
 
+# Der Branding-Bereich führt jedes Logo doppelt: eine Fassung für dunklen und
+# eine für hellen Hintergrund. PDFs landen auf Papier und sind hell, brauchen
+# also die helle Fassung. Ein Logo "für dunklen Hintergrund" ist meist weiß und
+# auf Papier schlicht unsichtbar - genau das war beim Maskottchen der Fall.
+def _light_brand_path(branding: dict | None, *extra_urls) -> Path | None:
+    branding = branding or {}
+    # Bewusst ohne Maskottchen und QR-Logo: beide sind auf den dunklen Auftritt
+    # gezeichnet und meist rein hell. Findet sich keine passende Fassung, malt
+    # der Aufrufer lieber den Schriftzug als ein Logo, das auf Papier verschwindet.
+    for url in (
+        *extra_urls,
+        branding.get("pdf_logo_url"),
+        branding.get("logo_light_url"),
+        branding.get("favicon_light_url"),
+        branding.get("logo_url"),
+    ):
+        path = _brand_asset_path(url)
+        if path:
+            return path
+    return None
+
+
 def _draw_brand_header(canvas, doc, branding: dict | None):
     branding = branding or {}
     page_w, page_h = doc.pagesize
-    logo_path = (
-        _brand_asset_path(branding.get("logo_url"))
-        or _brand_asset_path(branding.get("mascot_url"))
-        or _brand_asset_path("/assets/brand/tls-wordmark.png")
-    )
+    logo_path = _light_brand_path(branding) or _brand_asset_path("/assets/brand/tls-wordmark.png")
     x = 2 * cm
     y = page_h - 1.85 * cm
     if not (logo_path and _draw_logo(canvas, logo_path, x, y, 4.8 * cm, 1.1 * cm)):
-        canvas.setFillColor(WHITE)
+        canvas.setFillColor(INK)
         canvas.setFont("Helvetica-Bold", 10)
         canvas.drawString(x, y + 0.42 * cm, "THE LION SQUAD")
-        canvas.setFillColor(CYAN)
+        canvas.setFillColor(CYAN_INK)
         canvas.setFont("Helvetica-Bold", 6)
         canvas.drawString(x, y + 0.16 * cm, "E-SPORTS")
 
     domain = str(branding.get("domain") or "lionsquad.at").replace("https://", "").replace("http://", "").strip("/")
-    canvas.setFillColor(colors.HexColor("#64748B"))
+    canvas.setFillColor(INK_SOFT)
     canvas.setFont("Helvetica-Bold", 6)
     canvas.drawRightString(page_w - 2 * cm, y + 0.48 * cm, domain.upper())
-    canvas.setStrokeColor(colors.HexColor("#1F2937"))
+    canvas.setStrokeColor(RULE)
     canvas.setLineWidth(0.4)
     canvas.line(2 * cm, page_h - 2.08 * cm, page_w - 2 * cm, page_h - 2.08 * cm)
 
@@ -178,6 +289,42 @@ def _draw_cover_image(canvas, path: Path, page_w: float, page_h: float, opacity:
         if hasattr(canvas, "setFillAlpha"):
             canvas.setFillAlpha(opacity)
         canvas.drawImage(img, (page_w - draw_w) / 2, (page_h - draw_h) / 2, draw_w, draw_h, mask="auto")
+        canvas.restoreState()
+        return True
+    except Exception:
+        return False
+
+
+def _draw_watermark_logo(canvas, path: Path, center_x: float, center_y: float,
+                         max_size: float, opacity: float = 0.12,
+                         tint=(118, 130, 143)) -> bool:
+    """Zeichnet nur die Form eines Logos als flächige Tönung.
+
+    Das Vereinsmaskottchen ist reinweiß - gezeichnet für den dunklen Auftritt
+    am Bildschirm. Auf hellem Papier wäre es bei jeder Deckkraft unsichtbar.
+    Für ein Wasserzeichen zählt deshalb die Silhouette, nicht die Farbe der
+    Vorlage; ein echtes Spiel-Banner bringt seine eigenen Farben mit und wird
+    unverändert gezeichnet.
+    """
+    try:
+        with Image.open(str(path)).convert("RGBA") as source:
+            alpha = source.getchannel("A")
+            bbox = alpha.getbbox()
+            if bbox:
+                alpha = alpha.crop(bbox)
+            shape = Image.new("RGBA", alpha.size, tuple(tint) + (0,))
+            shape.putalpha(alpha)
+            reader = ImageReader(shape)
+        width, height = reader.getSize()
+        if not width or not height:
+            return False
+        ratio = min(max_size / width, max_size / height)
+        draw_w, draw_h = width * ratio, height * ratio
+        canvas.saveState()
+        if hasattr(canvas, "setFillAlpha"):
+            canvas.setFillAlpha(opacity)
+        canvas.drawImage(reader, center_x - draw_w / 2, center_y - draw_h / 2,
+                         draw_w, draw_h, mask="auto")
         canvas.restoreState()
         return True
     except Exception:
@@ -219,12 +366,12 @@ def _draw_sponsor_footer(canvas, doc, sponsors: list | None):
     max_items = 8 if page_w > 22 * cm else 6
     sponsors = sponsors[:max_items]
     band_top = 2.85 * cm
-    canvas.setFillColor(colors.HexColor("#080808"))
+    canvas.setFillColor(TINT)
     canvas.rect(0, 0.95 * cm, page_w, band_top - 0.95 * cm, fill=1, stroke=0)
-    canvas.setStrokeColor(colors.HexColor("#1F2937"))
+    canvas.setStrokeColor(RULE)
     canvas.setLineWidth(0.4)
     canvas.line(2 * cm, band_top, page_w - 2 * cm, band_top)
-    canvas.setFillColor(CYAN)
+    canvas.setFillColor(CYAN_INK)
     canvas.setFont("Helvetica-Bold", 6)
     canvas.drawCentredString(page_w / 2, 2.46 * cm, "PRESENTED BY OUR PARTNERS")
     gap = 4 * mm
@@ -238,7 +385,7 @@ def _draw_sponsor_footer(canvas, doc, sponsors: list | None):
         logo_path = _local_upload_path(sponsor.get("logo_url"))
         drawn = bool(logo_path and _draw_logo(canvas, logo_path, x, y, slot_w, slot_h))
         if not drawn:
-            canvas.setFillColor(WHITE)
+            canvas.setFillColor(INK)
             canvas.setFont("Helvetica-Bold", 6.5)
             canvas.drawCentredString(x + slot_w / 2, y + 3.5 * mm, str(sponsor.get("name") or "")[:28])
 
@@ -281,17 +428,19 @@ def _doc(buffer, title: str, orientation="portrait", sponsors: list | None = Non
 
 def _table_style():
     return TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), DARK),
-        ("TEXTCOLOR", (0, 0), (-1, 0), CYAN),
+        ("BACKGROUND", (0, 0), (-1, 0), TINT),
+        ("TEXTCOLOR", (0, 0), (-1, 0), CYAN_INK),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, 0), 8),
         ("ALIGN", (0, 0), (-1, 0), "LEFT"),
         ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
         ("FONTSIZE", (0, 1), (-1, -1), 9),
-        ("TEXTCOLOR", (0, 1), (-1, -1), colors.HexColor("#E5E7EB")),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#121212"), colors.HexColor("#161616")]),
-        ("LINEBELOW", (0, 0), (-1, 0), 1, CYAN),
-        ("GRID", (0, 1), (-1, -1), 0.25, colors.HexColor("#222")),
+        ("TEXTCOLOR", (0, 1), (-1, -1), INK),
+        # Zeilenwechsel als ganz helle Tönung: am Bildschirm erkennbar, im Druck
+        # sparsam. Ein Vollton je zweiter Zeile ist beides nicht.
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [PAPER, TINT]),
+        ("LINEBELOW", (0, 0), (-1, 0), 1, CYAN_INK),
+        ("GRID", (0, 1), (-1, -1), 0.25, RULE),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
@@ -312,8 +461,8 @@ def pdf_participants(tournament: dict, registrations: list, pdf_sponsors: list |
             str(i),
             r.get("display_name") or r.get("ingame_name") or "—",
             r.get("discord") or "—",
-            r.get("team", {}).get("tag") if r.get("team") else "—",
-            r.get("status", "—"),
+            _team_label(r.get("team")),
+            _registration_status_label(r.get("status")),
         ])
     t = Table(data, colWidths=[1.2 * cm, 7 * cm, 4 * cm, 2.5 * cm, 3 * cm], repeatRows=1)
     t.setStyle(_table_style())
@@ -409,9 +558,9 @@ def _pdf_duel_row(match: dict, reg_map: dict) -> list[str]:
         _pdf_registration_name(reg_map.get(registration_a)),
         f"{score_a or '—'} : {score_b or '—'}",
         _pdf_registration_name(reg_map.get(registration_b)),
-        match.get("scheduled_at") or "—",
+        _pdf_datetime_label(match.get("scheduled_at")),
         match.get("station_label") or match.get("station_name") or match.get("station_id") or "—",
-        match.get("status") or "—",
+        _match_status_label(match.get("status")),
     ]
 
 
@@ -430,17 +579,33 @@ def _pdf_multi_slot_rows(match: dict, reg_map: dict) -> list[list[str]]:
         rows.append([
             (match.get("round_name") or f"R{match.get('round')}") if index == 0 else "",
             f"{name} ({value})" if value else name,
-            (match.get("scheduled_at") or "—") if index == 0 else "",
+            _pdf_datetime_label(match.get("scheduled_at")) if index == 0 else "",
             (match.get("station_label") or match.get("station_name") or match.get("station_id") or "—") if index == 0 else "",
-            (match.get("status") or "—") if index == 0 else "",
+            _match_status_label(match.get("status")) if index == 0 else "",
         ])
     return rows or [[
         match.get("round_name") or f"R{match.get('round')}",
         "TBD",
-        match.get("scheduled_at") or "—",
+        _pdf_datetime_label(match.get("scheduled_at")),
         match.get("station_label") or match.get("station_name") or match.get("station_id") or "—",
-        match.get("status") or "—",
+        _match_status_label(match.get("status")),
     ]]
+
+
+# ReportLab bricht einfache Zeichenketten in einer Tabelle nicht um: ein langer
+# Name lief deshalb aus seiner Spalte in die Nachbarspalte. Das war eine der
+# gemeldeten Kollisionen - sichtbar erst bei Namen, die lang genug sind.
+def _fit_rows_to_columns(rows: list[list[str]], widths: list[float],
+                         padding: float = 16.0, font_name: str = "Helvetica",
+                         font_size: int = 9) -> list[list[str]]:
+    fitted = []
+    for row in rows:
+        fitted.append([
+            _truncate_to_width(str(cell), max(10.0, widths[index] - padding), font_name, font_size)
+            if index < len(widths) else str(cell)
+            for index, cell in enumerate(row)
+        ])
+    return fitted
 
 
 def _pdf_match_table(matches: list, reg_map: dict) -> tuple[list[str], list[list[str]], list]:
@@ -452,8 +617,10 @@ def _pdf_match_table(matches: list, reg_map: dict) -> tuple[list[str], list[list
     else:
         headers = ["Runde", "Teilnehmer A", "vs", "Teilnehmer B", "Zeit", "Station", "Status"]
         rows = [_pdf_duel_row(match, reg_map) for match in matches]
-        widths = [3.5 * cm, 6 * cm, 2.5 * cm, 6 * cm, 3 * cm, 2.5 * cm, 3 * cm]
-    return headers, rows, widths
+        # Die Zeitspalte braucht Platz fuer "13.09.2026 21:30"; mit 3 cm blieb
+        # davon "13.09.2026 21:..." uebrig.
+        widths = [3 * cm, 5.7 * cm, 2.2 * cm, 5.7 * cm, 3.7 * cm, 2.6 * cm, 3.2 * cm]
+    return headers, _fit_rows_to_columns(rows, widths), widths
 
 
 def pdf_matches(tournament: dict, matches: list, reg_map: dict, pdf_sponsors: list | None = None, pdf_branding: dict | None = None) -> bytes:
@@ -549,6 +716,111 @@ def _wrap_to_width(text: str, max_width: float, font_name: str, font_size: int, 
     return lines
 
 
+# Helvetica ragt rund 0,76 der Schriftgröße über die Grundlinie und 0,24
+# darunter. Wer Blöcke stapelt, muss damit rechnen.
+TEXT_ASCENT = 0.76
+TEXT_DESCENT = 0.24
+
+
+def _fit_lines(text: str, max_width: float, font_name: str, start_size: int,
+               min_size: int, max_lines: int) -> tuple[list[str], int]:
+    """Zeilen und Schriftgröße - dieselbe Rechnung, die auch gezeichnet wird."""
+    value = str(text or "").strip()
+    size = start_size
+    lines = [value]
+    while size > min_size:
+        lines = _wrap_to_width(value, max_width, font_name, size, max_lines)
+        if len(lines) <= max_lines and all(stringWidth(line, font_name, size) <= max_width for line in lines):
+            break
+        size -= 1
+    return _wrap_to_width(value, max_width, font_name, size, max_lines), size
+
+
+def text_block(top: float, text: str, *, max_width: float, start_size: int, min_size: int,
+               font_name: str = "Helvetica-Bold", max_lines: int = 2,
+               leading_factor: float = 1.1, gap_before: float = 0.0) -> dict:
+    """Ein Textblock, gestapelt an seiner Oberkante statt an der Grundlinie.
+
+    Genau hier steckte der Fehler auf der Urkunde: der Code rückte um einen
+    festen Abstand weiter und setzte dort die *Grundlinie* der nächsten Zeile.
+    Bei 35 pt ragt die Versalhöhe aber 0,86 cm über die Grundlinie, während der
+    Abstand 0,72 cm betrug - die Überschrift lief zwangsläufig in die Zeile
+    darüber. Ein Block kennt jetzt Oberkante, Höhe und Unterkante, und ein
+    Stapel daraus kann sich nicht mehr selbst überlappen.
+    """
+    lines, size = _fit_lines(text, max_width, font_name, start_size, min_size, max_lines)
+    block_top = top - gap_before
+    leading = size * leading_factor
+    height = size * TEXT_ASCENT + leading * (len(lines) - 1) + size * TEXT_DESCENT
+    return {
+        "lines": lines,
+        "size": size,
+        "font": font_name,
+        "leading": leading,
+        "top": block_top,
+        "first_baseline": block_top - size * TEXT_ASCENT,
+        "bottom": block_top - height,
+        "height": height,
+    }
+
+
+def _draw_text_block(canvas, block: dict, center_x: float, color) -> float:
+    canvas.setFillColor(color)
+    canvas.setFont(block["font"], block["size"])
+    y = block["first_baseline"]
+    for line in block["lines"]:
+        canvas.drawCentredString(center_x, y, line)
+        y -= block["leading"]
+    return block["bottom"]
+
+
+def _certificate_stack_at(page_w: float, top: float, scale: float, *, subtitle: str,
+                          headline: str, recipient: str, occasion: str) -> list[dict]:
+    blocks = [text_block(
+        top, subtitle.upper(), max_width=page_w - 5.2 * cm,
+        start_size=9, min_size=7, max_lines=1, leading_factor=1.2, gap_before=0)]
+    blocks.append(text_block(
+        blocks[-1]["bottom"], headline.upper(), max_width=page_w - 4.6 * cm,
+        start_size=max(19, int(34 * scale)), min_size=19, max_lines=2,
+        leading_factor=1.10, gap_before=0.42 * cm * scale))
+    blocks.append(text_block(
+        blocks[-1]["bottom"], "AUSGEZEICHNET WIRD", max_width=page_w - 5.2 * cm,
+        start_size=8.5, min_size=7, max_lines=1, leading_factor=1.2, gap_before=0.52 * cm * scale))
+    blocks.append(text_block(
+        blocks[-1]["bottom"], recipient, max_width=page_w - 4.0 * cm,
+        start_size=max(18, int(36 * scale)), min_size=18, max_lines=2,
+        leading_factor=1.06, gap_before=0.34 * cm * scale))
+    blocks.append(text_block(
+        blocks[-1]["bottom"], "für die Leistung bei", max_width=page_w - 5.2 * cm,
+        font_name="Helvetica", start_size=9.5, min_size=8, max_lines=1,
+        leading_factor=1.2, gap_before=0.62 * cm * scale))
+    blocks.append(text_block(
+        blocks[-1]["bottom"], occasion, max_width=page_w - 4.6 * cm,
+        start_size=max(9, int(15 * scale)), min_size=9, max_lines=3,
+        leading_factor=1.16, gap_before=0.26 * cm * scale))
+    return blocks
+
+
+def certificate_text_stack(page_w: float, top: float, *, subtitle: str, headline: str,
+                           recipient: str, occasion: str, min_bottom: float = 0.0) -> list[dict]:
+    """Der Kopf der Urkunde als Stapel: Untertitel, Titel, Hinweis, Name, Anlass.
+
+    Als eigene Funktion, weil sie ohne Zeichenfläche auskommt und damit prüfbar
+    ist. Zwei Zusagen hält sie ein, egal wie lang ein Name oder ein Turniertitel
+    ist: kein Block ragt in den darüberliegenden, und der Stapel endet oberhalb
+    von ``min_bottom`` - dort beginnt die Medaille, und dort war vorher kein
+    Anschlag.
+    """
+    scale = 1.0
+    blocks = _certificate_stack_at(page_w, top, scale, subtitle=subtitle, headline=headline,
+                                   recipient=recipient, occasion=occasion)
+    while blocks[-1]["bottom"] < min_bottom and scale > 0.55:
+        scale -= 0.05
+        blocks = _certificate_stack_at(page_w, top, scale, subtitle=subtitle, headline=headline,
+                                       recipient=recipient, occasion=occasion)
+    return blocks
+
+
 def _draw_centered_wrapped(canvas, text: str, center_x: float, first_baseline_y: float, max_width: float,
                            font_name: str = "Helvetica-Bold", start_size: int = 30, min_size: int = 15,
                            max_lines: int = 2, leading_factor: float = 1.18) -> float:
@@ -594,7 +866,7 @@ def pdf_station_signs(
 
     for page, station in enumerate(rows, 1):
         doc.page = page
-        c.setFillColor(BLACK)
+        c.setFillColor(PAPER)
         c.rect(0, 0, page_w, page_h, fill=1, stroke=0)
         c.setFillColor(CYAN)
         c.rect(0, page_h - 4, page_w, 4, fill=1, stroke=0)
@@ -605,7 +877,7 @@ def pdf_station_signs(
         content_h = content_top - content_bottom
         center_y = content_bottom + content_h * (0.54 if orientation == "landscape" else 0.52)
 
-        c.setStrokeColor(colors.HexColor("#1F2937"))
+        c.setStrokeColor(RULE)
         c.setLineWidth(1.2)
         c.roundRect(1.65 * cm, content_bottom, page_w - 3.3 * cm, content_h, 8, stroke=1, fill=0)
 
@@ -614,11 +886,11 @@ def pdf_station_signs(
         notes = _normalize_pdf_text(station.get("notes") or "")
         tournament_title = _normalize_pdf_text(tournament.get("title") or "THE LION SQUAD Event")
 
-        c.setFillColor(CYAN)
+        c.setFillColor(CYAN_INK)
         c.setFont("Helvetica-Bold", 13 if orientation == "landscape" else 11)
         c.drawCentredString(page_w / 2, content_top - 1.05 * cm, "SPIELSTATION")
 
-        c.setFillColor(WHITE)
+        c.setFillColor(INK)
         name_font_size = _fit_font_size(
             station_name.upper(),
             page_w - 4.2 * cm,
@@ -629,11 +901,11 @@ def pdf_station_signs(
         c.drawCentredString(page_w / 2, center_y + (0.95 * cm if orientation == "landscape" else 1.90 * cm), station_name.upper())
 
         if device:
-            c.setFillColor(CYAN)
+            c.setFillColor(CYAN_INK)
             c.setFont("Helvetica-Bold", 28 if orientation == "landscape" else 23)
             c.drawCentredString(page_w / 2, center_y - (0.75 * cm if orientation == "landscape" else 0.05 * cm), device.upper())
 
-        c.setFillColor(colors.HexColor("#E5E7EB"))
+        c.setFillColor(INK)
         _draw_centered_wrapped(
             c,
             tournament_title,
@@ -647,7 +919,7 @@ def pdf_station_signs(
         )
 
         if notes:
-            c.setFillColor(MUTED)
+            c.setFillColor(INK_SOFT)
             c.setFont("Helvetica", 12)
             c.drawCentredString(
                 page_w / 2,
@@ -655,16 +927,18 @@ def pdf_station_signs(
                 _truncate_to_width(notes, page_w - 5.6 * cm, "Helvetica", 12),
             )
 
-        c.setStrokeColor(CYAN)
+        c.setStrokeColor(CYAN_INK)
         c.setLineWidth(1.5)
         c.line(3.8 * cm, content_bottom + 1.55 * cm, page_w - 3.8 * cm, content_bottom + 1.55 * cm)
 
-        c.setFillColor(colors.HexColor("#64748B"))
+        # Sass vorher genau auf der Rahmenlinie. Innerhalb des Rahmens ist Platz,
+        # und unterhalb davon beginnt bereits das Sponsorenband.
+        c.setFillColor(INK_SOFT)
         c.setFont("Helvetica-Bold", 8)
-        c.drawCentredString(page_w / 2, 3.04 * cm, "THE LION SQUAD eSPORTS")
+        c.drawCentredString(page_w / 2, content_bottom + 0.62 * cm, "THE LION SQUAD eSPORTS")
 
         _draw_sponsor_footer(c, doc, sponsors)
-        c.setFillColor(MUTED)
+        c.setFillColor(INK_FAINT)
         c.setFont("Helvetica", 7)
         c.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
         c.drawRightString(page_w - 2 * cm, 0.72 * cm, f"Station {page}/{len(rows)}")
@@ -691,32 +965,35 @@ def _certificate_page(canvas, doc, certificate: dict, branding: dict | None, spo
         or _brand_asset_path(source.get("seo_image_url"))
         or _brand_asset_path((branding or {}).get("share_banner_url"))
     )
+    # Beim Wasserzeichen darf es das Maskottchen sein: gezeichnet wird dort nur
+    # seine Form, die Farbe der Vorlage spielt keine Rolle.
     mascot_path = (
-        _brand_asset_path((branding or {}).get("mascot_url"))
-        or _brand_asset_path((branding or {}).get("qr_logo_url"))
+        _light_brand_path(branding)
+        or _brand_asset_path((branding or {}).get("mascot_url"))
         or _brand_asset_path("/assets/brand/tls-mascot.png")
     )
 
-    canvas.setFillColor(BLACK)
+    # Heller Grund, darauf das Banner des Spiels als Wasserzeichen über die
+    # ganze Seite. Vorher lag darüber ein Schleier mit 76 % Deckkraft: das
+    # Banner war praktisch unsichtbar und die Urkunde eine schwarze Fläche.
+    canvas.setFillColor(PAPER)
     canvas.rect(0, 0, page_w, page_h, fill=1, stroke=0)
     if background_path:
-        _draw_cover_image(canvas, background_path, page_w, page_h, opacity=0.30)
-    _draw_alpha_rect(canvas, 0, 0, page_w, page_h, colors.HexColor("#030506"), 0.76)
-    if mascot_path:
-        _draw_alpha_logo(
-            canvas,
-            mascot_path,
-            (page_w - 10.8 * cm) / 2,
-            9.4 * cm,
-            10.8 * cm,
-            10.8 * cm,
-            0.095,
-            crop_transparent=True,
-        )
+        # Geringe Deckkraft direkt auf Weiß statt Bild plus Schleier: ein
+        # Schleier darüber hätte den Beitrag des Banners wieder auf ein Zehntel
+        # gedrückt und es unsichtbar gemacht.
+        #
+        # 0.08 ist bewusst niedrig. Ein dunkles Banner färbt die Seite sonst
+        # flächig grau ein, und Banner tragen oft selbst Schrift, die sich mit
+        # der Urkunde beißt. So bleibt eine Andeutung, die den Anlass zeigt und
+        # weder den Text stört noch den Drucker beschäftigt.
+        _draw_cover_image(canvas, background_path, page_w, page_h, opacity=0.08)
+    elif mascot_path:
+        _draw_watermark_logo(canvas, mascot_path, page_w / 2, page_h / 2, 12.0 * cm, opacity=0.10)
     canvas.setFillColor(CYAN)
-    canvas.rect(0, page_h - 5, page_w, 5, fill=1, stroke=0)
+    canvas.rect(0, page_h - 4, page_w, 4, fill=1, stroke=0)
     canvas.setFillColor(GOLD)
-    canvas.rect(0, page_h - 9, page_w, 1.4, fill=1, stroke=0)
+    canvas.rect(0, page_h - 6.2, page_w, 1.2, fill=1, stroke=0)
 
     _draw_brand_header(canvas, doc, branding)
 
@@ -724,10 +1001,10 @@ def _certificate_page(canvas, doc, certificate: dict, branding: dict | None, spo
     border_y = 3.22 * cm
     border_w = page_w - 2.5 * cm
     border_h = page_h - 6.30 * cm
-    canvas.setStrokeColor(colors.HexColor("#24313B"))
+    canvas.setStrokeColor(RULE)
     canvas.setLineWidth(1.2)
     canvas.roundRect(border_x, border_y, border_w, border_h, 8, stroke=1, fill=0)
-    canvas.setStrokeColor(GOLD)
+    canvas.setStrokeColor(GOLD_INK)
     canvas.setLineWidth(0.9)
     canvas.roundRect(border_x + 0.24 * cm, border_y + 0.24 * cm, border_w - 0.48 * cm, border_h - 0.48 * cm, 5, stroke=1, fill=0)
     canvas.setStrokeColor(CYAN)
@@ -745,91 +1022,61 @@ def _certificate_page(canvas, doc, certificate: dict, branding: dict | None, spo
     canvas.saveState()
     canvas.translate(1.02 * cm, page_h / 2)
     canvas.rotate(90)
-    canvas.setFillColor(colors.HexColor("#1B3A46"))
+    canvas.setFillColor(INK_FAINT)
     canvas.setFont("Helvetica-Bold", 6.5)
     canvas.drawCentredString(0, 0, "THE LION SQUAD CERTIFICATE")
     canvas.restoreState()
 
-    y = page_h - 4.22 * cm
-    canvas.setFillColor(CYAN)
-    canvas.setFont("Helvetica-Bold", 8.5)
-    canvas.drawCentredString(page_w / 2, y, _truncate_to_width(_normalize_pdf_text(subtitle).upper(), page_w - 5.2 * cm, "Helvetica-Bold", 8.5))
-
-    canvas.setFillColor(WHITE)
-    y -= 0.72 * cm
-    title_bottom = _draw_centered_wrapped(
-        canvas,
-        _certificate_title(rank).upper(),
-        page_w / 2,
-        y,
-        page_w - 4.6 * cm,
-        start_size=35,
-        min_size=20,
-        max_lines=2,
-        leading_factor=1.10,
+    # Der Kopf wird gestapelt statt an festen Grundlinien gesetzt. Die
+    # Medaillengruppe darunter ist der Anschlag, unter den er nicht rutschen
+    # darf - und sie rückt umgekehrt nach oben nach, wenn der Kopf kurz ist,
+    # damit in der Mitte kein Loch stehen bleibt.
+    medal_floor = 11.15 * cm
+    medal_cy = medal_floor
+    stack = certificate_text_stack(
+        page_w,
+        page_h - 3.95 * cm,
+        subtitle=_normalize_pdf_text(subtitle),
+        headline=_certificate_title(rank),
+        recipient=recipient,
+        occasion=title,
+        min_bottom=medal_floor + 1.7 * cm,
     )
-
-    y = title_bottom - 0.42 * cm
-    canvas.setFillColor(GOLD)
-    canvas.setFont("Helvetica-Bold", 8.5)
-    canvas.drawCentredString(page_w / 2, y, "AUSGEZEICHNET WIRD")
-
-    y -= 0.82 * cm
-    canvas.setFillColor(WHITE)
-    recipient_bottom = _draw_centered_wrapped(
-        canvas,
-        recipient,
-        page_w / 2,
-        y,
-        page_w - 4.0 * cm,
-        start_size=38,
-        min_size=22,
-        max_lines=2,
-        leading_factor=1.02,
-    )
-    canvas.setStrokeColor(GOLD)
+    # Nach oben nachrücken, aber nie so weit, dass die Kennzahlen darunter
+    # bedrängt werden.
+    medal_cy = min(stack[-1]["bottom"] - 2.05 * cm, 13.35 * cm)
+    medal_cy = max(medal_cy, medal_floor)
+    _draw_text_block(canvas, stack[0], page_w / 2, CYAN_INK)
+    _draw_text_block(canvas, stack[1], page_w / 2, INK)
+    _draw_text_block(canvas, stack[2], page_w / 2, GOLD_INK)
+    recipient_bottom = _draw_text_block(canvas, stack[3], page_w / 2, INK)
+    canvas.setStrokeColor(GOLD_INK)
     canvas.setLineWidth(0.75)
-    canvas.line(4.0 * cm, recipient_bottom + 0.30 * cm, page_w - 4.0 * cm, recipient_bottom + 0.30 * cm)
-
-    y = recipient_bottom - 0.46 * cm
-    canvas.setFillColor(colors.HexColor("#E5E7EB"))
-    canvas.setFont("Helvetica", 9.5)
-    canvas.drawCentredString(page_w / 2, y, "für die Leistung bei")
-    y -= 0.58 * cm
-    _draw_centered_wrapped(
-        canvas,
-        title,
-        page_w / 2,
-        y,
-        page_w - 4.6 * cm,
-        start_size=16,
-        min_size=10,
-        max_lines=3,
-        leading_factor=1.14,
-    )
+    canvas.line(4.0 * cm, recipient_bottom + 0.16 * cm, page_w - 4.0 * cm, recipient_bottom + 0.16 * cm)
+    _draw_text_block(canvas, stack[4], page_w / 2, INK_SOFT)
+    _draw_text_block(canvas, stack[5], page_w / 2, INK)
 
     medal_cx = page_w / 2
-    medal_cy = 11.95 * cm
-    canvas.setFillColor(colors.HexColor("#090D10"))
-    canvas.setStrokeColor(GOLD)
+    canvas.setFillColor(PAPER)
+    canvas.setStrokeColor(GOLD_INK)
     canvas.setLineWidth(1.4)
     canvas.circle(medal_cx, medal_cy, 1.26 * cm, stroke=1, fill=1)
-    canvas.setStrokeColor(CYAN)
+    canvas.setStrokeColor(CYAN_INK)
     canvas.setLineWidth(0.6)
     canvas.circle(medal_cx, medal_cy, 1.04 * cm, stroke=1, fill=0)
-    canvas.setFillColor(GOLD)
+    canvas.setFillColor(GOLD_INK)
     canvas.setFont("Helvetica-Bold", 21)
     canvas.drawCentredString(medal_cx, medal_cy + 0.08 * cm, _placement_label(rank).split(" ")[0])
-    canvas.setFillColor(MUTED)
+    canvas.setFillColor(INK_SOFT)
     canvas.setFont("Helvetica-Bold", 5.8)
     canvas.drawCentredString(medal_cx, medal_cy - 0.48 * cm, "PLATZIERUNG")
 
-    canvas.setFillColor(CYAN)
+    canvas.setFillColor(CYAN_INK)
     canvas.setFont("Helvetica-Bold", 15)
-    canvas.drawCentredString(page_w / 2, 10.06 * cm, _placement_label(rank).upper())
-    canvas.setFillColor(colors.HexColor("#CBD5E1"))
+    canvas.drawCentredString(page_w / 2, medal_cy - 1.89 * cm, _placement_label(rank).upper())
+    canvas.setFillColor(INK_SOFT)
     canvas.setFont("Helvetica-Bold", 9)
-    canvas.drawCentredString(page_w / 2, 9.46 * cm, _truncate_to_width(category.upper(), page_w - 5.0 * cm, "Helvetica-Bold", 9))
+    canvas.drawCentredString(page_w / 2, medal_cy - 2.49 * cm, _truncate_to_width(category.upper(), page_w - 5.0 * cm, "Helvetica-Bold", 9))
 
     metrics = [m for m in (certificate.get("metrics") or []) if m and (m.get("value") not in (None, ""))]
     if metrics:
@@ -841,22 +1088,22 @@ def _certificate_page(canvas, doc, certificate: dict, branding: dict | None, spo
         metric_y = 7.18 * cm
         for index, metric in enumerate(visible_metrics):
             x = start_x + index * (slot_w + gap)
-            canvas.setStrokeColor(colors.HexColor("#1F2937"))
-            canvas.setFillColor(colors.HexColor("#0B1115"))
+            canvas.setStrokeColor(RULE)
+            canvas.setFillColor(TINT)
             canvas.roundRect(x, metric_y, slot_w, 1.20 * cm, 5, fill=1, stroke=1)
-            canvas.setFillColor(GOLD)
+            canvas.setFillColor(GOLD_INK)
             canvas.setFont("Helvetica-Bold", 5.8)
             canvas.drawCentredString(x + slot_w / 2, metric_y + 0.78 * cm, str(metric.get("label") or "").upper()[:20])
-            canvas.setFillColor(WHITE)
+            canvas.setFillColor(INK)
             canvas.setFont("Helvetica-Bold", 11)
             canvas.drawCentredString(x + slot_w / 2, metric_y + 0.30 * cm, _truncate_to_width(str(metric.get("value")), slot_w - 0.35 * cm, "Helvetica-Bold", 11))
 
     issued = _normalize_pdf_text(certificate.get("issued_label") or datetime.now().strftime("%d.%m.%Y"))
-    canvas.setStrokeColor(colors.HexColor("#64748B"))
+    canvas.setStrokeColor(INK_FAINT)
     canvas.setLineWidth(0.6)
     canvas.line(3.0 * cm, 5.05 * cm, 8.05 * cm, 5.05 * cm)
     canvas.line(page_w - 8.05 * cm, 5.05 * cm, page_w - 3.0 * cm, 5.05 * cm)
-    canvas.setFillColor(MUTED)
+    canvas.setFillColor(INK_SOFT)
     canvas.setFont("Helvetica-Bold", 7)
     canvas.drawCentredString(5.52 * cm, 4.66 * cm, f"AUSGESTELLT AM {issued}".upper())
     canvas.drawCentredString(page_w - 5.52 * cm, 4.66 * cm, "TURNIERLEITUNG")
@@ -865,7 +1112,7 @@ def _certificate_page(canvas, doc, certificate: dict, branding: dict | None, spo
         _draw_logo(canvas, mascot_path, (page_w - 1.78 * cm) / 2, 4.15 * cm, 1.78 * cm, 1.78 * cm, crop_transparent=True)
 
     _draw_sponsor_footer(canvas, doc, sponsors or [])
-    canvas.setFillColor(MUTED)
+    canvas.setFillColor(INK_FAINT)
     canvas.setFont("Helvetica", 7)
     canvas.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
     canvas.drawRightString(page_w - 2 * cm, 0.72 * cm, "Urkunde")
@@ -919,7 +1166,7 @@ def _draw_qr_code(canvas, value: str, x: float, y: float, size: float, branding:
     height = bounds[3] - bounds[1]
     drawing = Drawing(size, size, transform=[size / width, 0, 0, size / height, 0, 0])
     drawing.add(widget)
-    canvas.setFillColor(WHITE)
+    canvas.setFillColor(PAPER)
     canvas.roundRect(x - 1.2 * mm, y - 1.2 * mm, size + 2.4 * mm, size + 2.4 * mm, 7, fill=1, stroke=0)
     renderPDF.draw(drawing, canvas, x, y)
 
@@ -938,9 +1185,9 @@ def _draw_qr_code(canvas, value: str, x: float, y: float, size: float, branding:
     badge_r = badge_size / 2
     logo_x = center_x - logo_size / 2
     logo_y = center_y - logo_size / 2
-    canvas.setFillColor(WHITE)
+    canvas.setFillColor(PAPER)
     canvas.circle(center_x, center_y, badge_r, fill=1, stroke=0)
-    canvas.setStrokeColor(BLACK)
+    canvas.setStrokeColor(RULE)
     canvas.setLineWidth(max(0.9, size * 0.006))
     canvas.circle(center_x, center_y, badge_r, fill=0, stroke=1)
     if logo_path:
@@ -968,18 +1215,18 @@ def pdf_qr_sign(
     doc = _Doc()
     branding = pdf_branding or {}
 
-    c.setFillColor(BLACK)
+    c.setFillColor(PAPER)
     c.rect(0, 0, page_w, page_h, fill=1, stroke=0)
     c.setFillColor(CYAN)
     c.rect(0, page_h - 4, page_w, 4, fill=1, stroke=0)
     _draw_brand_header(c, doc, branding)
 
-    c.setFillColor(CYAN)
+    c.setFillColor(CYAN_INK)
     c.setFont("Helvetica-Bold", 9.5)
     c.drawCentredString(page_w / 2, page_h - 4.25 * cm, _normalize_pdf_text(eyebrow or "QR CODE").upper()[:64])
 
     display_title = _normalize_pdf_text(title or "THE LION SQUAD").upper()
-    c.setFillColor(WHITE)
+    c.setFillColor(INK)
     title_bottom = _draw_centered_wrapped(
         c,
         display_title,
@@ -1011,7 +1258,7 @@ def pdf_qr_sign(
     qr_y = 7.95 * cm
     _draw_qr_code(c, str(url or "https://lionsquad.at"), qr_x, qr_y, qr_size, branding)
 
-    c.setFillColor(CYAN)
+    c.setFillColor(CYAN_INK)
     c.setFont("Helvetica-Bold", 14.5)
     c.drawCentredString(page_w / 2, 6.58 * cm, "SCANNEN UND ÖFFNEN")
 
@@ -1021,7 +1268,7 @@ def pdf_qr_sign(
     c.drawCentredString(page_w / 2, 5.96 * cm, _truncate_to_width(url_text, page_w - 4.6 * cm, "Helvetica", 8.4))
 
     _draw_sponsor_footer(c, doc, pdf_sponsors or [])
-    c.setFillColor(MUTED)
+    c.setFillColor(INK_FAINT)
     c.setFont("Helvetica", 7)
     c.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
     c.drawRightString(page_w - 2 * cm, 0.72 * cm, "QR-Schild")
