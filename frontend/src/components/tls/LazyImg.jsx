@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { resolveMediaUrl } from "@/lib/api";
+import { buildSrcSet } from "@/lib/imageVariants";
 
 /**
  * Shared public image helper with consistent lazy/eager loading, async decoding
@@ -17,12 +18,17 @@ export function LazyImg({
   loading,
   decoding = "async",
   sizes,
+  srcSet,
   width,
   height,
   ...rest
 }) {
   const [failed, setFailed] = useState(false);
   const resolvedSrc = useMemo(() => resolveMediaUrl(failed && fallbackSrc ? fallbackSrc : src), [failed, fallbackSrc, src]);
+  // Ohne srcset war das sizes-Attribut wirkungslos: der Browser hatte nur die
+  // gespeicherte Fassung zur Auswahl, bis zu 4096 Pixel breit - für eine
+  // Kachel, die rund 400 zeigt.
+  const resolvedSrcSet = useMemo(() => srcSet || buildSrcSet(resolvedSrc), [srcSet, resolvedSrc]);
 
   if (!resolvedSrc) return null;
 
@@ -35,7 +41,8 @@ export function LazyImg({
       loading={loading || (priority ? "eager" : "lazy")}
       decoding={decoding}
       fetchPriority={priority ? "high" : undefined}
-      sizes={sizes}
+      srcSet={resolvedSrcSet}
+      sizes={resolvedSrcSet ? (sizes || "100vw") : sizes}
       width={width}
       height={height}
       onError={(event) => {
