@@ -297,3 +297,28 @@ test("ein Ausfall der Nebendaten blockiert das Turnier nicht", async () => {
   expect(await screen.findByRole("heading", { name: "Winter Cup 2026" })).toBeInTheDocument();
   expect(screen.queryByTestId("admin-tr-load-error")).not.toBeInTheDocument();
 });
+
+// Spielwochen gibt es nur bei Formaten, die in Wochen spielen. Ein
+// K.-o.-Turnier hat Runden - dort waeren die Felder nur Ballast.
+
+test("die Spielwochen-Einstellungen erscheinen nur bei Wochenformaten", async () => {
+  const user = userEvent.setup();
+  renderPageWithFormat("league");
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+
+  expect(await screen.findByTestId("tr-edit-matchdays")).toBeInTheDocument();
+  expect(screen.getByTestId("tr-edit-matchday-days")).toHaveValue(7);
+  expect(screen.getByTestId("tr-edit-matchday-time")).toHaveValue("20:00");
+  expect(screen.getByLabelText("Standardtag")).toHaveValue("6");
+});
+
+test("ein K.-o.-Turnier zeigt keine Spielwochen-Einstellungen", async () => {
+  const user = userEvent.setup();
+  renderPageWithFormat("single_elim");
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+
+  await screen.findByLabelText("Turnierstruktur");
+  expect(screen.queryByTestId("tr-edit-matchdays")).not.toBeInTheDocument();
+});

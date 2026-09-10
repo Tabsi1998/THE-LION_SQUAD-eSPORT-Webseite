@@ -10,6 +10,7 @@ a tournament host would make them.
 """
 import pathlib
 import sys
+from datetime import datetime
 
 import pytest
 import pytest_asyncio
@@ -382,3 +383,118 @@ async def test_the_format_alone_decides_the_structure(flow, tournament_format, e
     stages = (await flow.get(f"/api/tournaments/{tournament['id']}/stages")).json()
     assert stages, "Es muss eine Phase entstanden sein"
     assert stages[0]["stage_type"] == expected_stage_type
+
+
+# ---------------------------------------------------------------- Spielwochen
+
+LEAGUE_START = "2026-09-08T18:00:00+00:00"
+
+
+async def league_with_matchdays(flow, count=4, **fields):
+    staff, tournament, users, regs = await bracket_of(
+        flow, count, format="league", start_date=LEAGUE_START, **fields)
+    return staff, tournament, users, regs
+
+
+@pytest.mark.asyncio
+async def test_a_league_is_played_in_weeks_not_in_rounds(flow):
+    _staff, tournament, _users, _regs = await league_with_matchdays(flow)
+
+    plan = (await flow.get(f"/api/tournaments/{tournament['id']}/matchdays")).json()
+
+    assert plan["applies"] is True
+    assert len(plan["matchdays"]) == 6, "vier Teilnehmer spielen Hin- und Rueckrunde"
+    first, second = plan["matchdays"][0], plan["matchdays"][1]
+    assert first["starts_at"] == LEAGUE_START
+    assert first["ends_at"] == second["starts_at"], "die Wochen schliessen luecklos an"
+
+
+@pytest.mark.asyncio
+async def test_without_any_agreement_the_default_time_counts(flow):
+    _staff, tournament, _users, _regs = await league_with_matchdays(flow)
+
+    plan = (await flow.get(f"/api/tournaments/{tournament['id']}/matchdays")).json()
+
+    entries = plan["matchdays"][0]["matches"]
+    assert entries, "Spieltag 1 hat Partien"
+    for entry in entries:
+        assert entry["schedule_source"] == "default"
+        moment = datetime.fromisoformat(entry["scheduled_at"])
+        assert moment.weekday() == 6 and moment.hour == 20, "Sonntag 20:00"
+
+
+@pytest.mark.asyncio
+async def test_the_default_time_is_a_tournament_setting(flow):
+    _staff, tournament, _users, _regs = await league_with_matchdays(
+        flow, default_match_weekday=4, default_match_time="19:30")
+
+    plan = (await flow.get(f"/api/tournaments/{tournament['id']}/matchdays")).json()
+
+    assert plan["settings"] == {"days": 7, "weekday": 4, "hour": 19, "minute": 30}
+    moment = datetime.fromisoformat(plan["matchdays"][0]["matches"][0]["scheduled_at"])
+    assert moment.weekday() == 4 and (moment.hour, moment.minute) == (19, 30)
+
+
+@pytest.mark.asyncio
+async def test_an_agreed_time_replaces_the_default(flow):
+    """Was die Gegenseite annimmt, gilt - und der Grund steht dabei."""
+    staff, tournament, users, regs = await league_with_matchdays(flow)
+    match = (await flow.matches(tournament))[0]
+    first, second = [slot["registration_id"] for slot in match["slots"]]
+    proposer = user_for(users, regs, first)
+    opponent = user_for(users, regs, second)
+    agreed = "2026-09-10T19:00:00+00:00"
+
+    flow.act_as(proposer)
+    created = await flow.post(f"/api/matches/{match['id']}/schedule-proposals",
+                              json={"scheduled_at": agreed})
+    assert created.status_code == 200, created.text
+    flow.act_as(opponent)
+    decided = await flow.post(
+        f"/api/matches/{match['id']}/schedule-proposals/{created.json()['id']}/decision",
+        json={"action": "accept"})
+    assert decided.status_code == 200, decided.text
+
+    plan = (await flow.get(f"/api/tournaments/{tournament['id']}/matchdays")).json()
+    entry = next(e for day in plan["matchdays"] for e in day["matches"] if e["match_id"] == match["id"])
+    assert entry["schedule_source"] == "accepted"
+    assert datetime.fromisoformat(entry["scheduled_at"]) == datetime.fromisoformat(agreed)
+
+
+@pytest.mark.asyncio
+async def test_an_unanswered_home_proposal_decides(flow):
+    """Schlaegt nur die Heimseite vor, gilt ihre Zeit - Slot eins ist Heim."""
+    _staff, tournament, users, regs = await league_with_matchdays(flow)
+    match = (await flow.matches(tournament))[0]
+    home_registration = match["slots"][0]["registration_id"]
+    flow.act_as(user_for(users, regs, home_registration))
+    wish = "2026-09-11T21:00:00+00:00"
+
+    created = await flow.post(f"/api/matches/{match['id']}/schedule-proposals",
+                              json={"scheduled_at": wish})
+    assert created.status_code == 200, created.text
+
+    plan = (await flow.get(f"/api/tournaments/{tournament['id']}/matchdays")).json()
+    entry = next(e for day in plan["matchdays"] for e in day["matches"] if e["match_id"] == match["id"])
+    assert entry["schedule_source"] == "home"
+    assert entry["home_registration_id"] == home_registration
+
+
+@pytest.mark.asyncio
+async def test_a_knockout_bracket_has_rounds_and_says_so(flow):
+    _staff, tournament, _users, _regs = await bracket_of(flow, 4, start_date=LEAGUE_START)
+
+    plan = (await flow.get(f"/api/tournaments/{tournament['id']}/matchdays")).json()
+
+    assert plan["applies"] is False
+    assert plan["matchdays"] == []
+
+
+@pytest.mark.asyncio
+async def test_the_schedule_opens_on_the_week_being_played(flow):
+    _staff, tournament, _users, _regs = await league_with_matchdays(flow)
+
+    plan = (await flow.get(f"/api/tournaments/{tournament['id']}/matchdays")).json()
+
+    numbers = [day["number"] for day in plan["matchdays"]]
+    assert plan["current"] in numbers

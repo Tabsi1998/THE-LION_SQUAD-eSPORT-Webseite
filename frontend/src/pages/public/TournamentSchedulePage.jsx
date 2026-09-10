@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
@@ -15,6 +15,24 @@ function formatDateTime(value) {
   if (!value) return "Termin offen";
   return new Date(value).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
 }
+
+// Ein Spieltag ist eine Woche. Die Kopfzeile nennt deshalb den Zeitraum, nicht
+// nur die Nummer - "Spieltag 3" allein sagt niemandem, wann gespielt wird.
+function formatWeekRange(startsAt, endsAt) {
+  if (!startsAt || !endsAt) return "";
+  const day = { day: "2-digit", month: "2-digit" };
+  const start = new Date(startsAt).toLocaleDateString("de-DE", day);
+  const end = new Date(endsAt).toLocaleDateString("de-DE", { ...day, year: "numeric" });
+  return `${start} – ${end}`;
+}
+
+// Warum dieser Termin gilt. Ohne das steht da eine Uhrzeit, bei der unklar
+// bleibt, ob sie vereinbart oder nur die Vorgabe ist.
+const SCHEDULE_SOURCE_LABELS = {
+  accepted: "vereinbart",
+  home: "Heimrecht",
+  default: "Standardzeit",
+};
 
 function stationLabel(match) {
   return match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
@@ -39,12 +57,22 @@ export default function TournamentSchedulePage() {
   const [searchParams] = useSearchParams();
   const accessToken = searchParams.get("access") || "";
   const [data, setData] = useState(null);
+  const [plan, setPlan] = useState(null);
+  const [activeMatchday, setActiveMatchday] = useState(null);
 
   const load = useCallback(async () => {
     const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
     const { data: tournament } = await api.get(`/tournaments/${slug}`, accessConfig);
     const { data: bracket } = await api.get(`/tournaments/${tournament.id}/bracket`, accessConfig);
     setData(bracket);
+    // Spielwochen gibt es nur bei Liga, Round Robin und Gruppen. Schlägt der
+    // Aufruf fehl, bleibt die bisherige Gruppierung stehen statt einer leeren Seite.
+    try {
+      const { data: matchdayPlan } = await api.get(`/tournaments/${tournament.id}/matchdays`, accessConfig);
+      setPlan(matchdayPlan);
+    } catch {
+      setPlan({ applies: false, matchdays: [] });
+    }
   }, [slug, accessToken]);
 
   useEffect(() => {
@@ -79,6 +107,36 @@ export default function TournamentSchedulePage() {
     return [...byDay.values()].sort((a, b) => Number(a.key.split(":")[0]) - Number(b.key.split(":")[0]));
   }, [data]);
 
+  const weeks = useMemo(() => (plan?.applies ? (plan.matchdays || []) : []), [plan]);
+  const suggestedMatchday = plan?.current ?? null;
+  // Beim Öffnen die Woche zeigen, die gerade gespielt wird - nicht Spieltag 1
+  // einer Liga, die im März angefangen hat. Beim Neuladen alle sieben Sekunden
+  // bleibt die gewählte Woche stehen, damit einem nichts wegspringt.
+  useEffect(() => {
+    if (!weeks.length) return;
+    setActiveMatchday((current) => (
+      current != null && weeks.some((week) => week.number === current)
+        ? current
+        : (suggestedMatchday ?? weeks[0].number)
+    ));
+  }, [suggestedMatchday, weeks]);
+
+  const resolvedByMatch = useMemo(() => {
+    const map = {};
+    for (const week of weeks) {
+      for (const entry of week.matches || []) map[entry.match_id] = entry;
+    }
+    return map;
+  }, [weeks]);
+
+  const weekIndex = weeks.findIndex((week) => week.number === activeMatchday);
+  const currentWeek = weekIndex >= 0 ? weeks[weekIndex] : null;
+  const weekMatches = useMemo(() => {
+    if (!currentWeek) return [];
+    const wanted = new Set((currentWeek.matches || []).map((entry) => entry.match_id));
+    return groups.flatMap((group) => group.matches).filter((match) => wanted.has(match.id));
+  }, [currentWeek, groups]);
+
   const tournament = data?.tournament || {};
   const tournamentUrl = `/tournaments/${tournament.slug || tournament.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
   const seoDescription = seoTextPreview(tournament.description, "Spielplan des eSports Turniers mit Runden, Heats, Zeiten und Matchseiten.");
@@ -106,32 +164,98 @@ export default function TournamentSchedulePage() {
         <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase">Spielplan</h1>
         <p className="mt-3 text-white/60 max-w-2xl">Alle Runden, Heats, Zeiten und öffentlichen Matchseiten für Terminabstimmung, Chat und Ergebnisstatus.</p>
 
-        <div className="mt-10 space-y-8">
-          {groups.map((group) => (
-            <section key={group.key}>
-              <h2 className="font-heading text-2xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> {group.label}</h2>
-              <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {group.matches.map((match) => (
-                  <Link key={match.id} to={`/matches/${match.id}`} className="border border-white/10 hover:border-[#29B6E8]/50 bg-[#121212] rounded-sm p-4 transition">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-[10px] uppercase tracking-widest text-white/40">{formatMatchKind(match)} {match.match_key || ""}</div>
-                        <div className="mt-1 font-heading font-bold uppercase line-clamp-2">{match.labels.join(" vs. ")}</div>
-                      </div>
-                      <span className="text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">{formatMatchStatus(match.schedule_status || match.status)}</span>
-                    </div>
-                    <div className="mt-3 text-sm text-white/55">{formatDateTime(match.scheduled_at)}</div>
-                    {stationLabel(match) && (
-                      <div className="mt-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">Station {stationLabel(match)}</div>
-                    )}
-                  </Link>
-                ))}
+        {currentWeek ? (
+          <div className="mt-10" data-testid="matchday-pager">
+            <div className="flex items-center justify-between gap-3 border border-white/10 bg-[#121212] rounded-sm px-3 py-3">
+              <button
+                type="button"
+                onClick={() => setActiveMatchday(weeks[weekIndex - 1].number)}
+                disabled={weekIndex <= 0}
+                data-testid="matchday-prev"
+                aria-label="Vorheriger Spieltag"
+                className="p-2 rounded-sm border border-white/10 text-white/70 enabled:hover:border-[#29B6E8]/50 enabled:hover:text-white disabled:opacity-30"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <div className="text-center min-w-0">
+                <div className="font-heading text-xl md:text-2xl font-black uppercase truncate" data-testid="matchday-title">
+                  Spieltag {currentWeek.number}
+                </div>
+                <div className="mt-0.5 text-xs text-white/55 tabular-nums" data-testid="matchday-range">
+                  {formatWeekRange(currentWeek.starts_at, currentWeek.ends_at)}
+                </div>
+                <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/30">
+                  {weekIndex + 1} von {weeks.length}
+                </div>
               </div>
-            </section>
-          ))}
-          {groups.length === 0 && <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/45">Noch kein Spielplan generiert.</div>}
-        </div>
+              <button
+                type="button"
+                onClick={() => setActiveMatchday(weeks[weekIndex + 1].number)}
+                disabled={weekIndex >= weeks.length - 1}
+                data-testid="matchday-next"
+                aria-label="Nächster Spieltag"
+                className="p-2 rounded-sm border border-white/10 text-white/70 enabled:hover:border-[#29B6E8]/50 enabled:hover:text-white disabled:opacity-30"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-3 gap-3" data-testid="matchday-matches">
+              {weekMatches.map((match) => (
+                <MatchCard key={match.id} match={match} resolved={resolvedByMatch[match.id]} />
+              ))}
+              {weekMatches.length === 0 && (
+                <div className="md:col-span-2 xl:col-span-3 border border-dashed border-white/15 rounded-sm p-8 text-center text-white/45">
+                  Für diesen Spieltag liegen keine Partien vor.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-10 space-y-8">
+            {groups.map((group) => (
+              <section key={group.key}>
+                <h2 className="font-heading text-2xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> {group.label}</h2>
+                <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {group.matches.map((match) => (
+                    <MatchCard key={match.id} match={match} resolved={resolvedByMatch[match.id]} />
+                  ))}
+                </div>
+              </section>
+            ))}
+            {groups.length === 0 && <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/45">Noch kein Spielplan generiert.</div>}
+          </div>
+        )}
       </section>
     </PublicLayout>
+  );
+}
+
+function MatchCard({ match, resolved }) {
+  // Der berechnete Termin geht vor: bei Spielwochen steht er auch dann fest,
+  // wenn noch niemand etwas vereinbart hat, weil dann die Standardzeit gilt.
+  const scheduledAt = resolved?.scheduled_at || match.scheduled_at;
+  const sourceLabel = SCHEDULE_SOURCE_LABELS[resolved?.schedule_source];
+  return (
+    <Link to={`/matches/${match.id}`} className="border border-white/10 hover:border-[#29B6E8]/50 bg-[#121212] rounded-sm p-4 transition">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-widest text-white/40">{formatMatchKind(match)} {match.match_key || ""}</div>
+          <div className="mt-1 font-heading font-bold uppercase line-clamp-2">{match.labels.join(" vs. ")}</div>
+        </div>
+        <span className="text-[10px] uppercase tracking-widest text-[#FFD700] font-bold shrink-0">{formatMatchStatus(match.schedule_status || match.status)}</span>
+      </div>
+      <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span className="text-sm text-white/55">{formatDateTime(scheduledAt)}</span>
+        {sourceLabel && (
+          <span className="text-[10px] uppercase tracking-widest text-white/35" data-testid={`schedule-source-${match.id}`}>
+            {sourceLabel}
+          </span>
+        )}
+      </div>
+      {stationLabel(match) && (
+        <div className="mt-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">Station {stationLabel(match)}</div>
+      )}
+    </Link>
   );
 }
