@@ -154,3 +154,42 @@ test("ein Ausfall einzelner Bereiche legt die Seite nicht lahm", async () => {
   await waitForLoadedEmailTab();
   expect(screen.getByTestId("admin-layout")).toBeInTheDocument();
 });
+
+// Dreizehn gleich aussehende Reiter, davon fuenf zum Mailversand. Die Gruppen
+// sagen, wozu ein Reiter gehoert - "Resend" und "Versandlogs" allein tun das
+// nicht.
+
+test("die Reiter stehen in benannten Gruppen", async () => {
+  renderPage();
+  await waitForLoadedEmailTab();
+
+  const mail = screen.getByTestId("settings-group-E-Mail");
+  for (const key of ["email", "smtp", "newsletter", "queue", "logs"]) {
+    expect(mail).toContainElement(screen.getByTestId(`settings-tab-${key}`));
+  }
+
+  const look = screen.getByTestId("settings-group-Auftritt");
+  expect(look).toContainElement(screen.getByTestId("settings-tab-brand"));
+  expect(look).not.toContainElement(screen.getByTestId("settings-tab-smtp"));
+
+  // Ohne Superadmin-Rechte gibt es die Zugangsgruppe nicht.
+  expect(screen.queryByTestId("settings-group-Zugang")).not.toBeInTheDocument();
+});
+
+test("eine unerwartet geformte Antwort legt nicht die ganze Seite lahm", async () => {
+  // Der Kern: unten stehen queue.filter, logs.map und discordCounters.map.
+  // Kam statt einer Liste etwas anderes, riss das die komplette Seite in die
+  // Fehlergrenze - statt nur diesen einen Bereich leer zu lassen.
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.startsWith("/settings/mail-queue?")) return Promise.resolve({ data: { items: [] } });
+    if (path.startsWith("/settings/email/logs")) return Promise.resolve({ data: { items: [] } });
+    if (path.startsWith("/admin/discord/counters")) return Promise.resolve({ data: {} });
+    return Promise.resolve(responseFor(path));
+  });
+
+  renderPage();
+
+  await waitForLoadedEmailTab();
+  expect(screen.getByTestId("settings-tab-queue")).toBeInTheDocument();
+});

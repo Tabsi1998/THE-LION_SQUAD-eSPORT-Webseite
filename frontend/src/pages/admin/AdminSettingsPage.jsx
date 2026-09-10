@@ -45,21 +45,37 @@ const STATUS_LABELS = {
   skipped: "übersprungen",
 };
 
-const SETTINGS_TABS = [
-  ["auth", "Login & Google", LogIn],
-  ["email", "Resend", Mail],
-  ["smtp", "SMTP", Server],
-  ["newsletter", "Newsletter", Mail],
-  ["queue", "Mail-Queue", Inbox],
-  ["discord", "Discord", MessageSquare],
-  ["twitch", "Twitch", Radio],
-  ["brand", "Branding", Palette],
-  ["socials", "Socials", Share2],
-  ["seo", "SEO & Analytics", Search],
-  ["legal", "Rechtliches", FileText],
-  ["system", "Status", Activity],
-  ["logs", "Versandlogs", Send],
+// Dreizehn gleich aussehende Reiter, von denen fünf den Mailversand betreffen:
+// "Resend", "SMTP", "Newsletter", "Mail-Queue" und "Versandlogs" sagen einzeln
+// nicht, welcher davon gemeint ist, und sie standen verstreut zwischen
+// Branding und Rechtlichem. Die Gruppen stehen jetzt über den Reitern - alles
+// bleibt einen Klick entfernt, aber man sieht, wozu es gehört.
+const SETTINGS_GROUPS = [
+  { label: "Zugang", tabs: [
+    ["auth", "Login & Google", LogIn],
+  ] },
+  { label: "E-Mail", tabs: [
+    ["email", "Resend", Mail],
+    ["smtp", "SMTP", Server],
+    ["newsletter", "Newsletter", Mail],
+    ["queue", "Mail-Queue", Inbox],
+    ["logs", "Versandlogs", Send],
+  ] },
+  { label: "Auftritt", tabs: [
+    ["brand", "Branding", Palette],
+    ["socials", "Socials", Share2],
+    ["seo", "SEO & Analytics", Search],
+    ["legal", "Rechtliches", FileText],
+  ] },
+  { label: "Verbindungen", tabs: [
+    ["discord", "Discord", MessageSquare],
+    ["twitch", "Twitch", Radio],
+  ] },
+  { label: "System", tabs: [
+    ["system", "Status", Activity],
+  ] },
 ];
+const SETTINGS_TABS = SETTINGS_GROUPS.flatMap((group) => group.tabs);
 const SETTINGS_TAB_KEYS = new Set(SETTINGS_TABS.map(([key]) => key));
 const INDEXNOW_DEFAULT_PATHS = ["/", "/sitemap.xml", "/sitemap-news.xml", "/news", "/events", "/esports", "/tournaments", "/fastlap", "/galerie", "/members"];
 
@@ -332,17 +348,20 @@ export default function AdminSettingsPage() {
       originalDiscordRef.current = discordPayload(next);
       return next;
     });
-    if (l) setLogs(l);
+    // Listen nur übernehmen, wenn es welche sind: unten stehen .map und
+    // .filter darauf, und ein unerwartet geformter Wert nähme die ganze Seite
+    // mit in die Fehlergrenze statt nur diesen einen Bereich leer zu lassen.
+    if (Array.isArray(l)) setLogs(l);
     if (sm) setSmtp((prev) => {
       const next = { ...prev, ...sm, smtp_pass: "", smtp_pass_masked: sm.smtp_pass_masked || "" };
       originalSmtpRef.current = smtpPayload(next);
       return next;
     });
-    if (q) setQueue(q);
+    if (Array.isArray(q)) setQueue(q);
     if (qs) setQueueStats(qs);
     if (st) setSystemStatus(st);
     if (tw) setTwitchStatus(tw);
-    if (dc) setDiscordCounters(dc);
+    if (Array.isArray(dc)) setDiscordCounters(dc);
     if (sb) setSiteBanners(Array.isArray(sb) ? sb : []);
     if (ac) setAuthConfig((prev) => ({ ...prev, ...ac }));
     const failed = requests
@@ -874,15 +893,30 @@ export default function AdminSettingsPage() {
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">System</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Einstellungen</h1>
 
-      <div className="flex flex-wrap gap-2 mb-6 border-b border-white/10 pb-3">
-        {SETTINGS_TABS.filter(([key]) => key !== "auth" || isSuperadmin).map(([k, l, Icn]) => {
-          const isDirty = dirtyTabs.has(k);
+      <div className="flex flex-wrap gap-x-7 gap-y-4 mb-6 border-b border-white/10 pb-4" data-testid="settings-tabs">
+        {SETTINGS_GROUPS.map((group) => {
+          const tabs = group.tabs.filter(([key]) => key !== "auth" || isSuperadmin);
+          if (!tabs.length) return null;
+          const groupIsDirty = tabs.some(([key]) => dirtyTabs.has(key));
           return (
-            <button key={k} onClick={() => selectTab(k)} data-testid={`settings-tab-${k}`}
-              className={`px-3 py-2 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap rounded-sm border transition ${tab === k ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/60 hover:border-white/25 hover:text-white"}`}>
-              <Icn className="w-3.5 h-3.5" />{l}
-              {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-[#FFD700] shadow-[0_0_8px_rgba(255,215,0,0.8)]" title="Ungespeicherte Änderungen" />}
-            </button>
+            <div key={group.label} data-testid={`settings-group-${group.label}`}>
+              <div className="mb-1.5 inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.25em] text-white/25">
+                {group.label}
+                {groupIsDirty && <span className="w-1.5 h-1.5 rounded-full bg-[#FFD700]" title="Ungespeicherte Änderungen in dieser Gruppe" />}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {tabs.map(([k, l, Icn]) => {
+                  const isDirty = dirtyTabs.has(k);
+                  return (
+                    <button key={k} onClick={() => selectTab(k)} data-testid={`settings-tab-${k}`}
+                      className={`px-3 py-2 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap rounded-sm border transition ${tab === k ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/60 hover:border-white/25 hover:text-white"}`}>
+                      <Icn className="w-3.5 h-3.5" />{l}
+                      {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-[#FFD700] shadow-[0_0_8px_rgba(255,215,0,0.8)]" title="Ungespeicherte Änderungen" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </div>
