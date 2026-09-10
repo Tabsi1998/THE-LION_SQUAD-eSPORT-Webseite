@@ -1,6 +1,6 @@
 # Umbauplan: Turniere, Übersichtlichkeit und die offenen Wünsche
 
-Stand: 10. September 2026 (Block 16 ergänzt).
+Stand: 10. September 2026 (Blöcke 16 bis 18 ergänzt).
 
 Dieser Plan führt das in [RESTPLAN.md](RESTPLAN.md) als **R5** angekündigte Turnierpaket
 aus und nimmt die später dazugekommenen Themen auf (Spielwochen, PDF, Live-Aktualisierung,
@@ -36,12 +36,14 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 8 | Klassischer Schreibweg stillgelegt | umgesetzt | #177 |
 | 9 | **Übersichtlichkeit** | umgesetzt | #178, #179, #181, #183, #185, #186, #188 |
 | 10 | **Spielwochen und Terminfindung** | umgesetzt | #189 |
-| 11 | PDF-Ausgabe | offen | — |
+| 11 | PDF-Ausgabe | umgesetzt | #193, #194 |
 | 12 | Galerie und Medien: Tempo, Videos überall | offen | — |
 | 13 | Entflechtung und Tempo | offen | — |
 | 14 | LionsAPP in den Store | offen | — |
 | 15 | Abschluss | offen | — |
-| 16 | **Turnier-Leitfaden im Adminbereich** | offen, neu aufgenommen | — |
+| 16 | **Turnier-Leitfaden im Adminbereich** | offen | — |
+| 17 | **Markenbilder hell und dunkel überall richtig** | teilweise | #193 |
+| 18 | **Auszeichnungen: Banner und Trophäen** | offen, neu aufgenommen | — |
 
 ### Warum Block 5 die Migration erledigt hat, ohne zu migrieren
 
@@ -307,6 +309,84 @@ Turnierbaum, sondern bei Battle Royale mit Punktewertung — und wer „F1" such
 Rundenzeiten statt bei Spielpaarungen.
 
 Die Liste wächst weiter; neue Titel sind eine Zeile, kein Umbau.
+
+## Block 17 — Markenbilder hell und dunkel überall richtig
+
+Der Branding-Bereich führt jedes Logo doppelt: eine Fassung für dunklen und eine für
+hellen Hintergrund, dazu Favicons je Modus. Der Wunsch: **überall die richtige nehmen**.
+
+### Bestandsaufnahme
+
+Nachgesehen statt vermutet. Das meiste stimmt bereits:
+
+| Ort | Nimmt | Urteil |
+| --- | --- | --- |
+| Weboberfläche (`Logo.jsx`) | `logo_dark_url` zuerst | **richtig** — die Oberfläche ist dunkel |
+| Favicons (`BrandingHead.jsx`) | je Variante mit `prefers-color-scheme` plus Rückfall | **richtig** |
+| SEO und Teilen-Vorschau | `share_banner_url`, dann Logofassungen | **stimmig** |
+| PDF-Export | nahm `logo_dark_url` zuerst | **war falsch**, behoben mit #193 |
+| QR-Code-Mitte | Rückfallkette nur aus Dunkel-Fassungen | **war falsch**, siehe unten |
+| Mobil-App | liest die Markenbilder gar nicht, bringt eigene mit | **offen** |
+
+### Der Fund im QR-Code
+
+Das Logo in der Mitte eines QR-Codes sitzt auf einem **weißen Kreis**. Die Rückfallkette
+bestand aber ausschließlich aus Bildern für dunklen Hintergrund — `mascot_url`,
+`favicon_dark_url`, `logo_dark_url`. War `qr_logo_url` nicht gesetzt, blieb der Kreis
+**leer**: das Maskottchen des Vereins ist rein weiß, und Weiß auf Weiß zeigt nichts.
+
+Beim Verein fällt das nicht auf, weil `qr_logo_url` dunkel gesetzt ist. Bei einem
+Verein ohne diesen Eintrag wäre jeder gedruckte QR-Code ohne Logo.
+
+Behoben: helle Fassungen zuerst, und ohne solche wird die **Silhouette** gezeichnet —
+dann trägt auch ein weißes Logo.
+
+### Was offen bleibt
+
+- **Die App** liest die Markenbilder aus den Einstellungen nicht. Ändert der Verein sein
+  Logo, ändert sich die App nicht mit. Gehört zu Block 14.
+- **Der Standard-Favicon** ist bei euch weiß. Browser ohne Unterstützung für
+  `prefers-color-scheme` zeigen ihn auf hellen Tableisten nicht. Kleinigkeit, aber
+  vermeidbar: dort gehört eine Fassung hin, die auf beidem trägt.
+
+## Block 18 — Auszeichnungen: Banner und Trophäen
+
+Der Wunsch, ausdrücklich für später: **Gewinnerbanner und Trophäen**, die ein Turnier
+vergibt und die im Profil sichtbar bleiben.
+
+### Wie es gedacht ist
+
+- **Für alle Teilnehmer** ein automatisch erzeugtes Banner mit der eigenen Bilanz aus
+  diesem Turnier: Siege, Niederlagen, Unentschieden, Platzierung.
+- **Für die ersten drei** eine eigene, gestaltete Fassung, die der Betreiber selbst
+  entwerfen kann und dem Turnier zuhängt.
+- **Trophäen**, die vergeben werden und die man ansehen kann.
+- Spieler und Teams **getrennt**: es gibt Team- und Einzelturniere, und ein Team-Banner
+  gehört ins Teamprofil, ein Spielerbanner ins Spielerprofil.
+- Eine verliehene Auszeichnung soll sich **als Profil- oder Teambanner einstellen**
+  lassen.
+- Spielbezug: bei FIFA das Spiel-Symbol, dazu Saison oder Liga.
+
+### Was daran zu klären ist
+
+Das ist kein kleiner Block. Vor dem Bauen zu entscheiden:
+
+- **Wie entsteht die Gestaltung?** Ein Vorlagensystem, in dem der Betreiber Hintergrund,
+  Schrift und Felder wählt, ist etwas anderes als fertige Bilder zum Hochladen. Beides ist
+  möglich; das zweite ist deutlich schneller.
+- **Wo werden die Bilder erzeugt?** Serverseitig zum Zeitpunkt der Vergabe, oder erst beim
+  Ansehen. Für Block 12 gilt ohnehin: Bilder brauchen kleinere Varianten.
+- **Was passiert bei Korrekturen?** Wird ein Ergebnis nachträglich geändert, stimmt eine
+  bereits vergebene Bilanz nicht mehr.
+
+Der Zusammenhang zu Block 12 ist eng: erzeugte Banner sind Medien und brauchen dieselben
+Vorschaubilder und Größen.
+
+## Querschnitt: alles auch in der App
+
+Nicht als eigener Block, sondern als Zusage über alle: was im Browser geht, muss **auch in
+der App** gehen — einschließlich der Einstellungen, etwa denen eines Teams. Bei jedem Block
+gehört die App-Seite dazu, nicht als Nachtrag.
 
 ## Querschnitt: Live-Aktualisierung überall
 

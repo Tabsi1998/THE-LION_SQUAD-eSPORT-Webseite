@@ -1225,6 +1225,29 @@ def pdf_certificate(
     )
 
 
+def qr_badge_sources(branding: dict | None) -> tuple[Path | None, Path | None]:
+    """Welches Bild in die Mitte eines QR-Codes gehört, und wie gezeichnet wird.
+
+    Der Kreis in der Mitte ist weiß. Die Rückfallkette bestand vorher nur aus
+    Bildern für dunklen Hintergrund: war ``qr_logo_url`` nicht gesetzt, blieb
+    der Kreis leer, weil ein rein weißes Maskottchen auf Weiß nichts zeigt.
+
+    Zurück kommt entweder ein Bild, das unverändert gezeichnet wird, oder eine
+    Vorlage, von der nur die Silhouette gezeichnet wird - so trägt auch ein
+    weißes Logo.
+    """
+    branding = branding or {}
+    for key in ("qr_logo_url", "favicon_light_url", "logo_light_url"):
+        path = _brand_asset_path(branding.get(key))
+        if path:
+            return path, None
+    for key in ("mascot_url", "logo_url", "logo_dark_url"):
+        path = _brand_asset_path(branding.get(key))
+        if path:
+            return None, path
+    return None, _brand_asset_path("/assets/brand/tls-mascot.png")
+
+
 def _draw_qr_code(canvas, value: str, x: float, y: float, size: float, branding: dict | None = None) -> None:
     widget = qr.QrCodeWidget(value, barLevel="H", barBorder=4)
     bounds = widget.getBounds()
@@ -1236,14 +1259,7 @@ def _draw_qr_code(canvas, value: str, x: float, y: float, size: float, branding:
     canvas.roundRect(x - 1.2 * mm, y - 1.2 * mm, size + 2.4 * mm, size + 2.4 * mm, 7, fill=1, stroke=0)
     renderPDF.draw(drawing, canvas, x, y)
 
-    logo_path = (
-        _brand_asset_path((branding or {}).get("qr_logo_url"))
-        or _brand_asset_path((branding or {}).get("mascot_url"))
-        or _brand_asset_path((branding or {}).get("favicon_dark_url"))
-        or _brand_asset_path((branding or {}).get("logo_dark_url"))
-        or _brand_asset_path((branding or {}).get("logo_url"))
-        or _brand_asset_path("/assets/brand/tls-mascot.png")
-    )
+    logo_path, silhouette_path = qr_badge_sources(branding)
     badge_size = size * 0.205
     logo_size = badge_size * 0.76
     center_x = x + size / 2
@@ -1258,6 +1274,9 @@ def _draw_qr_code(canvas, value: str, x: float, y: float, size: float, branding:
     canvas.circle(center_x, center_y, badge_r, fill=0, stroke=1)
     if logo_path:
         _draw_logo(canvas, logo_path, logo_x, logo_y, logo_size, logo_size, crop_transparent=True)
+    elif silhouette_path:
+        _draw_watermark_logo(canvas, silhouette_path, center_x, center_y, logo_size,
+                             opacity=1.0, tint=(20, 24, 29))
 
 
 def pdf_qr_sign(
