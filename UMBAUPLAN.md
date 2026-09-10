@@ -1,6 +1,6 @@
 # Umbauplan: Turniere, Übersichtlichkeit und die offenen Wünsche
 
-Stand: 10. September 2026.
+Stand: 10. September 2026 (Block 16 ergänzt).
 
 Dieser Plan führt das in [RESTPLAN.md](RESTPLAN.md) als **R5** angekündigte Turnierpaket
 aus und nimmt die später dazugekommenen Themen auf (Spielwochen, PDF, Live-Aktualisierung,
@@ -35,12 +35,13 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 7 | Ein Turnierbaum statt zwei, Spieltage als Spieltage | umgesetzt | #176 |
 | 8 | Klassischer Schreibweg stillgelegt | umgesetzt | #177 |
 | 9 | **Übersichtlichkeit** | umgesetzt | #178, #179, #181, #183, #185, #186, #188 |
-| 10 | **Spielwochen und Terminfindung** | offen zum Mergen | #189 |
+| 10 | **Spielwochen und Terminfindung** | umgesetzt | #189 |
 | 11 | PDF-Ausgabe | offen | — |
 | 12 | Galerie und Medien: Tempo, Videos überall | offen | — |
 | 13 | Entflechtung und Tempo | offen | — |
 | 14 | LionsAPP in den Store | offen | — |
 | 15 | Abschluss | offen | — |
+| 16 | **Turnier-Leitfaden im Adminbereich** | offen, neu aufgenommen | — |
 
 ### Warum Block 5 die Migration erledigt hat, ohne zu migrieren
 
@@ -209,6 +210,78 @@ anfassen, wenn ohnehin dort gearbeitet wird.
 ## Block 15 — Abschluss
 
 Alle CI-Prüfungen grün, automatischer App-Build, README auf Stand.
+
+## Block 16 — Turnier-Leitfaden im Adminbereich
+
+Dein Wunsch: eine Anleitung im Adminbereich, die sagt, **welches Turnier man wie einstellt**,
+mit einem Teil je Spiel und Bildern, damit Online-Turniere sauber laufen.
+
+### Warum das mehr sein soll als ein Text
+
+Ein Leitfaden, den man nur liest, veraltet. Diese Plattform hat bereits **Voreinstellungen**:
+im Formular „Turnier anlegen" und in `RulePresetPicker`. Der Leitfaden soll daran hängen —
+jede Empfehlung mit einem Knopf **„Diese Voreinstellung übernehmen"**, der Turnierstruktur,
+Teamgröße, Best-of, Ergebniserfassung und Terminplanung auf einmal setzt.
+
+Damit ist die Anleitung nicht Dokumentation neben der Software, sondern der Weg hinein.
+
+### Was verglichen wurde
+
+Angesehen habe ich Toornament, Challonge, Battlefy, start.gg, ESL Play, die Regelwerke von
+Call of Duty Challengers, Valorant, CS2, Rainbow Six und Age of Empires, dazu desbl.de.
+
+**Zu desbl.de:** die Übersichtsseite selbst gibt wenig her — Ligen mit Seasons und Ewiger
+Tabelle, Cups getrennt davon, und die Abläufe stehen in den Regelwerken und den Spiele-Foren.
+Die Zweiteilung **Liga (Saison, Spieltage, Tabelle) neben Cup (K.-o., an einem Tag)** ist
+aber genau die Trennung, die auch hier gilt.
+
+### Was in den Leitfaden gehört
+
+**Erstens: der Ablauf, unabhängig vom Spiel.** Aus den Regelwerken der großen Anbieter, und
+jeweils übersetzt auf die Felder dieser Plattform:
+
+| Empfehlung | Feld hier |
+| --- | --- |
+| Regelwerk, Format, Seeding und Qualifikationsweg **vor** der Anmeldung veröffentlichen | Regeln, Sichtbarkeit, Anmeldung öffnet |
+| Check-in 30 bis 60 Minuten vor Start | Check-in öffnet / Check-in endet |
+| Nicht erschienen: nach 10 bis 15 Minuten Forfeit | Walkover durch die Turnierleitung |
+| Ab etwa 32 Teilnehmern Gruppen zu 4 bis 8, dann Bracket | Gruppen, danach Turnierbaum |
+| Streitfall-Ablauf und Verhaltensregeln festlegen | Regeln, Ergebnis-Konflikte |
+| Termine bei Ligen über Spielwochen statt starrer Uhrzeit | Block 10 |
+
+**Zweitens: ein Teil je Spiel** mit dem, was dort üblich ist — Teamgröße, Serienlänge,
+Besonderheiten:
+
+| Spiel | Teamgröße | Übliche Serie | Besonderheit |
+| --- | --- | --- | --- |
+| Rocket League | 3v3 | Gruppen und Playoffs Best of 5, Finale Best of 7 | kurze Spiele, viele Runden an einem Abend möglich |
+| Rainbow Six Siege | 5v5 | Best of 1 bis Best of 3 | Map-Veto, die Heimseite hostet |
+| Call of Duty | 4v4 | Best of 5 | feste Modusfolge, etwa Hardpoint, Search & Destroy, Control |
+| Counter-Strike 2 | 5v5 | Best of 1 in Gruppen, Best of 3 in Playoffs | Schweizer System für die Gruppenphase, Double Elimination danach |
+| Valorant | 5v5 | Best of 3, Finale Best of 5 | Schweizer System für Qualifikation |
+| League of Legends | 5v5 | Best of 1 in Gruppen, Best of 3 bis 5 in Playoffs | — |
+| EA SPORTS FC | 1v1 | Hin- und Rückspiel | passt gut auf Liga mit Spielwochen |
+| Age of Empires | 1v1 | Best of 3 | fester Map-Pool ohne Wiederholung; ELO-Grenze für Amateurturniere |
+
+Die Liste ist der Anfang, nicht das Ende — sie wächst mit den Spielen, die der Verein
+tatsächlich spielt.
+
+**Drittens: welches Format wofür.** Einzelausscheidung für einen Abend, Double Elimination
+wenn eine Niederlage nicht sofort ausscheiden soll, Schweizer System für viele Teilnehmer
+ohne festen Baum, Gruppen mit anschließendem Baum ab etwa 32 Teilnehmern, Liga über eine
+Saison mit Spielwochen.
+
+### Wo es liegt
+
+Ein eigener Eintrag im Adminmenü, sichtbar für die Turnierleitung. Bilder über die
+vorhandene Medienverwaltung. Der Text wird mit der Software ausgeliefert, damit er nicht
+auseinanderläuft, wenn sich Felder ändern.
+
+### Offene Frage an dich
+
+Welche Spiele spielt ihr wirklich? Die Tabelle oben ist recherchiert, nicht eure Realität.
+Sag mir eure Titel, dann steht im Leitfaden, was ihr braucht — und nicht, was anderswo
+gespielt wird.
 
 ## Querschnitt: Live-Aktualisierung überall
 
