@@ -24,6 +24,7 @@ import {
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ChatMessage, Tournament } from "../../types";
+import { AttachButton, AttachmentDraftsRow, MessageAttachments, useChatAttachmentDrafts } from "../../components/ChatAttachments";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 
 const MATCH_LIVE_RESOURCES = ["matches", "matches-v2", "tournaments"];
@@ -242,21 +243,24 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     }
   }, [busy, counterAt, decisionNote, load, route.params.id]);
 
+  const chatAttachments = useChatAttachmentDrafts();
+
   const sendMessage = useCallback(async () => {
     const text = message.trim();
-    if (!text || busy || !canUseChat) return;
+    if (!chatAttachments.canSend(text) || busy || !canUseChat) return;
     setBusy(true);
     setError("");
     try {
-      const { data } = await api.post<ChatMessage>(`/matches/${route.params.id}/chat`, { message: text });
+      const { data } = await api.post<ChatMessage>(`/matches/${route.params.id}/chat`, { message: text, attachment_ids: chatAttachments.attachmentIds });
       setChat((items) => [...items, data]);
       setMessage("");
+      chatAttachments.reset();
     } catch (err) {
       setError(errorMessage(err, "Nachricht konnte nicht gesendet werden."));
     } finally {
       setBusy(false);
     }
-  }, [busy, canUseChat, message, route.params.id]);
+  }, [busy, canUseChat, chatAttachments, message, route.params.id]);
 
   const addStaffMention = useCallback(() => {
     setMessage((current) => {
@@ -568,7 +572,11 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                 </Pressable>
               </View>
               <FormInput label="Nachricht" value={message} onChangeText={setMessage} placeholder="Nachricht schreiben, @leitung oder @username markieren ..." style={styles.chatInput} />
-              <Button label="Senden" onPress={sendMessage} disabled={busy || !message.trim()} />
+              <AttachmentDraftsRow drafts={chatAttachments.drafts} onRemove={chatAttachments.remove} />
+              <View style={styles.mentionQuickRow}>
+                <AttachButton disabled={busy} onPress={() => { void chatAttachments.pick(); }} />
+              </View>
+              <Button label="Senden" onPress={sendMessage} disabled={busy || !chatAttachments.canSend(message)} />
             </View>
           ) : (
             <Muted>Schreiben können Teilnehmer, Team-Captains oder Turnierleitung.</Muted>
@@ -588,7 +596,8 @@ function ChatBubble({ message, own }: { message: ChatMessage; own: boolean }) {
         <Body style={styles.chatAuthor}>{own ? "Du" : author?.display_name || author?.username || "Spieler"}</Body>
         {message.created_at ? <Muted>{formatDate(message.created_at)}</Muted> : null}
       </View>
-      <RichText text={message.message} compact />
+      {message.message ? <RichText text={message.message} compact /> : null}
+      <MessageAttachments attachments={message.attachments} />
     </View>
   );
 }
