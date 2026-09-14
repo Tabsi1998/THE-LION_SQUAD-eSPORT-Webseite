@@ -25,6 +25,8 @@ import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ChatMessage, Tournament } from "../../types";
 import { AttachButton, AttachmentDraftsRow, MessageAttachments, useChatAttachmentDrafts } from "../../components/ChatAttachments";
+import { MessageSticker, StickerButton, StickerPicker } from "../../components/ChatStickers";
+import type { CatalogSticker } from "../../lib/stickers";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 
 const MATCH_LIVE_RESOURCES = ["matches", "matches-v2", "tournaments"];
@@ -244,6 +246,22 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   }, [busy, counterAt, decisionNote, load, route.params.id]);
 
   const chatAttachments = useChatAttachmentDrafts();
+  const [stickersOpen, setStickersOpen] = useState(false);
+
+  const sendSticker = useCallback(async (sticker: CatalogSticker) => {
+    setStickersOpen(false);
+    if (busy || !canUseChat) return;
+    setBusy(true);
+    setError("");
+    try {
+      const { data } = await api.post<ChatMessage>(`/matches/${route.params.id}/chat`, { sticker_id: sticker.id });
+      setChat((items) => [...items, data]);
+    } catch (err) {
+      setError(errorMessage(err, "Sticker konnte nicht gesendet werden."));
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, canUseChat, route.params.id]);
 
   const sendMessage = useCallback(async () => {
     const text = message.trim();
@@ -575,8 +593,10 @@ export function MatchDetailScreen({ navigation, route }: Props) {
               <AttachmentDraftsRow drafts={chatAttachments.drafts} onRemove={chatAttachments.remove} />
               <View style={styles.mentionQuickRow}>
                 <AttachButton disabled={busy} onPress={() => { void chatAttachments.pick(); }} />
+                <StickerButton disabled={busy} onPress={() => setStickersOpen(true)} />
               </View>
               <Button label="Senden" onPress={sendMessage} disabled={busy || !chatAttachments.canSend(message)} />
+              <StickerPicker visible={stickersOpen} onClose={() => setStickersOpen(false)} onPick={(sticker) => { void sendSticker(sticker); }} />
             </View>
           ) : (
             <Muted>Schreiben können Teilnehmer, Team-Captains oder Turnierleitung.</Muted>
@@ -598,6 +618,7 @@ function ChatBubble({ message, own }: { message: ChatMessage; own: boolean }) {
       </View>
       {message.message ? <RichText text={message.message} compact /> : null}
       <MessageAttachments attachments={message.attachments} />
+      <MessageSticker sticker={message.sticker} />
     </View>
   );
 }

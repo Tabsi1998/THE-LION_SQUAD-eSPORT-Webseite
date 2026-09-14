@@ -6,6 +6,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { ChatAttachButton, ChatAttachmentDrafts, ChatMessageAttachments, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
+import { ChatMessageSticker, ChatStickerButton, ChatStickerPicker } from "@/components/tls/ChatStickers";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -248,6 +249,15 @@ export default function MatchPage() {
   };
 
   const chatAttachments = useChatAttachmentDrafts();
+  const [stickersOpen, setStickersOpen] = useState(false);
+
+  const sendSticker = async (sticker) => {
+    await runAction(async () => {
+      const { data: saved } = await api.post(`/matches/${id}/chat`, { sticker_id: sticker.id });
+      setChat((rows) => [...rows, saved]);
+      setStickersOpen(false);
+    }, "Sticker konnte nicht gesendet werden.");
+  };
 
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -521,6 +531,7 @@ export default function MatchPage() {
                   <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{m.author?.display_name || m.author?.username || "Benutzer"}</div>
                   {m.message && <div className="mt-1 text-sm text-white/75 whitespace-pre-wrap">{m.message}</div>}
                   <ChatMessageAttachments attachments={m.attachments} />
+                  <ChatMessageSticker sticker={m.sticker} />
                 </div>
               ))}
               {chat.length === 0 && <div className="text-sm text-white/40">Noch keine Nachrichten.</div>}
@@ -531,8 +542,10 @@ export default function MatchPage() {
                   <button type="button" onClick={addStaffMention} className="px-2.5 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10">@leitung</button>
                 </div>
                 <ChatAttachmentDrafts drafts={chatAttachments.drafts} onRemove={chatAttachments.remove} />
+                <ChatStickerPicker open={stickersOpen} onClose={() => setStickersOpen(false)} onPick={sendSticker} disabled={busy} />
                 <div className="flex gap-2 items-end" onPaste={chatAttachments.onPaste}>
                   <ChatAttachButton onFiles={chatAttachments.addFiles} disabled={busy} testId="match-chat-attach" />
+                  <ChatStickerButton open={stickersOpen} onToggle={() => setStickersOpen((value) => !value)} disabled={busy} testId="match-chat-stickers" />
                   <MentionTextarea
                     value={message}
                     onValueChange={setMessage}

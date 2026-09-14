@@ -80,7 +80,8 @@ def attachment_preview_text(attachments: list[dict] | None) -> str:
 
 
 def chat_message_preview(message: dict, limit: int) -> str:
-    return (message.get("message") or "")[:limit] or attachment_preview_text(message.get("attachments"))
+    text = (message.get("message") or "")[:limit] or attachment_preview_text(message.get("attachments"))
+    return text or ("[Sticker]" if message.get("sticker") else "")
 
 
 def _write_private(filename: str, data: bytes) -> None:

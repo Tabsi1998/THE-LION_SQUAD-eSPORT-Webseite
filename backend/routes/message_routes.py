@@ -11,7 +11,8 @@ from services.moderation import block_between, interaction_is_blocked
 from services.notification_preferences import send_user_template
 from services.rate_limit import enforce_rate_limit
 from services.user_notifications import build_public_url, create_user_notification
-from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, attachment_preview_text, claim_attachments
+from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments
+from services.stickers import sticker_for_message
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
 
@@ -29,6 +30,7 @@ DM_PRIVACY_LABELS = {
 class DirectMessageCreate(BaseModel):
     message: str = Field(default="", max_length=1500)
     attachment_ids: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS_PER_MESSAGE)
+    sticker_id: str | None = Field(default=None, max_length=80)
 
 
 def _is_staff(user: dict | None) -> bool:
@@ -249,10 +251,11 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, request: 
     if not can_send:
         raise HTTPException(status_code=403, detail=hint or "Direktnachricht nicht erlaubt")
     text = body.message.strip()
-    if not text and not body.attachment_ids:
+    if not text and not body.attachment_ids and not body.sticker_id:
         raise HTTPException(status_code=400, detail="Nachricht darf nicht leer sein")
     now = now_utc().isoformat()
     message_id = new_id()
+    sticker = await sticker_for_message(db, body.sticker_id, text, body.attachment_ids)
     attachments = await claim_attachments(db, me["id"], body.attachment_ids, {
         "type": "direct", "user_ids": [me["id"], recipient["id"]], "message_id": message_id,
     })
@@ -262,6 +265,7 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, request: 
         "recipient_id": recipient["id"],
         "message": text,
         "attachments": attachments,
+        "sticker": sticker,
         "created_at": now,
         "updated_at": now,
     }
@@ -272,7 +276,7 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, request: 
     await create_user_notification(
         recipient["id"],
         title=f"Neue Nachricht von {_label(me)}",
-        body=text[:160] or attachment_preview_text(attachments),
+        body=chat_message_preview(doc, 160),
         url="/profile?tab=inbox",
         kind="direct_message",
         meta={"message_id": doc["id"], "thread_user_id": me["id"]},
@@ -282,7 +286,7 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, request: 
         "direct_message",
         display_name=_label(recipient),
         sender_name=_label(me),
-        preview=text[:300] or attachment_preview_text(attachments),
+        preview=chat_message_preview(doc, 300),
         url=await build_public_url("/profile?tab=inbox"),
         preferences_url=await build_public_url("/profile?tab=privacy"),
         dedupe_key=f"direct_message:{doc['id']}:{recipient['id']}",

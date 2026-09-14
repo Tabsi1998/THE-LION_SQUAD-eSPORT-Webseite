@@ -347,7 +347,8 @@ async def _notify_match_chat_message(
     match_title = _match_label(match)
     tournament_title = tournament.get("title") or "Turnier"
     url = f"/matches/{match.get('id')}"
-    body = f"{_user_label(sender)}: {(message.get('message') or '')[:140]}"
+    from services.chat_attachments import chat_message_preview
+    body = f"{_user_label(sender)}: {chat_message_preview(message, 140)}"
     meta = {
         "match_id": match.get("id"),
         "tournament_id": match.get("tournament_id"),
@@ -829,10 +830,12 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
         subject=f"{me['id']}:{match_id}",
     )
     text = body.message.strip()
-    if not text and not body.attachment_ids:
+    if not text and not body.attachment_ids and not body.sticker_id:
         raise HTTPException(status_code=400, detail="Nachricht darf nicht leer sein")
     from services.chat_attachments import claim_attachments
+    from services.stickers import sticker_for_message
     message_id = new_id()
+    sticker = await sticker_for_message(db, body.sticker_id, text, body.attachment_ids)
     attachments = await claim_attachments(db, me["id"], body.attachment_ids, {
         "type": "match", "match_id": match_id, "message_id": message_id,
     })
@@ -845,6 +848,7 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
         "user_id": me["id"],
         "message": text,
         "attachments": attachments,
+        "sticker": sticker,
         "created_at": now_iso,
         "updated_at": now_iso,
     }

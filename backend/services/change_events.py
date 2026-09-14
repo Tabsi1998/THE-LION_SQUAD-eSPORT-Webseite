@@ -41,6 +41,7 @@ PUBLIC_RESOURCES = frozenset({
     "seasons",
     "sponsors",
     "stations",
+    "stickers",
     "streams",
     "tournaments",
 })

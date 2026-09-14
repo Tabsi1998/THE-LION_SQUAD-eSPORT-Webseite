@@ -20,6 +20,8 @@ import type { ChatMessage } from "../types";
 import { resourceFromPath } from "../realtime/liveChanges";
 import { useLiveRefresh } from "../realtime/LiveChangesProvider";
 import { AttachButton, AttachmentDraftsRow, MessageAttachments, useChatAttachmentDrafts } from "./ChatAttachments";
+import { MessageSticker, StickerButton, StickerPicker } from "./ChatStickers";
+import type { CatalogSticker } from "../lib/stickers";
 import { EmptyState, SkeletonList } from "./ListState";
 import { RichText } from "./RichText";
 import { Body, Muted } from "./Text";
@@ -36,14 +38,21 @@ type Props = {
   onOpenProfile?: (username: string) => void;
 };
 
+// Außerhalb der Komponente, damit sie über alle Renderdurchläufe dieselben
+// bleiben. Als Standardwert im Parameter entstand bei jedem Rendern eine neue
+// Funktion, damit ein neues load - und der Effekt lud sofort wieder: Team- und
+// Turnierchat fragten den Server ohne Pause ab.
+const allMessages = (data: unknown) => (Array.isArray(data) ? data as ChatMessage[] : []);
+const alwaysAllowed = () => true;
+
 export function ChatThreadView({
   listUrl,
   postUrl,
   currentUserId,
   emptyTitle,
   lockedDetail,
-  extractMessages = (data) => (Array.isArray(data) ? data as ChatMessage[] : []),
-  canSend = () => true,
+  extractMessages = allMessages,
+  canSend = alwaysAllowed,
   mentionSearchUrl,
   onOpenProfile,
 }: Props) {
@@ -61,6 +70,7 @@ export function ChatThreadView({
   const didInitialScroll = useRef(false);
   const composerBottomInset = Math.max(insets.bottom, Platform.OS === "android" ? 8 : 10);
   const attachments = useChatAttachmentDrafts();
+  const [stickersOpen, setStickersOpen] = useState(false);
 
   const scrollToLatest = useCallback((animated = false) => {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated }));
@@ -151,6 +161,22 @@ export function ChatThreadView({
     }
   }, [allowed, attachments, postUrl, scrollToLatest, sending, text]);
 
+  const sendSticker = useCallback(async (sticker: CatalogSticker) => {
+    if (sending || !allowed) return;
+    setStickersOpen(false);
+    setSending(true);
+    try {
+      const { data } = await api.post<ChatMessage>(postUrl, { sticker_id: sticker.id });
+      setMessages((items) => [...items, data]);
+      nearBottomRef.current = true;
+      setTimeout(() => scrollToLatest(true), 50);
+    } catch (err) {
+      setError(errorMessage(err, "Sticker konnte nicht gesendet werden."));
+    } finally {
+      setSending(false);
+    }
+  }, [allowed, postUrl, scrollToLatest, sending]);
+
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
@@ -205,6 +231,7 @@ export function ChatThreadView({
         <AttachmentDraftsRow drafts={attachments.drafts} onRemove={attachments.remove} />
         <View style={[styles.composer, { paddingBottom: composerBottomInset }]}>
           <AttachButton disabled={!allowed || sending} onPress={() => { void attachments.pick(); }} />
+          <StickerButton disabled={!allowed || sending} onPress={() => setStickersOpen(true)} />
           <TextInput
             editable={allowed && !sending}
             multiline
@@ -227,6 +254,7 @@ export function ChatThreadView({
           </Pressable>
         </View>
       </KeyboardStickyView>
+      <StickerPicker visible={stickersOpen} onClose={() => setStickersOpen(false)} onPick={(sticker) => { void sendSticker(sticker); }} />
     </View>
   );
 }
@@ -256,6 +284,7 @@ function MessageBubble({ message, own, onOpenProfile }: { message: ChatMessage; 
         </View>
       ) : null}
       <MessageAttachments attachments={message.attachments} />
+      <MessageSticker sticker={message.sticker} />
     </View>
   );
 }

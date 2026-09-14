@@ -79,7 +79,10 @@ export function DirectMessagesScreen({ navigation }: Props) {
                     <Heading style={styles.name}>{name}</Heading>
                     {item.unread_count ? <Body style={styles.badge}>{item.unread_count}</Body> : null}
                   </View>
-                  <Muted numberOfLines={2}>{item.latest_message?.message || item.message_hint || "Unterhaltung öffnen"}</Muted>
+                  <Muted numberOfLines={2}>{item.latest_message?.message
+                    || (item.latest_message?.attachments?.length ? "[Anhang]" : item.latest_message?.sticker ? "[Sticker]" : "")
+                    || item.message_hint
+                    || "Unterhaltung öffnen"}</Muted>
                   {item.latest_message?.created_at ? <Muted>{formatDate(item.latest_message.created_at)}</Muted> : null}
                 </View>
               </Card>

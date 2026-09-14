@@ -456,6 +456,15 @@ export type ChatAttachment = {
   poster_url?: string | null;
 };
 
+export type ChatSticker = {
+  id: string;
+  pack_id?: string;
+  name: string;
+  url: string;
+  width?: number | null;
+  height?: number | null;
+};
+
 export type ChatMessage = {
   id: string;
   message: string;
@@ -468,6 +477,7 @@ export type ChatMessage = {
   recipient?: PublicUser | null;
   read_at?: string | null;
   attachments?: ChatAttachment[];
+  sticker?: ChatSticker | null;
 };
 
 export type DirectConversation = {

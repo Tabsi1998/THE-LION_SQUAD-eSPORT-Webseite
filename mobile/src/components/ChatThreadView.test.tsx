@@ -70,9 +70,28 @@ async function flush() {
   });
 }
 
+const stickerCatalog = {
+  packs: [
+    {
+      id: "fluent-esports",
+      name: "eSports & Party",
+      builtin: true,
+      stickers: [
+        { id: "fluent-trophy", pack_id: "fluent-esports", name: "Pokal", keywords: ["sieg"], url: "/api/stickers/files/fluent/trophy.png" },
+        { id: "fluent-fire", pack_id: "fluent-esports", name: "Feuer", keywords: ["heiß"], url: "/api/stickers/files/fluent/fire.png" },
+      ],
+    },
+  ],
+};
+
+// Feste Antwortobjekte wie bisher mit mockResolvedValue: jede Abfrage liefert
+// dasselbe Array, so wie React es beim erneuten Laden als unverändert erkennt.
+const chatResponse = { data: [existing] };
+const stickerResponse = { data: stickerCatalog };
+
 beforeEach(() => {
   jest.clearAllMocks();
-  mockGet.mockResolvedValue({ data: [existing] });
+  mockGet.mockImplementation(async (url: string) => (url === "/stickers" ? stickerResponse : chatResponse));
 });
 
 afterEach(async () => {
@@ -82,6 +101,18 @@ afterEach(async () => {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 150));
   });
+});
+
+test("der Chat lädt beim Öffnen einmal - auch wenn jede Antwort ein neues Array ist", async () => {
+  // Wie ein echter Server: jede Abfrage liefert neue Objekte.
+  mockGet.mockImplementation(async () => ({ data: [{ ...existing }] }));
+  await renderChat();
+  await flush();
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  });
+
+  expect(mockGet.mock.calls.filter(([url]) => url === "/teams/t-1/chat")).toHaveLength(1);
 });
 
 test("Bilder im Verlauf laden mit Anmeldung und in der kleinen Fassung", async () => {
@@ -122,6 +153,30 @@ test("ein ausgewähltes Bild wird hochgeladen und mit der Nachricht gesendet", a
 
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/teams/t-1/chat", { message: "", attachment_ids: ["att-new"] }));
   await waitFor(() => expect(screen.queryByTestId("chat-attachment-drafts")).toBeNull());
+});
+
+test("ein Sticker geht mit einem Tipp in den Chat - nur mit seiner Kennung", async () => {
+  mockPost.mockResolvedValue({
+    data: { id: "m-3", user_id: "u-1", message: "", attachments: [], sticker: stickerCatalog.packs[0].stickers[0] },
+  });
+  await renderChat();
+
+  await act(async () => {
+    fireEvent.press(screen.getByLabelText("Sticker"));
+  });
+  await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/stickers"));
+  fireEvent.changeText(screen.getByTestId("chat-sticker-search"), "sieg");
+  await waitFor(() => expect(screen.queryByLabelText("Sticker Feuer senden")).toBeNull());
+
+  await act(async () => {
+    fireEvent.press(screen.getByLabelText("Sticker Pokal senden"));
+  });
+
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/teams/t-1/chat", { sticker_id: "fluent-trophy" }));
+  const sticker = await screen.findByTestId("chat-message-sticker");
+  const source = (sticker as unknown as { props: { source: ImageSource } }).props.source;
+  expect(source.uri).toMatch(/\/api\/stickers\/files\/fluent\/trophy\.png$/);
+  expect(source.headers).toBeUndefined();
 });
 
 test("ein GIF wird gar nicht erst hochgeladen", async () => {
