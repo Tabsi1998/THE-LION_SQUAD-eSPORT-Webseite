@@ -1,8 +1,5 @@
 # THE LION SQUAD eSports
 
-[![CI](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions/workflows/codeql.yml)
-
 Selbst gehostete Vereins- und eSports-Plattform für THE LION SQUAD: öffentliche
 Website, Mitgliederbereich, Teams, Turniere, Fast Lap, Jahreswertung, Nachrichten,
 Galerie, Dokumente und Administration.
@@ -17,9 +14,9 @@ ergänzen Passwort und Google; [Einrichtung und Voraussetzungen](CONFIGURATION.m
 Die native Android-App ist auf Wunsch pausiert. Der größere Turnier-Umbau bleibt
 ein eigenes Paket nach [COMPETITION_ENGINE.md](COMPETITION_ENGINE.md).
 
-Die Badges zeigen den aktuellen Prüfstatus von `main`, keine Abnahme des
-Produktivservers. Dazu gehören [Praxistest](STAGING_ABNAHME.md),
-[Backup-/Restore-Nachweis](BACKUP_RESTORE.md) und [Release-Freigabe](RELEASE.md).
+Grüne Prüfungen sind keine Abnahme des Produktivservers. Dazu gehören
+[Praxistest](STAGING_ABNAHME.md), [Backup-/Restore-Nachweis](BACKUP_RESTORE.md) und
+[Release-Freigabe](RELEASE.md).
 
 ## Betrieb
 
@@ -70,8 +67,16 @@ corepack yarn build
 
 Benötigte Python-Pakete stehen in `backend/requirements.txt` und
 `backend/requirements-dev.txt`. Schreibende Live-Tests laufen ausschließlich auf
-einem dafür vorbereiteten Teststack. Die [CI-Workflows](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions)
-enthalten die verbindlichen automatischen Prüfungen; [Releases](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/releases)
+einem dafür vorbereiteten Teststack.
+
+**Lokal zuerst, GitHub bestätigt.** Die [CI-Workflows](.github/workflows/ci.yml)
+enthalten die verbindlichen automatischen Prüfungen. Sie laufen vor dem Push auf dem
+Entwicklungsrechner, denn GitHub rechnet für dieses private Repo jede Minute ab. Auf
+GitHub startet die CI deshalb nur für Pull Requests, die kein Entwurf sind, und nur mit
+den Jobs, deren Bereich der PR berührt ([Regeln](scripts/ci-changed-areas.py)). Der
+Geheimnis-Scan läuft bei jeder Änderung. CodeQL wird nur manuell gestartet, solange
+Code Scanning für das private Repo nicht aktiviert ist.
+[Releases](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/releases)
 dokumentieren veröffentlichte Artefakte.
 
 ## Lizenz

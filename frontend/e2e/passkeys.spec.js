@@ -1,7 +1,8 @@
 const { test, expect } = require("@playwright/test");
 const { generateKeyPairSync, randomBytes } = require("node:crypto");
 
-test("native browser passkey login continues into the existing admin MFA flow", async ({ page, context }) => {
+test("native browser passkey login continues into the existing admin MFA flow", async ({ page, context, browserName, baseURL }) => {
+  test.skip(browserName !== "chromium", "The virtual WebAuthn authenticator requires Chromium CDP.");
   const session = await context.newCDPSession(page);
   await session.send("WebAuthn.enable");
   const { authenticatorId } = await session.send("WebAuthn.addVirtualAuthenticator", {
@@ -27,7 +28,9 @@ test("native browser passkey login continues into the existing admin MFA flow", 
     verified = true;
     return route.fulfill({ contentType: "application/json", body: '{"mfa_required":true,"mfa_ticket":"passkey-mfa-ticket"}' });
   });
-  await page.goto("http://localhost:3000/login");
+  const loginURL = new URL("/login", baseURL);
+  loginURL.hostname = "localhost";
+  await page.goto(loginURL.href);
   const consent = page.getByRole("button", { name: /alle akzeptieren/i });
   if (await consent.count()) await consent.click();
   await page.getByTestId("login-passkey").click();

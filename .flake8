@@ -1,0 +1,5 @@
+[flake8]
+# Die CI wählt die Regeln per Kommandozeile (--select, --exclude).
+# extend-exclude gilt zusätzlich: Eine lokale virtuelle Umgebung unter backend/
+# darf den Lauf nicht mit fremdem Paketcode füllen.
+extend-exclude = .venv,venv,node_modules

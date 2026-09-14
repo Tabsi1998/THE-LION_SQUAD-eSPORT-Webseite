@@ -1,11 +1,12 @@
 name: CodeQL
 
+# Nur manuell. Das Repo ist privat; Code Scanning braucht dort GitHub Code
+# Security. Ohne das läuft die Analyse jeweils rund acht Minuten und scheitert
+# erst beim Hochladen, ohne verwertbares Ergebnis.
+# Wieder automatisch (pull_request, wöchentlich), sobald das Repo öffentlich ist
+# oder Code Security aktiviert wurde.
 on:
-  push:
-    branches: [main]
-  pull_request:
-  schedule:
-    - cron: "31 3 * * 1"
+  workflow_dispatch:
 
 permissions:
   actions: read

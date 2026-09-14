@@ -70,3 +70,10 @@ memory/test_credentials.md
 chainlit.md
 .ipynb_checkpoints/
 .deploy/
+
+# Local VS Code test environments and generated results
+/.local-testing/
+/*.code-workspace
+/frontend/test-results/
+/frontend/playwright-report/
+/frontend/coverage/
