@@ -53,6 +53,15 @@
           "icon": "./assets/notification-icon.png",
           "color": "#29B6E8"
         }
+      ],
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "LionsAPP greift auf deine Fotos und Videos zu, damit du sie im Chat senden kannst.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
       ]
     ],
     "updates": {

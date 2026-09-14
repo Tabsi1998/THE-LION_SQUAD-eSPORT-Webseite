@@ -445,6 +445,17 @@ export type PublicUser = {
   message_hint?: string;
 };
 
+export type ChatAttachment = {
+  id: string;
+  kind: "image" | "video";
+  mime?: string | null;
+  size?: number | null;
+  width?: number | null;
+  height?: number | null;
+  url: string;
+  poster_url?: string | null;
+};
+
 export type ChatMessage = {
   id: string;
   message: string;
@@ -456,6 +467,7 @@ export type ChatMessage = {
   sender?: PublicUser | null;
   recipient?: PublicUser | null;
   read_at?: string | null;
+  attachments?: ChatAttachment[];
 };
 
 export type DirectConversation = {

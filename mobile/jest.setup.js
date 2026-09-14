@@ -30,6 +30,19 @@ jest.mock("expo-constants", () => ({
 
 jest.mock("expo-device", () => ({ isDevice: false }));
 
+// Galerie, Videowiedergabe und Standbild haben im Test kein Gerät. Die Tests
+// setzen die Rückgabe von launchImageLibraryAsync selbst.
+jest.mock("expo-image-picker", () => ({
+  launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: null })),
+}));
+jest.mock("expo-video-thumbnails", () => ({
+  getThumbnailAsync: jest.fn(async () => ({ uri: "file:///vorschau.jpg", width: 320, height: 180 })),
+}));
+jest.mock("expo-video", () => ({
+  useVideoPlayer: jest.fn(() => ({ play: jest.fn() })),
+  VideoView: () => null,
+}));
+
 jest.mock("expo-haptics", () => ({
   impactAsync: jest.fn(),
   notificationAsync: jest.fn(),

@@ -19,6 +19,7 @@ import { colors } from "../theme";
 import type { ChatMessage } from "../types";
 import { resourceFromPath } from "../realtime/liveChanges";
 import { useLiveRefresh } from "../realtime/LiveChangesProvider";
+import { AttachButton, AttachmentDraftsRow, MessageAttachments, useChatAttachmentDrafts } from "./ChatAttachments";
 import { EmptyState, SkeletonList } from "./ListState";
 import { RichText } from "./RichText";
 import { Body, Muted } from "./Text";
@@ -59,6 +60,7 @@ export function ChatThreadView({
   const nearBottomRef = useRef(true);
   const didInitialScroll = useRef(false);
   const composerBottomInset = Math.max(insets.bottom, Platform.OS === "android" ? 8 : 10);
+  const attachments = useChatAttachmentDrafts();
 
   const scrollToLatest = useCallback((animated = false) => {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated }));
@@ -133,12 +135,13 @@ export function ChatThreadView({
 
   const send = useCallback(async () => {
     const message = text.trim();
-    if (!message || sending || !allowed) return;
+    if (!attachments.canSend(message) || sending || !allowed) return;
     setSending(true);
     try {
-      const { data } = await api.post<ChatMessage>(postUrl, { message });
+      const { data } = await api.post<ChatMessage>(postUrl, { message, attachment_ids: attachments.attachmentIds });
       setMessages((items) => [...items, data]);
       setText("");
+      attachments.reset();
       nearBottomRef.current = true;
       setTimeout(() => scrollToLatest(true), 50);
     } catch (err) {
@@ -146,7 +149,7 @@ export function ChatThreadView({
     } finally {
       setSending(false);
     }
-  }, [allowed, postUrl, scrollToLatest, sending, text]);
+  }, [allowed, attachments, postUrl, scrollToLatest, sending, text]);
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
@@ -199,7 +202,9 @@ export function ChatThreadView({
             ))}
           </View>
         ) : null}
+        <AttachmentDraftsRow drafts={attachments.drafts} onRemove={attachments.remove} />
         <View style={[styles.composer, { paddingBottom: composerBottomInset }]}>
+          <AttachButton disabled={!allowed || sending} onPress={() => { void attachments.pick(); }} />
           <TextInput
             editable={allowed && !sending}
             multiline
@@ -217,7 +222,7 @@ export function ChatThreadView({
             }}
             value={text}
           />
-          <Pressable disabled={!text.trim() || sending || !allowed} onPress={send} style={[styles.send, (!text.trim() || sending || !allowed) && styles.disabled]}>
+          <Pressable disabled={!attachments.canSend(text) || sending || !allowed} onPress={send} style={[styles.send, (!attachments.canSend(text) || sending || !allowed) && styles.disabled]}>
             <Body style={styles.sendText}>Senden</Body>
           </Pressable>
         </View>
@@ -245,9 +250,12 @@ function MessageBubble({ message, own, onOpenProfile }: { message: ChatMessage; 
         </Body>
         {message.created_at ? <Muted style={own && styles.ownMuted}>{formatDate(message.created_at)}</Muted> : null}
       </View>
-      <View style={own && styles.ownRichText}>
-        <RichText text={message.message} compact onOpenContent={openContent} />
-      </View>
+      {message.message ? (
+        <View style={own && styles.ownRichText}>
+          <RichText text={message.message} compact onOpenContent={openContent} />
+        </View>
+      ) : null}
+      <MessageAttachments attachments={message.attachments} />
     </View>
   );
 }
