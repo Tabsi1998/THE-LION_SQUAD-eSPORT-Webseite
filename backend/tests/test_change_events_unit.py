@@ -66,8 +66,8 @@ def test_private_mutation_is_visible_to_staff_only():
         public_queue = asyncio.Queue()
         staff_queue = asyncio.Queue()
         change_events._subscribers.update({
-            (public_queue, "public"),
-            (staff_queue, "staff"),
+            (public_queue, "public", "member-1"),
+            (staff_queue, "staff", "moderator-1"),
         })
 
         await change_events.publish_api_change(
@@ -174,7 +174,7 @@ def test_stream_emits_exactly_one_reset_for_unknown_cursor():
 def test_queue_overflow_replaces_stale_changes_with_snapshot_reset():
     async def scenario():
         queue = asyncio.Queue(maxsize=1)
-        change_events._subscribers.add((queue, "public"))
+        change_events._subscribers.add((queue, "public", None))
 
         await change_events.publish_api_change("PATCH", "/api/tournaments/one", 200)
         await change_events.publish_api_change("PATCH", "/api/tournaments/two", 200)
@@ -195,3 +195,92 @@ def test_refresh_and_stream_endpoints_do_not_publish_changes():
 
     asyncio.run(scenario())
     assert list(change_events._event_buffer) == []
+
+
+# Private Ressourcen: Direktnachrichten, Team-Chat und Benachrichtigungen sind
+# nicht öffentlich. Ohne gezielte Ereignisse erfuhr ein normales Mitglied nie
+# von seinen eigenen neuen Nachrichten und musste abfragen.
+
+def test_private_user_change_reaches_only_its_targets():
+    async def scenario():
+        alice = asyncio.Queue()
+        bob = asyncio.Queue()
+        staff = asyncio.Queue()
+        guest = asyncio.Queue()
+        change_events._subscribers.update({
+            (alice, "public", "alice-id"),
+            (bob, "public", "bob-id"),
+            (staff, "staff", "moderator-id"),
+            (guest, "public", None),
+        })
+
+        await change_events.publish_user_change(["alice-id"], "messages")
+
+        event_name, event = alice.get_nowait()
+        assert event_name == "change"
+        assert event["resource"] == "messages"
+        assert event["path"] == "/api/messages"
+        assert event["visibility_scope"] == "user"
+        # Staff bekommt fremde private Ereignisse nicht, Gäste und andere Mitglieder erst recht nicht.
+        assert bob.empty()
+        assert staff.empty()
+        assert guest.empty()
+        return event
+
+    event = asyncio.run(scenario())
+    rendered = change_events._format_sse("change", event)
+    assert change_events.TARGETS_KEY not in rendered
+    assert "alice-id" not in rendered
+
+
+def test_private_user_change_ignores_missing_targets():
+    asyncio.run(change_events.publish_user_change([None, ""], "notifications"))
+    asyncio.run(change_events.publish_user_change(["alice-id"], ""))
+
+    assert list(change_events._event_buffer) == []
+
+
+def test_replay_of_private_change_only_for_its_target():
+    async def scenario():
+        await change_events.publish_api_change("PATCH", "/api/tournaments/one", 200)
+        cursor = change_events._event_buffer[-1]["event_id"]
+        await change_events.publish_user_change(["alice-id", "bob-id"], "teams")
+        return (
+            change_events._replay_after(cursor, "public", "alice-id"),
+            change_events._replay_after(cursor, "public", "carol-id"),
+            change_events._replay_after(cursor, "staff", "moderator-id"),
+            change_events._replay_after(cursor, "public", None),
+        )
+
+    (alice, _), (carol, _), (staff, _), (guest, _) = asyncio.run(scenario())
+
+    assert [event["resource"] for event in alice] == ["teams"]
+    assert change_events.TARGETS_KEY not in alice[0]
+    assert carol == []
+    assert staff == []
+    assert guest == []
+
+
+def test_signed_in_stream_replays_own_private_change_only():
+    class DisconnectedRequest:
+        def __init__(self, last_event_id):
+            self.headers = {"last-event-id": last_event_id}
+
+        async def is_disconnected(self):
+            return True
+
+    async def scenario(user_id):
+        change_events._event_buffer.clear()
+        await change_events.publish_api_change("PATCH", "/api/tournaments/one", 200)
+        cursor = change_events._event_buffer[-1]["event_id"]
+        await change_events.publish_user_change(["alice-id"], "notifications")
+        stream = change_events.change_event_stream(DisconnectedRequest(cursor), "public", user_id)
+        return [chunk async for chunk in stream]
+
+    own = asyncio.run(scenario("alice-id"))
+    other = asyncio.run(scenario("bob-id"))
+
+    assert '"replayed":1' in own[0]
+    assert '"resource":"notifications"' in own[1]
+    assert '"replayed":0' in other[0]
+    assert len(other) == 1

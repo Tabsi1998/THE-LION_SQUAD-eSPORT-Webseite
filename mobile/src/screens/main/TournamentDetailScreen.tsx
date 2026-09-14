@@ -14,9 +14,12 @@ import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime, formatStatus } from "../../lib/format";
 import { getRegistrationState } from "../../lib/registration";
 import { isGuestUser } from "../../live";
+import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { Team, Tournament, User } from "../../types";
+
+const TOURNAMENT_LIVE_RESOURCES = ["tournaments", "matches", "matches-v2", "teams"];
 
 type Props = NativeStackScreenProps<TournamentStackParamList, "TournamentDetail">;
 type TabKey = "overview" | "bracket" | "matches" | "standings" | "participants" | "rules";
@@ -80,9 +83,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 10000);
-    return () => clearInterval(timer);
   }, [load]);
+  useLiveRefresh(load, TOURNAMENT_LIVE_RESOURCES, { fallbackMs: 10000 });
 
   const registrations = bracket.registrations || [];
   const myTeamIds = useMemo(() => new Set(myTeams.map((team) => team.id).filter(Boolean)), [myTeams]);

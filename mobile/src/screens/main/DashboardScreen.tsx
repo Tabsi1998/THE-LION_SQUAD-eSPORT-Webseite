@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import React, { useCallback, useMemo, useState } from "react";
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
@@ -13,9 +13,13 @@ import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { compareByNearestDate } from "../../lib/contentSort";
 import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
+import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { MainTabParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ClubEvent, DashboardAction, LiveStream, Match, MobileDashboardData, NewsPost, Tournament } from "../../types";
+
+// Was das Dashboard zeigt: eigene Matches, Turniere, Events, News, Streams und die Glocke.
+const DASHBOARD_LIVE_RESOURCES = ["tournaments", "matches", "events", "news", "streams", "notifications", "teams", "f1"];
 
 type Props = BottomTabScreenProps<MainTabParamList, "Dashboard">;
 type TimelineItem = {
@@ -105,11 +109,11 @@ export function DashboardScreen({ navigation }: Props) {
     }
   }, [isGuest, refreshMe]);
 
+  const isFocused = useIsFocused();
   useFocusEffect(useCallback(() => {
     void load();
-    const timer = setInterval(() => void load(), 10000);
-    return () => clearInterval(timer);
   }, [load]));
+  useLiveRefresh(load, DASHBOARD_LIVE_RESOURCES, { enabled: isFocused, fallbackMs: 10000 });
 
   const timeline = useMemo(() => {
     const source = isGuest

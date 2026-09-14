@@ -416,7 +416,7 @@ async def readiness():
 @app.get("/api/changes/stream")
 async def changes_stream(request: Request, user: dict | None = Depends(get_optional_user)):
     return StreamingResponse(
-        change_event_stream(request, visibility_scope_for_user(user)),
+        change_event_stream(request, visibility_scope_for_user(user), (user or {}).get("id")),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-store",
