@@ -18,6 +18,7 @@ import { GoogleAuthButton } from "@/components/tls/GoogleAuthButton";
 import { MfaSetupPanel } from "@/components/tls/MfaSetupPanel";
 import { PasskeysPanel } from "@/components/tls/PasskeysPanel";
 import { ChatAttachButton, ChatAttachmentDrafts, ChatMessageAttachments, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
+import { ChatMessageSticker, ChatStickerButton, ChatStickerPicker } from "@/components/tls/ChatStickers";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 
 const TABS = [
@@ -1281,6 +1282,7 @@ function MessagesPanel() {
   }, [query]);
 
   const dmAttachments = useChatAttachmentDrafts();
+  const [stickersOpen, setStickersOpen] = useState(false);
 
   const send = async () => {
     const message = text.trim();
@@ -1296,6 +1298,21 @@ function MessagesPanel() {
       loadThreads();
     } catch (err) {
       toast.error(formatRequestError(err, "Nachricht konnte nicht gesendet werden."));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const sendSticker = async (sticker) => {
+    if (!active?.id || sending) return;
+    setSending(true);
+    try {
+      const { data } = await api.post(`/messages/direct/${active.id}`, { sticker_id: sticker.id });
+      setMessages((rows) => [...rows, data]);
+      setStickersOpen(false);
+      loadThreads();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Sticker konnte nicht gesendet werden."));
     } finally {
       setSending(false);
     }
@@ -1407,7 +1424,7 @@ function MessagesPanel() {
                       <div className="font-bold text-sm truncate">{other.display_name || other.username}</div>
                       {thread.unread_count > 0 && <span className="shrink-0 min-w-5 h-5 px-1 rounded-sm bg-[#29B6E8] text-black text-[10px] font-black inline-flex items-center justify-center">{thread.unread_count}</span>}
                     </div>
-                    <div className="text-xs text-white/40 truncate">{thread.latest_message?.message || (thread.latest_message?.attachments?.length ? "[Anhang]" : "Noch keine Nachricht")}</div>
+                    <div className="text-xs text-white/40 truncate">{thread.latest_message?.message || (thread.latest_message?.attachments?.length ? "[Anhang]" : thread.latest_message?.sticker ? "[Sticker]" : "Noch keine Nachricht")}</div>
                   </button>
                 );
               })}
@@ -1441,6 +1458,7 @@ function MessagesPanel() {
                         </div>
                         {message.message && <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85">{message.message}</div>}
                         <ChatMessageAttachments attachments={message.attachments} />
+                        <ChatMessageSticker sticker={message.sticker} />
                       </div>
                     </div>
                   );
@@ -1448,8 +1466,10 @@ function MessagesPanel() {
                 {messages.length === 0 && <div className="text-center py-16 text-sm text-white/35">Noch keine Nachrichten in diesem Gespräch.</div>}
               </div>
               <ChatAttachmentDrafts drafts={dmAttachments.drafts} onRemove={dmAttachments.remove} />
+              <ChatStickerPicker open={stickersOpen && canSend} onClose={() => setStickersOpen(false)} onPick={sendSticker} disabled={sending} />
               <div className="border-t border-white/10 p-3 flex gap-2" onPaste={dmAttachments.onPaste}>
                 <ChatAttachButton onFiles={dmAttachments.addFiles} disabled={!canSend || sending} testId="direct-chat-attach" />
+                <ChatStickerButton open={stickersOpen && canSend} onToggle={() => setStickersOpen((value) => !value)} disabled={!canSend || sending} testId="direct-chat-stickers" />
                 <input
                   value={text}
                   onChange={(e) => setText(e.target.value)}

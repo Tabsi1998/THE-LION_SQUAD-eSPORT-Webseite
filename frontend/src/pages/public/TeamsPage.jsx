@@ -8,6 +8,7 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
 import { ChatAttachButton, ChatAttachmentDrafts, ChatMessageAttachments, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
+import { ChatMessageSticker, ChatStickerButton, ChatStickerPicker } from "@/components/tls/ChatStickers";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
@@ -382,6 +383,7 @@ function TeamChat({ team, user }) {
   const [sendError, setSendError] = useState("");
   const scrollRef = useRef(null);
   const attachments = useChatAttachmentDrafts();
+  const [stickersOpen, setStickersOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -421,6 +423,20 @@ function TeamChat({ team, user }) {
     }
   };
 
+  const sendSticker = async (sticker) => {
+    setSendError("");
+    const attempt = await submitOnce(async () => {
+      const { data } = await api.post(`/teams/${team.id}/chat`, { sticker_id: sticker.id });
+      setMessages((rows) => [...rows, data]);
+      setStickersOpen(false);
+    });
+    if (attempt.started && attempt.error) {
+      const messageText = formatRequestError(attempt.error, "Sticker konnte nicht gesendet werden.");
+      setSendError(messageText);
+      toast.error(messageText);
+    }
+  };
+
   return (
     <section data-testid="team-chat">
       <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2">
@@ -439,6 +455,7 @@ function TeamChat({ team, user }) {
                   </div>
                   {message.message && <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85"><MentionText text={message.message} /></div>}
                   <ChatMessageAttachments attachments={message.attachments} />
+                  <ChatMessageSticker sticker={message.sticker} />
                 </div>
               </div>
             );
@@ -446,8 +463,10 @@ function TeamChat({ team, user }) {
           {messages.length === 0 && <div className="text-center py-10 text-sm text-white/35">Noch keine Nachrichten im Team-Chat.</div>}
         </div>
         <ChatAttachmentDrafts drafts={attachments.drafts} onRemove={attachments.remove} />
+        <ChatStickerPicker open={stickersOpen} onClose={() => setStickersOpen(false)} onPick={sendSticker} disabled={loading} />
         <div className="border-t border-white/10 p-3 flex gap-2" onPaste={attachments.onPaste}>
           <ChatAttachButton onFiles={attachments.addFiles} disabled={loading} testId="team-chat-attach" />
+          <ChatStickerButton open={stickersOpen} onToggle={() => setStickersOpen((value) => !value)} disabled={loading} testId="team-chat-stickers" />
           <MentionTextarea
             value={text}
             onValueChange={(value) => { setText(value); setSendError(""); }}

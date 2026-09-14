@@ -36,6 +36,7 @@ from routes.mobile_routes import router as mobile_router
 from routes.admin_routes import router as admin_router
 from routes.upload_routes import router as upload_router
 from routes.chat_attachment_routes import router as chat_attachment_router
+from routes.sticker_routes import router as sticker_router
 from routes.badge_routes import router as badge_router, admin_router as achievement_admin_router
 from routes.phase_c_routes import router as phase_c_router
 from routes.phase_ef_routes import (
@@ -223,6 +224,7 @@ app.include_router(pdf_router)
 app.include_router(audit_router)
 app.include_router(upload_router)
 app.include_router(chat_attachment_router)
+app.include_router(sticker_router)
 app.include_router(badge_router)
 app.include_router(achievement_admin_router)
 app.include_router(phase_c_router)
@@ -356,7 +358,9 @@ async def security_headers(request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    if request.url.path.startswith("/api/"):
+    # Sticker-Bilder des Startpakets ändern sich nie und stehen in jedem Chat
+    # dutzendfach - die dürfen im Browser und in der App zwischengespeichert werden.
+    if request.url.path.startswith("/api/") and not request.url.path.startswith("/api/stickers/files/"):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"

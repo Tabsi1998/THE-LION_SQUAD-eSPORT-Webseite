@@ -112,6 +112,7 @@ const AdminNavPage = lazy(() => import("@/pages/admin/AdminNavPage"));
 const MembershipApplyPage = lazy(() => import("@/pages/public/MembershipApplyPage"));
 const AdminSponsorsPage = lazy(() => import("@/pages/admin/AdminSponsorsPage"));
 const AdminPartnersPage = lazy(() => import("@/pages/admin/AdminPartnersPage"));
+const AdminStickersPage = lazy(() => import("@/pages/admin/AdminStickersPage"));
 
 const AboutPage = lazy(() => import("@/pages/public/AboutPage"));
 const ContactPage = lazy(() => import("@/pages/public/ContactPage"));
@@ -275,6 +276,7 @@ function App() {
           <Route path="/admin/references" element={<ProtectedRoute requireClubAdmin><AdminReferencesPage /></ProtectedRoute>} />
           <Route path="/admin/game-servers" element={<ProtectedRoute requireClubAdmin><AdminGameServersPage /></ProtectedRoute>} />
           <Route path="/admin/achievements" element={<ProtectedRoute requireAdmin><AdminAchievementsPage /></ProtectedRoute>} />
+          <Route path="/admin/stickers" element={<ProtectedRoute requireAdmin><AdminStickersPage /></ProtectedRoute>} />
           <Route path="/admin/membership-applications" element={<ProtectedRoute requireClubAdmin><AdminMembershipApplicationsPage /></ProtectedRoute>} />
           <Route path="/admin/cms" element={<ProtectedRoute requireAdmin><AdminCmsPage /></ProtectedRoute>} />
           <Route path="/admin/media" element={<ProtectedRoute requireAdmin><AdminMediaPage /></ProtectedRoute>} />

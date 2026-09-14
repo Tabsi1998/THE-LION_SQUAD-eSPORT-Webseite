@@ -666,6 +666,7 @@ class MatchChatCreate(BaseModel):
     message: str = Field(default="", max_length=1500)
     # Höchstens vier, wie services.chat_attachments.MAX_ATTACHMENTS_PER_MESSAGE.
     attachment_ids: list[str] = Field(default_factory=list, max_length=4)
+    sticker_id: Optional[str] = Field(default=None, max_length=80)
 
 
 class MatchUpdate(BaseModel):

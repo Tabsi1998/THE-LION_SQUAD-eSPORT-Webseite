@@ -1,0 +1,825 @@
+{
+  "source": "Microsoft Fluent Emoji (3D)",
+  "license": "MIT",
+  "license_url": "/api/stickers/files/fluent/LICENSE.txt",
+  "project_url": "https://github.com/microsoft/fluentui-emoji",
+  "packs": [
+    {
+      "id": "fluent-reaktionen",
+      "name": "Reaktionen",
+      "stickers": [
+        {
+          "id": "fluent-face-with-tears-of-joy",
+          "name": "Tränen lachen",
+          "keywords": [
+            "lachen",
+            "lol",
+            "haha"
+          ],
+          "url": "/api/stickers/files/fluent/face-with-tears-of-joy.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-rolling-on-the-floor-laughing",
+          "name": "Kugeln vor Lachen",
+          "keywords": [
+            "rofl",
+            "lachen"
+          ],
+          "url": "/api/stickers/files/fluent/rolling-on-the-floor-laughing.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-grinning-squinting-face",
+          "name": "Breit grinsen",
+          "keywords": [
+            "grinsen",
+            "freude"
+          ],
+          "url": "/api/stickers/files/fluent/grinning-squinting-face.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-winking-face",
+          "name": "Zwinkern",
+          "keywords": [
+            "zwinkern",
+            "spaß"
+          ],
+          "url": "/api/stickers/files/fluent/winking-face.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-smiling-face-with-sunglasses",
+          "name": "Cool",
+          "keywords": [
+            "cool",
+            "lässig"
+          ],
+          "url": "/api/stickers/files/fluent/smiling-face-with-sunglasses.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-star-struck",
+          "name": "Begeistert",
+          "keywords": [
+            "wow",
+            "stark"
+          ],
+          "url": "/api/stickers/files/fluent/star-struck.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-partying-face",
+          "name": "Party",
+          "keywords": [
+            "party",
+            "feiern"
+          ],
+          "url": "/api/stickers/files/fluent/partying-face.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-smiling-face-with-heart-eyes",
+          "name": "Verliebt",
+          "keywords": [
+            "liebe",
+            "herz"
+          ],
+          "url": "/api/stickers/files/fluent/smiling-face-with-heart-eyes.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-hugging-face",
+          "name": "Umarmung",
+          "keywords": [
+            "danke",
+            "umarmen"
+          ],
+          "url": "/api/stickers/files/fluent/hugging-face.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-thinking-face",
+          "name": "Nachdenken",
+          "keywords": [
+            "hmm",
+            "denken"
+          ],
+          "url": "/api/stickers/files/fluent/thinking-face.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-face-with-rolling-eyes",
+          "name": "Augenrollen",
+          "keywords": [
+            "augenrollen",
+            "genervt"
+          ],
+          "url": "/api/stickers/files/fluent/face-with-rolling-eyes.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-exploding-head",
+          "name": "Kopf explodiert",
+          "keywords": [
+            "krass",
+            "unfassbar"
+          ],
+          "url": "/api/stickers/files/fluent/exploding-head.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-face-screaming-in-fear",
+          "name": "Schock",
+          "keywords": [
+            "schock",
+            "angst"
+          ],
+          "url": "/api/stickers/files/fluent/face-screaming-in-fear.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-loudly-crying-face",
+          "name": "Heulen",
+          "keywords": [
+            "weinen",
+            "traurig"
+          ],
+          "url": "/api/stickers/files/fluent/loudly-crying-face.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-pleading-face",
+          "name": "Bitte",
+          "keywords": [
+            "bitte",
+            "hundeblick"
+          ],
+          "url": "/api/stickers/files/fluent/pleading-face.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-pouting-face",
+          "name": "Wütend",
+          "keywords": [
+            "wütend",
+            "sauer",
+            "rage"
+          ],
+          "url": "/api/stickers/files/fluent/pouting-face.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-sleeping-face",
+          "name": "Schlafen",
+          "keywords": [
+            "müde",
+            "schlafen",
+            "afk"
+          ],
+          "url": "/api/stickers/files/fluent/sleeping-face.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-nerd-face",
+          "name": "Nerd",
+          "keywords": [
+            "nerd",
+            "streber"
+          ],
+          "url": "/api/stickers/files/fluent/nerd-face.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-zany-face",
+          "name": "Verrückt",
+          "keywords": [
+            "verrückt",
+            "crazy"
+          ],
+          "url": "/api/stickers/files/fluent/zany-face.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-clown-face",
+          "name": "Clown",
+          "keywords": [
+            "clown",
+            "witzig"
+          ],
+          "url": "/api/stickers/files/fluent/clown-face.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-skull",
+          "name": "Totenkopf",
+          "keywords": [
+            "tot",
+            "rip"
+          ],
+          "url": "/api/stickers/files/fluent/skull.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-ghost",
+          "name": "Geist",
+          "keywords": [
+            "geist",
+            "boo"
+          ],
+          "url": "/api/stickers/files/fluent/ghost.png",
+          "width": 256,
+          "height": 256
+        }
+      ]
+    },
+    {
+      "id": "fluent-haende",
+      "name": "Hände",
+      "stickers": [
+        {
+          "id": "fluent-thumbs-up",
+          "name": "Daumen hoch",
+          "keywords": [
+            "ja",
+            "gut",
+            "daumen"
+          ],
+          "url": "/api/stickers/files/fluent/thumbs-up.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-thumbs-down",
+          "name": "Daumen runter",
+          "keywords": [
+            "nein",
+            "schlecht"
+          ],
+          "url": "/api/stickers/files/fluent/thumbs-down.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-clapping-hands",
+          "name": "Applaus",
+          "keywords": [
+            "applaus",
+            "klatschen",
+            "gg"
+          ],
+          "url": "/api/stickers/files/fluent/clapping-hands.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-raising-hands",
+          "name": "Hände hoch",
+          "keywords": [
+            "hurra",
+            "jubel"
+          ],
+          "url": "/api/stickers/files/fluent/raising-hands.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-flexed-biceps",
+          "name": "Stark",
+          "keywords": [
+            "stark",
+            "power"
+          ],
+          "url": "/api/stickers/files/fluent/flexed-biceps.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-folded-hands",
+          "name": "Bitte / Danke",
+          "keywords": [
+            "danke",
+            "bitte"
+          ],
+          "url": "/api/stickers/files/fluent/folded-hands.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-handshake",
+          "name": "Handschlag",
+          "keywords": [
+            "deal",
+            "fair",
+            "gg"
+          ],
+          "url": "/api/stickers/files/fluent/handshake.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-oncoming-fist",
+          "name": "Faustgruß",
+          "keywords": [
+            "bro",
+            "fist"
+          ],
+          "url": "/api/stickers/files/fluent/oncoming-fist.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-waving-hand",
+          "name": "Winken",
+          "keywords": [
+            "hallo",
+            "tschüss"
+          ],
+          "url": "/api/stickers/files/fluent/waving-hand.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-ok-hand",
+          "name": "Okay",
+          "keywords": [
+            "okay",
+            "passt"
+          ],
+          "url": "/api/stickers/files/fluent/ok-hand.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-victory-hand",
+          "name": "Sieg",
+          "keywords": [
+            "sieg",
+            "peace"
+          ],
+          "url": "/api/stickers/files/fluent/victory-hand.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-crossed-fingers",
+          "name": "Daumen drücken",
+          "keywords": [
+            "glück",
+            "daumen drücken"
+          ],
+          "url": "/api/stickers/files/fluent/crossed-fingers.png",
+          "width": 256,
+          "height": 256
+        }
+      ]
+    },
+    {
+      "id": "fluent-esports",
+      "name": "eSports & Party",
+      "stickers": [
+        {
+          "id": "fluent-trophy",
+          "name": "Pokal",
+          "keywords": [
+            "pokal",
+            "sieg",
+            "champion"
+          ],
+          "url": "/api/stickers/files/fluent/trophy.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-1st-place-medal",
+          "name": "Platz 1",
+          "keywords": [
+            "erster",
+            "gold"
+          ],
+          "url": "/api/stickers/files/fluent/1st-place-medal.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-2nd-place-medal",
+          "name": "Platz 2",
+          "keywords": [
+            "zweiter",
+            "silber"
+          ],
+          "url": "/api/stickers/files/fluent/2nd-place-medal.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-3rd-place-medal",
+          "name": "Platz 3",
+          "keywords": [
+            "dritter",
+            "bronze"
+          ],
+          "url": "/api/stickers/files/fluent/3rd-place-medal.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-sports-medal",
+          "name": "Medaille",
+          "keywords": [
+            "medaille"
+          ],
+          "url": "/api/stickers/files/fluent/sports-medal.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-video-game",
+          "name": "Controller",
+          "keywords": [
+            "zocken",
+            "gaming",
+            "controller"
+          ],
+          "url": "/api/stickers/files/fluent/video-game.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-joystick",
+          "name": "Joystick",
+          "keywords": [
+            "retro",
+            "arcade"
+          ],
+          "url": "/api/stickers/files/fluent/joystick.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-racing-car",
+          "name": "Rennwagen",
+          "keywords": [
+            "rennen",
+            "fast lap",
+            "f1"
+          ],
+          "url": "/api/stickers/files/fluent/racing-car.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-chequered-flag",
+          "name": "Zielflagge",
+          "keywords": [
+            "ziel",
+            "rennen"
+          ],
+          "url": "/api/stickers/files/fluent/chequered-flag.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-soccer-ball",
+          "name": "Fußball",
+          "keywords": [
+            "fifa",
+            "fußball",
+            "ea fc"
+          ],
+          "url": "/api/stickers/files/fluent/soccer-ball.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-crossed-swords",
+          "name": "Duell",
+          "keywords": [
+            "duell",
+            "match",
+            "1v1"
+          ],
+          "url": "/api/stickers/files/fluent/crossed-swords.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-bullseye",
+          "name": "Volltreffer",
+          "keywords": [
+            "treffer",
+            "headshot"
+          ],
+          "url": "/api/stickers/files/fluent/bullseye.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-game-die",
+          "name": "Würfel",
+          "keywords": [
+            "glück",
+            "würfel"
+          ],
+          "url": "/api/stickers/files/fluent/game-die.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-lion",
+          "name": "Löwe",
+          "keywords": [
+            "löwe",
+            "lion squad"
+          ],
+          "url": "/api/stickers/files/fluent/lion.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-party-popper",
+          "name": "Konfetti",
+          "keywords": [
+            "party",
+            "glückwunsch"
+          ],
+          "url": "/api/stickers/files/fluent/party-popper.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-popcorn",
+          "name": "Popcorn",
+          "keywords": [
+            "zuschauen",
+            "drama"
+          ],
+          "url": "/api/stickers/files/fluent/popcorn.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-pizza",
+          "name": "Pizza",
+          "keywords": [
+            "essen",
+            "lan"
+          ],
+          "url": "/api/stickers/files/fluent/pizza.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-hot-beverage",
+          "name": "Kaffee",
+          "keywords": [
+            "kaffee",
+            "pause"
+          ],
+          "url": "/api/stickers/files/fluent/hot-beverage.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-beer-mug",
+          "name": "Bier",
+          "keywords": [
+            "bier",
+            "prost"
+          ],
+          "url": "/api/stickers/files/fluent/beer-mug.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-clinking-beer-mugs",
+          "name": "Prost",
+          "keywords": [
+            "prost",
+            "anstoßen"
+          ],
+          "url": "/api/stickers/files/fluent/clinking-beer-mugs.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-jack-o-lantern",
+          "name": "Kürbis",
+          "keywords": [
+            "halloween"
+          ],
+          "url": "/api/stickers/files/fluent/jack-o-lantern.png",
+          "width": 256,
+          "height": 256
+        }
+      ]
+    },
+    {
+      "id": "fluent-symbole",
+      "name": "Symbole",
+      "stickers": [
+        {
+          "id": "fluent-red-heart",
+          "name": "Herz",
+          "keywords": [
+            "liebe",
+            "herz"
+          ],
+          "url": "/api/stickers/files/fluent/red-heart.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-blue-heart",
+          "name": "Blaues Herz",
+          "keywords": [
+            "herz",
+            "lion blau"
+          ],
+          "url": "/api/stickers/files/fluent/blue-heart.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-fire",
+          "name": "Feuer",
+          "keywords": [
+            "feuer",
+            "heiß",
+            "stark"
+          ],
+          "url": "/api/stickers/files/fluent/fire.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-hundred-points",
+          "name": "100",
+          "keywords": [
+            "100",
+            "perfekt"
+          ],
+          "url": "/api/stickers/files/fluent/hundred-points.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-sparkles",
+          "name": "Glitzer",
+          "keywords": [
+            "neu",
+            "glitzer"
+          ],
+          "url": "/api/stickers/files/fluent/sparkles.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-collision",
+          "name": "Knall",
+          "keywords": [
+            "boom",
+            "knall"
+          ],
+          "url": "/api/stickers/files/fluent/collision.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-rocket",
+          "name": "Rakete",
+          "keywords": [
+            "los",
+            "rakete"
+          ],
+          "url": "/api/stickers/files/fluent/rocket.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-crown",
+          "name": "Krone",
+          "keywords": [
+            "könig",
+            "krone",
+            "mvp"
+          ],
+          "url": "/api/stickers/files/fluent/crown.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-gem-stone",
+          "name": "Juwel",
+          "keywords": [
+            "selten",
+            "juwel"
+          ],
+          "url": "/api/stickers/files/fluent/gem-stone.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-eyes",
+          "name": "Augen",
+          "keywords": [
+            "schau",
+            "augen"
+          ],
+          "url": "/api/stickers/files/fluent/eyes.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-light-bulb",
+          "name": "Idee",
+          "keywords": [
+            "idee",
+            "tipp"
+          ],
+          "url": "/api/stickers/files/fluent/light-bulb.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-check-mark-button",
+          "name": "Erledigt",
+          "keywords": [
+            "erledigt",
+            "ja",
+            "check"
+          ],
+          "url": "/api/stickers/files/fluent/check-mark-button.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-cross-mark",
+          "name": "Nein",
+          "keywords": [
+            "nein",
+            "falsch"
+          ],
+          "url": "/api/stickers/files/fluent/cross-mark.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-warning",
+          "name": "Achtung",
+          "keywords": [
+            "achtung",
+            "warnung"
+          ],
+          "url": "/api/stickers/files/fluent/warning.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-alarm-clock",
+          "name": "Wecker",
+          "keywords": [
+            "zeit",
+            "los geht's"
+          ],
+          "url": "/api/stickers/files/fluent/alarm-clock.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-hourglass-done",
+          "name": "Zeit um",
+          "keywords": [
+            "zeit",
+            "warten"
+          ],
+          "url": "/api/stickers/files/fluent/hourglass-done.png",
+          "width": 256,
+          "height": 256
+        }
+      ]
+    }
+  ]
+}

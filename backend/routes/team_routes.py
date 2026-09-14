@@ -51,6 +51,7 @@ class TeamInviteCreate(BaseModel):
 class TeamChatCreate(BaseModel):
     message: str = Field(default="", max_length=1500)
     attachment_ids: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS_PER_MESSAGE)
+    sticker_id: str | None = Field(default=None, max_length=80)
 
 
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
@@ -355,10 +356,12 @@ async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(
     if not _chat_allowed(team, me):
         raise HTTPException(status_code=403, detail="Team-Chat ist nur für Teammitglieder sichtbar")
     text = body.message.strip()
-    if not text and not body.attachment_ids:
+    if not text and not body.attachment_ids and not body.sticker_id:
         raise HTTPException(status_code=400, detail="Nachricht darf nicht leer sein")
     now = now_utc().isoformat()
     message_id = new_id()
+    from services.stickers import sticker_for_message
+    sticker = await sticker_for_message(db, body.sticker_id, text, body.attachment_ids)
     attachments = await claim_attachments(db, me["id"], body.attachment_ids, {
         "type": "team", "team_id": team_id, "message_id": message_id,
     })
@@ -368,6 +371,7 @@ async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(
         "user_id": me["id"],
         "message": text,
         "attachments": attachments,
+        "sticker": sticker,
         "created_at": now,
         "updated_at": now,
     }

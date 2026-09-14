@@ -8,7 +8,7 @@ import {
   ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon,
   Award, Inbox, UserCheck, Medal,
   FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing,
-  Search, Server, QrCode, Activity, MessagesSquare, ChevronDown,
+  Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -55,6 +55,7 @@ const ADMIN_GROUPS = [
       { to: "/admin/cms", label: "CMS-Seiten", icon: FileText },
       { to: "/admin/nav", label: "Navigation", icon: Code2 },
       { to: "/admin/achievements", label: "Achievements", icon: Medal },
+      { to: "/admin/stickers", label: "Sticker", icon: Sticker },
     ],
   },
   {
@@ -104,6 +105,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/cms": ["seiten", "texte", "email"],
   "/admin/nav": ["menue", "navigation"],
   "/admin/achievements": ["badges", "punkte", "level"],
+  "/admin/stickers": ["chat", "emoji", "fluent"],
   "/admin/sponsors": ["unterstuetzer", "partner"],
   "/admin/partners": ["kooperationen", "netzwerk"],
   "/admin/references": ["erfolge", "platzierungen", "results"],

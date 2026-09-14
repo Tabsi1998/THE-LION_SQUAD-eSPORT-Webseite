@@ -1,6 +1,6 @@
 const { test, expect } = require("@playwright/test");
 
-// Das Adminmenü führt 34 Einträge in 6 Gruppen. Offen ergab das eine 1689 px
+// Das Adminmenü führt 35 Einträge in 6 Gruppen. Offen ergab das eine 1689 px
 // hohe Liste, von der bei 1440x900 zwölf Einträge gleichzeitig sichtbar waren -
 // und wer auf einer Seite weit unten stand, sah im Menü nicht, wo er ist: die
 // Liste blieb oben stehen.
@@ -88,7 +88,7 @@ test.describe("Adminmenü", () => {
       await expect(page.getByTestId(`admin-nav-group-${group}`)).toHaveAttribute("aria-expanded", "true");
     }
     await expect(page.getByTestId("admin-nav-tournaments")).toBeVisible();
-    expect((await navMetrics(page)).entries).toBe(34);
+    expect((await navMetrics(page)).entries).toBe(35);
   });
 
   test("eine Gruppe lässt sich zuklappen und bleibt es nach dem Neuladen", async ({ page }) => {

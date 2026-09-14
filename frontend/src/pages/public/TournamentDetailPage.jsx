@@ -17,6 +17,7 @@ import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
 import { ChatAttachButton, ChatAttachmentDrafts, ChatMessageAttachments, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
+import { ChatMessageSticker, ChatStickerButton, ChatStickerPicker } from "@/components/tls/ChatStickers";
 import { formatDateTime, getRegistrationState } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
@@ -366,6 +367,7 @@ function TournamentChat({ tournament, user }) {
   const [sendError, setSendError] = useState("");
   const scrollRef = useRef(null);
   const attachments = useChatAttachmentDrafts();
+  const [stickersOpen, setStickersOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -410,6 +412,20 @@ function TournamentChat({ tournament, user }) {
     }
   };
 
+  const sendSticker = async (sticker) => {
+    setSendError("");
+    const attempt = await submitOnce(async () => {
+      const { data } = await api.post(`/tournaments/${tournament.id}/chat`, { sticker_id: sticker.id });
+      setMessages((rows) => [...rows, data]);
+      setStickersOpen(false);
+    });
+    if (attempt.started && attempt.error) {
+      const messageText = formatApiError(attempt.error.response?.data?.detail) || "Sticker konnte nicht gesendet werden.";
+      setSendError(messageText);
+      toast.error(messageText);
+    }
+  };
+
   return (
     <section data-testid="tournament-chat">
       <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2">
@@ -436,6 +452,7 @@ function TournamentChat({ tournament, user }) {
                       </div>
                       {message.message && <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85"><MentionText text={message.message} /></div>}
                       <ChatMessageAttachments attachments={message.attachments} />
+                      <ChatMessageSticker sticker={message.sticker} />
                     </div>
                   </div>
                 );
@@ -443,8 +460,10 @@ function TournamentChat({ tournament, user }) {
               {messages.length === 0 && <div className="text-center py-8 text-sm text-white/35">Noch keine Nachrichten.</div>}
             </div>
             <ChatAttachmentDrafts drafts={attachments.drafts} onRemove={attachments.remove} />
+            <ChatStickerPicker open={stickersOpen} onClose={() => setStickersOpen(false)} onPick={sendSticker} disabled={loading} />
             <form onSubmit={send} onPaste={attachments.onPaste} className="border-t border-white/10 p-3 flex gap-2">
               <ChatAttachButton onFiles={attachments.addFiles} disabled={loading} testId="tournament-chat-attach" />
+              <ChatStickerButton open={stickersOpen} onToggle={() => setStickersOpen((value) => !value)} disabled={loading} testId="tournament-chat-stickers" />
               <MentionTextarea
                 value={text}
                 onValueChange={(value) => { setText(value); setSendError(""); }}

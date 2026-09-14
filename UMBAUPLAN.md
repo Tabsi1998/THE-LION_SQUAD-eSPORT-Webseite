@@ -1,6 +1,6 @@
 # Umbauplan: Turniere, Übersichtlichkeit und die offenen Wünsche
 
-Stand: 14. September 2026 (Block 14.2 B: Bilder und Videos in der App).
+Stand: 14. September 2026 (Block 14.2 C: Sticker in Web und App).
 
 Dieser Plan führt das in [RESTPLAN.md](RESTPLAN.md) als **R5** angekündigte Turnierpaket
 aus und nimmt die später dazugekommenen Themen auf (Spielwochen, PDF, Live-Aktualisierung,
@@ -39,7 +39,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 11 | PDF-Ausgabe | umgesetzt | #193, #194 |
 | 12 | Galerie und Medien: Tempo, Videos überall | umgesetzt | #196 |
 | 13 | Entflechtung: `tournament_routes.py` aufgeteilt | umgesetzt | #200 |
-| 14 | LionsAPP in den Store | in Arbeit: 14.1, 14.2 A und 14.2 B umgesetzt | #201, #206, #207 |
+| 14 | LionsAPP in den Store | in Arbeit: 14.1 und 14.2 umgesetzt | #201, #206, #207, dieser PR |
 | 15 | Abschluss | offen | — |
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise | #193, #195 |
@@ -238,7 +238,7 @@ Beim Umbau aufgefallen und **bewusst nicht entfernt**, weil ein Umzug nichts lö
 | 14.1 | Live statt Abfragen, auch für private Meldungen | umgesetzt (#201) |
 | 14.2 A | Chat: Bilder und Videos, geschützt abgelegt, Backend und Web | umgesetzt (#206) |
 | 14.2 B | Chat in der App: Bilder und Videos senden und ansehen | umgesetzt (#207) |
-| 14.2 C | Sticker: eigener Satz, gepflegt im Adminbereich, in Web und App | offen |
+| 14.2 C | Sticker: Startpaket und eigene Pakete aus dem Adminbereich, in Web und App | umgesetzt (dieser PR) |
 | 14.3 | Animationen und Achievements | offen |
 | 14.4 | Store-Reife: Play Internal Testing, Absturzberichte, Bildgrößen in der App | offen |
 
@@ -307,6 +307,34 @@ Dafür kommen drei native Module dazu: `expo-image-picker`, `expo-video` und
 `expo-video-thumbnails`. Auf dem Handy wirkt das erst mit einer **neuen APK**. Wie diese
 künftig lokal gebaut und hochgeladen wird, klärt #205. Lokal geprüft ist, dass Metro die App
 mit den neuen Modulen für Android bündelt (`expo export`).
+
+### Was 14.2 C umfasst
+
+Sticker in **allen Chats**, im Web und in der App. Wie im Messenger geht ein Sticker allein
+raus: antippen, fertig. GIFs gibt es bewusst nicht.
+
+- **Startpaket:** 71 Sticker aus Microsoft Fluent Emoji (3D) in vier Paketen: Reaktionen,
+  Hände, eSports & Party, Symbole. Lizenz MIT; der Lizenztext liegt bei den Bildern und ist
+  im Adminbereich verlinkt.
+- **Eigene Pakete:** unter *Admin → Content → Sticker* anlegen, Bilder hochladen oder aus der
+  Mediathek wählen, Suchwörter vergeben. Eigene Pakete stehen in der Auswahl vorn. Das
+  Startpaket lässt sich paketweise abschalten, aber nicht ändern.
+- **Suche** nach Name und Suchwort; Umlaute muss man nicht tippen.
+- **Alte Nachrichten bleiben lesbar:** Die Nachricht speichert den Sticker mit. Ist ein Paket
+  abgeschaltet oder ein Sticker gelöscht, lässt er sich nicht mehr senden, steht aber weiter
+  im Verlauf. Benachrichtigungen zeigen „[Sticker]“.
+
+Die Bilder des Startpakets liefert das Backend unter `/api/stickers/files/…` aus, mit sieben
+Tagen Browser-Cache. So gilt dieselbe Adresse im Web und in der App. Eigene Sticker kommen nur
+aus dem eigenen Upload: Eine fremde Adresse lehnt der Server ab, sonst würde jedes Anzeigen
+die Chatteilnehmer bei Dritten abrufen lassen. Die App braucht dafür kein neues natives Modul.
+
+Dabei gefunden: **Team- und Turnier-Chat in der App luden ohne Pause neu.** Die Chat-Ansicht
+erzeugte bei jedem Rendern eine neue Standardfunktion. Dadurch entstand ein neues `load`, und
+nach jeder Serverantwort wurde sofort wieder geladen. Direktnachrichten waren nicht betroffen.
+Gesehen im Test, als der Mock wie ein echter Server neue Antworten lieferte; auf dem Gerät
+nicht gemessen, im Code aber eindeutig. Behoben, und ein Test prüft jetzt, dass beim Öffnen
+genau einmal geladen wird.
 
 ## Block 15 — Abschluss
 
@@ -538,7 +566,8 @@ Software kann keine Zugänge, echten Vereinsdaten oder einen Serverzugriff erfin
 | **Ausgangs-Trockenlauf** | `bash scripts/tournament-dryrun.sh vorher.json` einmal laufen lassen, damit es eine Vergleichsbasis gibt. Ohne Ausgabedatei kann später nicht verglichen werden. |
 | **Praxistest mit mehreren Nutzern** | Turnierabläufe mit echten Anmeldungen lassen sich als einzelner Nutzer im Livesystem nicht prüfen. |
 | **Abnahme nach Ausrollen** | Siehe [STAGING_ABNAHME.md](STAGING_ABNAHME.md). |
-| **Chat mit Bildern am Handy testen** | Mit der nächsten APK: in einer Direktnachricht ein Foto und ein kurzes Video senden, auf dem zweiten Konto öffnen. Erst dann ist 14.2 B wirklich auf dem Gerät bestätigt. |
+| **Chat mit Bildern und Stickern am Handy testen** | Mit der nächsten APK: in einer Direktnachricht ein Foto, ein kurzes Video und einen Sticker senden, auf dem zweiten Konto öffnen. Erst dann sind 14.2 B und C wirklich auf dem Gerät bestätigt. |
+| **Eigene Sticker anlegen** | Nach dem Ausrollen unter *Admin → Content → Sticker* ein Paket „Lion Squad“ anlegen und Löwe oder Maskottchen als PNG mit durchsichtigem Hintergrund hochladen. Ein leeres Paket erscheint im Chat nicht. |
 | **Medienbericht nach Block 12** | `docker compose exec backend python3 scripts/media-report.py` (nur lesend). Zeigt, was eure Bilder und ihre Fassungen wiegen, und ob 400/800/1600 px die richtigen Breiten sind. |
 
 Zum Testen ohne Livesystem gibt es seit Block 6 den Weg über die echte Anwendung gegen
