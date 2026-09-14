@@ -11,6 +11,11 @@ web-build/
 expo-env.d.ts
 
 # Native
+# android/ und ios/ erzeugt `expo prebuild` beim lokalen Release neu; builds/
+# nimmt die fertige APK auf.
+android/
+ios/
+builds/
 .kotlin/
 google-services.json
 *firebase-adminsdk*.json

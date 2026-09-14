@@ -2,6 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { releaseTag, versionProblems } = require("./release-version.cjs");
 
 const root = path.resolve(__dirname, "..");
 const readJson = (file) => JSON.parse(fs.readFileSync(path.join(root, file), "utf8"));
@@ -25,11 +26,12 @@ const appVersion = String(expo.version || "").trim();
 const versionCode = android.versionCode;
 const tag = process.env.GITHUB_REF_TYPE === "tag" ? process.env.GITHUB_REF_NAME : "";
 
-check(/^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta)\.\d+)?$/.test(version), `Invalid mobile package version: ${version}`);
+for (const problem of versionProblems(version)) failures.push(problem);
 check(version === appVersion, `mobile/package.json version (${version}) must match mobile/app.json expo.version (${appVersion})`);
 check(lock.version === version, `mobile/package-lock.json root version (${lock.version}) must match ${version}`);
 check(lock.packages?.[""]?.version === version, `mobile/package-lock.json package entry version (${lock.packages?.[""]?.version}) must match ${version}`);
 check(Number.isInteger(versionCode) && versionCode > 0, `expo.android.versionCode must be a positive integer, got ${versionCode}`);
+check(String(expo.ios?.buildNumber) === String(versionCode), `expo.ios.buildNumber (${expo.ios?.buildNumber}) must match expo.android.versionCode (${versionCode})`);
 check(expo.name === "LionsAPP", `expo.name must stay LionsAPP, got ${expo.name}`);
 check(expo.slug === "lionsapp", `expo.slug must stay lionsapp, got ${expo.slug}`);
 check(android.package === "at.lionsquad.app", `Android package must stay at.lionsquad.app, got ${android.package}`);
@@ -40,16 +42,11 @@ check(changelogHeader.test(changelog), `CHANGELOG.md must contain a dated sectio
 
 const sectionMatch = changelog.match(new RegExp(`^## ${escapedVersion} - \\d{4}-\\d{2}-\\d{2}\\s*\\n([\\s\\S]*?)(?=^## |\\s*$)`, "m"));
 check(Boolean(sectionMatch && /(^|\n)- /.test(sectionMatch[1])), `CHANGELOG.md section for ${version} must contain bullet entries`);
-check(releases.includes(version), `RELEASES.md historical list must contain ${version}`);
+check(releases.includes(`\`${version}\``), `RELEASES.md release history must list \`${version}\``);
 
 if (tag) {
-  const baseTag = `mobile-v${version}`;
-  const buildTag = `${baseTag}-build${versionCode}`;
-  check(tag === baseTag || tag === buildTag, `Tag ${tag} must match ${baseTag} or ${buildTag}`);
-}
-
-if (version.includes("-alpha.")) {
-  check(changelog.includes("alpha") || releases.includes("ALPHA"), "Alpha release metadata must mention alpha/ALPHA");
+  const expectedTag = releaseTag(version, versionCode);
+  check(tag === expectedTag, `Tag ${tag} must be ${expectedTag}`);
 }
 
 if (failures.length) {

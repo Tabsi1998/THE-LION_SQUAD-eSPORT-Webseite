@@ -2,7 +2,7 @@
 
 ## Current Distribution Target
 
-The public APK is an alpha build for Android testers. It can be attached to GitHub Releases, but GitHub is still an external APK source. Android can therefore show unknown-source and Play Protect prompts even when the APK is correctly signed.
+The public APK is a beta build for Android testers. It can be attached to GitHub Releases, but GitHub is still an external APK source. Android can therefore show unknown-source and Play Protect prompts even when the APK is correctly signed.
 
 The clean path for broad testing is Google Play Console:
 
@@ -14,28 +14,15 @@ Google Play distribution removes the manual sideload flow because users install 
 
 ## Release Signing
 
-Public APKs must never be signed with the Android debug certificate. The release workflow requires these GitHub Actions repository secrets:
+Public APKs must never be signed with the Android debug certificate, and every APK must be signed with the same upload key as all previous releases (certificate SHA-256 `0c5562d7…97a1`). An APK with a different certificate cannot update an installed app.
 
-- `ANDROID_KEYSTORE_BASE64`
-- `ANDROID_KEYSTORE_PASSWORD`
-- `ANDROID_KEY_ALIAS`
-- `ANDROID_KEY_PASSWORD`
+Releases are built locally with `npm run release:local`, see [RELEASES.md](RELEASES.md). The keystore, its passwords and `google-services.json` stay outside the repository, by default in `%USERPROFILE%\.lionsapp-release`. The script refuses a keystore inside the repository, passes the signing values to Gradle only through environment variables, removes the generated push config after the build and refuses to publish an APK whose certificate differs.
 
-These values must be stored under `Settings -> Secrets and variables -> Actions -> Repository secrets`. GitHub Actions Variables with the same names are not enough, and Environment secrets are not read unless the workflow explicitly uses that environment.
+The manual GitHub workflow remains as an emergency path. It reads the same values from repository secrets (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) and only produces an artifact.
 
-The keystore itself must stay private and outside Git. If it is lost, existing sideloaded APK installations can no longer be updated with the same package name and certificate.
+If the keystore is lost, existing sideloaded APK installations can no longer be updated with the same package name and certificate. Keep an offline backup.
 
 For Google Play, this key should be treated as the upload key. Google Play App Signing can then manage the final app signing key for Play Store distribution.
-
-## Local Signing Secret Setup
-
-Convert the local Java keystore to a GitHub secret value with PowerShell:
-
-```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("mobile\local-signing\the-lion-squad-upload.jks"))
-```
-
-Store the output as `ANDROID_KEYSTORE_BASE64` in GitHub repository secrets. Store the matching passwords and alias in the other three repository secrets.
 
 ## Release Integrity
 
@@ -46,7 +33,7 @@ Each GitHub APK release includes:
 - A `.signature.txt` file with the signer certificate metadata.
 - Embedded release notes from `mobile/CHANGELOG.md`.
 
-The workflow verifies the APK signature and fails if it detects the Android debug certificate.
+The release script verifies the APK signature and fails on the Android debug certificate or a different upload key.
 
 ## Play Protect Notes
 
@@ -68,10 +55,10 @@ Internal testing should be the first Play Console track. It keeps the app away f
 Before uploading the first internal testing build:
 
 - Confirm the package name stays `at.lionsquad.app`.
-- Use the same upload key as the GitHub release workflow.
+- Use the same upload key as the local release script.
 - Upload an AAB build for Play Console, while APK releases can continue on GitHub for manual testers.
 - Add a small tester list first, then expand after login, Home, Events, Teams, Chat, Profile, Notifications and logout have been smoke-tested.
-- Keep the release name aligned with the mobile changelog, e.g. `LionsAPP ALPHA v0.7.0 (Build 21)`.
+- Keep the release name aligned with the mobile changelog, e.g. `LionsAPP v0.2.0-beta (Build 57)`.
 
 Manual smoke-test checklist for every alpha candidate:
 

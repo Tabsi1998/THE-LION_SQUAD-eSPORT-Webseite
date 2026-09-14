@@ -1,23 +1,16 @@
 name: Mobile APK Release
 
+# Notweg. App-Releases entstehen lokal mit `npm run release:local` (siehe
+# mobile/RELEASES.md), weil Actions-Minuten Geld kosten. Dieser Workflow startet
+# nur von Hand und baut eine signierte APK als Artefakt; er veröffentlicht kein
+# Release. Früher lief er bei jedem Tag `mobile-v*` - das würde jetzt bei jedem
+# lokalen Release zusätzlich GitHub Actions starten.
+
 on:
   workflow_dispatch:
-    inputs:
-      channel:
-        description: Release channel
-        required: true
-        default: beta
-        type: choice
-        options:
-          - alpha
-          - beta
-          - stable
-  push:
-    tags:
-      - "mobile-v*"
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -64,41 +57,10 @@ jobs:
         working-directory: mobile
         shell: bash
         run: |
-          VERSION="$(node -p "require('./app.json').expo.version")"
-          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
-          if [ "$VERSION" != "$PACKAGE_VERSION" ]; then
-            echo "app.json version ($VERSION) and package.json version ($PACKAGE_VERSION) differ" >&2
-            exit 1
-          fi
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            if [[ "${GITHUB_REF_NAME}" == *"alpha"* ]]; then
-              CHANNEL="alpha"
-            elif [[ "${GITHUB_REF_NAME}" == *"beta"* ]]; then
-              CHANNEL="beta"
-            else
-              CHANNEL="stable"
-            fi
-          else
-            CHANNEL="${{ inputs.channel }}"
-          fi
+          VERSION="$(node -p "require('./package.json').version")"
           VERSION_CODE="$(node -p "require('./app.json').expo.android.versionCode")"
-          DISPLAY_VERSION="${VERSION%%-*}"
-          CHANNEL_LABEL="${CHANNEL^^}"
-          SHORT_SHA="${GITHUB_SHA::7}"
-          if [ "$CHANNEL" = "stable" ]; then
-            APK_NAME="LionsAPP-v${DISPLAY_VERSION}-build${VERSION_CODE}-${SHORT_SHA}.apk"
-            RELEASE_NAME="LionsAPP v${DISPLAY_VERSION} (Build ${VERSION_CODE})"
-          else
-            APK_NAME="LionsAPP-${CHANNEL_LABEL}-v${DISPLAY_VERSION}-build${VERSION_CODE}-${SHORT_SHA}.apk"
-            RELEASE_NAME="LionsAPP ${CHANNEL_LABEL} v${DISPLAY_VERSION} (Build ${VERSION_CODE})"
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "display_version=$DISPLAY_VERSION" >> "$GITHUB_OUTPUT"
-          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
-          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
-          echo "channel_label=$CHANNEL_LABEL" >> "$GITHUB_OUTPUT"
+          APK_NAME="$(node -p "require('./scripts/release-version.cjs').apkName('${VERSION}', ${VERSION_CODE}, '${GITHUB_SHA::7}')")"
           echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
-          echo "release_name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Generate Android project
         working-directory: mobile
@@ -136,9 +98,6 @@ jobs:
           [ -n "$ANDROID_KEY_PASSWORD" ] || missing+=("ANDROID_KEY_PASSWORD")
           if [ "${#missing[@]}" -gt 0 ]; then
             echo "::error::Missing Android release signing secrets: ${missing[*]}"
-            echo "GitHub releases must be signed with the stable LionsAPP upload key."
-            echo "Set these as Repository secrets in Settings -> Secrets and variables -> Actions."
-            echo "Do not store them as Variables and do not store them only in an Environment unless this workflow is configured to use that Environment."
             exit 1
           fi
 
@@ -158,73 +117,22 @@ jobs:
           chmod +x ./gradlew
           ./gradlew assembleRelease
 
-      - name: Stage APK
+      - name: Stage, verify and checksum APK
         working-directory: mobile
+        shell: bash
         run: |
           mkdir -p builds
-          cp android/app/build/outputs/apk/release/app-release.apk "builds/${{ steps.meta.outputs.apk_name }}"
-          ls -lh "builds/${{ steps.meta.outputs.apk_name }}"
-
-      - name: Verify APK signature and checksum
-        working-directory: mobile
-        shell: bash
-        run: |
+          APK="builds/${{ steps.meta.outputs.apk_name }}"
+          cp android/app/build/outputs/apk/release/app-release.apk "$APK"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
-          "$APKSIGNER" verify --print-certs "builds/${{ steps.meta.outputs.apk_name }}" | tee "builds/${{ steps.meta.outputs.apk_name }}.signature.txt"
-          if grep -q "CN=Android Debug" "builds/${{ steps.meta.outputs.apk_name }}.signature.txt"; then
-            echo "::error::APK is signed with the Android debug certificate."
+          "$APKSIGNER" verify --print-certs "$APK" | grep Signer > "$APK.signature.txt"
+          DIGEST="$(node -p "require('./scripts/release-version.cjs').signerDigest(require('fs').readFileSync('$APK.signature.txt', 'utf8'))")"
+          EXPECTED="$(node -p "require('./scripts/release-version.cjs').EXPECTED_SIGNER_SHA256")"
+          if [ "$DIGEST" != "$EXPECTED" ]; then
+            echo "::error::APK is not signed with the LionsAPP upload key ($DIGEST)."
             exit 1
           fi
-          sha256sum "builds/${{ steps.meta.outputs.apk_name }}" > "builds/${{ steps.meta.outputs.apk_name }}.sha256"
-
-      - name: Generate release notes
-        id: notes
-        working-directory: mobile
-        shell: bash
-        run: |
-          NOTES_FILE="builds/release-notes.md"
-          VERSION="${{ steps.meta.outputs.version }}"
-          APK_NAME="${{ steps.meta.outputs.apk_name }}"
-          SHA256="$(cut -d ' ' -f 1 "builds/${APK_NAME}.sha256")"
-          SIGNER="$(grep -m 1 -E "Signer #1 certificate DN|V[0-9]+ Signer: certificate DN" "builds/${APK_NAME}.signature.txt" | sed -E 's/^Signer #1 certificate DN: //; s/^V[0-9]+ Signer: certificate DN: //' || true)"
-          SIGNER_SHA="$(grep -m 1 -E "Signer #1 certificate SHA-256 digest|V[0-9]+ Signer: certificate SHA-256 digest" "builds/${APK_NAME}.signature.txt" | sed -E 's/^Signer #1 certificate SHA-256 digest: //; s/^V[0-9]+ Signer: certificate SHA-256 digest: //' || true)"
-          SIGNER="${SIGNER:-unknown}"
-          SIGNER_SHA="${SIGNER_SHA:-unknown}"
-          {
-            echo "# LionsAPP v${VERSION}"
-            echo ""
-            echo "**Release:** ${{ steps.meta.outputs.release_name }}"
-            echo ""
-            echo "**Channel:** \`${{ steps.meta.outputs.channel }}\`"
-            echo ""
-            echo "**Internal version:** \`${VERSION}\`"
-            echo ""
-            echo "**Android build:** \`${{ steps.meta.outputs.version_code }}\`"
-            echo ""
-            echo "**APK:** \`${APK_NAME}\`"
-            echo ""
-            echo "**SHA-256:** \`${SHA256}\`"
-            echo ""
-            echo "**Signer:** \`${SIGNER}\`"
-            echo ""
-            echo "**Signer SHA-256:** \`${SIGNER_SHA}\`"
-            echo ""
-            echo "## Changelog"
-            echo ""
-            awk -v ver="$VERSION" '
-              $0 ~ /^## / {
-                if (found) exit
-                found = index($0, ver) > 0
-                next
-              }
-              found { print }
-            ' CHANGELOG.md
-            echo ""
-            echo "## Installation"
-            echo ""
-            echo "Diese APK ist eine ${{ steps.meta.outputs.channel_label }}-Testversion. Bei Installation ausserhalb von Google Play kann Android weiterhin Hinweise zu externen Quellen oder Play Protect anzeigen. Fuer die sauberste Installation ohne Sideload-Warnung muss dieselbe App ueber Google Play Testing verteilt werden."
-          } > "$NOTES_FILE"
-          echo "notes_file=mobile/${NOTES_FILE}" >> "$GITHUB_OUTPUT"
+          sha256sum "$APK" > "$APK.sha256"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
@@ -235,16 +143,4 @@ jobs:
             mobile/builds/${{ steps.meta.outputs.apk_name }}.sha256
             mobile/builds/${{ steps.meta.outputs.apk_name }}.signature.txt
           if-no-files-found: error
-          retention-days: 30
-
-      - name: Publish GitHub release
-        if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v3
-        with:
-          name: ${{ steps.meta.outputs.release_name }}
-          prerelease: ${{ steps.meta.outputs.channel != 'stable' }}
-          body_path: ${{ steps.notes.outputs.notes_file }}
-          files: |
-            mobile/builds/${{ steps.meta.outputs.apk_name }}
-            mobile/builds/${{ steps.meta.outputs.apk_name }}.sha256
-            mobile/builds/${{ steps.meta.outputs.apk_name }}.signature.txt
+          retention-days: 7

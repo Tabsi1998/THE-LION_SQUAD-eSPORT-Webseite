@@ -1,74 +1,105 @@
-# Mobile Releases
+# App-Releases
 
-Die Android-App wird als APK ueber GitHub Actions gebaut. GitHub Releases enthalten die APK, eine SHA-256-Pruefsumme, die Signatur-Metadaten und die passenden Changelog-Details direkt im Release-Text.
+Die LionsAPP für Android wird **lokal gebaut** und als GitHub-Release veröffentlicht. GitHub Actions baut nur noch im Notfall und nur von Hand ([mobile-release.yml](../.github/workflows/mobile-release.yml)), weil Actions-Minuten Geld kosten. Die Webseite ist davon getrennt.
 
-## Kanaele
+## Versionen
 
-- `alpha`: fruehe Testversion fuer freiwillige Tester
-- `beta`: breiterer Test, wenn die Kernfunktionen stabil sind
-- `stable`: spaeter fuer produktive Releases
+| Version | Bedeutung |
+| --- | --- |
+| `0.2.0-beta`, `0.3.0-beta` … | Vor 1.0.0 gibt es nur Betas. |
+| `1.0.0` | Das erste richtige Release. |
+| `1.2.3-beta`, danach `1.2.3` | Ab 1.0.0: erst die Beta zum Testen, dann dieselbe Version als Release. |
 
-Die Webseite bleibt davon getrennt. Ein App-Release veroeffentlicht nur die APK.
+- Neue Funktionen: Minor erhöhen, z. B. `0.2.0-beta` → `0.3.0-beta`.
+- Nur Fehlerbehebungen: Patch erhöhen, z. B. `0.2.0-beta` → `0.2.1-beta`.
+- Die Version steht gleich in `mobile/package.json`, `mobile/package-lock.json` und `mobile/app.json`. Der Preflight prüft das.
 
-## Versionierung
+### Build-Zähler
 
-Die Version steht an zwei Stellen und muss gleich sein:
+Android vergleicht beim Update nicht die Version, sondern `expo.android.versionCode` in `app.json`. Er steigt mit **jedem** Build um mindestens 1, auch wenn dieselbe Version neu gebaut wird. `expo.ios.buildNumber` zieht mit.
 
-- `mobile/package.json`
-- `mobile/app.json`
+Im September 2026 fing die sichtbare Version neu bei 0.x an (#205). Die alten 1.x- und 2.x-Betas sind historisch; der Build-Zähler lief einfach weiter, von Build 56 auf 57. Installierte Apps aktualisieren sich deshalb normal.
 
-Die interne Version bleibt SemVer-kompatibel, damit npm, Expo, GitHub Tags und Automatisierung sauber sortieren koennen. Der sichtbare Release-Name darf trotzdem lesbarer sein.
+### Namen
 
-Empfohlenes Schema:
+| | Beispiel |
+| --- | --- |
+| Tag | `mobile-v0.2.0-beta-build57` |
+| Release | `LionsAPP v0.2.0-beta (Build 57)` |
+| APK | `LionsAPP-v0.2.0-beta-build57-<commit>.apk` |
 
-```text
-1.0.0
-1.0.0-beta.1
-0.2.0-alpha.1
-0.1.2-alpha.1
-0.1.1-alpha.1
-0.1.0-alpha.14
-```
+Betas erscheinen auf GitHub als Pre-Release, Releases als „Latest“.
 
-Regeln:
+## Einmalig einrichten
 
-- Kleine Bugfixes/Hotfixes: Patch erhoehen und Alpha-Zaehler neu starten, z.B. `0.1.0-alpha.14` -> `0.1.1-alpha.1`.
-- Mehrere kleine Alpha-Builds im selben Patch: Alpha-Zaehler erhoehen, z.B. `0.1.1-alpha.1` -> `0.1.1-alpha.2`.
-- Groessere neue Funktionsphase: Minor erhoehen, z.B. `0.1.x` -> `0.2.0-alpha.1`.
-- Breiterer Test: Beta-Kanal, z.B. `1.0.0-beta.1`.
-- Produktive Version: stabile SemVer ohne Suffix, z.B. `1.0.0`.
-
-Bei jedem Android-Release muss `expo.android.versionCode` in `mobile/app.json` um mindestens `1` erhoeht werden. Der `versionCode` ist der technische Android-Build-Zaehler und kann z.B. `15` sein, waehrend die sichtbare Version `0.1.1-alpha.1` ist.
-
-Soll dieselbe sichtbare App-Version als neuer Android-Build erneut gebaut werden, bleibt die SemVer-Version gleich und nur `expo.android.versionCode` steigt. Dafuer kann ein eindeutiger Build-Tag genutzt werden:
+Alles Geheime liegt **außerhalb des Repos**, standardmäßig in `%USERPROFILE%\.lionsapp-release`. Ein anderer Ort geht über die Umgebungsvariable `LIONSAPP_RELEASE_DIR`.
 
 ```text
-mobile-v1.0.0-beta.1-build31
+.lionsapp-release\
+  upload.jks             Upload-Schlüssel, mit dem alle bisherigen APKs signiert sind
+  google-services.json   aus Firebase, Android-App at.lionsquad.app (für Push)
+  signing.json           Passwörter und Pfade
 ```
 
-## Release-Namen
+Aufbau von `signing.json`:
 
-Interner Tag:
-
-```text
-mobile-v0.1.1-alpha.1
+```json
+{
+  "storeFile": "upload.jks",
+  "storePassword": "…",
+  "keyAlias": "…",
+  "keyPassword": "…",
+  "javaHome": "C:/Pfad/zum/jdk-21",
+  "androidHome": "C:/Users/<name>/AppData/Local/Android/Sdk"
+}
 ```
 
-Sichtbarer GitHub-Release-Name:
+Pfade mit `/` schreiben. Ein einzelner `\` ist in JSON ungültig; das Skript meldet dann die Stelle, aber nie den Inhalt.
 
-```text
-LionsAPP ALPHA v0.1.1 (Build 15)
+Statt der Datei gehen auch Umgebungsvariablen: `LIONSAPP_KEYSTORE`, `LIONSAPP_KEYSTORE_PASSWORD`, `LIONSAPP_KEY_ALIAS`, `LIONSAPP_KEY_PASSWORD`, `LIONSAPP_GOOGLE_SERVICES`, `LIONSAPP_JAVA_HOME`, `LIONSAPP_ANDROID_HOME`.
+
+Außerdem nötig: JDK 21, Android SDK mit Build-Tools und eine angemeldete GitHub CLI (`gh auth login`).
+
+**Der Schlüssel lässt sich nicht ersetzen.** Eine APK mit anderem Schlüssel lässt sich nicht über eine installierte LionsAPP installieren; alle müssten die App erst löschen. Das Skript bricht deshalb ab, wenn das Zertifikat nicht das bisherige ist (SHA-256 `0c5562d7…97a1`, vollständig in `scripts/release-version.cjs`). Den Schlüssel offline sichern, nie ins Repo, nie in einen Chat oder ein Log.
+
+## Release bauen
+
+Vorher im PR: Version und Build-Zähler erhöhen, einen Abschnitt in `CHANGELOG.md` schreiben, die Version unten in der Historie eintragen. Dann nach `main` mergen und lokal `main` holen.
+
+```bash
+cd mobile
+npm run release:local -- --check     # zeigt, was fehlt
+npm run release:local -- --dry-run   # baut und prüft, veröffentlicht nichts
+npm run release:local                # baut, prüft und legt das Release an
 ```
 
-APK-Name:
+Das Skript geht so vor:
 
-```text
-LionsAPP-ALPHA-v0.1.1-build15-<commit>.apk
-```
+1. Es prüft Version, Build-Zähler gegen alle bisherigen Tags, einen sauberen Stand auf `main` wie auf GitHub, Werkzeuge und Schlüssel. Ob der Schlüssel **derselbe wie bei Build 56** ist, zeigt schon `--check`, ohne zu bauen: keytool liest das Zertifikat, das Passwort geht dabei nur über eine Umgebungsvariable.
+2. Es führt Preflight, Typecheck und Tests aus.
+3. Es erzeugt das Android-Projekt (`expo prebuild`) und baut mit Gradle die APK.
+4. Es prüft die Signatur: kein Debug-Zertifikat, dasselbe Zertifikat wie bisher. Dann berechnet es SHA-256.
+5. Es legt das GitHub-Release an, mit APK, Prüfsumme, Signaturangaben und dem Changelog-Abschnitt.
 
-Der Build-Zusatz kommt aus `expo.android.versionCode`. Dadurch ist fuer Tester klar, welche APK neuer ist, ohne dass die App-Version endlos bei `0.1.0-alpha.X` bleibt.
+Passwörter bekommt Gradle nur über Umgebungsvariablen. Die Push-Datei wird nach dem Build aus `mobile/` entfernt, auch wenn der Build abbricht. `android/` und `builds/` sind von Git ausgeschlossen.
 
-Historische Einordnung, neueste Version oben:
+Unter Windows baut Gradle über ein kurzes, vorübergehendes Laufwerk (`subst`, z. B. `L:\mobile\android`), weil der Projektpfad Leerzeichen hat und lang ist. Das Ninja aus der Android-SDK-CMake 3.22.1 bricht bei den langen Pfaden der nativen Bibliotheken sonst mit `manifest 'build.ninja' still dirty after 100 tries` ab. Das Laufwerk wird danach wieder entfernt.
+
+## Notweg über GitHub Actions
+
+Den Workflow `Mobile APK Release` von Hand starten. Er braucht die Repository-Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` und `GOOGLE_SERVICES_JSON_BASE64`. Er baut eine signierte APK als Artefakt (7 Tage aufbewahrt) und veröffentlicht nichts.
+
+## Anzeige auf GitHub
+
+GitHub sortiert Releases nach Veröffentlichungsdatum, nicht nach Version. Alte Releases deshalb nicht neu veröffentlichen, höchstens Titel oder Text korrigieren.
+
+## Historie
+
+Neueste oben.
+
+- `0.2.0-beta`: Build 57, erste Version im neuen Schema
+
+Vor dem Neustart bei 0.x galt ein Schema mit Zähler (`-beta.N`, `-alpha.N`). Diese Versionen sind historisch:
 
 ```text
 2.0.0-beta.2
@@ -126,58 +157,4 @@ Historische Einordnung, neueste Version oben:
 0.1.0-alpha.1
 ```
 
-## APK manuell bauen
-
-In GitHub unter `Actions` den Workflow `Mobile APK Release` starten. Der Workflow erzeugt ein Artefakt mit diesem Namensschema:
-
-```text
-LionsAPP-BETA-v1.0.0-build41-<commit>.apk
-```
-
-## Push-Konfiguration
-
-Android-Push funktioniert nur, wenn die APK mit Firebase/FCM-Konfiguration gebaut wurde. Dafuer braucht der Release-Workflow zusaetzlich dieses Repository-Secret:
-
-- `GOOGLE_SERVICES_JSON_BASE64`
-
-Die Datei kommt aus Firebase Console -> Android-App `at.lionsquad.app` -> `google-services.json`. Der Workflow bricht ohne dieses Secret ab, damit keine APK ohne funktionierende native Push-Initialisierung veroeffentlicht wird.
-
-## Release-Signatur
-
-GitHub-Releases muessen mit dem stabilen Upload-Key signiert werden. Dafuer braucht der Workflow diese Repository-Secrets:
-
-- `ANDROID_KEYSTORE_BASE64`
-- `ANDROID_KEYSTORE_PASSWORD`
-- `ANDROID_KEY_ALIAS`
-- `ANDROID_KEY_PASSWORD`
-
-Ohne diese Repository-Secrets bricht der Release-Workflow ab, damit keine oeffentliche Debug-signierte APK entsteht. GitHub Actions Variables reichen dafuer nicht.
-
-## GitHub Release erstellen
-
-Fuer einen echten GitHub-Release einen Tag pushen:
-
-```bash
-git tag mobile-v0.1.1-alpha.1
-git push origin mobile-v0.1.1-alpha.1
-```
-
-Der Workflow haengt die APK automatisch an den Release. Alpha- und Beta-Releases werden als `prerelease` markiert.
-
-## Anzeige auf GitHub
-
-GitHub zeigt Releases nicht strikt nach SemVer an, sondern primaer nach Release-/Publikationszeit. Deshalb kann ein alter Release oben landen, wenn er nachtraeglich neu erstellt oder neu publiziert wird.
-
-Saubere Vorgehensweise:
-
-- Neue Releases immer normal ueber neue Tags erstellen.
-- Alte Releases nicht neu erstellen, wenn nur die Historie schoener aussehen soll.
-- Bestehende alte Releases lieber umbenennen und den Text korrigieren, statt sie zu loeschen und neu zu publizieren.
-- Fehlende alte Alpha-Stufen im Changelog und in dieser Release-Doku dokumentieren.
-- Die aktuelle empfohlene APK steht immer im neuesten tatsaechlichen Release oben.
-
-## Historische Alpha-Releases
-
-Die vollstaendige Historie steht im `CHANGELOG.md`. Aeltere Alpha-Versionen sollten nicht nachtraeglich neu publiziert werden, wenn die GitHub-Release-Liste strikt absteigend bleiben soll: GitHub sortiert Releases nach Publikationsdatum, dadurch wuerden neu erstellte alte Releases oberhalb der aktuellen Alpha erscheinen. Fuer alte Versionen ohne APK ist deshalb eine Changelog-only-Dokumentation sauberer als ein nachtraeglich veroeffentlichter APK-Rebuild.
-
-Bestehende Releases koennen nachtraeglich im Titel und Release-Text korrigiert werden, z.B. auf `LionsAPP ALPHA v0.1.0 (Build 14)`. Bereits veroeffentlichte APK-Dateinamen sollten als historische Artefakte unveraendert bleiben, ausser es gibt einen harten Grund fuer ein bewusstes Re-Upload.
+Die alte 0.x-Alpha-Reihe endete bei `0.12.0-beta.3`. Mit dem neuen Schema geht es bei `0.2.0-beta` weiter; die Tags unterscheiden sich durch den Build (`-build57`), deshalb gibt es keinen Konflikt.
