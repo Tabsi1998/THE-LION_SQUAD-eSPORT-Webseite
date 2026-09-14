@@ -2,7 +2,8 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-import routes.tournament_routes as tournament_routes
+import routes.tournament_common as tournament_common
+import routes.tournament_lifecycle_routes as tournament_lifecycle_routes
 from services.scheduler import _next_status, _prepare_tournament_transition
 
 
@@ -45,8 +46,8 @@ def test_automatic_live_transition_stays_blocked_without_playable_match(monkeypa
     async def collect(db, tournament_id):
         return [], {"id": tournament_id, "min_participants": 2, "event_mode": "online"}
 
-    monkeypatch.setattr(tournament_routes, "_finalize_bracket_for_checkin", finalize)
-    monkeypatch.setattr(tournament_routes, "_collect_plan_matches", collect)
+    monkeypatch.setattr(tournament_lifecycle_routes, "_finalize_bracket_for_checkin", finalize)
+    monkeypatch.setattr(tournament_common, "_collect_plan_matches", collect)
     db = SimpleNamespace(
         tournament_registrations=SimpleNamespace(
             count_documents=lambda query: asyncio.sleep(0, result=2),

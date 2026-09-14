@@ -5,15 +5,15 @@ import anyio
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from routes.tournament_routes import (
+from routes.tournament_common import (
     _can_create_initial_stage_preview,
-    _can_rebuild_bracket_from_format,
-    _create_initial_bracket_preview,
-    _finalize_bracket_for_checkin,
     _can_create_initial_legacy_preview,
     _estimated_match_count,
-    _refresh_tournament_previews_after_registration,
 )
+from routes.tournament_structure_routes import _can_rebuild_bracket_from_format
+from routes.tournament_crud_routes import _create_initial_bracket_preview
+from routes.tournament_lifecycle_routes import _finalize_bracket_for_checkin
+from routes.tournament_registration_routes import _refresh_tournament_previews_after_registration
 
 
 class FakeCursor:

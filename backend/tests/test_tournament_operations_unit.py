@@ -7,7 +7,12 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from fastapi import HTTPException
 
-import routes.tournament_routes as tournament_routes
+import routes.tournament_common as tournament_common
+import routes.tournament_crud_routes as tournament_crud_routes
+import routes.tournament_lifecycle_routes as tournament_lifecycle_routes
+import routes.tournament_registration_routes as tournament_registration_routes
+import routes.tournament_stage_routes as tournament_stage_routes
+import routes.tournament_structure_routes as tournament_structure_routes
 from routes.station_routes import (
     _assign_match_to_station,
     _match_has_minimum_participants,
@@ -39,7 +44,7 @@ def _legacy_match(**updates):
 
 
 def test_start_report_requires_configured_minimum_participants():
-    report = tournament_routes._planning_report(
+    report = tournament_common._planning_report(
         [_legacy_match()],
         {"event_mode": "online", "min_participants": 4},
         participant_count=3,
@@ -49,12 +54,12 @@ def test_start_report_requires_configured_minimum_participants():
     assert report["ready_match_count"] == 1
     assert report["ok"] is False
     assert report["errors"][0]["type"] == "insufficient_participants"
-    assert tournament_routes._live_start_blocker(report, force=False)["force_allowed"] is True
-    assert tournament_routes._live_start_blocker(report, force=True) is None
+    assert tournament_lifecycle_routes._live_start_blocker(report, force=False)["force_allowed"] is True
+    assert tournament_lifecycle_routes._live_start_blocker(report, force=True) is None
 
 
 def test_live_start_never_allows_only_preview_or_unfilled_matches():
-    report = tournament_routes._planning_report(
+    report = tournament_common._planning_report(
         [
             _legacy_match(status="preview", is_preview=True),
             {"id": "future", "status": "pending", "participant_a_id": None, "participant_b_id": None},
@@ -64,14 +69,14 @@ def test_live_start_never_allows_only_preview_or_unfilled_matches():
         require_fixed_bracket=True,
     )
 
-    blocker = tournament_routes._live_start_blocker(report, force=True)
+    blocker = tournament_lifecycle_routes._live_start_blocker(report, force=True)
     assert blocker["force_allowed"] is False
     assert any(error["type"] == "no_playable_matches" for error in report["errors"])
     assert report["checked_matches"] == 1
 
 
 def test_planning_ignores_future_empty_matches_in_missing_station_noise():
-    report = tournament_routes._planning_report(
+    report = tournament_common._planning_report(
         [{"id": "future", "status": "pending", "participant_a_id": None, "participant_b_id": None}],
         {"event_mode": "online"},
     )
@@ -144,15 +149,17 @@ def test_manual_live_start_does_not_change_status_before_hard_preflight(monkeypa
     async def collect(db_arg, tournament_id):
         return [], {"id": tournament_id, "min_participants": 2, "event_mode": "online"}
 
-    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
-    monkeypatch.setattr(tournament_routes, "_resolve_tid", resolve)
-    monkeypatch.setattr(tournament_routes, "_ensure_tournament_unlocked", unlocked)
-    monkeypatch.setattr(tournament_routes, "require_tournament_staff_permission", permitted)
-    monkeypatch.setattr(tournament_routes, "_finalize_bracket_for_checkin", finalize)
-    monkeypatch.setattr(tournament_routes, "_collect_plan_matches", collect)
+    monkeypatch.setattr(tournament_common, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_lifecycle_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_common, "_resolve_tid", resolve)
+    monkeypatch.setattr(tournament_lifecycle_routes, "_resolve_tid", resolve)
+    monkeypatch.setattr(tournament_lifecycle_routes, "_ensure_tournament_unlocked", unlocked)
+    monkeypatch.setattr(tournament_lifecycle_routes, "require_tournament_staff_permission", permitted)
+    monkeypatch.setattr(tournament_lifecycle_routes, "_finalize_bracket_for_checkin", finalize)
+    monkeypatch.setattr(tournament_lifecycle_routes, "_collect_plan_matches", collect)
 
     with pytest.raises(HTTPException) as error:
-        asyncio.run(tournament_routes.set_status(
+        asyncio.run(tournament_lifecycle_routes.set_status(
             "t1",
             {"status": "live", "force": True},
             {"id": "admin", "role": "tournament_admin"},
@@ -171,7 +178,7 @@ def test_self_registration_exact_retry_returns_existing_record_without_insert():
     )
     db = SimpleNamespace(tournament_registrations=registrations)
 
-    result = asyncio.run(tournament_routes._create_self_registration(
+    result = asyncio.run(tournament_registration_routes._create_self_registration(
         db,
         "t1",
         {"id": "t1"},
@@ -197,8 +204,8 @@ def test_team_registration_retry_by_another_manager_reuses_team_record(monkeypat
     async def valid_team(*_args):
         return {"id": "team-1", "name": "Lions", "tag": "TLS"}
 
-    monkeypatch.setattr(tournament_routes, "_validate_registration_actor", valid_team)
-    result = asyncio.run(tournament_routes._create_self_registration(
+    monkeypatch.setattr(tournament_registration_routes, "_validate_registration_actor", valid_team)
+    result = asyncio.run(tournament_registration_routes._create_self_registration(
         db,
         "t1",
         {"id": "t1"},
@@ -228,17 +235,18 @@ def test_staff_checkin_replay_skips_badges_and_audit(monkeypatch):
     async def identity(value):
         return value
 
-    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
-    monkeypatch.setattr(tournament_routes, "_resolve_tid", identity)
-    monkeypatch.setattr(tournament_routes, "_ensure_tournament_unlocked", AsyncMock())
-    monkeypatch.setattr(tournament_routes, "require_tournament_staff_permission", AsyncMock())
-    monkeypatch.setattr(tournament_routes, "mutation_lock", _uncontended_lock)
+    monkeypatch.setattr(tournament_common, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_registration_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_registration_routes, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_registration_routes, "_ensure_tournament_unlocked", AsyncMock())
+    monkeypatch.setattr(tournament_registration_routes, "require_tournament_staff_permission", AsyncMock())
+    monkeypatch.setattr(tournament_registration_routes, "mutation_lock", _uncontended_lock)
     badges = AsyncMock()
     audit = AsyncMock()
-    monkeypatch.setattr(tournament_routes, "_apply_checked_in_badges", badges)
-    monkeypatch.setattr(tournament_routes, "_audit_tournament_action", audit)
+    monkeypatch.setattr(tournament_registration_routes, "_apply_checked_in_badges", badges)
+    monkeypatch.setattr(tournament_registration_routes, "_audit_tournament_action", audit)
 
-    result = asyncio.run(tournament_routes.staff_set_registration_checkin(
+    result = asyncio.run(tournament_registration_routes.staff_set_registration_checkin(
         "t1",
         "reg-1",
         {"status": "checked_in"},
@@ -257,21 +265,22 @@ def test_self_checkin_replay_skips_late_hooks_badges_and_audit(monkeypatch):
     async def identity(value):
         return value
 
-    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
-    monkeypatch.setattr(tournament_routes, "_resolve_tid", identity)
-    monkeypatch.setattr(tournament_routes, "_ensure_tournament_unlocked", AsyncMock(return_value={"event_mode": "online"}))
-    monkeypatch.setattr(tournament_routes, "mutation_lock", _uncontended_lock)
-    monkeypatch.setattr(tournament_routes, "_find_self_registration", AsyncMock(return_value={
+    monkeypatch.setattr(tournament_common, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_registration_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_registration_routes, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_registration_routes, "_ensure_tournament_unlocked", AsyncMock(return_value={"event_mode": "online"}))
+    monkeypatch.setattr(tournament_registration_routes, "mutation_lock", _uncontended_lock)
+    monkeypatch.setattr(tournament_registration_routes, "_find_self_registration", AsyncMock(return_value={
         "id": "reg-1", "user_id": "user-1", "status": "checked_in",
     }))
     late_hooks = AsyncMock()
     badges = AsyncMock()
     audit = AsyncMock()
-    monkeypatch.setattr(tournament_routes, "_apply_late_checkin_hooks", late_hooks)
-    monkeypatch.setattr(tournament_routes, "_apply_checked_in_badges", badges)
-    monkeypatch.setattr(tournament_routes, "_audit_tournament_action", audit)
+    monkeypatch.setattr(tournament_registration_routes, "_apply_late_checkin_hooks", late_hooks)
+    monkeypatch.setattr(tournament_registration_routes, "_apply_checked_in_badges", badges)
+    monkeypatch.setattr(tournament_registration_routes, "_audit_tournament_action", audit)
 
-    result = asyncio.run(tournament_routes.checkin_self("t1", {"id": "user-1"}))
+    result = asyncio.run(tournament_registration_routes.checkin_self("t1", {"id": "user-1"}))
 
     assert result == {"ok": True, "idempotent_replay": True}
     late_hooks.assert_not_awaited()
@@ -290,14 +299,16 @@ def test_registration_update_replay_skips_write_and_bracket_refresh(monkeypatch)
     async def identity(value):
         return value
 
-    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
-    monkeypatch.setattr(tournament_routes, "_resolve_tid", identity)
-    monkeypatch.setattr(tournament_routes, "_ensure_tournament_unlocked", AsyncMock())
-    monkeypatch.setattr(tournament_routes, "require_tournament_staff_permission", AsyncMock())
+    monkeypatch.setattr(tournament_common, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_registration_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_common, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_registration_routes, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_registration_routes, "_ensure_tournament_unlocked", AsyncMock())
+    monkeypatch.setattr(tournament_registration_routes, "require_tournament_staff_permission", AsyncMock())
     refresh = AsyncMock()
-    monkeypatch.setattr(tournament_routes, "_refresh_tournament_previews_after_registration", refresh)
+    monkeypatch.setattr(tournament_registration_routes, "_refresh_tournament_previews_after_registration", refresh)
 
-    result = asyncio.run(tournament_routes.update_registration(
+    result = asyncio.run(tournament_registration_routes.update_registration(
         "t1",
         "reg-1",
         RegistrationUpdate(status="approved"),
@@ -315,23 +326,26 @@ def test_lock_and_unlock_replays_skip_second_audit(monkeypatch):
 
     audit = AsyncMock()
     updates = AsyncMock()
-    monkeypatch.setattr(tournament_routes, "_resolve_tid", identity)
-    monkeypatch.setattr(tournament_routes, "_audit_tournament_action", audit)
+    monkeypatch.setattr(tournament_common, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_lifecycle_routes, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_lifecycle_routes, "_audit_tournament_action", audit)
 
     locked_db = SimpleNamespace(tournaments=SimpleNamespace(
         find_one=AsyncMock(return_value={"id": "t1", "status": "completed", "locked_at": "2026-08-12T12:00:00+00:00"}),
         update_one=updates,
     ))
-    monkeypatch.setattr(tournament_routes, "get_db", lambda: locked_db)
-    locked = asyncio.run(tournament_routes.lock_tournament("t1", {"id": "admin-1"}))
+    monkeypatch.setattr(tournament_common, "get_db", lambda: locked_db)
+    monkeypatch.setattr(tournament_lifecycle_routes, "get_db", lambda: locked_db)
+    locked = asyncio.run(tournament_lifecycle_routes.lock_tournament("t1", {"id": "admin-1"}))
     assert locked["idempotent_replay"] is True
 
     unlocked_db = SimpleNamespace(tournaments=SimpleNamespace(
         find_one=AsyncMock(return_value={"id": "t1", "status": "completed"}),
         update_one=updates,
     ))
-    monkeypatch.setattr(tournament_routes, "get_db", lambda: unlocked_db)
-    unlocked = asyncio.run(tournament_routes.unlock_tournament("t1", {"id": "admin-1"}))
+    monkeypatch.setattr(tournament_common, "get_db", lambda: unlocked_db)
+    monkeypatch.setattr(tournament_lifecycle_routes, "get_db", lambda: unlocked_db)
+    unlocked = asyncio.run(tournament_lifecycle_routes.unlock_tournament("t1", {"id": "admin-1"}))
     assert unlocked["idempotent_replay"] is True
 
     updates.assert_not_awaited()
@@ -352,11 +366,11 @@ def test_tournament_creation_replay_reuses_existing_document(monkeypatch):
     db = SimpleNamespace(tournaments=tournaments, games=games)
     preview = AsyncMock()
 
-    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
-    monkeypatch.setattr(tournament_routes, "mutation_lock", _uncontended_lock)
-    monkeypatch.setattr(tournament_routes, "_create_initial_bracket_preview", preview)
+    monkeypatch.setattr(tournament_crud_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_crud_routes, "mutation_lock", _uncontended_lock)
+    monkeypatch.setattr(tournament_crud_routes, "_create_initial_bracket_preview", preview)
 
-    result = asyncio.run(tournament_routes.create_tournament(
+    result = asyncio.run(tournament_crud_routes.create_tournament(
         TournamentCreate(title="Sommer-Cup", game_id="game-1"),
         {"id": "admin-1"},
     ))
@@ -381,11 +395,11 @@ def test_tournament_creation_persists_engine_and_ruleset_versions(monkeypatch):
     db = SimpleNamespace(tournaments=tournaments, games=games)
     preview = AsyncMock(return_value={"ok": True, "engine": "legacy"})
 
-    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
-    monkeypatch.setattr(tournament_routes, "mutation_lock", _uncontended_lock)
-    monkeypatch.setattr(tournament_routes, "_create_initial_bracket_preview", preview)
+    monkeypatch.setattr(tournament_crud_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_crud_routes, "mutation_lock", _uncontended_lock)
+    monkeypatch.setattr(tournament_crud_routes, "_create_initial_bracket_preview", preview)
 
-    result = asyncio.run(tournament_routes.create_tournament(
+    result = asyncio.run(tournament_crud_routes.create_tournament(
         TournamentCreate(title="Sommer-Cup", game_id="game-1", format="single_elim"),
         {"id": "admin-1"},
     ))
@@ -416,14 +430,16 @@ def test_tournament_stage_creation_replay_reuses_existing_document(monkeypatch):
     async def identity(value):
         return value
 
-    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
-    monkeypatch.setattr(tournament_routes, "_resolve_tid", identity)
-    monkeypatch.setattr(tournament_routes, "_ensure_tournament_unlocked", AsyncMock())
-    monkeypatch.setattr(tournament_routes, "require_tournament_staff_permission", AsyncMock())
+    monkeypatch.setattr(tournament_common, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_stage_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_common, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_stage_routes, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_stage_routes, "_ensure_tournament_unlocked", AsyncMock())
+    monkeypatch.setattr(tournament_stage_routes, "require_tournament_staff_permission", AsyncMock())
     audit = AsyncMock()
-    monkeypatch.setattr(tournament_routes, "_audit_tournament_action", audit)
+    monkeypatch.setattr(tournament_stage_routes, "_audit_tournament_action", audit)
 
-    result = asyncio.run(tournament_routes.create_tournament_stage(
+    result = asyncio.run(tournament_stage_routes.create_tournament_stage(
         "t1",
         TournamentStageCreate(name="Finale", number=1),
         {"id": "admin-1"},
@@ -486,11 +502,13 @@ def _patch_bracket_rebuild_dependencies(monkeypatch, db):
     async def unlocked(db_arg, tournament_id):
         return await db_arg.tournaments.find_one({"id": tournament_id}, {"_id": 0})
 
-    monkeypatch.setattr(tournament_routes, "get_db", lambda: db)
-    monkeypatch.setattr(tournament_routes, "_resolve_tid", identity)
-    monkeypatch.setattr(tournament_routes, "_ensure_tournament_unlocked", unlocked)
-    monkeypatch.setattr(tournament_routes, "require_tournament_staff_permission", AsyncMock())
-    monkeypatch.setattr(tournament_routes, "_audit_tournament_action", AsyncMock())
+    monkeypatch.setattr(tournament_common, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_structure_routes, "get_db", lambda: db)
+    monkeypatch.setattr(tournament_common, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_structure_routes, "_resolve_tid", identity)
+    monkeypatch.setattr(tournament_structure_routes, "_ensure_tournament_unlocked", unlocked)
+    monkeypatch.setattr(tournament_structure_routes, "require_tournament_staff_permission", AsyncMock())
+    monkeypatch.setattr(tournament_structure_routes, "_audit_tournament_action", AsyncMock())
 
 
 @pytest.mark.parametrize(("tournament_format", "stage_type", "match_type", "match_count"), [
@@ -515,9 +533,9 @@ def test_rebuild_from_format_supports_64_player_custom_brackets(
     db = _bracket_rebuild_db(tournament=tournament)
     _patch_bracket_rebuild_dependencies(monkeypatch, db)
 
-    result = asyncio.run(tournament_routes.rebuild_bracket_from_tournament_format(
+    result = asyncio.run(tournament_structure_routes.rebuild_bracket_from_tournament_format(
         "t1",
-        tournament_routes.TournamentBracketStructurePayload(
+        tournament_common.TournamentBracketStructurePayload(
             name="Turnierbaum",
             stage_type=stage_type,
             match_type=match_type,
@@ -567,9 +585,9 @@ def test_invalid_custom_schema_preserves_existing_bracket(monkeypatch):
     _patch_bracket_rebuild_dependencies(monkeypatch, db)
 
     with pytest.raises(HTTPException) as error:
-        asyncio.run(tournament_routes.rebuild_bracket_from_tournament_format(
+        asyncio.run(tournament_structure_routes.rebuild_bracket_from_tournament_format(
             "t1",
-            tournament_routes.TournamentBracketStructurePayload(
+            tournament_common.TournamentBracketStructurePayload(
                 name="Neuer Baum",
                 stage_type="ffa_custom_bracket",
                 match_type="ffa",
@@ -620,9 +638,9 @@ def test_custom_bracket_write_failure_cleans_new_generation_only(monkeypatch):
     _patch_bracket_rebuild_dependencies(monkeypatch, db)
 
     with pytest.raises(RuntimeError, match="database write failed"):
-        asyncio.run(tournament_routes.rebuild_bracket_from_tournament_format(
+        asyncio.run(tournament_structure_routes.rebuild_bracket_from_tournament_format(
             "t1",
-            tournament_routes.TournamentBracketStructurePayload(
+            tournament_common.TournamentBracketStructurePayload(
                 stage_type="custom_bracket",
                 match_type="duel",
             ),
@@ -665,16 +683,16 @@ def test_structure_plan_is_deterministic_valid_and_read_only(
     ]
     db = _bracket_rebuild_db(tournament=tournament, registrations=registrations)
     _patch_bracket_rebuild_dependencies(monkeypatch, db)
-    payload = tournament_routes.TournamentStructurePlanPayload(
+    payload = tournament_structure_routes.TournamentStructurePlanPayload(
         stage_type=stage_type,
         match_type="duel" if stage_type else None,
         preview=False,
     )
 
-    first = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
+    first = asyncio.run(tournament_structure_routes.plan_bracket_from_tournament_format(
         "t1", payload, {"id": "admin-1"},
     ))
-    second = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
+    second = asyncio.run(tournament_structure_routes.plan_bracket_from_tournament_format(
         "t1", payload, {"id": "admin-1"},
     ))
 
@@ -723,9 +741,9 @@ def test_structure_plan_reports_replacement_impact_and_force_requirement(monkeyp
     )
     _patch_bracket_rebuild_dependencies(monkeypatch, db)
 
-    result = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
+    result = asyncio.run(tournament_structure_routes.plan_bracket_from_tournament_format(
         "t1",
-        tournament_routes.TournamentStructurePlanPayload(preview=False),
+        tournament_structure_routes.TournamentStructurePlanPayload(preview=False),
         {"id": "admin-1"},
     ))
 
@@ -744,7 +762,7 @@ def _apply_payload_from_plan(plan, **updates):
         "expected_base_structure_hash": plan["base_structure_hash"],
         **updates,
     }
-    return tournament_routes.TournamentStructureApplyPayload(**values)
+    return tournament_structure_routes.TournamentStructureApplyPayload(**values)
 
 
 def test_structure_apply_rejects_stale_base_before_any_write(monkeypatch):
@@ -761,8 +779,8 @@ def test_structure_apply_rejects_stale_base_before_any_write(monkeypatch):
     ]
     db = _bracket_rebuild_db(tournament=tournament, registrations=registrations)
     _patch_bracket_rebuild_dependencies(monkeypatch, db)
-    plan_request = tournament_routes.TournamentStructurePlanPayload(preview=False)
-    plan = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
+    plan_request = tournament_structure_routes.TournamentStructurePlanPayload(preview=False)
+    plan = asyncio.run(tournament_structure_routes.plan_bracket_from_tournament_format(
         "t1", plan_request, {"id": "admin-1"},
     ))
 
@@ -775,7 +793,7 @@ def test_structure_apply_rejects_stale_base_before_any_write(monkeypatch):
         "status": "preview",
     }])
     with pytest.raises(HTTPException) as error:
-        asyncio.run(tournament_routes.apply_tournament_structure_plan(
+        asyncio.run(tournament_structure_routes.apply_tournament_structure_plan(
             "t1",
             _apply_payload_from_plan(plan),
             {"id": "admin-1"},
@@ -826,15 +844,15 @@ def test_a_tournament_in_the_classic_store_is_planned_there_and_protected(monkey
         tournament=tournament, registrations=registrations, legacy_matches=played)
     _patch_bracket_rebuild_dependencies(monkeypatch, db)
 
-    plan = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
+    plan = asyncio.run(tournament_structure_routes.plan_bracket_from_tournament_format(
         "t1",
-        tournament_routes.TournamentStructurePlanPayload(preview=False),
+        tournament_structure_routes.TournamentStructurePlanPayload(preview=False),
         {"id": "admin-1"},
     ))
     assert plan["engine"] == "classic", "Bestand im alten Speicher gibt die Engine vor"
 
     with pytest.raises(HTTPException) as error:
-        asyncio.run(tournament_routes.apply_tournament_structure_plan(
+        asyncio.run(tournament_structure_routes.apply_tournament_structure_plan(
             "t1",
             _apply_payload_from_plan(plan),
             {"id": "admin-1"},
@@ -864,13 +882,13 @@ def test_structure_apply_activates_graph_plan_with_stage(monkeypatch):
         "match_type": "duel",
         "preview": False,
     }
-    plan = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
+    plan = asyncio.run(tournament_structure_routes.plan_bracket_from_tournament_format(
         "t1",
-        tournament_routes.TournamentStructurePlanPayload(**request_values),
+        tournament_structure_routes.TournamentStructurePlanPayload(**request_values),
         {"id": "admin-1"},
     ))
 
-    result = asyncio.run(tournament_routes.apply_tournament_structure_plan(
+    result = asyncio.run(tournament_structure_routes.apply_tournament_structure_plan(
         "t1",
         _apply_payload_from_plan(plan, **request_values),
         {"id": "admin-1"},
@@ -914,12 +932,12 @@ def test_structure_apply_rejects_invalid_validated_graph_before_write(monkeypatc
         None,
         SimpleNamespace(legacy_matches=[], stage_matches=[], stages=[]),
     ))
-    monkeypatch.setattr(tournament_routes, "_build_tournament_structure_plan", build_plan)
+    monkeypatch.setattr(tournament_structure_routes, "_build_tournament_structure_plan", build_plan)
 
     with pytest.raises(HTTPException) as error:
-        asyncio.run(tournament_routes.apply_tournament_structure_plan(
+        asyncio.run(tournament_structure_routes.apply_tournament_structure_plan(
             "t1",
-            tournament_routes.TournamentStructureApplyPayload(
+            tournament_structure_routes.TournamentStructureApplyPayload(
                 preview=False,
                 expected_plan_hash=plan_hash,
                 expected_base_structure_hash=base_hash,
@@ -963,14 +981,14 @@ def test_structure_apply_rejects_real_existing_matches_before_write(monkeypatch)
         registrations=registrations,
     )
     _patch_bracket_rebuild_dependencies(monkeypatch, db)
-    plan = asyncio.run(tournament_routes.plan_bracket_from_tournament_format(
+    plan = asyncio.run(tournament_structure_routes.plan_bracket_from_tournament_format(
         "t1",
-        tournament_routes.TournamentStructurePlanPayload(preview=False),
+        tournament_structure_routes.TournamentStructurePlanPayload(preview=False),
         {"id": "admin-1"},
     ))
 
     with pytest.raises(HTTPException) as error:
-        asyncio.run(tournament_routes.apply_tournament_structure_plan(
+        asyncio.run(tournament_structure_routes.apply_tournament_structure_plan(
             "t1",
             _apply_payload_from_plan(plan),
             {"id": "admin-1"},
@@ -1000,9 +1018,9 @@ def test_structure_apply_exact_retry_is_idempotent_without_replanning(monkeypatc
     db = _bracket_rebuild_db(tournament=tournament)
     _patch_bracket_rebuild_dependencies(monkeypatch, db)
 
-    result = asyncio.run(tournament_routes.apply_tournament_structure_plan(
+    result = asyncio.run(tournament_structure_routes.apply_tournament_structure_plan(
         "t1",
-        tournament_routes.TournamentStructureApplyPayload(
+        tournament_structure_routes.TournamentStructureApplyPayload(
             preview=False,
             expected_plan_hash=plan_hash,
             expected_base_structure_hash=base_hash,
