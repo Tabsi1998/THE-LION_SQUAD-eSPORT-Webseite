@@ -327,7 +327,7 @@ async def pdf_tournament_standings(
     if not await _result_export_allowed_for_request(db, t, user, access, "tournament"):
         raise HTTPException(status_code=403, detail="Ergebnis-PDF ist erst nach Turnierende öffentlich.")
     # Reuse standings logic
-    from routes.tournament_routes import standings as st_fn
+    from routes.tournament_view_routes import standings as st_fn
     rows = await st_fn(t["id"], access=access, user=user)
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
@@ -347,7 +347,7 @@ async def pdf_tournament_certificates(
         raise HTTPException(status_code=404)
     if not await _result_export_allowed_for_request(db, t, user, access, "tournament"):
         raise HTTPException(status_code=403, detail="Urkunden sind erst nach Turnierende öffentlich.")
-    from routes.tournament_routes import standings as st_fn
+    from routes.tournament_view_routes import standings as st_fn
     rows = _top_certificate_rows(await st_fn(t["id"], access=access, user=user))
     if not rows:
         raise HTTPException(status_code=404, detail="Keine Top-4-Platzierungen für Urkunden gefunden.")
@@ -383,7 +383,7 @@ async def pdf_tournament_certificate(
         raise HTTPException(status_code=404)
     if not await _result_export_allowed_for_request(db, t, user, access, "tournament"):
         raise HTTPException(status_code=403, detail="Urkunden sind erst nach Turnierende öffentlich.")
-    from routes.tournament_routes import standings as st_fn
+    from routes.tournament_view_routes import standings as st_fn
     rows = await st_fn(t["id"], access=access, user=user)
     row = next((item for item in rows if item.get("registration_id") == registration_id), None)
     if not row:

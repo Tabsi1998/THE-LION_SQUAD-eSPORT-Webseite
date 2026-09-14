@@ -216,11 +216,10 @@ async def _prepare_tournament_transition(db, doc: dict, next_status: str) -> boo
     if next_status not in {"check_in", "live"}:
         return True
     try:
-        from routes.tournament_routes import (
-            _collect_plan_matches,
+        from routes.tournament_common import _collect_plan_matches, _planning_report
+        from routes.tournament_lifecycle_routes import (
             _finalize_bracket_for_checkin,
             _live_start_blocker,
-            _planning_report,
         )
         tournament = {**doc, "status": next_status}
         await _finalize_bracket_for_checkin(db, tournament, None)

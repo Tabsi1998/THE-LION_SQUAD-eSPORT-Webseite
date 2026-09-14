@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from routes.tournament_routes import _planning_report
+from routes.tournament_common import _planning_report
 
 
 def _warning_types(report):

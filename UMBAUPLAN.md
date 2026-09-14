@@ -37,12 +37,12 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 9 | **Übersichtlichkeit** | umgesetzt | #178, #179, #181, #183, #185, #186, #188 |
 | 10 | **Spielwochen und Terminfindung** | umgesetzt | #189 |
 | 11 | PDF-Ausgabe | umgesetzt | #193, #194 |
-| 12 | Galerie und Medien: Tempo, Videos überall | offen | — |
-| 13 | Entflechtung und Tempo | offen | — |
+| 12 | Galerie und Medien: Tempo, Videos überall | umgesetzt | #196 |
+| 13 | Entflechtung: `tournament_routes.py` aufgeteilt | umgesetzt | dieser PR |
 | 14 | LionsAPP in den Store | offen | — |
 | 15 | Abschluss | offen | — |
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen | — |
-| 17 | **Markenbilder hell und dunkel überall richtig** | teilweise | #193 |
+| 17 | **Markenbilder hell und dunkel überall richtig** | teilweise | #193, #195 |
 | 18 | **Auszeichnungen: Banner und Trophäen** | offen, neu aufgenommen | — |
 
 ### Warum Block 5 die Migration erledigt hat, ohne zu migrieren
@@ -173,35 +173,58 @@ Betrifft `backend/pdf_service.py` (1030 Zeilen, reportlab + Pillow).
 - Bilder und Videos **laden schnell**, keine langen Wartezeiten.
 - Videos laufen sauber auf **PC-Web, Handy-Web und in der App**.
 
-Heute werden nur Originale bis 4096 px vorgehalten; es fehlen kleinere Varianten und
-Vorschaubilder. Das ist die Hauptursache der Wartezeiten.
+**Umgesetzt mit #196.** Bilder gibt es in drei Breiten (400, 800, 1600 px). Sie entstehen
+beim ersten Abruf, auch für alles, was schon hochgeladen ist; zu migrieren war nichts.
+Videos spielen im Raster nicht mehr von selbst, sondern zeigen ein Standbild. Das Standbild
+erzeugt der Browser beim Hochladen, der Container braucht dafür kein ffmpeg.
 
-## Block 13 — Entflechtung und Tempo
+Noch nicht geprüft: ob die App die Bildbreiten und Standbilder schon nutzt. Das gehört zu
+Block 14. Was eure echten Bilder wiegen, zeigt nach dem Ausrollen `scripts/media-report.py`
+(siehe [Was von dir kommen muss](#was-von-dir-kommen-muss)).
+
+## Block 13 — Entflechtung
 
 Die großen Dateien, die Änderungen langsam und riskant machen:
 
 | Datei | Zeilen | Lohnt sich das Aufteilen? |
 | --- | --- | --- |
-| `backend/routes/tournament_routes.py` | 3623 | **Ja.** Jeder weitere Block fasst sie an |
+| `backend/routes/tournament_routes.py` | 3653 | **Ja. Erledigt**, siehe unten |
 | `frontend/src/pages/admin/AdminTournamentEditPage.jsx` | 2175 | **Nebenbei**, wenn ohnehin daran gearbeitet wird |
 | `frontend/src/pages/admin/AdminSettingsPage.jsx` | 2101 | **Eher nicht.** Unabhängige Reiter, die selten gemeinsam geändert werden |
 | `frontend/src/pages/user/ProfilePage.jsx` | 1803 | **Eher nicht**, aus demselben Grund |
 | `backend/routes/news_routes.py` | 1453 | **Eher nicht** |
 
-### Die Empfehlung
-
 Aufteilen bringt dir als Betreiber **nichts Sichtbares**. Es senkt das Risiko künftiger
-Änderungen und macht sie schneller — mehr nicht. Deshalb nicht als eigenes Projekt,
-sondern dort, wo es Arbeit tatsächlich blockiert.
+Änderungen, mehr nicht. Deshalb wurde nur `tournament_routes.py` aufgeteilt: Jeder
+verbleibende Block fasst sie an. Die übrigen Dateien werden nur angefasst, wenn ohnehin
+dort gearbeitet wird.
 
-Die eine Ausnahme ist `tournament_routes.py`. Sie mischt Struktur, Anmeldungen, Tabellen,
-Exporte und jetzt Spielwochen, und **jeder verbleibende Block fasst sie erneut an**. Dafür
-gibt es im Projekt bereits ein erfolgreiches Vorbild: PR #163 hat `extras_routes` nach
-Domänen aufgeteilt.
+### Wie die Turnierrouten jetzt liegen
 
-**Vorschlag für die Reihenfolge:** erst die Blöcke, die du siehst — PDF und Galerie —, dann
-`tournament_routes.py` aufteilen, bevor App und Abschluss kommen. Die übrigen Dateien nur
-anfassen, wenn ohnehin dort gearbeitet wird.
+| Modul | Inhalt |
+| --- | --- |
+| `tournament_crud_routes.py` | Turniere anlegen, auflisten, ansehen, ändern, löschen |
+| `tournament_registration_routes.py` | Anmeldungen, Check-in, zuweisbare Nutzer |
+| `tournament_structure_routes.py` | Turnierbaum planen, übernehmen, neu aufbauen, zurücksetzen |
+| `tournament_lifecycle_routes.py` | Status wechseln, sperren, entsperren |
+| `tournament_stage_routes.py` | Phasen und Matches des Graph-Systems |
+| `tournament_view_routes.py` | Turnierbaum-Anzeige, Spieltage, Tabelle, Planungsprüfung, Spielplan-CSV |
+| `tournament_chat_routes.py`, `tournament_staff_routes.py`, `tournament_format_routes.py` | Chat, Turnierteam, Schweizer System und Gruppen |
+| `tournament_common.py` | Helfer, die mehrere Module brauchen |
+
+Alle Endpunkte hängen an **einem** gemeinsamen Router (`tournament_router.py`).
+`tournament_routes.py` importiert nur noch die Module. Die Routentabelle ist vor und
+nach dem Umbau identisch: 46 Endpunkte, keine Route verdeckt eine andere, und keine
+hängt von der Reihenfolge ab.
+
+Für künftige Tests gilt: **Ein Patch gehört an das Modul, in dem die Funktion nachschlägt.**
+`tournament_routes.py` reicht bewusst keine Helfer mehr durch. Ein Patch am falschen Ort
+scheitert laut, statt still daneben zu greifen.
+
+Beim Umbau aufgefallen und **bewusst nicht entfernt**, weil ein Umzug nichts löschen soll:
+`_rebuild_checkin_bracket_after_staff_change` (mit `_legacy_match_can_be_rebuilt`) und
+`MATCH_PLAN_ACTIVE_STATUSES` werden nirgends aufgerufen. `_competition_engine` und
+`_can_create_initial_legacy_preview` benutzen nur noch Tests.
 
 ## Block 14 — LionsAPP in den Store
 
@@ -427,6 +450,7 @@ Software kann keine Zugänge, echten Vereinsdaten oder einen Serverzugriff erfin
 | **Ausgangs-Trockenlauf** | `bash scripts/tournament-dryrun.sh vorher.json` einmal laufen lassen, damit es eine Vergleichsbasis gibt. Ohne Ausgabedatei kann später nicht verglichen werden. |
 | **Praxistest mit mehreren Nutzern** | Turnierabläufe mit echten Anmeldungen lassen sich als einzelner Nutzer im Livesystem nicht prüfen. |
 | **Abnahme nach Ausrollen** | Siehe [STAGING_ABNAHME.md](STAGING_ABNAHME.md). |
+| **Medienbericht nach Block 12** | `docker compose exec backend python3 scripts/media-report.py` (nur lesend). Zeigt, was eure Bilder und ihre Fassungen wiegen, und ob 400/800/1600 px die richtigen Breiten sind. |
 
 Zum Testen ohne Livesystem gibt es seit Block 6 den Weg über die echte Anwendung gegen
 eine Datenbank im Speicher (`backend/tests/flow_harness.py`) — damit lassen sich vollständige

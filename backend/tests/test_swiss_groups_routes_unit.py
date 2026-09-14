@@ -13,11 +13,8 @@ import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from routes.tournament_routes import (
-    _competition_engine,
-    _groups_generate_graph,
-    _swiss_next_round_graph,
-)
+from routes.tournament_common import _competition_engine
+from routes.tournament_format_routes import _groups_generate_graph, _swiss_next_round_graph
 from services.competition_read import load_competition_read_model
 from services.competition_standings import standings_for_structure
 

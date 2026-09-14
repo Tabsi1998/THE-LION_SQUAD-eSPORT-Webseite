@@ -150,7 +150,7 @@ async def _my_tournament_certificates(db, me: dict) -> list[dict]:
     if not tournament_map:
         return []
 
-    from routes.tournament_routes import standings as tournament_standings
+    from routes.tournament_view_routes import standings as tournament_standings
 
     result = []
     regs_by_tournament: dict[str, list[dict]] = {}
