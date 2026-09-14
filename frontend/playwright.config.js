@@ -8,6 +8,10 @@ module.exports = defineConfig({
   timeout: 45_000,
   expect: { timeout: 10_000 },
   retries: process.env.CI ? 1 : 0,
+  // Ohne Vorgabe startet Playwright halb so viele Worker wie Kerne. Auf einem
+  // großen Rechner überlastet das den Vite-Entwicklungsserver, und Seiten hängen
+  // beim Nachladen. E2E_WORKERS=2 entspricht dem 4-Kern-Rechner von GitHub.
+  workers: process.env.E2E_WORKERS ? Number(process.env.E2E_WORKERS) : undefined,
   reporter: process.env.CI
     ? [
         ["line"],
