@@ -17,6 +17,7 @@ import { GermanDateField } from "@/components/tls/GermanDateField";
 import { GoogleAuthButton } from "@/components/tls/GoogleAuthButton";
 import { MfaSetupPanel } from "@/components/tls/MfaSetupPanel";
 import { PasskeysPanel } from "@/components/tls/PasskeysPanel";
+import { ChatAttachButton, ChatAttachmentDrafts, ChatMessageAttachments, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 
 const TABS = [
@@ -1279,14 +1280,17 @@ function MessagesPanel() {
     return () => clearTimeout(timer);
   }, [query]);
 
+  const dmAttachments = useChatAttachmentDrafts();
+
   const send = async () => {
     const message = text.trim();
-    if (!active?.id || !message || sending) return;
+    if (!active?.id || !dmAttachments.canSend(message) || sending) return;
     setSending(true);
     try {
-      const { data } = await api.post(`/messages/direct/${active.id}`, { message });
+      const { data } = await api.post(`/messages/direct/${active.id}`, { message, attachment_ids: dmAttachments.attachmentIds });
       setMessages((rows) => [...rows, data]);
       setText("");
+      dmAttachments.reset();
       setHint("");
       setCanSend(true);
       loadThreads();
@@ -1403,7 +1407,7 @@ function MessagesPanel() {
                       <div className="font-bold text-sm truncate">{other.display_name || other.username}</div>
                       {thread.unread_count > 0 && <span className="shrink-0 min-w-5 h-5 px-1 rounded-sm bg-[#29B6E8] text-black text-[10px] font-black inline-flex items-center justify-center">{thread.unread_count}</span>}
                     </div>
-                    <div className="text-xs text-white/40 truncate">{thread.latest_message?.message || "Noch keine Nachricht"}</div>
+                    <div className="text-xs text-white/40 truncate">{thread.latest_message?.message || (thread.latest_message?.attachments?.length ? "[Anhang]" : "Noch keine Nachricht")}</div>
                   </button>
                 );
               })}
@@ -1435,14 +1439,17 @@ function MessagesPanel() {
                         <div className="text-[10px] uppercase tracking-widest text-white/35">
                           {message.created_at && new Date(message.created_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}
                         </div>
-                        <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85">{message.message}</div>
+                        {message.message && <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85">{message.message}</div>}
+                        <ChatMessageAttachments attachments={message.attachments} />
                       </div>
                     </div>
                   );
                 })}
                 {messages.length === 0 && <div className="text-center py-16 text-sm text-white/35">Noch keine Nachrichten in diesem Gespräch.</div>}
               </div>
-              <div className="border-t border-white/10 p-3 flex gap-2">
+              <ChatAttachmentDrafts drafts={dmAttachments.drafts} onRemove={dmAttachments.remove} />
+              <div className="border-t border-white/10 p-3 flex gap-2" onPaste={dmAttachments.onPaste}>
+                <ChatAttachButton onFiles={dmAttachments.addFiles} disabled={!canSend || sending} testId="direct-chat-attach" />
                 <input
                   value={text}
                   onChange={(e) => setText(e.target.value)}
@@ -1457,7 +1464,7 @@ function MessagesPanel() {
                   placeholder={canSend ? "Nachricht schreiben..." : "Direktnachrichten nicht erlaubt"}
                   className="flex-1 min-w-0 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm disabled:opacity-50"
                 />
-                <button type="button" disabled={!canSend || sending || !text.trim()} onClick={send} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
+                <button type="button" disabled={!canSend || sending || !dmAttachments.canSend(text)} onClick={send} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
                   <Send className="w-3.5 h-3.5" /> Senden
                 </button>
               </div>

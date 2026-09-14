@@ -89,6 +89,9 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     await db.direct_messages.update_many({"sender_id": user_id}, {"$set": {"message": "[Nachricht gelöscht]", "sender_anonymized": True}})
     await db.team_chat_messages.update_many({"user_id": user_id}, {"$set": {"message": "[Nachricht gelöscht]", "author_anonymized": True}})
     await db.match_chat_messages.update_many({"user_id": user_id}, {"$set": {"message": "[Nachricht gelöscht]", "author_anonymized": True}})
+    await db.tournament_chat_messages.update_many({"user_id": user_id}, {"$set": {"message": "[Nachricht gelöscht]", "author_anonymized": True}})
+    from services.chat_attachments import delete_user_attachments
+    await delete_user_attachments(db, user_id)
     await db.email_logs.update_many({"to": user.get("email")}, {"$set": {"to": anonymous_email, "recipient_anonymized": True}})
     await db.memberships.update_many({"user_id": user_id}, {"$set": {
         "email": anonymous_email, "first_name": None, "last_name": None, "phone": None,

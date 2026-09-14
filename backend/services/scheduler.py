@@ -162,6 +162,16 @@ async def _safe_mobile_push_receipts():
         _log_task_failure("mobile_push_receipts", exc)
 
 
+async def _safe_chat_attachment_cleanup():
+    try:
+        from services.chat_attachments import purge_stale_attachments
+        removed = await purge_stale_attachments()
+        if removed:
+            logger.info(f"[scheduler] chat_attachment_cleanup removed={removed}")
+    except Exception as exc:
+        _log_task_failure("chat_attachment_cleanup", exc)
+
+
 def _parse_dt(value):
     if not value:
         return None
@@ -307,6 +317,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("mobile_push_receipts", _safe_mobile_push_receipts), IntervalTrigger(minutes=5), id="mobile_push_receipts",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("status_transitions", _safe_status_transitions), IntervalTrigger(seconds=60), id="status_transitions",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("chat_attachment_cleanup", _safe_chat_attachment_cleanup), IntervalTrigger(hours=1), id="chat_attachment_cleanup",
                   max_instances=1, coalesce=True)
     sched.start()
     _scheduler = sched

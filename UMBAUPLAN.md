@@ -1,6 +1,6 @@
 # Umbauplan: Turniere, Übersichtlichkeit und die offenen Wünsche
 
-Stand: 14. September 2026 (Block 14.1: die App ist live).
+Stand: 14. September 2026 (Block 14.2 A: Bilder und Videos im Chat).
 
 Dieser Plan führt das in [RESTPLAN.md](RESTPLAN.md) als **R5** angekündigte Turnierpaket
 aus und nimmt die später dazugekommenen Themen auf (Spielwochen, PDF, Live-Aktualisierung,
@@ -39,7 +39,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 11 | PDF-Ausgabe | umgesetzt | #193, #194 |
 | 12 | Galerie und Medien: Tempo, Videos überall | umgesetzt | #196 |
 | 13 | Entflechtung: `tournament_routes.py` aufgeteilt | umgesetzt | #200 |
-| 14 | LionsAPP in den Store | in Arbeit: 14.1 umgesetzt | #201 |
+| 14 | LionsAPP in den Store | in Arbeit: 14.1 und 14.2 A umgesetzt | #201, dieser PR |
 | 15 | Abschluss | offen | — |
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise | #193, #195 |
@@ -228,14 +228,16 @@ Beim Umbau aufgefallen und **bewusst nicht entfernt**, weil ein Umzug nichts lö
 
 ## Block 14 — LionsAPP in den Store
 
-- Chat: **Tastatur, Emojis, GIFs** und Einfügen müssen sauber funktionieren.
+- Chat: **Tastatur, Emojis, Bilder, Videos, Sticker** und Einfügen müssen sauber funktionieren.
+  **Keine GIFs**, entschieden am 14.09.2026: kein externer Anbieter ([#202](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/202)).
 - **Animationen** und **Achievements** in der App.
 - Umstellung der App vom Abfragen (Polling) auf den bestehenden **SSE-Änderungsstrom**.
 
 | Schritt | Was | Stand |
 | --- | --- | --- |
 | 14.1 | Live statt Abfragen, auch für private Meldungen | umgesetzt (#201) |
-| 14.2 | Chat: Tastatur, Emojis, Einfügen, GIFs | offen; der GIF-Anbieter ist deine Entscheidung |
+| 14.2 A | Chat: Bilder und Videos, geschützt abgelegt, Backend und Web | umgesetzt (dieser PR) |
+| 14.2 B | Chat in der App: Bilder und Videos senden und ansehen; Sticker | offen |
 | 14.3 | Animationen und Achievements | offen |
 | 14.4 | Store-Reife: Play Internal Testing, Absturzberichte, Bildgrößen in der App | offen |
 
@@ -261,6 +263,30 @@ ist der Strom geschlossen; beim Zurückkehren laden offene Ansichten einmal neu.
 
 Nicht in 14.1: Einige öffentliche Turnierseiten im Web fragen zusätzlich im Intervall ab,
 obwohl sie am Strom hängen. Das Aufräumen gehört zu Block 15.
+
+### Was 14.2 A gefunden hat
+
+Alle Uploads lagen bisher im öffentlichen Ordner und waren unter `/api/static/uploads/…`
+**ohne Anmeldung** abrufbar. Für Galerie und Banner ist das richtig, für Bilder aus privaten
+Chats nicht. Chat-Anhänge liegen deshalb in einer eigenen Ablage und kommen nur über
+`/api/chat-attachments`, nach derselben Prüfung wie der Chat:
+
+| Chat | Wer den Anhang sehen darf |
+| --- | --- |
+| Direktnachricht | nur die zwei Beteiligten |
+| Team-Chat | Teammitglieder |
+| Turnier-Chat | Teilnehmer und Turnierleitung |
+| Match-Chat | wer das Match sehen darf; bei öffentlichen Turnieren wie der Chat selbst öffentlich |
+
+Wer keinen Zugriff hat, bekommt „nicht gefunden“, damit nicht einmal die Existenz eines
+Anhangs erkennbar ist. Hochgeladene, aber nie gesendete Anhänge verschwinden nach 24 Stunden.
+
+Dabei fiel eine Datenschutzlücke auf: Die Kontolöschung anonymisierte Direkt-, Team- und
+Match-Chat, **aber nicht den Turnier-Chat**. Behoben; Anhänge verschwinden jetzt mit.
+
+Grenzen (per Umgebungsvariable änderbar): Bilder bis 25 MB vor dem Verkleinern, Videos bis
+100 MB, höchstens 4 Anhänge pro Nachricht. Die Videolänge lässt sich nicht prüfen, weil es im
+Container kein ffmpeg gibt; das Standbild erzeugt der Browser.
 
 ## Block 15 — Abschluss
 
@@ -463,6 +489,18 @@ samt Prüftest über alle Filternamen.
 **Die App hängt seit Block 14.1 ebenfalls am Strom.** Dabei fiel eine Lücke auf, die auch
 das Web hatte: Direktnachrichten, Team-Chat und Benachrichtigungen erreichten normale
 Mitglieder nie live. Details stehen bei Block 14.
+
+## Neu aufgenommen am 14. September
+
+Als GitHub-Issues festgehalten, damit der laufende Block nicht unterbrochen wird:
+
+- [#203](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/203) Events an mehreren
+  Standorten, jeder mit Datum, Zeiten, Adresse und eigener Karte
+- [#204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/204) Event-Formular:
+  „Ort“ und „Stadt“ – die Karte kommt künftig nur aus der Adresse
+- [#205](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/205) App-Releases lokal
+  bauen und hochladen, Versionsschema `v0.x-beta` bis `v1.0.0`; offen ist, wie das zu den alten
+  Beta-Nummern 1.5.0 und 2.0.0 passt
 
 ## Noch offen und bewusst getrennt
 

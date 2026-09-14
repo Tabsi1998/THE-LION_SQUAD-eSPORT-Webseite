@@ -16,6 +16,7 @@ import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
+import { ChatAttachButton, ChatAttachmentDrafts, ChatMessageAttachments, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
 import { formatDateTime, getRegistrationState } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
@@ -364,6 +365,7 @@ function TournamentChat({ tournament, user }) {
   const [blocked, setBlocked] = useState("");
   const [sendError, setSendError] = useState("");
   const scrollRef = useRef(null);
+  const attachments = useChatAttachmentDrafts();
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -392,13 +394,14 @@ function TournamentChat({ tournament, user }) {
   const send = async (event) => {
     event.preventDefault();
     const message = text.trim();
-    if (!message) return;
+    if (!attachments.canSend(message)) return;
     setSendError("");
     const attempt = await submitOnce(async () => {
-      const { data } = await api.post(`/tournaments/${tournament.id}/chat`, { message });
+      const { data } = await api.post(`/tournaments/${tournament.id}/chat`, { message, attachment_ids: attachments.attachmentIds });
       setMessages((rows) => [...rows, data]);
       setText("");
       setBlocked("");
+      attachments.reset();
     });
     if (attempt.started && attempt.error) {
       const messageText = formatApiError(attempt.error.response?.data?.detail) || "Nachricht konnte nicht gesendet werden.";
@@ -431,14 +434,17 @@ function TournamentChat({ tournament, user }) {
                         <span className={mine ? "text-[#29B6E8]" : "text-white/55"}>{message.author?.display_name || message.author?.username || "Benutzer"}</span>
                         {message.created_at && <span>{new Date(message.created_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}</span>}
                       </div>
-                      <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85"><MentionText text={message.message} /></div>
+                      {message.message && <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85"><MentionText text={message.message} /></div>}
+                      <ChatMessageAttachments attachments={message.attachments} />
                     </div>
                   </div>
                 );
               })}
               {messages.length === 0 && <div className="text-center py-8 text-sm text-white/35">Noch keine Nachrichten.</div>}
             </div>
-            <form onSubmit={send} className="border-t border-white/10 p-3 flex gap-2">
+            <ChatAttachmentDrafts drafts={attachments.drafts} onRemove={attachments.remove} />
+            <form onSubmit={send} onPaste={attachments.onPaste} className="border-t border-white/10 p-3 flex gap-2">
+              <ChatAttachButton onFiles={attachments.addFiles} disabled={loading} testId="tournament-chat-attach" />
               <MentionTextarea
                 value={text}
                 onValueChange={(value) => { setText(value); setSendError(""); }}
@@ -456,7 +462,7 @@ function TournamentChat({ tournament, user }) {
                 className="flex-1 min-w-0"
                 textareaClassName="h-10 max-h-28 w-full resize-none bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-[#29B6E8]"
               />
-              <button disabled={loading || !text.trim()} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
+              <button disabled={loading || !attachments.canSend(text)} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
                 <Send className="w-3.5 h-3.5" /> Senden
               </button>
             </form>

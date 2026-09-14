@@ -440,25 +440,17 @@ def _create_original_image_preview(path: pathlib.Path, suffix: str) -> dict | No
     return _image_to_webp_preview(img)
 
 
-async def _upload_image_impl(
-    file: UploadFile,
-    me: dict,
+def _encode_image_bytes(
+    data: bytes,
+    declared_content_type: str,
+    suffix: str,
+    filename_hint: str,
     trim_empty_borders: bool = False,
-    media_scope: str = "user",
-):
-    """Upload an image. Returns public URL `/api/static/uploads/{filename}`.
-    Accepts PNG/JPEG/WebP and re-encodes before serving."""
-    media_scope = _clean_media_scope(media_scope, me)
-    declared_content_type = file.content_type or ""
-    suffix = pathlib.Path(file.filename or "").suffix.lower()
-    filename_hint = file.filename or "upload"
-    if declared_content_type and declared_content_type not in ALLOWED_IMAGE and suffix not in IMAGE_MIME_BY_EXT:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Nur PNG, JPG oder WebP erlaubt. Erkannt: {declared_content_type or 'unbekannt'}",
-        )
-    # Read & size check
-    data = await _read_upload_limited(file, MAX_BYTES, MAX_IMAGE_UPLOAD_MB)
+) -> dict:
+    """Check, rotate, shrink and re-encode an image without storing it.
+
+    Public uploads and private chat attachments share this path, so both get the
+    same format checks and pixel limits."""
     original_size = len(data)
     original_width = 0
     original_height = 0
@@ -523,6 +515,43 @@ async def _upload_image_impl(
     except Exception as exc:
         logger.warning("[uploads] image processing failed: %s", exc)
         raise HTTPException(status_code=400, detail="Bild konnte nicht verarbeitet werden. Bitte PNG, JPG oder WebP erneut exportieren.")
+    return {
+        "data": data,
+        "content_type": content_type,
+        "ext": ext,
+        "original_size": original_size,
+        "original_width": original_width,
+        "original_height": original_height,
+        "width": stored_width,
+        "height": stored_height,
+    }
+
+
+async def _upload_image_impl(
+    file: UploadFile,
+    me: dict,
+    trim_empty_borders: bool = False,
+    media_scope: str = "user",
+):
+    """Upload an image. Returns public URL `/api/static/uploads/{filename}`.
+    Accepts PNG/JPEG/WebP and re-encodes before serving."""
+    media_scope = _clean_media_scope(media_scope, me)
+    declared_content_type = file.content_type or ""
+    suffix = pathlib.Path(file.filename or "").suffix.lower()
+    filename_hint = file.filename or "upload"
+    if declared_content_type and declared_content_type not in ALLOWED_IMAGE and suffix not in IMAGE_MIME_BY_EXT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nur PNG, JPG oder WebP erlaubt. Erkannt: {declared_content_type or 'unbekannt'}",
+        )
+    # Read & size check
+    data = await _read_upload_limited(file, MAX_BYTES, MAX_IMAGE_UPLOAD_MB)
+    encoded = _encode_image_bytes(data, declared_content_type, suffix, filename_hint, trim_empty_borders)
+    data = encoded["data"]
+    content_type, ext = encoded["content_type"], encoded["ext"]
+    original_size = encoded["original_size"]
+    original_width, original_height = encoded["original_width"], encoded["original_height"]
+    stored_width, stored_height = encoded["width"], encoded["height"]
     filename = f"{uuid.uuid4().hex}{ext}"
     path = PUBLIC_UPLOAD_DIR / filename
     try:

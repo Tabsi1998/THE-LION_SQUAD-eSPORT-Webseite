@@ -9,6 +9,7 @@ from auth import get_current_user, get_optional_user, require_admin
 from models import TeamCreate, TeamUpdate, now_utc, new_id
 from services.notification_preferences import send_user_template
 from services.user_notifications import build_public_url, create_user_notification
+from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments
 from services.query_filters import safe_regex
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
@@ -48,7 +49,8 @@ class TeamInviteCreate(BaseModel):
 
 
 class TeamChatCreate(BaseModel):
-    message: str = Field(min_length=1, max_length=1500)
+    message: str = Field(default="", max_length=1500)
+    attachment_ids: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS_PER_MESSAGE)
 
 
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
@@ -219,7 +221,7 @@ async def _notify_team_chat_message(db, team: dict, sender: dict, message: dict,
         await create_user_notification(
             recipient_id,
             title=f"Neue Teamnachricht [{team.get('tag')}]",
-            body=f"{_user_label(sender)}: {(message.get('message') or '')[:140]}",
+            body=f"{_user_label(sender)}: {chat_message_preview(message, 140)}",
             url=f"/teams/{team['id']}",
             kind="team_chat_message",
             meta={"team_id": team["id"], "message_id": message["id"]},
@@ -353,14 +355,19 @@ async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(
     if not _chat_allowed(team, me):
         raise HTTPException(status_code=403, detail="Team-Chat ist nur für Teammitglieder sichtbar")
     text = body.message.strip()
-    if not text:
+    if not text and not body.attachment_ids:
         raise HTTPException(status_code=400, detail="Nachricht darf nicht leer sein")
     now = now_utc().isoformat()
+    message_id = new_id()
+    attachments = await claim_attachments(db, me["id"], body.attachment_ids, {
+        "type": "team", "team_id": team_id, "message_id": message_id,
+    })
     message = {
-        "id": new_id(),
+        "id": message_id,
         "team_id": team_id,
         "user_id": me["id"],
         "message": text,
+        "attachments": attachments,
         "created_at": now,
         "updated_at": now,
     }

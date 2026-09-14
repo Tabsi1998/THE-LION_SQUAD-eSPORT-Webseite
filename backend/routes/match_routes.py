@@ -828,14 +828,23 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
         window_seconds=300,
         subject=f"{me['id']}:{match_id}",
     )
+    text = body.message.strip()
+    if not text and not body.attachment_ids:
+        raise HTTPException(status_code=400, detail="Nachricht darf nicht leer sein")
+    from services.chat_attachments import claim_attachments
+    message_id = new_id()
+    attachments = await claim_attachments(db, me["id"], body.attachment_ids, {
+        "type": "match", "match_id": match_id, "message_id": message_id,
+    })
     now_iso = now_utc().isoformat()
     doc = {
-        "id": new_id(),
+        "id": message_id,
         "match_id": match_id,
         "tournament_id": match.get("tournament_id"),
         "stage_id": match.get("stage_id"),
         "user_id": me["id"],
-        "message": body.message.strip(),
+        "message": text,
+        "attachments": attachments,
         "created_at": now_iso,
         "updated_at": now_iso,
     }

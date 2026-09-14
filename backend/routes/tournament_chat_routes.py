@@ -7,6 +7,7 @@ from database import get_db
 from auth import get_current_user
 from models import now_utc, new_id
 from services.user_notifications import create_user_notification
+from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments
 from routes.tournament_common import (
     STAFF_ROLES,
     TOURNAMENT_MUTATION_LOCKED_DETAIL,
@@ -23,7 +24,8 @@ MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 
 
 class TournamentChatCreate(BaseModel):
-    message: str = Field(min_length=1, max_length=1000)
+    message: str = Field(default="", max_length=1000)
+    attachment_ids: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS_PER_MESSAGE)
 
 
 async def _can_use_tournament_chat(tournament: dict, user: dict | None) -> bool:
@@ -130,7 +132,7 @@ async def _notify_tournament_chat_message(db, tournament: dict, sender: dict, me
         await create_user_notification(
             recipient_id,
             title=f"Neue Turniernachricht: {title}",
-            body=f"{_user_label(sender)}: {(message.get('message') or '')[:140]}",
+            body=f"{_user_label(sender)}: {chat_message_preview(message, 140)}",
             url=f"/tournaments/{tournament.get('slug') or tournament['id']}/chat",
             kind="tournament_chat_message",
             meta={"tournament_id": tournament["id"], "message_id": message["id"]},
@@ -176,14 +178,19 @@ async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = 
     if not await _can_use_tournament_chat(tournament, me):
         raise HTTPException(status_code=403, detail="Turnier-Chat ist nur für Teilnehmer und Turnierleitung sichtbar")
     text = body.message.strip()
-    if not text:
+    if not text and not body.attachment_ids:
         raise HTTPException(status_code=400, detail="Nachricht darf nicht leer sein")
     now = now_utc().isoformat()
+    message_id = new_id()
+    attachments = await claim_attachments(db, me["id"], body.attachment_ids, {
+        "type": "tournament", "tournament_id": tid, "message_id": message_id,
+    })
     doc = {
-        "id": new_id(),
+        "id": message_id,
         "tournament_id": tid,
         "user_id": me["id"],
         "message": text,
+        "attachments": attachments,
         "created_at": now,
         "updated_at": now,
     }
