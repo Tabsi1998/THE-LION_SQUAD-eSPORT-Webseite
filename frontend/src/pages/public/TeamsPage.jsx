@@ -7,6 +7,7 @@ import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
+import { ChatAttachButton, ChatAttachmentDrafts, ChatMessageAttachments, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
@@ -380,6 +381,7 @@ function TeamChat({ team, user }) {
   const { submitting: loading, submitOnce } = useSubmissionGuard();
   const [sendError, setSendError] = useState("");
   const scrollRef = useRef(null);
+  const attachments = useChatAttachmentDrafts();
 
   const load = useCallback(async () => {
     try {
@@ -404,12 +406,13 @@ function TeamChat({ team, user }) {
 
   const send = async () => {
     const message = text.trim();
-    if (!message) return;
+    if (!attachments.canSend(message)) return;
     setSendError("");
     const attempt = await submitOnce(async () => {
-      const { data } = await api.post(`/teams/${team.id}/chat`, { message });
+      const { data } = await api.post(`/teams/${team.id}/chat`, { message, attachment_ids: attachments.attachmentIds });
       setMessages((rows) => [...rows, data]);
       setText("");
+      attachments.reset();
     });
     if (attempt.started && attempt.error) {
       const messageText = formatRequestError(attempt.error, "Nachricht konnte nicht gesendet werden.");
@@ -434,14 +437,17 @@ function TeamChat({ team, user }) {
                     <span className={mine ? "text-[#29B6E8]" : "text-white/55"}>{message.author?.display_name || message.author?.username || "Benutzer"}</span>
                     {message.created_at && <span>{new Date(message.created_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}</span>}
                   </div>
-                  <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85"><MentionText text={message.message} /></div>
+                  {message.message && <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85"><MentionText text={message.message} /></div>}
+                  <ChatMessageAttachments attachments={message.attachments} />
                 </div>
               </div>
             );
           })}
           {messages.length === 0 && <div className="text-center py-10 text-sm text-white/35">Noch keine Nachrichten im Team-Chat.</div>}
         </div>
-        <div className="border-t border-white/10 p-3 flex gap-2">
+        <ChatAttachmentDrafts drafts={attachments.drafts} onRemove={attachments.remove} />
+        <div className="border-t border-white/10 p-3 flex gap-2" onPaste={attachments.onPaste}>
+          <ChatAttachButton onFiles={attachments.addFiles} disabled={loading} testId="team-chat-attach" />
           <MentionTextarea
             value={text}
             onValueChange={(value) => { setText(value); setSendError(""); }}
@@ -459,7 +465,7 @@ function TeamChat({ team, user }) {
             className="flex-1 min-w-0"
             textareaClassName="h-10 max-h-28 w-full resize-none bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-[#29B6E8]"
           />
-          <button type="button" onClick={send} disabled={loading || !text.trim()} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
+          <button type="button" onClick={send} disabled={loading || !attachments.canSend(text)} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
             <Send className="w-3.5 h-3.5" /> Senden
           </button>
         </div>

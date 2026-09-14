@@ -663,7 +663,9 @@ class MatchScheduleProposalDecision(BaseModel):
 
 
 class MatchChatCreate(BaseModel):
-    message: str = Field(min_length=1, max_length=1500)
+    message: str = Field(default="", max_length=1500)
+    # Höchstens vier, wie services.chat_attachments.MAX_ATTACHMENTS_PER_MESSAGE.
+    attachment_ids: list[str] = Field(default_factory=list, max_length=4)
 
 
 class MatchUpdate(BaseModel):

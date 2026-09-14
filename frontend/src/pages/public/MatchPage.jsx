@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
+import { ChatAttachButton, ChatAttachmentDrafts, ChatMessageAttachments, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -246,13 +247,16 @@ export default function MatchPage() {
     }, "Forfeit konnte nicht gespeichert werden.");
   };
 
+  const chatAttachments = useChatAttachmentDrafts();
+
   const sendMessage = async (e) => {
     e.preventDefault();
-    if (!message.trim()) return;
+    if (!chatAttachments.canSend(message)) return;
     await runAction(async () => {
-      const { data: saved } = await api.post(`/matches/${id}/chat`, { message: message.trim() });
+      const { data: saved } = await api.post(`/matches/${id}/chat`, { message: message.trim(), attachment_ids: chatAttachments.attachmentIds });
       setChat((rows) => [...rows, saved]);
       setMessage("");
+      chatAttachments.reset();
     }, "Nachricht konnte nicht gesendet werden.");
   };
 
@@ -515,7 +519,8 @@ export default function MatchPage() {
               {chat.map((m) => (
                 <div key={m.id} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
                   <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{m.author?.display_name || m.author?.username || "Benutzer"}</div>
-                  <div className="mt-1 text-sm text-white/75 whitespace-pre-wrap">{m.message}</div>
+                  {m.message && <div className="mt-1 text-sm text-white/75 whitespace-pre-wrap">{m.message}</div>}
+                  <ChatMessageAttachments attachments={m.attachments} />
                 </div>
               ))}
               {chat.length === 0 && <div className="text-sm text-white/40">Noch keine Nachrichten.</div>}
@@ -525,7 +530,9 @@ export default function MatchPage() {
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={addStaffMention} className="px-2.5 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10">@leitung</button>
                 </div>
-                <div className="flex gap-2 items-end">
+                <ChatAttachmentDrafts drafts={chatAttachments.drafts} onRemove={chatAttachments.remove} />
+                <div className="flex gap-2 items-end" onPaste={chatAttachments.onPaste}>
+                  <ChatAttachButton onFiles={chatAttachments.addFiles} disabled={busy} testId="match-chat-attach" />
                   <MentionTextarea
                     value={message}
                     onValueChange={setMessage}
@@ -537,7 +544,7 @@ export default function MatchPage() {
                     textareaClassName="input w-full min-h-[4.5rem] resize-y"
                     placeholder="Nachricht schreiben, @leitung oder @username markieren"
                   />
-                  <button disabled={busy || !message.trim()} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm disabled:opacity-50"><Send className="w-4 h-4" /></button>
+                  <button disabled={busy || !chatAttachments.canSend(message)} aria-label="Senden" className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm disabled:opacity-50"><Send className="w-4 h-4" /></button>
                 </div>
               </form>
             ) : (

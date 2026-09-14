@@ -35,6 +35,7 @@ from routes.news_routes import router as news_router
 from routes.mobile_routes import router as mobile_router
 from routes.admin_routes import router as admin_router
 from routes.upload_routes import router as upload_router
+from routes.chat_attachment_routes import router as chat_attachment_router
 from routes.badge_routes import router as badge_router, admin_router as achievement_admin_router
 from routes.phase_c_routes import router as phase_c_router
 from routes.phase_ef_routes import (
@@ -221,6 +222,7 @@ app.include_router(dsgvo_router)
 app.include_router(pdf_router)
 app.include_router(audit_router)
 app.include_router(upload_router)
+app.include_router(chat_attachment_router)
 app.include_router(badge_router)
 app.include_router(achievement_admin_router)
 app.include_router(phase_c_router)
