@@ -1,9 +1,16 @@
 name: CI
 
+# Lokal zuerst, GitHub bestätigt: Die Prüfungen laufen vor dem Push auf dem
+# Entwicklungsrechner (lokaler CI-Spiegel liest genau diese Datei). GitHub
+# rechnet jede Minute ab, deshalb hier nur das Nötige:
+# - Entwurfs-PRs lösen nichts aus; "Ready for review" startet den Lauf.
+# - Nur die Jobs laufen, deren Bereich der PR berührt (scripts/ci-changed-areas.py).
+# - Der Geheimnis-Scan läuft bei jeder Änderung.
+# - Kein zweiter Lauf nach dem Merge auf main; bei Bedarf manuell starten.
 on:
-  push:
-    branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,8 +23,39 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Bereiche und Geheimnis-Scan
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.areas.outputs.backend }}
+      frontend: ${{ steps.areas.outputs.frontend }}
+      mobile: ${{ steps.areas.outputs.mobile }}
+      container: ${{ steps.areas.outputs.container }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Scan tracked source for secrets and removed provider remnants
+        run: python3 scripts/check-secrets.py
+      - name: Decide which jobs this change needs
+        id: areas
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            python3 scripts/ci-changed-areas.py --all >> "$GITHUB_OUTPUT"
+          else
+            python3 scripts/ci-changed-areas.py --base "$BASE_SHA" --head "$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          fi
+
   backend:
     name: Backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -42,8 +80,6 @@ jobs:
           pip install -r backend/requirements-dev.txt
       - name: Compile backend
         run: python -m compileall -q backend
-      - name: Scan tracked source for secrets and removed provider remnants
-        run: python scripts/check-secrets.py
       - name: Check documentation links
         run: python scripts/check-doc-links.py
       - name: Validate shell scripts
@@ -61,16 +97,18 @@ jobs:
             --cov-report=xml:test-results/backend-coverage.xml \
             --junitxml=test-results/backend-junit.xml
       - name: Upload backend test diagnostics
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: backend-test-results
           path: test-results/
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 7
 
   frontend:
     name: Frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -123,7 +161,7 @@ jobs:
         working-directory: frontend
         run: yarn test:e2e
       - name: Upload frontend test diagnostics
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: frontend-test-results
@@ -132,10 +170,12 @@ jobs:
             frontend/playwright-report/
             frontend/test-results/
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 7
 
   mobile:
     name: Mobile App
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -179,6 +219,8 @@ jobs:
 
   container-smoke:
     name: Production container smoke
+    needs: changes
+    if: needs.changes.outputs.container == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
