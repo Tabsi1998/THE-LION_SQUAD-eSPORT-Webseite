@@ -1,6 +1,6 @@
 # Umbauplan: Turniere, Übersichtlichkeit und die offenen Wünsche
 
-Stand: 10. September 2026 (Blöcke 16 bis 18 ergänzt).
+Stand: 14. September 2026 (Blöcke 12 und 13 umgesetzt).
 
 Dieser Plan führt das in [RESTPLAN.md](RESTPLAN.md) als **R5** angekündigte Turnierpaket
 aus und nimmt die später dazugekommenen Themen auf (Spielwochen, PDF, Live-Aktualisierung,
@@ -38,7 +38,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 10 | **Spielwochen und Terminfindung** | umgesetzt | #189 |
 | 11 | PDF-Ausgabe | umgesetzt | #193, #194 |
 | 12 | Galerie und Medien: Tempo, Videos überall | umgesetzt | #196 |
-| 13 | Entflechtung: `tournament_routes.py` aufgeteilt | umgesetzt | dieser PR |
+| 13 | Entflechtung: `tournament_routes.py` aufgeteilt | umgesetzt | #200 |
 | 14 | LionsAPP in den Store | offen | — |
 | 15 | Abschluss | offen | — |
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen | — |
