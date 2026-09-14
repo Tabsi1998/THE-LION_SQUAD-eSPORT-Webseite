@@ -365,6 +365,9 @@ async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(
         "updated_at": now,
     }
     await db.team_chat_messages.insert_one(message)
+    # Team chat is not a public resource; only members (and the sender) are told.
+    from services.change_events import publish_user_change
+    await publish_user_change([*(team.get("member_ids") or []), me["id"]], "teams")
     mentioned_user_ids = await _notify_team_mentions(db, team, me, message)
     await _notify_team_chat_message(db, team, me, message, mentioned_user_ids)
     try:

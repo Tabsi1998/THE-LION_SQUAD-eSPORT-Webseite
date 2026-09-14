@@ -9,9 +9,12 @@ import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { compareByNearestDate } from "../../lib/contentSort";
+import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ClubEvent, F1Challenge, Tournament } from "../../types";
+
+const TOURNAMENT_LIST_LIVE_RESOURCES = ["tournaments", "events", "f1"];
 
 type Props = NativeStackScreenProps<TournamentStackParamList, "TournamentList">;
 type Filter = "all" | "events" | "tournaments" | "fastlaps";
@@ -65,9 +68,8 @@ export function TournamentsScreen({ navigation }: Props) {
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 30000);
-    return () => clearInterval(timer);
   }, [load]);
+  useLiveRefresh(load, TOURNAMENT_LIST_LIVE_RESOURCES, { fallbackMs: 30000 });
 
   const items = useMemo(() => {
     const mapped: HubItem[] = [

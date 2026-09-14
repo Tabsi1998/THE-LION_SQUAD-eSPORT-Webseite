@@ -101,6 +101,10 @@ async def create_user_notification(
     }
     await db.notifications.insert_one(doc)
     doc.pop("_id", None)
+    if in_app_allowed:
+        # Only the recipient hears about it, and only that something is new.
+        from services.change_events import publish_user_change
+        await publish_user_change([user_id], "notifications")
     try:
         push_sent_count = 0
         if push_channel_allowed:

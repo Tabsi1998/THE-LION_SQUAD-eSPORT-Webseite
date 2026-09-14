@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Button } from "../../components/Button";
@@ -24,6 +24,9 @@ import {
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ChatMessage, Tournament } from "../../types";
+import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
+
+const MATCH_LIVE_RESOURCES = ["matches", "matches-v2", "tournaments"];
 
 type Props = NativeStackScreenProps<TournamentStackParamList, "MatchDetail">;
 
@@ -158,13 +161,11 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     setSuccess("");
   }, [route.params.id]);
 
+  const isFocused = useIsFocused();
   useFocusEffect(useCallback(() => {
     void load({ preserveDrafts: false });
-    const timer = setInterval(() => {
-      void load();
-    }, 10000);
-    return () => clearInterval(timer);
   }, [load]));
+  useLiveRefresh(() => load(), MATCH_LIVE_RESOURCES, { enabled: isFocused, fallbackMs: 10000 });
 
   const refreshAfterResult = useCallback(async () => {
     await Promise.all([

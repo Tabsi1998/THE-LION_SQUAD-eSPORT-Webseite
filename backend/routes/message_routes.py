@@ -259,6 +259,9 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, request: 
         "updated_at": now,
     }
     await db.direct_messages.insert_one(doc)
+    # Both sides: the recipient sees the message, the sender's other devices too.
+    from services.change_events import publish_user_change
+    await publish_user_change([me["id"], recipient["id"]], "messages")
     await create_user_notification(
         recipient["id"],
         title=f"Neue Nachricht von {_label(me)}",

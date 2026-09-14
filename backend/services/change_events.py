@@ -4,12 +4,19 @@ The transport intentionally remains in-process. Production therefore runs one
 API worker until a shared event bus is introduced. Public subscribers only see
 redacted resource invalidations; authenticated staff can receive the original
 API path needed by internal screens.
+
+Private resources (direct messages, team chat, notifications) are not public,
+so ordinary members never saw their own changes on the stream. Such changes are
+published to explicit target users instead: only those subscribers receive
+them, staff included only if targeted, and the event carries nothing but the
+resource name.
 """
 import asyncio
 import json
 import time
 import uuid
 from collections import deque
+from collections.abc import Iterable
 from contextlib import suppress
 from datetime import datetime, timezone
 
@@ -45,10 +52,13 @@ PUBLIC_RESOURCE_ALIASES = {
     "settings/site-banners/admin": "settings",
 }
 STAFF_STREAM_ROLES = frozenset({"moderator", "tournament_admin", "club_admin", "superadmin"})
+USER_SCOPE = "user"
+# Held only in the in-memory buffer; stripped before an event reaches a client.
+TARGETS_KEY = "_target_user_ids"
 EVENT_BUFFER_SIZE = 256
 SUBSCRIBER_QUEUE_SIZE = 100
 
-_subscribers: set[tuple[asyncio.Queue, str]] = set()
+_subscribers: set[tuple[asyncio.Queue, str, str | None]] = set()
 _event_buffer: deque[dict] = deque(maxlen=EVENT_BUFFER_SIZE)
 _stream_epoch = str(uuid.uuid4())
 _version = 0
@@ -123,7 +133,32 @@ def _build_api_change_event(method: str, path: str, status_code: int) -> dict:
     }
 
 
-def _event_for_scope(event: dict, visibility_scope: str) -> dict | None:
+def _build_user_change_event(resource: str, user_ids: frozenset[str]) -> dict:
+    event_id = str(uuid.uuid4())
+    return {
+        "event_id": event_id,
+        "event_type": "api.changed",
+        "entity_type": resource,
+        "entity_id": None,
+        "version": _next_version(),
+        "occurred_at": _utc_now(),
+        "visibility_scope": USER_SCOPE,
+        "dedupe_key": f"api.changed:{event_id}",
+        "id": event_id,
+        "path": f"/api/{resource}",
+        "resource": resource,
+        "ts": int(time.time() * 1000),
+        TARGETS_KEY: user_ids,
+    }
+
+
+def _event_for_scope(event: dict, visibility_scope: str, user_id: str | None = None) -> dict | None:
+    targets = event.get(TARGETS_KEY)
+    if targets is not None:
+        if not user_id or user_id not in targets:
+            return None
+        return {key: value for key, value in event.items() if key != TARGETS_KEY}
+
     if event.get("visibility_scope") != "public" and visibility_scope != "staff":
         return None
     if visibility_scope == "staff":
@@ -168,7 +203,7 @@ def _format_sse(event: str, data: dict, *, include_id: bool = True) -> str:
     return "\n".join(lines) + "\n\n"
 
 
-def _replay_after(last_event_id: str, visibility_scope: str) -> tuple[list[dict], bool]:
+def _replay_after(last_event_id: str, visibility_scope: str, user_id: str | None = None) -> tuple[list[dict], bool]:
     if not last_event_id:
         return [], False
     events = list(_event_buffer)
@@ -177,7 +212,7 @@ def _replay_after(last_event_id: str, visibility_scope: str) -> tuple[list[dict]
             replay = [
                 scoped
                 for item in events[index + 1:]
-                if (scoped := _event_for_scope(item, visibility_scope)) is not None
+                if (scoped := _event_for_scope(item, visibility_scope, user_id)) is not None
             ]
             return replay, False
     return [], True
@@ -192,15 +227,9 @@ def _queue_reset(queue: asyncio.Queue, visibility_scope: str, version: int) -> N
     queue.put_nowait(("reset", _reset_event(visibility_scope, "queue_overflow", version)))
 
 
-async def publish_api_change(method: str, path: str, status_code: int):
-    normalized_path = _normalized_path(path)
-    if normalized_path.startswith("/api/auth/refresh") or normalized_path.startswith("/api/changes/stream"):
-        return
-
-    event = _build_api_change_event(method, normalized_path, status_code)
-    _event_buffer.append(event)
-    for queue, visibility_scope in list(_subscribers):
-        scoped_event = _event_for_scope(event, visibility_scope)
+def _deliver(event: dict) -> None:
+    for queue, visibility_scope, user_id in list(_subscribers):
+        scoped_event = _event_for_scope(event, visibility_scope, user_id)
         if scoped_event is None:
             continue
         try:
@@ -209,13 +238,36 @@ async def publish_api_change(method: str, path: str, status_code: int):
             _queue_reset(queue, visibility_scope, event["version"])
 
 
-async def change_event_stream(request: Request, visibility_scope: str = "public"):
+async def publish_api_change(method: str, path: str, status_code: int):
+    normalized_path = _normalized_path(path)
+    if normalized_path.startswith("/api/auth/refresh") or normalized_path.startswith("/api/changes/stream"):
+        return
+
+    event = _build_api_change_event(method, normalized_path, status_code)
+    _event_buffer.append(event)
+    _deliver(event)
+
+
+async def publish_user_change(user_ids: Iterable[str | None], resource: str) -> None:
+    """Tell specific signed-in users that one of their private resources changed.
+
+    The event names the resource only. The target list never leaves the server.
+    """
+    targets = frozenset(user_id for user_id in (user_ids or ()) if user_id)
+    if not targets or not resource:
+        return
+    event = _build_user_change_event(resource, targets)
+    _event_buffer.append(event)
+    _deliver(event)
+
+
+async def change_event_stream(request: Request, visibility_scope: str = "public", user_id: str | None = None):
     scope = "staff" if visibility_scope == "staff" else "public"
     queue: asyncio.Queue = asyncio.Queue(maxsize=SUBSCRIBER_QUEUE_SIZE)
-    subscriber = (queue, scope)
+    subscriber = (queue, scope, user_id or None)
     _subscribers.add(subscriber)
     last_event_id = request.headers.get("last-event-id", "").strip()
-    replay, reset_required = _replay_after(last_event_id, scope)
+    replay, reset_required = _replay_after(last_event_id, scope, user_id)
     try:
         yield _format_sse("connected", {
             "ok": True,

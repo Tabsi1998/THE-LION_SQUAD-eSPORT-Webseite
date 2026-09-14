@@ -7,6 +7,7 @@ import { Body, Muted } from "../components/Text";
 import { api } from "../lib/api";
 import { isGuestUser } from "../live";
 import { navigateToNotification } from "../navigation/rootNavigation";
+import { useLiveRefresh } from "../realtime/LiveChangesProvider";
 import { colors } from "../theme";
 import type { UserNotification } from "../types";
 import {
@@ -26,6 +27,8 @@ type NotificationContextValue = {
   markAllRead: () => Promise<void>;
   openNotification: (item: UserNotification) => Promise<void>;
 };
+
+const NOTIFICATION_LIVE_RESOURCES = ["notifications"];
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 
@@ -87,14 +90,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     load();
   }, [ensurePushRegistered, load]);
 
-  useEffect(() => {
-    if (!enabled) return undefined;
-    const timer = setInterval(() => {
-      ensurePushRegistered();
-      load();
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [enabled, ensurePushRegistered, load]);
+  const refreshFromLive = useCallback(() => {
+    ensurePushRegistered();
+    return load();
+  }, [ensurePushRegistered, load]);
+  useLiveRefresh(refreshFromLive, NOTIFICATION_LIVE_RESOURCES, { enabled, fallbackMs: 5000 });
 
   useEffect(() => {
     if (!enabled) {

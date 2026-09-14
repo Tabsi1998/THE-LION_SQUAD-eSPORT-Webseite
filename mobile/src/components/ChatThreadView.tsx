@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Keyboard,
   NativeScrollEvent,
@@ -17,6 +17,8 @@ import { formatDate } from "../lib/format";
 import type { ContentTarget } from "../lib/contentLinks";
 import { colors } from "../theme";
 import type { ChatMessage } from "../types";
+import { resourceFromPath } from "../realtime/liveChanges";
+import { useLiveRefresh } from "../realtime/LiveChangesProvider";
 import { EmptyState, SkeletonList } from "./ListState";
 import { RichText } from "./RichText";
 import { Body, Muted } from "./Text";
@@ -82,9 +84,10 @@ export function ChatThreadView({
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 7000);
-    return () => clearInterval(timer);
   }, [load]);
+  // /messages/direct/... -> messages, /teams/.../chat -> teams, /tournaments/.../chat -> tournaments
+  const liveResources = useMemo(() => [resourceFromPath(listUrl)], [listUrl]);
+  useLiveRefresh(load, liveResources, { fallbackMs: 7000 });
 
   useEffect(() => {
     const onShow = () => {

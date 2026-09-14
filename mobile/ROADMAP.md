@@ -72,8 +72,8 @@ Die App soll fuer normale Nutzer die wichtigen Webseitenfunktionen nativ abbilde
 
 - Globale Glocke mit ungelesener Anzahl bleibt sichtbar, ohne Inhalte zu ueberdecken.
 - Notification-Tap-Routing: Benachrichtigung oeffnet direkt Event, Turnier, Match, Team, Chat, News oder Profil.
-- Polling zentralisieren und reduzieren, damit nicht jede Ansicht separat unnoetig API-Last erzeugt.
-- Realtime-Schicht pruefen: WebSocket oder Server-Sent Events fuer Chat, Benachrichtigungen, Match-Updates und Check-ins.
+- Erledigt mit Block 14.1: Polling zentralisiert. Ansichten laden nur noch, wenn der Server eine passende Änderung meldet; abgefragt wird nur ohne Verbindung.
+- Erledigt mit Block 14.1: Server-Sent Events über `/api/changes/stream` für Chat, Benachrichtigungen, Matches und Turniere, mit gezielten Meldungen für private Ressourcen.
 - Echte Telefon-Pushs nach stabiler Firebase/Expo-Konfiguration reaktivieren und separat auf APK testen.
 - Akzeptanz: Nutzer bekommt relevante App- und Handy-Benachrichtigungen zuverlaessig und landet direkt am richtigen Ziel.
 

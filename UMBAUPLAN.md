@@ -1,6 +1,6 @@
 # Umbauplan: Turniere, Übersichtlichkeit und die offenen Wünsche
 
-Stand: 14. September 2026 (Blöcke 12 und 13 umgesetzt).
+Stand: 14. September 2026 (Block 14.1: die App ist live).
 
 Dieser Plan führt das in [RESTPLAN.md](RESTPLAN.md) als **R5** angekündigte Turnierpaket
 aus und nimmt die später dazugekommenen Themen auf (Spielwochen, PDF, Live-Aktualisierung,
@@ -39,7 +39,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 11 | PDF-Ausgabe | umgesetzt | #193, #194 |
 | 12 | Galerie und Medien: Tempo, Videos überall | umgesetzt | #196 |
 | 13 | Entflechtung: `tournament_routes.py` aufgeteilt | umgesetzt | #200 |
-| 14 | LionsAPP in den Store | offen | — |
+| 14 | LionsAPP in den Store | in Arbeit: 14.1 umgesetzt | #201 |
 | 15 | Abschluss | offen | — |
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise | #193, #195 |
@@ -231,6 +231,36 @@ Beim Umbau aufgefallen und **bewusst nicht entfernt**, weil ein Umzug nichts lö
 - Chat: **Tastatur, Emojis, GIFs** und Einfügen müssen sauber funktionieren.
 - **Animationen** und **Achievements** in der App.
 - Umstellung der App vom Abfragen (Polling) auf den bestehenden **SSE-Änderungsstrom**.
+
+| Schritt | Was | Stand |
+| --- | --- | --- |
+| 14.1 | Live statt Abfragen, auch für private Meldungen | umgesetzt (#201) |
+| 14.2 | Chat: Tastatur, Emojis, Einfügen, GIFs | offen; der GIF-Anbieter ist deine Entscheidung |
+| 14.3 | Animationen und Achievements | offen |
+| 14.4 | Store-Reife: Play Internal Testing, Absturzberichte, Bildgrößen in der App | offen |
+
+### Was 14.1 gefunden hat
+
+Der Änderungsstrom kannte nur „öffentlich“ und „Staff“. Direktnachrichten, Team-Chat und
+Benachrichtigungen sind nicht öffentlich. Ein normales Mitglied bekam davon deshalb **nie**
+eine Live-Meldung, weder in der App noch im Web. Das Web hat die Lücke mit Intervallen
+überdeckt: Direktnachrichten alle 8 s, Glocke alle 30 s.
+
+Jetzt gibt es gezielte Meldungen. Nur die Beteiligten bekommen sie, Staff nicht, und sie
+nennen nur die Art der Änderung: keinen Text, keine Kennung.
+
+| Ansicht in der App | vorher | jetzt |
+| --- | --- | --- |
+| Benachrichtigungen | alle 5 s abgefragt | sofort |
+| Chats (direkt, Team, Turnier) | alle 7 s | sofort |
+| Dashboard, Match, Turnierdetail | alle 10 s | sofort |
+| Turnierliste | alle 30 s | sofort |
+
+Ohne Verbindung (kein Netz, Server startet neu) fragt die App wie bisher ab. Im Hintergrund
+ist der Strom geschlossen; beim Zurückkehren laden offene Ansichten einmal neu.
+
+Nicht in 14.1: Einige öffentliche Turnierseiten im Web fragen zusätzlich im Intervall ab,
+obwohl sie am Strom hängen. Das Aufräumen gehört zu Block 15.
 
 ## Block 15 — Abschluss
 
@@ -430,9 +460,9 @@ Dabei fiel ein Filtereintrag auf, der nie zutreffen konnte (`matches_v2` mit Unt
 statt `matches-v2`); folgenlos, aber eine Falle für die nächste Ansicht. Behoben mit #187,
 samt Prüftest über alle Filternamen.
 
-**Offen ist die App.** Sie hat keine SSE-Anbindung und fragt in Intervallen ab: Chat alle
-7 s, Dashboard und Turnierdetail alle 10 s, Turnierliste alle 30 s. „Sofort live" heißt
-dort also bis zu einer halben Minute. Das ist Block 14.
+**Die App hängt seit Block 14.1 ebenfalls am Strom.** Dabei fiel eine Lücke auf, die auch
+das Web hatte: Direktnachrichten, Team-Chat und Benachrichtigungen erreichten normale
+Mitglieder nie live. Details stehen bei Block 14.
 
 ## Noch offen und bewusst getrennt
 
