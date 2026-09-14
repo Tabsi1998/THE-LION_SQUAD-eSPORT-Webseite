@@ -39,7 +39,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 11 | PDF-Ausgabe | umgesetzt | #193, #194 |
 | 12 | Galerie und Medien: Tempo, Videos überall | umgesetzt | #196 |
 | 13 | Entflechtung: `tournament_routes.py` aufgeteilt | umgesetzt | #200 |
-| 14 | LionsAPP in den Store | in Arbeit: 14.1 und 14.2 umgesetzt | #201, #206, #207, dieser PR |
+| 14 | LionsAPP in den Store | in Arbeit: 14.1 und 14.2 umgesetzt | #201, #206, #207, #208 |
 | 15 | Abschluss | offen | — |
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise | #193, #195 |
@@ -238,7 +238,7 @@ Beim Umbau aufgefallen und **bewusst nicht entfernt**, weil ein Umzug nichts lö
 | 14.1 | Live statt Abfragen, auch für private Meldungen | umgesetzt (#201) |
 | 14.2 A | Chat: Bilder und Videos, geschützt abgelegt, Backend und Web | umgesetzt (#206) |
 | 14.2 B | Chat in der App: Bilder und Videos senden und ansehen | umgesetzt (#207) |
-| 14.2 C | Sticker: Startpaket und eigene Pakete aus dem Adminbereich, in Web und App | umgesetzt (dieser PR) |
+| 14.2 C | Sticker: Startpaket und eigene Pakete aus dem Adminbereich, in Web und App | umgesetzt (#208) |
 | 14.3 | Animationen und Achievements | offen |
 | 14.4 | Store-Reife: Play Internal Testing, Absturzberichte, Bildgrößen in der App | offen |
 
