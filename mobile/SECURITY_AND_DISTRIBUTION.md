@@ -14,11 +14,13 @@ Google Play distribution removes the manual sideload flow because users install 
 
 ## Release Signing
 
-Public APKs must never be signed with the Android debug certificate, and every APK must be signed with the same upload key as all previous releases (certificate SHA-256 `0c5562d7…97a1`). An APK with a different certificate cannot update an installed app.
+Public APKs must never be signed with the Android debug certificate, and every APK must be signed with the app's upload key (certificate SHA-256 `6f69a289…cb98` since build 57). An APK with a different certificate cannot update an installed app.
+
+Builds up to 56 used an older key (`0c5562d7…97a1`) that was only kept as a GitHub secret. Build 57 introduced a new key instead of recovering it, so installations of older builds have to be replaced once.
 
 Releases are built locally with `npm run release:local`, see [RELEASES.md](RELEASES.md). The keystore, its passwords and `google-services.json` stay outside the repository, by default in `%USERPROFILE%\.lionsapp-release`. The script refuses a keystore inside the repository, passes the signing values to Gradle only through environment variables, removes the generated push config after the build and refuses to publish an APK whose certificate differs.
 
-The manual GitHub workflow remains as an emergency path. It reads the same values from repository secrets (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) and only produces an artifact.
+The manual GitHub workflow remains as an emergency path. It reads the same values from repository secrets (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) and only produces an artifact. Those secrets still hold the old key; the workflow's certificate check rejects such a build until they are replaced.
 
 If the keystore is lost, existing sideloaded APK installations can no longer be updated with the same package name and certificate. Keep an offline backup.
 

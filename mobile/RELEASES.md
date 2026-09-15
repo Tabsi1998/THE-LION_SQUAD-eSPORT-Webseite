@@ -18,7 +18,7 @@ Die LionsAPP für Android wird **lokal gebaut** und als GitHub-Release veröffen
 
 Android vergleicht beim Update nicht die Version, sondern `expo.android.versionCode` in `app.json`. Er steigt mit **jedem** Build um mindestens 1, auch wenn dieselbe Version neu gebaut wird. `expo.ios.buildNumber` zieht mit.
 
-Im September 2026 fing die sichtbare Version neu bei 0.x an (#205). Die alten 1.x- und 2.x-Betas sind historisch; der Build-Zähler lief einfach weiter, von Build 56 auf 57. Installierte Apps aktualisieren sich deshalb normal.
+Im September 2026 fing die sichtbare Version neu bei 0.x an (#205). Die alten 1.x- und 2.x-Betas sind historisch; der Build-Zähler lief einfach weiter, von Build 56 auf 57. Gleichzeitig kam ein neuer Signaturschlüssel (siehe unten): Wer eine App bis Build 56 installiert hat, muss sie einmal löschen und Build 57 neu installieren.
 
 ### Namen
 
@@ -36,7 +36,7 @@ Alles Geheime liegt **außerhalb des Repos**, standardmäßig in `%USERPROFILE%\
 
 ```text
 .lionsapp-release\
-  upload.jks             Upload-Schlüssel, mit dem alle bisherigen APKs signiert sind
+  upload.jks             Upload-Schlüssel der App (seit Build 57)
   google-services.json   aus Firebase, Android-App at.lionsquad.app (für Push)
   signing.json           Passwörter und Pfade
 ```
@@ -60,7 +60,13 @@ Statt der Datei gehen auch Umgebungsvariablen: `LIONSAPP_KEYSTORE`, `LIONSAPP_KE
 
 Außerdem nötig: JDK 21, Android SDK mit Build-Tools und eine angemeldete GitHub CLI (`gh auth login`).
 
-**Der Schlüssel lässt sich nicht ersetzen.** Eine APK mit anderem Schlüssel lässt sich nicht über eine installierte LionsAPP installieren; alle müssten die App erst löschen. Das Skript bricht deshalb ab, wenn das Zertifikat nicht das bisherige ist (SHA-256 `0c5562d7…97a1`, vollständig in `scripts/release-version.cjs`). Den Schlüssel offline sichern, nie ins Repo, nie in einen Chat oder ein Log.
+**Der Schlüssel lässt sich nicht ersetzen.** Eine APK mit anderem Schlüssel lässt sich nicht über eine installierte LionsAPP installieren; alle müssten die App erst löschen. Das Skript bricht deshalb ab, wenn das Zertifikat nicht das erwartete ist (SHA-256 `6f69a289…cb98`, vollständig in `scripts/release-version.cjs`).
+
+Genau das ist mit Build 57 einmal passiert: Der alte Schlüssel (SHA-256 `0c5562d7…97a1`) lag nur noch als GitHub-Secret vor. Statt ihn über GitHub Actions zurückzuholen, gibt es seit Build 57 einen neuen (#205). Die Push-Datei ließ sich dagegen aus der veröffentlichten APK von Build 56 zurückgewinnen, denn ihre Werte stecken in jeder APK.
+
+### Schlüssel sichern
+
+Den ganzen Ordner `%USERPROFILE%\.lionsapp-release` sichern, zum Beispiel auf einem USB-Stick, der sicher verwahrt wird, oder als Anhang im Passwortmanager. Nie ins Repo, nie in einen Chat oder ein Log. Geht er verloren, muss jede installierte App wieder gelöscht und neu installiert werden.
 
 ## Release bauen
 
@@ -75,15 +81,15 @@ npm run release:local                # baut, prüft und legt das Release an
 
 Das Skript geht so vor:
 
-1. Es prüft Version, Build-Zähler gegen alle bisherigen Tags, einen sauberen Stand auf `main` wie auf GitHub, Werkzeuge und Schlüssel. Ob der Schlüssel **derselbe wie bei Build 56** ist, zeigt schon `--check`, ohne zu bauen: keytool liest das Zertifikat, das Passwort geht dabei nur über eine Umgebungsvariable.
+1. Es prüft Version, Build-Zähler gegen alle bisherigen Tags, einen sauberen Stand auf `main` wie auf GitHub, Werkzeuge und Schlüssel. Ob der Schlüssel **der richtige** ist, zeigt schon `--check`, ohne zu bauen: keytool liest das Zertifikat, das Passwort geht dabei nur über eine Umgebungsvariable.
 2. Es führt Preflight, Typecheck und Tests aus.
 3. Es erzeugt das Android-Projekt (`expo prebuild`) und baut mit Gradle die APK.
-4. Es prüft die Signatur: kein Debug-Zertifikat, dasselbe Zertifikat wie bisher. Dann berechnet es SHA-256.
+4. Es prüft die Signatur: kein Debug-Zertifikat, das erwartete Zertifikat. Dann berechnet es SHA-256.
 5. Es legt das GitHub-Release an, mit APK, Prüfsumme, Signaturangaben und dem Changelog-Abschnitt.
 
 Passwörter bekommt Gradle nur über Umgebungsvariablen. Die Push-Datei wird nach dem Build aus `mobile/` entfernt, auch wenn der Build abbricht. `android/` und `builds/` sind von Git ausgeschlossen.
 
-Unter Windows baut Gradle über ein kurzes, vorübergehendes Laufwerk (`subst`, z. B. `L:\mobile\android`), weil der Projektpfad Leerzeichen hat und lang ist. Das Ninja aus der Android-SDK-CMake 3.22.1 bricht bei den langen Pfaden der nativen Bibliotheken sonst mit `manifest 'build.ninja' still dirty after 100 tries` ab. Das Laufwerk wird danach wieder entfernt.
+Gebaut wird in einem eigenen Ordner außerhalb des Repos (Standard `C:\lsb`, änderbar mit `buildDir` in `signing.json`). Das Skript legt dort ein Git-Worktree des Commits an und installiert die Abhängigkeiten; beim nächsten Mal bleiben sie erhalten. So entspricht die APK genau dem Commit, und der Pfad ist kurz und ohne Leerzeichen. Im Projektpfad `C:\GIT Privat\…` brach der native Build von react-native-reanimated mit `manifest 'build.ninja' still dirty after 100 tries` ab; ein Umweg über ein `subst`-Laufwerk half nicht, weil Node die Pfade wieder zum echten Ort auflöst. Der Ordner braucht einige GB und darf jederzeit gelöscht werden. Der erste Build dauert rund 15 Minuten.
 
 ## Notweg über GitHub Actions
 

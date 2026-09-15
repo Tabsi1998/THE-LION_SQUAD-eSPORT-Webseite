@@ -11,6 +11,7 @@ import releaseVersion from "./release-version.cjs";
 
 const {
   EXPECTED_SIGNER_SHA256,
+  PREVIOUS_SIGNER_SHA256,
   apkName,
   changelogSection,
   highestBuild,
@@ -19,15 +20,23 @@ const {
   releaseNotes,
   releaseTag,
   signerDigest,
+  signerName,
   usesDebugCertificate,
   versionProblems,
 } = releaseVersion;
 
-// Ausgabe von apksigner für Build 56, dem letzten Release vor dem Neustart bei 0.x.
+// Ausgabe von apksigner für Build 56, dem letzten Release mit dem alten Schlüssel.
 const BUILD_56_SIGNATURE = [
   "V2 Signer: certificate DN: CN=THE LION SQUAD - eSPORTS, OU=Verein, O=THE LION SQUAD - eSPORTS, L=Telfs, ST=Tirol, C=AT",
   "V2 Signer: certificate SHA-256 digest: 0c5562d7e2f7d1bc214a3cb4b2ff0020aa0d1e7df46073739a96b8c8bbf197a1",
   "V2 Signer: certificate SHA-1 digest: 84aca40e417cab18d3e218f25b58fcdb04cdc073",
+].join("\n");
+
+// Dieselbe Angabe im Format, das apksigner aus den Build-Tools 36 schreibt.
+const CURRENT_SIGNATURE = [
+  "Signer #1 certificate DN: CN=THE LION SQUAD - eSPORTS, OU=Verein, O=THE LION SQUAD - eSPORTS, L=Telfs, ST=Tirol, C=AT",
+  `Signer #1 certificate SHA-256 digest: ${EXPECTED_SIGNER_SHA256}`,
+  "Signer #1 certificate SHA-1 digest: e2200d0061bc96eff6f798e84e547dc50f882922",
 ].join("\n");
 
 test("das Schema nimmt 0.2.0-beta, 1.2.3-beta und 1.2.3", () => {
@@ -64,11 +73,19 @@ test("der Build-Zähler kommt aus allen App-Tags, alten und neuen", () => {
   assert.equal(highestBuild([]), 0);
 });
 
-test("die Signatur von Build 56 ist das erwartete Zertifikat", () => {
-  assert.equal(signerDigest(BUILD_56_SIGNATURE), EXPECTED_SIGNER_SHA256);
+test("Signaturangaben werden in beiden Formaten von apksigner gelesen", () => {
+  assert.equal(signerDigest(BUILD_56_SIGNATURE), PREVIOUS_SIGNER_SHA256);
+  assert.equal(signerDigest(CURRENT_SIGNATURE), EXPECTED_SIGNER_SHA256);
+  assert.match(signerName(CURRENT_SIGNATURE), /^CN=THE LION SQUAD - eSPORTS/);
   assert.equal(usesDebugCertificate(BUILD_56_SIGNATURE), false);
   assert.equal(usesDebugCertificate("Signer #1 certificate DN: C=US, O=Android, CN=Android Debug"), true);
   assert.equal(signerDigest("keine Signatur"), null);
+});
+
+test("seit Build 57 gilt der neue Schlüssel, eine APK mit dem alten fällt auf", () => {
+  // Der Wechsel ist bewusst (#205). Wer ihn rückgängig macht, soll es hier merken.
+  assert.notEqual(EXPECTED_SIGNER_SHA256, PREVIOUS_SIGNER_SHA256);
+  assert.notEqual(signerDigest(BUILD_56_SIGNATURE), EXPECTED_SIGNER_SHA256);
 });
 
 test("der Changelog-Abschnitt gehört genau zu seiner Version", () => {
@@ -94,7 +111,7 @@ test("die Release-Notizen nennen Build, Prüfsumme, Zertifikat und Änderungen",
     versionCode: 57,
     apk: "LionsAPP-v0.2.0-beta-build57-abc1234.apk",
     sha256: "f".repeat(64),
-    signatureText: BUILD_56_SIGNATURE,
+    signatureText: CURRENT_SIGNATURE,
     changelog: "## 0.2.0-beta - 2026-09-15\n\n- Sticker im Chat\n",
   });
   assert.match(notes, /\| Android-Build \| 57 \|/);

@@ -11,10 +11,15 @@
 
 const TAG_PREFIX = "mobile-v";
 
-// Zertifikat des Upload-Schlüssels, mit dem alle bisherigen APKs signiert sind.
-// Kein Geheimnis: Es steht in jeder .signature.txt eines Releases. Eine APK mit
-// anderem Zertifikat lässt sich nicht über eine installierte App aktualisieren.
-const EXPECTED_SIGNER_SHA256 = "0c5562d7e2f7d1bc214a3cb4b2ff0020aa0d1e7df46073739a96b8c8bbf197a1";
+// Zertifikat des Upload-Schlüssels. Kein Geheimnis: Es steht in jeder
+// .signature.txt eines Releases. Eine APK mit anderem Zertifikat lässt sich nicht
+// über eine installierte App aktualisieren.
+//
+// Seit Build 57 gibt es einen neuen Schlüssel. Der alte lag nur noch als
+// GitHub-Secret vor; statt ihn über GitHub Actions zurückzuholen, wurde ein neuer
+// erzeugt (#205). Apps bis Build 56 müssen deshalb einmal neu installiert werden.
+const EXPECTED_SIGNER_SHA256 = "6f69a289e8a4c73e2153355a9f249064d12b2f98e78a3072e984d1180e1dcb98";
+const PREVIOUS_SIGNER_SHA256 = "0c5562d7e2f7d1bc214a3cb4b2ff0020aa0d1e7df46073739a96b8c8bbf197a1";
 
 const VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-beta)?$/;
 
@@ -67,14 +72,18 @@ function highestBuild(tags) {
   return highest;
 }
 
+// apksigner schreibt je nach Version "Signer #1 certificate ..." oder
+// "V2 Signer: certificate ...".
+const SIGNER_PREFIX = String.raw`(?:Signer #1|V\d+ Signer):? certificate`;
+
 /** SHA-256 des Signaturzertifikats aus der Ausgabe von apksigner verify --print-certs. */
 function signerDigest(signatureText) {
-  const match = /(?:Signer #1|V\d+ Signer): certificate SHA-256 digest: ([0-9a-f]{64})/i.exec(signatureText || "");
+  const match = new RegExp(`${SIGNER_PREFIX} SHA-256 digest: ([0-9a-f]{64})`, "i").exec(signatureText || "");
   return match ? match[1].toLowerCase() : null;
 }
 
 function signerName(signatureText) {
-  const match = /(?:Signer #1|V\d+ Signer): certificate DN: (.+)/.exec(signatureText || "");
+  const match = new RegExp(`${SIGNER_PREFIX} DN: (.+)`).exec(signatureText || "");
   return match ? match[1].trim() : null;
 }
 
@@ -124,13 +133,14 @@ function releaseNotes({ version, versionCode, apk, sha256, signatureText, change
     "",
     "## Installation",
     "",
-    `${install} Außerhalb von Google Play kann Android Hinweise zu unbekannten Quellen oder Play Protect zeigen. Eine installierte LionsAPP lässt sich direkt aktualisieren, weil jede APK mit demselben Schlüssel signiert ist.`,
+    `${install} Außerhalb von Google Play kann Android Hinweise zu unbekannten Quellen oder Play Protect zeigen. Eine LionsAPP bis Build 56 ist mit einem älteren Schlüssel signiert und muss einmal gelöscht werden, bevor sich diese Version installieren lässt.`,
     "",
   ].join("\n");
 }
 
 module.exports = {
   EXPECTED_SIGNER_SHA256,
+  PREVIOUS_SIGNER_SHA256,
   TAG_PREFIX,
   apkName,
   changelogSection,

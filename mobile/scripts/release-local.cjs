@@ -189,8 +189,8 @@ function gatherChecks() {
     ? "Prüfbar, sobald Schlüssel, Passwort, Alias und Java da sind."
     : key.error
       ? "Der Schlüssel ließ sich nicht öffnen: Passwort oder Alias stimmen nicht."
-      : `Das ist ein anderes Zertifikat (${key.digest.slice(0, 8)}…), nicht der Schlüssel von Build 56.`;
-  add(key?.digest === release.EXPECTED_SIGNER_SHA256, "Schlüssel ist derselbe wie bei Build 56", keyHint, true);
+      : `Das ist ein anderes Zertifikat (${key.digest.slice(0, 8)}…), nicht der Upload-Schlüssel der App.`;
+  add(key?.digest === release.EXPECTED_SIGNER_SHA256, "Schlüssel passt zum Zertifikat der App", keyHint, true);
   add(fs.existsSync(config.googleServices) && !insideRepo(config.googleServices), "google-services.json für Push liegt außerhalb des Repos", `Erwartet unter ${config.googleServices} (Firebase, App at.lionsquad.app).`);
 
   const gh = run("gh", ["auth", "status"], { capture: true, allowFailure: true });
@@ -326,7 +326,7 @@ function main() {
   if (release.usesDebugCertificate(signatureText)) fail("Die APK ist mit dem Android-Debug-Zertifikat signiert.");
   const digest = release.signerDigest(signatureText);
   if (digest !== release.EXPECTED_SIGNER_SHA256) {
-    const message = `Die APK ist mit einem anderen Schlüssel signiert (${digest || "unbekannt"}) als alle bisherigen Builds. Eine installierte LionsAPP ließe sich damit nicht aktualisieren.`;
+    const message = `Die APK ist nicht mit dem Upload-Schlüssel der App signiert (${digest || "unbekannt"}). Eine installierte LionsAPP ließe sich damit nicht aktualisieren.`;
     if (mode === "release") fail(message);
     console.warn(`\nWarnung: ${message}`);
   }
