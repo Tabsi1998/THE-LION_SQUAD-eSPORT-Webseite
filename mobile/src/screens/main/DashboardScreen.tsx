@@ -11,6 +11,7 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { compareByNearestDate } from "../../lib/contentSort";
+import { seasonLine, splitHomeTimeline, type HomeItem } from "../../lib/dashboard";
 import { displayName, formatDate, formatEventType, formatNewsCategory, formatStatus, placeParts } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
@@ -22,18 +23,7 @@ import type { ClubEvent, DashboardAction, LiveStream, Match, MobileDashboardData
 const DASHBOARD_LIVE_RESOURCES = ["tournaments", "matches", "events", "news", "streams", "notifications", "teams", "f1"];
 
 type Props = BottomTabScreenProps<MainTabParamList, "Dashboard">;
-type TimelineItem = {
-  id: string;
-  kind: "tournament" | "event";
-  title: string;
-  date?: string | null;
-  status?: string;
-  phaseLabel?: string;
-  detail?: string | null;
-  bannerUrl?: string | null;
-  targetId?: string;
-  registrationStatus?: string | null;
-};
+type TimelineItem = HomeItem;
 type QuickActionItem = {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
@@ -45,6 +35,7 @@ const emptyDashboard: MobileDashboardData = {
   public: { tournaments: [], events: [] },
   news: [],
   streams: [],
+  season: null,
   stats: { my_tournaments: 0, my_events: 0, open_matches: 0, staff_matches: 0, open_actions: 0, news: 0, public_tournaments: 0, public_events: 0, live_streams: 0 },
 };
 const OPEN_MATCH_STATUSES = new Set(["ready", "scheduled", "in_progress", "waiting_result"]);
@@ -64,6 +55,7 @@ function normalizeDashboard(payload?: Partial<MobileDashboardData> | null): Mobi
     },
     news: Array.isArray(payload?.news) ? payload.news : [],
     streams: Array.isArray(payload?.streams) ? payload.streams : [],
+    season: payload?.season ?? null,
     stats: { ...emptyDashboard.stats, ...(payload?.stats || {}) },
   };
 }
@@ -76,12 +68,11 @@ export function DashboardScreen({ navigation }: Props) {
   const [error, setError] = useState("");
   const [offline, setOffline] = useState(false);
   const isGuest = isGuestUser(user);
+  // Nur Ziele, die nicht ohnehin in der Tab-Leiste stehen. Turniere sind der
+  // Events-Tab, News und Jahreswertung haben unten eigene Abschnitte (#212).
   const quickActions = useMemo(() => {
     const actions: QuickActionItem[] = [
       { icon: "chatbubbles-outline", label: "Nachrichten", onPress: () => navigation.navigate("More", { screen: "DirectMessages" }) },
-      { icon: "trophy-outline", label: "Jahreswertung", onPress: () => navigation.navigate("More", { screen: "SeasonPass" }) },
-      { icon: "newspaper-outline", label: "News", onPress: () => navigation.navigate("More", { screen: "NewsList" }) },
-      { icon: "calendar-outline", label: "Turniere", onPress: () => navigation.navigate("Tournaments", { screen: "TournamentList" }) },
       { icon: "flash-outline", label: "Fast Laps", onPress: () => navigation.navigate("More", { screen: "FastLapList" }) },
     ];
     if (user?.is_club_member) {
@@ -127,7 +118,9 @@ export function DashboardScreen({ navigation }: Props) {
       ];
     return source.sort((a, b) => compareByNearestDate(a.date, b.date, a.status, b.status, a.phaseLabel, b.phaseLabel));
   }, [data, isGuest]);
-  const liveItems = useMemo(() => timeline.filter(isLiveTimelineItem).slice(0, 3), [timeline]);
+  // Jeder Termin steht nur einmal: entweder unter "Heute und Live" oder unter
+  // "nächste Termine". Vorbei und Abgesagtes filtert schon der Server.
+  const { live: liveItems, next: nextItems, moreCount } = useMemo(() => splitHomeTimeline(timeline), [timeline]);
 
   const openTournament = useCallback((id?: string | null) => {
     if (!id) return;
@@ -198,7 +191,7 @@ export function DashboardScreen({ navigation }: Props) {
         {offline && !error ? <OfflineNotice /> : null}
 
         <View style={styles.grid}>
-          <Stat label={isGuest ? "Turniere" : "Meine Termine"} value={String(isGuest ? data.stats.public_tournaments : data.stats.my_tournaments + data.stats.my_events)} />
+          <Stat label={isGuest ? "Turniere" : "Meine Termine"} value={String(isGuest ? data.stats.public_tournaments : timeline.length)} />
           <Stat label={isGuest ? "Events" : "Aktionen"} value={String(isGuest ? data.stats.public_events : data.stats.open_actions)} tone="gold" />
           <Stat label="News" value={String(data.stats.news)} />
         </View>
@@ -228,13 +221,11 @@ export function DashboardScreen({ navigation }: Props) {
           </Section>
         ) : null}
 
-        <Section title="Schnellzugriff">
-          <View style={styles.quickGrid}>
-            {quickActions.map((action) => (
-              <QuickAction key={action.label} icon={action.icon} label={action.label} onPress={action.onPress} />
-            ))}
-          </View>
-        </Section>
+        <View style={styles.quickRow}>
+          {quickActions.map((action) => (
+            <QuickAction key={action.label} icon={action.icon} label={action.label} onPress={action.onPress} />
+          ))}
+        </View>
 
         {liveItems.length ? (
           <Section title="Heute und Live">
@@ -252,60 +243,60 @@ export function DashboardScreen({ navigation }: Props) {
           </Section>
         ) : null}
 
-        <Section title={isGuest ? "Aktuell geplant" : "Meine nächsten Termine"} actionLabel="Alle Turniere" onAction={() => navigation.navigate("Tournaments")}>
-          {timeline.length ? (
-            timeline.slice(0, 6).map((item) => (
-              <TimelineCard key={`${item.kind}-${item.id}`} item={item} onPress={() => openTimelineItem(item)} />
-            ))
-          ) : (
-            <EmptyState icon="calendar-outline" title={isGuest ? "Noch keine Termine" : "Keine eigenen Termine"} detail={isGuest ? "Sobald Website-Termine veröffentlicht sind, stehen sie hier." : "Deine Turnier- und Event-Anmeldungen erscheinen hier automatisch."} />
-          )}
-        </Section>
-
-        {!isGuest ? (
+        {!isGuest && data.me.actions.length ? (
           <Section title="Offene Aktionen">
-            {data.me.actions.length ? (
-              data.me.actions.map((action) => (
-                <Pressable key={action.id} onPress={() => openAction(action)} style={({ pressed }) => [pressed && styles.pressed]}>
-                  <Card style={styles.actionCard}>
-                    <View style={styles.actionIcon}>
-                      <Ionicons name={iconForAction(action.type)} color={colors.cyan} size={18} />
-                    </View>
-                    <View style={styles.flex}>
-                      <Body style={styles.rowTitle}>{action.label}</Body>
-                      {action.detail ? <Muted>{action.detail}</Muted> : null}
-                    </View>
-                    {action.target_id ? <Ionicons name="chevron-forward" color={colors.muted} size={18} /> : null}
-                  </Card>
-                </Pressable>
-              ))
-            ) : (
-              <EmptyState icon="checkmark-circle-outline" title="Keine offenen Aktionen" detail="Check-ins, offene Matches und wichtige Hinweise landen automatisch hier." />
-            )}
+            {data.me.actions.map((action) => (
+              <Pressable key={action.id} onPress={() => openAction(action)} style={({ pressed }) => [pressed && styles.pressed]}>
+                <Card style={styles.actionCard}>
+                  <View style={styles.actionIcon}>
+                    <Ionicons name={iconForAction(action.type)} color={colors.cyan} size={18} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Body style={styles.rowTitle}>{action.label}</Body>
+                    {action.detail ? <Muted>{action.detail}</Muted> : null}
+                  </View>
+                  {action.target_id ? <Ionicons name="chevron-forward" color={colors.muted} size={18} /> : null}
+                </Card>
+              </Pressable>
+            ))}
           </Section>
         ) : null}
 
         <Section
-          title="Jahreswertung"
-          actionLabel="Rangliste"
-          onAction={() => navigation.navigate("More", { screen: "SeasonPass" })}
+          title={isGuest ? "Aktuell geplant" : "Meine nächsten Termine"}
+          actionLabel={moreCount > 0 ? `Alle (${nextItems.length + liveItems.length + moreCount})` : "Alle Termine"}
+          onAction={() => navigation.navigate("Tournaments")}
         >
+          {nextItems.length ? (
+            nextItems.map((item) => (
+              <TimelineCard key={`${item.kind}-${item.id}`} item={item} onPress={() => openTimelineItem(item)} />
+            ))
+          ) : liveItems.length ? (
+            <Muted>Alles Weitere steht oben unter „Heute und Live“.</Muted>
+          ) : (
+            <EmptyState icon="calendar-outline" title={isGuest ? "Noch keine Termine" : "Keine anstehenden Termine"} detail={isGuest ? "Sobald Website-Termine veröffentlicht sind, stehen sie hier." : "Sobald du dich für ein Turnier oder Event anmeldest, steht es hier. Vergangene Termine findest du im Profil unter Referenzen."} />
+          )}
+        </Section>
+
+        {data.season ? (
           <Pressable
             onPress={() => navigation.navigate("More", { screen: "SeasonPass" })}
             style={({ pressed }) => [pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel={`${data.season.name || "Jahreswertung"}: ${seasonLine(data.season)}`}
           >
-            <Card style={styles.seasonCard}>
+            <Card style={styles.seasonRow}>
               <View style={styles.seasonIcon}>
-                <Ionicons name="trophy-outline" color={colors.gold} size={26} />
+                <Ionicons name="trophy-outline" color={colors.gold} size={20} />
               </View>
               <View style={styles.flex}>
-                <Body style={styles.rowTitle}>Jahreswertung {new Date().getFullYear()}</Body>
-                <Muted>Punkte aus Turnieren, Fast Laps, Events und gepflegten Wertungen.</Muted>
-                <Muted style={styles.seasonHint}>Rangliste ansehen</Muted>
+                <Body style={styles.rowTitle}>{data.season.name || "Jahreswertung"}</Body>
+                <Muted>{seasonLine(data.season)}</Muted>
               </View>
+              <Ionicons name="chevron-forward" color={colors.muted} size={18} />
             </Card>
           </Pressable>
-        </Section>
+        ) : null}
 
         <Section title="News">
           {data.news.length ? (
@@ -354,6 +345,7 @@ function tournamentToTimeline(tournament: Tournament): TimelineItem {
     title: tournament.title,
     date: tournament.start_date,
     status: tournament.status,
+    phaseState: tournament.public_phase?.state,
     phaseLabel: tournament.public_phase?.label,
     detail: tournament.game?.display_name || tournament.game?.name || tournament.game_name || tournament.event?.name || tournament.format_label,
     bannerUrl: tournament.banner_url || tournament.game?.cover_url || tournament.game?.logo_url,
@@ -369,31 +361,13 @@ function eventToTimeline(event: ClubEvent): TimelineItem {
     title: event.title || event.name || "Event",
     date: event.start_date || event.date,
     status: event.status,
+    phaseState: event.public_phase?.state,
     phaseLabel: event.public_phase?.label,
     detail: placeParts(event.location, event.city).join(" · ") || formatEventType(event.event_type || event.type),
     bannerUrl: event.banner_url,
     targetId: event.slug || event.id,
     registrationStatus: event.own_registration?.status,
   };
-}
-
-function isLiveTimelineItem(item: TimelineItem) {
-  const status = `${item.status || ""} ${item.phaseLabel || ""}`.toLowerCase();
-  if (status.includes("live") || status.includes("check") || status.includes("running") || status.includes("progress")) {
-    return true;
-  }
-  if (status.includes("registration") || status.includes("anmeldung")) {
-    return true;
-  }
-  return isToday(item.date);
-}
-
-function isToday(value?: string | null) {
-  if (!value) return false;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-  const today = new Date();
-  return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
 }
 
 function Section({ title, actionLabel, onAction, children }: { title: string; actionLabel?: string; onAction?: () => void; children: React.ReactNode }) {
@@ -491,8 +465,8 @@ function Stat({ label, value, tone = "cyan" }: { label: string; value: string; t
 
 function QuickAction({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}>
-      <Ionicons name={icon} color={colors.cyan} size={20} />
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}>
+      <Ionicons name={icon} color={colors.cyan} size={18} />
       <Muted style={styles.quickLabel}>{label}</Muted>
     </Pressable>
   );
@@ -561,27 +535,32 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
-  quickGrid: {
+  quickRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 8,
   },
   quickAction: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.05)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 999,
     borderWidth: 1,
-    flexBasis: "47%",
-    flexGrow: 1,
-    gap: 6,
-    justifyContent: "center",
-    minHeight: 74,
-    padding: 10,
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 40,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   quickLabel: {
     color: colors.white,
     fontWeight: "900",
+  },
+  seasonRow: {
+    alignItems: "center",
+    borderColor: "rgba(255,215,0,0.28)",
+    flexDirection: "row",
+    gap: 12,
   },
   stat: {
     flex: 1,

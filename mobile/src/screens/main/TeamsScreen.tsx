@@ -8,11 +8,18 @@ import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
+import { chatTitle, splitTeams, teamMembers, teamMeta, teamSquads } from "../../lib/teams";
 import type { TeamStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { Team, TeamInvite } from "../../types";
 
+// Teams: eigene zuerst, mit Chat direkt auf der Karte; darunter die weiteren
+// öffentlichen Teams. Vorher zeigte die Liste entweder nur eigene oder nur
+// alle, und jede Karte trug "0 Squads" zweimal (#215).
+
 type Props = NativeStackScreenProps<TeamStackParamList, "TeamList">;
+
+type Row = { kind: "heading"; key: string; title: string; count: number } | { kind: "team"; key: string; team: Team; mine: boolean };
 
 export function TeamsScreen({ navigation }: Props) {
   const [myTeams, setMyTeams] = useState<Team[]>([]);
@@ -56,9 +63,27 @@ export function TeamsScreen({ navigation }: Props) {
     }
   }, [load]);
 
-  const list = myTeams.length ? myTeams : allTeams;
-  const memberTotal = useMemo(() => list.reduce((sum, team) => sum + Number(team.member_count ?? team.members?.length ?? 0), 0), [list]);
-  const squadTotal = useMemo(() => list.reduce((sum, team) => sum + Number(team.squad_count ?? team.squads?.length ?? 0), 0), [list]);
+  const { mine, others } = useMemo(() => splitTeams(myTeams, allTeams), [myTeams, allTeams]);
+  const rows = useMemo<Row[]>(() => {
+    const result: Row[] = [];
+    if (mine.length) {
+      result.push({ kind: "heading", key: "h-mine", title: "Meine Teams", count: mine.length });
+      mine.forEach((team) => result.push({ kind: "team", key: `m-${team.id}`, team, mine: true }));
+    }
+    if (others.length) {
+      result.push({ kind: "heading", key: "h-others", title: mine.length ? "Weitere Teams" : "Öffentliche Teams", count: others.length });
+      others.forEach((team) => result.push({ kind: "team", key: `o-${team.id}`, team, mine: false }));
+    }
+    return result;
+  }, [mine, others]);
+
+  const statTeams = mine.length ? mine : others;
+  const memberTotal = useMemo(() => statTeams.reduce((sum, team) => sum + teamMembers(team), 0), [statTeams]);
+  const squadTotal = useMemo(() => statTeams.reduce((sum, team) => sum + teamSquads(team), 0), [statTeams]);
+
+  const openChat = useCallback((team: Team) => {
+    navigation.navigate("TeamChat", { id: team.id, title: chatTitle(team) });
+  }, [navigation]);
 
   if (loading) {
     return (
@@ -71,8 +96,8 @@ export function TeamsScreen({ navigation }: Props) {
   return (
     <Screen padded={false}>
       <FlatList
-        data={list}
-        keyExtractor={(item) => item.id}
+        data={rows}
+        keyExtractor={(item) => item.key}
         ListHeaderComponent={
           <View style={styles.header}>
             <View style={styles.headerTop}>
@@ -81,16 +106,18 @@ export function TeamsScreen({ navigation }: Props) {
               </View>
               <View style={styles.headerText}>
                 <Muted style={styles.eyebrow}>Community</Muted>
-                <Title>{myTeams.length ? "Meine Teams" : "Teams"}</Title>
+                <Title>Teams</Title>
               </View>
             </View>
-            {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Deine Teams, Einladungen und der Team-Chat.</Muted>}
+            {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
-            <View style={styles.stats}>
-              <Stat icon="shield-outline" label="Teams" value={list.length} />
-              <Stat icon="people-outline" label="Mitglieder" value={memberTotal} tone="gold" />
-              <Stat icon="layers-outline" label="Squads" value={squadTotal} />
-            </View>
+            {statTeams.length ? (
+              <View style={styles.stats}>
+                <Stat icon="shield-outline" label="Teams" value={statTeams.length} />
+                <Stat icon="people-outline" label="Mitglieder" value={memberTotal} tone="gold" />
+                {squadTotal > 0 ? <Stat icon="layers-outline" label="Squads" value={squadTotal} /> : null}
+              </View>
+            ) : null}
 
             {invites.length ? (
               <View style={styles.invites}>
@@ -105,12 +132,29 @@ export function TeamsScreen({ navigation }: Props) {
             ) : null}
           </View>
         }
-        ListEmptyComponent={<EmptyState title="Keine Teams" detail="Du bist noch in keinem Team oder es gibt keine öffentlichen Teams." />}
+        ListEmptyComponent={
+          <EmptyState
+            icon="people-outline"
+            title="Noch kein Team"
+            detail="Einem Team trittst du über eine Einladung oder einen Join-Code bei. Öffentliche Teams erscheinen hier, sobald es welche gibt."
+          />
+        }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
         contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <TeamCard team={item} onPress={() => navigation.navigate("TeamDetail", { id: item.id })} />
-        )}
+        renderItem={({ item }) =>
+          item.kind === "heading" ? (
+            <View style={styles.sectionHead}>
+              <Heading>{item.title}</Heading>
+              <Pill label={String(item.count)} />
+            </View>
+          ) : (
+            <TeamCard
+              team={item.team}
+              onPress={() => navigation.navigate("TeamDetail", { id: item.team.id })}
+              onChat={item.mine ? () => openChat(item.team) : undefined}
+            />
+          )
+        }
       />
     </Screen>
   );
@@ -131,10 +175,10 @@ function InviteCard({ invite, onAccept, onDecline }: { invite: TeamInvite; onAcc
         </View>
       </View>
       <View style={styles.inviteActions}>
-        <Pressable onPress={onAccept} style={({ pressed }) => [styles.acceptButton, pressed && styles.pressed]}>
+        <Pressable onPress={onAccept} accessibilityRole="button" style={({ pressed }) => [styles.acceptButton, pressed && styles.pressed]}>
           <Body style={styles.acceptText}>Annehmen</Body>
         </Pressable>
-        <Pressable onPress={onDecline} style={({ pressed }) => [styles.declineButton, pressed && styles.pressed]}>
+        <Pressable onPress={onDecline} accessibilityRole="button" style={({ pressed }) => [styles.declineButton, pressed && styles.pressed]}>
           <Muted style={styles.declineText}>Ablehnen</Muted>
         </Pressable>
       </View>
@@ -142,11 +186,10 @@ function InviteCard({ invite, onAccept, onDecline }: { invite: TeamInvite; onAcc
   );
 }
 
-function TeamCard({ team, onPress }: { team: Team; onPress: () => void }) {
-  const members = team.member_count ?? team.members?.length ?? 0;
-  const squads = team.squad_count ?? team.squads?.length ?? 0;
+function TeamCard({ team, onPress, onChat }: { team: Team; onPress: () => void; onChat?: () => void }) {
+  const lastMessage = team.chat_preview?.length ? team.chat_preview[team.chat_preview.length - 1] : null;
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [pressed && styles.pressed]}>
       <Card style={styles.card}>
         <View style={styles.teamTop}>
           <MediaImage
@@ -156,19 +199,30 @@ function TeamCard({ team, onPress }: { team: Team; onPress: () => void }) {
           />
           <View style={styles.teamText}>
             <View style={styles.titleRow}>
-              <Body style={styles.title}>{team.name}</Body>
+              <Body style={styles.title} numberOfLines={1}>{team.name}</Body>
               {team.tag ? <Pill label={team.tag} /> : null}
             </View>
-            <Muted>{members} Mitglieder · {squads} Squads</Muted>
+            <Muted>{teamMeta(team)}</Muted>
           </View>
-          <Ionicons name="chevron-forward" color={colors.cyan} size={18} />
+          {onChat ? (
+            <Pressable
+              onPress={onChat}
+              accessibilityRole="button"
+              accessibilityLabel={`${team.name}: Chat öffnen`}
+              hitSlop={8}
+              style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}
+            >
+              <Ionicons name="chatbubbles-outline" color={colors.black} size={18} />
+            </Pressable>
+          ) : (
+            <Ionicons name="chevron-forward" color={colors.cyan} size={18} />
+          )}
         </View>
-        {team.description ? <Muted numberOfLines={2}>{team.description}</Muted> : null}
-        <View style={styles.metaRow}>
-          <Pill label={`${squads} Squads`} tone="gold" />
-          <Pill label={`${members} Spieler`} />
-          {team.chat_preview?.length ? <Pill label={`${team.chat_preview.length} Chat`} /> : null}
-        </View>
+        {onChat && lastMessage ? (
+          <Muted numberOfLines={1}>{lastMessage.author}: {lastMessage.message}</Muted>
+        ) : team.description ? (
+          <Muted numberOfLines={2}>{team.description}</Muted>
+        ) : null}
       </Card>
     </Pressable>
   );
@@ -248,7 +302,9 @@ const styles = StyleSheet.create({
   sectionHead: {
     alignItems: "center",
     flexDirection: "row",
+    gap: 8,
     justifyContent: "space-between",
+    paddingTop: 4,
   },
   inviteCard: {
     gap: 10,
@@ -288,7 +344,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   card: {
-    gap: 10,
+    gap: 8,
   },
   teamTop: {
     alignItems: "center",
@@ -317,13 +373,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    flex: 1,
+    flexShrink: 1,
     fontWeight: "900",
   },
-  metaRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+  chatButton: {
+    alignItems: "center",
+    backgroundColor: colors.cyan,
+    borderRadius: 20,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
   },
   pill: {
     backgroundColor: "rgba(41,182,232,0.12)",

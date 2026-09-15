@@ -104,6 +104,7 @@ GitHub sortiert Releases nach Veröffentlichungsdatum, nicht nach Version. Alte 
 Neueste oben.
 
 - `0.2.1-beta`: Build 58, Tastatur-Fehler im Chat und Texte (Block 14.3)
+- `0.3.0-beta`: Build 59, Startseite, Profil, Mehr und Teams aufgeräumt (Block 14.4)
 - `0.2.0-beta`: Build 57, erste Version im neuen Schema
 
 Vor dem Neustart bei 0.x galt ein Schema mit Zähler (`-beta.N`, `-alpha.N`). Diese Versionen sind historisch:

@@ -1,247 +1,171 @@
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
+import { api } from "../../lib/api";
 import { isGuestUser } from "../../live";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 
+// "Mehr" ist das Verzeichnis: eine Zeile je Ziel, keine Beschreibungstexte.
+// Vorher war jedes Ziel eine große Karte mit Badge und zwei Zeilen Text, und
+// der Discord-Link stand fest im Code - und war falsch (#214). Die
+// Vereinskanäle kommen jetzt aus den Einstellungen, wie im Web-Footer.
+
 type Props = NativeStackScreenProps<MoreStackParamList, "MoreHub">;
 
-type ModuleItem = {
+type Entry = {
   title: string;
-  detail: string;
-  badge: string;
   icon: keyof typeof Ionicons.glyphMap;
-  badgeTone?: "cyan" | "gold" | "green";
   section?: NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>;
   screen?: "NewsList" | "FastLapList" | "DirectMessages" | "Notifications" | "SeasonPass";
   ownPublicProfile?: boolean;
-  externalUrl?: string;
+  membersOnly?: boolean;
 };
 
-const featuredModules: ModuleItem[] = [
+type SocialLink = { platform?: string; label?: string; url?: string; enabled?: boolean };
+
+const GROUPS: Array<{ title: string; entries: Entry[] }> = [
   {
-    title: "Jahreswertung",
-    detail: "Punkte, Rangliste und Jahres-Champion der laufenden Saison.",
-    screen: "SeasonPass",
-    badge: "Neu",
-    icon: "trophy-outline",
-    badgeTone: "gold",
+    title: "Konto",
+    entries: [
+      { title: "Nachrichten", icon: "chatbubbles-outline", screen: "DirectMessages" },
+      { title: "Benachrichtigungen", icon: "notifications-outline", screen: "Notifications" },
+      { title: "Öffentliches Profil", icon: "open-outline", ownPublicProfile: true },
+    ],
   },
   {
-    title: "Alerts",
-    detail: "Push, Mentions, Erinnerungen und Match-Updates.",
-    screen: "Notifications",
-    badge: "Push",
-    icon: "notifications-outline",
+    title: "Gaming",
+    entries: [
+      { title: "Fast Laps", icon: "flash-outline", screen: "FastLapList" },
+      { title: "Jahreswertung", icon: "trophy-outline", screen: "SeasonPass" },
+      { title: "Spielerprofile", icon: "people-outline", section: "profiles" },
+    ],
   },
   {
-    title: "Nachrichten",
-    detail: "Direktnachrichten mit Spielern und Community-Kontakten.",
-    screen: "DirectMessages",
-    badge: "Chat",
-    icon: "chatbubble-outline",
-  },
-  {
-    title: "News",
-    detail: "Updates, Events und verknüpfte Turniere.",
-    screen: "NewsList",
-    badge: "Live",
-    icon: "newspaper-outline",
+    title: "Verein",
+    entries: [
+      { title: "News", icon: "newspaper-outline", screen: "NewsList" },
+      { title: "Mitgliedervorteile", icon: "star-outline", section: "benefits", membersOnly: true },
+      { title: "Referenzen", icon: "medal-outline", section: "references" },
+      { title: "Sponsoren", icon: "ribbon-outline", section: "sponsors" },
+      { title: "Partner", icon: "link-outline", section: "partners" },
+    ],
   },
 ];
 
-const clubModules: ModuleItem[] = [
-  {
-    title: "Öffentliches Profil",
-    detail: "Deine öffentliche Profilseite mit Referenzen und Community-Infos.",
-    ownPublicProfile: true,
-    badge: "Profil",
-    icon: "open-outline",
-  },
-  {
-    title: "Fast Laps",
-    detail: "Challenges, Strecken und Bestzeiten direkt in LionsAPP ansehen.",
-    screen: "FastLapList",
-    badge: "Racing",
-    icon: "flash-outline",
-  },
-  {
-    title: "Events",
-    detail: "Community-Abende, LANs, Festival-Auftritte und Anmeldestatus.",
-    section: "events",
-    badge: "Kalender",
-    icon: "calendar-outline",
-  },
-  {
-    title: "Mitgliedervorteile",
-    detail: "Dynamische Vorteile für aktive Vereinsmitglieder.",
-    section: "benefits",
-    badge: "Member",
-    icon: "star-outline",
-    badgeTone: "gold",
-  },
-  {
-    title: "Spielerprofile",
-    detail: "Profile finden, Rollen sehen und Achievements vergleichen.",
-    section: "profiles",
-    badge: "Social",
-    icon: "people-outline",
-  },
-  {
-    title: "Referenzen",
-    detail: "Erfolge, Highlights und Vereinsmomente gesammelt ansehen.",
-    section: "references",
-    badge: "Archiv",
-    icon: "medal-outline",
-    badgeTone: "gold",
-  },
-];
+const SOCIAL_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  discord: "logo-discord",
+  whatsapp: "logo-whatsapp",
+  facebook: "logo-facebook",
+  instagram: "logo-instagram",
+  tiktok: "logo-tiktok",
+  youtube: "logo-youtube",
+  twitch: "logo-twitch",
+  twitter: "logo-twitter",
+  x: "logo-twitter",
+  website: "globe-outline",
+};
 
-const partnerModules: ModuleItem[] = [
-  {
-    title: "Sponsoren",
-    detail: "Hinterlegte Unterstützer mit Kurzinfo und Link-Logik.",
-    section: "sponsors",
-    badge: "Club",
-    icon: "ribbon-outline",
-  },
-  {
-    title: "Partner",
-    detail: "Kooperationen, Ligen, Community-Partner und Event-Bezug.",
-    section: "partners",
-    badge: "Netzwerk",
-    icon: "link-outline",
-  },
-  {
-    title: "Discord beitreten",
-    detail: "Dem Server beitreten und mit der Community in Kontakt bleiben.",
-    externalUrl: "https://discord.gg/thelionsquad",
-    badge: "Discord",
-    icon: "logo-discord",
-    badgeTone: "cyan",
-  },
-];
+export function socialIcon(platform?: string | null): keyof typeof Ionicons.glyphMap {
+  return SOCIAL_ICONS[String(platform || "").toLowerCase()] || "link-outline";
+}
 
 export function MoreScreen({ navigation }: Props) {
   const { user } = useAuth();
-  const appVersion = Constants.expoConfig?.version ?? "1.0.0";
+  const [socials, setSocials] = useState<SocialLink[]>([]);
+  const appVersion = Constants.expoConfig?.version ?? "?";
+  const build = Constants.expoConfig?.android?.versionCode;
 
-  const handlePress = (item: ModuleItem) => {
-    if (item.externalUrl) {
-      Linking.openURL(item.externalUrl).catch(() => {});
-      return;
-    }
-    if (item.ownPublicProfile) {
+  useEffect(() => {
+    let cancelled = false;
+    api.get<{ social_links?: SocialLink[] }>("/settings/public")
+      .then(({ data }) => {
+        if (cancelled) return;
+        const links = Array.isArray(data?.social_links) ? data.social_links : [];
+        setSocials(links.filter((link) => link?.enabled !== false && link?.url));
+      })
+      .catch(() => {
+        if (!cancelled) setSocials([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const open = (entry: Entry) => {
+    if (entry.ownPublicProfile) {
       if (!user?.username || isGuestUser(user)) return;
       navigation.navigate("PublicProfile", { username: user.username });
       return;
     }
-    if (item.screen) {
-      navigation.navigate(item.screen as any);
+    if (entry.screen) {
+      navigation.navigate(entry.screen as any);
       return;
     }
-    if (item.section) {
-      navigation.navigate("InfoCenter", { section: item.section });
-    }
+    if (entry.section) navigation.navigate("InfoCenter", { section: entry.section });
   };
 
   return (
     <Screen padded={false}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Card style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <Ionicons name="shield-checkmark-outline" color={colors.black} size={22} />
-          </View>
-          <View style={styles.heroText}>
-            <Muted style={styles.heroEyebrow}>THE LION SQUAD</Muted>
-            <Title>Mehr</Title>
-            <Muted>Verein, Community, News und App-Funktionen an einem Ort.</Muted>
-          </View>
-          <View style={styles.versionPill}>
-            <Muted style={styles.versionText}>v{appVersion}</Muted>
-          </View>
-        </Card>
+        <View style={styles.header}>
+          <Muted style={styles.eyebrow}>THE LION SQUAD</Muted>
+          <Title>Mehr</Title>
+        </View>
 
-        <Section title="Schnellzugriff">
-          <View style={styles.grid}>
-            {featuredModules.map((item) => (
-              <ModuleCard key={item.title} item={item} onPress={() => handlePress(item)} compact />
-            ))}
+        {GROUPS.map((group) => {
+          const entries = group.entries.filter((entry) => !entry.membersOnly || user?.is_club_member);
+          if (!entries.length) return null;
+          return (
+            <View key={group.title} style={styles.group}>
+              <Heading>{group.title}</Heading>
+              <Card style={styles.list}>
+                {entries.map((entry, index) => (
+                  <Pressable
+                    key={entry.title}
+                    onPress={() => open(entry)}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [styles.row, index > 0 && styles.rowBorder, pressed && styles.pressed]}
+                  >
+                    <Ionicons name={entry.icon} color={colors.cyan} size={20} />
+                    <Body style={styles.rowTitle}>{entry.title}</Body>
+                    <Ionicons name="chevron-forward" color={colors.muted} size={16} />
+                  </Pressable>
+                ))}
+              </Card>
+            </View>
+          );
+        })}
+
+        {socials.length ? (
+          <View style={styles.group}>
+            <Heading>Folge uns</Heading>
+            <View style={styles.socialRow}>
+              {socials.map((link) => (
+                <Pressable
+                  key={`${link.platform}-${link.url}`}
+                  accessibilityRole="link"
+                  accessibilityLabel={link.label || link.platform || "Link"}
+                  onPress={() => { Linking.openURL(String(link.url)).catch(() => {}); }}
+                  style={({ pressed }) => [styles.social, pressed && styles.pressed]}
+                  testID={`social-${String(link.platform || "link").toLowerCase()}`}
+                >
+                  <Ionicons name={socialIcon(link.platform)} color={colors.white} size={22} />
+                </Pressable>
+              ))}
+            </View>
           </View>
-        </Section>
+        ) : null}
 
-        <Section title="Verein und Gaming">
-          {clubModules.map((item) => (
-            <ModuleCard key={item.title} item={item} onPress={() => handlePress(item)} />
-          ))}
-        </Section>
-
-        <Section title="Netzwerk">
-          {partnerModules.map((item) => (
-            <ModuleCard key={item.title} item={item} onPress={() => handlePress(item)} external={Boolean(item.externalUrl)} />
-          ))}
-        </Section>
+        <Muted style={styles.version}>LionsAPP v{appVersion}{build ? ` · Build ${build}` : ""}</Muted>
       </ScrollView>
     </Screen>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <Heading>{title}</Heading>
-      {children}
-    </View>
-  );
-}
-
-function ModuleCard({
-  item,
-  onPress,
-  compact = false,
-  external = false,
-}: {
-  item: ModuleItem;
-  onPress: () => void;
-  compact?: boolean;
-  external?: boolean;
-}) {
-  const accent = item.badgeTone === "gold" ? colors.gold : item.badgeTone === "green" ? colors.success : colors.cyan;
-
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [compact && styles.gridItem, pressed && styles.pressed]}>
-      <Card style={[styles.card, compact && styles.compactCard]}>
-        <View style={styles.cardTop}>
-          <View style={[styles.iconWrap, { borderColor: `${accent}55`, backgroundColor: `${accent}18` }]}>
-            <Ionicons name={item.icon} color={accent} size={compact ? 19 : 18} />
-          </View>
-          <View style={styles.cardTitleWrap}>
-            <Body style={styles.title}>{item.title}</Body>
-            <Badge label={item.badge} accent={accent} />
-          </View>
-        </View>
-        <Muted numberOfLines={compact ? 3 : 2}>{item.detail}</Muted>
-        <View style={styles.openRow}>
-          <Muted style={styles.openHint}>{external ? "Extern öffnen" : "Bereich öffnen"}</Muted>
-          <Ionicons name={external ? "open-outline" : "chevron-forward"} color={colors.cyan} size={15} />
-        </View>
-      </Card>
-    </Pressable>
-  );
-}
-
-function Badge({ label, accent }: { label: string; accent: string }) {
-  return (
-    <View style={[styles.badge, { borderColor: `${accent}55`, backgroundColor: `${accent}18` }]}>
-      <Muted style={[styles.badgeText, { color: accent }]}>{label}</Muted>
-    </View>
   );
 }
 
@@ -251,103 +175,54 @@ const styles = StyleSheet.create({
     padding: 18,
     paddingBottom: 32,
   },
-  hero: {
-    alignItems: "center",
-    borderColor: "rgba(41,182,232,0.32)",
-    flexDirection: "row",
-    gap: 12,
+  header: {
+    gap: 2,
   },
-  heroIcon: {
-    alignItems: "center",
-    backgroundColor: colors.cyan,
-    borderRadius: 10,
-    height: 46,
-    justifyContent: "center",
-    width: 46,
-  },
-  heroText: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-  },
-  heroEyebrow: {
+  eyebrow: {
     color: colors.cyan,
     fontWeight: "900",
     textTransform: "uppercase",
   },
-  versionPill: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderColor: colors.border,
-    borderRadius: 7,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  versionText: {
-    color: colors.white,
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  section: {
+  group: {
     gap: 10,
   },
-  grid: {
+  list: {
+    gap: 0,
+    padding: 0,
+  },
+  row: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    minHeight: 50,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  rowBorder: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+  },
+  rowTitle: {
+    flex: 1,
+    fontWeight: "900",
+  },
+  socialRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
   },
-  gridItem: {
-    flexBasis: "47%",
-    flexGrow: 1,
-  },
-  card: {
-    gap: 8,
-  },
-  compactCard: {
-    minHeight: 148,
-  },
-  cardTop: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: 10,
-  },
-  cardTitleWrap: {
-    flex: 1,
-    gap: 6,
-    minWidth: 0,
-  },
-  iconWrap: {
+  social: {
     alignItems: "center",
-    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 24,
     borderWidth: 1,
-    height: 38,
+    height: 48,
     justifyContent: "center",
-    width: 38,
+    width: 48,
   },
-  title: {
-    fontWeight: "900",
-  },
-  badge: {
-    alignSelf: "flex-start",
-    borderRadius: 6,
-    borderWidth: 1,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
-  openRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 4,
-    marginTop: "auto",
-  },
-  openHint: {
-    color: colors.cyan,
-    fontWeight: "900",
+  version: {
+    textAlign: "center",
   },
   pressed: {
     opacity: 0.72,
