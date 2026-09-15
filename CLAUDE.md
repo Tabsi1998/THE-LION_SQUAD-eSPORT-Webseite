@@ -1,7 +1,8 @@
 # CLAUDE.md – Übergabe und Arbeitsregeln für THE LION SQUAD
 
 Diese Datei ist das Wissen aus der Arbeit mit Claude Code an diesem Repository,
-Stand **15. September 2026, abends**. Sie wird beim Start jeder Sitzung gelesen.
+Stand **15. September 2026, spät abends (nach PR #270)**. Sie wird beim Start
+jeder Sitzung gelesen.
 Wer sie liest, soll ohne Rückfragen dort weitermachen können, wo die letzte
 Sitzung aufgehört hat. Alles hier ist bewusst frei von Geheimnissen.
 
@@ -201,6 +202,12 @@ python scripts/local_check.py --list                   # Schritte anzeigen
   scheitern – das ist Last, allein laufen sie grün.
 - `.gitleaks.toml` erlaubt nur geprüfte Testwerte, jeweils an Datei und
   genauen Wert gebunden.
+- Findet der Check `docker` oder `gitleaks` nicht, obwohl beide installiert
+  sind: VS Code neu starten – der PATH wird beim Start gelesen.
+- Vollständiger Lauf (`--all`) am 15.09. auf dem zweiten PC: 41 Schritte
+  grün in rund 7 Minuten. Backend 919 bestanden / 20 übersprungen, Web 167
+  Vitest- und 146 Browser-Tests, App 89 Tests. Ratsche: 468 Dateien mit
+  Formatierungsdrift, 135 flake8-, 111 mypy-, 5 ShellCheck-Altlasten, 0 OSV.
 
 **Erweitern.** `scripts/local_check.py` hat drei Teile: Kopf (Pfade,
 Versionen, Ports, Umgebungen), gemeinsamer Kern (Runner, Ratsche, Gitleaks,
@@ -266,10 +273,11 @@ npx expo install --check
 ### 6.4 Bekannte Stolpersteine
 
 - **Expo-Patch-Versionen:** „Validate Expo config“ (`npx expo install
-  --check`) fällt durch, sobald Expo Patches veröffentlicht (15.09.: expo
-  57.0.23, expo-image-picker 57.0.18, expo-notifications 57.0.19). Kein
+  --check`) fällt durch, sobald Expo Patches veröffentlicht. Kein
   Code-Fehler. Beheben im nächsten App-PR mit
-  `npx expo install expo expo-image-picker expo-notifications` (eigener Commit).
+  `npx expo install expo expo-image-picker expo-notifications` (eigener
+  Commit). Zuletzt am 15.09. mit #270 nachgezogen (expo 57.0.23,
+  expo-image-picker 57.0.18, expo-notifications 57.0.19); `main` ist grün.
 - **Git Bash + Docker:** `MSYS_NO_PATHCONV=1` setzen; Env-Dateien,
   `docker compose cp`-Quellen und curl `-K` brauchen Windows-Pfade
   (`cygpath -w`); `/dev/null` wird zu `C:\dev\null` (leere Datei nehmen);
@@ -296,6 +304,11 @@ npx expo install --check
 - Gebaut wird in einem **Git-Worktree ohne Leerzeichen im Pfad**, bisher
   `C:\lsb` (der Projektpfad mit Leerzeichen bricht den nativen
   reanimated-Build). JDK 21 unter `.codex-tools/local-testing/jdk21/`.
+- Zweiter PC (`C:\Programmieren`, Stand 15.09.): JDK 21 liegt unter
+  `C:\Program Files\Java\jdk-21.0.10` (im PATH steht Java 25, das reicht dem
+  Check). Android SDK, `%USERPROFILE%\.lionsapp-release\` und ein `buildDir`
+  in `signing.json` fehlen dort noch – ein App-Build geht bis dahin nur am
+  Original-PC. `npm run release:local -- --check` zeigt den Stand.
 
 ```bash
 git -C C:/lsb checkout main && git -C C:/lsb pull
@@ -325,39 +338,36 @@ Betreiber an `update.sh` erinnern.
 
 ---
 
-## 9. Aktueller Stand (15. September 2026, abends)
+## 9. Aktueller Stand (15. September 2026, spät abends)
 
 ### Gemergt heute
 #237 (App 14.4), #261 (#221 Live-Aktualisierung), #262 (App 0.3.1-beta),
 #263 (#232 Uploads über nginx), #264 (App 0.4.0-beta, Build 61 vorbereitet),
-#266 (#233 Teil 1, Betrieb). `main` steht auf `81c0ba0`.
+#266 (#233 Teil 1, Betrieb), #267 (#253 Profil-Layout), #268 (diese Datei),
+#270 (#269 lokaler Check). `main` steht auf `42b9d76`.
 
 ### Offene PRs
-- **#267** – Web-Profil: Seitenmenü am PC, volle Breite, eine Datei je Reiter
-  (`Closes #253`). Zweig `feat/253-profil-layout`, auf `main` rebased, Spiegel
-  grün (22/0/3), Status „bereit zur Prüfung“. **Wartet auf Merge durch den
-  Betreiber.**
+- Keine, sobald dieser Doku-PR (#271) gemergt ist.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
   (`mobile-v0.3.1-beta-build60`).
 - **Build 61 (0.4.0-beta) ist noch nicht gebaut.** `main` trägt schon
-  Version 0.4.0-beta / versionCode 61. Nächster Schritt: Abschnitt 7 – falls
-  der Expo-Check den Build stoppt, zuerst die drei Pakete anheben (kleines
-  Issue, Label `app`).
+  Version 0.4.0-beta / versionCode 61, der Expo-Check ist seit #270 grün.
+  Nächster Schritt: Abschnitt 7 am Original-PC (der zweite PC hat weder
+  Android SDK noch die Release-Geheimnisse).
 
 ### Erledigungen beim Betreiber
-- PR #267 mergen („Squash and merge“).
-- `update.sh` am Server ausführen (#263 und #266 sind Backend/Web).
+- `update.sh` am Server ausführen (#263, #266 und #267 sind Backend/Web).
 - Build 60 installieren, ein Bild im Chat senden und den Text aus der
   Bildkachel in **#238** posten (dort steht jetzt der Fehlergrund).
 
-### Meilensteine und offene Issues (37 offen)
+### Meilensteine und offene Issues (33 offen)
 | Meilenstein | Issues |
 | --- | --- |
-| Web: Profil I – Aufbau | #253 (PR #267), #257 Privatsphäre aufteilen, #258 Grunddaten + Sicherheit |
+| Web: Profil I – Aufbau | #257 Privatsphäre aufteilen, #258 Grunddaten + Sicherheit (#253 ist mit #267 zu) |
 | Web: Profil II – Nachrichten und Dashboard | #254 Inbox als Chat, #255 Benachrichtigungen anklickbar, #256 Dashboard, #259 Freunde |
-| Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg, #265 Betrieb II |
+| Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg, #265 Betrieb II, #271 diese Doku |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
 | App 0.3.1-beta | #238 schwarze Chat-Kachel (wartet auf Text vom Betreiber) |
 | App 0.5.0-beta | #249 Was ist neu, #250 Update aus der App, #251 In-App-Banner |
@@ -379,13 +389,29 @@ Betreiber an `update.sh` erinnern.
 Vor jedem neuen Paket: Stand melden und auf das OK warten.
 
 ### Noch offene Doku
-- `UMBAUPLAN.md`: Abschnitt „Was 22.2 gefunden hat“ fehlt noch (wurde
-  zurückgestellt, um Konflikte mit #263 zu vermeiden). Inhalt: Server-Fehler
-  standen bisher nur in Container-Logs; langsame Anfragen waren unsichtbar;
-  die Web-Fehlersammlung war standardmäßig aus – alles mit #266 behoben
-  (Fehlergruppen mit Fingerabdruck, langsame Anfragen, Admin → Betrieb).
-  Plus Meilenstein-Zeilen für #264/#266/#267 nachziehen und das Artifact
-  aktualisieren.
+- Das Online-Artifact des Umbauplans (Abschnitt 1) auf den Stand von
+  `UMBAUPLAN.md` bringen. „Was 22.2 gefunden hat“ und die Zeilen für
+  #261/#262/#263/#264/#266/#267 stehen seit #271 in der Datei.
+
+### GitHub-Befunde vom 15.09. (zweiter PC, nichts davon geändert)
+- **CodeQL** (`codeql.yml`, nur manuell) startet nicht: „recent account
+  payments have failed or your spending limit needs to be increased“. Die
+  drei offenen CodeQL-Warnungen sind alt: eine zeigt auf
+  `tournament_routes.py:3149` aus der Zeit vor Block 13 (die Datei hat heute
+  24 Zeilen), die zwei anderen (`pdf_service.py:891`, `user_routes.py:626`)
+  sind Vorbelegungen, die im Normalfall überschrieben werden – kein Fehler.
+- **`main` hat keinen Branch-Schutz und keine Rulesets.** „Nie direkt auf
+  `main`“ ist nur Vereinbarung. Empfehlung: Settings → Branches → „Require a
+  pull request before merging“.
+- **Rund 60 Remote-Zweige gemergter PRs** liegen noch auf GitHub.
+  Empfehlung: Settings → General → „Automatically delete head branches“; die
+  alten einmal unter Branches löschen.
+- Zwei PRs wurden mit rotem letzten Lauf gemergt: #263 (Job „Bereiche und
+  Geheimnis-Scan“, Log nicht mehr abrufbar) und #264 (`InfoCenterScreen`-Test
+  am 5-s-Timeout, Last auf dem Runner). Der Lauf zu #270 auf demselben Stand
+  war komplett grün, lokal ebenso.
+- Alter lokaler Zweig `*-changes-new` des früheren Anbieters (Remote gelöscht):
+  alle Patches sind in `main`; der Betreiber löscht ihn selbst.
 
 ### Wichtige Funde dieses Tages (für Erklärungen an den Betreiber)
 - Bilder trugen `Cache-Control: no-store` über den nginx-`/api/`-Block und
