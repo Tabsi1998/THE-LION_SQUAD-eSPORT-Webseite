@@ -27,7 +27,7 @@ jest.mock("../auth/AuthContext", () => ({ useAuth: () => ({ accessToken: "token-
 jest.mock("../realtime/LiveChangesProvider", () => ({ useLiveRefresh: () => undefined }));
 jest.mock("react-native-keyboard-controller", () => {
   const { View } = jest.requireActual("react-native");
-  return { KeyboardStickyView: View };
+  return { KeyboardAvoidingView: View };
 });
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -113,6 +113,25 @@ test("der Chat lädt beim Öffnen einmal - auch wenn jede Antwort ein neues Arra
   });
 
   expect(mockGet.mock.calls.filter(([url]) => url === "/teams/t-1/chat")).toHaveLength(1);
+});
+
+test("Nachrichten zeigen die Uhrzeit, und kurz aufeinanderfolgende teilen sich den Kopf", async () => {
+  const today = (hour: number, minute: number) => new Date(new Date().setHours(hour, minute, 0, 0)).toISOString();
+  mockGet.mockImplementation(async (url: string) => (url === "/stickers" ? stickerResponse : {
+    data: [
+      { id: "g-1", user_id: "u-2", message: "Erste", created_at: today(10, 0), author: { id: "u-2", display_name: "Mitspieler" } },
+      { id: "g-2", user_id: "u-2", message: "Zweite, gleich danach", created_at: today(10, 2), author: { id: "u-2", display_name: "Mitspieler" } },
+      { id: "g-3", user_id: "u-1", message: "Antwort", created_at: today(10, 3) },
+    ],
+  }));
+  await renderChat();
+
+  await waitFor(() => expect(screen.getByText("Antwort")).toBeTruthy());
+  // Zwei Nachrichten von "Mitspieler" innerhalb von fünf Minuten: ein Kopf.
+  expect(screen.getAllByText("Mitspieler")).toHaveLength(1);
+  expect(screen.getByText("10:00")).toBeTruthy();
+  expect(screen.queryByText("10:02")).toBeNull();
+  expect(screen.getByText("10:03")).toBeTruthy();
 });
 
 test("Bilder im Verlauf laden mit Anmeldung und in der kleinen Fassung", async () => {

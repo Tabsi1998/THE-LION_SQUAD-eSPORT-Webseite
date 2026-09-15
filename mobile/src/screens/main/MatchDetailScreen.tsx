@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
@@ -14,6 +15,8 @@ import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { invalidateCache } from "../../lib/cache";
 import {
+  continuesMessageGroup,
+  formatChatTime,
   formatDate,
   formatDateTime,
   formatEventMode,
@@ -410,11 +413,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
 
   return (
     <Screen padded={false}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 92 : 0}
-        style={styles.keyboard}
-      >
+      {/* Dieselbe Ansicht wie im Chat: der Block bekommt unten so viel Abstand, wie
+          die Tastatur ihn überdeckt; automaticOffset misst die Lage am Bildschirm (#210). */}
+      <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.keyboard}>
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -581,7 +582,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
 
         <Card style={styles.card}>
           <Heading>Matchchat</Heading>
-          {chat.length ? chat.map((item) => <ChatBubble key={item.id} message={item} own={item.user_id === user?.id} />) : <Muted>Noch keine Nachrichten.</Muted>}
+          {chat.length ? chat.map((item, index) => (
+            <ChatBubble key={item.id} message={item} own={item.user_id === user?.id} grouped={continuesMessageGroup(chat[index - 1], item)} />
+          )) : <Muted>Noch keine Nachrichten.</Muted>}
           {canUseChat ? (
             <View style={styles.chatComposer}>
               <View style={styles.mentionQuickRow}>
@@ -608,14 +611,16 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   );
 }
 
-function ChatBubble({ message, own }: { message: ChatMessage; own: boolean }) {
+function ChatBubble({ message, own, grouped }: { message: ChatMessage; own: boolean; grouped: boolean }) {
   const author = message.author || message.sender;
   return (
     <View style={[styles.chatBubble, own && styles.chatBubbleOwn]}>
-      <View style={styles.chatHead}>
-        <Body style={styles.chatAuthor}>{own ? "Du" : author?.display_name || author?.username || "Spieler"}</Body>
-        {message.created_at ? <Muted>{formatDate(message.created_at)}</Muted> : null}
-      </View>
+      {grouped ? null : (
+        <View style={styles.chatHead}>
+          <Body style={styles.chatAuthor}>{own ? "Du" : author?.display_name || author?.username || "Spieler"}</Body>
+          {message.created_at ? <Muted>{formatChatTime(message.created_at)}</Muted> : null}
+        </View>
+      )}
       {message.message ? <RichText text={message.message} compact /> : null}
       <MessageAttachments attachments={message.attachments} />
       <MessageSticker sticker={message.sticker} />

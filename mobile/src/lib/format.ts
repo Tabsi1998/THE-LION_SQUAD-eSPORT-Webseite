@@ -47,6 +47,74 @@ export function formatScheduleMode(value?: string | null) {
   return SCHEDULE_MODE_LABELS[key] || "";
 }
 
+/**
+ * Event-Typ als Begriff statt Rohwert. Ältere Einträge tragen Schreibweisen ohne
+ * Unterstrich ("clubevening"); die werden auf den bekannten Schlüssel gelegt.
+ * "general" ist der Standardtyp und sagt nichts - dafür kommt nichts zurück.
+ */
+export function formatEventType(value?: string | null) {
+  const key = normalizeEventType(value);
+  if (!key || key === "general") return "";
+  return EVENT_TYPE_LABELS[key] || humanizeStatus(key);
+}
+
+export function normalizeEventType(value?: string | null) {
+  const key = String(value || "").trim().toLowerCase();
+  if (!key) return "";
+  if (EVENT_TYPE_LABELS[key]) return key;
+  const squeezed = key.replace(/[^a-z0-9]/g, "");
+  return Object.keys(EVENT_TYPE_LABELS).find((known) => known.replace(/_/g, "") === squeezed) || key;
+}
+
+export function formatNewsCategory(value?: string | null) {
+  const key = String(value || "").trim().toLowerCase();
+  if (!key) return "";
+  return NEWS_CATEGORY_LABELS[key] || humanizeStatus(key);
+}
+
+/** Ort und Stadt, ohne Wiederholung, wenn beide gleich sind ("Telfs · Telfs"). */
+export function placeParts(...values: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const value of values) {
+    const text = String(value || "").trim();
+    const key = text.toLowerCase();
+    if (!text || seen.has(key)) continue;
+    seen.add(key);
+    parts.push(text);
+  }
+  return parts;
+}
+
+/** Zeit einer Chat-Nachricht: heute nur die Uhrzeit, gestern "Gestern", sonst Datum und Uhrzeit. */
+export function formatChatTime(value?: string | null, now: Date = new Date()) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const time = date.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" });
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const stamp = date.getTime();
+  if (stamp >= dayStart && stamp < dayStart + DAY_MS) return time;
+  if (stamp >= dayStart - DAY_MS && stamp < dayStart) return `Gestern, ${time}`;
+  return `${formatDate(value)}, ${time}`;
+}
+
+type GroupableMessage = { user_id?: string | null; sender_id?: string | null; created_at?: string | null };
+
+/** Folgt eine Nachricht kurz auf eine vom selben Absender, braucht sie keinen eigenen Kopf. */
+export function continuesMessageGroup(previous: GroupableMessage | null | undefined, message: GroupableMessage, maxGapMs = 5 * 60 * 1000) {
+  if (!previous) return false;
+  const previousAuthor = previous.user_id || previous.sender_id;
+  const author = message.user_id || message.sender_id;
+  if (!previousAuthor || previousAuthor !== author) return false;
+  const before = Date.parse(previous.created_at || "");
+  const after = Date.parse(message.created_at || "");
+  if (Number.isNaN(before) || Number.isNaN(after)) return false;
+  return after >= before && after - before <= maxGapMs;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const STATUS_LABELS: Record<string, string> = {
   accepted: "Angenommen",
   active: "Aktiv",
@@ -141,6 +209,37 @@ const SCHEDULE_MODE_LABELS: Record<string, string> = {
   fixed_by_staff: "Termin: festgelegt",
   hybrid: "Termin: Hybrid",
   player_proposal: "Termin: Vorschläge",
+};
+
+// Wie /api/events/meta im Backend - dieselben Begriffe wie auf der Webseite.
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  general: "Allgemein",
+  public_event: "Public Event",
+  club_evening: "Vereinsabend",
+  lan_party: "LAN-Party",
+  online_event: "Online Event",
+  expo: "Messe / Expo",
+  community_evening: "Community-Abend",
+  grill_evening: "Grillabend",
+  mario_kart_event: "Mario Kart Event",
+  f1_event: "F1 Event",
+  internal: "Interner Termin",
+  sponsor_action: "Sponsorenaktion",
+  tournament_finals: "Turnier-Finals",
+};
+
+// Wie /api/news/meta im Backend.
+const NEWS_CATEGORY_LABELS: Record<string, string> = {
+  club: "Verein",
+  tournaments: "Turniere",
+  events: "Events",
+  community: "Community",
+  sponsors: "Sponsoren",
+  members: "Mitglieder",
+  teams: "Teams",
+  announcement: "Ankündigung",
+  recap: "Rückblick",
+  maintenance: "Wartung",
 };
 
 function humanizeStatus(value: string) {

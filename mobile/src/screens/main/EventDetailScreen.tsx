@@ -15,7 +15,7 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import type { ContentTarget } from "../../lib/contentLinks";
-import { formatDateTime, formatStatus } from "../../lib/format";
+import { formatDateTime, formatStatus, placeParts } from "../../lib/format";
 import { getRegistrationState } from "../../lib/registration";
 import { isGuestUser } from "../../live";
 import type { TournamentStackParamList } from "../../navigation/types";
@@ -189,7 +189,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
           <Title>{event.title || event.name || "Event"}</Title>
           <View style={styles.metaRow}>
             <Pill label={event.event_type || event.type || "Event"} />
-            {[event.location, event.city].filter(Boolean).join(", ") ? <Pill label={[event.location, event.city].filter(Boolean).join(", ")} tone="gold" /> : null}
+            {placeParts(event.location, event.city).length ? <Pill label={placeParts(event.location, event.city).join(", ")} tone="gold" /> : null}
             {event.has_registration ? <Pill label={registered ? "Angemeldet" : "Anmeldung"} /> : null}
           </View>
         </View>

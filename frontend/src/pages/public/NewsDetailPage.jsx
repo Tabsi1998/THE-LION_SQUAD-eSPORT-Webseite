@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
+import { newsCategoryLabel } from "@/lib/newsCategories";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -57,7 +58,7 @@ export default function NewsDetailPage() {
           <ArrowLeft className="w-3.5 h-3.5" /> Alle News
         </Link>
         <div className="mt-6 flex items-center gap-3 text-[11px] uppercase tracking-widest font-bold">
-          <span className="text-[#29B6E8]">{post.category}</span>
+          <span className="text-[#29B6E8]">{newsCategoryLabel(post.category)}</span>
           {post.pinned && <span className="inline-flex items-center gap-1 text-[#FFD700]"><Pin className="w-3 h-3" /> Angepinnt</span>}
           <span className="text-white/40 ml-auto">{new Date(post.published_at || post.created_at).toLocaleDateString("de-DE", { dateStyle: "long" })}</span>
         </div>

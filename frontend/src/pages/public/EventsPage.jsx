@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
+import { eventTypeLabel } from "@/lib/eventTypes";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
@@ -116,7 +117,7 @@ export default function EventsPage() {
 
 function EventCard({ e, meta }) {
   const VIcon = VIS_ICON[e.visibility];
-  const typeLabel = meta.types.find((t) => t.k === e.event_type)?.l || e.event_type;
+  const typeLabel = eventTypeLabel(e.event_type, meta.types);
   const descriptionPreview = plainTextPreview(e.description);
   return (
     <Link

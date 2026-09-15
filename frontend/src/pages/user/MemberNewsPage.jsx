@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { newsCategoryLabel } from "@/lib/newsCategories";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Pin, ArrowLeft, Newspaper, Crown } from "lucide-react";
@@ -49,7 +50,7 @@ export default function MemberNewsPage() {
                 className="block border border-[#FFD700]/15 hover:border-[#FFD700]/40 rounded-sm bg-[#121212] p-5 transition group"
               >
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold">
-                  <span className="text-[#FFD700]">{n.category}</span>
+                  <span className="text-[#FFD700]">{newsCategoryLabel(n.category)}</span>
                   {n.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
                   <span className="text-white/30 ml-auto">{new Date(n.created_at).toLocaleDateString("de-DE")}</span>
                 </div>

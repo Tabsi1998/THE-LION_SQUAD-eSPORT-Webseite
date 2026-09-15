@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
+import { newsCategoryLabel } from "@/lib/newsCategories";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
@@ -181,7 +182,7 @@ function NewsCard({ n, featured = false }) {
         </div>
       <div className="p-5 flex-1 flex flex-col">
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold">
-          <span style={{ color: c }}>{n.category}</span>
+          <span style={{ color: c }}>{newsCategoryLabel(n.category)}</span>
           {n.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
           {VIcon && <VIcon className="w-3 h-3 text-[#FFD700]" />}
           <span className="text-white/30 ml-auto">{new Date(n.published_at || n.created_at).toLocaleDateString("de-DE")}</span>

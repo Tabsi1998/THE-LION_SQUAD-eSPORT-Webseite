@@ -10,10 +10,10 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { KeyboardStickyView } from "react-native-keyboard-controller";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, errorMessage } from "../lib/api";
-import { formatDate } from "../lib/format";
+import { continuesMessageGroup, formatChatTime } from "../lib/format";
 import type { ContentTarget } from "../lib/contentLinks";
 import { colors } from "../theme";
 import type { ChatMessage } from "../types";
@@ -63,7 +63,6 @@ export function ChatThreadView({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [allowed, setAllowed] = useState(true);
-  const [composerHeight, setComposerHeight] = useState(88);
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const nearBottomRef = useRef(true);
@@ -185,35 +184,43 @@ export function ChatThreadView({
 
   if (loading) return <SkeletonList count={5} hasImage={false} />;
 
+  // Liste und Eingabezeile stehen untereinander in einem Block. Öffnet sich die
+  // Tastatur, bekommt der Block unten genau so viel Abstand, wie die Tastatur
+  // ihn wirklich überdeckt - automaticOffset misst dafür die Lage am Bildschirm,
+  // Tab-Leiste und Safe-Area spielen keine Rolle. Vorher schob eine
+  // KeyboardStickyView nur die Eingabezeile um die volle Tastaturhöhe nach oben;
+  // in der Tab-Ansicht endet der Bildschirm aber über der Tab-Leiste, die Zeile
+  // schwebte darüber, und die Liste lief unter ihr weiter (#210).
   return (
-    <View style={styles.wrap}>
+    <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.wrap}>
       <ScrollView
         ref={scrollRef}
         style={styles.scroller}
-        contentContainerStyle={[styles.messages, { paddingBottom: composerHeight + 18 }]}
+        contentContainerStyle={styles.messages}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
         onContentSizeChange={() => {
           if (!didInitialScroll.current || nearBottomRef.current) scrollToLatest(false);
         }}
+        onLayout={() => {
+          // Die Liste wird kleiner, wenn die Tastatur kommt: unten bleiben.
+          if (nearBottomRef.current) scrollToLatest(false);
+        }}
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
-        {messages.length ? messages.map((message) => (
+        {messages.length ? messages.map((message, index) => (
           <MessageBubble
             key={message.id}
             message={message}
+            grouped={continuesMessageGroup(messages[index - 1], message)}
             onOpenProfile={onOpenProfile}
             own={message.user_id === currentUserId || message.sender_id === currentUserId}
           />
         )) : <EmptyState title={emptyTitle} detail={allowed ? "Schreibe die erste Nachricht." : lockedDetail || error} />}
       </ScrollView>
-      <KeyboardStickyView
-        offset={{ closed: 0, opened: 0 }}
-        onLayout={(event) => setComposerHeight(Math.ceil(event.nativeEvent.layout.height))}
-        style={styles.composerDock}
-      >
+      <View style={styles.composerDock}>
         {mentionCandidates.length ? (
           <View style={styles.suggestions}>
             {mentionCandidates.map((candidate) => (
@@ -253,31 +260,39 @@ export function ChatThreadView({
             <Body style={styles.sendText}>Senden</Body>
           </Pressable>
         </View>
-      </KeyboardStickyView>
+      </View>
       <StickerPicker visible={stickersOpen} onClose={() => setStickersOpen(false)} onPick={(sticker) => { void sendSticker(sticker); }} />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
-function MessageBubble({ message, own, onOpenProfile }: { message: ChatMessage; own: boolean; onOpenProfile?: (username: string) => void }) {
+function MessageBubble({ message, own, grouped, onOpenProfile }: {
+  message: ChatMessage;
+  own: boolean;
+  /** Folgt kurz auf eine Nachricht desselben Absenders: kein eigener Kopf. */
+  grouped: boolean;
+  onOpenProfile?: (username: string) => void;
+}) {
   const author = message.author || message.sender;
   const name = own ? "Du" : author?.display_name || author?.username || "Spieler";
   const openContent = useCallback((target: ContentTarget) => {
     if (target.type === "profile" && onOpenProfile) onOpenProfile(target.id);
   }, [onOpenProfile]);
   return (
-    <View style={[styles.bubble, own && styles.bubbleOwn]}>
-      <View style={styles.bubbleHead}>
-        <Body
-          onPress={() => {
-            if (author?.username && onOpenProfile) onOpenProfile(author.username);
-          }}
-          style={[styles.author, own && styles.ownText]}
-        >
-          {name}
-        </Body>
-        {message.created_at ? <Muted style={own && styles.ownMuted}>{formatDate(message.created_at)}</Muted> : null}
-      </View>
+    <View style={[styles.bubble, own && styles.bubbleOwn, grouped && styles.bubbleGrouped]}>
+      {grouped ? null : (
+        <View style={styles.bubbleHead}>
+          <Body
+            onPress={() => {
+              if (author?.username && onOpenProfile) onOpenProfile(author.username);
+            }}
+            style={[styles.author, own && styles.ownText]}
+          >
+            {name}
+          </Body>
+          {message.created_at ? <Muted style={own && styles.ownMuted}>{formatChatTime(message.created_at)}</Muted> : null}
+        </View>
+      )}
       {message.message ? (
         <View style={own && styles.ownRichText}>
           <RichText text={message.message} compact onOpenContent={openContent} />
@@ -322,6 +337,9 @@ const styles = StyleSheet.create({
     alignSelf: "flex-end",
     backgroundColor: "rgba(41, 182, 232, 0.18)",
     borderColor: "rgba(41, 182, 232, 0.4)",
+  },
+  bubbleGrouped: {
+    marginTop: -6,
   },
   bubbleHead: {
     flexDirection: "row",

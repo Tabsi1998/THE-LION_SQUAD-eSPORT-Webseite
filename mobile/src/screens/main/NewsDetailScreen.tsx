@@ -11,7 +11,7 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import type { ContentTarget } from "../../lib/contentLinks";
-import { formatDate } from "../../lib/format";
+import { formatDate, placeParts } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { NewsPost } from "../../types";
@@ -151,7 +151,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
                 date={event.start_date || event.date}
                 phase={event.public_phase}
                 status={event.status}
-                description={[event.location, event.city].filter(Boolean).join(", ")}
+                description={placeParts(event.location, event.city).join(", ")}
                 onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id } })}
               />
             ))}

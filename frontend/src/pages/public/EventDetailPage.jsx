@@ -17,17 +17,16 @@ import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
+import { eventTypeLabel, normalizeEventType } from "@/lib/eventTypes";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag, UserPlus, CheckCircle, XCircle, Radio } from "lucide-react";
 
-const TYPE_LABELS = {
-  club_evening: "Vereinsabend", lan_party: "LAN-Party", public_event: "Public Event",
-  community_evening: "Community-Abend", grill_evening: "Grillabend",
-  mario_kart_event: "Mario Kart Event", f1_event: "F1 Event", expo: "Messe / Expo",
-  online_event: "Online Event", internal: "Interner Termin",
-  sponsor_action: "Sponsorenaktion", tournament_finals: "Turnier-Finals", general: "Event",
-};
+// Der Standardtyp "general" sagt nichts; im Kopf steht dann schlicht "Event".
+function eventKindLabel(value) {
+  const key = normalizeEventType(value);
+  return key && key !== "general" ? eventTypeLabel(key) : "Event";
+}
 
 function fullAddress(e) {
   const cityLine = [e.postal_code, e.city].filter(Boolean).join(" ");
@@ -111,7 +110,7 @@ export default function EventDetailPage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 min-w-0">
           <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Events", to: "/events" }, { label: e.name }]} className="mb-4" />
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#9F7AEA]">{TYPE_LABELS[e.event_type] || "EVENT"}</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#9F7AEA]">{eventKindLabel(e.event_type)}</span>
             <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status || "draft"} size="md" />
             {e.visibility === "members" && <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]"><Crown className="w-3 h-3" /> Mitglieder</span>}
             {e.visibility === "internal" && <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-white/60"><Lock className="w-3 h-3" /> Intern</span>}

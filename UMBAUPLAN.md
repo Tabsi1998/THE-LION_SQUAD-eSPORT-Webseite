@@ -1,6 +1,6 @@
 # Umbauplan: Turniere, Übersichtlichkeit und die offenen Wünsche
 
-Stand: 15. September 2026 (App-Releases lokal, Version 0.2.0-beta, #205).
+Stand: 15. September 2026 (Block 14.3: App-Feinschliff I, Version 0.2.1-beta).
 
 Dieser Plan führt das in [RESTPLAN.md](RESTPLAN.md) als **R5** angekündigte Turnierpaket
 aus und nimmt die später dazugekommenen Themen auf (Spielwochen, PDF, Live-Aktualisierung,
@@ -239,8 +239,16 @@ Beim Umbau aufgefallen und **bewusst nicht entfernt**, weil ein Umzug nichts lö
 | 14.2 A | Chat: Bilder und Videos, geschützt abgelegt, Backend und Web | umgesetzt (#206) |
 | 14.2 B | Chat in der App: Bilder und Videos senden und ansehen | umgesetzt (#207) |
 | 14.2 C | Sticker: Startpaket und eigene Pakete aus dem Adminbereich, in Web und App | umgesetzt (#208) |
-| 14.3 | Animationen und Achievements | offen |
-| 14.4 | Store-Reife: Play Internal Testing, Absturzberichte, Bildgrößen in der App | offen |
+| 14.3 | App-Feinschliff I: Tastatur-Fehler im Chat, Rohbegriffe, Uhrzeiten (#210, #211) → `0.2.1-beta` | umgesetzt (#220) |
+| 14.4 | App-Feinschliff II: Startseite, Profil, „Mehr“, Teams (#212–#215) → `0.3.0-beta` | offen |
+| 14.5 | Erfolge mit Symbolen, Fortschritt, Freischalt-Moment; sanfte Übergänge (#218) | offen |
+| 14.6 | Kalender in App und Web, „In meinen Kalender“ (#216) | offen |
+| 14.7 | Fingerabdruck-Sperre und Passkey-Login in der App (#217) | offen |
+| 14.8 | Store-Reife: Play Internal Testing, Absturzberichte, Bildgrößen (#219) | offen |
+
+Die Nummern sind die Reihenfolge: zuerst der Fehler und die Texte als kleine Version, dann der
+Umbau der vier Hauptseiten, danach die neuen Funktionen, zuletzt der Store. Grundlage sind die
+Screenshots und das Feedback vom 15. September (siehe „Neu aufgenommen am 15. September“).
 
 ### Was 14.1 gefunden hat
 
@@ -335,6 +343,20 @@ nach jeder Serverantwort wurde sofort wieder geladen. Direktnachrichten waren ni
 Gesehen im Test, als der Mock wie ein echter Server neue Antworten lieferte; auf dem Gerät
 nicht gemessen, im Code aber eindeutig. Behoben, und ein Test prüft jetzt, dass beim Öffnen
 genau einmal geladen wird.
+
+### Was 14.3 gefunden hat
+
+**Warum die Chat-Eingabe schwebte.** Die Eingabezeile hing in einer `KeyboardStickyView`, die
+sie um die volle Tastaturhöhe nach oben schiebt. In der Tab-Ansicht endet der Bildschirm aber
+über der Tab-Leiste, und die Nachrichtenliste dahinter bekam nur den Abstand der Eingabezeile.
+Jetzt stehen Liste und Eingabezeile in einem Block, der bei offener Tastatur genau um die
+überdeckte Höhe eingerückt wird; die Bibliothek misst dafür die Lage am Bildschirm. Der
+Match-Chat nutzte noch die Tastatur-Ansicht von React Native, die auf Android nichts tat, und
+bekommt dieselbe Lösung. Ob es am Gerät passt, zeigt erst Build 58.
+
+**Rohwerte auch im Web.** Ältere Events tragen den Typ `clubevening` statt `club_evening`.
+Die Webseite zeigte dafür ebenso den Rohwert wie die App; beide legen solche Schreibweisen
+jetzt auf den bekannten Begriff. News-Kategorien standen im Web auf fünf Seiten roh.
 
 ## Block 15 — Abschluss
 
@@ -551,6 +573,34 @@ Als GitHub-Issues festgehalten, damit der laufende Block nicht unterbrochen wird
   neu bei 0.x anfangen, der Build-Zähler läuft weiter (57). Umgesetzt mit `npm run release:local`.
   Der alte Signaturschlüssel lag nur als GitHub-Secret vor; seit Build 57 gibt es einen neuen
 
+## Neu aufgenommen am 15. September
+
+Feedback zur App nach Build 57, mit Screenshots. Als Issues festgehalten, Reihenfolge wie in
+Block 14:
+
+- [#210](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/210) **Fehler:** Die
+  Chat-Eingabe schwebt bei offener Tastatur mitten im Bildschirm, Nachrichten sind darunter
+  sichtbar. Vermutlich schieben `resize`-Modus und `KeyboardStickyView` doppelt.
+- [#211](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/211) Rohbegriffe
+  („clubevening“, „events“), „Telfs · Telfs“, Chat ohne Uhrzeit, wiederholte Absenderköpfe.
+- [#212](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/212) Startseite:
+  „Heute und Live“ zeigt jede offene Anmeldung, Termine doppelt, Vergangenes und Abgesagtes unter
+  „nächste Termine“, Schnellzugriff doppelt die Tab-Leiste.
+- [#213](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/213) Profil: 14 Knöpfe
+  vor dem Inhalt, vier doppelt; Einstellungen hinter ein Zahnrad.
+- [#214](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/214) „Mehr“: Zeilen
+  statt Riesenkarten, Vereins-Links als Logos aus den Einstellungen. Der Discord-Link in der App
+  ist fest im Code und weicht von dem in den Einstellungen ab.
+- [#215](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/215) Teams-Ansicht
+  wirkt leer, „Squads“ unerklärt.
+- [#216](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/216) Kalender mit
+  Monatsansicht, „In meinen Kalender“, später abonnierbarer Feed.
+- [#217](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/217) Fingerabdruck-
+  Sperre und Passkey-Login in der App. Die Webseite hat Passkeys bereits.
+- [#218](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/218) Erfolge: Symbole
+  statt Punkte, Fortschritt sichtbar, Freischalt-Moment wie im Web.
+- [#219](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/219) Store-Reife.
+
 ## Noch offen und bewusst getrennt
 
 **Klassischen Leseweg entfernen.** Der Schreibweg ist mit Block 8 stillgelegt; gelesen
@@ -567,7 +617,9 @@ Software kann keine Zugänge, echten Vereinsdaten oder einen Serverzugriff erfin
 | **Ausgangs-Trockenlauf** | `bash scripts/tournament-dryrun.sh vorher.json` einmal laufen lassen, damit es eine Vergleichsbasis gibt. Ohne Ausgabedatei kann später nicht verglichen werden. |
 | **Praxistest mit mehreren Nutzern** | Turnierabläufe mit echten Anmeldungen lassen sich als einzelner Nutzer im Livesystem nicht prüfen. |
 | **Abnahme nach Ausrollen** | Siehe [STAGING_ABNAHME.md](STAGING_ABNAHME.md). |
-| **Chat mit Bildern und Stickern am Handy testen** | Mit der nächsten APK: in einer Direktnachricht ein Foto, ein kurzes Video und einen Sticker senden, auf dem zweiten Konto öffnen. Erst dann sind 14.2 B und C wirklich auf dem Gerät bestätigt. |
+| **Chat mit Bildern am Handy testen** | Build 57 ist installiert, Sticker sind am Gerät bestätigt. Offen: ein Foto und ein kurzes Video senden und auf dem zweiten Konto öffnen; prüfen, ob eine Push-Benachrichtigung ankommt. |
+| **Discord-Link klären** | App: `discord.gg/thelionsquad`, Einstellungen: `discord.com/invite/thelionsquadesports`. Welcher gilt? Danach nur noch in den Einstellungen pflegen (#214). |
+| **Play-Console-Konto** | Für 14.8. Einmalige Gebühr, Konto des Vereins. Erst nötig, wenn die Feinschliff-Blöcke fertig sind. |
 | **Neuen App-Schlüssel sichern** | Seit Build 57 ist die App mit einem neuen Schlüssel signiert; er liegt in `%USERPROFILE%\.lionsapp-release`. Den ganzen Ordner auf einen USB-Stick oder in den Passwortmanager sichern. Geht er verloren, muss jede installierte App wieder neu installiert werden. |
 | **Alte App einmal löschen** | Build 57 lässt sich wegen des neuen Schlüssels nicht über Build 56 installieren: alte LionsAPP löschen, neue installieren, neu anmelden. Das gilt für alle, die die App schon haben. |
 | **Eigene Sticker anlegen** | Nach dem Ausrollen unter *Admin → Content → Sticker* ein Paket „Lion Squad“ anlegen und Löwe oder Maskottchen als PNG mit durchsichtigem Hintergrund hochladen. Ein leeres Paket erscheint im Chat nicht. |

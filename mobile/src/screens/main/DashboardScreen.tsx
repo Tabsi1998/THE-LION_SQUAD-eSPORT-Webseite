@@ -11,7 +11,7 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { compareByNearestDate } from "../../lib/contentSort";
-import { displayName, formatDate, formatStatus } from "../../lib/format";
+import { displayName, formatDate, formatEventType, formatNewsCategory, formatStatus, placeParts } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { MainTabParamList } from "../../navigation/types";
@@ -370,7 +370,7 @@ function eventToTimeline(event: ClubEvent): TimelineItem {
     date: event.start_date || event.date,
     status: event.status,
     phaseLabel: event.public_phase?.label,
-    detail: [event.location, event.city].filter(Boolean).join(" · ") || event.event_type || event.type,
+    detail: placeParts(event.location, event.city).join(" · ") || formatEventType(event.event_type || event.type),
     bannerUrl: event.banner_url,
     targetId: event.slug || event.id,
     registrationStatus: event.own_registration?.status,
@@ -465,7 +465,7 @@ function MatchOverviewCard({ match, onPress, staff = false }: { match: Match; on
 }
 
 function NewsCard({ post, onPress }: { post: NewsPost; onPress: () => void }) {
-  const detail = [post.category, post.excerpt || post.summary].filter(Boolean).join(" · ");
+  const detail = [formatNewsCategory(post.category), post.excerpt || post.summary].filter(Boolean).join(" · ");
 
   return (
     <ContentCard
