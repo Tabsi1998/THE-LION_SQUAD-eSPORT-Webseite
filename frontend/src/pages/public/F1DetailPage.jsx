@@ -10,6 +10,7 @@ import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { Award, Tv, Trophy, Flag, Calendar, Trash2, FileDown } from "lucide-react";
 import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
@@ -80,11 +81,9 @@ export default function F1DetailPage() {
 
   useEffect(() => {
     loadBoard();
-    const iv = setInterval(loadBoard, 10000);
-    return () => clearInterval(iv);
   }, [loadBoard]);
 
-  useApiInvalidation(loadBoard, ["f1"]);
+  useLiveRefresh(loadBoard, ["f1"], { fallbackMs: 10000 });
 
   if (!challenge) return <PublicLayout><PublicLoadingState label="Lade Fast Lap" /></PublicLayout>;
 

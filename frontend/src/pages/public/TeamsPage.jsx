@@ -13,6 +13,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
@@ -395,11 +396,7 @@ function TeamChat({ team, user }) {
   }, [team.id]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    const timer = setInterval(load, 8000);
-    return () => clearInterval(timer);
-  }, [load]);
-  useApiInvalidation(load, ["teams"]);
+  useLiveRefresh(load, ["teams"], { fallbackMs: 8000 });
 
   useEffect(() => {
     const box = scrollRef.current;

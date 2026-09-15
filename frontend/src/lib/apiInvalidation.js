@@ -102,6 +102,34 @@ export function subscribeApiInvalidation(listener) {
   return () => listeners.delete(listener);
 }
 
+// Steht die Verbindung zum Änderungsstrom? Solange ja, braucht keine Ansicht
+// im Takt nachzufragen; fällt sie weg, darf sie es (#221). Die Brücke setzt
+// den Zustand, useLiveRefresh liest ihn.
+let streamConnected = false;
+const streamListeners = new Set();
+
+export function setStreamConnected(next) {
+  const value = Boolean(next);
+  if (value === streamConnected) return;
+  streamConnected = value;
+  streamListeners.forEach((listener) => {
+    try {
+      listener(value);
+    } catch {
+      // Ein kaputter Abonnent blockiert die anderen nicht.
+    }
+  });
+}
+
+export function isStreamConnected() {
+  return streamConnected;
+}
+
+export function subscribeStreamState(listener) {
+  streamListeners.add(listener);
+  return () => streamListeners.delete(listener);
+}
+
 export function invalidationMatches(event, resources = []) {
   if (event?.reset || event?.event_type === "stream.reset") return true;
   if (!resources.length) return true;

@@ -5,7 +5,7 @@ import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
 import { MascotBadge } from "@/components/tls/Logo";
 import { SponsorGrid } from "@/components/tls/SponsorTicker";
 import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { formatDateTime } from "@/lib/datetime";
 import { sortByNearestDate } from "@/lib/contentSort";
 import { CalendarDays, Flag, MapPin, Monitor, Trophy, Users } from "lucide-react";
@@ -57,10 +57,9 @@ export default function EventTVPage() {
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 15000);
-    return () => clearInterval(interval);
   }, [load]);
-  useApiInvalidation(load, ["events", "tournaments", "matches", "matches-v2", "stations", "f1"]);
+  // Die TV-Anzeige läuft stundenlang: ohne Strom alle 15 s nachfragen.
+  useLiveRefresh(load, ["events", "tournaments", "matches", "matches-v2", "stations", "f1"], { fallbackMs: 15000 });
 
   const activity = useMemo(() => {
     if (!event) return [];

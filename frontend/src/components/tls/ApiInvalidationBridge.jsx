@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { API } from "@/lib/api";
-import { emitApiInvalidation } from "@/lib/apiInvalidation";
+import { emitApiInvalidation, setStreamConnected } from "@/lib/apiInvalidation";
 
 export function ApiInvalidationBridge() {
   useEffect(() => {
@@ -16,8 +16,15 @@ export function ApiInvalidationBridge() {
     };
     source.addEventListener("change", (message) => forward(message));
     source.addEventListener("reset", (message) => forward(message, true));
+    // Der Browser verbindet nach einem Abbruch von selbst neu. Dazwischen
+    // gilt der Strom als getrennt, und die Ansichten fragen im Takt nach.
+    source.addEventListener("open", () => setStreamConnected(true));
+    source.addEventListener("error", () => setStreamConnected(false));
 
-    return () => source.close();
+    return () => {
+      source.close();
+      setStreamConnected(false);
+    };
   }, []);
 
   return null;

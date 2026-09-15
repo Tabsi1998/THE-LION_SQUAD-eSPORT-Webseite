@@ -8,7 +8,7 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
 import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X, Flag, MessageSquare, Send } from "lucide-react";
@@ -76,11 +76,9 @@ export default function TournamentDetailPage() {
 
   useEffect(() => {
     load();
-    const iv = setInterval(load, 10000);
-    return () => clearInterval(iv);
   }, [load]);
 
-  useApiInvalidation(load, ["tournaments"]);
+  useLiveRefresh(load, ["tournaments"], { fallbackMs: 10000 });
 
   const runAction = async (task, fallback) => {
     setActionError("");
@@ -381,12 +379,7 @@ function TournamentChat({ tournament, user }) {
   }, [tournament.id, user]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    if (!user) return undefined;
-    const timer = setInterval(load, 6000);
-    return () => clearInterval(timer);
-  }, [load, user]);
-  useApiInvalidation(load, ["tournaments"]);
+  useLiveRefresh(load, ["tournaments"], { fallbackMs: 6000, enabled: Boolean(user) });
 
   useEffect(() => {
     const box = scrollRef.current;

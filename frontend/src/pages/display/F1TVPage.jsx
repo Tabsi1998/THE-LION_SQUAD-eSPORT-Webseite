@@ -8,6 +8,7 @@ import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 const medalColors = ["#FFD700", "#C0C0C0", "#CD7F32"];
 
@@ -42,23 +43,23 @@ export default function F1TVPage() {
 
   useApiInvalidation(loadChallenge, ["f1"]);
 
+  const activeTrack = challenge?.tracks?.length ? challenge.tracks[activeTrackIdx % challenge.tracks.length] : null;
+  const fetchLB = useCallback(async () => {
+    if (!activeTrack) return;
+    try {
+      const { data } = await api.get(`/f1/challenges/${id}/leaderboard?track_id=${activeTrack.id}`);
+      setBoard(data);
+      setBoardError(null);
+      setLastUpdated(Date.now());
+    } catch (error) {
+      setBoardError(error);
+    }
+  }, [activeTrack, id]);
   useEffect(() => {
-    if (!challenge?.tracks?.length) return;
-    const tr = challenge.tracks[activeTrackIdx % challenge.tracks.length];
-    const fetchLB = async () => {
-      try {
-        const { data } = await api.get(`/f1/challenges/${id}/leaderboard?track_id=${tr.id}`);
-        setBoard(data);
-        setBoardError(null);
-        setLastUpdated(Date.now());
-      } catch (error) {
-        setBoardError(error);
-      }
-    };
     fetchLB();
-    const iv = setInterval(fetchLB, 7000);
-    return () => clearInterval(iv);
-  }, [challenge, activeTrackIdx, id]);
+  }, [fetchLB]);
+  // Die TV-Anzeige läuft stundenlang: ohne Strom alle 7 s nachfragen.
+  useLiveRefresh(fetchLB, ["f1"], { fallbackMs: 7000 });
 
   // Cycle tracks every 45s if championship AND no manual override via ?track=
   useEffect(() => {

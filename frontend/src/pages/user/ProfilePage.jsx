@@ -6,6 +6,7 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MultiSelect } from "@/components/tls/MultiSelect";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { gameLabel } from "@/lib/gameLabels";
 import { buildDirtyPayload, hasPayloadChanges, sameValue } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
@@ -1253,11 +1254,8 @@ function MessagesPanel() {
     openThread({ id: targetId });
   }, [params, active?.id, openThread]);
 
-  useEffect(() => {
-    if (!active?.id) return undefined;
-    const timer = setInterval(() => openThread(active), 8000);
-    return () => clearInterval(timer);
-  }, [active, openThread]);
+  // Der offene Chat lädt bei jeder Nachrichtenänderung nach; ohne Strom alle 8 s.
+  useLiveRefresh(() => openThread(active), ["messages"], { fallbackMs: 8000, enabled: Boolean(active?.id) });
 
   useEffect(() => {
     const box = scrollRef.current;

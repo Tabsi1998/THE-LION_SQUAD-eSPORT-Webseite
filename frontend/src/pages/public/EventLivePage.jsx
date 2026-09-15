@@ -11,6 +11,7 @@ import { formatDateTime } from "@/lib/datetime";
 import { sortByNearestDate } from "@/lib/contentSort";
 import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { seoTextPreview } from "@/lib/textPreview";
 
 const ACTIVE_MATCH_STATUSES = new Set(["in_progress", "running", "waiting_result", "disputed"]);
@@ -130,9 +131,8 @@ export default function EventLivePage() {
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 20000);
-    return () => clearInterval(interval);
   }, [load]);
+  useLiveRefresh(load, ["events", "tournaments", "matches", "matches-v2", "stations", "f1"], { fallbackMs: 20000 });
 
   const stationMap = useMemo(() => new Map(stations.map((station) => [station.id, station])), [stations]);
   const liveMatches = useMemo(() => matches.filter((match) => ACTIVE_MATCH_STATUSES.has(match.status)).sort((a, b) => a.sortTime - b.sortTime), [matches]);

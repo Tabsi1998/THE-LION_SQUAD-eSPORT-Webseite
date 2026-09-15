@@ -4,7 +4,7 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { Trophy, Bell, Crown, Gift, Award, UserCheck, AlertTriangle, Medal, Users, Eye } from "lucide-react";
 
 const OPEN_MATCH_STATUSES = new Set(["ready", "scheduled", "in_progress", "waiting_result"]);
@@ -79,18 +79,14 @@ export default function DashboardPage() {
       if (typeof document === "undefined" || !document.hidden) load().catch(() => {});
     };
     refreshVisible();
-    const timer = window.setInterval(() => {
-      refreshVisible();
-    }, 10000);
     window.addEventListener("focus", refreshVisible);
     document.addEventListener("visibilitychange", refreshVisible);
     return () => {
-      window.clearInterval(timer);
       window.removeEventListener("focus", refreshVisible);
       document.removeEventListener("visibilitychange", refreshVisible);
     };
   }, [load]);
-  useApiInvalidation(load, ["matches", "prizes", "users", "penalties", "achievements", "membership", "tournaments", "f1", "admin/notifications"]);
+  useLiveRefresh(load, ["matches", "prizes", "users", "penalties", "achievements", "membership", "tournaments", "f1", "admin/notifications"], { fallbackMs: 10000 });
 
   return (
     <PublicLayout>

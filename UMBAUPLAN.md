@@ -39,8 +39,8 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 11 | PDF-Ausgabe | umgesetzt | #193, #194 |
 | 12 | Galerie und Medien: Tempo, Videos überall | umgesetzt | #196 |
 | 13 | Entflechtung: `tournament_routes.py` aufgeteilt | umgesetzt | #200 |
-| 14 | LionsAPP in den Store | in Arbeit: 14.1 bis 14.3 umgesetzt | #201, #206, #207, #208, #209, #220 |
-| 15 | Abschluss: Abfrage-Intervalle im Web weg, große Dateien nebenbei teilen | offen (#221, #223) | — |
+| 14 | LionsAPP in den Store | in Arbeit: 14.1 bis 14.4 umgesetzt, v0.3.0-beta (Build 59) | #201, #206, #207, #208, #209, #220, #237 |
+| 15 | Abschluss: Abfrage-Intervalle im Web weg, große Dateien nebenbei teilen | #221 umgesetzt (dieser PR), #223 offen | — |
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen (#228) | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise (#229) | #193, #195 |
 | 18 | **Auszeichnungen: Banner und Trophäen** | offen (#230) | — |
@@ -250,7 +250,7 @@ Beim Umbau aufgefallen und **bewusst nicht entfernt**, weil ein Umzug nichts lö
 | 14.2 B | Chat in der App: Bilder und Videos senden und ansehen | umgesetzt (#207) |
 | 14.2 C | Sticker: Startpaket und eigene Pakete aus dem Adminbereich, in Web und App | umgesetzt (#208) |
 | 14.3 | App-Feinschliff I: Tastatur-Fehler im Chat, Rohbegriffe, Uhrzeiten (#210, #211) → `0.2.1-beta` | umgesetzt (#220) |
-| 14.4 | App-Feinschliff II: Startseite, Profil, „Mehr“, Teams (#212–#215) → `0.3.0-beta` | umgesetzt (dieser PR) |
+| 14.4 | App-Feinschliff II: Startseite, Profil, „Mehr“, Teams (#212–#215) → `0.3.0-beta` | umgesetzt (#237, Build 59) |
 | 14.5 | Erfolge mit Symbolen, Fortschritt, Freischalt-Moment; sanfte Übergänge (#218) | offen |
 | 14.6 | Kalender in App und Web, „In meinen Kalender“ (#216) | offen |
 | 14.7 | Fingerabdruck-Sperre und Passkey-Login in der App (#217) | offen |
@@ -390,7 +390,52 @@ Teams sind die Vorlage für weitere Bildschirm-Tests.
 
 ## Block 15 — Abschluss
 
-Alle CI-Prüfungen grün, automatischer App-Build, README auf Stand.
+Alle CI-Prüfungen grün, automatischer App-Build, README auf Stand. Seit dem 15. September läuft
+die Arbeit nach Issues mit Meilensteinen (siehe „Meilensteine“ unten); Block 15 sind die Issues
+#221 (Abfrage-Intervalle) und #223 (große Admin-Dateien).
+
+### Was 15.1 gefunden hat (#221, dieser PR)
+
+**Der Strom und der Takt liefen nebeneinander.** 19 Ansichten im Web hatten ein eigenes
+`setInterval` (6 bis 60 Sekunden) *und* hingen am Änderungsstrom – jede Änderung wurde
+doppelt geladen, und ohne Änderung fragte jede offene Seite trotzdem alle paar Sekunden nach.
+Jetzt gibt es einen Hook `useLiveRefresh` wie in der App: laden bei passender Änderung, im Takt
+nur, solange die Verbindung zum Strom fehlt, und einmal nachladen, wenn sie wieder steht. Die
+Brücke zum Strom meldet dafür erstmals, ob sie verbunden ist. Reine Uhren, der Wechsel der
+TV-Ansichten und die Update-Prüfung des Service Workers bleiben bei `setInterval`; sie fragen
+keinen Server.
+
+**Twitch ist der Ausnahmefall.** Ob ein Kanal live ist, erfährt der Server nur durch eigenes
+Nachfragen; der Strom meldet nur Änderungen aus dem Adminbereich. Der Live-Stream-Slider fragt
+deshalb weiter einmal pro Minute – als `pollMs` im selben Hook, damit die Ausnahme sichtbar ist
+und im versteckten Tab ruht.
+
+**Die Admin-Einstellungen hatten zwei Wege zum selben Laden.** `useApiInvalidation` für
+`settings` plus ein Takt auf den Reitern Warteschlange und Twitch. Jetzt ein Hook, dessen
+Rückfall-Takt nur auf diesen Reitern aktiv ist. Die Datei hat weiter 2.100 Zeilen – #223 bleibt
+eigener Schritt.
+
+## Meilensteine
+
+Angelegt am 15. September, jedes offene Issue hängt an einem. App-Issues sammeln sich je
+Version und werden zusammen als Beta veröffentlicht.
+
+| Meilenstein | Inhalt |
+| --- | --- |
+| App 0.3.1-beta | Nur Fehler aus Build 59: #238 Bild schwarz, #246 Rohwerte II, #247 Umbrüche im Profil, #252 Referenzen leer |
+| App 0.4.0-beta | Seiten aufräumen II: #241 Events-Tab, #242 Mehr/Gaming, #243 eigene Seiten, #244 Sponsoren, #248 Startseite II |
+| App 0.5.0-beta | Tester-Komfort: #249 „Was ist neu“, #250 Update aus der App, #251 In-App-Banner |
+| App 0.6.0-beta | #218 Erfolge (14.5) |
+| App 0.7.0-beta | #216 Kalender (14.6), #236 Galerie |
+| App 0.8.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner |
+| App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
+| Web: Tempo und Betrieb | Block 15 und 22: #221, #223, #231, #232, #233 |
+| Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy, #257 Privatsphäre und Benachrichtigungen, #258 Grunddaten und Sicherheit |
+| Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat, #255 Benachrichtigungen anklickbar, #256 Dashboard, #259 Freunde (#222 ist darin aufgegangen) |
+| Web: Dynamik | Block 20: #224, #225, #226 |
+| Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
+| Auszeichnungen und Marke | Block 17 und 18: #229, #230 |
+| Später | Ideen ohne Termin: #260 Plattform-Konten verknüpfen |
 
 ## Block 16 — Turnier-Leitfaden im Adminbereich
 
