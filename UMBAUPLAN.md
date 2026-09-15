@@ -1,6 +1,6 @@
 # Umbauplan: Turniere, Übersichtlichkeit und die offenen Wünsche
 
-Stand: 15. September 2026 (App-Releases lokal, Version 0.2.0-beta, #205).
+Stand: 15. September 2026 (Block 14.3: App-Feinschliff I, Version 0.2.1-beta).
 
 Dieser Plan führt das in [RESTPLAN.md](RESTPLAN.md) als **R5** angekündigte Turnierpaket
 aus und nimmt die später dazugekommenen Themen auf (Spielwochen, PDF, Live-Aktualisierung,
@@ -239,7 +239,7 @@ Beim Umbau aufgefallen und **bewusst nicht entfernt**, weil ein Umzug nichts lö
 | 14.2 A | Chat: Bilder und Videos, geschützt abgelegt, Backend und Web | umgesetzt (#206) |
 | 14.2 B | Chat in der App: Bilder und Videos senden und ansehen | umgesetzt (#207) |
 | 14.2 C | Sticker: Startpaket und eigene Pakete aus dem Adminbereich, in Web und App | umgesetzt (#208) |
-| 14.3 | App-Feinschliff I: Tastatur-Fehler im Chat, Rohbegriffe, Uhrzeiten (#210, #211) → `0.2.1-beta` | offen |
+| 14.3 | App-Feinschliff I: Tastatur-Fehler im Chat, Rohbegriffe, Uhrzeiten (#210, #211) → `0.2.1-beta` | umgesetzt (dieser PR) |
 | 14.4 | App-Feinschliff II: Startseite, Profil, „Mehr“, Teams (#212–#215) → `0.3.0-beta` | offen |
 | 14.5 | Erfolge mit Symbolen, Fortschritt, Freischalt-Moment; sanfte Übergänge (#218) | offen |
 | 14.6 | Kalender in App und Web, „In meinen Kalender“ (#216) | offen |
@@ -343,6 +343,20 @@ nach jeder Serverantwort wurde sofort wieder geladen. Direktnachrichten waren ni
 Gesehen im Test, als der Mock wie ein echter Server neue Antworten lieferte; auf dem Gerät
 nicht gemessen, im Code aber eindeutig. Behoben, und ein Test prüft jetzt, dass beim Öffnen
 genau einmal geladen wird.
+
+### Was 14.3 gefunden hat
+
+**Warum die Chat-Eingabe schwebte.** Die Eingabezeile hing in einer `KeyboardStickyView`, die
+sie um die volle Tastaturhöhe nach oben schiebt. In der Tab-Ansicht endet der Bildschirm aber
+über der Tab-Leiste, und die Nachrichtenliste dahinter bekam nur den Abstand der Eingabezeile.
+Jetzt stehen Liste und Eingabezeile in einem Block, der bei offener Tastatur genau um die
+überdeckte Höhe eingerückt wird; die Bibliothek misst dafür die Lage am Bildschirm. Der
+Match-Chat nutzte noch die Tastatur-Ansicht von React Native, die auf Android nichts tat, und
+bekommt dieselbe Lösung. Ob es am Gerät passt, zeigt erst Build 58.
+
+**Rohwerte auch im Web.** Ältere Events tragen den Typ `clubevening` statt `club_evening`.
+Die Webseite zeigte dafür ebenso den Rohwert wie die App; beide legen solche Schreibweisen
+jetzt auf den bekannten Begriff. News-Kategorien standen im Web auf fünf Seiten roh.
 
 ## Block 15 — Abschluss
 
