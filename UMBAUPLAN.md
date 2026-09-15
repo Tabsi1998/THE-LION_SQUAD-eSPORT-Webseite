@@ -239,7 +239,7 @@ Beim Umbau aufgefallen und **bewusst nicht entfernt**, weil ein Umzug nichts lö
 | 14.2 A | Chat: Bilder und Videos, geschützt abgelegt, Backend und Web | umgesetzt (#206) |
 | 14.2 B | Chat in der App: Bilder und Videos senden und ansehen | umgesetzt (#207) |
 | 14.2 C | Sticker: Startpaket und eigene Pakete aus dem Adminbereich, in Web und App | umgesetzt (#208) |
-| 14.3 | App-Feinschliff I: Tastatur-Fehler im Chat, Rohbegriffe, Uhrzeiten (#210, #211) → `0.2.1-beta` | umgesetzt (dieser PR) |
+| 14.3 | App-Feinschliff I: Tastatur-Fehler im Chat, Rohbegriffe, Uhrzeiten (#210, #211) → `0.2.1-beta` | umgesetzt (#220) |
 | 14.4 | App-Feinschliff II: Startseite, Profil, „Mehr“, Teams (#212–#215) → `0.3.0-beta` | offen |
 | 14.5 | Erfolge mit Symbolen, Fortschritt, Freischalt-Moment; sanfte Übergänge (#218) | offen |
 | 14.6 | Kalender in App und Web, „In meinen Kalender“ (#216) | offen |
