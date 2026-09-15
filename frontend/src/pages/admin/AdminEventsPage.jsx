@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
+import { eventTypeLabel } from "@/lib/eventTypes";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
@@ -173,7 +174,7 @@ export default function AdminEventsPage() {
       filteredList.map((event) => [
         event.name,
         event.slug,
-        meta.types.find((type) => type.k === event.event_type)?.l || event.event_type,
+        eventTypeLabel(event.event_type, meta.types),
         meta.statuses.find((status) => status.k === event.status)?.l || event.status,
         event.visibility,
         formatAdminDate(event.start_date),
@@ -260,7 +261,7 @@ export default function AdminEventsPage() {
                 {filteredList.map((e) => (
                   <tr key={e.id}>
                     <td className="px-4 py-3"><div className="font-bold">{e.name}</div><div className="text-[11px] text-white/50">/{e.slug}</div></td>
-                    <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#9F7AEA] font-bold">{meta.types.find((t) => t.k === e.event_type)?.l || e.event_type}</td>
+                    <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#9F7AEA] font-bold">{eventTypeLabel(e.event_type, meta.types)}</td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-white/70 font-bold">{meta.statuses.find((s) => s.k === e.status)?.l || e.status}</td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-white/60">{e.visibility}</td>
                     <td className="px-4 py-3 text-xs text-white/70">{e.start_date ? new Date(e.start_date).toLocaleDateString("de-DE") : "—"}</td>

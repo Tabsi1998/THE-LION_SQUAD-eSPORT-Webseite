@@ -11,6 +11,7 @@ import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../lib/api";
+import { placeParts } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 
@@ -170,7 +171,7 @@ function Events({ items, onOpen }: { items: any[]; onOpen: (event: any) => void 
           key={event.id}
           date={event.date || event.start_date}
           description={event.description}
-          detail={[event.location, event.city, event.country].filter(Boolean).join(", ") || "Ort offen"}
+          detail={placeParts(event.location, event.city, event.country).join(", ") || "Ort offen"}
           image={event.banner_url}
           kind="event"
           onPress={() => onOpen(event)}

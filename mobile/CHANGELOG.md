@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1-beta - 2026-09-15
+
+- Mobile: Die Chat-Eingabe bleibt bei geöffneter Tastatur an der Tastaturkante, Nachrichten laufen nicht mehr darunter weiter. Gilt für Direktnachrichten, Team-, Turnier- und Match-Chat (#210).
+- Mobile: Event-Typen und News-Kategorien erscheinen als Begriff statt als Rohwert („clubevening“, „events“); Ort und Stadt stehen nur noch einmal (#211).
+- Mobile: Chat-Nachrichten zeigen die Uhrzeit, gestern und ältere Tage mit Datum. Kurz aufeinanderfolgende Nachrichten desselben Absenders teilen sich den Kopf (#211).
+- Web: News-Kategorien und Event-Typen stehen auf allen Seiten als Begriff, auch bei älteren Schreibweisen wie „clubevening“ (#211).
+
 ## 0.2.0-beta - 2026-09-15
 
 - **Wichtig: einmal neu installieren.** Diese Version ist mit einem neuen Schlüssel signiert. Eine installierte LionsAPP bis Build 56 lässt sich nicht darüber aktualisieren: erst die alte App löschen, dann diese installieren und neu anmelden.

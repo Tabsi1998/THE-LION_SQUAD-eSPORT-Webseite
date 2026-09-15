@@ -8,7 +8,7 @@ import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage, responseFromCache } from "../../lib/api";
-import { formatDate } from "../../lib/format";
+import { formatDate, formatNewsCategory } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { NewsPost } from "../../types";
@@ -135,7 +135,7 @@ export function NewsScreen({ navigation }: Props) {
                     onPress={() => setActiveCategory(activeCategory === cat ? null : cat)}
                     style={[styles.chip, activeCategory === cat && styles.chipActive]}
                   >
-                    <Muted style={[styles.chipText, activeCategory === cat && styles.chipTextActive]}>{cat}</Muted>
+                    <Muted style={[styles.chipText, activeCategory === cat && styles.chipTextActive]}>{formatNewsCategory(cat)}</Muted>
                   </Pressable>
                 ))}
               </ScrollView>
@@ -198,7 +198,7 @@ function FeaturedNewsCard({ post, onPress }: { post: NewsPost; onPress: () => vo
         <View style={styles.featuredBody}>
           <View style={styles.top}>
             {post.pinned ? <Muted style={styles.badgePinned}>TOP</Muted> : null}
-            {post.category ? <Muted style={styles.badgeCategory}>{post.category}</Muted> : null}
+            {post.category ? <Muted style={styles.badgeCategory}>{formatNewsCategory(post.category)}</Muted> : null}
           </View>
           <Heading>{post.title}</Heading>
           <Muted>{formatDate(post.published_at || post.created_at)}</Muted>
@@ -225,7 +225,7 @@ function NewsCard({ post, onPress }: { post: NewsPost; onPress: () => void }) {
         <View style={styles.text}>
           <View style={styles.top}>
             <Body style={styles.title}>{post.title}</Body>
-            {post.category ? <Muted style={styles.badgeCategory}>{post.category}</Muted> : null}
+            {post.category ? <Muted style={styles.badgeCategory}>{formatNewsCategory(post.category)}</Muted> : null}
           </View>
           <Muted>{formatDate(post.published_at || post.created_at)}</Muted>
           {post.excerpt || post.summary ? <Muted numberOfLines={2}>{post.excerpt || post.summary}</Muted> : null}

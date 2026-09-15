@@ -9,6 +9,7 @@ import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { compareByNearestDate } from "../../lib/contentSort";
+import { formatEventType, placeParts } from "../../lib/format";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -81,7 +82,7 @@ export function TournamentsScreen({ navigation }: Props) {
         status: event.status,
         phase: event.public_phase?.label,
         image: event.banner_url,
-        detail: [event.event_type || event.type, event.location, event.city].filter(Boolean).join(" · "),
+        detail: [formatEventType(event.event_type || event.type), ...placeParts(event.location, event.city)].filter(Boolean).join(" · "),
         raw: event,
       })),
       ...tournaments.map((tournament) => ({

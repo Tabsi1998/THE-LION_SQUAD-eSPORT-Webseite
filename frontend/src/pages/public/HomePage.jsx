@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { newsCategoryLabel } from "@/lib/newsCategories";
 import { applyCspNonce } from "@/lib/csp";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
@@ -291,7 +292,7 @@ function NewsCard({ news, featured = false }) {
       )}
       <div className="p-4 flex-1">
         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
-          {news.category}
+          {newsCategoryLabel(news.category)}
           {news.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
         </div>
         <h3 className={`mt-2 font-heading font-black uppercase leading-tight break-words line-clamp-3 group-hover:text-[#29B6E8] transition ${featured ? "text-xl md:text-2xl" : ""}`}>{news.title}</h3>

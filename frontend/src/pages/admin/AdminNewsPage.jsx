@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
+import { newsCategoryLabel } from "@/lib/newsCategories";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { EditorialChecklist } from "@/components/tls/EditorialChecklist";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -213,7 +214,7 @@ export default function AdminNewsPage() {
                       </div>
                       <div className="text-[11px] text-white/50">/{n.slug}</div>
                     </td>
-                    <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{n.category}</td>
+                    <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{newsCategoryLabel(n.category)}</td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-white/60 font-bold">{n.visibility}</td>
                     <td className="px-4 py-3 text-xs">
                       <span className={`${state.className} font-bold uppercase`}>{state.label}</span>

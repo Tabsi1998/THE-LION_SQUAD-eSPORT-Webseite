@@ -84,7 +84,7 @@ export function TeamsScreen({ navigation }: Props) {
                 <Title>{myTeams.length ? "Meine Teams" : "Teams"}</Title>
               </View>
             </View>
-            {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Teams, Einladungen, Squads und Community-Chat aus der Live-Plattform.</Muted>}
+            {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Deine Teams, Einladungen und der Team-Chat.</Muted>}
 
             <View style={styles.stats}>
               <Stat icon="shield-outline" label="Teams" value={list.length} />
