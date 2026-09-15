@@ -7,10 +7,12 @@ ersten Abruf vom Backend kommen - es baut sie dann - und muss beim zweiten von
 nginx kommen. Nur Standardbibliothek, damit es auf jedem Runner läuft.
 """
 import json
+import os
 import secrets
 import struct
 import subprocess
 import sys
+import tempfile
 import zlib
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -53,11 +55,14 @@ def expect(condition: bool, message: str) -> None:
 def check(base: str, service: str, upload_dir: str) -> dict:
     base = base.rstrip("/")
     name = f"tls-media-check-{secrets.token_hex(6)}.png"
-    local = f"/tmp/{name}" if sys.platform != "win32" else name
+    local = os.path.join(tempfile.gettempdir(), name)
     with open(local, "wb") as handle:
         handle.write(png_bytes(900, 600))
     remote = f"{upload_dir}/public/{name}"
-    compose("cp", local, f"{service}:{remote}")
+    try:
+        compose("cp", local, f"{service}:{remote}")
+    finally:
+        os.unlink(local)
     try:
         status, headers, body = fetch(base, f"/api/static/uploads/{name}")
         expect(status == 200, f"Original: Status {status}")
