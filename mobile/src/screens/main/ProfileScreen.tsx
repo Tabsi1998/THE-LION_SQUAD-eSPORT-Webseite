@@ -389,7 +389,7 @@ export function ProfileScreen() {
             {tabs.map((item) => (
               <Pressable key={item.key} onPress={() => setTab(item.key)} accessibilityRole="tab" accessibilityState={{ selected: tab === item.key }} style={[styles.tab, tab === item.key && styles.tabActive]}>
                 <Ionicons name={item.icon} color={tab === item.key ? colors.cyan : colors.muted} size={15} />
-                <Muted style={[styles.tabText, tab === item.key && styles.tabTextActive]}>{item.label}</Muted>
+                <Muted style={[styles.tabText, tab === item.key && styles.tabTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{item.label}</Muted>
               </Pressable>
             ))}
           </View>
@@ -831,8 +831,9 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
 function Stat({ label, value, tone = "cyan" }: { label: string; value: string; tone?: "cyan" | "gold" }) {
   return (
     <View style={styles.stat}>
-      <Body style={[styles.statValue, tone === "gold" && styles.gold]}>{value}</Body>
-      <Muted>{label}</Muted>
+      {/* Ein Wert bleibt eine Zeile: "Superadmin" brach vorher als "Superad/min" (#247). */}
+      <Body style={[styles.statValue, tone === "gold" && styles.gold]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{value}</Body>
+      <Muted numberOfLines={1}>{label}</Muted>
     </View>
   );
 }
@@ -957,8 +958,8 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+    flexWrap: "nowrap",
+    gap: 6,
   },
   backRow: {
     alignItems: "center",
@@ -976,13 +977,15 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 7,
     borderWidth: 1,
-    flexBasis: "31.5%",
+    // Vier gleich breite Reiter in einer Zeile; vorher rutschte "Erfolge"
+    // allein in eine zweite Zeile (#247).
+    flex: 1,
     flexDirection: "row",
-    flexGrow: 1,
-    gap: 6,
+    gap: 5,
     justifyContent: "center",
     minHeight: 38,
-    paddingHorizontal: 12,
+    minWidth: 0,
+    paddingHorizontal: 6,
     paddingVertical: 8,
   },
   tabActive: {
@@ -990,6 +993,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(41, 182, 232, 0.42)",
   },
   tabText: {
+    flexShrink: 1,
     fontWeight: "900",
     textAlign: "center",
   },

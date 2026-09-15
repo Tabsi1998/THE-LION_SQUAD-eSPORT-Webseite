@@ -28,7 +28,8 @@ export function ActionTile({
       style={({ pressed }) => [styles.tile, tone === "danger" && styles.dangerSurface, isDisabled && styles.disabled, pressed && styles.pressed]}
     >
       <Ionicons name={icon} color={color} size={18} />
-      <Muted style={[styles.tileText, { color }]}>{label}</Muted>
+      {/* Eine Zeile, notfalls kleiner: "Einstellungen" brach vorher mitten im Wort (#247). */}
+      <Muted style={[styles.tileText, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Muted>
     </Pressable>
   );
 }

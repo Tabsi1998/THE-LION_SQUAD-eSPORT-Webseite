@@ -179,33 +179,74 @@ export function MessageAttachments({ attachments }: { attachments?: ChatAttachme
   const several = items.length > 1;
   return (
     <View style={styles.grid} testID="chat-message-attachments">
-      {items.map((item) => {
-        const preview = item.kind === "video"
-          ? authorizedSource(item.poster_url, accessToken)
-          : authorizedSource(item.url, accessToken, 800);
-        return (
-          <Pressable
-            key={item.id}
-            accessibilityLabel={item.kind === "video" ? "Video abspielen" : "Bild öffnen"}
-            accessibilityRole="imagebutton"
-            onPress={() => setOpen(item)}
-            style={[styles.tile, several && styles.tileSmall]}
-          >
-            {preview ? (
-              <Image source={preview} style={StyleSheet.absoluteFill} resizeMode="cover" testID={`chat-attachment-image-${item.id}`} />
-            ) : (
-              <Ionicons name="film-outline" size={28} color={colors.muted} />
-            )}
-            {item.kind === "video" ? (
-              <View style={styles.playBadge}>
-                <Ionicons name="play" size={20} color={colors.white} />
-              </View>
-            ) : null}
-          </Pressable>
-        );
-      })}
+      {items.map((item) => (
+        <AttachmentTile key={item.id} item={item} token={accessToken} small={several} onOpen={() => setOpen(item)} />
+      ))}
       <AttachmentViewer item={open} token={accessToken} onClose={() => setOpen(null)} />
     </View>
+  );
+}
+
+/**
+ * Eine Kachel je Anhang. Lädt das Bild nicht, steht das dran - vorher blieb
+ * die Kachel einfach schwarz, und niemand sah, ob es 404, 401 oder ein
+ * Decoder-Fehler war (#238). Ein Tipp versucht es noch einmal.
+ */
+function AttachmentTile({ item, token, small, onOpen }: { item: ChatAttachment; token: string | null; small: boolean; onOpen: () => void }) {
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const preview = item.kind === "video"
+    ? authorizedSource(item.poster_url, token)
+    : authorizedSource(item.url, token, 800);
+  const failed = state === "error";
+  return (
+    <Pressable
+      accessibilityLabel={failed ? "Bild erneut laden" : item.kind === "video" ? "Video abspielen" : "Bild öffnen"}
+      accessibilityRole="imagebutton"
+      onPress={() => {
+        if (failed) {
+          setState("loading");
+          setError("");
+          setAttempt((count) => count + 1);
+          return;
+        }
+        onOpen();
+      }}
+      style={[styles.tile, small && styles.tileSmall]}
+    >
+      {preview && !failed ? (
+        <Image
+          key={attempt}
+          source={preview}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          testID={`chat-attachment-image-${item.id}`}
+          onLoad={() => setState("ready")}
+          onError={(event) => {
+            setState("error");
+            setError(String(event?.nativeEvent?.error || "").slice(0, 80));
+          }}
+        />
+      ) : null}
+      {!preview ? <Ionicons name="film-outline" size={28} color={colors.muted} /> : null}
+      {preview && state === "loading" ? (
+        <View style={styles.tileState} accessibilityLabel="Bild wird geladen">
+          <ActivityIndicator color={colors.cyan} />
+        </View>
+      ) : null}
+      {failed ? (
+        <View style={styles.tileState} testID={`chat-attachment-error-${item.id}`}>
+          <Ionicons name="image-outline" size={22} color={colors.muted} />
+          <Muted style={styles.tileStateText} numberOfLines={2}>Bild konnte nicht geladen werden{error ? ` (${error})` : ""}. Tippen zum Wiederholen.</Muted>
+        </View>
+      ) : null}
+      {item.kind === "video" && !failed ? (
+        <View style={styles.playBadge}>
+          <Ionicons name="play" size={20} color={colors.white} />
+        </View>
+      ) : null}
+    </Pressable>
   );
 }
 
@@ -332,6 +373,18 @@ const styles = StyleSheet.create({
   tileSmall: {
     height: 108,
     width: 108,
+  },
+  tileState: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    gap: 6,
+    justifyContent: "center",
+    padding: 8,
+  },
+  tileStateText: {
+    fontSize: 11,
+    textAlign: "center",
   },
   viewer: {
     alignItems: "center",

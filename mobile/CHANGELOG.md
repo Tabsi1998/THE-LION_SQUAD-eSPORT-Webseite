@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1-beta - 2026-09-15
+
+- Mobile: Mehr → Referenzen zeigt die Referenzen des Vereins mit Platzierung, Spiel, Lineup und Zusammenfassung; vorher blieb die Liste leer, weil die App ein Array erwartete, der Server aber `{ items, summary }` liefert (#252).
+- Mobile: Turnierformate stehen als Begriff („Mehrspieler freier Turnierbaum“ statt „ffacustombracket“), die Rolle in Spielerprofilen als „Community“ statt „community_user“, die Mitgliedschaft als „Aktiv · Ordentliches Mitglied“ statt „active (ordinary)“; „Achievements“ heißt „Erfolge“ und fehlt bei null; Entwicklertexte im Infocenter sind weg (#246).
+- Mobile: Im Profil brechen „Einstellungen“, „Superadmin“ und der Reiter „Erfolge“ nicht mehr um (#247).
+- Mobile: Lädt ein Bild im Chat nicht, zeigt die Kachel das mit Grund statt schwarz zu bleiben; ein Tipp lädt neu. Damit wird sichtbar, woran es bei #238 liegt.
+
 ## 0.3.0-beta - 2026-09-15
 
 - Mobile: Die Startseite zeigt nur noch Termine ab heute; Vergangenes und Abgesagtes fällt weg. Live und Heute stehen oben, danach höchstens vier nächste Termine, der Rest hinter „Alle (N)“. Die Jahreswertung steht als eine Zeile mit eigenem Platz und Führendem, die Schnellzugriffe sind auf drei geschrumpft (#212).
