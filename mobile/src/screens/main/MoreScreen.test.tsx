@@ -48,10 +48,12 @@ test("Zeilen statt Karten: jedes Ziel einmal, Mitgliedervorteile nur für Mitgli
   await render(<MoreScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(mockGet).toHaveBeenCalled());
 
-  for (const title of ["Nachrichten", "Benachrichtigungen", "Öffentliches Profil", "Fast Laps", "Jahreswertung", "News", "Mitgliedervorteile", "Sponsoren", "Partner"]) {
+  for (const title of ["Nachrichten", "Benachrichtigungen", "Öffentliches Profil", "Jahreswertung", "Spielerprofile", "News", "Mitgliedervorteile", "Sponsoren", "Partner"]) {
     expect(screen.getAllByText(title)).toHaveLength(1);
   }
   expect(screen.queryByText("Bereich öffnen")).toBeNull();
+  // Fast Laps haben den Events-Tab und den Schnellzugriff auf der Startseite (#242).
+  expect(screen.queryByText("Fast Laps")).toBeNull();
 
   await fireEvent.press(screen.getByText("Sponsoren"));
   expect(navigate).toHaveBeenCalledWith("InfoCenter", { section: "sponsors" });

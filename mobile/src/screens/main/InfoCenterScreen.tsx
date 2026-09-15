@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
@@ -12,6 +12,7 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../lib/api";
 import { formatDate, formatMembershipStatus, formatMembershipType, formatRole, placeParts } from "../../lib/format";
+import { groupSponsorsByTier } from "../../lib/sponsors";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { Reference, ReferenceSummary } from "../../types";
@@ -39,6 +40,17 @@ const SECTION_INTRO: Record<SectionKey, string> = {
   profiles: "Öffentliche Spielerprofile der Community.",
 };
 
+// Aus "Mehr" kommt man mit einem Bereich; dann ist das hier dessen Seite -
+// mit eigenem Titel und ohne die Verschiebeleiste des Infocenters (#243).
+const SECTION_GROUP: Record<SectionKey, string> = {
+  sponsors: "Verein",
+  partners: "Verein",
+  events: "Verein",
+  benefits: "Verein",
+  references: "Verein",
+  profiles: "Gaming",
+};
+
 const REFERENCE_STATUS: Record<string, string> = {
   active: "Laufend",
   planned: "Geplant",
@@ -59,6 +71,11 @@ export function InfoCenterScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const active = useMemo(() => sections.find((item) => item.key === section) || sections[0], [section]);
+  const fixedSection = Boolean(route.params?.section);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: fixedSection ? active.label : "Info Center" });
+  }, [active.label, fixedSection, navigation]);
 
   const loadLive = useCallback(async () => {
     try {
@@ -101,12 +118,12 @@ export function InfoCenterScreen({ navigation, route }: Props) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadLive(); }} tintColor={colors.cyan} />}
       >
         <View style={styles.header}>
-          <Muted>Info Center</Muted>
+          <Muted style={styles.eyebrow}>{SECTION_GROUP[active.key]}</Muted>
           <Title>{active.label}</Title>
           <Muted>{SECTION_INTRO[active.key]}</Muted>
         </View>
 
-        <SegmentedTabs items={sections} value={section} onChange={setSection} />
+        {fixedSection ? null : <SegmentedTabs items={sections} value={section} onChange={setSection} />}
 
         {loading ? (
           <SkeletonList count={4} hasImage={false} />
@@ -125,33 +142,42 @@ export function InfoCenterScreen({ navigation, route }: Props) {
   );
 }
 
+// Stufen wie auf der Webseite: Hauptsponsor volle Breite, Bronze zu viert, Logos
+// ohne Boxen auf dem dunklen Grund (#244).
 function Sponsors({ items }: { items: any[] }) {
   if (!items.length) return <EmptyState title="Keine Sponsoren" detail="Sobald Sponsoren auf der Website gepflegt sind, erscheinen ihre Logos hier." />;
   return (
-    <View style={styles.sponsorGrid}>
-      {items.map((sponsor) => {
-        const href = normalizeLink(sponsor.url || sponsor.link);
-        return (
-          <Pressable
-            key={sponsor.id}
-            onPress={href ? () => Linking.openURL(href) : undefined}
-            style={({ pressed }) => [styles.sponsorTile, pressed && styles.pressed]}
-            accessibilityLabel={`${sponsor.name} – Website öffnen`}
-            accessibilityRole="link"
-          >
-            <MediaImage
-              uri={sponsor.logo_url}
-              resizeMode="contain"
-              style={styles.sponsorLogo}
-              fallback={
-                <Body style={styles.sponsorFallback}>
-                  {(sponsor.name || "?").slice(0, 2).toUpperCase()}
-                </Body>
-              }
-            />
-          </Pressable>
-        );
-      })}
+    <View style={styles.sponsorGroups}>
+      {groupSponsorsByTier(items).map(({ tier, items: rows }) => (
+        <View key={tier.key} style={styles.sponsorGroup} testID={`sponsor-tier-${tier.key}`}>
+          <Muted style={[styles.sponsorTierLabel, { color: tier.color }]}>{tier.label}</Muted>
+          <View style={styles.sponsorGrid}>
+            {rows.map((sponsor) => {
+              const href = normalizeLink(sponsor.url || sponsor.link);
+              return (
+                <Pressable
+                  key={sponsor.id}
+                  onPress={href ? () => Linking.openURL(href) : undefined}
+                  style={({ pressed }) => [styles.sponsorTile, { flexBasis: `${Math.floor(100 / tier.perRow) - 3}%` }, pressed && styles.pressed]}
+                  accessibilityLabel={href ? `${sponsor.name} – Website öffnen` : sponsor.name}
+                  accessibilityRole={href ? "link" : "image"}
+                >
+                  <MediaImage
+                    uri={sponsor.logo_url}
+                    resizeMode="contain"
+                    style={[styles.sponsorLogo, { height: tier.logoHeight }]}
+                    fallback={
+                      <Body style={styles.sponsorFallback} numberOfLines={2}>
+                        {sponsor.name || "?"}
+                      </Body>
+                    }
+                  />
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -538,29 +564,42 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   // Sponsoren-Grid: nur Logos, klickbar
+  sponsorGroups: {
+    gap: 18,
+  },
+  sponsorGroup: {
+    gap: 8,
+  },
+  sponsorTierLabel: {
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
   sponsorGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 10,
   },
   sponsorTile: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 10,
-    borderWidth: 1,
-    height: 80,
+    flexGrow: 1,
     justifyContent: "center",
-    width: "47%",
+    paddingVertical: 6,
   },
   sponsorLogo: {
-    borderRadius: 8,
-    height: 56,
-    width: "90%",
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    width: "100%",
   },
   sponsorFallback: {
-    color: colors.cyan,
-    fontSize: 22,
+    color: colors.white,
     fontWeight: "900",
+    textAlign: "center",
+  },
+  eyebrow: {
+    color: colors.cyan,
+    fontWeight: "900",
+    textTransform: "uppercase",
   },
 });

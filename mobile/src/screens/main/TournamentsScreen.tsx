@@ -9,6 +9,7 @@ import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { compareByNearestDate } from "../../lib/contentSort";
+import { splitOpenAndPast } from "../../lib/dashboard";
 import { formatEventType, formatTournamentFormat, placeParts } from "../../lib/format";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
@@ -19,10 +20,11 @@ const TOURNAMENT_LIST_LIVE_RESOURCES = ["tournaments", "events", "f1"];
 
 type Props = NativeStackScreenProps<TournamentStackParamList, "TournamentList">;
 type Filter = "all" | "events" | "tournaments" | "fastlaps";
+type HubBase = { id: string; title: string; date?: string | null; endDate?: string | null; status?: string; phase?: string; image?: string | null; detail?: string };
 type HubItem =
-  | { kind: "event"; id: string; title: string; date?: string | null; status?: string; phase?: string; image?: string | null; detail?: string; raw: ClubEvent }
-  | { kind: "tournament"; id: string; title: string; date?: string | null; status?: string; phase?: string; image?: string | null; detail?: string; raw: Tournament }
-  | { kind: "fastlap"; id: string; title: string; date?: string | null; status?: string; phase?: string; image?: string | null; detail?: string; raw: F1Challenge };
+  | (HubBase & { kind: "event"; raw: ClubEvent })
+  | (HubBase & { kind: "tournament"; raw: Tournament })
+  | (HubBase & { kind: "fastlap"; raw: F1Challenge });
 
 const filters: Array<{ key: Filter; label: string }> = [
   { key: "all", label: "Alle" },
@@ -33,6 +35,7 @@ const filters: Array<{ key: Filter; label: string }> = [
 
 export function TournamentsScreen({ navigation }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
+  const [showPast, setShowPast] = useState(false);
   const [events, setEvents] = useState<ClubEvent[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [fastlaps, setFastlaps] = useState<F1Challenge[]>([]);
@@ -79,6 +82,7 @@ export function TournamentsScreen({ navigation }: Props) {
         id: event.slug || event.id,
         title: event.title || event.name || "Event",
         date: event.start_date || event.date,
+        endDate: event.end_date,
         status: event.status,
         phase: event.public_phase?.label,
         image: event.banner_url,
@@ -90,6 +94,7 @@ export function TournamentsScreen({ navigation }: Props) {
         id: tournament.slug || tournament.id,
         title: tournament.title,
         date: tournament.start_date,
+        endDate: tournament.end_date,
         status: tournament.status,
         phase: tournament.public_phase?.label,
         image: tournament.banner_url || tournament.game?.cover_url || tournament.game?.logo_url,
@@ -101,6 +106,7 @@ export function TournamentsScreen({ navigation }: Props) {
         id: challenge.slug || challenge.id,
         title: challenge.title,
         date: challenge.start_date,
+        endDate: challenge.end_date,
         status: challenge.status,
         phase: challenge.public_phase?.label,
         image: challenge.banner_url,
@@ -111,11 +117,14 @@ export function TournamentsScreen({ navigation }: Props) {
     const visible = mapped.filter((item) => matchesFilter(item, filter));
     return visible.sort((a, b) => compareByNearestDate(a.date, b.date, a.status, b.status, a.phase, b.phase));
   }, [events, fastlaps, filter, tournaments]);
+  // Ohne Tipp nur, was ansteht; Beendetes und Abgesagtes hinter "Vergangene
+  // anzeigen" (#241). Die Zähler oben zählen dieselbe Menge wie die Liste.
+  const { open: openItems, past: pastItems } = useMemo(() => splitOpenAndPast(items), [items]);
   const groupedItems = useMemo(() => ({
-    events: items.filter((item) => item.kind === "event"),
-    tournaments: items.filter((item) => item.kind === "tournament"),
-    fastlaps: items.filter((item) => item.kind === "fastlap"),
-  }), [items]);
+    events: openItems.filter((item) => item.kind === "event"),
+    tournaments: openItems.filter((item) => item.kind === "tournament"),
+    fastlaps: openItems.filter((item) => item.kind === "fastlap"),
+  }), [openItems]);
 
   const open = useCallback((item: HubItem) => {
     if (item.kind === "event") navigation.navigate("EventDetail", { id: item.id });
@@ -139,29 +148,48 @@ export function TournamentsScreen({ navigation }: Props) {
       >
         <View style={styles.header}>
           <Heading>Events</Heading>
-          {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Alle sichtbaren Events, Turniere und Fast-Lap Challenges an einem Ort.</Muted>}
+          {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Was ansteht: Events, Turniere und Fast Laps.</Muted>}
         </View>
         {offline && !error ? <OfflineNotice detail="Events, Turniere und Fast-Laps werden aus gespeicherten Daten angezeigt." /> : null}
 
         <SegmentedTabs items={filters} value={filter} onChange={setFilter} />
 
-        <View style={styles.stats}>
-          <Stat label="Events" value={String(events.length)} />
-          <Stat label="Turniere" value={String(tournaments.length)} tone="gold" />
-          <Stat label="Fast Laps" value={String(fastlaps.length)} />
-        </View>
+        {filter === "all" && openItems.length ? (
+          <View style={styles.stats}>
+            <Stat label="Events" value={String(groupedItems.events.length)} />
+            <Stat label="Turniere" value={String(groupedItems.tournaments.length)} tone="gold" />
+            <Stat label="Fast Laps" value={String(groupedItems.fastlaps.length)} />
+          </View>
+        ) : null}
 
-        {items.length && filter === "all" ? (
+        {openItems.length && filter === "all" ? (
           <>
             <HubSection title="Events" items={groupedItems.events} onOpen={open} />
             <HubSection title="Turniere" items={groupedItems.tournaments} onOpen={open} />
             <HubSection title="Fast Laps" items={groupedItems.fastlaps} onOpen={open} />
           </>
-        ) : items.length ? (
-          items.map((item) => <HubContentCard key={`${item.kind}-${item.id}`} item={item} onPress={() => open(item)} />)
+        ) : openItems.length ? (
+          openItems.map((item) => <HubContentCard key={`${item.kind}-${item.id}`} item={item} onPress={() => open(item)} />)
         ) : (
-          <EmptyState icon="calendar-clear-outline" title="Keine Einträge" detail="Für diese Auswahl sind aktuell keine sichtbaren Inhalte vorhanden." />
+          <EmptyState icon="calendar-clear-outline" title="Nichts Offenes" detail={pastItems.length ? "Alles, was hier war, ist vorbei – unten lässt sich Vergangenes einblenden." : "Sobald etwas geplant ist, steht es hier."} />
         )}
+
+        {pastItems.length ? (
+          <View style={styles.section}>
+            <Pressable
+              onPress={() => setShowPast((value) => !value)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showPast }}
+              style={({ pressed }) => [styles.pastToggle, pressed && styles.pressed]}
+              testID="events-past-toggle"
+            >
+              <Body style={styles.pastToggleText}>{showPast ? "Vergangene ausblenden" : `Vergangene anzeigen (${pastItems.length})`}</Body>
+            </Pressable>
+            {showPast ? (
+              <HubSection title="Vergangen" items={pastItems} onOpen={open} />
+            ) : null}
+          </View>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -220,6 +248,21 @@ const styles = StyleSheet.create({
   stats: {
     flexDirection: "row",
     gap: 10,
+  },
+  pastToggle: {
+    alignItems: "center",
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 42,
+    justifyContent: "center",
+  },
+  pastToggleText: {
+    color: colors.cyan,
+    fontWeight: "900",
+  },
+  pressed: {
+    opacity: 0.72,
   },
   stat: {
     flex: 1,

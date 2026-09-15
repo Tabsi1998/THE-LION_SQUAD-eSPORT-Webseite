@@ -13,7 +13,8 @@ jest.mock("../../auth/AuthContext", () => ({
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 jest.mock("../../components/MediaImage", () => ({ MediaImage: () => null }));
 
-const navigation = { navigate: jest.fn(), getParent: () => ({ navigate: jest.fn() }) } as never;
+const setOptions = jest.fn();
+const navigation = { navigate: jest.fn(), setOptions, getParent: () => ({ navigate: jest.fn() }) } as never;
 
 function routeFor(section: string) {
   return { key: "info", name: "InfoCenter", params: { section } } as never;
@@ -41,6 +42,13 @@ beforeEach(() => {
           summary: { total: 17, active: 1, planned: 0, podiums: 6, gold: 1, silver: 1, bronze: 4, top10: 9, games: 5 },
         },
       });
+    }
+    if (path === "/sponsors") {
+      return Promise.resolve({ data: [
+        { id: "s1", name: "Raiffeisen", tier: "main", logo_url: null },
+        { id: "s2", name: "Föger", tier: "bronze", logo_url: null },
+        { id: "s3", name: "Omni FM", tier: "gold", logo_url: null },
+      ] });
     }
     if (path === "/users/public-list") {
       return Promise.resolve({ data: [{ id: "p-1", username: "Multimativ", user_type: "community_user", achievements_count: 0 }] });
@@ -82,6 +90,21 @@ test("Mitgliedschaft und Rolle stehen als Begriff", async () => {
   await waitFor(() => expect(screen.getByText("@Multimativ · Community")).toBeTruthy());
   expect(screen.queryByText(/community_user/)).toBeNull();
   expect(screen.queryByText(/Achievements/)).toBeNull();
+});
+
+test("aus Mehr geöffnet ist der Bereich eine eigene Seite: Titel gesetzt, keine Verschiebeleiste", async () => {
+  await render(<InfoCenterScreen navigation={navigation} route={routeFor("sponsors")} />);
+  // MediaImage ist im Test leer; der Name steht im Zugänglichkeits-Label der Kachel.
+  await waitFor(() => expect(screen.getByLabelText("Raiffeisen")).toBeTruthy());
+
+  expect(setOptions).toHaveBeenCalledWith({ title: "Sponsoren" });
+  expect(screen.queryByText("Partner")).toBeNull();
+  expect(screen.queryByText("Vorteile")).toBeNull();
+  // Stufen in Reihenfolge, Hauptsponsor zuerst (#244).
+  expect(screen.getByText("Hauptsponsor")).toBeTruthy();
+  expect(screen.getByText("Gold")).toBeTruthy();
+  expect(screen.getByText("Bronze")).toBeTruthy();
+  expect(screen.queryByText("Silber")).toBeNull();
 });
 
 test("Erfolge nur, wenn es welche gibt", () => {

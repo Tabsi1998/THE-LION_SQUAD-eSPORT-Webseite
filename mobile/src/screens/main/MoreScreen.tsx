@@ -23,7 +23,7 @@ type Entry = {
   title: string;
   icon: keyof typeof Ionicons.glyphMap;
   section?: NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>;
-  screen?: "NewsList" | "FastLapList" | "DirectMessages" | "Notifications" | "SeasonPass";
+  screen?: "NewsList" | "DirectMessages" | "Notifications" | "SeasonPass";
   ownPublicProfile?: boolean;
   membersOnly?: boolean;
 };
@@ -40,9 +40,9 @@ const GROUPS: Array<{ title: string; entries: Entry[] }> = [
     ],
   },
   {
+    // Nur Ziele ohne eigenen Tab: Fast Laps und Turniere haben den Events-Tab (#242).
     title: "Gaming",
     entries: [
-      { title: "Fast Laps", icon: "flash-outline", screen: "FastLapList" },
       { title: "Jahreswertung", icon: "trophy-outline", screen: "SeasonPass" },
       { title: "Spielerprofile", icon: "people-outline", section: "profiles" },
     ],
