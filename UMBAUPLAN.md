@@ -39,11 +39,18 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 11 | PDF-Ausgabe | umgesetzt | #193, #194 |
 | 12 | Galerie und Medien: Tempo, Videos überall | umgesetzt | #196 |
 | 13 | Entflechtung: `tournament_routes.py` aufgeteilt | umgesetzt | #200 |
-| 14 | LionsAPP in den Store | in Arbeit: 14.1 und 14.2 umgesetzt | #201, #206, #207, #208 |
-| 15 | Abschluss | offen | — |
-| 16 | **Turnier-Leitfaden im Adminbereich** | offen | — |
-| 17 | **Markenbilder hell und dunkel überall richtig** | teilweise | #193, #195 |
-| 18 | **Auszeichnungen: Banner und Trophäen** | offen, neu aufgenommen | — |
+| 14 | LionsAPP in den Store | in Arbeit: 14.1 bis 14.3 umgesetzt | #201, #206, #207, #208, #209, #220 |
+| 15 | Abschluss: Abfrage-Intervalle im Web weg, große Dateien nebenbei teilen | offen (#221, #223) | — |
+| 16 | **Turnier-Leitfaden im Adminbereich** | offen (#228) | — |
+| 17 | **Markenbilder hell und dunkel überall richtig** | teilweise (#229) | #193, #195 |
+| 18 | **Auszeichnungen: Banner und Trophäen** | offen (#230) | — |
+| 19 | **Web-Profil: Nachrichten eigene Seite, Einstellungen gebündelt** | offen (#222) | — |
+| 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
+| 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
+
+Reihenfolge ab hier, abwechselnd App und Web, damit beides vorankommt: 14.4 → 15 → 14.5 → 19 →
+14.6 → 20 → 14.7 → 21 → 16 → 14.8 → 17 (Rest) → 18. Der klassische Leseweg (#231) läuft als
+eigener kleiner Schritt dazwischen, sobald der Trockenlauf auf dem Server wiederholt ist.
 
 ### Warum Block 5 die Migration erledigt hat, ohne zu migrieren
 
@@ -601,6 +608,40 @@ Block 14:
   statt Punkte, Fortschritt sichtbar, Freischalt-Moment wie im Web.
 - [#219](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/219) Store-Reife.
 
+### Web-Check vom 15. September
+
+Alle Seiten im Code durchgesehen, Vorschlagsliste vom Betreiber bestätigt. Die Webseite am
+Handy ist dabei nur über Code und Browser-Tests beurteilt, nicht auf einem Gerät.
+
+- [#221](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/221) 25 Stellen
+  fragen im Takt nach, obwohl der Änderungsstrom alles liefert; die meisten laden doppelt.
+  Block 15.
+- [#222](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/222) Profil hat
+  neun Reiter, Nachrichten stecken unter `/profile?tab=inbox`. Block 19.
+- [#223](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/223) Große
+  Admin-Dateien beim nächsten Anfassen aufteilen. Regel, kein Umbau.
+- [#224](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/224) Startseite:
+  Countdown, Live-Zahlen, Änderungen sichtbar. Block 20.
+- [#225](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/225) Turnierseiten:
+  Änderungen an Tabelle, Baum und Spielplan hervorheben. Block 20.
+- [#226](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/226) 50-mal
+  „Lade …“ auf 39 Seiten; Skelette und sanfte Übergänge. Block 20.
+- [#227](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/227) Tageszentrale
+  im Admin um gemeldete Ergebnisse, Meldungen, Kontakt und Termine heute erweitern. Block 21.
+  Korrektur meiner ersten Einschätzung: Die Aufgabenliste gibt es seit Block 9.2, es fehlen
+  nur Einträge.
+- [#228](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/228) Turnier-
+  Leitfaden. Block 16.
+- [#229](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/229) Block 17
+  Rest: Standard-Favicon, Markenbilder in der App.
+- [#230](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/230) Block 18:
+  Banner und Trophäen.
+- [#231](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/231) Klassischen
+  Leseweg entfernen.
+- Kalender auch im Web als Monatsansicht, nicht nur `.ics`: in #216 ergänzt.
+- Der Discord-Link in der App ist falsch; richtig ist `discord.com/invite/thelionsquadesports`.
+  In #214 vermerkt.
+
 ## Noch offen und bewusst getrennt
 
 **Klassischen Leseweg entfernen.** Der Schreibweg ist mit Block 8 stillgelegt; gelesen
@@ -617,8 +658,8 @@ Software kann keine Zugänge, echten Vereinsdaten oder einen Serverzugriff erfin
 | **Ausgangs-Trockenlauf** | `bash scripts/tournament-dryrun.sh vorher.json` einmal laufen lassen, damit es eine Vergleichsbasis gibt. Ohne Ausgabedatei kann später nicht verglichen werden. |
 | **Praxistest mit mehreren Nutzern** | Turnierabläufe mit echten Anmeldungen lassen sich als einzelner Nutzer im Livesystem nicht prüfen. |
 | **Abnahme nach Ausrollen** | Siehe [STAGING_ABNAHME.md](STAGING_ABNAHME.md). |
-| **Chat mit Bildern am Handy testen** | Build 57 ist installiert, Sticker sind am Gerät bestätigt. Offen: ein Foto und ein kurzes Video senden und auf dem zweiten Konto öffnen; prüfen, ob eine Push-Benachrichtigung ankommt. |
-| **Discord-Link klären** | App: `discord.gg/thelionsquad`, Einstellungen: `discord.com/invite/thelionsquadesports`. Welcher gilt? Danach nur noch in den Einstellungen pflegen (#214). |
+| **Build 58 am Handy prüfen** | Tastatur im Team-Chat und in einer Direktnachricht: Klebt die Eingabezeile an der Tastatur? Dazu Uhrzeiten im Chat und „Vereinsabend · Telfs“ in der Events-Liste. Foto, Video, Sticker und Push sind mit Build 57 bestätigt. |
+| **Entscheidung zu Block 10** | Soll der berechnete Termin (vereinbart, Heimrecht oder Standardzeit) in die Partie geschrieben werden? Ohne das können Erinnerungen, Stationen und TV-Anzeigen ihn nicht nutzen. |
 | **Play-Console-Konto** | Für 14.8. Einmalige Gebühr, Konto des Vereins. Erst nötig, wenn die Feinschliff-Blöcke fertig sind. |
 | **Neuen App-Schlüssel sichern** | Seit Build 57 ist die App mit einem neuen Schlüssel signiert; er liegt in `%USERPROFILE%\.lionsapp-release`. Den ganzen Ordner auf einen USB-Stick oder in den Passwortmanager sichern. Geht er verloren, muss jede installierte App wieder neu installiert werden. |
 | **Alte App einmal löschen** | Build 57 lässt sich wegen des neuen Schlüssels nicht über Build 56 installieren: alte LionsAPP löschen, neue installieren, neu anmelden. Das gilt für alle, die die App schon haben. |
