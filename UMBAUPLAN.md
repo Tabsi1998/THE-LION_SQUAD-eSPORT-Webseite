@@ -47,10 +47,13 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 19 | **Web-Profil: Nachrichten eigene Seite, Einstellungen gebündelt** | offen (#222) | — |
 | 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
 | 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
+| 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | offen (#232, #233) | — |
 
-Reihenfolge ab hier, abwechselnd App und Web, damit beides vorankommt: 14.4 → 15 → 14.5 → 19 →
-14.6 → 20 → 14.7 → 21 → 16 → 14.8 → 17 (Rest) → 18. Der klassische Leseweg (#231) läuft als
-eigener kleiner Schritt dazwischen, sobald der Trockenlauf auf dem Server wiederholt ist.
+Reihenfolge ab hier, abwechselnd App und Web, damit beides vorankommt: 14.4 → 15 → 22 → 14.5 →
+19 → 14.6 → 20 → 14.7 → 21 → 16 → 14.8 → 17 (Rest) → 18. Block 22 steht früh, weil die
+Langsamkeit im Handy-Browser heute stört und weil die Fehler-Logs jeden weiteren Block
+absichern. Der klassische Leseweg (#231) läuft als eigener kleiner Schritt dazwischen, sobald
+der Trockenlauf auf dem Server wiederholt ist.
 
 ### Warum Block 5 die Migration erledigt hat, ohne zu migrieren
 
@@ -638,6 +641,13 @@ Handy ist dabei nur über Code und Browser-Tests beurteilt, nicht auf einem Ger�
   Banner und Trophäen.
 - [#231](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/231) Klassischen
   Leseweg entfernen.
+- [#232](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/232) Tempo: Galerie
+  im Handy-Browser langsam. Im Code auffällig: Alle Bilder laufen durch den API-Prozess mit
+  einem Worker, das Upload-Volume hängt nur im Backend-Container. Erst messen, dann Bilder
+  über nginx ausliefern. Block 22.
+- [#233](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/233) Betrieb:
+  Server-Fehler mit Stack, langsame Anfragen, Web-Fehler standardmäßig an, Web Vitals,
+  Auto-Checks, Alarme per Discord. Block 22.
 - Kalender auch im Web als Monatsansicht, nicht nur `.ics`: in #216 ergänzt.
 - Der Discord-Link in der App ist falsch; richtig ist `discord.com/invite/thelionsquadesports`.
   In #214 vermerkt.
