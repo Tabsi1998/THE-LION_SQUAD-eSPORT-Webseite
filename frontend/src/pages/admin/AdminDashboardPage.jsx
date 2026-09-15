@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2, TrendingUp } from "lucide-react";
 
@@ -28,11 +28,7 @@ export default function AdminDashboardPage() {
     api.get("/admin/growth-stats?days=30").then(({ data }) => setGrowth(data)).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    const id = window.setInterval(load, 30000);
-    return () => window.clearInterval(id);
-  }, [load]);
-  useApiInvalidation(load);
+  useLiveRefresh(load, [], { fallbackMs: 30000 });
 
   const queuePending = Number(sys?.mail_queue?.pending || 0);
   const queueFailed = Number(sys?.mail_queue?.failed || 0);

@@ -40,7 +40,7 @@ describe("API invalidation stream", () => {
     const modules = import.meta.glob("../pages/**/*.jsx", { query: "?raw", import: "default", eager: true });
     const used = new Set();
     for (const source of Object.values(modules)) {
-      for (const call of String(source).matchAll(/useApiInvalidation\([^)]*?\[([^\]]*)\]/g)) {
+      for (const call of String(source).matchAll(/use(?:ApiInvalidation|LiveRefresh)\([^)]*?\[([^\]]*)\]/g)) {
         for (const part of call[1].split(",")) {
           const name = part.trim().replace(/^["'`]|["'`]$/g, "");
           if (name) used.add(name);

@@ -6,7 +6,7 @@ import { BracketTree } from "@/components/tls/BracketTree";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
@@ -35,11 +35,9 @@ export default function TournamentBracketPage() {
 
   useEffect(() => {
     load();
-    const iv = setInterval(load, 7000);
-    return () => clearInterval(iv);
   }, [load]);
 
-  useApiInvalidation(load, ["tournaments", "matches"]);
+  useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 7000 });
 
   if (!data) return <PublicLayout><PublicLoadingState label="Lade Turnierbaum" /></PublicLayout>;
   const t = data.tournament;

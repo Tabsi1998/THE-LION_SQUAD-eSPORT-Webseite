@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { ExternalLink, MessageSquareText, Radio, Users } from "lucide-react";
@@ -48,10 +48,11 @@ export function LiveStreamSlider() {
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 60000);
-    return () => clearInterval(timer);
   }, [load]);
-  useApiInvalidation(load, ["streams"]);
+  // Ob ein Kanal live ist, erfährt der Server nur durch eigenes Nachfragen bei
+  // Twitch; der Strom meldet nur Änderungen aus dem Adminbereich. Deshalb
+  // bleibt eine Abfrage pro Minute, aber nur im sichtbaren Tab.
+  useLiveRefresh(load, ["streams"], { pollMs: 60000 });
 
   useEffect(() => {
     if (!streams.length) {

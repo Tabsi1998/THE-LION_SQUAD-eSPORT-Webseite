@@ -4,7 +4,7 @@ import { API, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seoTextPreview } from "@/lib/textPreview";
@@ -35,11 +35,9 @@ export default function TournamentStandingsPage() {
 
   useEffect(() => {
     load();
-    const iv = setInterval(load, 7000);
-    return () => clearInterval(iv);
   }, [load]);
 
-  useApiInvalidation(load, ["tournaments", "matches"]);
+  useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 7000 });
   const tournamentUrl = t ? `/tournaments/${t.slug || t.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "/tournaments";
   const resultPdfUrl = t ? `${API}/exports/tournaments/${t.slug || t.id}/standings.pdf${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "";
   const certificatePdfUrl = t ? `${API}/exports/tournaments/${t.slug || t.id}/certificates.pdf${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "";

@@ -5,7 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentCard } from "@/components/tls/TournamentCard";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { sortByNearestDate } from "@/lib/contentSort";
 import { Trophy } from "lucide-react";
@@ -39,11 +39,9 @@ export default function TournamentsPage() {
   useEffect(() => {
     setLoading(true);
     load();
-    const iv = setInterval(load, 15000);
-    return () => clearInterval(iv);
   }, [load]);
 
-  useApiInvalidation(load, ["tournaments"]);
+  useLiveRefresh(load, ["tournaments"], { fallbackMs: 15000 });
 
   useEffect(() => {
     const nextStatus = searchParams.get("status") || "all";

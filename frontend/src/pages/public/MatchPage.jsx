@@ -10,7 +10,7 @@ import { ChatMessageSticker, ChatStickerButton, ChatStickerPicker } from "@/comp
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 
@@ -111,18 +111,14 @@ export default function MatchPage() {
       if (typeof document === "undefined" || !document.hidden) load().catch(() => {});
     };
     load({ preserveDrafts: false }).catch(() => setData(null));
-    const timer = window.setInterval(() => {
-      refreshVisible();
-    }, 10000);
     window.addEventListener("focus", refreshVisible);
     document.addEventListener("visibilitychange", refreshVisible);
     return () => {
-      window.clearInterval(timer);
       window.removeEventListener("focus", refreshVisible);
       document.removeEventListener("visibilitychange", refreshVisible);
     };
   }, [load]);
-  useApiInvalidation(load, ["matches", "matches-v2", "tournaments"]);
+  useLiveRefresh(load, ["matches", "matches-v2", "tournaments"], { fallbackMs: 10000 });
 
   const title = data?.tournament?.title ? `${data.matchday_label} - ${data.tournament.title}` : "Match";
   const description = data?.tournament?.title

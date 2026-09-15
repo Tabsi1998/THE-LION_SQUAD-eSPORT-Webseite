@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy } from "lucide-react";
 import { api, resolveMediaUrl } from "@/lib/api";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { MascotBadge } from "@/components/tls/Logo";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { SponsorGrid } from "@/components/tls/SponsorTicker";
@@ -44,10 +44,9 @@ export default function BracketTVPage() {
 
   useEffect(() => {
     load();
-    const iv = setInterval(load, 15000);
-    return () => clearInterval(iv);
   }, [load]);
-  useApiInvalidation(load, ["tournaments", "matches", "stations"]);
+  // Die TV-Anzeige läuft stundenlang: ohne Strom alle 15 s nachfragen.
+  useLiveRefresh(load, ["tournaments", "matches", "stations"], { fallbackMs: 15000 });
   const flashMap = useMatchFlash(data);
 
   const views = useMemo(() => buildTvViews(data, boardMode), [data, boardMode]);

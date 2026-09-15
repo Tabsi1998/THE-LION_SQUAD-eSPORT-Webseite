@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { refreshCrowns } from "@/components/tls/LevelAvatarFrame";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 const TABS = [
   ["unread", "Ungelesen"],
@@ -113,12 +113,7 @@ export function NotificationBell() {
   }, [openUrl, user]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    if (!user) return undefined;
-    const timer = setInterval(load, 30000);
-    return () => clearInterval(timer);
-  }, [load, user]);
-  useApiInvalidation(load, ["admin/notifications", "notifications", "messages", "teams", "tournaments", "matches", "prizes"]);
+  useLiveRefresh(load, ["admin/notifications", "notifications", "messages", "teams", "tournaments", "matches", "prizes"], { fallbackMs: 30000, enabled: Boolean(user) });
 
   useEffect(() => {
     if (!open) return undefined;

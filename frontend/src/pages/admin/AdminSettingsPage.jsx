@@ -7,6 +7,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload, useImageUploadBusy } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useAuth } from "@/context/AuthContext";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
@@ -386,7 +387,10 @@ export default function AdminSettingsPage() {
   }, [isSuperadmin]);
 
   useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["settings", "users"]);
+  // Warteschlange und Twitch-Status ändern sich ohne Klick: auf diesen
+  // Reitern ohne Strom alle 15 s nachfragen, sonst nur bei Änderung.
+  const liveTab = tab === "queue" || tab === "twitch";
+  useLiveRefresh(load, ["settings", "users"], { fallbackMs: liveTab ? 15000 : 0 });
 
   const loadNewsletterSources = useCallback(async () => {
     const [newsRes, eventsRes] = await Promise.allSettled([
@@ -407,11 +411,8 @@ export default function AdminSettingsPage() {
   useApiInvalidation(loadNewsletterSources, ["news", "events"]);
 
   useEffect(() => {
-    if (tab !== "queue" && tab !== "twitch") return undefined;
-    load();
-    const id = window.setInterval(load, 15000);
-    return () => window.clearInterval(id);
-  }, [tab, load]);
+    if (liveTab) load();
+  }, [liveTab, load]);
 
   const setBrandField = (key, value) => {
     brandDirtyRef.current = true;

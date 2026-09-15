@@ -5,7 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { api } from "@/lib/api";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
@@ -77,10 +77,8 @@ export default function TournamentSchedulePage() {
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 7000);
-    return () => clearInterval(interval);
   }, [load]);
-  useApiInvalidation(load, ["tournaments", "matches", "matches-v2"]);
+  useLiveRefresh(load, ["tournaments", "matches", "matches-v2"], { fallbackMs: 7000 });
 
   const groups = useMemo(() => {
     const tournament = data?.tournament || {};
