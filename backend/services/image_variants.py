@@ -15,6 +15,7 @@ a few thousand requests with different widths would write a few thousand files.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 
@@ -81,6 +82,44 @@ def build_variant(source: Path, width: int) -> Path | None:
     except (OSError, ValueError, Image.DecompressionBombError) as exc:
         logger.warning("[media] variant %s@%s failed: %s", source.name, width, exc)
         return None
+
+
+def build_all_variants(source: Path) -> list[Path]:
+    """Every offered width that is smaller than the picture, written now.
+
+    Since nginx serves uploads straight from disk (#232), a variant that does
+    not exist yet is the one request per width that still goes through the
+    API process. Building them right after the upload keeps the first album
+    view as fast as the second.
+    """
+    built = []
+    for width in VARIANT_WIDTHS:
+        target = build_variant(source, width)
+        if target is not None:
+            built.append(target)
+    return built
+
+
+def schedule_variants(source: Path) -> "asyncio.Task[list[Path]] | None":
+    """Build the variants without holding up the upload response.
+
+    Inside the event loop the work moves to a thread and the task is returned;
+    without a loop (scripts, tests) it runs right here and None comes back.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        build_all_variants(source)
+        return None
+
+    async def _run() -> list[Path]:
+        try:
+            return await asyncio.to_thread(build_all_variants, source)
+        except Exception as exc:  # noqa: BLE001 - nie den Upload gefährden
+            logger.warning("[media] variants for %s failed: %s", source.name, exc)
+            return []
+
+    return loop.create_task(_run())
 
 
 def resolve_variant(source: Path, requested) -> Path | None:

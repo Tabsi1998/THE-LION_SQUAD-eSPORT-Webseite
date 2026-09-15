@@ -122,6 +122,9 @@ services:
         condition: service_healthy
     ports:
       - "${FRONTEND_BIND:-127.0.0.1}:${FRONTEND_PORT:-3000}:80"
+    volumes:
+      # Nur lesend: nginx liefert die öffentlichen Uploads selbst (#232).
+      - uploads_data:/srv/uploads:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
       interval: 15s
