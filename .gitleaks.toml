@@ -1,0 +1,37 @@
+title = "THE LION SQUAD secret scan"
+
+# Every rule Gitleaks ships stays on. What follows are the findings that were
+# looked at one by one and are not credentials. Each entry binds the paths to
+# the exact value they may contain, so the same file cannot quietly start
+# carrying a real secret: any other value in it still fails the scan.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "The settings encryption key of the CI's throwaway stack. It stands in ci.yml for anyone to read and protects no real data; the tests, the route inventory and the local check's container smoke use the same value."
+condition = "AND"
+paths = ['''^(\.github/workflows/ci\.yml|backend/tests/flow_harness\.py|backend/tests/test_runtime_security_unit\.py|scripts/route-inventory\.py|scripts/local_check\.py)$''']
+regexTarget = "secret"
+regexes = ['''^NQBHeGtQg5HYMo1HzvJtSQPN7X8YpJrZDvw-XMz0Bm8=$''']
+
+[[allowlists]]
+description = "The placeholder JWT secret the route inventory sets when none is configured, so it can import the app."
+condition = "AND"
+paths = ['''^scripts/route-inventory\.py$''']
+regexTarget = "secret"
+regexes = ['''^route-inventory-secret-with-at-least-32-chars$''']
+
+[[allowlists]]
+description = "The TOTP test secret from RFC 6238: base32 of 12345678901234567890."
+condition = "AND"
+paths = ['''^backend/tests/test_totp_secret_store_unit\.py$''']
+regexTarget = "secret"
+regexes = ['''^GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ$''']
+
+[[allowlists]]
+description = "A deliberately wrong password in the login test."
+condition = "AND"
+paths = ['''^backend/tests/test_live_preview_validation\.py$''']
+regexTarget = "secret"
+regexes = ['''^definitely-wrong-1$''']

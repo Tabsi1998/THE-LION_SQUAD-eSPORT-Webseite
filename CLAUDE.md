@@ -167,7 +167,60 @@ Seit dem 15. September gilt:
 
 ## 6. Lokal prüfen (Pflicht vor jedem Push)
 
-### 6.1 Der CI-Spiegel
+### 6.1 Der versionierte Check (jeder PC)
+
+`scripts/local_check.py` liegt im Repo und läuft auf jedem PC mit den
+Werkzeugen im PATH: Python 3.11, Node 24 (Web) und Node 20 (App, wie
+`ci.yml`), Docker Desktop, Git for Windows und gitleaks. Er führt **alle**
+Jobs aus `ci.yml` aus – ohne Bereichsfilter – und legt venvs unter
+`~/.local-ci/` ab, nicht im Repo.
+
+```bash
+python scripts/local_check.py                          # alles außer extra
+python scripts/local_check.py --all                    # plus Zusatzprüfungen
+python scripts/local_check.py --only backend,frontend
+python scripts/local_check.py --list                   # Schritte anzeigen
+```
+
+- Gruppen: `repository` (Secrets, Doku-Links, Shell-Skripte,
+  Routen-Vertrag, Zeilenenden, Gitleaks über Historie und ungespeicherte
+  Dateien), `backend`, `frontend` (inkl. Playwright), `mobile`, `container`.
+- `extra` rechnet GitHub nicht: black/isort, flake8 komplett, mypy,
+  Kontrast, ShellCheck, OSV über die Lockfiles. Diese Prüfungen arbeiten mit
+  einer Ratsche: `scripts/ci-baseline.json` hält den bekannten Stand fest,
+  nur **neue** Befunde schlagen fehl. Nach dem Abbau von Altlasten mit
+  `--record` neu aufnehmen und die Baseline mitcommitten.
+- Bericht: `.local-testing/local-check.json`, Logs unter
+  `.local-testing/logs/`.
+- Der Container-Smoke läuft als Compose-Projekt `tls-local-check`; ein
+  lokaler Entwicklungs-Stack und seine Volumes bleiben unberührt. Sind die
+  Ports 8001/3000 belegt, überspringt der Check den Smoke mit Hinweis.
+- Die Git-Bash-Stolpersteine aus 6.4 (`MSYS_NO_PATHCONV`, TMPDIR) setzt der
+  Check selbst.
+- Neben anderen schweren Läufen können App-Tests an ihrem 5-s-Timeout
+  scheitern – das ist Last, allein laufen sie grün.
+- `.gitleaks.toml` erlaubt nur geprüfte Testwerte, jeweils an Datei und
+  genauen Wert gebunden.
+
+**Erweitern.** `scripts/local_check.py` hat drei Teile: Kopf (Pfade,
+Versionen, Ports, Umgebungen), gemeinsamer Kern (Runner, Ratsche, Gitleaks,
+OSV, ShellCheck, Dienst-Helfer – dieselbe Kopie liegt in OmniFM,
+IT-Tabelander und dolibarr-mahnwesen; ein Fix dort lohnt sich auch hier) und
+die LION-Schritte mit `plan()`. Ein Schritt ist eine Funktion
+`(context) -> str`: Rückgabe ist die Ergebniszeile, `StepFailed` nennt Grund
+und Abhilfe, `StepSkipped` sagt, warum er hier nicht laufen kann.
+Eingetragen wird er mit `Step(gruppe, name, beschreibung, aktion, needs)`;
+`needs` nennt Schritte derselben Gruppe oder `gruppe/name`. Neue
+Befund-Prüfungen laufen über `ratchet()`, CI-Gates nie.
+
+**Maschinenlokal (nicht in Git)** auf dem zweiten PC (`C:\Programmieren`):
+Werkzeuge unter `~/.local-toolchain` (Node 20/22, Go, llvm-mingw);
+`.ci-panel/test_checks.py` zeigt jeden Schritt im VS-Code-Testing-Panel
+(über `.git/info/exclude` ausgeblendet); `C:\Programmieren\check-all.py
+--serve` ist das Dashboard über alle Repos, `Programmieren.code-workspace`
+öffnet alle fünf.
+
+### 6.2 Der CI-Spiegel (Original-PC)
 
 `.vscode/ci_mirror.py` liest `.github/workflows/ci.yml` und führt dieselben
 Schritte in Git Bash aus, inklusive Playwright und Container-Smoke.
@@ -196,7 +249,7 @@ Baseline (15.09.): Backend rund 850 bestanden / 20 übersprungen; Web
 163 Vitest-Tests; Spiegel für #253: 22 bestanden, 0 fehlgeschlagen,
 3 übersprungen.
 
-### 6.2 Ohne Spiegel (Einzelbefehle wie in ci.yml)
+### 6.3 Ohne Spiegel (Einzelbefehle wie in ci.yml)
 
 ```bash
 # Backend (venv: backend/.venv, Python 3.11)
@@ -210,7 +263,7 @@ cd mobile && npm run typecheck && npm test && npm run test:security && npm run t
 npx expo install --check
 ```
 
-### 6.3 Bekannte Stolpersteine
+### 6.4 Bekannte Stolpersteine
 
 - **Expo-Patch-Versionen:** „Validate Expo config“ (`npx expo install
   --check`) fällt durch, sobald Expo Patches veröffentlicht (15.09.: expo
