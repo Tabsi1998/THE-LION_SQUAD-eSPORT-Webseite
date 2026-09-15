@@ -123,6 +123,13 @@ async def init_indexes():
     await db.user_reports.create_index("id", unique=True)
     await db.user_reports.create_index([("status", 1), ("created_at", -1)])
     await db.user_reports.create_index([("target_user_id", 1), ("created_at", -1)])
+    # Betriebssicht (#233): Fehlergruppen und langsame Anfragen, 30 Tage per TTL.
+    await db.ops_errors.create_index("fingerprint", unique=True)
+    await db.ops_errors.create_index([("resolved_at", 1), ("last_seen_at", -1)])
+    await db.ops_errors.create_index("expires_at", expireAfterSeconds=0)
+    await db.ops_slow_requests.create_index("at")
+    await db.ops_slow_requests.create_index([("route", 1), ("at", -1)])
+    await db.ops_slow_requests.create_index("expires_at", expireAfterSeconds=0)
     # Audit
     await db.audit_logs.create_index("id", unique=True)
     await db.audit_logs.create_index("created_at")

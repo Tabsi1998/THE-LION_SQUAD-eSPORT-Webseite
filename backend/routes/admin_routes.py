@@ -13,6 +13,8 @@ from models import now_utc
 from services.competition_read import count_matches_by_status
 from services.user_notifications import create_user_notification
 
+from services.ops_monitor import errors_overview, ops_summary, set_error_resolved, slow_overview
+
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger("tls.admin")
 
@@ -153,7 +155,13 @@ async def dashboard(me: dict = Depends(require_admin())):
     }
     today_matches = await count_matches_by_status(db, {"ready", "in_progress"})
     open_disputes = await count_matches_by_status(db, {"disputed"})
+    try:
+        ops = await ops_summary(db)
+    except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
+        logger.warning("ops summary failed", exc_info=True)
+        ops = None
     return {
+        "ops": ops,
         "player_count": await db.users.count_documents({"is_active": True}),
         "team_count": await db.teams.count_documents({}),
         "active_tournaments": await db.tournaments.count_documents({"status": {"$in": ["live", "check_in"]}}),
@@ -214,6 +222,47 @@ async def mobile_client_logs(
             {"display_name": {"$regex": search, "$options": "i"}},
         ]
     return await db.mobile_client_logs.find(query, {"_id": 0}).sort([("priority_rank", 1), ("received_at", -1)]).to_list(limit)
+
+
+# ---------------------------------------------------------------- Betrieb (#233)
+
+@router.get("/ops/summary")
+async def ops_overview(me: dict = Depends(require_club_admin())):
+    return await ops_summary(get_db())
+
+
+@router.get("/ops/errors")
+async def ops_errors(
+    status: str = Query(default="open", pattern="^(open|resolved|all)$"),
+    limit: int = Query(default=100, ge=1, le=500),
+    me: dict = Depends(require_club_admin()),
+):
+    return await errors_overview(get_db(), status=status, limit=limit)
+
+
+@router.post("/ops/errors/{fingerprint}/resolve")
+async def ops_error_resolve(fingerprint: str, me: dict = Depends(require_club_admin())):
+    row = await set_error_resolved(get_db(), fingerprint, True)
+    if not row:
+        raise HTTPException(status_code=404, detail="Fehlergruppe nicht gefunden")
+    return row
+
+
+@router.post("/ops/errors/{fingerprint}/reopen")
+async def ops_error_reopen(fingerprint: str, me: dict = Depends(require_club_admin())):
+    row = await set_error_resolved(get_db(), fingerprint, False)
+    if not row:
+        raise HTTPException(status_code=404, detail="Fehlergruppe nicht gefunden")
+    return row
+
+
+@router.get("/ops/slow")
+async def ops_slow(
+    hours: int = Query(default=24, ge=1, le=720),
+    limit: int = Query(default=50, ge=1, le=200),
+    me: dict = Depends(require_club_admin()),
+):
+    return await slow_overview(get_db(), hours=hours, limit=limit)
 
 
 @router.get("/logs")

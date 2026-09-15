@@ -71,6 +71,7 @@ const ADMIN_GROUPS = [
     label: "System",
     items: [
       { to: "/admin/downloads", label: "Downloads & QR", icon: QrCode },
+      { to: "/admin/ops", label: "Betrieb", icon: AlertTriangle, clubOnly: true },
       { to: "/admin/logs", label: "Logs", icon: Activity, clubOnly: true },
       { to: "/admin/audit", label: "Audit Logs", icon: ShieldCheck, clubOnly: true },
       { to: "/admin/moderation", label: "Moderation", icon: MessagesSquare },
@@ -83,6 +84,7 @@ const ADMIN_GROUPS = [
 
 const ADMIN_SEARCH_TERMS = {
   "/admin": ["home", "start", "control"],
+  "/admin/ops": ["fehler", "tempo", "langsam", "monitoring", "betrieb", "errors"],
   "/admin/members": ["verein", "mitgliedschaft", "beitrag"],
   "/admin/member-profiles": ["profile", "spielerprofile", "vereinsspieler"],
   "/admin/membership-applications": ["antraege", "beitritt", "join"],
