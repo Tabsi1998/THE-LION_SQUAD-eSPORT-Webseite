@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0-beta - 2026-09-15
+
+- **Wichtig: einmal neu installieren.** Diese Version ist mit einem neuen Schlüssel signiert. Eine installierte LionsAPP bis Build 56 lässt sich nicht darüber aktualisieren: erst die alte App löschen, dann diese installieren und neu anmelden.
+- Release: Neues Versionsschema. Vor 1.0.0 gibt es nur Betas (`0.2.0-beta`, `0.3.0-beta` …), die früheren 1.x- und 2.x-Betas sind historisch. Der Android-Build-Zähler läuft weiter (Build 57).
+- Release: Die APK wird lokal gebaut und veröffentlicht (`npm run release:local`). Das Skript bricht ab, wenn sie nicht mit dem Upload-Schlüssel der App signiert ist.
+- Mobile: Chats, Benachrichtigungen, Dashboard, Match und Turniere aktualisieren sich sofort. Ohne Verbindung fragt die App wie bisher in Abständen nach (#201).
+- Mobile: Bilder und Videos im Chat senden und ansehen, in Direktnachricht, Team-, Turnier- und Match-Chat (#207).
+- Mobile: Sticker im Chat, mit Startpaket und eigenen Paketen des Vereins (#208).
+- Mobile: Behoben, dass Team- und Turnier-Chat ununterbrochen neu luden (#208).
+- Mobile: Nach der Anmeldung fragt die App die Zustimmung zu geänderter Datenschutzerklärung und Nutzungsbedingungen ab (#147).
+- Mobile: Erste APK mit Expo SDK 57 und React Native 0.86.3. Der Umstieg steht schon unter 2.0.0-beta.2, Build 56 enthielt aber noch SDK 56 (#162).
+
 ## 2.0.0-beta.2 - 2026-08-12
 
 - Mobile: Das Dashboard priorisiert eigene und betreute offene Matches und fuehrt direkt zur Ergebniserfassung; Erfolgs- und Fehlerfeedback ist in den Match-Workflow integriert.

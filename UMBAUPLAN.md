@@ -1,6 +1,6 @@
 # Umbauplan: Turniere, Übersichtlichkeit und die offenen Wünsche
 
-Stand: 14. September 2026 (Block 14.2 C: Sticker in Web und App).
+Stand: 15. September 2026 (App-Releases lokal, Version 0.2.0-beta, #205).
 
 Dieser Plan führt das in [RESTPLAN.md](RESTPLAN.md) als **R5** angekündigte Turnierpaket
 aus und nimmt die später dazugekommenen Themen auf (Spielwochen, PDF, Live-Aktualisierung,
@@ -305,7 +305,7 @@ Dieselben Anhänge in **allen Chats der App**: Direktnachricht, Team, Turnier un
 
 Dafür kommen drei native Module dazu: `expo-image-picker`, `expo-video` und
 `expo-video-thumbnails`. Auf dem Handy wirkt das erst mit einer **neuen APK**. Wie diese
-künftig lokal gebaut und hochgeladen wird, klärt #205. Lokal geprüft ist, dass Metro die App
+lokal gebaut und hochgeladen wird, beschreibt `mobile/RELEASES.md` (#205). Lokal geprüft ist, dass Metro die App
 mit den neuen Modulen für Android bündelt (`expo export`).
 
 ### Was 14.2 C umfasst
@@ -547,8 +547,9 @@ Als GitHub-Issues festgehalten, damit der laufende Block nicht unterbrochen wird
 - [#204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/204) Event-Formular:
   „Ort“ und „Stadt“ – die Karte kommt künftig nur aus der Adresse
 - [#205](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/205) App-Releases lokal
-  bauen und hochladen, Versionsschema `v0.x-beta` bis `v1.0.0`; offen ist, wie das zu den alten
-  Beta-Nummern 1.5.0 und 2.0.0 passt
+  bauen und hochladen, Versionsschema `v0.x-beta` bis `v1.0.0`. Entschieden am 15. September:
+  neu bei 0.x anfangen, der Build-Zähler läuft weiter (57). Umgesetzt mit `npm run release:local`.
+  Der alte Signaturschlüssel lag nur als GitHub-Secret vor; seit Build 57 gibt es einen neuen
 
 ## Noch offen und bewusst getrennt
 
@@ -567,6 +568,8 @@ Software kann keine Zugänge, echten Vereinsdaten oder einen Serverzugriff erfin
 | **Praxistest mit mehreren Nutzern** | Turnierabläufe mit echten Anmeldungen lassen sich als einzelner Nutzer im Livesystem nicht prüfen. |
 | **Abnahme nach Ausrollen** | Siehe [STAGING_ABNAHME.md](STAGING_ABNAHME.md). |
 | **Chat mit Bildern und Stickern am Handy testen** | Mit der nächsten APK: in einer Direktnachricht ein Foto, ein kurzes Video und einen Sticker senden, auf dem zweiten Konto öffnen. Erst dann sind 14.2 B und C wirklich auf dem Gerät bestätigt. |
+| **Neuen App-Schlüssel sichern** | Seit Build 57 ist die App mit einem neuen Schlüssel signiert; er liegt in `%USERPROFILE%\.lionsapp-release`. Den ganzen Ordner auf einen USB-Stick oder in den Passwortmanager sichern. Geht er verloren, muss jede installierte App wieder neu installiert werden. |
+| **Alte App einmal löschen** | Build 57 lässt sich wegen des neuen Schlüssels nicht über Build 56 installieren: alte LionsAPP löschen, neue installieren, neu anmelden. Das gilt für alle, die die App schon haben. |
 | **Eigene Sticker anlegen** | Nach dem Ausrollen unter *Admin → Content → Sticker* ein Paket „Lion Squad“ anlegen und Löwe oder Maskottchen als PNG mit durchsichtigem Hintergrund hochladen. Ein leeres Paket erscheint im Chat nicht. |
 | **Medienbericht nach Block 12** | `docker compose exec backend python3 scripts/media-report.py` (nur lesend). Zeigt, was eure Bilder und ihre Fassungen wiegen, und ob 400/800/1600 px die richtigen Breiten sind. |
 

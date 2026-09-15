@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "2.0.0-beta.2",
+  "version": "0.2.0-beta",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -12,7 +12,9 @@
     "test:watch": "jest --watch",
     "audit:ci": "node scripts/audit-ci.cjs",
     "test:security": "node --no-warnings --test scripts/cache-security.test.mjs scripts/logging-security.test.mjs",
-    "release:preflight": "node scripts/release-preflight.cjs"
+    "release:preflight": "node scripts/release-preflight.cjs",
+    "release:local": "node scripts/release-local.cjs",
+    "test:release": "node --no-warnings --test scripts/release-version.test.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
