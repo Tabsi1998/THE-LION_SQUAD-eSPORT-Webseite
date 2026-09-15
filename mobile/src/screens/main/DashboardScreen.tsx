@@ -170,29 +170,32 @@ export function DashboardScreen({ navigation }: Props) {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
       >
+        {/* Eine Zeile Begrüßung mit den Pills daneben; der Erklärsatz ist weg (#248). */}
         <Card style={styles.heroCard}>
           <View style={styles.heroTop}>
             <View style={styles.heroMark}>
               <Ionicons name={isGuest ? "radio-outline" : "shield-checkmark-outline"} color={colors.black} size={22} />
             </View>
             <View style={styles.flex}>
-              <Muted style={styles.heroEyebrow}>{isGuest ? "THE LION SQUAD" : "Willkommen zurück"}</Muted>
+              <Muted style={styles.heroEyebrow}>{isGuest ? "THE LION SQUAD" : "Hallo"}</Muted>
               <Title>{isGuest ? "Live Home" : displayName(user)}</Title>
             </View>
+            <View style={styles.heroBadges}>
+              <Badge label={isGuest ? "Gast" : user?.is_club_member ? "Vereinsmitglied" : "Community"} tone={isGuest || !user?.is_club_member ? "cyan" : "gold"} />
+              {!isGuest && user?.is_tournament_staff ? <Badge label="Staff" /> : null}
+            </View>
           </View>
-          <Body style={styles.heroBody}>{isGuest ? "Aktuelle Turniere, Events und News aus der Website." : "Deine nächsten Termine, offenen Aktionen und Vereins-News."}</Body>
-          <View style={styles.heroBadges}>
-            <Badge label={isGuest ? "Gastmodus" : user?.is_club_member ? "Vereinsmitglied" : "Community"} tone={isGuest || !user?.is_club_member ? "cyan" : "gold"} />
-            {!isGuest && user?.is_tournament_staff ? <Badge label="Staff" /> : null}
-          </View>
+          {isGuest ? <Body style={styles.heroBody}>Aktuelle Turniere, Events und News aus der Website.</Body> : null}
         </Card>
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
         {offline && !error ? <OfflineNotice /> : null}
 
+        {/* Eine Null als Kennzahl sagt nichts: "Aktionen" nur, wenn es welche gibt (#248). */}
         <View style={styles.grid}>
           <Stat label={isGuest ? "Turniere" : "Meine Termine"} value={String(isGuest ? data.stats.public_tournaments : timeline.length)} />
-          <Stat label={isGuest ? "Events" : "Aktionen"} value={String(isGuest ? data.stats.public_events : data.stats.open_actions)} tone="gold" />
+          {isGuest ? <Stat label="Events" value={String(data.stats.public_events)} tone="gold" /> : null}
+          {!isGuest && data.stats.open_actions > 0 ? <Stat label="Aktionen" value={String(data.stats.open_actions)} tone="gold" /> : null}
           <Stat label="News" value={String(data.stats.news)} />
         </View>
 
@@ -298,9 +301,9 @@ export function DashboardScreen({ navigation }: Props) {
           </Pressable>
         ) : null}
 
-        <Section title="News">
+        <Section title="News" actionLabel="Alle News" onAction={() => navigation.navigate("More", { screen: "NewsList" })}>
           {data.news.length ? (
-            data.news.slice(0, 4).map((post) => (
+            data.news.slice(0, 3).map((post) => (
               <NewsCard
                 key={post.id}
                 post={post}
@@ -387,10 +390,7 @@ function Section({ title, actionLabel, onAction, children }: { title: string; ac
 }
 
 function TimelineCard({ item, onPress }: { item: TimelineItem; onPress: () => void }) {
-  const detail = [item.detail, item.registrationStatus ? `Anmeldung: ${formatStatus(item.registrationStatus)}` : null]
-    .filter(Boolean)
-    .join(" · ");
-
+  // Die eigene Anmeldung als Pill neben dem Datum statt als Text (#248).
   return (
     <ContentCard
       kind={item.kind}
@@ -399,7 +399,8 @@ function TimelineCard({ item, onPress }: { item: TimelineItem; onPress: () => vo
       date={item.date}
       label={item.phaseLabel}
       status={item.status}
-      detail={detail}
+      secondaryLabel={item.registrationStatus ? formatStatus(item.registrationStatus) : null}
+      detail={item.detail}
       onPress={onPress}
     />
   );
@@ -467,7 +468,7 @@ function QuickAction({ icon, label, onPress }: { icon: keyof typeof Ionicons.gly
   return (
     <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}>
       <Ionicons name={icon} color={colors.cyan} size={18} />
-      <Muted style={styles.quickLabel}>{label}</Muted>
+      <Muted style={styles.quickLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{label}</Muted>
     </Pressable>
   );
 }
@@ -524,9 +525,9 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.86)",
   },
   heroBadges: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+    alignItems: "flex-end",
+    flexShrink: 0,
+    gap: 6,
   },
   error: {
     color: colors.live,
@@ -536,8 +537,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   quickRow: {
+    // Drei gleich breite Pills in einer Zeile; "Verein" rutschte vorher in die zweite (#248).
     flexDirection: "row",
-    flexWrap: "wrap",
+    flexWrap: "nowrap",
     gap: 8,
   },
   quickAction: {
@@ -546,14 +548,18 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 999,
     borderWidth: 1,
+    flex: 1,
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
+    justifyContent: "center",
     minHeight: 40,
-    paddingHorizontal: 14,
+    minWidth: 0,
+    paddingHorizontal: 10,
     paddingVertical: 8,
   },
   quickLabel: {
     color: colors.white,
+    flexShrink: 1,
     fontWeight: "900",
   },
   seasonRow: {

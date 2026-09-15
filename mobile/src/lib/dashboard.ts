@@ -51,6 +51,34 @@ export function splitHomeTimeline(items: HomeItem[], now: Date = new Date(), { l
   };
 }
 
+// Dieselbe Regel wie im Backend (_still_relevant in mobile_routes.py): ein
+// Termin ist offen, solange er nicht beendet oder abgesagt ist und heute oder
+// später endet. Der Events-Tab zeigt sonst Beendetes und Abgesagtes zwischen
+// dem, was ansteht (#241).
+const DONE_STATUSES = new Set(["completed", "results_published", "archived", "cancelled", "finished", "closed"]);
+
+export type DatedItem = { status?: string | null; date?: string | null; endDate?: string | null };
+
+function startOfLocalDay(now: Date) {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+}
+
+export function isStillRelevant(item: DatedItem, now: Date = new Date()) {
+  if (DONE_STATUSES.has(String(item.status || "").toLowerCase())) return false;
+  const end = Date.parse(item.endDate || item.date || "");
+  if (Number.isNaN(end)) return true;
+  return end >= startOfLocalDay(now);
+}
+
+/** Offenes zuerst; Vergangenes getrennt und neueste zuerst. */
+export function splitOpenAndPast<T extends DatedItem>(items: T[], now: Date = new Date()) {
+  const open = items.filter((item) => isStillRelevant(item, now));
+  const past = items
+    .filter((item) => !isStillRelevant(item, now))
+    .sort((a, b) => (Date.parse(b.date || "") || 0) - (Date.parse(a.date || "") || 0));
+  return { open, past };
+}
+
 export type SeasonSummary = {
   name?: string | null;
   my_rank?: number | null;

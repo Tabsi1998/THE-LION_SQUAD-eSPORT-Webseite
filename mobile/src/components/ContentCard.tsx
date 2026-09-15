@@ -9,8 +9,10 @@ import { StatusBadge } from "./StatusBadge";
 
 export type ContentCardKind = "event" | "fastlap" | "news" | "team" | "tournament";
 
+// Die ganze Karte ist tippbar; einen zweiten Knopf "Details" darunter gibt
+// es nicht mehr (#248). `secondaryLabel` ist ein zweiter Status, etwa die
+// eigene Anmeldung.
 export function ContentCard({
-  actionLabel,
   compact = false,
   date,
   description,
@@ -20,10 +22,10 @@ export function ContentCard({
   label,
   onPress,
   phase,
+  secondaryLabel,
   status,
   title,
 }: {
-  actionLabel?: string | null;
   compact?: boolean;
   date?: string | null;
   description?: string | null;
@@ -33,12 +35,12 @@ export function ContentCard({
   label?: string | null;
   onPress?: () => void;
   phase?: { label?: string | null; state?: string | null } | string | null;
+  secondaryLabel?: string | null;
   status?: string | null;
   title?: string | null;
 }) {
   const accent = accentForKind(kind);
   const body = stripText(description || detail || "");
-  const cta = actionLabel || actionLabelForKind(kind);
   const content = (
     <>
       <MediaImage
@@ -55,21 +57,17 @@ export function ContentCard({
         <View style={styles.metaRow}>
           {date ? <Muted>{formatDate(date)}</Muted> : null}
           {label || phase || status ? <StatusBadge label={label} phase={phase} status={status} /> : null}
+          {secondaryLabel ? <StatusBadge label={secondaryLabel} /> : null}
         </View>
         {body ? <Muted numberOfLines={2}>{body}</Muted> : null}
-        {onPress ? (
-          <View style={styles.actionRow}>
-            <Muted style={styles.actionText}>{cta}</Muted>
-            <Ionicons name="arrow-forward" color={colors.black} size={13} />
-          </View>
-        ) : null}
       </View>
+      {onPress ? <Ionicons name="chevron-forward" color={colors.muted} size={16} /> : null}
     </>
   );
 
   if (!onPress) return <View style={styles.card}>{content}</View>;
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       {content}
     </Pressable>
   );
@@ -81,12 +79,6 @@ function labelForKind(kind: ContentCardKind) {
   if (kind === "news") return "News";
   if (kind === "team") return "Team";
   return "Turnier";
-}
-
-function actionLabelForKind(kind: ContentCardKind) {
-  if (kind === "news") return "Lesen";
-  if (kind === "team") return "Team ansehen";
-  return "Details";
 }
 
 function iconForKind(kind: ContentCardKind) {
@@ -139,24 +131,6 @@ const styles = StyleSheet.create({
   },
   compactBody: {
     paddingVertical: 8,
-  },
-  actionRow: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: colors.cyan,
-    borderRadius: 6,
-    flexDirection: "row",
-    gap: 5,
-    marginTop: 2,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-  },
-  actionText: {
-    color: colors.black,
-    fontSize: 11,
-    fontWeight: "900",
-    lineHeight: 14,
-    textTransform: "uppercase",
   },
   kindRow: {
     alignItems: "center",

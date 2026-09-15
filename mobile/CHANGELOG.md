@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0-beta - 2026-09-15
+
+- Mobile: Der Events-Tab zeigt ohne Tipp nur, was ansteht; Beendetes und Abgesagtes steht hinter „Vergangene anzeigen (N)“. Die Zähler oben zählen dieselbe Menge wie die Liste (#241).
+- Mobile: „Mehr“ → Gaming ohne Fast Laps – die haben den Events-Tab und den Schnellzugriff auf der Startseite (#242).
+- Mobile: Sponsoren, Partner, Referenzen, Vorteile und Spielerprofile aus „Mehr“ sind eigene Seiten mit eigenem Titel, ohne die Verschiebeleiste des Infocenters (#243).
+- Mobile: Sponsoren nach Stufe wie auf der Webseite: Hauptsponsor volle Breite, Gold zu zweit, Silber zu dritt, Bronze zu viert, Logos ohne Boxen (#244).
+- Mobile: Startseite: eine Zeile Begrüßung mit den Pills daneben, „Aktionen“ nur wenn es welche gibt, Schnellzugriffe in einer Zeile, Anmeldestatus als Pill, News auf drei mit „Alle News“ (#248).
+- Mobile: Karten für Termine und News haben keinen zweiten Knopf „Details“/„Lesen“ mehr; die ganze Karte ist tippbar (#248).
+
 ## 0.3.1-beta - 2026-09-15
 
 - Mobile: Mehr → Referenzen zeigt die Referenzen des Vereins mit Platzierung, Spiel, Lineup und Zusammenfassung; vorher blieb die Liste leer, weil die App ein Array erwartete, der Server aber `{ items, summary }` liefert (#252).

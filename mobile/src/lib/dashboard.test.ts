@@ -1,3 +1,4 @@
+import { isStillRelevant, splitOpenAndPast } from "./dashboard";
 import { isLiveOrToday, seasonLine, splitHomeTimeline, type HomeItem } from "./dashboard";
 
 // Die Startseite zeigte Halloween am 15. September unter "Heute und Live" und
@@ -5,6 +6,29 @@ import { isLiveOrToday, seasonLine, splitHomeTimeline, type HomeItem } from "./d
 
 const now = new Date(2026, 8, 15, 18, 0); // 15.09.2026, 18:00 Ortszeit
 const item = (overrides: Partial<HomeItem>): HomeItem => ({ id: "x", kind: "event", title: "Termin", ...overrides });
+
+// Der Events-Tab zeigte Beendetes und Abgesagtes zwischen dem, was ansteht (#241).
+describe("Offen und vergangen", () => {
+  test("beendet, abgesagt oder gestern ist vergangen; heute und später ist offen", () => {
+    expect(isStillRelevant({ status: "registration_open", date: "2026-10-31T18:00:00Z" }, now)).toBe(true);
+    expect(isStillRelevant({ status: "scheduled", date: "2026-09-15T09:00:00" }, now)).toBe(true);
+    expect(isStillRelevant({ status: "cancelled", date: "2026-09-12T18:00:00Z" }, now)).toBe(false);
+    expect(isStillRelevant({ status: "completed", date: "2026-10-31T18:00:00Z" }, now)).toBe(false);
+    expect(isStillRelevant({ status: "scheduled", date: "2026-09-14T23:00:00" }, now)).toBe(false);
+    expect(isStillRelevant({ status: "scheduled", date: "2026-09-10T09:00:00", endDate: "2026-09-16T09:00:00" }, now)).toBe(true);
+    expect(isStillRelevant({ status: "scheduled" }, now)).toBe(true);
+  });
+
+  test("Vergangenes steht getrennt und neueste zuerst", () => {
+    const { open, past } = splitOpenAndPast([
+      { id: "a", status: "completed", date: "2026-05-23" },
+      { id: "b", status: "registration_open", date: "2026-10-31" },
+      { id: "c", status: "cancelled", date: "2026-09-12" },
+    ], now);
+    expect(open.map((row) => row.id)).toEqual(["b"]);
+    expect(past.map((row) => row.id)).toEqual(["c", "a"]);
+  });
+});
 
 describe("Heute und Live", () => {
   test("eine offene Anmeldung in sechs Wochen ist nicht live", () => {
