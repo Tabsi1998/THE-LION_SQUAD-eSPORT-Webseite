@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Image, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch, TextInput, View } from "react-native";
 import { ActionRow, ActionTile } from "../../components/ActionRow";
@@ -44,15 +44,16 @@ type AchievementTier = {
   earned_at?: string;
 };
 
+// Reiter nur für Inhalt. Bearbeiten erreicht man über die Aktionszeile,
+// Privatsphäre und Benachrichtigungen über das Zahnrad (#213). Vorher standen
+// hier sieben Reiter unter sieben Kacheln, vier davon doppelt.
 const tabs: Array<{ key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
   { key: "overview", label: "Übersicht", icon: "person-circle-outline" },
   { key: "references", label: "Referenzen", icon: "ribbon-outline" },
-  { key: "prizes", label: "Gewinne", icon: "trophy-outline" },
-  { key: "edit", label: "Bearbeiten", icon: "create-outline" },
+  { key: "prizes", label: "Gewinne", icon: "gift-outline" },
   { key: "achievements", label: "Erfolge", icon: "trophy-outline" },
-  { key: "privacy", label: "Privat", icon: "shield-checkmark-outline" },
-  { key: "notifications", label: "Benachr.", icon: "notifications-outline" },
 ];
+const SETTINGS_TABS: TabKey[] = ["privacy", "notifications"];
 
 const notificationChannels: Array<{ key: string; label: string; detail: string }> = [
   { key: "email", label: "E-Mail", detail: "Nur wichtige optionale Hinweise per Mail." },
@@ -104,8 +105,12 @@ export function ProfileScreen() {
   const [profileError, setProfileError] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [view, setView] = useState<"profile" | "settings">("profile");
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveRef = useRef<(successText?: string) => Promise<void>>(async () => {});
 
   const guest = isGuestUser(user);
+  const activeTab = view === "settings" ? null : tab;
 
   const resetForm = useCallback(() => {
     const u = (user || {}) as Record<string, any>;
@@ -192,8 +197,12 @@ export function ProfileScreen() {
   }, [loadProfileData]);
 
   useEffect(() => {
-    const requestedTab = route.params?.tab;
-    if (requestedTab && tabs.some((item) => item.key === requestedTab)) {
+    const requestedTab = route.params?.tab as TabKey | undefined;
+    if (!requestedTab) return;
+    if (SETTINGS_TABS.includes(requestedTab)) {
+      setView("settings");
+    } else if (requestedTab === "edit" || tabs.some((item) => item.key === requestedTab)) {
+      setView("profile");
       setTab(requestedTab);
     }
   }, [route.params?.tab]);
@@ -219,7 +228,7 @@ export function ProfileScreen() {
     return { open, ready, pickedUp };
   }, [prizes]);
 
-  const save = useCallback(async () => {
+  const save = useCallback(async (successText = "Profil gespeichert.") => {
     if (guest) return;
     setSaving(true);
     setMessage("");
@@ -233,7 +242,7 @@ export function ProfileScreen() {
           .filter(Boolean),
       };
       const { data } = await api.patch("/users/me", payload);
-      setMessage("Profil gespeichert.");
+      setMessage(successText);
       await refreshMe();
       setForm((current) => ({ ...current, ...data }));
       await loadProfileData();
@@ -243,6 +252,22 @@ export function ProfileScreen() {
       setSaving(false);
     }
   }, [form, guest, loadProfileData, refreshMe]);
+  saveRef.current = save;
+
+  // Schalter in den Einstellungen speichern von selbst, kurz nach dem letzten
+  // Tipp. Vorher stand unter 24 Schaltern ein "Speichern"-Knopf, den man
+  // leicht vergaß. Der Ref nimmt beim Auslösen das aktuelle Formular.
+  const scheduleSave = useCallback(() => {
+    if (guest) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
+      void saveRef.current("Gespeichert.");
+    }, 700);
+  }, [guest]);
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+  }, []);
 
   const evaluateAchievements = useCallback(async () => {
     if (guest) return;
@@ -348,29 +373,33 @@ export function ProfileScreen() {
         </View>
 
         <View style={styles.quickActions}>
-          <ActionTile icon="create-outline" label="Bearbeiten" onPress={() => setTab("edit")} />
-          <ActionTile icon="open-outline" label="Öffentlich" onPress={guest ? undefined : openPublicProfile} />
+          <ActionTile icon="create-outline" label="Bearbeiten" onPress={guest ? undefined : () => { setView("profile"); setTab("edit"); }} />
           <ActionTile icon="share-social-outline" label="Teilen" onPress={guest ? undefined : sharePublicProfile} />
-          <ActionTile icon="trophy-outline" label="Gewinne" onPress={guest ? undefined : () => setTab("prizes")} />
-          <ActionTile icon="refresh-outline" label={refreshing ? "Lädt" : "Aktualisieren"} onPress={guest || refreshing ? undefined : refreshProfile} />
-          <ActionTile icon="shield-checkmark-outline" label="Privat" onPress={() => setTab("privacy")} />
-          <ActionTile icon="notifications-outline" label="Benachr." onPress={() => setTab("notifications")} />
+          <ActionTile icon="open-outline" label="Öffentlich" onPress={guest ? undefined : openPublicProfile} />
+          <ActionTile icon="settings-outline" label="Einstellungen" onPress={() => setView("settings")} />
         </View>
 
-        <View style={styles.tabs}>
-          {tabs.map((item) => (
-            <Pressable key={item.key} onPress={() => setTab(item.key)} style={[styles.tab, tab === item.key && styles.tabActive]}>
-              <Ionicons name={item.icon} color={tab === item.key ? colors.cyan : colors.muted} size={15} />
-              <Muted style={[styles.tabText, tab === item.key && styles.tabTextActive]}>{item.label}</Muted>
-            </Pressable>
-          ))}
-        </View>
+        {view === "settings" ? (
+          <Pressable onPress={() => setView("profile")} accessibilityRole="button" style={styles.backRow} testID="profile-back">
+            <Ionicons name="arrow-back" color={colors.cyan} size={16} />
+            <Muted style={styles.backText}>Zurück zum Profil</Muted>
+          </Pressable>
+        ) : (
+          <View style={styles.tabs}>
+            {tabs.map((item) => (
+              <Pressable key={item.key} onPress={() => setTab(item.key)} accessibilityRole="tab" accessibilityState={{ selected: tab === item.key }} style={[styles.tab, tab === item.key && styles.tabActive]}>
+                <Ionicons name={item.icon} color={tab === item.key ? colors.cyan : colors.muted} size={15} />
+                <Muted style={[styles.tabText, tab === item.key && styles.tabTextActive]}>{item.label}</Muted>
+              </Pressable>
+            ))}
+          </View>
+        )}
 
         {message ? <Muted style={message.includes("konnte") ? styles.error : styles.success}>{message}</Muted> : null}
         {profileError ? <Muted style={styles.error}>{profileError}</Muted> : null}
         {profileLoading && !guest ? <SkeletonList count={3} hasImage={false} /> : null}
 
-        {!profileLoading && tab === "overview" ? (
+        {!profileLoading && activeTab === "overview" ? (
           <>
             <Card style={styles.card}>
               <Heading>Profilstatus</Heading>
@@ -409,7 +438,7 @@ export function ProfileScreen() {
           </>
         ) : null}
 
-        {!profileLoading && tab === "references" ? (
+        {!profileLoading && activeTab === "references" ? (
           <>
             <Card style={styles.card}>
               <Heading>Meine Referenzen</Heading>
@@ -434,7 +463,7 @@ export function ProfileScreen() {
           </>
         ) : null}
 
-        {!profileLoading && tab === "prizes" ? (
+        {!profileLoading && activeTab === "prizes" ? (
           <>
             <Card style={styles.card}>
               <Heading>Meine Gewinne</Heading>
@@ -455,9 +484,14 @@ export function ProfileScreen() {
           </>
         ) : null}
 
-        {!profileLoading && tab === "edit" ? (
+        {!profileLoading && activeTab === "edit" ? (
           <Card style={styles.card}>
-            <Heading>Profil bearbeiten</Heading>
+            <View style={styles.cardTop}>
+              <Heading>Profil bearbeiten</Heading>
+              <Pressable onPress={() => setTab("overview")} style={styles.smallAction} accessibilityRole="button">
+                <Muted style={styles.smallActionText}>Fertig</Muted>
+              </Pressable>
+            </View>
             {guest ? <Muted>Profilbearbeitung ist nur nach Login aktiv.</Muted> : null}
             <Field label="Anzeigename" value={form.display_name} onChangeText={(v) => setField(setForm, "display_name", v)} />
             <Field label="Vorname" value={form.first_name} onChangeText={(v) => setField(setForm, "first_name", v)} />
@@ -476,20 +510,20 @@ export function ProfileScreen() {
             {["discord_name", "twitch_handle", "youtube_handle", "tiktok_handle", "instagram_handle", "x_handle", "steam_id", "epic_id", "psn_id", "xbox_id", "nintendo_fc", "ea_id", "riot_id", "battlenet_id", "website"].map((key) => (
               <Field key={key} label={labelFor(key)} value={form[key]} onChangeText={(v) => setField(setForm, key, v)} />
             ))}
-            <Button label={saving ? "Speichert ..." : "Profil speichern"} onPress={save} disabled={guest || saving} />
+            <Button label={saving ? "Speichert ..." : "Profil speichern"} onPress={() => save()} disabled={guest || saving} />
           </Card>
         ) : null}
 
-        {!profileLoading && tab === "achievements" ? (
+        {!profileLoading && activeTab === "achievements" ? (
           <>
             <Card style={styles.card}>
               <View style={styles.cardTop}>
                 <Heading>Erfolge</Heading>
-                <Pressable onPress={evaluateAchievements} disabled={guest} style={styles.smallAction}>
-                  <Muted style={styles.smallActionText}>Prüfen</Muted>
+                <Pressable onPress={evaluateAchievements} disabled={guest} style={styles.smallAction} accessibilityRole="button">
+                  <Muted style={styles.smallActionText}>Neu berechnen</Muted>
                 </Pressable>
               </View>
-              <Muted>{insights.points} Punkte · {insights.earned.length} freigeschaltet · {insights.tiers.length} Gesamtstufen</Muted>
+              <Muted>{insights.earned.length} von {insights.tiers.length} Stufen freigeschaltet · {insights.points} Punkte</Muted>
             </Card>
             {(achievements.groups || []).length ? (
               (achievements.groups || []).map((group) => (
@@ -508,27 +542,27 @@ export function ProfileScreen() {
           </>
         ) : null}
 
-        {!profileLoading && tab === "privacy" ? (
+        {!profileLoading && view === "settings" ? (
           <Card style={styles.card}>
             <Heading>Privatsphäre</Heading>
-            <Toggle label="Öffentliches Profil" detail="Profil ist in der Community-Suche sichtbar." value={Boolean(form.privacy_public_profile)} onValueChange={(v) => setField(setForm, "privacy_public_profile", v)} />
-            <Toggle label="Twitch im Profil anzeigen" detail="Live-Embed darf auf deinem öffentlichen Profil erscheinen." value={Boolean(form.show_twitch_embed)} onValueChange={(v) => setField(setForm, "show_twitch_embed", v)} />
+            <Muted>Änderungen werden von selbst gespeichert.</Muted>
+            <Toggle label="Öffentliches Profil" detail="Profil ist in der Community-Suche sichtbar." value={Boolean(form.privacy_public_profile)} onValueChange={(v) => { setField(setForm, "privacy_public_profile", v); scheduleSave(); }} />
+            <Toggle label="Twitch im Profil anzeigen" detail="Live-Embed darf auf deinem öffentlichen Profil erscheinen." value={Boolean(form.show_twitch_embed)} onValueChange={(v) => { setField(setForm, "show_twitch_embed", v); scheduleSave(); }} />
             <Muted>Direktnachrichten</Muted>
             <View style={styles.optionGrid}>
               {dmOptions.map(([value, label]) => (
-                <Pressable key={value} onPress={() => setField(setForm, "dm_privacy", value)} style={[styles.option, form.dm_privacy === value && styles.optionActive]}>
+                <Pressable key={value} onPress={() => { setField(setForm, "dm_privacy", value); scheduleSave(); }} accessibilityRole="radio" accessibilityState={{ selected: form.dm_privacy === value }} style={[styles.option, form.dm_privacy === value && styles.optionActive]}>
                   <Muted style={[styles.optionText, form.dm_privacy === value && styles.optionTextActive]}>{label}</Muted>
                 </Pressable>
               ))}
             </View>
-            <Button label="Privatsphäre speichern" onPress={save} disabled={guest || saving} />
           </Card>
         ) : null}
 
-        {!profileLoading && tab === "notifications" ? (
+        {!profileLoading && view === "settings" ? (
           <Card style={styles.card}>
             <Heading>Benachrichtigungen</Heading>
-            <Toggle label="Newsletter" detail="Grundsätzliche Zustimmung für News und Events." value={Boolean(form.newsletter_consent)} onValueChange={(v) => setField(setForm, "newsletter_consent", v)} />
+            <Toggle label="Newsletter" detail="Grundsätzliche Zustimmung für News und Events." value={Boolean(form.newsletter_consent)} onValueChange={(v) => { setField(setForm, "newsletter_consent", v); scheduleSave(); }} />
             <Muted style={styles.sectionText}>Kanäle</Muted>
             {notificationChannels.map((item) => (
               <Toggle
@@ -536,12 +570,13 @@ export function ProfileScreen() {
                 label={item.label}
                 detail={item.detail}
                 value={notificationEnabled(item.key)}
-                onValueChange={(v) =>
+                onValueChange={(v) => {
                   setForm((current) => ({
                     ...current,
                     notification_preferences: { ...(current.notification_preferences || {}), [item.key]: v },
-                  }))
-                }
+                  }));
+                  scheduleSave();
+                }}
               />
             ))}
             <Muted style={styles.sectionText}>Jede Benachrichtigung pro Kanal</Muted>
@@ -562,19 +597,20 @@ export function ProfileScreen() {
                         label={channel.label}
                         value={enabled}
                         disabled={disabled}
-                        onValueChange={(v) =>
+                        onValueChange={(v) => {
                           setForm((current) => ({
                             ...current,
                             notification_preferences: { ...(current.notification_preferences || {}), [key]: v },
-                          }))
-                        }
+                          }));
+                          scheduleSave();
+                        }}
                       />
                     );
                   })}
                 </View>
               </View>
             ))}
-            <Button label="Benachrichtigungen speichern" onPress={save} disabled={guest || saving} />
+            {saving ? <Muted>Speichert …</Muted> : null}
           </Card>
         ) : null}
 
@@ -582,9 +618,9 @@ export function ProfileScreen() {
           <Card style={styles.card}>
             <Muted>Live-Gastmodus aktiv. Profilbearbeitung und persönliche Einstellungen sind nach Login verfügbar.</Muted>
           </Card>
-        ) : (
+        ) : view === "settings" ? (
           <ActionRow icon="log-out-outline" label="Abmelden" detail="Dieses Gerät aus deinem Konto ausloggen." tone="danger" onPress={logout} />
-        )}
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -923,6 +959,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+  },
+  backRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+    minHeight: 38,
+  },
+  backText: {
+    color: colors.cyan,
+    fontWeight: "900",
   },
   tab: {
     alignItems: "center",

@@ -259,6 +259,16 @@ export type DashboardAction = {
   priority?: number;
 };
 
+export type DashboardSeason = {
+  id: string;
+  slug?: string | null;
+  name?: string | null;
+  participant_count?: number | null;
+  my_rank?: number | null;
+  my_points?: number | null;
+  leader?: { display_name?: string | null; points?: number | null } | null;
+};
+
 export type MobileDashboardData = {
   me: {
     tournaments: Tournament[];
@@ -273,6 +283,7 @@ export type MobileDashboardData = {
   };
   news: NewsPost[];
   streams: LiveStream[];
+  season?: DashboardSeason | null;
   stats: {
     my_tournaments: number;
     my_events: number;

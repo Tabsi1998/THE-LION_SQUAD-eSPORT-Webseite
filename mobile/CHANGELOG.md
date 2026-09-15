@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0-beta - 2026-09-15
+
+- Mobile: Die Startseite zeigt nur noch Termine ab heute; Vergangenes und Abgesagtes fällt weg. Live und Heute stehen oben, danach höchstens vier nächste Termine, der Rest hinter „Alle (N)“. Die Jahreswertung steht als eine Zeile mit eigenem Platz und Führendem, die Schnellzugriffe sind auf drei geschrumpft (#212).
+- Mobile: Das Profil hat vier Reiter (Übersicht, Referenzen, Gewinne, Erfolge) und eine Aktionszeile (Bearbeiten, Teilen, Öffentlich, Einstellungen). Privatsphäre, Benachrichtigungen und Abmelden liegen hinter dem Zahnrad; Schalter speichern von selbst. Erfolge zeigen „X von Y Stufen freigeschaltet“ (#213).
+- Mobile: „Mehr“ ist eine Liste in den Gruppen Konto, Gaming und Verein statt großer Karten. Die Vereinskanäle („Folge uns“) kommen aus den Einstellungen; der fest eingebaute, falsche Discord-Link ist weg. Version und Build stehen klein am Ende (#214).
+- Mobile: Die Teamliste zeigt eigene Teams mit Chat-Knopf und letzter Nachricht, darunter die weiteren öffentlichen Teams. „0 Squads“ erscheint nicht mehr; ohne Team erklärt die Seite, wie man beitritt (#215).
+
 ## 0.2.1-beta - 2026-09-15
 
 - Mobile: Die Chat-Eingabe bleibt bei geöffneter Tastatur an der Tastaturkante, Nachrichten laufen nicht mehr darunter weiter. Gilt für Direktnachrichten, Team-, Turnier- und Match-Chat (#210).

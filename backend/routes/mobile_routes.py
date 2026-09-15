@@ -5,6 +5,7 @@ import json
 import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -23,6 +24,12 @@ STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 ACTIVE_TOURNAMENT_REGISTRATION_STATUSES = {"pending", "registered", "approved", "checked_in", "waitlist"}
 ACTIVE_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in", "waitlist"}
 HIDDEN_PUBLIC_STATUSES = {"draft", "completed", "results_published", "archived", "cancelled"}
+DONE_STATUSES = {"completed", "results_published", "archived", "cancelled"}
+try:
+    LOCAL_TZ = ZoneInfo("Europe/Vienna")
+except ZoneInfoNotFoundError:  # pragma: no cover - Container ohne Zeitzonendaten
+    LOCAL_TZ = timezone(timedelta(hours=1), "Europe/Vienna")
+SEASON_CACHE_SECONDS = 60
 
 
 class MobilePushTokenCreate(BaseModel):
@@ -118,6 +125,63 @@ def _date_key(row: dict) -> datetime:
         or _parse_dt(row.get("scheduled_at"))
         or datetime.max.replace(tzinfo=timezone.utc)
     )
+
+
+def _start_of_local_day(now: datetime) -> datetime:
+    """Mitternacht in Österreich, als UTC - "heute" richtet sich nach dem Verein, nicht nach dem Server."""
+    local = now.astimezone(LOCAL_TZ)
+    return local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+
+
+def _still_relevant(row: dict, day_start: datetime) -> bool:
+    """Eigene Termine auf der Startseite: heute oder später, und nicht vorbei.
+
+    Vorher standen unter "Meine nächsten Termine" auch der Summer Cup vom Mai
+    und die abgesagte Championship, und der Zähler zählte sie mit (#212).
+    """
+    if (row.get("status") or "") in DONE_STATUSES:
+        return False
+    start = _parse_dt(row.get("start_date")) or _parse_dt(row.get("date"))
+    end = _parse_dt(row.get("end_date")) or start
+    return end is None or end >= day_start
+
+
+# Die Jahreswertung rechnet über alle Turniere und Fast Laps. Für die Startseite
+# reicht ein Stand pro Minute; jeder App-Start und jede Live-Meldung laden sie.
+_season_cache: dict[str, Any] = {"at": None, "season_id": None, "standings": []}
+
+
+async def _season_summary(user: dict | None) -> dict | None:
+    from routes.season_routes import season_standings
+
+    db = get_db()
+    season = await db.seasons.find_one(
+        {"status": "active"}, {"_id": 0, "id": 1, "slug": 1, "name": 1, "start_date": 1},
+        sort=[("start_date", -1)],
+    )
+    if not season:
+        return None
+    now = now_utc()
+    cached_at = _season_cache["at"]
+    if _season_cache["season_id"] != season["id"] or not cached_at or (now - cached_at).total_seconds() > SEASON_CACHE_SECONDS:
+        try:
+            result = await season_standings(season["id"])
+            standings = result.get("standings") if isinstance(result, dict) else []
+        except Exception:
+            standings = []
+        _season_cache.update(at=now, season_id=season["id"], standings=list(standings or []))
+    standings = _season_cache["standings"]
+    mine = next((row for row in standings if user and row.get("user_id") == user.get("id")), None)
+    leader = standings[0] if standings else None
+    return {
+        "id": season["id"],
+        "slug": season.get("slug"),
+        "name": season.get("name") or "Jahreswertung",
+        "participant_count": len(standings),
+        "my_rank": mine.get("rank") if mine else None,
+        "my_points": mine.get("points") if mine else None,
+        "leader": {"display_name": leader.get("display_name"), "points": leader.get("points")} if leader else None,
+    }
 
 
 def _public_user_registration(registration: dict | None) -> dict | None:
@@ -428,6 +492,7 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
     my_matches: list[dict] = []
     staff_matches: list[dict] = []
 
+    day_start = _start_of_local_day(now_utc())
     if user:
         tournament_regs = await _my_tournament_registrations(user)
         tournament_ids = list({reg.get("tournament_id") for reg in tournament_regs if reg.get("tournament_id")})
@@ -440,6 +505,7 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
             tournament = tournament_by_id.get(reg.get("tournament_id"))
             if tournament and await _visible_tournament(tournament, user, participant_ids):
                 my_tournaments.append(await _compact_tournament(tournament, user, reg))
+        my_tournaments = [row for row in my_tournaments if _still_relevant(row, day_start)]
         my_tournaments.sort(key=_date_key)
         my_tournaments = my_tournaments[:12]
 
@@ -454,6 +520,7 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
             event = event_by_id.get(reg.get("event_id"))
             if event and await _visible_event(event, user, registered_event_ids):
                 my_events.append(await _compact_event(event, reg))
+        my_events = [row for row in my_events if _still_relevant(row, day_start)]
         my_events.sort(key=_date_key)
         my_events = my_events[:12]
 
@@ -476,6 +543,7 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
         "public": public,
         "news": news,
         "streams": live_streams[:6] if isinstance(live_streams, list) else [],
+        "season": await _season_summary(user),
         "stats": {
             "my_tournaments": len(my_tournaments),
             "my_events": len(my_events),

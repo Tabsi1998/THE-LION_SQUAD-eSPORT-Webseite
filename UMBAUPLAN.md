@@ -250,7 +250,7 @@ Beim Umbau aufgefallen und **bewusst nicht entfernt**, weil ein Umzug nichts lö
 | 14.2 B | Chat in der App: Bilder und Videos senden und ansehen | umgesetzt (#207) |
 | 14.2 C | Sticker: Startpaket und eigene Pakete aus dem Adminbereich, in Web und App | umgesetzt (#208) |
 | 14.3 | App-Feinschliff I: Tastatur-Fehler im Chat, Rohbegriffe, Uhrzeiten (#210, #211) → `0.2.1-beta` | umgesetzt (#220) |
-| 14.4 | App-Feinschliff II: Startseite, Profil, „Mehr“, Teams (#212–#215) → `0.3.0-beta` | offen |
+| 14.4 | App-Feinschliff II: Startseite, Profil, „Mehr“, Teams (#212–#215) → `0.3.0-beta` | umgesetzt (dieser PR) |
 | 14.5 | Erfolge mit Symbolen, Fortschritt, Freischalt-Moment; sanfte Übergänge (#218) | offen |
 | 14.6 | Kalender in App und Web, „In meinen Kalender“ (#216) | offen |
 | 14.7 | Fingerabdruck-Sperre und Passkey-Login in der App (#217) | offen |
@@ -367,6 +367,26 @@ bekommt dieselbe Lösung. Ob es am Gerät passt, zeigt erst Build 58.
 **Rohwerte auch im Web.** Ältere Events tragen den Typ `clubevening` statt `club_evening`.
 Die Webseite zeigte dafür ebenso den Rohwert wie die App; beide legen solche Schreibweisen
 jetzt auf den bekannten Begriff. News-Kategorien standen im Web auf fünf Seiten roh.
+
+### Was 14.4 gefunden hat
+
+**Die Startseite zeigte Vergangenes.** `/api/mobile/dashboard` lieferte alle eigenen Turniere
+und Events, auch abgeschlossene und abgesagte; deshalb stand „Meine nächsten Termine“ voll
+mit alten Einträgen. Das Backend filtert jetzt auf heute und später (Wiener Zeit) und liefert
+die Jahreswertung als Kurzfassung mit, damit die Startseite sie ohne zweiten Aufruf zeigt.
+
+**Der Discord-Link in „Mehr“ war falsch.** Er stand fest im Code (`discord.gg/thelionsquad`).
+Die App holt die Vereinskanäle jetzt aus `/api/settings/public`, denselben Daten wie der
+Web-Footer; wer im Adminbereich einen Kanal ändert, ändert ihn damit auch in der App.
+
+**Die Einstellungen im Profil speicherten erst auf Knopfdruck.** Unter 24 Schaltern stand ein
+„Speichern“-Knopf, den man leicht vergaß; die Schalter speichern jetzt kurz nach dem letzten
+Tipp von selbst.
+
+**Tests für Bildschirme.** Die Testbibliothek der App (Version 14) macht `render` und
+`fireEvent` asynchron; ohne `await` ist der Baum beim ersten Zugriff noch leer und die Meldung
+(„render function has not been called“) führt in die Irre. Die neuen Tests für „Mehr“ und
+Teams sind die Vorlage für weitere Bildschirm-Tests.
 
 ## Block 15 — Abschluss
 
