@@ -1,4 +1,14 @@
-import { scrubClientLogText } from "./clientLog";
+import { scrubClientLogText, startWebClientLogging } from "./clientLog";
+
+vi.mock("./api", () => ({ api: { post: vi.fn(() => Promise.resolve({ data: {} })) } }));
+
+// Web-Fehler waren nur mit VITE_CLIENT_LOGGING=true sichtbar; im Standard blieb
+// der Adminbereich blind (#233). Ohne die Variable ist die Sammlung jetzt an.
+test("web client logging starts by default", () => {
+  delete window.__tlsWebClientLoggingStarted;
+  startWebClientLogging();
+  expect(window.__tlsWebClientLoggingStarted).toBe(true);
+});
 
 
 test("client log sanitizer removes credentials and URL details", () => {

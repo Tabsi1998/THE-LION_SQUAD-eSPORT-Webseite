@@ -121,6 +121,15 @@ export default function AdminDashboardPage() {
       tone: pushErrors > 0 ? "#FF3B30" : (data?.mobile_push?.active_tokens || 0) > 0 ? "#00FF88" : "#FFD700",
     },
     {
+      label: "Betrieb",
+      detail: data?.ops
+        ? `${data.ops.open_error_groups ?? 0} Fehlergruppen offen, ${data.ops.slow_requests_24h ?? 0} langsame Anfragen in 24 h`
+        : "Server-Fehler und langsame Anfragen",
+      to: "/admin/ops",
+      icon: AlertTriangle,
+      tone: (data?.ops?.open_error_groups || 0) > 0 ? "#FF3B30" : (data?.ops?.slow_requests_24h || 0) > 20 ? "#FFD700" : "#00FF88",
+    },
+    {
       label: "Client-Logs",
       detail: `${data?.client_logs?.critical_open ?? 0} kritisch, ${data?.client_logs?.high_open ?? 0} hoch offen`,
       to: "/admin/mobile-logs",

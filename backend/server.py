@@ -6,6 +6,7 @@ load_dotenv(ROOT / ".env")
 
 import os
 import logging
+import time
 from urllib.parse import urlparse
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
@@ -65,6 +66,7 @@ from routes.dsgvo_routes import dsgvo_router
 from routes.export_routes import pdf_router
 from routes.audit_routes import audit_router
 from services.image_variants import resolve_variant as resolve_image_variant
+from services import ops_monitor
 from services.change_events import (
     change_event_stream,
     publish_api_change,
@@ -376,6 +378,29 @@ async def api_change_notifications(request, call_next):
         and response.status_code < 400
     ):
         await publish_api_change(request.method, request.url.path, response.status_code)
+    return response
+
+
+# Betriebssicht (#233): unbehandelte Ausnahmen und 5xx-Antworten werden zu
+# Fehlergruppen, Anfragen über der Schwelle zu Einträgen unter "Tempo". Die
+# Aufzeichnung darf nie die Antwort verhindern - die Ausnahme wird nach dem
+# Festhalten unverändert weitergereicht.
+@app.middleware("http")
+async def ops_monitoring(request, call_next):
+    path = request.url.path
+    if not path.startswith("/api/") or not ops_monitor.should_watch(path):
+        return await call_next(request)
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        await ops_monitor.record_exception(app, request, exc)
+        raise
+    duration_ms = (time.perf_counter() - started) * 1000
+    if response.status_code >= 500:
+        await ops_monitor.record_http_error(app, request, response.status_code)
+    if duration_ms >= ops_monitor.SLOW_REQUEST_MS:
+        await ops_monitor.record_slow_request(app, request, duration_ms, response.status_code)
     return response
 
 

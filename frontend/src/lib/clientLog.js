@@ -2,7 +2,10 @@ import { api } from "./api";
 
 const DEDUPE_MS = 30000;
 const MAX_LOGS_PER_MINUTE = 12;
-const CLIENT_LOGGING_ENABLED = import.meta.env.VITE_CLIENT_LOGGING === "true";
+// Standardmäßig an: Fehler aus dem Browser kommen mit denselben Grenzen wie
+// bisher (Deduplizierung, 12 pro Minute, Tokens und E-Mail-Adressen entfernt)
+// im Adminbereich an. Nur VITE_CLIENT_LOGGING=false schaltet es ab (#233).
+const CLIENT_LOGGING_ENABLED = import.meta.env.VITE_CLIENT_LOGGING !== "false";
 const sentAtByFingerprint = new Map();
 let recentSendTimes = [];
 
