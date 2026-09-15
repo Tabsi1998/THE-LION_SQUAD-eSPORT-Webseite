@@ -250,3 +250,93 @@ function humanizeStatus(value: string) {
     .replace(/^\w/, (char) => char.toUpperCase());
 }
 
+// Turnierformate wie in frontend/src/lib/tournamentLabels.js. Der Schlüssel
+// wird ohne Unterstriche und Großbuchstaben verglichen, weil ältere Turniere
+// "ffacustombracket" oder "singleelim" tragen und so roh auf der Karte
+// standen (#246).
+const TOURNAMENT_FORMAT_LABELS: Record<string, string> = {
+  single_elim: "Single Elimination",
+  single_elimination: "Single Elimination",
+  double_elim: "Double Elimination",
+  double_elimination: "Double Elimination",
+  round_robin: "Jeder gegen jeden",
+  round_robin_groups: "Jeder-gegen-jeden-Gruppen",
+  swiss: "Schweizer System",
+  groups: "Gruppenphase",
+  ffa: "Mehrspieler frei",
+  battle_royale: "Überlebensmodus",
+  league: "Liga",
+  ffa_league: "Mehrspieler-Liga",
+  time_trial: "Zeitfahren",
+  grand_prix: "Rennserie",
+  custom_bracket: "Freier Turnierbaum",
+  ffa_custom_bracket: "Mehrspieler freier Turnierbaum",
+  ffa_single_elimination: "FFA Single Elimination",
+  simple: "Einzelrunde",
+};
+
+const TOURNAMENT_FORMAT_BY_KEY: Record<string, string> = Object.fromEntries(
+  Object.entries(TOURNAMENT_FORMAT_LABELS).map(([key, label]) => [normalizeKey(key), label]),
+);
+
+function normalizeKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+export function formatTournamentFormat(value?: string | null) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return TOURNAMENT_FORMAT_BY_KEY[normalizeKey(raw)] || humanizeStatus(raw);
+}
+
+// Nutzerarten aus dem Backend (models.UserType) und Rollen, wie sie in
+// Spielerlisten stehen. "community_user" stand vorher roh unter dem Namen.
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  club_member: "Vereinsmitglied",
+  community_user: "Community",
+  guest: "Gast",
+  member: "Vereinsmitglied",
+  moderator: "Moderator",
+  organizer: "Turnierleitung",
+  player: "Spieler",
+  staff: "Staff",
+  superadmin: "Superadmin",
+};
+
+export function formatRole(value?: string | null) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return ROLE_LABELS[raw.toLowerCase()] || formatStatus(raw);
+}
+
+// Mitgliedsarten und -status der Vereinsmitgliedschaft (membership_routes).
+const MEMBERSHIP_TYPE_LABELS: Record<string, string> = {
+  ordinary: "Ordentliches Mitglied",
+  supporting: "Förderndes Mitglied",
+  honorary: "Ehrenmitglied",
+  youth: "Jugendmitglied",
+  family: "Familienmitglied",
+};
+
+const MEMBERSHIP_STATUS_LABELS: Record<string, string> = {
+  active: "Aktiv",
+  honorary: "Ehrenmitglied",
+  pending: "Beantragt",
+  paused: "Ruhend",
+  inactive: "Inaktiv",
+  ended: "Beendet",
+};
+
+export function formatMembershipType(value?: string | null) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return MEMBERSHIP_TYPE_LABELS[raw.toLowerCase()] || humanizeStatus(raw);
+}
+
+export function formatMembershipStatus(value?: string | null) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return MEMBERSHIP_STATUS_LABELS[raw.toLowerCase()] || formatStatus(raw);
+}
+

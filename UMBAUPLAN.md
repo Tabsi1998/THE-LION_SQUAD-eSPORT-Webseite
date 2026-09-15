@@ -422,7 +422,7 @@ Version und werden zusammen als Beta veröffentlicht.
 
 | Meilenstein | Inhalt |
 | --- | --- |
-| App 0.3.1-beta | Nur Fehler aus Build 59: #238 Bild schwarz, #246 Rohwerte II, #247 Umbrüche im Profil, #252 Referenzen leer |
+| App 0.3.1-beta | Nur Fehler aus Build 59: #246 Rohwerte II, #247 Umbrüche im Profil, #252 Referenzen leer (dieser PR, Build 60); #238 Bild schwarz bekommt damit einen sichtbaren Fehlergrund und bleibt offen |
 | App 0.4.0-beta | Seiten aufräumen II: #241 Events-Tab, #242 Mehr/Gaming, #243 eigene Seiten, #244 Sponsoren, #248 Startseite II |
 | App 0.5.0-beta | Tester-Komfort: #249 „Was ist neu“, #250 Update aus der App, #251 In-App-Banner |
 | App 0.6.0-beta | #218 Erfolge (14.5) |

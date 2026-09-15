@@ -9,7 +9,7 @@ import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { compareByNearestDate } from "../../lib/contentSort";
-import { formatEventType, placeParts } from "../../lib/format";
+import { formatEventType, formatTournamentFormat, placeParts } from "../../lib/format";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -93,7 +93,7 @@ export function TournamentsScreen({ navigation }: Props) {
         status: tournament.status,
         phase: tournament.public_phase?.label,
         image: tournament.banner_url || tournament.game?.cover_url || tournament.game?.logo_url,
-        detail: [tournament.game?.display_name || tournament.game?.name || tournament.game_name, tournament.format_label || tournament.format].filter(Boolean).join(" · "),
+        detail: [tournament.game?.display_name || tournament.game?.name || tournament.game_name, tournament.format_label || formatTournamentFormat(tournament.format)].filter(Boolean).join(" · "),
         raw: tournament,
       })),
       ...fastlaps.map((challenge) => ({

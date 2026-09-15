@@ -154,13 +154,40 @@ export type Achievement = {
   accent: string;
 };
 
+// Vereinsreferenz aus /api/references (Antwort: { items, summary }).
 export type Reference = {
   id: string;
-  title: string;
-  game: string;
-  placement: string;
-  mode: string;
-  date: string;
+  title?: string | null;
+  organizer?: string | null;
+  team_name?: string | null;
+  description?: string | null;
+  status?: "active" | "planned" | "completed" | "archived" | string | null;
+  placement?: number | string | null;
+  placement_label?: string | null;
+  medal?: string | null;
+  participants_count?: number | null;
+  teams_count?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  location?: string | null;
+  tournament_url?: string | null;
+  source_url?: string | null;
+  game_name?: string | null;
+  game?: { id?: string; name?: string; display_name?: string; short_name?: string | null; logo_url?: string | null; cover_url?: string | null } | null;
+  reference_meta?: { platforms?: Array<{ key: string; label: string }>; title_segments?: string[] } | null;
+  lineup_members?: Array<{ profile_id?: string; display_name?: string | null; avatar_url?: string | null }> | null;
+};
+
+export type ReferenceSummary = {
+  total: number;
+  active: number;
+  planned: number;
+  podiums: number;
+  gold: number;
+  silver: number;
+  bronze: number;
+  top10: number;
+  games: number;
 };
 
 export type Sponsor = {

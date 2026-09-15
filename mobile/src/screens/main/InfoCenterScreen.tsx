@@ -11,9 +11,10 @@ import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../lib/api";
-import { placeParts } from "../../lib/format";
+import { formatDate, formatMembershipStatus, formatMembershipType, formatRole, placeParts } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
+import type { Reference, ReferenceSummary } from "../../types";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "InfoCenter">;
 type SectionKey = NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>;
@@ -27,6 +28,24 @@ const sections: Array<{ key: SectionKey; label: string }> = [
   { key: "profiles", label: "Profile" },
 ];
 
+// Ein Satz je Bereich für Mitglieder - vorher stand hier ein Entwicklersatz
+// über "native App-Module" (#246).
+const SECTION_INTRO: Record<SectionKey, string> = {
+  sponsors: "Die Unternehmen, die den Verein unterstützen.",
+  partners: "Vereine und Projekte, mit denen wir zusammenarbeiten.",
+  events: "Kommende Termine des Vereins.",
+  benefits: "Was dir die Mitgliedschaft bringt.",
+  references: "Externe Turniere und Ligen, bei denen THE LION SQUAD angetreten ist.",
+  profiles: "Öffentliche Spielerprofile der Community.",
+};
+
+const REFERENCE_STATUS: Record<string, string> = {
+  active: "Laufend",
+  planned: "Geplant",
+  completed: "Abgeschlossen",
+  archived: "Archiviert",
+};
+
 export function InfoCenterScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const [section, setSection] = useState<SectionKey>(route.params?.section || "sponsors");
@@ -35,7 +54,8 @@ export function InfoCenterScreen({ navigation, route }: Props) {
   const [events, setEvents] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [benefits, setBenefits] = useState<any[]>([]);
-  const [references, setReferences] = useState<any[]>([]);
+  const [references, setReferences] = useState<Reference[]>([]);
+  const [referenceSummary, setReferenceSummary] = useState<ReferenceSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const active = useMemo(() => sections.find((item) => item.key === section) || sections[0], [section]);
@@ -48,14 +68,18 @@ export function InfoCenterScreen({ navigation, route }: Props) {
         api.get<any[]>("/events").catch(() => ({ data: [] })),
         api.get<any[]>("/users/public-list").catch(() => ({ data: [] })),
         api.get<any[]>("/membership/benefits").catch(() => ({ data: [] })),
-        api.get<any[]>("/references").catch(() => ({ data: [] })),
+        api.get<Reference[] | { items?: Reference[]; summary?: ReferenceSummary }>("/references").catch(() => ({ data: [] as Reference[] })),
       ]);
       setSponsors(Array.isArray(liveSponsors.data) ? liveSponsors.data : []);
       setPartners(Array.isArray(livePartners.data) ? livePartners.data : []);
       setEvents(Array.isArray(liveEvents.data) ? liveEvents.data : []);
       setProfiles(Array.isArray(liveProfiles.data) ? liveProfiles.data : []);
       setBenefits(Array.isArray(liveBenefits.data) ? liveBenefits.data : []);
-      setReferences(Array.isArray(liveReferences.data) ? liveReferences.data : []);
+      // Der Server liefert { items, summary }; die Liste war leer, solange die
+      // App ein Array erwartete (#252). Ein Array bleibt für ältere Server erlaubt.
+      const referenceData = liveReferences.data;
+      setReferences(Array.isArray(referenceData) ? referenceData : referenceData?.items ?? []);
+      setReferenceSummary(Array.isArray(referenceData) ? null : referenceData?.summary ?? null);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -79,7 +103,7 @@ export function InfoCenterScreen({ navigation, route }: Props) {
         <View style={styles.header}>
           <Muted>Info Center</Muted>
           <Title>{active.label}</Title>
-          <Muted>Sponsoren, Verein, Events, Referenzen und Profile als native App-Module.</Muted>
+          <Muted>{SECTION_INTRO[active.key]}</Muted>
         </View>
 
         <SegmentedTabs items={sections} value={section} onChange={setSection} />
@@ -92,7 +116,7 @@ export function InfoCenterScreen({ navigation, route }: Props) {
             {section === "partners" ? <Partners items={partners} /> : null}
             {section === "events" ? <Events items={events} onOpen={(event) => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id } })} /> : null}
             {section === "benefits" ? <Benefits isMember={Boolean(user?.is_club_member)} membership={user?.membership || null} items={benefits} /> : null}
-            {section === "references" ? <References items={references} /> : null}
+            {section === "references" ? <References items={references} summary={referenceSummary} /> : null}
             {section === "profiles" ? <Profiles items={profiles} onOpen={(profile) => profile.username ? navigation.navigate("PublicProfile", { username: profile.username }) : undefined} /> : null}
           </>
         )}
@@ -187,45 +211,99 @@ function Events({ items, onOpen }: { items: any[]; onOpen: (event: any) => void 
 function Benefits({ isMember, membership, items }: { isMember: boolean; membership?: Record<string, unknown> | null; items: any[] }) {
   const status = String(membership?.member_status || membership?.status || (isMember ? "active" : "inactive"));
   const type = String(membership?.membership_type || membership?.type || "");
+  // "active (ordinary)" stand vorher roh in der Karte (#246).
+  const statusLabel = isMember ? formatMembershipStatus(status) : "Gesperrt";
+  const typeLabel = formatMembershipType(type);
   return (
     <>
       <Card style={[styles.card, isMember ? styles.memberCard : styles.locked]}>
         <View style={styles.cardTop}>
           <Heading>{isMember ? "Mitgliedschaft aktiv" : "Mitgliedschaft erforderlich"}</Heading>
-          <Badge label={isMember ? status : "Gesperrt"} />
+          <Badge label={statusLabel} />
         </View>
-        <Muted>{isMember ? `Vorteile sind für deinen Account freigeschaltet${type ? ` (${type.replace(/_/g, " ")})` : ""}.` : "Diese Vorteile werden freigeschaltet, wenn der Account als Vereinsmitglied markiert ist."}</Muted>
+        <Muted>{isMember ? `Die Vorteile sind für dich freigeschaltet${typeLabel ? ` · ${typeLabel}` : ""}.` : "Diese Vorteile gibt es für Vereinsmitglieder."}</Muted>
       </Card>
       {items.map((benefit) => (
         <Card key={benefit.id || benefit.title} style={[styles.card, !isMember && (benefit.memberOnly || benefit.member_only) && styles.locked]}>
           <View style={styles.cardTop}>
             <Heading>{benefit.title}</Heading>
-            <Badge label={benefit.category || benefit.kind || "Member"} />
+            <Badge label={benefit.category || benefit.kind || "Mitglieder"} />
           </View>
           <Muted>{benefit.description}</Muted>
           <Muted style={isMember ? styles.memberOk : styles.memberLocked}>{isMember ? "Freigeschaltet" : "Gesperrt"}</Muted>
         </Card>
       ))}
-      {!items.length ? <EmptyState title="Keine Vorteile gepflegt" detail="Mitgliedervorteile können im Adminbereich ergänzt werden." /> : null}
+      {!items.length ? <EmptyState title="Noch keine Vorteile eingetragen" detail="Sobald der Verein Vorteile eingetragen hat, stehen sie hier." /> : null}
     </>
   );
 }
 
-function References({ items }: { items: any[] }) {
-  if (!items.length) return <EmptyState title="Keine Referenzen" detail="Erfolge, Platzierungen und Highlights erscheinen hier." />;
+function References({ items, summary }: { items: Reference[]; summary: ReferenceSummary | null }) {
+  if (!items.length) return <EmptyState title="Keine Referenzen" detail="Externe Turniere und Ligen, bei denen der Verein angetreten ist, erscheinen hier." />;
   return (
     <>
-      {items.map((reference) => (
-        <Card key={reference.id} style={styles.card}>
-          <View style={styles.cardTop}>
-            <Heading>{reference.placement || reference.result || reference.title}</Heading>
-            <Badge label={reference.game || reference.category || "Referenz"} />
-          </View>
-          <Body style={styles.strong}>{reference.title || reference.event_name || reference.tournament_title}</Body>
-          <Muted>{reference.mode || reference.kind || "Live"} · {reference.date || reference.published_at || reference.created_at || ""}</Muted>
-        </Card>
-      ))}
+      {summary ? (
+        <View style={styles.summaryRow} testID="reference-summary">
+          <SummaryTile label="Teilnahmen" value={summary.total} />
+          <SummaryTile label="Podeste" value={summary.podiums} tone="gold" />
+          <SummaryTile label="Gold" value={summary.gold} tone="gold" />
+          <SummaryTile label="Spiele" value={summary.games} />
+        </View>
+      ) : null}
+      {items.map((reference) => <ReferenceCard key={reference.id} item={reference} />)}
     </>
+  );
+}
+
+function SummaryTile({ label, value, tone = "cyan" }: { label: string; value: number; tone?: "cyan" | "gold" }) {
+  return (
+    <View style={styles.summaryTile}>
+      <Body style={[styles.summaryValue, tone === "gold" && styles.summaryValueGold]}>{value}</Body>
+      <Muted style={styles.summaryLabel} numberOfLines={1}>{label}</Muted>
+    </View>
+  );
+}
+
+// Wie die Karte auf lionsquad.at/references: Platzierung groß, Titel, Spiel,
+// Datum, Lineup, Link zum Turnier.
+function ReferenceCard({ item }: { item: Reference }) {
+  const placement = Number(item.placement);
+  const placed = Number.isFinite(placement) && placement > 0;
+  const placementText = item.placement_label || (placed ? `${placement}.` : "Teilnahme");
+  const game = item.game?.display_name || item.game?.name || item.game_name || "";
+  const lineup = (item.lineup_members || []).map((member) => member.display_name).filter(Boolean);
+  const meta = [item.organizer, item.team_name, item.start_date ? formatDate(item.start_date) : "", item.location].filter(Boolean).join(" · ");
+  const tags = [
+    ...(item.reference_meta?.platforms || []).map((platform) => platform.label),
+    ...(item.reference_meta?.title_segments || []),
+  ].filter(Boolean);
+  const link = item.tournament_url || item.source_url || null;
+  const status = REFERENCE_STATUS[String(item.status || "completed")] || REFERENCE_STATUS.completed;
+  return (
+    <LinkedCard url={link}>
+      <Card style={styles.card}>
+        <View style={styles.refTop}>
+          <View style={[styles.refRank, placement === 1 && styles.refRankGold, placement === 2 && styles.refRankSilver, placement === 3 && styles.refRankBronze]}>
+            <Body style={[styles.refRankText, !placed && styles.refRankTextSmall]} numberOfLines={1} adjustsFontSizeToFit>{placementText}</Body>
+            <Muted style={styles.refRankLabel} numberOfLines={1}>
+              {item.teams_count ? `${item.teams_count} Teams` : item.participants_count ? `${item.participants_count} Teilnehmer` : "Platz"}
+            </Muted>
+          </View>
+          <View style={styles.refText}>
+            <View style={styles.wrap}>
+              <Badge label={status} />
+              {game ? <Badge label={game} /> : null}
+            </View>
+            <Body style={styles.strong}>{item.title || "Referenz"}</Body>
+            {meta ? <Muted>{meta}</Muted> : null}
+          </View>
+        </View>
+        {item.description ? <Muted numberOfLines={3}>{item.description}</Muted> : null}
+        {tags.length ? <View style={styles.wrap}>{tags.map((tag) => <Badge key={tag} label={tag} />)}</View> : null}
+        {lineup.length ? <Muted>Lineup: {lineup.join(", ")}</Muted> : null}
+        {link ? <Muted style={styles.link}>Turnier öffnen</Muted> : null}
+      </Card>
+    </LinkedCard>
   );
 }
 
@@ -244,20 +322,29 @@ function Profiles({ items, onOpen }: { items: any[]; onOpen: (profile: any) => v
             />
             <View style={styles.profileText}>
               <Heading>{profile.name || profile.display_name || profile.username}</Heading>
-              <Muted>@{profile.username} · {profile.role || profile.user_type || profile.achievement_level?.title || "Community"}</Muted>
+              {/* "community_user" stand vorher roh neben dem Namen (#246). */}
+              <Muted>@{profile.username} · {formatRole(profile.user_type || profile.role) || profile.achievement_level?.title || "Community"}</Muted>
             </View>
             <Ionicons name="chevron-forward" color={colors.muted} size={18} />
           </View>
           <View style={styles.wrap}>
             {(profile.games || profile.favorite_games || []).map((game: string) => <Badge key={game} label={game} />)}
           </View>
-          <Muted>{profile.achievements_count ?? profile.achievements?.length ?? 0} Achievements hinterlegt</Muted>
+          {achievementLine(profile) ? <Muted>{achievementLine(profile)}</Muted> : null}
           <Muted style={styles.link}>Profil öffnen</Muted>
           </Card>
         </Pressable>
       ))}
     </>
   );
+}
+
+/** "3 Erfolge · 120 Punkte" - bei null Erfolgen nichts, statt "0 Achievements hinterlegt". */
+export function achievementLine(profile: { achievements_count?: number | null; achievements?: unknown[] | null; achievement_points?: number | null; points?: number | null }) {
+  const count = Number(profile.achievements_count ?? profile.achievements?.length ?? 0);
+  if (!count) return "";
+  const points = Number(profile.achievement_points ?? profile.points ?? 0);
+  return `${count} ${count === 1 ? "Erfolg" : "Erfolge"}${points ? ` · ${points} Punkte` : ""}`;
 }
 
 function LinkedCard({ url, children }: { url?: string | null; children: React.ReactNode }) {
@@ -285,6 +372,72 @@ function Badge({ label }: { label: string }) {
 }
 
 const styles = StyleSheet.create({
+  summaryRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  summaryTile: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    gap: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 10,
+  },
+  summaryValue: {
+    color: colors.cyan,
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  summaryValueGold: {
+    color: colors.gold,
+  },
+  summaryLabel: {
+    fontSize: 11,
+  },
+  refTop: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  refRank: {
+    alignItems: "center",
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 64,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+    width: 78,
+  },
+  refRankGold: {
+    borderColor: "rgba(255,215,0,0.55)",
+  },
+  refRankSilver: {
+    borderColor: "rgba(192,192,192,0.55)",
+  },
+  refRankBronze: {
+    borderColor: "rgba(205,127,50,0.55)",
+  },
+  refRankText: {
+    color: colors.white,
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  refRankTextSmall: {
+    fontSize: 13,
+  },
+  refRankLabel: {
+    fontSize: 11,
+  },
+  refText: {
+    flex: 1,
+    gap: 6,
+    minWidth: 0,
+  },
   content: {
     gap: 14,
     padding: 18,

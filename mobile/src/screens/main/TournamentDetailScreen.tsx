@@ -11,7 +11,7 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
-import { formatDate, formatDateTime, formatStatus } from "../../lib/format";
+import { formatDate, formatDateTime, formatStatus, formatTournamentFormat } from "../../lib/format";
 import { getRegistrationState } from "../../lib/registration";
 import { isGuestUser } from "../../live";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
@@ -243,7 +243,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
           <View style={styles.pillRow}>
             <StatusBadge phase={tournament.public_phase} status={tournament.status} />
             <Pill label={formatDate(tournament.start_date)} />
-            <Pill label={tournament.format_label || tournament.format || "Format offen"} />
+            <Pill label={tournament.format_label || formatTournamentFormat(tournament.format) || "Format offen"} />
             <Pill label={`${tournament.participant_count ?? tournament.participants?.length ?? registrations.length ?? 0}${tournament.max_participants ? `/${tournament.max_participants}` : ""} Teilnehmer`} />
           </View>
         </View>

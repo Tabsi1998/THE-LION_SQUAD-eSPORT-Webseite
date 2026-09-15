@@ -2,13 +2,46 @@ import {
   continuesMessageGroup,
   formatChatTime,
   formatEventType,
+  formatMembershipStatus,
+  formatMembershipType,
   formatNewsCategory,
+  formatRole,
+  formatTournamentFormat,
   normalizeEventType,
   placeParts,
 } from "./format";
 
 // Texte, die vorher roh aus der Datenbank kamen: "clubevening · Telfs · Telfs",
 // News mit Kategorie "events", Chat-Nachrichten nur mit Datum (#211).
+
+// Rohwerte II aus Build 59: "ffacustombracket", "community_user", "active (ordinary)" (#246).
+describe("Turnierformat, Rolle, Mitgliedschaft", () => {
+  test("Turnierformate heißen wie auf der Webseite, auch in alter Schreibweise", () => {
+    expect(formatTournamentFormat("ffa_custom_bracket")).toBe("Mehrspieler freier Turnierbaum");
+    expect(formatTournamentFormat("ffacustombracket")).toBe("Mehrspieler freier Turnierbaum");
+    expect(formatTournamentFormat("singleelim")).toBe("Single Elimination");
+    expect(formatTournamentFormat("Single-Elimination")).toBe("Single Elimination");
+    expect(formatTournamentFormat("round_robin")).toBe("Jeder gegen jeden");
+    expect(formatTournamentFormat("")).toBe("");
+    expect(formatTournamentFormat("irgend_was")).toBe("Irgend was");
+  });
+
+  test("Nutzerarten und Rollen als Begriff", () => {
+    expect(formatRole("community_user")).toBe("Community");
+    expect(formatRole("club_member")).toBe("Vereinsmitglied");
+    expect(formatRole("superadmin")).toBe("Superadmin");
+    expect(formatRole("player")).toBe("Spieler");
+    expect(formatRole(null)).toBe("");
+  });
+
+  test("Mitgliedschaft als Begriff statt active (ordinary)", () => {
+    expect(formatMembershipStatus("active")).toBe("Aktiv");
+    expect(formatMembershipStatus("pending")).toBe("Beantragt");
+    expect(formatMembershipType("ordinary")).toBe("Ordentliches Mitglied");
+    expect(formatMembershipType("supporting")).toBe("Förderndes Mitglied");
+    expect(formatMembershipType("")).toBe("");
+  });
+});
 
 describe("Event-Typen", () => {
   test("bekannte Schlüssel bekommen den Begriff der Webseite", () => {
