@@ -47,7 +47,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 19 | **Web-Profil: Nachrichten eigene Seite, Einstellungen gebündelt** | offen (#222) | — |
 | 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
 | 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
-| 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | offen (#232, #233) | — |
+| 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | #232 umgesetzt (dieser PR), #233 offen | — |
 
 Reihenfolge ab hier, abwechselnd App und Web, damit beides vorankommt: 14.4 → 15 → 22 → 14.5 →
 19 → 14.6 → 20 → 14.7 → 21 → 16 → 14.8 → 17 (Rest) → 18. Block 22 steht früh, weil die
@@ -436,6 +436,41 @@ Version und werden zusammen als Beta veröffentlicht.
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | Block 17 und 18: #229, #230 |
 | Später | Ideen ohne Termin: #260 Plattform-Konten verknüpfen |
+
+## Block 22 — Tempo und Betrieb
+
+Zwei Issues: #232 (Bilder und Tempo) und #233 (Fehler- und Tempo-Logs, Auto-Checks, Alarme im
+Adminbereich).
+
+### Was 22.1 gefunden hat (#232, dieser PR)
+
+**Kein Browser durfte ein Bild behalten.** nginx reicht alles unter `/api/` an das Backend
+weiter und hängt jeder Antwort `Cache-Control: no-store` an – auch den Bildern unter
+`/api/static/uploads/…`. Jeder Besuch der Galerie lud also jede Kachel neu, auch am Handy
+und auch, wenn man nur zurück und wieder vor ging. Das ist der größere Teil der
+„Langsamkeit“, nicht die Bildgröße: die kleineren Fassungen gab es seit Block 12.
+
+**Jedes Bild lief durch den einen API-Prozess.** Das Backend läuft mit einem Worker
+(Voraussetzung für den Änderungsstrom); eine Galerieseite mit 40 Kacheln schickte 40
+Dateiabrufe durch denselben Prozess, der auch alle Aufrufe und Live-Verbindungen bedient.
+
+**Jetzt:** Das Upload-Volume hängt nur lesend auch im Web-Container. nginx liefert die
+öffentlichen Uploads direkt von der Platte, 30 Tage im Browser-Cache (die Dateinamen sind
+Zufallskennungen), mit Bereichsanfragen für Videos. Für `?w=400|800|1600` versucht nginx die
+fertige Fassung; gibt es sie noch nicht, baut sie das Backend beim ersten Abruf wie bisher –
+und neue Uploads bekommen ihre Fassungen sofort beim Hochladen. Der Kopf `X-TLS-Media`
+sagt, wer geliefert hat (`nginx` oder `backend`); der Container-Smoke prüft das mit einem
+echten Bild (`scripts/check-media-serving.py`).
+
+**Messung** (lokaler Produktions-Stack, 40 Fotos mit 3000×2000 Pixeln, 8 parallel): Original
+je Bild 0,07–0,11 s → 0,03 s; fertige 400er-Fassung je Bild 0,086 s → 0,003 s; `Cache-Control`
+`no-store` → 30 Tage. Das Erzeugen einer Fassung beim ersten Abruf dauert in beiden Fällen rund
+1 s je Bild (Rechenzeit) – deshalb entstehen sie jetzt beim Upload. Nebenbefund: `HEAD` auf ein
+Bild lieferte vorher JSON (405), jetzt das Bild.
+
+**Nicht geändert:** private Chat-Anhänge bleiben beim Backend (Zugriffsprüfung), ebenso
+Dokumente. Bilder, die schmaler sind als die verlangte Fassung, liefert weiter das Backend
+(es gibt dafür keine Datei); das betrifft Logos und kleine Grafiken.
 
 ## Block 16 — Turnier-Leitfaden im Adminbereich
 

@@ -11,12 +11,16 @@ import io
 import pytest
 from PIL import Image
 
+import asyncio
+
 from services.image_variants import (
     VARIANT_WIDTHS,
+    build_all_variants,
     build_variant,
     is_resizable,
     normalize_width,
     resolve_variant,
+    schedule_variants,
     srcset_widths,
     variant_path,
 )
@@ -50,6 +54,37 @@ def test_a_width_between_two_offers_is_not_silently_upgraded():
 
 
 # ---------------------------------------------------------------- Erzeugen
+
+# Seit nginx die Uploads von der Platte liefert (#232), entstehen die Fassungen
+# gleich beim Upload - sonst ginge je Breite noch ein erster Abruf durch die API.
+
+def test_all_smaller_widths_are_built_after_an_upload(bild):
+    quelle = bild(width=1000, height=700)
+
+    fertig = build_all_variants(quelle)
+
+    assert [pfad.name for pfad in fertig] == ["foto-400.webp", "foto-800.webp"]
+    assert not variant_path(quelle, 1600).exists()
+
+
+def test_scheduling_outside_the_event_loop_builds_right_away(bild):
+    quelle = bild()
+
+    assert schedule_variants(quelle) is None
+    assert all(variant_path(quelle, breite).is_file() for breite in VARIANT_WIDTHS)
+
+
+def test_scheduling_inside_the_event_loop_does_not_block_the_upload(bild):
+    quelle = bild()
+
+    async def hochladen():
+        aufgabe = schedule_variants(quelle)
+        assert aufgabe is not None
+        return await aufgabe
+
+    fertig = asyncio.run(hochladen())
+    assert len(fertig) == len(VARIANT_WIDTHS)
+
 
 def test_a_variant_is_written_once_and_then_reused(bild):
     quelle = bild()

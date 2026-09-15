@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from auth import require_admin, get_current_user
 from database import get_db
 from models import new_id, now_utc
+from services.image_variants import schedule_variants
 from services.rate_limit import enforce_rate_limit, get_client_ip
 from storage import PRIVATE_DOC_DIR, PUBLIC_UPLOAD_DIR, ensure_directory
 from services.media_formats import (
@@ -398,6 +399,7 @@ def _image_to_webp_preview(img: Image.Image) -> dict:
     except OSError as exc:
         logger.error("[uploads] failed to write converted preview %s: %s", path, exc)
         raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR prüfen.")
+    schedule_variants(path)
     return {
         "filename": filename,
         "url": f"/api/static/uploads/{filename}",
@@ -560,6 +562,9 @@ async def _upload_image_impl(
     except OSError as exc:
         logger.error("[uploads] failed to write %s: %s", path, exc)
         raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR prüfen.")
+    # Die kleineren Fassungen gleich mitbauen, damit nginx sie ab dem ersten
+    # Abruf von der Platte liefert (#232).
+    schedule_variants(path)
     url = f"/api/static/uploads/{filename}"
     try:
         await get_db().media_uploads.insert_one({

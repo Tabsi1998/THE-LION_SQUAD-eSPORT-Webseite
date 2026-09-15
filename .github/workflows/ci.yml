@@ -260,6 +260,8 @@ jobs:
         run: python3 scripts/staging-preflight.py
       - name: Verify web release and cache headers
         run: python3 scripts/check-web-update.py http://127.0.0.1:3000
+      - name: Verify uploads are served by nginx
+        run: python3 scripts/check-media-serving.py http://127.0.0.1:3000
       - name: Stop ephemeral stack
         if: always()
         run: docker compose down --volumes --remove-orphans

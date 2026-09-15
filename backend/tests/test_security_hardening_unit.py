@@ -131,7 +131,8 @@ def test_internal_nginx_preserves_tls_and_sanitizes_forwarded_host():
 
     assert "map $http_x_forwarded_proto $tls_forwarded_proto" in nginx
     assert "proxy_set_header X-Forwarded-Proto $scheme;" not in nginx
-    assert nginx.count("proxy_set_header X-Forwarded-Host $host;") == 7
+    # 7 Proxy-Blöcke plus der Rückfall für Uploads, die nginx nicht selbst liefert (#232).
+    assert nginx.count("proxy_set_header X-Forwarded-Host $host;") == 8
     assert 'if ($host = "www.lionsquad.at")' in nginx
     assert "return 308 https://lionsquad.at$request_uri;" in nginx
     assert '"www.lionsquad.at" "308"' in route_contract
@@ -145,6 +146,7 @@ def test_internal_nginx_uses_one_nonce_based_csp_without_external_fonts():
     assert "map $request_id $tls_content_security_policy" in nginx
     assert "script-src 'self' 'nonce-$request_id'" in nginx
     assert "script-src 'self' 'unsafe-inline'" not in nginx
-    assert nginx.count("add_header Content-Security-Policy $tls_content_security_policy always;") == 7
+    # 7 Blöcke plus die zwei für Uploads von der Platte und ihren Rückfall (#232).
+    assert nginx.count("add_header Content-Security-Policy $tls_content_security_policy always;") == 9
     assert 'meta name="csp-nonce" content="$request_id"' in nginx
     assert "fonts.googleapis.com" not in css
