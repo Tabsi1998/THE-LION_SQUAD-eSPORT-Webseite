@@ -1,6 +1,7 @@
 # Umbauplan: Turniere, Übersichtlichkeit und die offenen Wünsche
 
-Stand: 15. September 2026 (Block 14.3: App-Feinschliff I, Version 0.2.1-beta).
+Stand: 15. September 2026, abends (App 0.4.0-beta vorbereitet, Build 61 noch nicht gebaut;
+Web: Profil I begonnen, #253 umgesetzt).
 
 Dieser Plan führt das in [RESTPLAN.md](RESTPLAN.md) als **R5** angekündigte Turnierpaket
 aus und nimmt die später dazugekommenen Themen auf (Spielwochen, PDF, Live-Aktualisierung,
@@ -39,15 +40,15 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 11 | PDF-Ausgabe | umgesetzt | #193, #194 |
 | 12 | Galerie und Medien: Tempo, Videos überall | umgesetzt | #196 |
 | 13 | Entflechtung: `tournament_routes.py` aufgeteilt | umgesetzt | #200 |
-| 14 | LionsAPP in den Store | in Arbeit: 14.1 bis 14.4 umgesetzt, v0.3.0-beta (Build 59) | #201, #206, #207, #208, #209, #220, #237 |
-| 15 | Abschluss: Abfrage-Intervalle im Web weg, große Dateien nebenbei teilen | #221 umgesetzt (dieser PR), #223 offen | — |
+| 14 | LionsAPP in den Store | in Arbeit: 14.1 bis 14.4 umgesetzt, v0.3.1-beta (Build 60) veröffentlicht, v0.4.0-beta (Build 61) vorbereitet | #201, #206, #207, #208, #209, #220, #237, #262, #264 |
+| 15 | Abschluss: Abfrage-Intervalle im Web weg, große Dateien nebenbei teilen | #221 umgesetzt, #223 offen | #261 |
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen (#228) | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise (#229) | #193, #195 |
 | 18 | **Auszeichnungen: Banner und Trophäen** | offen (#230) | — |
-| 19 | **Web-Profil: Nachrichten eigene Seite, Einstellungen gebündelt** | offen (#222) | — |
+| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | in Arbeit: #253 umgesetzt; #257, #258 (Profil I) und #254, #255, #256, #259 (Profil II) offen | #267 |
 | 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
 | 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
-| 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | #232 umgesetzt (dieser PR), #233 offen | — |
+| 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | #232 und #233 Teil 1 umgesetzt, Rest als #265 offen | #263, #266 |
 
 Reihenfolge ab hier, abwechselnd App und Web, damit beides vorankommt: 14.4 → 15 → 22 → 14.5 →
 19 → 14.6 → 20 → 14.7 → 21 → 16 → 14.8 → 17 (Rest) → 18. Block 22 steht früh, weil die
@@ -394,7 +395,7 @@ Alle CI-Prüfungen grün, automatischer App-Build, README auf Stand. Seit dem 15
 die Arbeit nach Issues mit Meilensteinen (siehe „Meilensteine“ unten); Block 15 sind die Issues
 #221 (Abfrage-Intervalle) und #223 (große Admin-Dateien).
 
-### Was 15.1 gefunden hat (#221, dieser PR)
+### Was 15.1 gefunden hat (#221, PR #261)
 
 **Der Strom und der Takt liefen nebeneinander.** 19 Ansichten im Web hatten ein eigenes
 `setInterval` (6 bis 60 Sekunden) *und* hingen am Änderungsstrom – jede Änderung wurde
@@ -422,15 +423,15 @@ Version und werden zusammen als Beta veröffentlicht.
 
 | Meilenstein | Inhalt |
 | --- | --- |
-| App 0.3.1-beta | Nur Fehler aus Build 59: #246 Rohwerte II, #247 Umbrüche im Profil, #252 Referenzen leer (dieser PR, Build 60); #238 Bild schwarz bekommt damit einen sichtbaren Fehlergrund und bleibt offen |
-| App 0.4.0-beta | Seiten aufräumen II: #241 Events-Tab, #242 Mehr/Gaming, #243 eigene Seiten, #244 Sponsoren, #248 Startseite II (dieser PR, Build 61) |
+| App 0.3.1-beta | Nur Fehler aus Build 59: #246 Rohwerte II, #247 Umbrüche im Profil, #252 Referenzen leer (#262, Build 60); #238 Bild schwarz bekommt damit einen sichtbaren Fehlergrund und bleibt offen |
+| App 0.4.0-beta | Seiten aufräumen II: #241 Events-Tab, #242 Mehr/Gaming, #243 eigene Seiten, #244 Sponsoren, #248 Startseite II (#264; Build 61 noch nicht gebaut) |
 | App 0.5.0-beta | Tester-Komfort: #249 „Was ist neu“, #250 Update aus der App, #251 In-App-Banner |
 | App 0.6.0-beta | #218 Erfolge (14.5) |
 | App 0.7.0-beta | #216 Kalender (14.6), #236 Galerie |
 | App 0.8.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner |
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
-| Web: Tempo und Betrieb | Block 15 und 22: #221, #223, #231, #232, #233 |
-| Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (dieser PR: Seitenmenü, volle Breite, eine Datei je Reiter), #257 Privatsphäre und Benachrichtigungen, #258 Grunddaten und Sicherheit |
+| Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233 umgesetzt; #223, #231, #265 offen |
+| Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen, #258 Grunddaten und Sicherheit |
 | Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat, #255 Benachrichtigungen anklickbar, #256 Dashboard, #259 Freunde (#222 ist darin aufgegangen) |
 | Web: Dynamik | Block 20: #224, #225, #226 |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
@@ -442,7 +443,7 @@ Version und werden zusammen als Beta veröffentlicht.
 Zwei Issues: #232 (Bilder und Tempo) und #233 (Fehler- und Tempo-Logs, Auto-Checks, Alarme im
 Adminbereich).
 
-### Was 22.1 gefunden hat (#232, dieser PR)
+### Was 22.1 gefunden hat (#232, PR #263)
 
 **Kein Browser durfte ein Bild behalten.** nginx reicht alles unter `/api/` an das Backend
 weiter und hängt jeder Antwort `Cache-Control: no-store` an – auch den Bildern unter
@@ -472,12 +473,32 @@ Bild lieferte vorher JSON (405), jetzt das Bild.
 Dokumente. Bilder, die schmaler sind als die verlangte Fassung, liefert weiter das Backend
 (es gibt dafür keine Datei); das betrifft Logos und kleine Grafiken.
 
+### Was 22.2 gefunden hat (#233 Teil 1, PR #266)
+
+**Server-Fehler standen nur in Container-Logs.** Wer im Web einen Fehler sah, musste am
+Server `docker logs` lesen; nichts fasste gleiche Fehler zusammen. Jetzt fängt eine
+Middleware jeden Fehler (Starlette packt ihn in eine `ExceptionGroup`, `unwrap_exception`
+holt ihn heraus), bildet aus Fehlerart, Route, Methode und Stelle einen Fingerabdruck und
+zählt gleiche Fehler als Gruppe in `ops_errors` (30 Tage). Admin → Betrieb zeigt die
+Gruppen; jede lässt sich als erledigt markieren und ist beim nächsten Auftreten wieder offen.
+
+**Langsame Anfragen waren unsichtbar.** Jede Anfrage über `SLOW_REQUEST_MS` (Standard 1 s)
+landet mit Route und Dauer in `ops_slow_requests` (30 Tage) und erscheint unter Betrieb je
+Route.
+
+**Die Web-Fehlersammlung war standardmäßig aus.** Jetzt ist sie an; nur
+`VITE_CLIENT_LOGGING="false"` schaltet sie ab (Compose: `CLIENT_LOGGING_ENABLED`, Standard
+`true`).
+
+**Offen als #265 (Betrieb II):** Web Vitals je Seite, Auto-Checks mit Ampel, Alarme per
+Discord.
+
 ## Block 19 — Web-Profil
 
 Aus den PC-Screenshots vom 15. September: Profil I – Aufbau (#253, #257, #258) und
 Profil II – Nachrichten und Dashboard (#254, #255, #256, #259).
 
-### Was 19.1 gefunden hat (#253, dieser PR)
+### Was 19.1 gefunden hat (#253, PR #267)
 
 **Eine Datei, neun Reiter, 1.828 Zeilen.** `ProfilePage.jsx` trug Grunddaten, Gaming, Socials,
 Teams, Freunde, Inbox, Achievements, Sitzungen und Privatsphäre samt Formularzustand. Jetzt
