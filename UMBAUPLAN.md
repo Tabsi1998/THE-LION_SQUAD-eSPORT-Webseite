@@ -430,7 +430,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.8.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner |
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #223, #231, #232, #233 |
-| Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy, #257 Privatsphäre und Benachrichtigungen, #258 Grunddaten und Sicherheit |
+| Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (dieser PR: Seitenmenü, volle Breite, eine Datei je Reiter), #257 Privatsphäre und Benachrichtigungen, #258 Grunddaten und Sicherheit |
 | Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat, #255 Benachrichtigungen anklickbar, #256 Dashboard, #259 Freunde (#222 ist darin aufgegangen) |
 | Web: Dynamik | Block 20: #224, #225, #226 |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
@@ -471,6 +471,34 @@ Bild lieferte vorher JSON (405), jetzt das Bild.
 **Nicht geändert:** private Chat-Anhänge bleiben beim Backend (Zugriffsprüfung), ebenso
 Dokumente. Bilder, die schmaler sind als die verlangte Fassung, liefert weiter das Backend
 (es gibt dafür keine Datei); das betrifft Logos und kleine Grafiken.
+
+## Block 19 — Web-Profil
+
+Aus den PC-Screenshots vom 15. September: Profil I – Aufbau (#253, #257, #258) und
+Profil II – Nachrichten und Dashboard (#254, #255, #256, #259).
+
+### Was 19.1 gefunden hat (#253, dieser PR)
+
+**Eine Datei, neun Reiter, 1.828 Zeilen.** `ProfilePage.jsx` trug Grunddaten, Gaming, Socials,
+Teams, Freunde, Inbox, Achievements, Sitzungen und Privatsphäre samt Formularzustand. Jetzt
+hält die Seite nur noch Rahmen, Zustand und Speichern (290 Zeilen); jeder Reiter liegt unter
+`src/pages/user/profile/` in einer eigenen Datei. Verschoben wurde zeilengenau per Skript,
+das die Importe je Datei berechnet – abtippen wäre die sichere Quelle für neue Fehler gewesen.
+Die kommenden Umbauten (#257, #258, #254) fassen damit je eine kleine Datei an.
+
+**Das Menü ist ein Element mit drei Lagen.** Am PC Seitenleiste links (klebt beim Scrollen),
+am Tablet und Handy eine waagrecht scrollbare Reihe – dieselben Knöpfe, nur per CSS anders
+gelegt. Zwei getrennte Menüs hätten jeden Reiter doppelt ins Dokument gestellt (Tests,
+Screenreader). Der Inhalt nutzt am PC die Breite (`max-w-7xl`), die Formularzeilen sind
+zweispaltig.
+
+**`/profile?tab=…` bleibt.** Mails und Benachrichtigungen aus dem Backend verlinken so an elf
+Stellen; ein Pfad wie `/profile/socials` brächte nichts außer Umstellungsarbeit. Neu ist nur,
+dass ein Reiterwechsel ein eigener Verlaufseintrag ist – „Zurück“ führt zum vorigen Reiter.
+
+**Vier Lint-Unterdrückungen waren versteckt.** `eslint-suppressions.json` erlaubte der alten
+Datei vier Kästchen-Labels ohne zugänglichen Text; in den neuen Dateien griff die Regel wieder.
+Die Labels haben jetzt ein `aria-label`, die Unterdrückung ist überflüssig.
 
 ## Block 16 — Turnier-Leitfaden im Adminbereich
 

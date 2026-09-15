@@ -169,10 +169,5 @@
     "jsx-a11y/no-static-element-interactions": {
       "count": 1
     }
-  },
-  "src/pages/user/ProfilePage.jsx": {
-    "jsx-a11y/label-has-associated-control": {
-      "count": 4
-    }
   }
 }
