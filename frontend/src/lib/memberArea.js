@@ -30,3 +30,28 @@ export function eventDateLine(event) {
   const startDay = formatVienna(event.start_date, { withTime: false });
   return end && end !== startDay ? `${start} – ${end}` : start;
 }
+
+// Interne News: nur, was Mitglieder oder der Vorstand sehen (#284).
+export function memberNews(posts, limit = 3) {
+  return (Array.isArray(posts) ? posts : [])
+    .filter((post) => MEMBER_LEVELS.has(post?.visibility))
+    .slice(0, limit);
+}
+
+/**
+ * Ansprechpartner aus den Vorstandsposten (#284): nur besetzte Posten, in
+ * der Reihenfolge des Vorstands. Vertretungen zählen nicht extra, sonst
+ * stünde der Kassier zweimal da.
+ */
+export function boardContacts(positions, limit = 4) {
+  return (Array.isArray(positions) ? positions : [])
+    .filter((position) => position?.user && position.is_active !== false)
+    .map((position) => ({
+      id: position.id,
+      title: position.display_title || position.title_male || "",
+      name: position.user.display_name || position.user.gamertag || position.user.username || "",
+      avatar: position.user.avatar_url || position.user.photo_url || "",
+      profileUrl: position.user.profile_url || (position.user.slug ? `/members/${position.user.slug}` : "/board"),
+    }))
+    .slice(0, limit);
+}
