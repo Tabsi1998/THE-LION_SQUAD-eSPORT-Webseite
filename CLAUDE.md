@@ -412,8 +412,8 @@ braucht.
 (Profil II). `main` steht auf `72cef4c`.
 
 ### Offene PRs
-- #285 (#282 Benutzermenü im Kopf, #283 interne Events) und #286 (App
-  0.4.1-beta, #238). Reihenfolge: erst #285, dann #286, dann Build 62.
+- #294 (#293 Admin-Knopf weg, Doku) und #286 (App 0.4.1-beta, #238).
+  Reihenfolge egal; nach #286 baut der Haupt-PC Build 62.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
