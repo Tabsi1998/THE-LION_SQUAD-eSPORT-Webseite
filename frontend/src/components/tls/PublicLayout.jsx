@@ -71,15 +71,6 @@ export function PublicLayout({ children }) {
             <GlobalSearch />
             {user ? (
               <>
-                {isAdmin && (
-                  <Link
-                    to="/admin"
-                    data-testid="nav-admin"
-                    className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8] border border-[#29B6E8]/40 rounded-sm hover:bg-[#29B6E8]/10 transition"
-                  >
-                    <Shield className="w-3.5 h-3.5" /> Admin
-                  </Link>
-                )}
                 <NotificationBell />
                 <Link
                   to="/messages"
@@ -91,7 +82,8 @@ export function PublicLayout({ children }) {
                   <MessageSquare className="w-3.5 h-3.5" />
                 </Link>
                 {/* Benutzermenü statt sechs Knöpfen: Dashboard, Profil,
-                    Nachrichten, Mitgliederbereich, Admin, Abmelden (#282). */}
+                    Nachrichten, Mitgliederbereich, Admin, Abmelden (#282).
+                    Der blaue Admin-Knopf ist auf Wunsch des Betreibers weg. */}
                 <UserMenu />
               </>
             ) : (

@@ -167,7 +167,8 @@ Seit dem 15. September gilt:
   (Avatar und Name, dahinter Dashboard, Mein Profil, Nachrichten,
   Mitgliederbereich nur für Mitglieder, Admin nur für Admins, Abmelden;
   eigener Knopf ohne Radix wie die Glocke). In `PublicLayout.jsx` bleiben
-  Suche, Admin-Knopf, Glocke, Nachrichten und das Handy-Klappmenü. Das
+  Suche, Glocke, Nachrichten und das Handy-Klappmenü; der blaue Admin-Knopf
+  ist auf Wunsch des Betreibers weg (Admin nur noch im Menü). Das
   Dashboard verlinkt oben rechts „Profil bearbeiten“. Browser-Test
   `frontend/e2e/header-user-menu.spec.js`; der Abmelde-Test in
   `e2e/public.spec.js` öffnet zuerst das Menü (`nav-user`, am Handy
@@ -411,7 +412,8 @@ braucht.
 (Profil II). `main` steht auf `72cef4c`.
 
 ### Offene PRs
-- #285 (#282 Benutzermenü im Kopf, #283 interne Events). Nach dem Merge: keine.
+- #294 (#293 Admin-Knopf weg, Doku) und #286 (App 0.4.1-beta, #238).
+  Reihenfolge egal; nach #286 baut der Haupt-PC Build 62.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -426,16 +428,21 @@ braucht.
   Mitgliederbereich und Kopfzeile“ (#282–#284) abgeschlossen ist.
 - #284: den Vorschlag im Issue bestätigen oder ändern – erst dann wird
   umgebaut.
-- #238: der Text aus der Bildkachel liegt vor („Bild konnte nicht geladen
-  werden … Unexpected HTTP Code“); die Fehlersuche läuft in App 0.4.1-beta.
+- #238: Fix in #286 (App 0.4.1-beta). Nach dem Merge baut der Haupt-PC Build
+  62; dann installieren, ein Bild im Chat senden – entweder erscheint es,
+  oder die Kachel nennt den HTTP-Status (der ist dann die Diagnose).
+- #287: drei Fragen zum Rechtemodell beantworten (Freigaben oder Rollen,
+  Vorstand aus der Mitgliedschaft, Umfang der Turnierleitung) – erst dann
+  wird an „Web: Rollen und Rechte“ gebaut.
 
-### Meilensteine und offene Issues (27 offen)
+### Meilensteine und offene Issues (32 offen)
 | Meilenstein | Issues |
 | --- | --- |
 | Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg, #265 Betrieb II |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
 | Web: Mitgliederbereich und Kopfzeile | #284 Mitgliederbereich aufräumen (Vorschlag, wartet auf OK); #282 und #283 sind mit #285 umgesetzt |
-| App 0.4.1-beta | #238 Chat-Bild „Unexpected HTTP Code“ (Fehlertext liegt vor) |
+| App 0.4.1-beta | #238 Chat-Bild „Unexpected HTTP Code“ – Fix in #286, danach Build 62 |
+| Web: Rollen und Rechte | #287 Ist-Stand und Zielbild (Entscheidung), #288 Turnierleitung ohne Redaktion, #289 Redaktionsrecht, #290 Vereinsvorstand, #291 Zwei-Faktor für Club-Admin-Routen (bug), #292 Rechte sichtbar, team_leader weg |
 | App 0.5.0-beta | #249 Was ist neu, #250 Update aus der App, #251 In-App-Banner, #277 Nickname-Feld weg |
 | App 0.6.0-beta | #218 Erfolge |
 | App 0.7.0-beta | #216 Kalender, #236 Galerie |
@@ -453,7 +460,9 @@ braucht.
 3. App 0.4.1-beta: #238 Chat-Bild → Build 62.
 4. Betrieb II #265.
 5. App 0.5.0-beta (#249–#251, #277) → Build 63.
-6. Danach Dynamik, 0.6.0, Admin und Turniere, … Abwechselnd App und Web.
+6. Web: Rollen und Rechte (#287–#292), sobald die Entscheidung in #287 steht –
+   Zusatzwunsch vom 16.09., muss die Reihenfolge davor nicht verschieben.
+7. Danach Dynamik, 0.6.0, Admin und Turniere, … Abwechselnd App und Web.
 
 Vor jedem neuen Paket: Stand melden und auf das OK warten.
 

@@ -424,7 +424,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Meilenstein | Inhalt |
 | --- | --- |
 | App 0.3.1-beta | Nur Fehler aus Build 59: #246 Rohwerte II, #247 Umbrüche im Profil, #252 Referenzen leer (#262, Build 60); #238 Bild schwarz bekommt damit einen sichtbaren Fehlergrund und bleibt offen |
-| App 0.4.1-beta | #238 Chat-Bild: seit Build 61 steht der Grund in der Kachel („Unexpected HTTP Code“), Fehlersuche und Behebung |
+| App 0.4.1-beta | #238 Chat-Bild: seit Build 61 steht der Grund in der Kachel („Unexpected HTTP Code“); #286 holt das Bild über den API-Client und nennt sonst den HTTP-Status – Build 62 |
 | App 0.4.0-beta | Seiten aufräumen II: #241 Events-Tab, #242 Mehr/Gaming, #243 eigene Seiten, #244 Sponsoren, #248 Startseite II (#264; Build 61 noch nicht gebaut) |
 | App 0.5.0-beta | Tester-Komfort: #249 „Was ist neu“, #250 Update aus der App, #251 In-App-Banner, #277 Nickname-Feld weg (ein Anzeigename wie im Web) |
 | App 0.6.0-beta | #218 Erfolge (14.5) |
@@ -435,6 +435,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
 | Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar (#279, umgesetzt), #256 Dashboard (#280, umgesetzt), #259 Freunde (#281, umgesetzt; #222 ist darin aufgegangen) – Meilenstein abgeschlossen |
 | Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (Vorschlag im Issue, wartet auf das OK) |
+| Web: Rollen und Rechte | Zusatzwunsch vom 16.09., nachdem der Betreiber als Admin den Adminbereich sah: #287 Ist-Stand und Zielbild (Entscheidung: Freigaben oder Rollen), #288 Turnierleitung ohne Redaktion, #289 Redaktionsrecht für News/Galerie/Sponsoren, #290 Vereinsvorstand für Mitglieder/Dokumente/Vorteile, #291 Zwei-Faktor auch für Club-Admin-Routen, #292 Rechte sichtbar und `team_leader` weg |
 | Web: Dynamik | Block 20: #224, #225, #226 |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | Block 17 und 18: #229, #230 |
@@ -651,7 +652,8 @@ Grunddaten, Privatsphäre oder Passwort. Der Betreiber hat es im ersten Test bem
 **Sechs Knöpfe nebeneinander.** Mitgliederbereich, Admin, Glocke, Nachrichten, Name, Logout –
 auf einem Laptop lief die Kopfzeile über. Jetzt gibt es einen Knopf mit Avatar und Name und
 dahinter ein Menü: Dashboard, Mein Profil, Nachrichten, Mitgliederbereich (nur Mitglieder),
-Admin (nur Admins), Abmelden. Im Kopf bleiben Suche, Admin-Knopf, Glocke und Nachrichten.
+Admin (nur Admins), Abmelden. Im Kopf bleiben Suche, Glocke und Nachrichten; den blauen
+Admin-Knopf wollte der Betreiber nach dem ersten Blick auch weg haben – Admin steht im Menü.
 Am Handy hat das Klappmenü dieselben Einträge; das Dashboard bekommt „Profil bearbeiten“.
 
 **Kein Radix.** Wie die Glocke ist das Menü ein eigener Knopf (Klick daneben und Escape
