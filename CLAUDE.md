@@ -163,6 +163,20 @@ Seit dem 15. September gilt:
   `/api/messages/users?q=` und rechnet den Stand zu mir aus `/api/friends`;
   `ProfileNav` nimmt `badges` (Zähler und Punkt je Reiter), das Profil lädt
   dafür `/api/friends` und hört auf die Ressource `friends`.
+- Benutzermenü im Kopf (#282, PR #285): `components/tls/UserMenu.jsx`
+  (Avatar und Name, dahinter Dashboard, Mein Profil, Nachrichten,
+  Mitgliederbereich nur für Mitglieder, Admin nur für Admins, Abmelden;
+  eigener Knopf ohne Radix wie die Glocke). In `PublicLayout.jsx` bleiben
+  Suche, Admin-Knopf, Glocke, Nachrichten und das Handy-Klappmenü. Das
+  Dashboard verlinkt oben rechts „Profil bearbeiten“. Browser-Test
+  `frontend/e2e/header-user-menu.spec.js`; der Abmelde-Test in
+  `e2e/public.spec.js` öffnet zuerst das Menü (`nav-user`, am Handy
+  `nav-logout-mobile`).
+- Mitgliederbereich (#283, PR #285): `pages/user/MemberAreaPage.jsx` lädt
+  `/api/events?upcoming=true&compact=true`; `lib/memberArea.js` behält
+  Mitglieder- und interne Events, die noch anstehen (Karte und Kachel
+  „Interne Events“). Browser-Test `frontend/e2e/member-area.spec.js`.
+  Der Umbau der Seite (#284) wartet auf das OK des Betreibers.
 - Privatsphäre und Benachrichtigungen (#257, PR #275) speichern von selbst:
   `profile/useAutosave.js` (0,7 s Entprellung, ein PATCH je Lauf, Änderungen
   während des Speicherns bleiben stehen), Schalter in `profile/SwitchRow.jsx`
@@ -387,37 +401,42 @@ braucht.
 
 ---
 
-## 9. Aktueller Stand (15. September 2026, spät abends)
+## 9. Aktueller Stand (16. September 2026)
 
-### Gemergt heute
+### Gemergt zuletzt (15./16. September)
 #237 (App 14.4), #261 (#221 Live-Aktualisierung), #262 (App 0.3.1-beta),
 #263 (#232 Uploads über nginx), #264 (App 0.4.0-beta, Build 61 vorbereitet),
 #266 (#233 Teil 1, Betrieb), #267 (#253 Profil-Layout), #268 (diese Datei),
-#270 (#269 lokaler Check). `main` steht auf `42b9d76`.
+#270 (#269 lokaler Check), #272–#276 (Umzug, Doku, Profil I), #278–#281
+(Profil II). `main` steht auf `72cef4c`.
 
 ### Offene PRs
-- Keine, sobald der Doku-PR zu #273 (Umzug) gemergt ist.
+- #285 (#282 Benutzermenü im Kopf, #283 interne Events). Nach dem Merge: keine.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
   (`mobile-v0.3.1-beta-build60`), **Build 61** (`mobile-v0.4.0-beta-build61`,
   Commit ec89de6, am 16.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
-  `46b6ce34`). Nächster Build ist 62 mit App 0.5.0-beta (#249–#251).
+  `46b6ce34`). Nächster Build ist 62 mit App 0.4.1-beta (#238), danach 63
+  mit App 0.5.0-beta (#249–#251, #277).
 
 ### Erledigungen beim Betreiber
-- `update.sh` am Server, sobald #281 gemergt ist: damit sind Web: Profil I und
-  Profil II komplett am Server (Stand des Servers: #275 vom 16.09.).
-- Build 61 installieren (Release-Seite → APK → installieren; Build 60 muss
-  nicht deinstalliert werden), ein Bild im Chat senden und den Text aus der
-  Bildkachel in **#238** posten (dort steht der Fehlergrund).
+- Server steht auf #281 (16.09.): Profil I und Profil II sind am Server. Das
+  nächste `update.sh` ist fällig, sobald der Meilenstein „Web:
+  Mitgliederbereich und Kopfzeile“ (#282–#284) abgeschlossen ist.
+- #284: den Vorschlag im Issue bestätigen oder ändern – erst dann wird
+  umgebaut.
+- #238: der Text aus der Bildkachel liegt vor („Bild konnte nicht geladen
+  werden … Unexpected HTTP Code“); die Fehlersuche läuft in App 0.4.1-beta.
 
-### Meilensteine und offene Issues (26 offen)
+### Meilensteine und offene Issues (27 offen)
 | Meilenstein | Issues |
 | --- | --- |
 | Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg, #265 Betrieb II |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
-| App 0.3.1-beta | #238 schwarze Chat-Kachel (wartet auf Text vom Betreiber) |
-| App 0.5.0-beta | #249 Was ist neu, #250 Update aus der App, #251 In-App-Banner |
+| Web: Mitgliederbereich und Kopfzeile | #284 Mitgliederbereich aufräumen (Vorschlag, wartet auf OK); #282 und #283 sind mit #285 umgesetzt |
+| App 0.4.1-beta | #238 Chat-Bild „Unexpected HTTP Code“ (Fehlertext liegt vor) |
+| App 0.5.0-beta | #249 Was ist neu, #250 Update aus der App, #251 In-App-Banner, #277 Nickname-Feld weg |
 | App 0.6.0-beta | #218 Erfolge |
 | App 0.7.0-beta | #216 Kalender, #236 Galerie |
 | App 0.8.0-beta | #239 Sticker/GIFs, #240 Freundschaftsanfragen, #245 Laufbanner |
@@ -427,13 +446,14 @@ braucht.
 | Spaeter | #260 Plattform-Konten verknüpfen |
 
 ### Reihenfolge danach (vom Betreiber freigegeben)
-1. Profil I ist fertig (#253, #257, #258 mit #267, #275, #276); der Meilenstein
-   „Web: Profil I – Aufbau“ ist abgeschlossen, Server-Update fällig.
-2. Profil II ist fertig (#254, #255, #256, #259 mit #278, #279, #280, #281); der
-   Meilenstein „Web: Profil II“ ist abgeschlossen, Server-Update fällig.
-3. Betrieb II #265.
-4. App 0.5.0-beta (#249–#251) → Build 62.
-5. Danach Dynamik, 0.6.0, Admin und Turniere, … Abwechselnd App und Web.
+1. Profil I und Profil II sind fertig und seit 16.09. am Server (#267, #275,
+   #276, #278–#281).
+2. Web: Mitgliederbereich und Kopfzeile – #282 und #283 (#285, umgesetzt), #284
+   nach dem OK des Betreibers. Danach Server-Update.
+3. App 0.4.1-beta: #238 Chat-Bild → Build 62.
+4. Betrieb II #265.
+5. App 0.5.0-beta (#249–#251, #277) → Build 63.
+6. Danach Dynamik, 0.6.0, Admin und Turniere, … Abwechselnd App und Web.
 
 Vor jedem neuen Paket: Stand melden und auf das OK warten.
 

@@ -8,7 +8,7 @@ import { NotificationRow } from "@/components/tls/NotificationRow";
 import { bundleNotifications } from "@/lib/notifications";
 import { dashboardActions, formatVienna, registrationLabel, seasonLine, splitHomeTimeline, timelineItems } from "@/lib/dashboard";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { Trophy, Bell, Crown, Gift, AlertTriangle, UserCheck, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords } from "lucide-react";
+import { Trophy, Bell, Crown, Gift, AlertTriangle, UserCheck, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, Settings } from "lucide-react";
 
 // Das Dashboard ist die persönliche Startseite, wie die App-Startseite seit
 // #237 (#256): Kopf, offene Aktionen, nächste Termine, Jahreswertung,
@@ -152,7 +152,7 @@ export default function DashboardPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12">
         <div className="flex items-center gap-4 mb-8" data-testid="dashboard-header">
           <DashboardAvatar user={user} isClubMember={isClubMember} />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="font-heading text-2xl md:text-4xl font-black uppercase truncate">{user?.display_name || user?.username}</h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               {isClubMember ? <Pill tone="gold" testId="dashboard-pill-member"><Crown className="w-3 h-3" /> Vereinsmitglied</Pill> : <Pill tone="grey" testId="dashboard-pill-community">Community</Pill>}
@@ -161,6 +161,9 @@ export default function DashboardPage() {
               {!isClubMember ? <Link to="/membership/join" data-testid="dashboard-join-cta" className="text-xs font-bold text-[#FFD700] hover:underline">Mitglied werden</Link> : null}
             </div>
           </div>
+          <Link to="/profile" data-testid="dashboard-edit-profile" aria-label="Profil bearbeiten" title="Profil bearbeiten" className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 border border-white/15 text-white/70 hover:text-[#29B6E8] hover:border-[#29B6E8]/40 rounded-sm text-[11px] font-bold uppercase tracking-wider transition">
+            <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Profil bearbeiten</span>
+          </Link>
         </div>
 
         {completeness && completeness.score < 100 && (

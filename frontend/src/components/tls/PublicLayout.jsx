@@ -11,7 +11,8 @@ import { openCookieSettings } from "@/components/tls/CookieConsent";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Menu, X, User, LogOut, Shield, Crown, Megaphone, ArrowUp, MessageSquare } from "lucide-react";
+import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, MessageSquare, Settings } from "lucide-react";
+import { UserMenu } from "@/components/tls/UserMenu";
 import { useCallback, useMemo, useState, useEffect } from "react";
 
 export function PublicLayout({ children }) {
@@ -70,15 +71,6 @@ export function PublicLayout({ children }) {
             <GlobalSearch />
             {user ? (
               <>
-                {isClubMember && (
-                  <Link
-                    to="/members/area"
-                    data-testid="nav-member-area"
-                    className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 rounded-sm hover:bg-[#FFD700]/10 transition"
-                  >
-                    <Crown className="w-3.5 h-3.5" /> Mitgliederbereich
-                  </Link>
-                )}
                 {isAdmin && (
                   <Link
                     to="/admin"
@@ -98,22 +90,9 @@ export function PublicLayout({ children }) {
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
                 </Link>
-                <Link
-                  to="/dashboard"
-                  data-testid="nav-dashboard"
-                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/80 border border-white/10 rounded-sm hover:border-[#29B6E8]/40 hover:text-[#29B6E8] transition"
-                >
-                  <User className="w-3.5 h-3.5" /> {user.display_name || user.username}
-                </Link>
-                <button
-                  data-testid="nav-logout"
-                  onClick={async () => { if (await logout()) nav("/"); }}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 border border-[#FF3B30]/35 text-[#FF3B30] hover:bg-[#FF3B30]/10 transition rounded-sm text-xs font-bold uppercase tracking-wider"
-                  aria-label="Logout"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">Logout</span>
-                </button>
+                {/* Benutzermenü statt sechs Knöpfen: Dashboard, Profil,
+                    Nachrichten, Mitgliederbereich, Admin, Abmelden (#282). */}
+                <UserMenu />
               </>
             ) : (
               <>
@@ -151,7 +130,7 @@ export function PublicLayout({ children }) {
               <MobileNav isClubMember={isClubMember} onClose={closeMobile} />
               <div className="border-t border-white/10 mt-3 pt-3 space-y-0.5">
                 {user && isClubMember && (
-                  <Link to="/members/area" onClick={closeMobile} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#FFD700]">
+                  <Link to="/members/area" onClick={closeMobile} data-testid="nav-member-area-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#FFD700]">
                     <Crown className="w-3.5 h-3.5 inline mr-1.5" /> Mitgliederbereich
                   </Link>
                 )}
@@ -162,12 +141,16 @@ export function PublicLayout({ children }) {
                 )}
                 {user ? (
                   <>
-                    <Link to="/dashboard" onClick={closeMobile} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">Mein Bereich</Link>
+                    <Link to="/dashboard" onClick={closeMobile} data-testid="nav-dashboard-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">Dashboard</Link>
+                    <Link to="/profile" onClick={closeMobile} data-testid="nav-profile-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">
+                      <Settings className="w-3.5 h-3.5 inline mr-1.5" /> Mein Profil
+                    </Link>
                     <Link to="/messages" onClick={closeMobile} data-testid="nav-messages-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">
                       <MessageSquare className="w-3.5 h-3.5 inline mr-1.5" /> Nachrichten
                     </Link>
                     <button
                       type="button"
+                      data-testid="nav-logout-mobile"
                       onClick={async () => {
                         if (await logout()) {
                           closeMobile();
@@ -176,7 +159,7 @@ export function PublicLayout({ children }) {
                       }}
                       className="w-full text-left px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#FF3B30]"
                     >
-                      <LogOut className="w-3.5 h-3.5 inline mr-1.5" /> Logout
+                      <LogOut className="w-3.5 h-3.5 inline mr-1.5" /> Abmelden
                     </button>
                   </>
                 ) : (

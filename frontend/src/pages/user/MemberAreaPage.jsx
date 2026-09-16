@@ -4,7 +4,8 @@ import { API, api, formatMemberSince, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Crown, Gift, FileText, Bell, Calendar, Hash, Newspaper, Eye, ArrowRight, User } from "lucide-react";
+import { eventDateLine, memberEvents } from "@/lib/memberArea";
+import { Crown, Gift, FileText, Bell, Calendar, Hash, Newspaper, Eye, ArrowRight, User, MapPin } from "lucide-react";
 
 export default function MemberAreaPage() {
   const { user } = useAuth();
@@ -12,6 +13,9 @@ export default function MemberAreaPage() {
   const [my, setMy] = useState(null);
   const [docs, setDocs] = useState([]);
   const [internalNews, setInternalNews] = useState([]);
+  // Interne Events (#283): die Event-Liste liefert, was ich sehen darf; hier
+  // bleiben nur Mitglieder- und interne Events, die noch anstehen.
+  const [internalEvents, setInternalEvents] = useState([]);
 
   const load = useCallback(() => {
     Promise.allSettled([
@@ -19,17 +23,19 @@ export default function MemberAreaPage() {
       api.get("/membership/me"),
       api.get("/documents"),
       api.get("/news"),
-    ]).then(([b, m, d, n]) => {
+      api.get("/events?upcoming=true&compact=true&limit=48"),
+    ]).then(([b, m, d, n, e]) => {
       if (b.status === "fulfilled") setBenefits(b.value.data);
       if (m.status === "fulfilled") setMy(m.value.data);
       if (d.status === "fulfilled") setDocs(d.value.data);
       if (n.status === "fulfilled") {
         setInternalNews(n.value.data.filter((x) => x.visibility === "members" || x.visibility === "internal").slice(0, 3));
       }
+      if (e.status === "fulfilled") setInternalEvents(memberEvents(e.value.data));
     });
   }, []);
   useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["membership", "documents", "news", "users"]);
+  useApiInvalidation(load, ["membership", "documents", "news", "users", "events"]);
 
   const memberSince = my?.membership?.member_since
     ? formatMemberSince(my.membership.member_since, my.membership.member_since_precision)
@@ -62,11 +68,12 @@ export default function MemberAreaPage() {
         </div>
 
         {/* Quick tiles */}
-        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="mt-8 grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <Tile to="/members/membership" icon={User} title="Mitgliedschaft" subtitle="Status, Nummer, Verlauf" testId="tile-membership" />
           <Tile to="/members/benefits" icon={Gift} title="Vorteile" subtitle={`${benefits.length} verfügbar`} testId="tile-benefits" />
           <Tile to="/members/documents" icon={FileText} title="Dokumente" subtitle={`${docs.length} freigegeben`} testId="tile-documents" />
           <Tile to="/members/news" icon={Newspaper} title="Interne News" subtitle={`${internalNews.length} aktuell`} testId="tile-news" />
+          <Tile to="/events" icon={Calendar} title="Interne Events" subtitle={`${internalEvents.length} anstehend`} testId="tile-events" />
         </div>
 
         {/* Recent benefits */}
@@ -126,8 +133,20 @@ export default function MemberAreaPage() {
                 </div>
               )}
             </Section>
-            <Section title="Interne Events" icon={Calendar}>
-              <Empty text="Keine internen Events geplant." />
+            <Section title="Interne Events" icon={Calendar} more={internalEvents.length ? { to: "/events", label: "Alle Events" } : null}>
+              {internalEvents.length === 0 ? (
+                <div data-testid="member-area-events-empty"><Empty text="Kein Mitglieder-Event steht an." /></div>
+              ) : (
+                <div className="space-y-3" data-testid="member-area-events">
+                  {internalEvents.slice(0, 3).map((ev) => (
+                    <Link key={ev.id} to={`/events/${ev.slug}`} data-testid={`member-area-event-${ev.id}`} className="block border-l-2 border-[#FFD700]/50 pl-3 hover:border-[#FFD700] transition">
+                      <div className="text-[10px] uppercase tracking-widest text-white/40">{eventDateLine(ev)}</div>
+                      <div className="font-bold text-white mt-0.5">{ev.name}</div>
+                      {ev.location && <div className="text-xs text-white/50 mt-0.5 inline-flex items-center gap-1"><MapPin className="w-3 h-3" /> {ev.location}</div>}
+                    </Link>
+                  ))}
+                </div>
+              )}
             </Section>
           </div>
         </div>
