@@ -129,8 +129,9 @@ Seit dem 15. September gilt:
 - Profil (seit #253 / PR #267): `pages/user/ProfilePage.jsx` ist nur noch
   Rahmen; je Reiter eine Datei unter `pages/user/profile/` (`BasicTab`,
   `GamingTab`, `SocialsTab`, `AchievementsTab`, `PrivacyTab`,
-  `NotificationsTab`, `TeamsPanel`, `FriendsPanel`, `MessagesPanel`,
-  `SessionsPanel`, `AchievementPanels`, `ProfileNav`, `fields.jsx`,
+  `NotificationsTab`, `SecurityTab` mit `PasswordPanel` und `SessionsPanel`,
+  `TeamsPanel`, `FriendsPanel`, `MessagesPanel`, `AchievementPanels`,
+  `ProfileNav`, `fields.jsx`,
   `constants.js`, `form.js`). Reiter bleiben `?tab=…`, weil Mails und
   Benachrichtigungen aus dem Backend so verlinken (Benachrichtigungen seit
   #257: `?tab=notifications`).
@@ -140,6 +141,13 @@ Seit dem 15. September gilt:
   (eigener `role="switch"`-Knopf; die Radix-Switch braucht ResizeObserver),
   Sichtbarkeits-Gruppen und Schnellwahl als reine Logik in
   `profile/visibility.js`.
+- Grunddaten und Sicherheit (#258, PR #276): Länder in `lib/countries.js`
+  (nur ISO-Codes, Namen per `Intl.DisplayNames`), Social-Symbole und die
+  Bereinigung eingefügter Adressen in `profile/socials.js`, `?tab=sessions`
+  ist ein Alias auf `security` (`TAB_ALIASES` in `ProfilePage.jsx`). Reiter
+  liegen im Profil-Formular, eigene Formulare darin (Passwort) nutzen Knöpfe
+  mit `type="button"`. `ImageUpload` zeigt keine Dateinamen mehr und hat
+  „Ansehen“/„Entfernen“ – überall, auch im Adminbereich.
 - Admin-Seite Betrieb: `pages/admin/AdminOpsPage.jsx`, Route `/admin/ops`,
   Menüpunkt „Betrieb“ unter System.
 - ESLint nutzt `frontend/eslint-suppressions.json` (Sammel-Unterdrückungen).
@@ -344,8 +352,10 @@ npm run release:local                 # bauen, prüfen, GitHub-Release und Tag a
 Der Betreiber deployt **von Hand** mit `update.sh` auf dem Produktivserver.
 Backend- und Web-Änderungen greifen **erst danach**. Bei jedem App-Test
 fragen, ob der Server aktualisiert ist – Build 59 zeigte alte Termine, weil
-#237 noch nicht am Server war. Nach jedem gemergten Backend-/Web-PR den
-Betreiber an `update.sh` erinnern.
+#237 noch nicht am Server war. Der Betreiber aktualisiert den Server nach
+Meilensteinen, nicht nach jedem PR (16.09.): an `update.sh` nur erinnern, wenn
+ein Meilenstein abgeschlossen ist oder ein App-Build Backend-Änderungen
+braucht.
 
 ---
 
@@ -367,15 +377,15 @@ Betreiber an `update.sh` erinnern.
   `46b6ce34`). Nächster Build ist 62 mit App 0.5.0-beta (#249–#251).
 
 ### Erledigungen beim Betreiber
-- `update.sh` am Server ausführen (#263, #266 und #267 sind Backend/Web).
+- `update.sh` am Server, sobald #276 gemergt ist: damit ist Web: Profil I
+  komplett am Server (Stand vorher: #275).
 - Build 61 installieren (Release-Seite → APK → installieren; Build 60 muss
   nicht deinstalliert werden), ein Bild im Chat senden und den Text aus der
   Bildkachel in **#238** posten (dort steht der Fehlergrund).
 
-### Meilensteine und offene Issues (31 offen)
+### Meilensteine und offene Issues (30 offen)
 | Meilenstein | Issues |
 | --- | --- |
-| Web: Profil I – Aufbau | #258 Grunddaten + Sicherheit (#253 mit #267, #257 mit #275 zu) |
 | Web: Profil II – Nachrichten und Dashboard | #254 Inbox als Chat, #255 Benachrichtigungen anklickbar, #256 Dashboard, #259 Freunde |
 | Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg, #265 Betrieb II |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
@@ -390,7 +400,8 @@ Betreiber an `update.sh` erinnern.
 | Spaeter | #260 Plattform-Konten verknüpfen |
 
 ### Reihenfolge danach (vom Betreiber freigegeben)
-1. Profil I fertig: **#258** (#257 ist mit PR #275 erledigt; baut auf den Reiter-Dateien aus #267 auf).
+1. Profil I ist fertig (#253, #257, #258 mit #267, #275, #276); der Meilenstein
+   „Web: Profil I – Aufbau“ ist abgeschlossen, Server-Update fällig.
 2. Profil II: #254, #255, #256, #259.
 3. Betrieb II #265.
 4. App 0.5.0-beta (#249–#251) → Build 62.
