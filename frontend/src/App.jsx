@@ -74,6 +74,7 @@ const TermsPage = lazy(() => import("@/pages/public/LegalPages").then((m) => ({ 
 const DashboardPage = lazy(() => import("@/pages/user/DashboardPage"));
 const ProfilePage = lazy(() => import("@/pages/user/ProfilePage"));
 const MessagesPage = lazy(() => import("@/pages/user/MessagesPage"));
+const NotificationsPage = lazy(() => import("@/pages/user/NotificationsPage"));
 const MatchHubPage = lazy(() => import("@/pages/user/MatchHubPage"));
 const PrivacyAccountPage = lazy(() => import("@/pages/user/PrivacyAccountPage"));
 const ConsentPage = lazy(() => import("@/pages/user/ConsentPage"));
@@ -223,6 +224,7 @@ function App() {
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
           <Route path="/messages/:userId" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
           <Route path="/hub/matches/:id" element={<ProtectedRoute><MatchHubPage /></ProtectedRoute>} />
           <Route path="/privacy-account" element={<ProtectedRoute><PrivacyAccountPage /></ProtectedRoute>} />
           <Route path="/consent" element={<ProtectedRoute><ConsentPage /></ProtectedRoute>} />

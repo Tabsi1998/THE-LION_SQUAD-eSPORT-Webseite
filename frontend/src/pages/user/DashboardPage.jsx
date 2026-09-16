@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { NotificationRow } from "@/components/tls/NotificationRow";
+import { bundleNotifications } from "@/lib/notifications";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { Trophy, Bell, Crown, Gift, Award, UserCheck, AlertTriangle, Medal, Users, Eye } from "lucide-react";
 
@@ -46,7 +48,6 @@ export default function DashboardPage() {
   const [matches, setMatches] = useState([]);
   const [staffMatches, setStaffMatches] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [notificationsExpanded, setNotificationsExpanded] = useState(false);
   const [openPrizes, setOpenPrizes] = useState(0);
   const [completeness, setCompleteness] = useState(null);
   const [penaltyCount, setPenaltyCount] = useState(0);
@@ -87,6 +88,17 @@ export default function DashboardPage() {
     };
   }, [load]);
   useLiveRefresh(load, ["matches", "prizes", "users", "penalties", "achievements", "membership", "tournaments", "f1", "admin/notifications"], { fallbackMs: 10000 });
+
+  // Die fünf neuesten, gebündelt und anklickbar (#255); „Alle N anzeigen“
+  // führt auf die Benachrichtigungsseite. Ein Klick markiert das Bündel als
+  // gelesen, die Zeile selbst führt ans Ziel.
+  const notificationBundles = useMemo(() => bundleNotifications(notifications).slice(0, 5), [notifications]);
+  const openNotification = useCallback(async (bundle) => {
+    const ids = (bundle.ids || []).filter((id) => notifications.some((row) => row.id === id && !row.read));
+    if (!ids.length) return;
+    setNotifications((rows) => rows.map((row) => (ids.includes(row.id) ? { ...row, read: true } : row)));
+    await Promise.allSettled(ids.map((id) => api.post(`/admin/notifications/${id}/read`)));
+  }, [notifications]);
 
   return (
     <PublicLayout>
@@ -136,21 +148,16 @@ export default function DashboardPage() {
           </div>
           <div className="border border-white/10 rounded-sm bg-[#121212] p-5 min-w-0" data-testid="dashboard-notifications">
             <h2 className="font-heading text-xl font-bold uppercase mb-4 flex items-center gap-2"><Bell className="w-4 h-4 text-[#29B6E8]" /> Benachrichtigungen</h2>
-            <div id="dashboard-notification-list" className={`space-y-3 ${notificationsExpanded ? "max-h-96 overflow-y-auto pr-2" : ""}`}>
-              {notifications.length === 0 && <div className="text-sm text-white/40">Keine Benachrichtigungen.</div>}
-              {(notificationsExpanded ? notifications : notifications.slice(0, 3)).map((n) => (
-                <div key={n.id} className="border-l-2 border-[#29B6E8]/50 pl-3 text-sm">
-                  <div className="text-white">{n.title}</div>
-                  <div className="text-white/50 text-xs">{new Date(n.created_at).toLocaleString("de-DE")}</div>
-                </div>
+            <div id="dashboard-notification-list" className="-mx-2 border border-white/5 rounded-sm bg-[#0F0F10] overflow-hidden">
+              {notifications.length === 0 && <div className="p-3 text-sm text-white/40">Keine Benachrichtigungen.</div>}
+              {notificationBundles.map((bundle) => (
+                <NotificationRow key={bundle.id} bundle={bundle} onOpen={openNotification} compact testIdPrefix="dashboard-notification" />
               ))}
             </div>
-            {notifications.length > 3 && (
-              <button type="button" aria-expanded={notificationsExpanded} aria-controls="dashboard-notification-list"
-                onClick={() => setNotificationsExpanded((expanded) => !expanded)}
-                className="mt-4 min-h-11 w-full border border-[#29B6E8]/40 rounded-sm px-3 py-2 text-sm font-bold text-[#29B6E8] hover:bg-[#29B6E8]/10">
-                {notificationsExpanded ? "Weniger anzeigen" : `Alle ${notifications.length} anzeigen`}
-              </button>
+            {notifications.length > notificationBundles.length && (
+              <Link to="/notifications" data-testid="dashboard-notifications-all" className="mt-4 min-h-11 w-full inline-flex items-center justify-center border border-[#29B6E8]/40 rounded-sm px-3 py-2 text-sm font-bold text-[#29B6E8] hover:bg-[#29B6E8]/10">
+                {`Alle ${notifications.length} anzeigen`}
+              </Link>
             )}
           </div>
         </div>
