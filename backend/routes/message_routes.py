@@ -208,30 +208,50 @@ async def list_conversations(me: dict = Depends(get_current_user)):
     return result
 
 
+THREAD_PAGE_SIZE = 50
+THREAD_PAGE_MAX = 100
+
+
 @router.get("/direct/{user_id}")
-async def get_direct_thread(user_id: str, me: dict = Depends(get_current_user)):
+async def get_direct_thread(
+    user_id: str,
+    before: str | None = None,
+    limit: int = THREAD_PAGE_SIZE,
+    me: dict = Depends(get_current_user),
+):
+    """Die Unterhaltung seitenweise (#254): ohne ``before`` die neuesten
+    Nachrichten, mit ``before`` die älteren vor dieser Nachricht. Gelesen
+    markiert nur das Öffnen, nicht das Nachladen."""
     db = get_db()
     other = await _get_active_user(db, user_id)
     can_send, hint = await _message_permission(db, me, other)
     block = await block_between(db, me["id"], other["id"])
-    rows = await db.direct_messages.find(
-        {
-            "$or": [
-                {"sender_id": me["id"], "recipient_id": other["id"]},
-                {"sender_id": other["id"], "recipient_id": me["id"]},
-            ]
-        },
-        {"_id": 0},
-    ).sort("created_at", 1).to_list(250)
-    now = now_utc().isoformat()
-    await db.direct_messages.update_many(
-        {"sender_id": other["id"], "recipient_id": me["id"], "read_at": {"$exists": False}},
-        {"$set": {"read_at": now}},
-    )
-    await db.notifications.update_many(
-        {"user_id": me["id"], "kind": "direct_message", "meta.thread_user_id": other["id"], "read": {"$ne": True}},
-        {"$set": {"read": True}},
-    )
+    page_size = max(1, min(int(limit or THREAD_PAGE_SIZE), THREAD_PAGE_MAX))
+    thread = {
+        "$or": [
+            {"sender_id": me["id"], "recipient_id": other["id"]},
+            {"sender_id": other["id"], "recipient_id": me["id"]},
+        ]
+    }
+    query: dict = dict(thread)
+    if before:
+        anchor = await db.direct_messages.find_one({"id": before, **thread}, {"_id": 0, "created_at": 1})
+        if not anchor:
+            raise HTTPException(status_code=404, detail="Nachricht nicht gefunden")
+        query["created_at"] = {"$lt": anchor["created_at"]}
+    rows = await db.direct_messages.find(query, {"_id": 0}).sort("created_at", -1).to_list(page_size + 1)
+    has_more = len(rows) > page_size
+    rows = list(reversed(rows[:page_size]))
+    if not before:
+        now = now_utc().isoformat()
+        await db.direct_messages.update_many(
+            {"sender_id": other["id"], "recipient_id": me["id"], "read_at": {"$exists": False}},
+            {"$set": {"read_at": now}},
+        )
+        await db.notifications.update_many(
+            {"user_id": me["id"], "kind": "direct_message", "meta.thread_user_id": other["id"], "read": {"$ne": True}},
+            {"$set": {"read": True}},
+        )
     users = {me["id"]: me, other["id"]: other}
     return {
         "user": _public_user(other),
@@ -239,6 +259,8 @@ async def get_direct_thread(user_id: str, me: dict = Depends(get_current_user)):
         "message_hint": hint,
         "blocked_by_me": bool(block and block.get("blocker_id") == me["id"]),
         "messages": [_public_message(row, users) for row in rows],
+        "has_more": has_more,
+        "page_size": page_size,
     }
 
 
@@ -277,7 +299,7 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, request: 
         recipient["id"],
         title=f"Neue Nachricht von {_label(me)}",
         body=chat_message_preview(doc, 160),
-        url="/profile?tab=inbox",
+        url=f"/profile?tab=inbox&to={me['id']}",
         kind="direct_message",
         meta={"message_id": doc["id"], "thread_user_id": me["id"]},
     )
@@ -287,7 +309,7 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, request: 
         display_name=_label(recipient),
         sender_name=_label(me),
         preview=chat_message_preview(doc, 300),
-        url=await build_public_url("/profile?tab=inbox"),
+        url=await build_public_url(f"/messages/{me['id']}"),
         preferences_url=await build_public_url("/profile?tab=notifications"),
         dedupe_key=f"direct_message:{doc['id']}:{recipient['id']}",
         mail_meta={

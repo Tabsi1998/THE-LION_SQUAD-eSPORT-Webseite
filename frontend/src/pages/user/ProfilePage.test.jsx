@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 
 // Das Profil ist die Seite, die jedes Mitglied selbst bearbeitet. Getestet wird
@@ -259,4 +259,20 @@ test("Socials: eine eingefuegte Adresse wird zum Nutzernamen mit Vorschau-Link",
 
   expect(field).toHaveValue("tabsi.98");
   expect(screen.getByTestId("profile-instagram-preview")).toHaveAttribute("href", "https://instagram.com/tabsi.98");
+});
+
+test("?tab=inbox leitet zur eigenen Nachrichten-Seite weiter, mit to= direkt ins Gespraech", async () => {
+  render(
+    <ConfirmDialogProvider>
+      <MemoryRouter initialEntries={["/profile?tab=inbox&to=u-9"]}>
+        <Routes>
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/messages/:userId" element={<div data-testid="messages-page-stub" />} />
+        </Routes>
+      </MemoryRouter>
+    </ConfirmDialogProvider>
+  );
+
+  expect(await screen.findByTestId("messages-page-stub")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Inbox/i })).toBeNull();
 });

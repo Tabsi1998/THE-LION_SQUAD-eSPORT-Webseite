@@ -134,7 +134,18 @@ Seit dem 15. September gilt:
   `ProfileNav`, `fields.jsx`,
   `constants.js`, `form.js`). Reiter bleiben `?tab=…`, weil Mails und
   Benachrichtigungen aus dem Backend so verlinken (Benachrichtigungen seit
-  #257: `?tab=notifications`).
+  #257: `?tab=notifications`; `?tab=inbox` leitet seit #254 auf `/messages`
+  um, mit `&to=` direkt ins Gespräch).
+- Nachrichten (#254, PR #278): eigene Seite `pages/user/MessagesPage.jsx`
+  (`/messages`, `/messages/:userId`), Verlauf in
+  `pages/user/messages/ConversationView.jsx` (scrollt in sich, lädt beim
+  Hochscrollen nach, hält die Position, „N neue Nachrichten“), reine Logik
+  in `messages/messageGroups.js` (Tages-Trenner, Kopf-Zusammenfassung,
+  `mergeMessages`). Backend `GET /api/messages/direct/{id}?before=&limit=`
+  mit `has_more`; gelesen markiert nur das Öffnen. Die Web-Benachrichtigung
+  behält `/profile?tab=inbox&to=…`, weil die App diesen Pfad liest
+  (`mobile/src/navigation/rootNavigation.ts`). Browser-Test
+  `frontend/e2e/messages.spec.js` mit nachgestelltem Server.
 - Privatsphäre und Benachrichtigungen (#257, PR #275) speichern von selbst:
   `profile/useAutosave.js` (0,7 s Entprellung, ein PATCH je Lauf, Änderungen
   während des Speicherns bleiben stehen), Schalter in `profile/SwitchRow.jsx`
@@ -383,10 +394,10 @@ braucht.
   nicht deinstalliert werden), ein Bild im Chat senden und den Text aus der
   Bildkachel in **#238** posten (dort steht der Fehlergrund).
 
-### Meilensteine und offene Issues (30 offen)
+### Meilensteine und offene Issues (29 offen)
 | Meilenstein | Issues |
 | --- | --- |
-| Web: Profil II – Nachrichten und Dashboard | #254 Inbox als Chat, #255 Benachrichtigungen anklickbar, #256 Dashboard, #259 Freunde |
+| Web: Profil II – Nachrichten und Dashboard | #255 Benachrichtigungen anklickbar, #256 Dashboard, #259 Freunde (#254 mit #278 zu) |
 | Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg, #265 Betrieb II |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
 | App 0.3.1-beta | #238 schwarze Chat-Kachel (wartet auf Text vom Betreiber) |
@@ -402,7 +413,7 @@ braucht.
 ### Reihenfolge danach (vom Betreiber freigegeben)
 1. Profil I ist fertig (#253, #257, #258 mit #267, #275, #276); der Meilenstein
    „Web: Profil I – Aufbau“ ist abgeschlossen, Server-Update fällig.
-2. Profil II: #254, #255, #256, #259.
+2. Profil II: #255, #256, #259 (#254 ist mit PR #278 erledigt).
 3. Betrieb II #265.
 4. App 0.5.0-beta (#249–#251) → Build 62.
 5. Danach Dynamik, 0.6.0, Admin und Turniere, … Abwechselnd App und Web.

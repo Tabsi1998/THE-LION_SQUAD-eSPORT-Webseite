@@ -6,7 +6,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameLabel } from "@/lib/gameLabels";
 import { buildDirtyPayload, hasPayloadChanges, sameValue } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Save, Crown } from "lucide-react";
 import { AchievementUnlockOverlay } from "@/components/tls/AchievementUnlockOverlay";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
@@ -24,7 +24,6 @@ import { NotificationsTab } from "./profile/NotificationsTab";
 import { SecurityTab } from "./profile/SecurityTab";
 import { TeamsPanel } from "./profile/TeamsPanel";
 import { FriendsPanel } from "./profile/FriendsPanel";
-import { MessagesPanel } from "./profile/MessagesPanel";
 
 // Das Profil: Rahmen, Formularzustand und Speichern. Jeder Reiter ist eine
 // eigene Datei unter ./profile - vorher standen 1.800 Zeilen in dieser einen
@@ -44,7 +43,14 @@ export default function ProfilePage() {
   const { user, refresh, isClubMember } = useAuth();
   const siteSettings = usePublicSiteSettings();
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const requestedParam = params.get("tab") || "basic";
+  // Die Inbox ist seit #254 die eigene Seite /messages; alte Links aus Mails,
+  // Benachrichtigungen und der App landen dort, mit ?to= direkt im Gespräch.
+  const inboxTarget = requestedParam === "inbox" ? `/messages${params.get("to") ? `/${params.get("to")}` : ""}` : null;
+  useEffect(() => {
+    if (inboxTarget) navigate(inboxTarget, { replace: true });
+  }, [inboxTarget, navigate]);
   const requestedTab = TAB_ALIASES[requestedParam] || requestedParam;
   const tab = TABS.some((item) => item.k === requestedTab) ? requestedTab : "basic";
   // Der Reiter steht in der Adresse (?tab=…, wie in Mails und Benachrichtigungen
@@ -284,7 +290,6 @@ export default function ProfilePage() {
             )}
             {tab === "teams" && <TeamsPanel />}
             {tab === "friends" && <FriendsPanel />}
-            {tab === "inbox" && <MessagesPanel />}
             {tab === "security" && <SecurityTab user={user} refresh={refresh} siteSettings={siteSettings} />}
             {tab === "privacy" && (
               <PrivacyTab

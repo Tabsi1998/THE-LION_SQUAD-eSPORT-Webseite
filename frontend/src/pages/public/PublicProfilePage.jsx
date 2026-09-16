@@ -318,7 +318,7 @@ export default function PublicProfilePage() {
       nav(`/login?next=/u/${encodeURIComponent(profile.username)}`);
       return;
     }
-    nav(`/profile?tab=inbox&to=${encodeURIComponent(profile.id)}`);
+    nav(`/messages/${encodeURIComponent(profile.id)}`);
   };
 
   return (

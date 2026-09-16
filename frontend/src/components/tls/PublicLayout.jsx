@@ -11,7 +11,7 @@ import { openCookieSettings } from "@/components/tls/CookieConsent";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Menu, X, User, LogOut, Shield, Crown, Megaphone, ArrowUp } from "lucide-react";
+import { Menu, X, User, LogOut, Shield, Crown, Megaphone, ArrowUp, MessageSquare } from "lucide-react";
 import { useCallback, useMemo, useState, useEffect } from "react";
 
 export function PublicLayout({ children }) {
@@ -90,6 +90,15 @@ export function PublicLayout({ children }) {
                 )}
                 <NotificationBell />
                 <Link
+                  to="/messages"
+                  data-testid="nav-messages"
+                  aria-label="Nachrichten"
+                  title="Nachrichten"
+                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/80 border border-white/10 rounded-sm hover:border-[#29B6E8]/40 hover:text-[#29B6E8] transition"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                </Link>
+                <Link
                   to="/dashboard"
                   data-testid="nav-dashboard"
                   className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/80 border border-white/10 rounded-sm hover:border-[#29B6E8]/40 hover:text-[#29B6E8] transition"
@@ -154,6 +163,9 @@ export function PublicLayout({ children }) {
                 {user ? (
                   <>
                     <Link to="/dashboard" onClick={closeMobile} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">Mein Bereich</Link>
+                    <Link to="/messages" onClick={closeMobile} data-testid="nav-messages-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">
+                      <MessageSquare className="w-3.5 h-3.5 inline mr-1.5" /> Nachrichten
+                    </Link>
                     <button
                       type="button"
                       onClick={async () => {
