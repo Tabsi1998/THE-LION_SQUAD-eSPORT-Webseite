@@ -35,3 +35,10 @@ condition = "AND"
 paths = ['''^backend/tests/test_live_preview_validation\.py$''']
 regexTarget = "secret"
 regexes = ['''^definitely-wrong-1$''']
+
+[[allowlists]]
+description = "The made-up new password the profile test types into the password panel (#258); the request body is asserted, nothing is real."
+condition = "AND"
+paths = ['''^frontend/src/pages/user/ProfilePage\.test\.jsx$''']
+regexTarget = "secret"
+regexes = ['''^neues-passwort-123$''']
