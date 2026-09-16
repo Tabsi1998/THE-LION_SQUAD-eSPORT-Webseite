@@ -17,7 +17,7 @@ from services.ops_monitor import errors_overview, ops_summary, set_error_resolve
 from services.ops_alerts import alert_red_checks
 from services.ops_checks import checks_overview, run_checks
 from services.ops_vitals import vitals_overview
-from services.app_releases import delete_release, list_releases, public_release, store_release, update_release, upload_token_matches
+from services.app_releases import delete_release, list_releases, public_release, store_release, update_release, upload_token_matches, upload_token_problem, upload_token_status
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger("tls.admin")
@@ -725,8 +725,13 @@ class AppReleaseUpdate(BaseModel):
 
 async def _release_uploader(request: Request, user: dict | None = Depends(get_optional_user)) -> str:
     """Wer darf hochladen: der Vereinsadmin (Sitzung) oder das Release-Skript (Token aus der Server-Umgebung)."""
-    if upload_token_matches(request.headers.get("X-Release-Token")):
+    presented = request.headers.get("X-Release-Token")
+    if upload_token_matches(presented):
         return "release-script"
+    problem = upload_token_problem(presented)
+    if problem:
+        # Das Skript hat ein Token geschickt: sagen, woran es liegt (#307).
+        raise HTTPException(status_code=401, detail=problem)
     if not user:
         raise HTTPException(status_code=401, detail="Nicht angemeldet")
     if user.get("role") not in {"club_admin", "superadmin"}:
@@ -739,6 +744,12 @@ async def _release_uploader(request: Request, user: dict | None = Depends(get_op
 @router.get("/app-releases")
 async def admin_app_releases(me: dict = Depends(require_club_admin())):
     return await list_releases(get_db())
+
+
+@router.get("/app-releases/status")
+async def admin_app_release_status(me: dict = Depends(require_club_admin())):
+    """Ob das Release-Skript hochladen kann: Token am Server ja/nein (#307)."""
+    return {"upload_token": upload_token_status()}
 
 
 @router.post("/app-releases")

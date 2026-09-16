@@ -91,8 +91,13 @@ async def test_only_apks_from_admins_or_the_release_script_are_accepted(flow, mo
     assert (await upload(flow)).status_code == 403
 
     flow.act_as(None)
+    monkeypatch.delenv(app_releases.UPLOAD_TOKEN_ENV, raising=False)
+    missing = await upload(flow, headers={"X-Release-Token": "x" * 40})
+    assert missing.status_code == 401 and "kein APP_RELEASE_UPLOAD_TOKEN hinterlegt" in missing.json()["detail"]
+
     monkeypatch.setenv(app_releases.UPLOAD_TOKEN_ENV, "x" * 40)
-    assert (await upload(flow, headers={"X-Release-Token": "falsch"})).status_code == 401
+    wrong = await upload(flow, headers={"X-Release-Token": "falsch"})
+    assert wrong.status_code == 401 and wrong.json()["detail"] == "Upload-Token stimmt nicht mit dem Server überein."
     scripted = await upload(flow, headers={"X-Release-Token": "x" * 40})
     assert scripted.status_code == 200, scripted.text
     stored = await flow.db.app_releases.find_one({"build": 63}, {"_id": 0})
@@ -127,3 +132,20 @@ async def test_a_newer_upload_becomes_current_and_deleting_removes_the_file(flow
     assert (await flow.client.delete("/api/admin/app-releases/64")).status_code == 200
     assert not app_releases.release_path(64).exists()
     assert (await flow.get("/api/mobile/app-download/64")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_the_admin_sees_whether_the_server_has_an_upload_token(flow, monkeypatch):
+    admin = await flow.add_user(role="club_admin", name="clubadmin")
+    flow.act_as(admin)
+    monkeypatch.delenv(app_releases.UPLOAD_TOKEN_ENV, raising=False)
+    status = (await flow.get("/api/admin/app-releases/status")).json()["upload_token"]
+    assert status["configured"] is False and status["length"] == 0 and status["env"] == "APP_RELEASE_UPLOAD_TOKEN"
+
+    monkeypatch.setenv(app_releases.UPLOAD_TOKEN_ENV, "y" * 48)
+    status = (await flow.get("/api/admin/app-releases/status")).json()["upload_token"]
+    assert status == {"configured": True, "length": 48, "min_length": 24, "env": "APP_RELEASE_UPLOAD_TOKEN"}
+
+    player = await flow.add_user(role="player", name="spieler")
+    flow.act_as(player)
+    assert (await flow.get("/api/admin/app-releases/status")).status_code == 403

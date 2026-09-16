@@ -29,6 +29,7 @@ export function formatSize(bytes) {
 export default function AdminAppReleasesPage() {
   const confirm = useConfirm();
   const [rows, setRows] = useState([]);
+  const [tokenStatus, setTokenStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ version: "", build: "", notes: "", min_build: "", set_current: true, file: null });
@@ -36,8 +37,12 @@ export default function AdminAppReleasesPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/admin/app-releases");
+      const [{ data }, statusResult] = await Promise.all([
+        api.get("/admin/app-releases"),
+        api.get("/admin/app-releases/status").catch(() => ({ data: null })),
+      ]);
       setRows(Array.isArray(data) ? data : []);
+      setTokenStatus(statusResult?.data?.upload_token || null);
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
     } finally {
@@ -116,6 +121,24 @@ export default function AdminAppReleasesPage() {
         </button>
       </div>
 
+      {tokenStatus ? (
+        <div
+          data-testid="app-release-token-status"
+          className={`mb-6 flex items-start gap-3 rounded-sm border px-4 py-3 text-sm ${tokenStatus.configured ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FFD95A]/30 bg-[#FFD95A]/10"}`}
+        >
+          {tokenStatus.configured ? <CheckCircle2 className="w-4 h-4 text-[#00FF88] mt-0.5" /> : <Smartphone className="w-4 h-4 text-[#FFD95A] mt-0.5" />}
+          <div>
+            <div className="font-bold">
+              Upload-Token am Server: {tokenStatus.configured ? `eingerichtet (${tokenStatus.length} Zeichen)` : "fehlt"}
+            </div>
+            <div className="text-white/55">
+              {tokenStatus.configured
+                ? "Das Release-Skript kann die APK nach dem Veröffentlichen selbst ablegen."
+                : `${tokenStatus.env} in der Server-.env setzen (mindestens ${tokenStatus.min_length} Zeichen), docker-compose reicht es durch, danach update.sh. Bis dahin: APK unten von Hand hochladen.`}
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="border border-white/10 bg-[#121212] rounded-sm overflow-x-auto mb-6">
         <table className="w-full text-sm" data-testid="app-releases-table">
           <thead>

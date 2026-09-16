@@ -21,9 +21,12 @@ const RELEASES = [
   { build: 62, version: "0.4.1-beta", size: 51_000_000, sha256: "1234567890abcdef", published_at: "2026-09-16T10:00:00Z", min_build: 60, is_current: false, download_url: "/api/mobile/app-download/62" },
 ];
 
+let tokenStatus = { configured: true, length: 48, min_length: 24, env: "APP_RELEASE_UPLOAD_TOKEN" };
+
 beforeEach(() => {
   vi.clearAllMocks();
-  apiMock.get.mockResolvedValue({ data: RELEASES });
+  tokenStatus = { configured: true, length: 48, min_length: 24, env: "APP_RELEASE_UPLOAD_TOKEN" };
+  apiMock.get.mockImplementation((url) => Promise.resolve(String(url).endsWith("/status") ? { data: { upload_token: tokenStatus } } : { data: RELEASES }));
   apiMock.patch.mockResolvedValue({ data: {} });
   apiMock.post.mockResolvedValue({ data: RELEASES[0] });
 });
@@ -68,4 +71,16 @@ test("Größen sind lesbar", () => {
   expect(formatSize(0)).toBe("-");
   expect(formatSize(2048)).toBe("2 KB");
   expect(formatSize(52_428_800)).toBe("50.0 MB");
+});
+
+test("die Seite sagt, ob das Release-Skript hochladen kann", async () => {
+  render(<MemoryRouter><AdminAppReleasesPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("app-release-token-status")).toHaveTextContent("eingerichtet (48 Zeichen)"));
+});
+
+test("ohne Token am Server steht, was zu tun ist", async () => {
+  tokenStatus = { configured: false, length: 0, min_length: 24, env: "APP_RELEASE_UPLOAD_TOKEN" };
+  render(<MemoryRouter><AdminAppReleasesPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("app-release-token-status")).toHaveTextContent("fehlt"));
+  expect(screen.getByTestId("app-release-token-status")).toHaveTextContent(/APP_RELEASE_UPLOAD_TOKEN in der Server-.env setzen/);
 });
