@@ -130,6 +130,12 @@ async def init_indexes():
     await db.ops_slow_requests.create_index("at")
     await db.ops_slow_requests.create_index([("route", 1), ("at", -1)])
     await db.ops_slow_requests.create_index("expires_at", expireAfterSeconds=0)
+    # Betrieb II (#265): Web Vitals 30 Tage, Check-Läufe 7 Tage, Alarm-Drosselung.
+    await db.ops_vitals.create_index([("at", -1)])
+    await db.ops_vitals.create_index("expires_at", expireAfterSeconds=0)
+    await db.ops_check_runs.create_index([("at", -1)])
+    await db.ops_check_runs.create_index("expires_at", expireAfterSeconds=0)
+    await db.ops_alert_state.create_index("key", unique=True)
     # Audit
     await db.audit_logs.create_index("id", unique=True)
     await db.audit_logs.create_index("created_at")

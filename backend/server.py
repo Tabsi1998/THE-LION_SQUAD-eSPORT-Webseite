@@ -35,6 +35,7 @@ from routes.station_routes import router as station_router
 from routes.news_routes import router as news_router
 from routes.mobile_routes import router as mobile_router
 from routes.admin_routes import router as admin_router
+from routes.ops_routes import router as ops_router
 from routes.upload_routes import router as upload_router
 from routes.chat_attachment_routes import router as chat_attachment_router
 from routes.sticker_routes import router as sticker_router
@@ -218,6 +219,7 @@ app.include_router(station_router)
 app.include_router(news_router)
 app.include_router(mobile_router)
 app.include_router(admin_router)
+app.include_router(ops_router)
 app.include_router(settings_router)
 app.include_router(season_router)
 app.include_router(widget_router)

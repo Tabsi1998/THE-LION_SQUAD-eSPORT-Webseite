@@ -84,7 +84,7 @@ const ADMIN_GROUPS = [
 
 const ADMIN_SEARCH_TERMS = {
   "/admin": ["home", "start", "control"],
-  "/admin/ops": ["fehler", "tempo", "langsam", "monitoring", "betrieb", "errors"],
+  "/admin/ops": ["fehler", "tempo", "langsam", "monitoring", "betrieb", "errors", "vitals", "checks", "ampel", "alarme"],
   "/admin/members": ["verein", "mitgliedschaft", "beitrag"],
   "/admin/member-profiles": ["profile", "spielerprofile", "vereinsspieler"],
   "/admin/membership-applications": ["antraege", "beitritt", "join"],

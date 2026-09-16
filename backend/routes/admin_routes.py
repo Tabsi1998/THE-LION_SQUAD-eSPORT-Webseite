@@ -14,6 +14,9 @@ from services.competition_read import count_matches_by_status
 from services.user_notifications import create_user_notification
 
 from services.ops_monitor import errors_overview, ops_summary, set_error_resolved, slow_overview
+from services.ops_alerts import alert_red_checks
+from services.ops_checks import checks_overview, run_checks
+from services.ops_vitals import vitals_overview
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger("tls.admin")
@@ -263,6 +266,27 @@ async def ops_slow(
     me: dict = Depends(require_club_admin()),
 ):
     return await slow_overview(get_db(), hours=hours, limit=limit)
+
+
+# ---------------------------------------------------------------- Betrieb II (#265)
+
+@router.get("/ops/vitals")
+async def ops_vitals(days: int = Query(default=7, ge=1, le=30), me: dict = Depends(require_club_admin())):
+    return await vitals_overview(get_db(), days=days)
+
+
+@router.get("/ops/checks")
+async def ops_checks(me: dict = Depends(require_club_admin())):
+    return await checks_overview(get_db())
+
+
+@router.post("/ops/checks/run")
+async def ops_checks_run(me: dict = Depends(require_club_admin())):
+    """Jetzt prüfen - mit denselben Alarmen wie der Scheduler, gedrosselt."""
+    db = get_db()
+    run = await run_checks(db)
+    await alert_red_checks(db, run)
+    return run
 
 
 @router.get("/logs")

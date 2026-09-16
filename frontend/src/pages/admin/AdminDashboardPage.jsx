@@ -1,3 +1,4 @@
+import { opsDetail, opsTone } from "@/lib/ops";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
@@ -122,12 +123,10 @@ export default function AdminDashboardPage() {
     },
     {
       label: "Betrieb",
-      detail: data?.ops
-        ? `${data.ops.open_error_groups ?? 0} Fehlergruppen offen, ${data.ops.slow_requests_24h ?? 0} langsame Anfragen in 24 h`
-        : "Server-Fehler und langsame Anfragen",
+      detail: opsDetail(data?.ops),
       to: "/admin/ops",
       icon: AlertTriangle,
-      tone: (data?.ops?.open_error_groups || 0) > 0 ? "#FF3B30" : (data?.ops?.slow_requests_24h || 0) > 20 ? "#FFD700" : "#00FF88",
+      tone: opsTone(data?.ops),
     },
     {
       label: "Client-Logs",
@@ -180,6 +179,8 @@ export default function AdminDashboardPage() {
     if (item.to.startsWith("/admin/prizes")) return pendingPrizes > 0 || readyPrizes > 0;
     if (item.to === "/admin/mobile-push") return pushErrors > 0;
     if (item.to === "/admin/mobile-logs") return Number(data?.client_logs?.open || 0) > 0;
+    // Betrieb (#265): rote oder gelbe Auto-Checks und offene Fehlergruppen sind eine Aufgabe.
+    if (item.to === "/admin/ops") return ["crit", "warn"].includes(data?.ops?.checks?.status) || Number(data?.ops?.open_error_groups || 0) > 0;
     return false;
   };
   // Steht nichts an, wird das gesagt. Früher rückten hier vier Routinelinks
