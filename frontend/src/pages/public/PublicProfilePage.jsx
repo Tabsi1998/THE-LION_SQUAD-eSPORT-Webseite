@@ -1,3 +1,4 @@
+import { countryName } from "@/lib/countries";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
@@ -376,7 +377,7 @@ export default function PublicProfilePage() {
                     <Radio className="w-3 h-3 animate-live" /> Live
                   </span>
                 )}
-                {profile.country && <span>· <MapPin className="w-3.5 h-3.5 inline mr-1" />{profile.country}</span>}
+                {profile.country && <span>· <MapPin className="w-3.5 h-3.5 inline mr-1" />{countryName(profile.country)}</span>}
                 {joinedDate && <span>· <Calendar className="w-3.5 h-3.5 inline mr-1" />Mitglied seit {joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" })}</span>}
                 {profile.role && profile.role !== "player" && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FFD700]/40 text-[#FFD700] text-[10px] uppercase tracking-widest rounded-sm">

@@ -45,7 +45,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen (#228) | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise (#229) | #193, #195 |
 | 18 | **Auszeichnungen: Banner und Trophäen** | offen (#230) | — |
-| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | in Arbeit: #253 und #257 umgesetzt; #258 (Profil I) und #254, #255, #256, #259 (Profil II) offen | #267, #275 |
+| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | in Arbeit: Profil I (#253, #257, #258) umgesetzt; Profil II (#254, #255, #256, #259) offen | #267, #275, #276 |
 | 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
 | 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
 | 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | #232 und #233 Teil 1 umgesetzt, Rest als #265 offen | #263, #266 |
@@ -431,7 +431,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.8.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner |
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233 umgesetzt; #223, #231, #265 offen |
-| Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit |
+| Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
 | Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat, #255 Benachrichtigungen anklickbar, #256 Dashboard, #259 Freunde (#222 ist darin aufgegangen) |
 | Web: Dynamik | Block 20: #224, #225, #226 |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
@@ -544,6 +544,31 @@ umgeschaltet wird, bleibt stehen. Die Text-Reiter behalten eine feste Speicherle
 und Design-Tokens, die die Webseite nicht setzt – deshalb ein eigener Schalter. Ein klebender
 Tabellenkopf und ein seitlich scrollender Rahmen schließen sich aus: am PC klebt der Kopf, am
 Handy scrollt die Tabelle seitwärts.
+
+### Was 19.3 gefunden hat (#258, PR #276)
+
+**Der Nickname war ein totes Feld.** Backend und App speichern `nickname`, gelesen wird es nirgends
+(Modelle, Registrierung, DSGVO-Export, Turniere geprüft). Im Web ist das Feld weg; der Anzeigename
+sagt jetzt, wo er erscheint. Feld und App-Eingabe bleiben, bis ein App-Issue sie abräumt.
+
+**Land als Auswahl ohne Namensliste.** `lib/countries.js` hält nur die ISO-Codes; die deutschen
+Namen liefert `Intl.DisplayNames`, den jeder aktuelle Browser hat. Österreich, Deutschland und
+Schweiz stehen vorne. Ein alter Freitextwert bleibt als „Bisher: …“ wählbar.
+
+**Passwort ändern gab es nur als Endpunkt.** `/auth/change-password` war da, eine Oberfläche nicht;
+jetzt im Reiter Sicherheit. Das Backend meldet danach alle Geräte ab, auch das aktuelle, deshalb
+führt der Weg direkt zur Anmeldung. Google-Konten ohne Passwort bekommen den Hinweis auf
+„Passwort vergessen“.
+
+**Der Google-Knopf war schon der offizielle.** Login und Registrierung rendern ihn über Google
+Identity Services (Logo, Schrift, Abstände, deutsch). Selbst gebaut war nur die Profil-Karte mit
+einem handgezeichneten Logo-Ausschnitt; die steht jetzt unter Sicherheit ohne ihn.
+
+**Eingefügte Adressen werden zu Nutzernamen.** `profile/socials.js` kennt je Plattform die
+Adressformen (Instagram, X/Twitter, Twitch, TikTok, YouTube mit `@`, `c/`, `user/`; Steam mit
+`/id/` und `/profiles/`). Beim Tippen bleibt der Text, eine Adresse wird sofort bereinigt, beim
+Verlassen des Felds fällt ein führendes `@`. Dateinamen unter Bildern sind weg, dafür gibt es
+„Ansehen“ und „Entfernen“ – in jedem `ImageUpload`, auch im Adminbereich.
 
 ## Block 16 — Turnier-Leitfaden im Adminbereich
 

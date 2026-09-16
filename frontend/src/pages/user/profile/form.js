@@ -13,7 +13,6 @@ export function profileToForm(user) {
     display_name: user.display_name || "",
     first_name: user.first_name || "",
     last_name: user.last_name || "",
-    nickname: user.nickname || "",
     bio: user.bio || "",
     birth_date: dateInputValue(user.birth_date),
     gender: user.gender || "",
