@@ -1,166 +1,130 @@
-import { Bell, MessageSquare } from "lucide-react";
-import { DIRECT_MESSAGE_PRIVACY, EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, VISIBILITY, notificationPreferenceKey } from "./constants";
+import { MessageSquare, ShieldCheck } from "lucide-react";
+import { DIRECT_MESSAGE_PRIVACY } from "./constants";
 import { Section } from "./fields";
+import { AutosaveStatus, SwitchRow } from "./SwitchRow";
+import { QUICK_VISIBILITY, VISIBILITY_GROUPS, VISIBILITY_LEVELS, fieldLevel, groupLevel } from "./visibility";
 
-export function PrivacyTab({ form, set, setVisibility, setNotificationPreference, notificationEnabled, notificationTopicEnabled }) {
+// Privatsphäre in drei Karten (#257): öffentliches Profil, Direktnachrichten
+// und die Sichtbarkeit der Felder in Gruppen mit Schnellwahl. Newsletter und
+// Benachrichtigungen haben ihren eigenen Reiter. Alles hier speichert von
+// selbst, deshalb gibt es keinen Speichern-Knopf mehr.
+export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autosave }) {
+  const visibility = form.profile_visibility || {};
+  const publicProfile = !!form.privacy_public_profile;
   return (
-    <>
-                <Section>
-                  <label aria-label="Öffentliches Profil" className="flex items-start gap-3 p-4 border border-white/10 rounded-sm bg-[#0A0A0A]">
-                    <input type="checkbox" checked={form.privacy_public_profile} onChange={(e) => set("privacy_public_profile", e.target.checked)} data-testid="profile-privacy" className="accent-[#29B6E8] mt-1" />
-                    <div>
-                      <div className="font-bold text-white">Öffentliches Profil</div>
-                      <div className="text-sm text-white/60 mt-1">Wenn aktiv, sind Avatar, Bio, Achievements, Stats und öffentliche Socials für jeden sichtbar.</div>
-                    </div>
-                  </label>
+    <Section>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-white/60">Wer was von deinem Profil sieht.</p>
+        <AutosaveStatus status={autosave.status} message={autosave.message} />
+      </div>
 
-                  <label aria-label="Newsletter" className="flex items-start gap-3 p-4 border border-white/10 rounded-sm bg-[#0A0A0A]">
-                    <input type="checkbox" checked={form.newsletter_consent} onChange={(e) => set("newsletter_consent", e.target.checked)} className="accent-[#29B6E8] mt-1" />
-                    <div>
-                      <div className="font-bold text-white">Newsletter</div>
-                      <div className="text-sm text-white/60 mt-1">Ich willige separat ein, Newsletter, Event-Hinweise und Vereinsnews per E-Mail zu erhalten. Jederzeit widerrufbar.</div>
-                    </div>
-                  </label>
+      <SwitchRow
+        label="Öffentliches Profil"
+        description="Wenn aktiv, sind Avatar, Bio, Achievements, Stats und die freigegebenen Felder für andere sichtbar. Wenn aus, sieht niemand dein Profil."
+        checked={publicProfile}
+        onCheckedChange={(checked) => set("privacy_public_profile", checked)}
+        testId="profile-privacy"
+      />
 
-                  <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]">
-                    <div className="flex items-start gap-3 mb-4">
-                      <MessageSquare className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />
-                      <div>
-                        <h3 className="font-heading font-black uppercase mb-1">Direktnachrichten</h3>
-                        <p className="text-xs text-white/50">Lege fest, wer dir private Nachrichten über die Webseite senden darf.</p>
+      <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]">
+        <div className="flex items-start gap-3 mb-4">
+          <MessageSquare className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />
+          <div>
+            <h3 className="font-heading font-black uppercase mb-1">Direktnachrichten</h3>
+            <p className="text-xs text-white/50">Lege fest, wer dir private Nachrichten über die Webseite senden darf.</p>
+          </div>
+        </div>
+        <select
+          value={form.dm_privacy || "everyone"}
+          onChange={(e) => set("dm_privacy", e.target.value)}
+          aria-label="Wer darf mir schreiben"
+          data-testid="profile-dm-privacy"
+          className="w-full bg-[#121212] border border-white/10 px-3 py-2 rounded-sm text-sm"
+        >
+          {DIRECT_MESSAGE_PRIVACY.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+      </div>
+
+      <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]">
+        <div className="flex items-start gap-3 mb-4">
+          <ShieldCheck className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />
+          <div>
+            <h3 className="font-heading font-black uppercase mb-1">Sichtbarkeit der Felder</h3>
+            <p className="text-xs text-white/50">Je Gruppe eine Schnellwahl für alle Felder; darunter lässt sich jedes Feld einzeln anders stellen.</p>
+          </div>
+        </div>
+        {publicProfile ? null : (
+          <p className="text-[11px] text-[#FFD700] mb-4" data-testid="profile-visibility-hint">
+            Solange das Profil nicht öffentlich ist, sieht niemand diese Felder. Die Stufen gelten, sobald du es einschaltest.
+          </p>
+        )}
+        <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-xs mb-5">
+          {VISIBILITY_LEVELS.map((level) => (
+            <div key={level.k} className="flex gap-2">
+              <dt className="font-bold text-white/80 shrink-0">{level.l}:</dt>
+              <dd className="text-white/50">{level.d}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="space-y-3">
+          {VISIBILITY_GROUPS.map((group) => {
+            const current = groupLevel(visibility, group);
+            return (
+              <div key={group.k} className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid={`profile-vis-group-${group.k}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-bold text-white">{group.l}</div>
+                    <div className="text-xs text-white/50 mt-0.5">{group.fields.map((field) => field.l).join(" · ")}</div>
+                  </div>
+                  <div role="group" aria-label={`Alle Felder in ${group.l} auf`} className="flex flex-wrap gap-1">
+                    {QUICK_VISIBILITY.map((level) => {
+                      const active = current === level.k;
+                      return (
+                        <button
+                          key={level.k}
+                          type="button"
+                          aria-pressed={active}
+                          title={level.d}
+                          onClick={() => setVisibilityGroup(group, level.k)}
+                          data-testid={`profile-vis-group-${group.k}-${level.k}`}
+                          className={`min-h-9 px-3 rounded-sm border text-[11px] font-bold uppercase tracking-wider transition ${active ? "border-[#29B6E8]/55 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white hover:border-white/25"}`}
+                        >
+                          {level.l}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {current === "mixed" ? (
+                  <p className="text-[11px] text-[#FFD700] mt-2" data-testid={`profile-vis-group-${group.k}-mixed`}>Gemischt: Die Felder dieser Gruppe haben unterschiedliche Stufen.</p>
+                ) : null}
+                {current === "admins" ? (
+                  <p className="text-[11px] text-white/50 mt-2">Alle Felder dieser Gruppe stehen auf „Nur Admins“.</p>
+                ) : null}
+                <details className="mt-3">
+                  <summary className="cursor-pointer select-none text-xs text-white/60 hover:text-white">Einzelne Felder ({group.fields.length})</summary>
+                  <div className="mt-3 space-y-2">
+                    {group.fields.map((field) => (
+                      <div key={field.k} className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-white/80">{field.l}</span>
+                        <select
+                          value={fieldLevel(visibility, field.k)}
+                          onChange={(e) => setVisibility(field.k, e.target.value)}
+                          aria-label={`${field.l} sichtbar für`}
+                          data-testid={`profile-vis-${field.k}`}
+                          className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs"
+                        >
+                          {VISIBILITY_LEVELS.map((level) => <option key={level.k} value={level.k}>{level.l} – {level.d}</option>)}
+                        </select>
                       </div>
-                    </div>
-                    <select
-                      value={form.dm_privacy || "everyone"}
-                      onChange={(e) => set("dm_privacy", e.target.value)}
-                      data-testid="profile-dm-privacy"
-                      className="w-full bg-[#121212] border border-white/10 px-3 py-2 rounded-sm text-sm"
-                    >
-                      {DIRECT_MESSAGE_PRIVACY.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
+                    ))}
                   </div>
-
-                  <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]">
-                    <div className="flex items-start gap-3 mb-4">
-                      <Bell className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />
-                      <div>
-                        <h3 className="font-heading font-black uppercase mb-1">Benachrichtigungen</h3>
-                        <p className="text-xs text-white/50">Steuere getrennt, ob Hinweise per E-Mail, Push oder In-App ankommen. Account- und Sicherheitsmails bleiben immer aktiv.</p>
-                      </div>
-                    </div>
-                    <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">Kanäle</div>
-                    <div className="grid sm:grid-cols-3 gap-3 mb-5">
-                      {NOTIFICATION_CHANNELS.map((pref) => {
-                        const checked = notificationEnabled(pref.k);
-                        return (
-                          <label key={pref.k} aria-label={pref.l} className={`flex items-start gap-3 border rounded-sm p-3 ${checked ? "border-[#29B6E8]/45 bg-[#29B6E8]/5" : "border-white/10 bg-[#121212]"}`}>
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) => setNotificationPreference(pref.k, e.target.checked)}
-                              data-testid={`profile-notification-channel-${pref.k}`}
-                              className="accent-[#29B6E8] mt-1"
-                            />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 font-bold text-white text-sm">
-                                <Bell className="w-3.5 h-3.5 text-[#29B6E8]" /> {pref.l}
-                              </div>
-                              <div className="text-xs text-white/50 mt-1">{pref.d}</div>
-                            </div>
-                          </label>
-                        );
-                      })}
-                    </div>
-                    <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">Jede Benachrichtigung pro Kanal</div>
-                    <div className="overflow-x-auto border border-white/10 rounded-sm">
-                      <table className="w-full min-w-[720px] text-sm">
-                        <thead className="bg-[#121212] text-[10px] uppercase tracking-widest text-white/45">
-                          <tr>
-                            <th className="text-left px-3 py-3">Benachrichtigung</th>
-                            {NOTIFICATION_CHANNELS.map((channel) => (
-                              <th key={channel.k} className="text-center px-3 py-3">{channel.l}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/10">
-                          {EMAIL_PREFERENCES.map((topic) => (
-                            <tr key={topic.k} className="bg-[#0A0A0A]">
-                              <td className="px-3 py-3 align-top">
-                                <div className="font-bold text-white">{topic.l}</div>
-                                <div className="text-xs text-white/50 mt-1">{topic.d}</div>
-                                {topic.requiresNewsletter && !form.newsletter_consent ? (
-                                  <div className="text-[11px] text-[#FFD700] mt-1">E-Mail benötigt Newsletter-Zustimmung.</div>
-                                ) : null}
-                              </td>
-                              {NOTIFICATION_CHANNELS.map((channel) => {
-                                const key = notificationPreferenceKey(channel.k, topic.k);
-                                const channelEnabled = notificationEnabled(channel.k);
-                                const disabled = !channelEnabled || (channel.k === "email" && topic.requiresNewsletter && !form.newsletter_consent);
-                                const checked = channelEnabled && notificationTopicEnabled(channel.k, topic);
-                                return (
-                                  <td key={key} className="px-3 py-3 text-center align-top">
-                                    <label className={`inline-flex items-center justify-center gap-2 px-2 py-1.5 border rounded-sm ${checked ? "border-[#29B6E8]/45 bg-[#29B6E8]/10" : "border-white/10 bg-[#121212]"} ${disabled ? "opacity-45" : ""}`}>
-                                      <input
-                                        type="checkbox"
-                                        checked={checked}
-                                        disabled={disabled}
-                                        onChange={(e) => setNotificationPreference(key, e.target.checked)}
-                                        data-testid={`profile-notification-${channel.k}-${topic.k}`}
-                                        className="accent-[#29B6E8]"
-                                      />
-                                      <span className="text-[11px] font-bold uppercase tracking-wider">{checked ? "An" : "Aus"}</span>
-                                    </label>
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]">
-                    <h3 className="font-heading font-black uppercase mb-1">Sichtbarkeit einzelner Felder</h3>
-                    <p className="text-xs text-white/50 mb-4">Wähle, wer welches Feld sehen darf. Standard: öffentlich.</p>
-                    <div className="space-y-2">
-                      {[
-                        { k: "discord", l: "Discord" },
-                        { k: "email", l: "E-Mail" },
-                        { k: "city", l: "Wohnort" },
-                        { k: "country", l: "Land" },
-                        { k: "birth_date", l: "Geburtsdatum" },
-                        { k: "twitch", l: "Twitch" },
-                        { k: "steam", l: "Steam" },
-                        { k: "psn", l: "PSN" },
-                        { k: "xbox", l: "Xbox" },
-                        { k: "youtube", l: "YouTube" },
-                        { k: "instagram", l: "Instagram" },
-                        { k: "x", l: "X / Twitter" },
-                        { k: "epic", l: "Epic" },
-                        { k: "nintendo", l: "Nintendo Friend Code" },
-                        { k: "ea", l: "EA ID" },
-                        { k: "riot", l: "Riot ID" },
-                        { k: "battlenet", l: "Battle.net" },
-                        { k: "main_platforms", l: "Plattformen" },
-                        { k: "input_devices", l: "Eingabegeräte" },
-                        { k: "favorite_games", l: "Lieblingsspiele" },
-                      ].map((f) => (
-                        <div key={f.k} className="flex items-center justify-between gap-3">
-                          <span className="text-sm text-white/80">{f.l}</span>
-                          <select
-                            value={form.profile_visibility?.[f.k] || "public"}
-                            onChange={(e) => setVisibility(f.k, e.target.value)}
-                            data-testid={`profile-vis-${f.k}`}
-                            className="bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs"
-                          >
-                            {VISIBILITY.map((v) => <option key={v.k} value={v.k}>{v.l}</option>)}
-                          </select>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </Section>
-    </>
+                </details>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </Section>
   );
 }

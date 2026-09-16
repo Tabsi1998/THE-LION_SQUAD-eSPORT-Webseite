@@ -98,17 +98,76 @@ test("speichert nur das tatsaechlich geaenderte Feld", async () => {
   expect(payload).toEqual({ bio: "Neue Vorstellung." });
 });
 
-test("die Sichtbarkeitseinstellung wird mitgeschickt", async () => {
+test("ein Schalter auf Privatsphaere speichert von selbst, ohne Speichern-Knopf", async () => {
   const user = userEvent.setup();
   renderPage();
   await waitForForm();
 
   await user.click(await openPrivacyTab(user));
-  await user.click(screen.getByTestId("profile-save"));
+  expect(screen.queryByTestId("profile-save")).toBeNull();
 
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
   const [, payload] = apiMock.patch.mock.calls.at(-1);
-  expect(payload.privacy_public_profile).toBe(true);
+  expect(payload).toEqual({ privacy_public_profile: true });
+  await screen.findByText("Gespeichert.");
+  expect(screen.getByTestId("profile-privacy")).toBeChecked();
+});
+
+test("die Schnellwahl Verein setzt alle Felder der Gruppe und schickt genau einen PATCH", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await waitForForm();
+  await openPrivacyTab(user);
+
+  await user.click(screen.getByTestId("profile-vis-group-contact-members"));
+  await user.selectOptions(screen.getByTestId("profile-dm-privacy"), "friends");
+
+  for (const key of ["email", "discord", "city", "country"]) {
+    expect(screen.getByTestId(`profile-vis-${key}`)).toHaveValue("members");
+  }
+  expect(screen.getByTestId("profile-vis-group-contact-members")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("profile-vis-steam")).toHaveValue("public");
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
+  const [, payload] = apiMock.patch.mock.calls.at(-1);
+  expect(payload).toEqual({
+    profile_visibility: { email: "members", discord: "members", city: "members", country: "members" },
+    dm_privacy: "friends",
+  });
+  // Nach der Entprellung kommt kein zweiter Aufruf mehr.
+  await new Promise((resolve) => setTimeout(resolve, 900));
+  expect(apiMock.patch).toHaveBeenCalledTimes(1);
+});
+
+test("ein einzelnes Feld anders als seine Gruppe zeigt die Gruppe als gemischt", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await waitForForm();
+  await openPrivacyTab(user);
+
+  await user.selectOptions(screen.getByTestId("profile-vis-email"), "private");
+
+  expect(screen.getByTestId("profile-vis-group-contact-mixed")).toBeInTheDocument();
+  expect(screen.getByTestId("profile-vis-group-contact-public")).toHaveAttribute("aria-pressed", "false");
+});
+
+test("der Reiter Benachrichtigungen schaltet Kanaele und graut die Spalte aus", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await waitForForm();
+
+  await user.click(screen.getByRole("button", { name: /Benachrichtigungen/i }));
+  const push = await screen.findByTestId("profile-notification-channel-push");
+  expect(push).toBeChecked();
+  await user.click(push);
+
+  expect(screen.getByTestId("profile-notification-push-match_reminders")).toBeDisabled();
+  expect(screen.getByTestId("profile-notification-column-push")).toHaveTextContent("Kanal aus");
+  expect(screen.getByTestId("profile-newsletter")).not.toBeChecked();
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
+  const [, payload] = apiMock.patch.mock.calls.at(-1);
+  expect(payload).toEqual({ notification_preferences: { push: false } });
 });
 
 test("ohne Aenderung wird nicht gespeichert", async () => {

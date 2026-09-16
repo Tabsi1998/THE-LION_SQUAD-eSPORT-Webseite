@@ -52,7 +52,7 @@ async def queue_birthday_greetings(now: datetime | None = None) -> dict:
     current = now.astimezone(VIENNA_TZ) if now else datetime.now(VIENNA_TZ)
     today = current.date()
     base = await _site_base_url()
-    preferences_url = f"{base}/profile?tab=privacy"
+    preferences_url = f"{base}/profile?tab=notifications"
     query = {
         "is_active": True,
         "is_banned": {"$ne": True},

@@ -13,12 +13,15 @@ import { AchievementUnlockOverlay } from "@/components/tls/AchievementUnlockOver
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, TABS, notificationPreferenceKey } from "./profile/constants";
 import { achievementInsights, profileFormPayload, profileToForm } from "./profile/form";
+import { applyGroupLevel } from "./profile/visibility";
+import { useAutosave } from "./profile/useAutosave";
 import { ProfileNav } from "./profile/ProfileNav";
 import { BasicTab } from "./profile/BasicTab";
 import { GamingTab } from "./profile/GamingTab";
 import { SocialsTab } from "./profile/SocialsTab";
 import { AchievementsTab } from "./profile/AchievementsTab";
 import { PrivacyTab } from "./profile/PrivacyTab";
+import { NotificationsTab } from "./profile/NotificationsTab";
 import { TeamsPanel } from "./profile/TeamsPanel";
 import { FriendsPanel } from "./profile/FriendsPanel";
 import { MessagesPanel } from "./profile/MessagesPanel";
@@ -28,8 +31,12 @@ import { SessionsPanel } from "./profile/SessionsPanel";
 // eigene Datei unter ./profile - vorher standen 1.800 Zeilen in dieser einen
 // (#253, Regel aus #223). Am PC steht das Menü links und der Inhalt nutzt die
 // Breite; am Tablet und Handy bleibt die Reiterreihe oben.
+//
+// Reiter mit Textfeldern haben eine Speicherleiste; Privatsphäre und
+// Benachrichtigungen bestehen nur aus Schaltern und Auswahlfeldern und
+// speichern von selbst (#257).
 
-const FORM_TABS = new Set(["basic", "gaming", "socials", "privacy"]);
+const FORM_TABS = new Set(["basic", "gaming", "socials"]);
 
 export default function ProfilePage() {
   const { user, refresh, isClubMember } = useAuth();
@@ -71,6 +78,13 @@ export default function ProfilePage() {
   const [games, setGames] = useState([]);
   const initialProfileFormRef = useRef(null);
   const initialProfileUserIdRef = useRef("");
+  const autosave = useAutosave({
+    form,
+    setForm,
+    initialFormRef: initialProfileFormRef,
+    initialUserIdRef: initialProfileUserIdRef,
+    refresh,
+  });
 
   const loadAchievements = useCallback(async () => {
     const [achievements, profileCompleteness] = await Promise.allSettled([
@@ -117,6 +131,12 @@ export default function ProfilePage() {
   }, [user]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  // Schalter und Auswahlfelder auf Privatsphäre und Benachrichtigungen
+  // speichern kurz nach dem letzten Klick von selbst.
+  const setSetting = (k, v) => {
+    set(k, v);
+    autosave.schedule();
+  };
   const setGameId = (gameSlug, fieldKey, value) => setForm((f) => ({
     ...f,
     game_ids: {
@@ -124,14 +144,24 @@ export default function ProfilePage() {
       [gameSlug]: { ...((f.game_ids || {})[gameSlug] || {}), [fieldKey]: value },
     },
   }));
-  const setVisibility = (field, level) => setForm((f) => ({
-    ...f,
-    profile_visibility: { ...(f.profile_visibility || {}), [field]: level },
-  }));
-  const setNotificationPreference = (field, enabled) => setForm((f) => ({
-    ...f,
-    notification_preferences: { ...(f.notification_preferences || {}), [field]: enabled },
-  }));
+  const setVisibility = (field, level) => {
+    setForm((f) => ({
+      ...f,
+      profile_visibility: { ...(f.profile_visibility || {}), [field]: level },
+    }));
+    autosave.schedule();
+  };
+  const setVisibilityGroup = (group, level) => {
+    setForm((f) => ({ ...f, profile_visibility: applyGroupLevel(f.profile_visibility, group, level) }));
+    autosave.schedule();
+  };
+  const setNotificationPreference = (field, enabled) => {
+    setForm((f) => ({
+      ...f,
+      notification_preferences: { ...(f.notification_preferences || {}), [field]: enabled },
+    }));
+    autosave.schedule();
+  };
   const gameIdGroups = (() => {
     const groups = new Map();
     games.forEach((game) => {
@@ -170,6 +200,7 @@ export default function ProfilePage() {
 
   const submit = async (e) => {
     e.preventDefault();
+    autosave.cancel();
     setSaving(true);
     try {
       const payload = buildDirtyPayload(
@@ -226,6 +257,9 @@ export default function ProfilePage() {
   if (!user) return null;
 
   const achInsights = achData ? achievementInsights(achData) : null;
+  // Die Speicherleiste zeigt, ob auf den Text-Reitern noch etwas ungespeichert ist.
+  const dirty = !!initialProfileFormRef.current
+    && hasPayloadChanges(buildDirtyPayload(profileFormPayload(form), profileFormPayload(initialProfileFormRef.current)));
   return (
     <PublicLayout>
       <AchievementUnlockOverlay tiers={unlockedTiers} onClose={() => setUnlockedTiers([])} />
@@ -280,22 +314,34 @@ export default function ProfilePage() {
             {tab === "privacy" && (
               <PrivacyTab
                 form={form}
-                set={set}
+                set={setSetting}
                 setVisibility={setVisibility}
+                setVisibilityGroup={setVisibilityGroup}
+                autosave={autosave}
+              />
+            )}
+            {tab === "notifications" && (
+              <NotificationsTab
+                form={form}
+                set={setSetting}
                 setNotificationPreference={setNotificationPreference}
                 notificationEnabled={notificationEnabled}
                 notificationTopicEnabled={notificationTopicEnabled}
+                autosave={autosave}
               />
             )}
 
             {FORM_TABS.has(tab) && (
-              <div className="pt-4 flex gap-3">
+              <div className="sticky bottom-0 z-10 -mx-4 px-4 py-3 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 bg-[#050505]/95 backdrop-blur border-t border-white/10 flex flex-wrap items-center gap-3" data-testid="profile-save-bar">
                 <button type="submit" disabled={saving} data-testid="profile-save" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition text-xs">
                   <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
                 </button>
                 <Link to="/privacy-account" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm text-xs">
                   DSGVO / Daten
                 </Link>
+                {dirty ? (
+                  <span className="text-xs text-[#FFD700]" data-testid="profile-unsaved">Ungespeicherte Änderungen</span>
+                ) : null}
               </div>
             )}
           </form>
