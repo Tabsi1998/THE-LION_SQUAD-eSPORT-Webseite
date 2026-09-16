@@ -91,6 +91,35 @@ Passwörter bekommt Gradle nur über Umgebungsvariablen. Die Push-Datei wird nac
 
 Gebaut wird in einem eigenen Ordner außerhalb des Repos (Standard `C:\lsb`, änderbar mit `buildDir` in `signing.json`). Das Skript legt dort ein Git-Worktree des Commits an und installiert die Abhängigkeiten; beim nächsten Mal bleiben sie erhalten. So entspricht die APK genau dem Commit, und der Pfad ist kurz und ohne Leerzeichen. Im Projektpfad `C:\GIT Privat\…` brach der native Build von react-native-reanimated mit `manifest 'build.ninja' still dirty after 100 tries` ab; ein Umweg über ein `subst`-Laufwerk half nicht, weil Node die Pfade wieder zum echten Ort auflöst. Der Ordner braucht einige GB und darf jederzeit gelöscht werden. Der erste Build dauert rund 15 Minuten.
 
+## Update aus der App (#250)
+
+Das Repo ist privat: vom Handy aus kommt niemand ohne GitHub-Login an die APK. Deshalb hält der
+Vereinsserver je Build eine Kopie (`uploads/app-releases`, Sammlung `app_releases`) und liefert sie
+an angemeldete Nutzer über `GET /api/mobile/app-download/{build}`. Die App fragt beim Start und beim
+Zurückkehren in den Vordergrund höchstens einmal pro Stunde `GET /api/mobile/app-version?build=…`,
+zeigt bei einem neueren Build einen Banner mit „Was ist neu“, „Herunterladen“ und „Später“, prüft
+Größe und MD5 der Datei und öffnet den Android-Installer. Liegt der eigene Build unter `min_build`,
+ist das Update Pflicht und der Banner nicht wegdrückbar.
+
+**Wie die APK auf den Server kommt**
+
+1. Automatisch: Das Release-Skript schickt sie nach `gh release create`, wenn zwei Werte gesetzt
+   sind – als Umgebungsvariablen `LIONSAPP_UPLOAD_URL` (z. B. `https://lionsquad.at`) und
+   `LIONSAPP_UPLOAD_TOKEN`, oder als `uploadUrl`/`uploadToken` in `.lionsapp-release/signing.json`.
+   Das Token ist dasselbe wie `APP_RELEASE_UPLOAD_TOKEN` in der `.env` des Servers (mindestens 24
+   Zeichen, `openssl rand -hex 24`). Schlägt der Upload fehl, bleibt das GitHub-Release gültig; die
+   APK lässt sich dann von Hand nachreichen.
+2. Von Hand: Admin → System → App-Versionen, APK auswählen, Version und Build eintragen.
+
+Dort steht auch, welches Release „aktuell“ ist und ab welchem Build ein Update Pflicht wird.
+
+## „Was ist neu“ in der App (#249)
+
+`npm run whatsnew` schreibt den Abschnitt der aktuellen Version aus `CHANGELOG.md` nach
+`src/whatsnew.json`; die App zeigt ihn einmal nach dem Update und jederzeit unter Mehr. Der
+Preflight bricht ab, wenn die Datei nicht zum Changelog passt – nach jedem Versionssprung also
+`npm run whatsnew` ausführen und die Datei einchecken.
+
 ## Notweg über GitHub Actions
 
 Den Workflow `Mobile APK Release` von Hand starten. Er braucht die Repository-Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` und `GOOGLE_SERVICES_JSON_BASE64`. Er baut eine signierte APK als Artefakt (7 Tage aufbewahrt) und veröffentlicht nichts.
@@ -108,6 +137,7 @@ Neueste oben.
 - `0.3.1-beta`: Build 60, nur Fehler aus dem Test von Build 59 (Meilenstein App 0.3.1-beta)
 - `0.4.0-beta`: Build 61, Seiten aufräumen II – Events-Tab, Mehr, eigene Seiten, Sponsoren, Startseite (Meilenstein App 0.4.0-beta)
 - `0.4.1-beta`: Build 62, Chat-Bilder in der App über den API-Client, HTTP-Status in der Kachel (Meilenstein App 0.4.1-beta)
+- `0.5.0-beta`: Build 63, Was ist neu, Update aus der App, In-App-Banner gebündelt, Nickname weg (Meilenstein App 0.5.0-beta)
 - `0.2.0-beta`: Build 57, erste Version im neuen Schema
 
 Vor dem Neustart bei 0.x galt ein Schema mit Zähler (`-beta.N`, `-alpha.N`). Diese Versionen sind historisch:

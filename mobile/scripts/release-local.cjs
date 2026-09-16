@@ -110,7 +110,47 @@ function loadConfig() {
     javaHome: pick("LIONSAPP_JAVA_HOME", "javaHome", process.env.JAVA_HOME || ""),
     androidHome: pick("LIONSAPP_ANDROID_HOME", "androidHome", process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || ""),
     buildDir: path.resolve(pick("LIONSAPP_BUILD_DIR", "buildDir", isWindows ? "C:/lsb" : path.join(os.tmpdir(), "lionsapp-build"))),
+    // Update aus der App (#250): die APK nach dem Veröffentlichen an den Vereinsserver schicken.
+    uploadUrl: String(pick("LIONSAPP_UPLOAD_URL", "uploadUrl", "")).replace(/\/+$/, ""),
+    uploadToken: pick("LIONSAPP_UPLOAD_TOKEN", "uploadToken", ""),
   };
+}
+
+/**
+ * Die APK an den Vereinsserver schicken, damit die App sie ohne GitHub laden
+ * kann (#250). Fehlt die Einrichtung oder scheitert der Upload, bleibt das
+ * GitHub-Release gültig - die APK lässt sich unter Admin → App-Versionen
+ * von Hand nachreichen. Das Token wird nie ausgegeben.
+ */
+async function uploadToServer({ config, apkPath, apk, version, versionCode, changelog }) {
+  if (!config.uploadUrl || !config.uploadToken) {
+    console.log("Server-Upload übersprungen: LIONSAPP_UPLOAD_URL und LIONSAPP_UPLOAD_TOKEN (oder uploadUrl/uploadToken in signing.json) fehlen.");
+    return false;
+  }
+  const { whatsNewEntries } = require("./whats-new.cjs");
+  const notes = whatsNewEntries(changelog, version).map((item) => `- ${item}`).join("\n");
+  const form = new FormData();
+  form.append("file", new Blob([fs.readFileSync(apkPath)], { type: "application/vnd.android.package-archive" }), apk);
+  form.append("version", version);
+  form.append("build", String(versionCode));
+  form.append("notes", notes);
+  form.append("set_current", "true");
+  try {
+    const response = await fetch(`${config.uploadUrl}/api/admin/app-releases`, {
+      method: "POST",
+      headers: { "X-Release-Token": config.uploadToken },
+      body: form,
+    });
+    if (!response.ok) {
+      console.warn(`Warnung: Server-Upload fehlgeschlagen (HTTP ${response.status}). Das GitHub-Release gilt trotzdem; APK unter Admin → App-Versionen von Hand hochladen.`);
+      return false;
+    }
+    console.log(`Am Server abgelegt: Build ${versionCode} (Admin → App-Versionen).`);
+    return true;
+  } catch (error) {
+    console.warn(`Warnung: Server-Upload fehlgeschlagen (${error.message}). Das GitHub-Release gilt trotzdem.`);
+    return false;
+  }
 }
 
 function javaMajor(javaHome) {
@@ -356,6 +396,8 @@ function main() {
   ], { cwd: repoDir });
   git(["fetch", "--quiet", "--tags", "origin"]);
   console.log(`\nVeröffentlicht: ${release.releaseName(version, versionCode)}`);
+  step("APK an den Vereinsserver schicken");
+  return uploadToServer({ config, apkPath, apk, version, versionCode, changelog });
 }
 
 try {

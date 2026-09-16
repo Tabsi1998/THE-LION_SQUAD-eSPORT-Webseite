@@ -88,8 +88,8 @@ test.describe("Adminmenü", () => {
       await expect(page.getByTestId(`admin-nav-group-${group}`)).toHaveAttribute("aria-expanded", "true");
     }
     await expect(page.getByTestId("admin-nav-tournaments")).toBeVisible();
-    // 36 seit "Betrieb" unter System (#233).
-    expect((await navMetrics(page)).entries).toBe(36);
+    // 36 seit "Betrieb" unter System (#233), 37 seit "App-Versionen" (#250).
+    expect((await navMetrics(page)).entries).toBe(37);
   });
 
   test("eine Gruppe lässt sich zuklappen und bleibt es nach dem Neuladen", async ({ page }) => {

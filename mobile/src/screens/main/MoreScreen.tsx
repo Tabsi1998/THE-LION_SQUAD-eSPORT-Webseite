@@ -11,6 +11,7 @@ import { api } from "../../lib/api";
 import { isGuestUser } from "../../live";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
+import { useAppUpdate } from "../../update/AppUpdateProvider";
 
 // "Mehr" ist das Verzeichnis: eine Zeile je Ziel, keine Beschreibungstexte.
 // Vorher war jedes Ziel eine große Karte mit Badge und zwei Zeilen Text, und
@@ -78,6 +79,7 @@ export function socialIcon(platform?: string | null): keyof typeof Ionicons.glyp
 
 export function MoreScreen({ navigation }: Props) {
   const { user } = useAuth();
+  const { openWhatsNew } = useAppUpdate();
   const [socials, setSocials] = useState<SocialLink[]>([]);
   const appVersion = Constants.expoConfig?.version ?? "?";
   const build = Constants.expoConfig?.android?.versionCode;
@@ -163,13 +165,28 @@ export function MoreScreen({ navigation }: Props) {
           </View>
         ) : null}
 
-        <Muted style={styles.version}>LionsAPP v{appVersion}{build ? ` · Build ${build}` : ""}</Muted>
+        <View style={styles.versionRow}>
+          <Muted style={styles.version}>LionsAPP v{appVersion}{build ? ` · Build ${build}` : ""}</Muted>
+          <Pressable onPress={openWhatsNew} accessibilityRole="button" testID="more-whats-new" style={({ pressed }) => [pressed && styles.pressed]}>
+            <Muted style={styles.whatsNew}>Was ist neu</Muted>
+          </Pressable>
+        </View>
       </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  versionRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "center",
+  },
+  whatsNew: {
+    color: colors.cyan,
+    fontWeight: "700",
+  },
   content: {
     gap: 18,
     padding: 18,

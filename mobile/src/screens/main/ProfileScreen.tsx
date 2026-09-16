@@ -118,7 +118,6 @@ export function ProfileScreen() {
       display_name: u.display_name || "",
       first_name: u.first_name || "",
       last_name: u.last_name || "",
-      nickname: u.nickname || "",
       bio: u.bio || "",
       birth_date: String(u.birth_date || "").slice(0, 10),
       gender: u.gender || "",
@@ -494,9 +493,9 @@ export function ProfileScreen() {
             </View>
             {guest ? <Muted>Profilbearbeitung ist nur nach Login aktiv.</Muted> : null}
             <Field label="Anzeigename" value={form.display_name} onChangeText={(v) => setField(setForm, "display_name", v)} />
+            <Muted>So heißt du überall: im Profil, in Teams, Turnieren und Ranglisten.</Muted>
             <Field label="Vorname" value={form.first_name} onChangeText={(v) => setField(setForm, "first_name", v)} />
             <Field label="Nachname" value={form.last_name} onChangeText={(v) => setField(setForm, "last_name", v)} />
-            <Field label="Nickname" value={form.nickname} onChangeText={(v) => setField(setForm, "nickname", v)} />
             <Field label="Bio" value={form.bio} multiline onChangeText={(v) => setField(setForm, "bio", v)} />
             <Field label="Land" value={form.country} onChangeText={(v) => setField(setForm, "country", v)} />
             <Field label="Stadt" value={form.city} onChangeText={(v) => setField(setForm, "city", v)} />

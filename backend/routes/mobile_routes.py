@@ -8,6 +8,7 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from auth import get_current_user, get_optional_user
@@ -17,6 +18,7 @@ from services.match_overview import operational_match_overviews, own_match_overv
 from services.profile_references import personal_profile_references
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
+from services.app_releases import current_release, next_check_after, public_release, release_file, update_decision
 
 router = APIRouter(prefix="/api/mobile", tags=["mobile"])
 
@@ -670,6 +672,44 @@ async def create_mobile_client_log(body: MobileClientLogCreate, user: dict = Dep
     }
     await db.mobile_client_logs.insert_one(row)
     return {"ok": True, "id": row["id"]}
+
+
+# ---------------------------------------------------------------- App-Releases (#250)
+
+@router.get("/app-version")
+async def app_version(build: int | None = None, user: dict = Depends(get_current_user)):
+    """Das aktuelle Release und ob diese App-Installation ein Update braucht."""
+    current = await current_release(get_db())
+    decision = update_decision(build, current)
+    return {
+        "current": public_release(current),
+        "own_build": int(build or 0) or None,
+        "next_check_after": next_check_after(),
+        **decision,
+    }
+
+
+@router.get("/app-download/{build}")
+async def app_download(build: int, user: dict = Depends(get_current_user)):
+    """Die APK eines Builds - nur für angemeldete Nutzer, mit Content-Length für den Fortschritt."""
+    doc = await get_db().app_releases.find_one({"build": int(build)}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Release nicht gefunden")
+    path = release_file(doc)
+    if path is None:
+        raise HTTPException(status_code=404, detail="APK nicht gefunden")
+    info = public_release(doc)
+    return FileResponse(
+        path,
+        media_type="application/vnd.android.package-archive",
+        filename=info["filename"],
+        headers={
+            "Content-Disposition": f"attachment; filename=\"{info['filename']}\"",
+            "X-Content-Type-Options": "nosniff",
+            "X-Release-Sha256": info["sha256"] or "",
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.get("/push-status")

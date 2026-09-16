@@ -40,7 +40,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 11 | PDF-Ausgabe | umgesetzt | #193, #194 |
 | 12 | Galerie und Medien: Tempo, Videos überall | umgesetzt | #196 |
 | 13 | Entflechtung: `tournament_routes.py` aufgeteilt | umgesetzt | #200 |
-| 14 | LionsAPP in den Store | in Arbeit: 14.1 bis 14.4 umgesetzt, v0.3.1-beta (Build 60), v0.4.0-beta (Build 61) und v0.4.1-beta (Build 62) veröffentlicht | #201, #206, #207, #208, #209, #220, #237, #262, #264 |
+| 14 | LionsAPP in den Store | in Arbeit: 14.1 bis 14.4 umgesetzt, v0.3.1-beta (Build 60), v0.4.0-beta (Build 61) und v0.4.1-beta (Build 62) veröffentlicht, v0.5.0-beta (Build 63) vorbereitet | #201, #206, #207, #208, #209, #220, #237, #262, #264, #286, #304 |
 | 15 | Abschluss: Abfrage-Intervalle im Web weg, große Dateien nebenbei teilen | #221 umgesetzt, #223 offen | #261 |
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen (#228) | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise (#229) | #193, #195 |
@@ -389,6 +389,27 @@ Tipp von selbst.
 („render function has not been called“) führt in die Irre. Die neuen Tests für „Mehr“ und
 Teams sind die Vorlage für weitere Bildschirm-Tests.
 
+### Was 14.5 gefunden hat (App 0.5.0-beta: #249, #250, #251, #277, PR #304)
+
+**Das Repo ist privat – die App kommt nicht an GitHub.** Deshalb hält der Vereinsserver je Build
+eine Kopie der APK und liefert sie angemeldeten Nutzern; das Release-Skript legt sie nach dem
+Veröffentlichen ab (Token aus der Server-Umgebung, nie im Repo), sonst der Admin von Hand unter
+System → App-Versionen. Die App prüft Größe und MD5 – SHA-256 kann `expo-file-system` auf einer
+Datei nicht rechnen, MD5 schon – und öffnet den Android-Installer über einen Intent. Für das
+Installieren aus einer fremden Quelle fragt Android einmal nach (`REQUEST_INSTALL_PACKAGES`).
+
+**„Was ist neu“ ohne Server.** Der Changelog-Abschnitt der Version wird beim Versionssprung in
+die App gebündelt (`src/whatsnew.json`); der Preflight bricht ab, wenn die Datei veraltet ist.
+Die Karte erscheint genau einmal nach einem Update – beim allerersten Start nicht, da kennt
+niemand „neu“.
+
+**Banner waren Stapel.** Drei Meldungen lagen übereinander und blieben stehen. Jetzt ein Banner,
+gebündelt („2 neue Benachrichtigungen“), fünf Sekunden, wegwischbar; im offenen Chat mit
+derselben Person kommt keiner – die Nachricht steht ja schon da. Die Entscheidungen liegen in
+`lib/popups.ts`, damit sie ohne Gerät testbar sind.
+
+**Nickname weg** wie im Web (#258): ein Anzeigename, ein Satz dazu.
+
 ## Block 15 — Abschluss
 
 Alle CI-Prüfungen grün, automatischer App-Build, README auf Stand. Seit dem 15. September läuft
@@ -426,7 +447,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.3.1-beta | Nur Fehler aus Build 59: #246 Rohwerte II, #247 Umbrüche im Profil, #252 Referenzen leer (#262, Build 60); #238 Bild schwarz bekommt damit einen sichtbaren Fehlergrund und bleibt offen |
 | App 0.4.1-beta | #238 Chat-Bild: seit Build 61 steht der Grund in der Kachel („Unexpected HTTP Code“); #286 holt das Bild über den API-Client und nennt sonst den HTTP-Status – Build 62 veröffentlicht (16.09.) |
 | App 0.4.0-beta | Seiten aufräumen II: #241 Events-Tab, #242 Mehr/Gaming, #243 eigene Seiten, #244 Sponsoren, #248 Startseite II (#264; Build 61 noch nicht gebaut) |
-| App 0.5.0-beta | Tester-Komfort: #249 „Was ist neu“, #250 Update aus der App, #251 In-App-Banner, #277 Nickname-Feld weg (ein Anzeigename wie im Web) |
+| App 0.5.0-beta | Tester-Komfort: #249 „Was ist neu“, #250 Update aus der App, #251 In-App-Banner, #277 Nickname-Feld weg – umgesetzt in #304, Build 63 nach Merge und Server-Update |
 | App 0.6.0-beta | #218 Erfolge (14.5) |
 | App 0.7.0-beta | #216 Kalender (14.6), #236 Galerie |
 | App 0.8.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner |

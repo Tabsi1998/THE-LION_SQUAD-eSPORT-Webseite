@@ -101,6 +101,8 @@ async def init_indexes():
     await db.notifications.create_index("user_id")
     await db.notifications.create_index([("user_id", 1), ("read", 1), ("created_at", -1)])
     await db.mobile_push_tokens.create_index("token", unique=True)
+    # App-Releases (#250): ein Eintrag je Build.
+    await db.app_releases.create_index("build", unique=True)
     await db.mobile_push_tokens.create_index([("user_id", 1), ("enabled", 1), ("updated_at", -1)])
     await db.mobile_push_tokens.create_index([("enabled", 1), ("last_ticket_status", 1), ("last_ticket_at", -1)])
     await db.mobile_push_tokens.create_index([("last_receipt_checked_at", -1)])

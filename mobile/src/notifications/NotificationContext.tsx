@@ -1,12 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, Pressable, StyleSheet, View } from "react-native";
+import { AppState, PanResponder, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../auth/AuthContext";
 import { Body, Muted } from "../components/Text";
 import { api } from "../lib/api";
 import { isGuestUser } from "../live";
-import { navigateToNotification } from "../navigation/rootNavigation";
+import { navigateToNotification, navigationRef } from "../navigation/rootNavigation";
+import { POPUP_AUTO_HIDE_MS, mergePopup, popupBody, popupTitle, suppressedByOpenChat, type PopupState } from "../lib/popups";
 import { useLiveRefresh } from "../realtime/LiveChangesProvider";
 import { colors } from "../theme";
 import type { UserNotification } from "../types";
@@ -39,7 +40,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<UserNotification[]>([]);
-  const [popups, setPopups] = useState<UserNotification[]>([]);
+  // In-App-Banner (#251): höchstens einer, gebündelt, nach fünf Sekunden weg.
+  const [popup, setPopup] = useState<PopupState | null>(null);
   const knownIds = useRef(new Set<string>());
   const primed = useRef(false);
   const pushRegistered = useRef(false);
@@ -59,13 +61,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       if (existing) return rows.map((row) => row.id === item.id ? { ...row, ...item, read: row.read } : row);
       return [item, ...rows].slice(0, 80);
     });
-    setPopups((current) => [item, ...current.filter((row) => row.id !== item.id)].slice(0, 3));
+    if (suppressedByOpenChat(item, navigationRef.isReady() ? navigationRef.getCurrentRoute() : null)) return;
+    setPopup((current) => mergePopup(current, item));
   }, []);
 
   const load = useCallback(async () => {
     if (!enabled) {
       setItems([]);
-      setPopups([]);
+      setPopup(null);
       knownIds.current = new Set();
       primed.current = false;
       return;
@@ -76,7 +79,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       setItems(rows);
       const nextUnread = rows.filter((item) => !item.read && item.id && !knownIds.current.has(item.id)).slice(0, 3);
       if (primed.current && nextUnread.length) {
-        setPopups((current) => [...nextUnread, ...current].slice(0, 3));
+        const route = navigationRef.isReady() ? navigationRef.getCurrentRoute() : null;
+        const fresh = nextUnread.filter((item) => !suppressedByOpenChat(item, route));
+        if (fresh.length) setPopup((current) => fresh.reduceRight((state, item) => mergePopup(state, item), current));
       }
       knownIds.current = new Set(rows.map((item) => item.id).filter(Boolean));
       primed.current = true;
@@ -111,10 +116,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, [enabled, ensurePushRegistered, load]);
 
   useEffect(() => {
-    if (!popups.length) return undefined;
-    const timer = setTimeout(() => setPopups((current) => current.slice(0, -1)), 6500);
+    if (!popup) return undefined;
+    const timer = setTimeout(() => setPopup(null), POPUP_AUTO_HIDE_MS);
     return () => clearTimeout(timer);
-  }, [popups]);
+  }, [popup]);
+
+  // Nach oben wischen schließt den Banner sofort.
+  const swipeUp = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_event, gesture) => gesture.dy < -8 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+    onPanResponderRelease: (_event, gesture) => {
+      if (gesture.dy < -24) setPopup(null);
+    },
+  }), []);
 
   const markRead = useCallback(async (item: UserNotification) => {
     if (!item.read) {
@@ -130,9 +143,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const openNotification = useCallback(async (item: UserNotification) => {
     await markRead(item);
-    setPopups((rows) => rows.filter((row) => row.id !== item.id));
+    setPopup(null);
     navigateToNotification(item);
   }, [markRead]);
+
+  const openPopup = useCallback((state: PopupState) => {
+    setPopup(null);
+    if (state.items.length > 1) {
+      if (navigationRef.isReady()) navigationRef.navigate("More", { screen: "Notifications" });
+      return;
+    }
+    if (state.items[0]) void openNotification(state.items[0]);
+  }, [openNotification]);
 
   useEffect(() => {
     if (!enabled) {
@@ -199,15 +221,24 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           },
         ]}
       >
-        {popups.map((item) => (
-          <Pressable key={item.id} onPress={() => { openNotification(item); }} style={styles.popup}>
+        {popup ? (
+          <Pressable
+            key={popup.shownAt}
+            onPress={() => openPopup(popup)}
+            style={styles.popup}
+            testID="notification-popup"
+            accessibilityRole="button"
+            accessibilityLabel={popupTitle(popup)}
+            accessibilityHint="Nach oben wischen schließt"
+            {...swipeUp.panHandlers}
+          >
             <Ionicons name="notifications" color={colors.cyan} size={18} />
             <View style={styles.popupText}>
-              <Body style={styles.popupTitle} numberOfLines={1}>{item.title || "Benachrichtigung"}</Body>
-              {item.body ? <Muted numberOfLines={2}>{item.body}</Muted> : null}
+              <Body style={styles.popupTitle} numberOfLines={1}>{popupTitle(popup)}</Body>
+              {popupBody(popup) ? <Muted numberOfLines={2}>{popupBody(popup)}</Muted> : null}
             </View>
           </Pressable>
-        ))}
+        ) : null}
       </View>
     </NotificationContext.Provider>
   );

@@ -1,0 +1,11 @@
+{
+  "version": "0.5.0-beta",
+  "build": 63,
+  "date": "2026-09-16",
+  "items": [
+    "Nach einem Update zeigt die App einmal „Was ist neu“ mit den Punkten der Version; unter Mehr ist die Karte jederzeit erreichbar.",
+    "Neue Versionen kommen aus der App heraus: Banner „Build N ist da“, Download vom Vereinsserver mit Fortschritt und Prüfsumme, dann der Android-Installer – ohne GitHub am Handy. Ein Pflicht-Update lässt sich nicht wegdrücken.",
+    "In-App-Banner für Benachrichtigungen: nur noch einer sichtbar, kurz hintereinander eintreffende Meldungen werden „2 neue Benachrichtigungen“, nach fünf Sekunden von selbst weg, nach oben wischen schließt sofort; im offenen Chat mit derselben Person kein Banner.",
+    "Das Feld „Nickname“ im Profil ist weg – ein Anzeigename wie im Web."
+  ]
+}

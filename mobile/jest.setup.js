@@ -24,7 +24,7 @@ jest.mock("expo-secure-store", () => ({
 jest.mock("expo-constants", () => ({
   __esModule: true,
   default: {
-    expoConfig: { version: "0.4.1-beta", extra: { clientLogging: false, eas: { projectId: "test-project" } } },
+    expoConfig: { version: "0.5.0-beta", android: { versionCode: 63 }, extra: { clientLogging: false, eas: { projectId: "test-project" } } },
   },
 }));
 
