@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import "@/index.css";
 import App from "@/App";
 import { startWebClientLogging } from "@/lib/clientLog";
+import { startVitals } from "@/lib/vitals";
 import { toast } from "sonner";
 import { applyWaitingServiceWorker, register as registerServiceWorker } from "@/serviceWorkerRegistration";
 
@@ -16,6 +17,7 @@ window.addEventListener("vite:preloadError", () => {
   });
 });
 startWebClientLogging();
+startVitals();
 root.render(
   <React.StrictMode>
     <App />

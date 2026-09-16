@@ -172,6 +172,22 @@ async def _safe_chat_attachment_cleanup():
         _log_task_failure("chat_attachment_cleanup", exc)
 
 
+async def _safe_ops_checks():
+    """Auto-Checks für den Betrieb (#265): Ampel speichern, rote Checks melden."""
+    try:
+        from database import get_db
+        from services.ops_alerts import alert_red_checks
+        from services.ops_checks import run_checks
+
+        db = get_db()
+        run = await run_checks(db)
+        sent = await alert_red_checks(db, run)
+        if run.get("status") != "ok" or sent:
+            logger.info(f"[scheduler] ops_checks status={run.get('status')} failing={run.get('failing')} alerts={len(sent)}")
+    except Exception as exc:
+        _log_task_failure("ops_checks", exc)
+
+
 def _parse_dt(value):
     if not value:
         return None
@@ -319,6 +335,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("status_transitions", _safe_status_transitions), IntervalTrigger(seconds=60), id="status_transitions",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("chat_attachment_cleanup", _safe_chat_attachment_cleanup), IntervalTrigger(hours=1), id="chat_attachment_cleanup",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("ops_checks", _safe_ops_checks), IntervalTrigger(minutes=5), id="ops_checks",
                   max_instances=1, coalesce=True)
     sched.start()
     _scheduler = sched

@@ -111,7 +111,7 @@ async def _upsert_error(app: Any, request: Any, *, error_type: str, message: str
         fingerprint = error_fingerprint(error_type, route, method, frame)
         now_iso = now_utc().isoformat()
         db = get_db()
-        await db.ops_errors.update_one(
+        outcome = await db.ops_errors.update_one(
             {"fingerprint": fingerprint},
             {
                 "$setOnInsert": {"id": new_id(), "fingerprint": fingerprint, "first_seen_at": now_iso},
@@ -131,6 +131,13 @@ async def _upsert_error(app: Any, request: Any, *, error_type: str, message: str
             },
             upsert=True,
         )
+        if int(status_code) >= 500 and getattr(outcome, "upserted_id", None) is not None:
+            # Eine neue 5xx-Gruppe meldet sich per Discord (#265) - im Hintergrund.
+            from services.ops_alerts import schedule_error_alert
+
+            group = await db.ops_errors.find_one({"fingerprint": fingerprint}, {"_id": 0, "stack": 0})
+            if group:
+                schedule_error_alert(db, group)
         return fingerprint
     except Exception as exc:  # noqa: BLE001 - die Aufzeichnung darf die Antwort nie verhindern
         logger.debug("[ops] error record failed: %s", type(exc).__name__)
@@ -261,10 +268,13 @@ async def ops_summary(db) -> dict:
     recent_groups = await db.ops_errors.find({"last_seen_at": {"$gte": since}}, {"_id": 0, "count": 1, "route": 1, "error_type": 1, "last_seen_at": 1}).sort("last_seen_at", -1).to_list(200)
     slow_rows = await db.ops_slow_requests.find({"at": {"$gte": since}}, {"_id": 0, "route": 1, "duration_ms": 1}).to_list(5000)
     slowest = max(slow_rows, key=lambda row: int(row.get("duration_ms") or 0), default=None)
+    from services.ops_checks import latest_checks_summary
+
     return {
         "open_error_groups": open_groups,
         "error_groups_24h": len(recent_groups),
         "slow_requests_24h": len(slow_rows),
         "slowest_route_24h": {"route": slowest.get("route"), "duration_ms": slowest.get("duration_ms")} if slowest else None,
         "threshold_ms": SLOW_REQUEST_MS,
+        "checks": await latest_checks_summary(db),
     }

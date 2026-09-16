@@ -195,8 +195,11 @@ function mergedLegacyText(primary, legacy) {
 function discordPayload(source) {
   const payload = { ...(source || {}) };
   if (!payload.webhook_url) delete payload.webhook_url;
+  if (!payload.ops_webhook_url) delete payload.ops_webhook_url;
   delete payload.configured;
   delete payload.webhook_url_masked;
+  delete payload.ops_configured;
+  delete payload.ops_webhook_url_masked;
   delete payload.last_status;
   delete payload.last_error;
   delete payload.last_event_key;
@@ -252,7 +255,7 @@ export default function AdminSettingsPage() {
     site_banner_audience: "all", site_banner_link_url: "", site_banner_link_label: "",
     site_banner_starts_at: "", site_banner_ends_at: "",
   });
-  const [discord, setDiscord] = useState({ webhook_url: "", username: "", avatar_url: "", enabled: true, configured: false, webhook_url_masked: "", last_status: "", last_error: "", last_event_key: "", last_checked_at: "" });
+  const [discord, setDiscord] = useState({ webhook_url: "", ops_webhook_url: "", username: "", avatar_url: "", enabled: true, configured: false, ops_configured: false, webhook_url_masked: "", ops_webhook_url_masked: "", last_status: "", last_error: "", last_event_key: "", last_checked_at: "" });
   const [authConfig, setAuthConfig] = useState({
     password_login_enabled: true,
     registration_enabled: true,
@@ -345,7 +348,7 @@ export default function AdminSettingsPage() {
       return next;
     });
     if (d && !discordDirtyRef.current) setDiscord((prev) => {
-      const next = { ...prev, ...d, webhook_url: "" };
+      const next = { ...prev, ...d, webhook_url: "", ops_webhook_url: "" };
       originalDiscordRef.current = discordPayload(next);
       return next;
     });
@@ -709,6 +712,26 @@ export default function AdminSettingsPage() {
       const { data } = await api.post("/settings/discord/test");
       if (data.ok) toast.success(`Discord-Test gesendet${data.status_code ? ` (${data.status_code})` : ""}.`);
       else toast.error(`Fehler: ${data.error || data.reason || "unbekannt"}`);
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+  const sendDiscordOpsTest = async () => {
+    try {
+      const { data } = await api.post("/settings/discord/test?target=ops");
+      if (data.ok) toast.success("Testalarm an den Betriebs-Webhook gesendet.");
+      else toast.error(data.reason === "ops_webhook_missing" ? "Kein Betriebs-Webhook hinterlegt." : `Fehler: ${data.error || data.reason}`);
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+  const clearDiscordOpsWebhook = async () => {
+    if (!await confirm({
+      title: "Betriebs-Webhook entfernen?",
+      description: "Rote Auto-Checks und neue Serverfehler werden danach nicht mehr gemeldet.",
+      confirmLabel: "Entfernen",
+    })) return;
+    try {
+      await api.put("/settings/discord", { clear_ops_webhook: true });
+      toast.success("Betriebs-Webhook entfernt.");
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
@@ -1547,6 +1570,22 @@ export default function AdminSettingsPage() {
             <button onClick={saveDiscord} disabled={imageUploadBusy || savingDiscord} data-testid="discord-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingDiscord ? "Speichere..." : "Speichern"}</button>
               <button onClick={sendDiscordTest} data-testid="discord-test" className="px-4 py-2 border border-[#5865F2] text-[#5865F2] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Test senden</button>
               {discord.configured && <button onClick={clearDiscordWebhook} data-testid="discord-clear" className="px-4 py-2 border border-[#FF3B30]/60 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm">Webhook entfernen</button>}
+            </div>
+          </div>
+          <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3" data-testid="discord-ops">
+            <div className="font-heading font-bold uppercase">Betriebs-Webhook (nur Alarme)</div>
+            <p className="text-xs text-white/50">
+              Eigener Kanal für den Betrieb: rote Auto-Checks und neue Serverfehler (Admin → Betrieb). Der Community-Webhook oben bekommt davon nichts.
+              Leer heißt: keine Alarme.
+            </p>
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Webhook URL {discord.ops_webhook_url_masked && <span className="text-white/40 normal-case">(aktuell: {discord.ops_webhook_url_masked})</span>}</div>
+              <input type="password" placeholder="https://discord.com/api/webhooks/…" value={discord.ops_webhook_url} onChange={(e) => setDiscordField("ops_webhook_url", e.target.value)} data-testid="discord-ops-webhook" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
+              <p className="text-xs text-white/40 mt-1">Am besten ein privater Kanal nur für den Vorstand. Speichern über „Speichern“ oben.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button onClick={sendDiscordOpsTest} data-testid="discord-ops-test" className="px-4 py-2 border border-[#FF3B30]/60 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Testalarm senden</button>
+              {discord.ops_configured && <button onClick={clearDiscordOpsWebhook} data-testid="discord-ops-clear" className="px-4 py-2 border border-white/20 text-white/70 font-bold uppercase tracking-wider rounded-sm">Betriebs-Webhook entfernen</button>}
             </div>
           </div>
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">

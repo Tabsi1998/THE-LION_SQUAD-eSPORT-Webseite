@@ -1,5 +1,11 @@
-"""Discord webhook notifications. Reads webhook URL from settings 'discord' doc.
-Silent failure if not configured."""
+"""Discord webhook notifications. Reads webhook URLs from settings 'discord' doc.
+Silent failure if not configured.
+
+Zwei Webhooks, zwei Kanäle (#265): ``webhook_url`` ist der Community-Kanal
+(News, Turniere, Fast Lap, Erfolge). ``ops_webhook_url`` ist ein eigener
+Kanal für den Betrieb (rote Auto-Checks, neue Serverfehler) - fehlt er, wird
+kein Alarm gesendet; auf den Community-Kanal fällt der Betrieb nie zurück.
+"""
 import asyncio
 import logging
 import os
@@ -12,6 +18,7 @@ from services.secret_store import decrypt_secret
 logger = logging.getLogger("tls-arena.discord")
 VALID_WEBHOOK_HOSTS = {"discord.com", "discordapp.com", "canary.discord.com", "ptb.discord.com"}
 PRIVATE_DISCORD_VISIBILITIES = {"members", "internal"}
+OPS_BOT_NAME = "LION Betrieb"
 
 
 def is_valid_discord_webhook_url(url: str) -> bool:
@@ -102,25 +109,69 @@ async def _get_discord_config() -> dict:
     db = get_db()
     s = await db.settings.find_one({"id": "discord"}) or {}
     webhook_url = decrypt_secret(s.get("webhook_url")).strip()
+    ops_webhook_url = decrypt_secret(s.get("ops_webhook_url")).strip()
     return {
         "webhook_url": webhook_url,
+        "ops_webhook_url": ops_webhook_url,
         "enabled": bool(s.get("enabled", True) and webhook_url),
+        "ops_enabled": bool(s.get("enabled", True) and ops_webhook_url),
         "username": s.get("username") or "THE LION SQUAD",
         "avatar_url": await _public_avatar_url(s.get("avatar_url")),
+    }
+
+
+async def _post_embed(webhook_url: str, *, username: str | None, avatar_url: str | None,
+                      title: str, description: str, color: int, url: str | None,
+                      fields: list | None, log: dict) -> dict:
+    """Ein Embed an genau diesen Webhook; das Log landet in email_logs."""
+    db = get_db()
+    embed = {"title": title[:256], "description": description[:4000], "color": color}
+    embed_url = await _public_link_url(url)
+    if embed_url:
+        embed["url"] = embed_url
+    if fields:
+        embed["fields"] = [{"name": f["name"][:256], "value": str(f["value"])[:1024], "inline": f.get("inline", True)} for f in fields[:10]]
+    payload = {"embeds": [embed]}
+    if username:
+        payload["username"] = username
+    if _is_public_http_url(avatar_url):
+        payload["avatar_url"] = avatar_url
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.post(webhook_url, json=payload)
+            if r.status_code == 400 and "avatar_url" in payload and "avatar_url" in r.text:
+                payload.pop("avatar_url", None)
+                r = await client.post(webhook_url, json=payload)
+        if r.status_code >= 400:
+            log["status"] = "failed"
+            log["error"] = f"{r.status_code} {r.text[:200]}"
+        else:
+            log["status"] = "sent"
+        await db.email_logs.insert_one(log)
+        return {"ok": log["status"] == "sent", "status_code": r.status_code, "error": log["error"]}
+    except Exception as e:
+        logger.error(f"[discord] {e}")
+        log["status"] = "failed"
+        log["error"] = str(e)[:300]
+        await db.email_logs.insert_one(log)
+        return {"ok": False, "reason": str(e)}
+
+
+def _new_log(event_key: str, title: str, target: str) -> dict:
+    return {
+        "id": new_id(), "channel": "discord", "target": target, "event_key": event_key,
+        "title": title, "status": "skipped", "error": None,
+        "created_at": now_utc().isoformat(),
     }
 
 
 async def send_discord(title: str, description: str = "", *,
                        color: int = 0x29B6E8, url: str = None,
                        fields: list = None, event_key: str = "custom") -> dict:
-    """Send an embed to the configured Discord webhook."""
+    """Send an embed to the community Discord webhook."""
     db = get_db()
     cfg = await _get_discord_config()
-    log = {
-        "id": new_id(), "channel": "discord", "event_key": event_key,
-        "title": title, "status": "skipped", "error": None,
-        "created_at": now_utc().isoformat(),
-    }
+    log = _new_log(event_key, title, "community")
     if not cfg["enabled"]:
         log["error"] = "Discord webhook not configured"
         await db.email_logs.insert_one(log)
@@ -130,38 +181,32 @@ async def send_discord(title: str, description: str = "", *,
         log["error"] = "Invalid Discord webhook URL"
         await db.email_logs.insert_one(log)
         return {"ok": False, "reason": "invalid_webhook_url", "error": log["error"]}
+    return await _post_embed(
+        cfg["webhook_url"], username=cfg["username"], avatar_url=cfg.get("avatar_url"),
+        title=title, description=description, color=color, url=url, fields=fields, log=log,
+    )
 
-    embed = {"title": title[:256], "description": description[:4000], "color": color}
-    embed_url = await _public_link_url(url)
-    if embed_url: embed["url"] = embed_url
-    if fields: embed["fields"] = [{"name": f["name"][:256], "value": str(f["value"])[:1024], "inline": f.get("inline", True)} for f in fields[:10]]
-    payload = {"embeds": [embed]}
-    if cfg["username"]: payload["username"] = cfg["username"]
-    if _is_public_http_url(cfg.get("avatar_url")):
-        payload["avatar_url"] = cfg["avatar_url"]
-    try:
-        async with httpx.AsyncClient(timeout=8) as client:
-            r = await client.post(cfg["webhook_url"], json=payload)
-            if r.status_code == 400 and "avatar_url" in payload and "avatar_url" in r.text:
-                payload.pop("avatar_url", None)
-                r = await client.post(cfg["webhook_url"], json=payload)
-        if r.status_code >= 400:
-            log["status"] = "failed"
-            log["error"] = f"{r.status_code} {r.text[:200]}"
-        else:
-            log["status"] = "sent"
+
+async def send_ops_discord(title: str, description: str = "", *,
+                           color: int = 0xFF3B30, url: str = None,
+                           fields: list = None, event_key: str = "ops") -> dict:
+    """Send an embed to the operations webhook only - never to the community channel (#265)."""
+    db = get_db()
+    cfg = await _get_discord_config()
+    log = _new_log(event_key, title, "ops")
+    if not cfg["ops_enabled"]:
+        log["error"] = "Discord ops webhook not configured"
         await db.email_logs.insert_one(log)
-        return {
-            "ok": log["status"] == "sent",
-            "status_code": r.status_code,
-            "error": log["error"],
-        }
-    except Exception as e:
-        logger.error(f"[discord] {e}")
+        return {"ok": False, "reason": "ops_webhook_missing", "error": log["error"]}
+    if not is_valid_discord_webhook_url(cfg["ops_webhook_url"]):
         log["status"] = "failed"
-        log["error"] = str(e)[:300]
+        log["error"] = "Invalid Discord ops webhook URL"
         await db.email_logs.insert_one(log)
-        return {"ok": False, "reason": str(e)}
+        return {"ok": False, "reason": "invalid_webhook_url", "error": log["error"]}
+    return await _post_embed(
+        cfg["ops_webhook_url"], username=OPS_BOT_NAME, avatar_url=cfg.get("avatar_url"),
+        title=title, description=description, color=color, url=url, fields=fields, log=log,
+    )
 
 
 async def send_public_discord(item: dict | None, title: str, description: str = "", *,

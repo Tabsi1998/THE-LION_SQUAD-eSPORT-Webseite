@@ -65,6 +65,11 @@ _stream_epoch = str(uuid.uuid4())
 _version = 0
 
 
+def last_event_occurred_at() -> str | None:
+    """Zeitpunkt des letzten Ereignisses im Puffer - für die Auto-Checks (#265)."""
+    return _event_buffer[-1].get("occurred_at") if _event_buffer else None
+
+
 def visibility_scope_for_user(user: dict | None) -> str:
     if user and user.get("role") in STAFF_STREAM_ROLES:
         return "staff"

@@ -116,6 +116,19 @@ Seit dem 15. September gilt:
   `/api/admin/ops/*`, Sammlungen `ops_errors` / `ops_slow_requests` (TTL
   30 Tage), `SLOW_REQUEST_MS` (Standard 1000). Starlette packt Fehler in
   `ExceptionGroup` → `unwrap_exception`.
+- Betrieb II (#265, PR #299): `services/ops_checks.py` – acht Prüfungen
+  (Datenbank, Speicher, Upload-Volume, Mail-Queue, Änderungsstrom,
+  Bildvarianten, Fehlergruppen, Scheduler), Bewertung in `rate_*`, Lauf
+  alle 5 min über den Scheduler-Job `ops_checks`, Sammlung
+  `ops_check_runs` (TTL 7 Tage). `services/ops_alerts.py` – eigener
+  Betriebs-Webhook (`settings.discord.ops_webhook_url`, `send_ops_discord`;
+  nie der Community-Webhook) für rote Prüfungen und neue 5xx-Gruppen (Hook in
+  `ops_monitor._upsert_error`), eine Meldung je Schlüssel und Stunde
+  (`ops_alert_state`). `services/ops_vitals.py` + `routes/ops_routes.py`:
+  `POST /api/ops/vitals` (anonym, 30 Sendungen je Adresse und Minute,
+  Sammlung `ops_vitals` TTL 30 Tage), Auswertung p50/p75 je Route.
+  Admin-Endpunkte `/api/admin/ops/vitals`, `/checks`, `POST /checks/run`;
+  `ops_summary` trägt `checks` für die Tageszentrale.
 - Bild-Varianten beim Upload: `backend/services/image_variants.py`
   (`schedule_variants`).
 - Deutsch-Prüfung `test_german_copy.py` schlägt bei „fuer/ueber/weiss“ an –
@@ -196,7 +209,12 @@ Seit dem 15. September gilt:
   mit `type="button"`. `ImageUpload` zeigt keine Dateinamen mehr und hat
   „Ansehen“/„Entfernen“ – überall, auch im Adminbereich.
 - Admin-Seite Betrieb: `pages/admin/AdminOpsPage.jsx`, Route `/admin/ops`,
-  Menüpunkt „Betrieb“ unter System.
+  Menüpunkt „Betrieb“ unter System; Reiter Fehler, Tempo, Vitals, Checks
+  (#265). `lib/vitals.js` sammelt LCP/FCP/TTFB/CLS/INP (`web-vitals`
+  nachgeladen, Start in `index.jsx`, `sendBeacon` beim Verbergen der
+  Seite, nichts bei Do Not Track); `lib/ops.js` liefert Ampel-Sätze und
+  -Farben, die Tageszentrale führt „Betrieb“ als Aufgabe, sobald ein Check
+  gelb oder rot ist. Browser-Test `frontend/e2e/admin-ops.spec.js`.
 - ESLint nutzt `frontend/eslint-suppressions.json` (Sammel-Unterdrückungen).
   Nach dem Auslagern von Code: `npx eslint --prune-suppressions src`.
 - Web-Fehlersammlung ist standardmäßig **an** (`VITE_CLIENT_LOGGING` nur
@@ -416,8 +434,8 @@ braucht.
 (Profil II). `main` steht auf `72cef4c`.
 
 ### Offene PRs
-- #298 (#284 Mitgliederbereich). Nach dem Merge ist der Meilenstein „Web:
-  Mitgliederbereich und Kopfzeile“ komplett – Server-Update fällig.
+- #299 (#265 Betrieb II). Nach dem Merge: keine; Server-Update fällig, das
+  deckt #298 (Mitgliederbereich) mit ab.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -428,21 +446,22 @@ braucht.
   Nächster Build ist 63 mit App 0.5.0-beta (#249–#251, #277).
 
 ### Erledigungen beim Betreiber
-- `update.sh` am Server, sobald #298 gemergt ist: damit ist „Web:
-  Mitgliederbereich und Kopfzeile“ komplett am Server (Stand des Servers:
-  #281 vom 16.09.; seither #285, #294, #298).
-- Build 62 installieren (Release-Seite → APK), ein Bild im Chat senden:
-  entweder erscheint es, oder die Kachel nennt „HTTP <Status>: <Grund>“ –
-  den Text bitte in #238 posten.
+- `update.sh` am Server, sobald #299 gemergt ist: damit sind Mitgliederbereich
+  (#298) und Betrieb II (#299) am Server (Stand des Servers: #294 vom 16.09.).
+- Danach Einstellungen → Discord: einen privaten Kanal als Betriebs-Webhook
+  eintragen und „Testalarm senden“ – ohne ihn gibt es keine Alarme. Dann
+  Admin → Betrieb → Checks → „Jetzt prüfen“.
+- Build 62 ist getestet: Bilder im Chat erscheinen (#238 erledigt).
 - #287 ist entschieden (Freigaben, Vorstand aus der Mitgliedschaft,
   Turnierleitung pro Turnier); nichts mehr offen.
 
-### Meilensteine und offene Issues (34 offen)
+### Meilensteine und offene Issues (37 offen)
 | Meilenstein | Issues |
 | --- | --- |
-| Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg, #265 Betrieb II |
+| Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg; #265 Betrieb II ist mit #299 umgesetzt |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
 | Mitgliederbereich II: Dolibarr | #295 Mitgliedsdaten und Beitrag per API, #296 Rechnungen und Zahlungslink, #297 Vorstand und Status aus Dolibarr (später, eigener Meilenstein) |
+| Discord: Kanäle und Bot | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und melden, #302 Discord-Bot (Aktivität, Rollen, Befehle; braucht #260), #303 Meldungen mit Bild und Vorschau (später) |
 | Web: Rollen und Rechte | #287 Ist-Stand und Zielbild (Entscheidung), #288 Turnierleitung ohne Redaktion, #289 Redaktionsrecht, #290 Vereinsvorstand, #291 Zwei-Faktor für Club-Admin-Routen (bug), #292 Rechte sichtbar, team_leader weg |
 | App 0.5.0-beta | #249 Was ist neu, #250 Update aus der App, #251 In-App-Banner, #277 Nickname-Feld weg |
 | App 0.6.0-beta | #218 Erfolge |
@@ -455,15 +474,16 @@ braucht.
 
 ### Reihenfolge danach (vom Betreiber freigegeben)
 1. Profil I und Profil II sind fertig und seit 16.09. am Server.
-2. Web: Mitgliederbereich und Kopfzeile ist fertig (#285, #294, #298) –
-   Server-Update fällig, sobald #298 gemergt ist.
-3. App 0.4.1-beta ist als Build 62 veröffentlicht (#286); Test durch den
-   Betreiber steht aus (#238).
-4. Betrieb II #265.
+2. Web: Mitgliederbereich und Kopfzeile ist fertig und gemergt (#285, #294,
+   #298) – Server-Update zusammen mit #299.
+3. App 0.4.1-beta ist als Build 62 veröffentlicht und bestätigt (#238 erledigt).
+4. Betrieb II #265 ist umgesetzt (#299) – nach dem Merge Server-Update.
 5. App 0.5.0-beta (#249–#251, #277) → Build 63.
 6. Web: Rollen und Rechte (#287–#292) – Entscheidung liegt vor.
 7. Mitgliederbereich II: Dolibarr (#295–#297) – später, nach Rollen und Rechten.
-8. Danach Dynamik, 0.6.0, Admin und Turniere, … Abwechselnd App und Web.
+8. Discord: Kanäle und Bot (#300–#303) – nach Rollen und Rechten; der Bot
+   braucht die Konto-Verknüpfung #260.
+9. Danach Dynamik, 0.6.0, Admin und Turniere, … Abwechselnd App und Web.
 
 Vor jedem neuen Paket: Stand melden und auf das OK warten.
 

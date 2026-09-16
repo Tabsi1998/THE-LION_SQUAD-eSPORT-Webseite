@@ -48,7 +48,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | umgesetzt: Profil I (#253, #257, #258) und Profil II (#254, #255, #256, #259); Nachtrag Kopfzeile und Mitgliederbereich (#282, #283, #284 umgesetzt) | #267, #275, #276, #278, #279, #280, #281, #285, #294, #298 |
 | 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
 | 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
-| 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | #232 und #233 Teil 1 umgesetzt, Rest als #265 offen | #263, #266 |
+| 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | umgesetzt: #232, #233 Teil 1, #265 Betrieb II | #263, #266, #299 |
 
 Reihenfolge ab hier, abwechselnd App und Web, damit beides vorankommt: 14.4 → 15 → 22 → 14.5 →
 19 → 14.6 → 20 → 14.7 → 21 → 16 → 14.8 → 17 (Rest) → 18. Block 22 steht früh, weil die
@@ -431,11 +431,12 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.7.0-beta | #216 Kalender (14.6), #236 Galerie |
 | App 0.8.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner |
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
-| Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233 umgesetzt; #223, #231, #265 offen |
+| Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
 | Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar (#279, umgesetzt), #256 Dashboard (#280, umgesetzt), #259 Freunde (#281, umgesetzt; #222 ist darin aufgegangen) – Meilenstein abgeschlossen |
 | Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (#298, umgesetzt) – Meilenstein abgeschlossen |
 | Mitgliederbereich II: Dolibarr | Wunsch des Betreibers vom 16.09.: #295 Mitgliedsdaten und Beitragsstatus per Dolibarr-API in Mitgliederbereich und Admin, #296 Rechnungen ansehen/herunterladen und Zahlungslink, #297 Vorstandsbesetzung und Status aus Dolibarr (nach Bestätigung im Admin) – später, nach Rollen und Rechten |
+| Discord: Kanäle und Bot | Wunsch des Betreibers vom 16.09.: #300 ein Webhook je Zweck (News, Events, Erfolge, Vorstand, Betrieb) mit Schaltern je Ereignis, #301 Erfolge sofort auswerten statt erst beim Profilbesuch, #302 Discord-Bot für Aktivitätszähler, Rollenabgleich und Befehle (braucht #260), #303 Meldungen mit Bild, Link und Vorschau – später, nach Rollen und Rechten |
 | Web: Rollen und Rechte | Zusatzwunsch vom 16.09., nachdem der Betreiber als Admin den Adminbereich sah: #287 Ist-Stand und Zielbild (Entscheidung: Freigaben oder Rollen), #288 Turnierleitung ohne Redaktion, #289 Redaktionsrecht für News/Galerie/Sponsoren, #290 Vereinsvorstand für Mitglieder/Dokumente/Vorteile, #291 Zwei-Faktor auch für Club-Admin-Routen, #292 Rechte sichtbar und `team_leader` weg |
 | Web: Dynamik | Block 20: #224, #225, #226 |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
@@ -496,6 +497,29 @@ Route.
 
 **Offen als #265 (Betrieb II):** Web Vitals je Seite, Auto-Checks mit Ampel, Alarme per
 Discord.
+
+### Was 22.3 gefunden hat (#265, PR #299)
+
+**Web Vitals brauchen keinen Dienst.** `web-vitals` misst im Browser, die Seite schickt am Ende
+des Besuchs ein paar Zahlen per `sendBeacon` – Route als Vorlage, Wert, Geräteklasse, sonst
+nichts. Kein Cookie, keine Adresse, kein Nutzer; wer Do Not Track gesetzt hat, sendet nichts.
+Damit steht unter Betrieb → Vitals „/galerie/:slug am Handy: LCP p75 6,1 s“ statt eines Gefühls.
+
+**Die Auto-Checks messen, was still kaputtgeht.** Datenbank-Latenz, freier Speicher, Upload-
+Volume, Mail-Queue (hängende Sendungen), Änderungsstrom, fehlende Bildvarianten, offene
+Fehlergruppen, Scheduler – alle fünf Minuten, sieben Tage Verlauf. Die Bewertung liegt getrennt
+von der Messung, damit die Schwellen testbar sind. Die In-Memory-Datenbank der Tests kennt
+kein `ping`; die Prüfung weicht dort auf ein Lesen aus.
+
+**Alarme über einen eigenen Webhook, gedrosselt.** Der erste Entwurf schickte Alarme über den
+Community-Webhook – dort gehören nur News, Turniere und Erfolge hin (Einwand des Betreibers).
+Jetzt gibt es in den Discord-Einstellungen einen zweiten, privaten Betriebs-Webhook; fehlt er,
+gibt es keine Alarme, und auf den Community-Kanal fällt der Betrieb nie zurück. Rote Prüfungen
+und neue 5xx-Gruppen gehen dorthin, höchstens eine Meldung je Schlüssel und Stunde. Die Fehlergruppen-Meldung läuft als Hintergrund-Aufgabe, damit der
+Anfrage-Pfad nicht auf Discord wartet. Push an Admins bleibt aus – der Webhook reicht.
+
+**p75 mit Interpolation.** Bei wenigen Messwerten liefert der nächste Rang (wie bei Tempo)
+Sprünge; die Vitals rechnen linear zwischen den Rängen.
 
 ## Block 19 — Web-Profil
 
