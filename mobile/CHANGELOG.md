@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1-beta - 2026-09-16
+
+- Mobile: Bilder im Chat: Antwortet der Server dem Bildlader mit einem Fehlercode („Unexpected HTTP code“), holt die App das Bild über denselben Weg wie jeden anderen Aufruf - mit Anmeldung und Token-Erneuerung - und zeigt es an; ab dann gehen weitere Bilder gleich so. Scheitert auch das, steht der HTTP-Status mit Grund in der Kachel statt einer abgeschnittenen Meldung (#238).
+- Mobile: Die Vollansicht eines Chat-Bilds zeigt einen Ladekreis und, falls nötig, denselben Fehlergrund (#238).
+
 ## 0.4.0-beta - 2026-09-15
 
 - Mobile: Der Events-Tab zeigt ohne Tipp nur, was ansteht; Beendetes und Abgesagtes steht hinter „Vergangene anzeigen (N)“. Die Zähler oben zählen dieselbe Menge wie die Liste (#241).

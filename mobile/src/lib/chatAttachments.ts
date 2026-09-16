@@ -1,5 +1,7 @@
 import { API_BASE_URL } from "../config";
 import type { ChatAttachment } from "../types";
+import { api, errorMessage } from "./api";
+import { registerCacheClearer } from "./cache";
 
 // Bilder und Videos im Chat, auf Seite der App.
 //
@@ -85,10 +87,75 @@ export function canSendChatMessage(text: string, drafts: ChatAttachmentDraft[]) 
   return Boolean(text.trim()) || readyAttachmentIds(drafts).length > 0;
 }
 
+/** Absolute Adresse eines Anhangs; mit Breite die kleinere Fassung (400, 800, 1600). */
+export function attachmentRequestUrl(url: string, width?: number) {
+  const absolute = url.startsWith("/") ? `${API_BASE_URL}${url}` : url;
+  return width ? `${absolute}${absolute.includes("?") ? "&" : "?"}w=${width}` : absolute;
+}
+
 /** Bild- oder Videoquelle mit Anmeldung; mit Breite die kleinere Fassung. */
 export function authorizedSource(url: string | null | undefined, token: string | null | undefined, width?: number) {
   if (!url) return null;
-  const absolute = url.startsWith("/") ? `${API_BASE_URL}${url}` : url;
-  const uri = width ? `${absolute}${absolute.includes("?") ? "&" : "?"}w=${width}` : absolute;
+  const uri = attachmentRequestUrl(url, width);
   return token ? { uri, headers: { Authorization: `Bearer ${token}` } } : { uri };
 }
+
+/**
+ * Der HTTP-Status aus der Meldung des Bildladers, falls einer drinsteht.
+ * Android (Fresco) meldet „Unexpected HTTP code Response{…, code=404, …}“,
+ * iOS „… status code: 404“ - beides ist in der Kachel abgeschnitten und sagt
+ * dem Betreiber nichts (#238).
+ */
+export function httpStatusFromImageError(message: unknown): number | null {
+  const text = String(message ?? "");
+  const match = /(?:code=|status(?: code)?[=: ]\s*|HTTP(?: code)?\s+)(\d{3})\b/i.exec(text);
+  return match ? Number(match[1]) : null;
+}
+
+/** Kurz und lesbar: „HTTP 404: Anhang nicht gefunden“ oder die Netzmeldung. */
+export function describeAttachmentError(error: unknown): string {
+  const status = (error as { response?: { status?: number } } | null)?.response?.status;
+  const text = errorMessage(error, "Unbekannter Fehler");
+  return status ? `HTTP ${status}: ${text}` : text;
+}
+
+const DATA_URI_LIMIT = 24;
+const dataUris = new Map<string, string>();
+
+function blobToDataUri(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string" && reader.result) resolve(reader.result);
+      else reject(new Error("Bild konnte nicht gelesen werden."));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Bild konnte nicht gelesen werden."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Holt einen Anhang über den API-Client statt über den Bildlader: derselbe
+ * Weg wie jeder andere Aufruf der App, mit Token-Erneuerung bei 401. Das
+ * Ergebnis ist eine data:-Adresse, die <Image> ohne Kopfzeilen anzeigt.
+ * Die letzten Bilder bleiben im Speicher, bis das Konto wechselt.
+ */
+export async function fetchAttachmentDataUri(url: string, width?: number): Promise<string> {
+  const target = attachmentRequestUrl(url, width);
+  const known = dataUris.get(target);
+  if (known) return known;
+  const { data } = await api.get<Blob>(target, { responseType: "blob" });
+  const uri = await blobToDataUri(data);
+  if (dataUris.size >= DATA_URI_LIMIT) {
+    const oldest = dataUris.keys().next().value;
+    if (oldest !== undefined) dataUris.delete(oldest);
+  }
+  dataUris.set(target, uri);
+  return uri;
+}
+
+export function forgetAttachmentData() {
+  dataUris.clear();
+}
+
+registerCacheClearer(forgetAttachmentData);

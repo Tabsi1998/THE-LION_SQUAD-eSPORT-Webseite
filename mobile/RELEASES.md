@@ -107,6 +107,7 @@ Neueste oben.
 - `0.3.0-beta`: Build 59, Startseite, Profil, Mehr und Teams aufgeräumt (Block 14.4)
 - `0.3.1-beta`: Build 60, nur Fehler aus dem Test von Build 59 (Meilenstein App 0.3.1-beta)
 - `0.4.0-beta`: Build 61, Seiten aufräumen II – Events-Tab, Mehr, eigene Seiten, Sponsoren, Startseite (Meilenstein App 0.4.0-beta)
+- `0.4.1-beta`: Build 62, Chat-Bilder in der App über den API-Client, HTTP-Status in der Kachel (Meilenstein App 0.4.1-beta)
 - `0.2.0-beta`: Build 57, erste Version im neuen Schema
 
 Vor dem Neustart bei 0.x galt ein Schema mit Zähler (`-beta.N`, `-alpha.N`). Diese Versionen sind historisch:
