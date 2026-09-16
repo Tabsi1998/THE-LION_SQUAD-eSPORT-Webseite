@@ -40,12 +40,12 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 11 | PDF-Ausgabe | umgesetzt | #193, #194 |
 | 12 | Galerie und Medien: Tempo, Videos überall | umgesetzt | #196 |
 | 13 | Entflechtung: `tournament_routes.py` aufgeteilt | umgesetzt | #200 |
-| 14 | LionsAPP in den Store | in Arbeit: 14.1 bis 14.4 umgesetzt, v0.3.1-beta (Build 60) und v0.4.0-beta (Build 61) veröffentlicht | #201, #206, #207, #208, #209, #220, #237, #262, #264 |
+| 14 | LionsAPP in den Store | in Arbeit: 14.1 bis 14.4 umgesetzt, v0.3.1-beta (Build 60), v0.4.0-beta (Build 61) und v0.4.1-beta (Build 62) veröffentlicht | #201, #206, #207, #208, #209, #220, #237, #262, #264 |
 | 15 | Abschluss: Abfrage-Intervalle im Web weg, große Dateien nebenbei teilen | #221 umgesetzt, #223 offen | #261 |
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen (#228) | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise (#229) | #193, #195 |
 | 18 | **Auszeichnungen: Banner und Trophäen** | offen (#230) | — |
-| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | umgesetzt: Profil I (#253, #257, #258) und Profil II (#254, #255, #256, #259); Nachtrag Kopfzeile und Mitgliederbereich (#282, #283 umgesetzt, #284 wartet auf das OK) | #267, #275, #276, #278, #279, #280, #281, #285 |
+| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | umgesetzt: Profil I (#253, #257, #258) und Profil II (#254, #255, #256, #259); Nachtrag Kopfzeile und Mitgliederbereich (#282, #283, #284 umgesetzt) | #267, #275, #276, #278, #279, #280, #281, #285, #294, #298 |
 | 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
 | 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
 | 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | umgesetzt: #232, #233 Teil 1, #265 Betrieb II | #263, #266, #299 |
@@ -424,7 +424,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Meilenstein | Inhalt |
 | --- | --- |
 | App 0.3.1-beta | Nur Fehler aus Build 59: #246 Rohwerte II, #247 Umbrüche im Profil, #252 Referenzen leer (#262, Build 60); #238 Bild schwarz bekommt damit einen sichtbaren Fehlergrund und bleibt offen |
-| App 0.4.1-beta | #238 Chat-Bild: seit Build 61 steht der Grund in der Kachel („Unexpected HTTP Code“); #286 holt das Bild über den API-Client und nennt sonst den HTTP-Status – Build 62 |
+| App 0.4.1-beta | #238 Chat-Bild: seit Build 61 steht der Grund in der Kachel („Unexpected HTTP Code“); #286 holt das Bild über den API-Client und nennt sonst den HTTP-Status – Build 62 veröffentlicht (16.09.) |
 | App 0.4.0-beta | Seiten aufräumen II: #241 Events-Tab, #242 Mehr/Gaming, #243 eigene Seiten, #244 Sponsoren, #248 Startseite II (#264; Build 61 noch nicht gebaut) |
 | App 0.5.0-beta | Tester-Komfort: #249 „Was ist neu“, #250 Update aus der App, #251 In-App-Banner, #277 Nickname-Feld weg (ein Anzeigename wie im Web) |
 | App 0.6.0-beta | #218 Erfolge (14.5) |
@@ -434,7 +434,8 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
 | Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar (#279, umgesetzt), #256 Dashboard (#280, umgesetzt), #259 Freunde (#281, umgesetzt; #222 ist darin aufgegangen) – Meilenstein abgeschlossen |
-| Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (Vorschlag im Issue, wartet auf das OK) |
+| Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (#298, umgesetzt) – Meilenstein abgeschlossen |
+| Mitgliederbereich II: Dolibarr | Wunsch des Betreibers vom 16.09.: #295 Mitgliedsdaten und Beitragsstatus per Dolibarr-API in Mitgliederbereich und Admin, #296 Rechnungen ansehen/herunterladen und Zahlungslink, #297 Vorstandsbesetzung und Status aus Dolibarr (nach Bestätigung im Admin) – später, nach Rollen und Rechten |
 | Web: Rollen und Rechte | Zusatzwunsch vom 16.09., nachdem der Betreiber als Admin den Adminbereich sah: #287 Ist-Stand und Zielbild (Entscheidung: Freigaben oder Rollen), #288 Turnierleitung ohne Redaktion, #289 Redaktionsrecht für News/Galerie/Sponsoren, #290 Vereinsvorstand für Mitglieder/Dokumente/Vorteile, #291 Zwei-Faktor auch für Club-Admin-Routen, #292 Rechte sichtbar und `team_leader` weg |
 | Web: Dynamik | Block 20: #224, #225, #226 |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
@@ -697,6 +698,22 @@ Termin, Ort und Link; eine Kachel zählt sie. Die Auswahl steckt in `lib/memberA
 
 **Was bleibt (#284):** Kacheln und Karten zeigen dieselben Themen doppelt, und drei Karten
 sind meist leer. Der Vorschlag steht im Issue und wartet auf das OK des Betreibers.
+
+### Was 19.10 gefunden hat (#284, PR #298)
+
+**Doppelt und leer.** Vier Kacheln oben, darunter dieselben Themen als Karten, drei davon mit
+„Keine …“. Jetzt: Kopf mit Mitgliedschaft, eine Zeile Verweise (Mitgliedschaft, Vorteile,
+Dokumente, Interne News, Vorstand, Discord aus den Einstellungen), darunter nur Karten mit
+Inhalt. Ist nichts freigeschaltet, steht ein Satz.
+
+**Ansprechpartner gab es schon – auf der Vorstandsseite.** `/api/board?active_only=true`
+liefert die Posten mit Person und Titel je Geschlecht; der Mitgliederbereich zeigt die
+besetzten Posten als Karte mit Link ins Mitgliedsprofil. Kein neuer Endpunkt.
+
+**Dolibarr ist der nächste Schritt, nicht dieser.** Beitrag bezahlt bis, Rechnungen als PDF,
+Zahlungslink und die Vorstandsbesetzung aus der Vereinsverwaltung stehen als eigener
+Meilenstein „Mitgliederbereich II: Dolibarr“ (#295–#297) – nach Rollen und Rechten, weil
+der Vorstand dort an die Rechte gehängt wird (#290).
 
 ## Block 16 — Turnier-Leitfaden im Adminbereich
 

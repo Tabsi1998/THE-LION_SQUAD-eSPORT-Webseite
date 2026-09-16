@@ -186,11 +186,15 @@ Seit dem 15. September gilt:
   `frontend/e2e/header-user-menu.spec.js`; der Abmelde-Test in
   `e2e/public.spec.js` öffnet zuerst das Menü (`nav-user`, am Handy
   `nav-logout-mobile`).
-- Mitgliederbereich (#283, PR #285): `pages/user/MemberAreaPage.jsx` lädt
-  `/api/events?upcoming=true&compact=true`; `lib/memberArea.js` behält
-  Mitglieder- und interne Events, die noch anstehen (Karte und Kachel
-  „Interne Events“). Browser-Test `frontend/e2e/member-area.spec.js`.
-  Der Umbau der Seite (#284) wartet auf das OK des Betreibers.
+- Mitgliederbereich (#283 PR #285, #284 PR #298): `pages/user/MemberAreaPage.jsx`
+  – Kopf mit Mitgliedschaft, eine Zeile Verweise (inkl. Discord aus
+  `/api/settings/public`), darunter nur Karten mit Inhalt: interne Events
+  (`/api/events?upcoming=true`), Dokumente, Vorteile, interne News,
+  Ansprechpartner aus `/api/board?active_only=true`. Auswahl in
+  `lib/memberArea.js` (`memberEvents`, `memberNews`, `boardContacts`).
+  Leer-Satz statt leerer Karten. Browser-Test `frontend/e2e/member-area.spec.js`.
+  Dolibarr (Beitrag, Rechnungen, Vorstand) ist Meilenstein „Mitgliederbereich
+  II: Dolibarr“ (#295–#297).
 - Privatsphäre und Benachrichtigungen (#257, PR #275) speichern von selbst:
   `profile/useAutosave.js` (0,7 s Entprellung, ein PATCH je Lauf, Änderungen
   während des Speicherns bleiben stehen), Schalter in `profile/SwitchRow.jsx`
@@ -430,36 +434,33 @@ braucht.
 (Profil II). `main` steht auf `72cef4c`.
 
 ### Offene PRs
-- #294 (#293 Admin-Knopf weg, Doku) und #286 (App 0.4.1-beta, #238).
-  Reihenfolge egal; nach #286 baut der Haupt-PC Build 62.
+- #298 (#284 Mitgliederbereich). Nach dem Merge ist der Meilenstein „Web:
+  Mitgliederbereich und Kopfzeile“ komplett – Server-Update fällig.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
   (`mobile-v0.3.1-beta-build60`), **Build 61** (`mobile-v0.4.0-beta-build61`,
   Commit ec89de6, am 16.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
-  `46b6ce34`). Nächster Build ist 62 mit App 0.4.1-beta (#238), danach 63
-  mit App 0.5.0-beta (#249–#251, #277).
+  `46b6ce34`), **Build 62** (`mobile-v0.4.1-beta-build62`, Commit e64f840, am
+  16.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `89180c42`; #238).
+  Nächster Build ist 63 mit App 0.5.0-beta (#249–#251, #277).
 
 ### Erledigungen beim Betreiber
-- Server steht auf #281 (16.09.): Profil I und Profil II sind am Server. Das
-  nächste `update.sh` ist fällig, sobald der Meilenstein „Web:
-  Mitgliederbereich und Kopfzeile“ (#282–#284) abgeschlossen ist.
-- #284: den Vorschlag im Issue bestätigen oder ändern – erst dann wird
-  umgebaut.
-- #238: Fix in #286 (App 0.4.1-beta). Nach dem Merge baut der Haupt-PC Build
-  62; dann installieren, ein Bild im Chat senden – entweder erscheint es,
-  oder die Kachel nennt den HTTP-Status (der ist dann die Diagnose).
-- #287: drei Fragen zum Rechtemodell beantworten (Freigaben oder Rollen,
-  Vorstand aus der Mitgliedschaft, Umfang der Turnierleitung) – erst dann
-  wird an „Web: Rollen und Rechte“ gebaut.
+- `update.sh` am Server, sobald #298 gemergt ist: damit ist „Web:
+  Mitgliederbereich und Kopfzeile“ komplett am Server (Stand des Servers:
+  #281 vom 16.09.; seither #285, #294, #298).
+- Build 62 installieren (Release-Seite → APK), ein Bild im Chat senden:
+  entweder erscheint es, oder die Kachel nennt „HTTP <Status>: <Grund>“ –
+  den Text bitte in #238 posten.
+- #287 ist entschieden (Freigaben, Vorstand aus der Mitgliedschaft,
+  Turnierleitung pro Turnier); nichts mehr offen.
 
-### Meilensteine und offene Issues (32 offen)
+### Meilensteine und offene Issues (34 offen)
 | Meilenstein | Issues |
 | --- | --- |
 | Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg; #265 Betrieb II ist mit #299 umgesetzt |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
-| Web: Mitgliederbereich und Kopfzeile | #284 Mitgliederbereich aufräumen (Vorschlag, wartet auf OK); #282 und #283 sind mit #285 umgesetzt |
-| App 0.4.1-beta | #238 Chat-Bild „Unexpected HTTP Code“ – Fix in #286, danach Build 62 |
+| Mitgliederbereich II: Dolibarr | #295 Mitgliedsdaten und Beitrag per API, #296 Rechnungen und Zahlungslink, #297 Vorstand und Status aus Dolibarr (später, eigener Meilenstein) |
 | Web: Rollen und Rechte | #287 Ist-Stand und Zielbild (Entscheidung), #288 Turnierleitung ohne Redaktion, #289 Redaktionsrecht, #290 Vereinsvorstand, #291 Zwei-Faktor für Club-Admin-Routen (bug), #292 Rechte sichtbar, team_leader weg |
 | App 0.5.0-beta | #249 Was ist neu, #250 Update aus der App, #251 In-App-Banner, #277 Nickname-Feld weg |
 | App 0.6.0-beta | #218 Erfolge |
@@ -471,16 +472,16 @@ braucht.
 | Spaeter | #260 Plattform-Konten verknüpfen |
 
 ### Reihenfolge danach (vom Betreiber freigegeben)
-1. Profil I und Profil II sind fertig und seit 16.09. am Server (#267, #275,
-   #276, #278–#281).
-2. Web: Mitgliederbereich und Kopfzeile – #282 und #283 (#285, umgesetzt), #284
-   nach dem OK des Betreibers. Danach Server-Update.
-3. App 0.4.1-beta: #238 Chat-Bild → Build 62.
+1. Profil I und Profil II sind fertig und seit 16.09. am Server.
+2. Web: Mitgliederbereich und Kopfzeile ist fertig (#285, #294, #298) –
+   Server-Update fällig, sobald #298 gemergt ist.
+3. App 0.4.1-beta ist als Build 62 veröffentlicht (#286); Test durch den
+   Betreiber steht aus (#238).
 4. Betrieb II #265.
 5. App 0.5.0-beta (#249–#251, #277) → Build 63.
-6. Web: Rollen und Rechte (#287–#292), sobald die Entscheidung in #287 steht –
-   Zusatzwunsch vom 16.09., muss die Reihenfolge davor nicht verschieben.
-7. Danach Dynamik, 0.6.0, Admin und Turniere, … Abwechselnd App und Web.
+6. Web: Rollen und Rechte (#287–#292) – Entscheidung liegt vor.
+7. Mitgliederbereich II: Dolibarr (#295–#297) – später, nach Rollen und Rechten.
+8. Danach Dynamik, 0.6.0, Admin und Turniere, … Abwechselnd App und Web.
 
 Vor jedem neuen Paket: Stand melden und auf das OK warten.
 
