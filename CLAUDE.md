@@ -154,6 +154,11 @@ Seit dem 15. September gilt:
   unter `/notifications`. Das Dashboard zeigt fünf Bündel und verlinkt
   dorthin. Backend-Pfade `/me/prizes` und `/tournaments/<slug>/chat` gibt es
   im Web nicht – die Zielzuordnung schreibt sie um.
+- Dashboard (#256, PR #280): `pages/user/DashboardPage.jsx` liest
+  `/api/mobile/dashboard` (derselbe Endpunkt wie die App, nur Anmeldung
+  nötig); Termin-, Aktions- und Saisonlogik in `lib/dashboard.js`
+  (Übertragung von `mobile/src/lib/dashboard.ts`). Kacheln nur noch
+  Mitgliedervorteile, Strafen, Daten. Browser-Test `frontend/e2e/dashboard.spec.js`.
 - Privatsphäre und Benachrichtigungen (#257, PR #275) speichern von selbst:
   `profile/useAutosave.js` (0,7 s Entprellung, ein PATCH je Lauf, Änderungen
   während des Speicherns bleiben stehen), Schalter in `profile/SwitchRow.jsx`
@@ -402,10 +407,10 @@ braucht.
   nicht deinstalliert werden), ein Bild im Chat senden und den Text aus der
   Bildkachel in **#238** posten (dort steht der Fehlergrund).
 
-### Meilensteine und offene Issues (28 offen)
+### Meilensteine und offene Issues (27 offen)
 | Meilenstein | Issues |
 | --- | --- |
-| Web: Profil II – Nachrichten und Dashboard | #256 Dashboard, #259 Freunde (#254 mit #278, #255 mit #279 zu) |
+| Web: Profil II – Nachrichten und Dashboard | #259 Freunde (#254 mit #278, #255 mit #279, #256 mit #280 zu) |
 | Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg, #265 Betrieb II |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
 | App 0.3.1-beta | #238 schwarze Chat-Kachel (wartet auf Text vom Betreiber) |
@@ -421,7 +426,7 @@ braucht.
 ### Reihenfolge danach (vom Betreiber freigegeben)
 1. Profil I ist fertig (#253, #257, #258 mit #267, #275, #276); der Meilenstein
    „Web: Profil I – Aufbau“ ist abgeschlossen, Server-Update fällig.
-2. Profil II: #256, #259 (#254 mit #278, #255 mit #279 erledigt).
+2. Profil II: #259 (#254 mit #278, #255 mit #279, #256 mit #280 erledigt).
 3. Betrieb II #265.
 4. App 0.5.0-beta (#249–#251) → Build 62.
 5. Danach Dynamik, 0.6.0, Admin und Turniere, … Abwechselnd App und Web.
