@@ -129,6 +129,14 @@ Seit dem 15. September gilt:
   Sammlung `ops_vitals` TTL 30 Tage), Auswertung p50/p75 je Route.
   Admin-Endpunkte `/api/admin/ops/vitals`, `/checks`, `POST /checks/run`;
   `ops_summary` trägt `checks` für die Tageszentrale.
+- App-Releases (#250, PR #304): `services/app_releases.py`, Ablage
+  `uploads/app-releases` (`storage.APP_RELEASE_DIR`), Sammlung `app_releases`
+  (ein Eintrag je Build, `is_current`, `min_build`). `GET /api/mobile/app-version`
+  und `GET /api/mobile/app-download/{build}` (angemeldet); Admin
+  `/api/admin/app-releases` (Liste, Upload, PATCH, DELETE). Upload auch per
+  `X-Release-Token` = `APP_RELEASE_UPLOAD_TOKEN` aus der Server-`.env` (nie im
+  Repo). Web-Seite `pages/admin/AdminAppReleasesPage.jsx` unter System →
+  App-Versionen.
 - Bild-Varianten beim Upload: `backend/services/image_variants.py`
   (`schedule_variants`).
 - Deutsch-Prüfung `test_german_copy.py` schlägt bei „fuer/ueber/weiss“ an –
@@ -235,7 +243,19 @@ Seit dem 15. September gilt:
   Rohwerte), `lib/teams.ts`, `lib/sponsors.ts` (`SPONSOR_TIERS`).
 - Bausteine: `components/ContentCard.tsx` (`secondaryLabel`, kein
   „Details“-Knopf mehr), `components/ChatAttachments.tsx` (`AttachmentTile`
-  mit Lade-/Fehlerzustand – zeigt den Grund, wenn ein Bild nicht lädt).
+  mit Lade-/Fehlerzustand – zeigt den Grund, wenn ein Bild nicht lädt),
+  `components/AuthorizedImage.tsx` (Bild mit Anmeldung: Bildlader, sonst
+  API-Client als data:-Adresse; #238).
+- Updates und „Was ist neu“ (#249, #250, PR #304): `update/AppUpdateProvider.tsx`
+  fragt `/api/mobile/app-version?build=` (höchstens einmal pro Stunde),
+  zeigt `components/AppUpdateBanner.tsx` (Download mit Anmeldung über
+  `expo-file-system/legacy`, MD5/Größe prüfen, Installer über
+  `expo-intent-launcher`) und `components/WhatsNewCard.tsx` aus
+  `src/whatsnew.json` (`npm run whatsnew` schreibt sie aus `CHANGELOG.md`,
+  der Preflight prüft sie). Logik in `lib/appUpdate.ts`, `lib/whatsnew.ts`.
+- In-App-Banner (#251): `lib/popups.ts` (bündeln, unterdrücken im offenen
+  Chat), Anzeige in `notifications/NotificationContext.tsx` (einer sichtbar,
+  5 s, nach oben wischen).
 - Bildschirm-Tests: `@testing-library/react-native` 14 macht `render` und
   `fireEvent` **asynchron** – immer `await render(…)`, `await
   fireEvent.press(…)`; sonst „render function has not been called“ (führt in
@@ -407,6 +427,13 @@ npm run release:local                 # bauen, prüfen, GitHub-Release und Tag a
   (Windows-Dateisperre). Abhilfe: `%TEMP%\jest` löschen und neu starten.
 - `signing.json` ist strenges JSON: ein Komma nach dem letzten Eintrag macht
   sie ungültig; das Skript nennt Zeile und Spalte, nie den Inhalt.
+- Nach jedem Versionssprung `npm run whatsnew` (schreibt `src/whatsnew.json`
+  aus `CHANGELOG.md`, #249) – der Preflight bricht sonst ab.
+- Nach `gh release create` schickt das Skript die APK an den Vereinsserver
+  (#250), wenn `uploadUrl`/`uploadToken` in `signing.json` oder
+  `LIONSAPP_UPLOAD_URL`/`LIONSAPP_UPLOAD_TOKEN` gesetzt sind (Token =
+  `APP_RELEASE_UPLOAD_TOKEN` der Server-`.env`). Ohne: Hinweis, kein Fehler;
+  dann Admin → System → App-Versionen von Hand.
 - Nach jedem Build dem Betreiber Klick-Schritte geben (Release-Seite, APK,
   Installation; bei Schlüsselwechsel einmal deinstallieren).
 
@@ -434,8 +461,8 @@ braucht.
 (Profil II). `main` steht auf `72cef4c`.
 
 ### Offene PRs
-- #299 (#265 Betrieb II). Nach dem Merge: keine; Server-Update fällig, das
-  deckt #298 (Mitgliederbereich) mit ab.
+- #304 (App 0.5.0-beta: #249, #250, #251, #277). Nach dem Merge: keine;
+  Server-Update fällig (neue Endpunkte und Admin-Seite), dann Build 63.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -443,19 +470,24 @@ braucht.
   Commit ec89de6, am 16.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
   `46b6ce34`), **Build 62** (`mobile-v0.4.1-beta-build62`, Commit e64f840, am
   16.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `89180c42`; #238).
-  Nächster Build ist 63 mit App 0.5.0-beta (#249–#251, #277).
+  Nächster Build ist 63 mit App 0.5.0-beta (#249–#251, #277, PR #304) –
+  erst nach dem Merge und dem Server-Update, damit das Skript die APK am
+  Server ablegen kann.
 
 ### Erledigungen beim Betreiber
-- `update.sh` am Server, sobald #299 gemergt ist: damit sind Mitgliederbereich
-  (#298) und Betrieb II (#299) am Server (Stand des Servers: #294 vom 16.09.).
-- Danach Einstellungen → Discord: einen privaten Kanal als Betriebs-Webhook
-  eintragen und „Testalarm senden“ – ohne ihn gibt es keine Alarme. Dann
-  Admin → Betrieb → Checks → „Jetzt prüfen“.
-- Build 62 ist getestet: Bilder im Chat erscheinen (#238 erledigt).
+- #299 ist gemergt: `update.sh` am Server (Stand des Servers: #294 vom
+  16.09.), dann Einstellungen → Discord: privaten Kanal als Betriebs-Webhook
+  eintragen, „Testalarm senden“, Admin → Betrieb → Checks → „Jetzt prüfen“.
+- Nach dem Merge von #304: `update.sh`; in der Server-`.env`
+  `APP_RELEASE_UPLOAD_TOKEN` setzen (`openssl rand -hex 24`), in
+  `%USERPROFILE%\.lionsapp-release\signing.json` `uploadUrl`
+  (`https://lionsquad.at`) und `uploadToken` (derselbe Wert) eintragen –
+  dann Bescheid geben für Build 63. Build 62 auf dem Handy zeigt danach den
+  Update-Banner: das ist der Test für #250.
 - #287 ist entschieden (Freigaben, Vorstand aus der Mitgliedschaft,
   Turnierleitung pro Turnier); nichts mehr offen.
 
-### Meilensteine und offene Issues (37 offen)
+### Meilensteine und offene Issues (33 offen)
 | Meilenstein | Issues |
 | --- | --- |
 | Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg; #265 Betrieb II ist mit #299 umgesetzt |
@@ -463,7 +495,7 @@ braucht.
 | Mitgliederbereich II: Dolibarr | #295 Mitgliedsdaten und Beitrag per API, #296 Rechnungen und Zahlungslink, #297 Vorstand und Status aus Dolibarr (später, eigener Meilenstein) |
 | Discord: Kanäle und Bot | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und melden, #302 Discord-Bot (Aktivität, Rollen, Befehle; braucht #260), #303 Meldungen mit Bild und Vorschau (später) |
 | Web: Rollen und Rechte | #287 Ist-Stand und Zielbild (Entscheidung), #288 Turnierleitung ohne Redaktion, #289 Redaktionsrecht, #290 Vereinsvorstand, #291 Zwei-Faktor für Club-Admin-Routen (bug), #292 Rechte sichtbar, team_leader weg |
-| App 0.5.0-beta | #249 Was ist neu, #250 Update aus der App, #251 In-App-Banner, #277 Nickname-Feld weg |
+| App 0.5.0-beta | #249, #250, #251, #277 sind mit #304 umgesetzt – Build 63 nach Merge und Server-Update |
 | App 0.6.0-beta | #218 Erfolge |
 | App 0.7.0-beta | #216 Kalender, #236 Galerie |
 | App 0.8.0-beta | #239 Sticker/GIFs, #240 Freundschaftsanfragen, #245 Laufbanner |
@@ -477,8 +509,8 @@ braucht.
 2. Web: Mitgliederbereich und Kopfzeile ist fertig und gemergt (#285, #294,
    #298) – Server-Update zusammen mit #299.
 3. App 0.4.1-beta ist als Build 62 veröffentlicht und bestätigt (#238 erledigt).
-4. Betrieb II #265 ist umgesetzt (#299) – nach dem Merge Server-Update.
-5. App 0.5.0-beta (#249–#251, #277) → Build 63.
+4. Betrieb II #265 ist umgesetzt und gemergt (#299) – Server-Update fällig.
+5. App 0.5.0-beta ist umgesetzt (#304) → nach Merge und Server-Update Build 63.
 6. Web: Rollen und Rechte (#287–#292) – Entscheidung liegt vor.
 7. Mitgliederbereich II: Dolibarr (#295–#297) – später, nach Rollen und Rechten.
 8. Discord: Kanäle und Bot (#300–#303) – nach Rollen und Rechten; der Bot
