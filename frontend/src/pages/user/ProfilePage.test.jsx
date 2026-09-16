@@ -51,10 +51,10 @@ vi.mock("sonner", () => ({ toast: toastMock }));
 
 const ProfilePage = (await import("./ProfilePage")).default;
 
-function renderPage() {
+function renderPage(entries = ["/profile"]) {
   return render(
     <ConfirmDialogProvider>
-      <MemoryRouter initialEntries={["/profile"]}>
+      <MemoryRouter initialEntries={entries}>
         <ProfilePage />
       </MemoryRouter>
     </ConfirmDialogProvider>
@@ -205,4 +205,58 @@ test("ein Speicherfehler meldet sich und laesst die Eingabe stehen", async () =>
 
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Profil konnte nicht gespeichert werden."));
   expect(screen.getByTestId("profile-bio")).toHaveValue("Bleibt erhalten.");
+});
+
+test("Grunddaten: ein Anzeigename statt zwei Namen, Land als Auswahl, Sicherheit nicht mehr hier", async () => {
+  renderPage();
+  await waitForForm();
+
+  expect(screen.getByTestId("profile-display-name")).toBeInTheDocument();
+  expect(screen.queryByText(/Nickname/i)).toBeNull();
+  expect(screen.getByTestId("profile-country").tagName).toBe("SELECT");
+  expect(screen.getByRole("option", { name: "Österreich" })).toHaveValue("AT");
+  expect(screen.queryByTestId("profile-google-link")).toBeNull();
+  expect(screen.queryByTestId("passkeys-panel")).toBeNull();
+});
+
+test("der Reiter Sicherheit buendelt Passwort, Passkeys, Zwei-Faktor, Google und Geraete; ?tab=sessions landet dort", async () => {
+  renderPage(["/profile?tab=sessions"]);
+
+  expect(await screen.findByTestId("profile-password-panel")).toBeInTheDocument();
+  expect(screen.getByTestId("profile-tab-security")).toHaveAttribute("aria-current", "page");
+  expect(screen.getByTestId("passkeys-panel")).toBeInTheDocument();
+  expect(screen.getByTestId("profile-mfa-note")).toBeInTheDocument();
+  expect(screen.getByTestId("profile-google-link")).toBeInTheDocument();
+  expect(await screen.findByTestId("profile-sessions-panel")).toBeInTheDocument();
+  expect(screen.queryByTestId("profile-save")).toBeNull();
+});
+
+test("Passwort aendern schickt aktuelles und neues Passwort und meldet den Wechsel", async () => {
+  const user = userEvent.setup();
+  renderPage(["/profile?tab=security"]);
+  await screen.findByTestId("profile-password-panel");
+
+  expect(screen.getByTestId("profile-password-submit")).toBeDisabled();
+  await user.type(screen.getByTestId("profile-password-current"), "altes-passwort");
+  await user.type(screen.getByTestId("profile-password-new"), "neues-passwort-123");
+  await user.type(screen.getByTestId("profile-password-repeat"), "neues-passwort-123");
+  await user.click(screen.getByTestId("profile-password-submit"));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/auth/change-password", {
+    current_password: "altes-passwort",
+    new_password: "neues-passwort-123",
+  }));
+  expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Passwort geändert"));
+});
+
+test("Socials: eine eingefuegte Adresse wird zum Nutzernamen mit Vorschau-Link", async () => {
+  const user = userEvent.setup();
+  renderPage(["/profile?tab=socials"]);
+  const field = await screen.findByTestId("profile-instagram");
+
+  await user.click(field);
+  await user.paste("https://www.instagram.com/tabsi.98");
+
+  expect(field).toHaveValue("tabsi.98");
+  expect(screen.getByTestId("profile-instagram-preview")).toHaveAttribute("href", "https://instagram.com/tabsi.98");
 });

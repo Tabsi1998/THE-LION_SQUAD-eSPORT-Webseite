@@ -1,4 +1,4 @@
-import { Bell, Eye, Gamepad2, Globe, Medal, MessageSquare, MonitorSmartphone, User, UserPlus, Users } from "lucide-react";
+import { Bell, Eye, Gamepad2, Globe, Medal, MessageSquare, ShieldCheck, User, UserPlus, Users } from "lucide-react";
 
 // Privatsphäre und Benachrichtigungen sind seit #257 zwei Reiter; Mails
 // verlinken die Benachrichtigungen mit ?tab=notifications.
@@ -10,9 +10,11 @@ export const TABS = [
   { k: "friends", label: "Freunde", icon: UserPlus },
   { k: "inbox", label: "Inbox", icon: MessageSquare },
   { k: "achievements", label: "Achievements", icon: Medal },
-  { k: "sessions", label: "Sitzungen", icon: MonitorSmartphone },
   { k: "privacy", label: "Privatsphäre", icon: Eye },
   { k: "notifications", label: "Benachrichtigungen", icon: Bell },
+  // Sicherheit bündelt seit #258 Passwort, Passkeys, Zwei-Faktor, Google und
+  // die Geräte (vorher eigener Reiter „Sitzungen“; ?tab=sessions landet hier).
+  { k: "security", label: "Sicherheit", icon: ShieldCheck },
 ];
 
 export const PLATFORMS = [

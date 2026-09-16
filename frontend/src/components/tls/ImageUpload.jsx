@@ -63,16 +63,6 @@ function fileLooksSupported(file) {
   return SUPPORTED_IMAGE_TYPES.has(type) || SUPPORTED_IMAGE_EXT_RE.test(file.name || "");
 }
 
-function imageFileName(value) {
-  if (!value) return "";
-  try {
-    const url = new URL(resolveMediaUrl(value), window.location.origin);
-    return decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || String(value));
-  } catch {
-    return String(value).split("/").pop() || String(value);
-  }
-}
-
 function ImagePreviewBox({ value, previewClass, onClear, testId }) {
   const [state, setState] = useState(value ? "loading" : "empty");
   const src = value ? resolveMediaUrl(value) : "";
@@ -106,7 +96,6 @@ function ImagePreviewBox({ value, previewClass, onClear, testId }) {
               <ImageIcon className="w-7 h-7 text-[#FF3B30]/70" />
               <span className="text-[10px] uppercase tracking-widest font-bold text-[#FF3B30]">Vorschau nicht ladbar</span>
               <span className="text-[10px] text-white/45">Die Bild-URL ist gespeichert.</span>
-              <span className="text-[10px] text-white/35 break-all line-clamp-2">{imageFileName(value)}</span>
             </div>
           )}
           <button type="button" onClick={onClear} className="absolute top-1 right-1 p-1 bg-black/70 text-white/80 rounded-sm opacity-0 group-hover:opacity-100 transition" data-testid={`${testId}-clear`}>
@@ -554,7 +543,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
             data-testid={`${testId}-btn`}
             className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 disabled:opacity-50"
           >
-            <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : value ? "Anderes Bild" : "Bild hochladen"}
+            <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : value ? "Ändern" : "Bild hochladen"}
           </button>
           {allowLibrary && (
             <button
@@ -567,14 +556,25 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
             </button>
           )}
           {value && (
-            <a
-              href={resolveMediaUrl(value)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block text-[10px] text-white/45 hover:text-[#29B6E8] break-all"
-            >
-              {imageFileName(value)}
-            </a>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={resolveMediaUrl(value)}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid={`${testId}-open`}
+                className="inline-flex items-center px-3 py-2 border border-white/15 text-white/70 font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-white/5"
+              >
+                Ansehen
+              </a>
+              <button
+                type="button"
+                onClick={() => onChange("")}
+                data-testid={`${testId}-remove`}
+                className="inline-flex items-center px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10"
+              >
+                Entfernen
+              </button>
+            </div>
           )}
           <p className="text-[10px] text-white/40">PNG/JPG/WebP bis {maxSizeMb} MB.</p>
         </div>

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameLabel } from "@/lib/gameLabels";
 import { buildDirtyPayload, hasPayloadChanges, sameValue } from "@/lib/dirtyPayload";
@@ -22,10 +21,10 @@ import { SocialsTab } from "./profile/SocialsTab";
 import { AchievementsTab } from "./profile/AchievementsTab";
 import { PrivacyTab } from "./profile/PrivacyTab";
 import { NotificationsTab } from "./profile/NotificationsTab";
+import { SecurityTab } from "./profile/SecurityTab";
 import { TeamsPanel } from "./profile/TeamsPanel";
 import { FriendsPanel } from "./profile/FriendsPanel";
 import { MessagesPanel } from "./profile/MessagesPanel";
-import { SessionsPanel } from "./profile/SessionsPanel";
 
 // Das Profil: Rahmen, Formularzustand und Speichern. Jeder Reiter ist eine
 // eigene Datei unter ./profile - vorher standen 1.800 Zeilen in dieser einen
@@ -37,29 +36,16 @@ import { SessionsPanel } from "./profile/SessionsPanel";
 // speichern von selbst (#257).
 
 const FORM_TABS = new Set(["basic", "gaming", "socials"]);
+// ?tab=sessions war der eigene Reiter für Geräte; seit #258 steckt er in
+// „Sicherheit“, alte Links landen dort.
+const TAB_ALIASES = { sessions: "security" };
 
 export default function ProfilePage() {
   const { user, refresh, isClubMember } = useAuth();
   const siteSettings = usePublicSiteSettings();
-  const confirmGoogle = useConfirm();
-  const googleLinked = !!user?.google_linked;
-  const googleOnly = user?.auth_provider === "google";
-  const unlinkGoogle = async () => {
-    if (!await confirmGoogle({
-      title: "Google trennen?",
-      description: "Du kannst dich danach wieder mit E-Mail und Passwort anmelden.",
-      confirmLabel: "Trennen",
-    })) return;
-    try {
-      await api.post("/auth/google/unlink");
-      await refresh();
-      toast.success("Google-Verknüpfung entfernt.");
-    } catch (e) {
-      toast.error(e.response?.data?.detail || "Google konnte nicht getrennt werden.");
-    }
-  };
   const [params, setParams] = useSearchParams();
-  const requestedTab = params.get("tab") || "basic";
+  const requestedParam = params.get("tab") || "basic";
+  const requestedTab = TAB_ALIASES[requestedParam] || requestedParam;
   const tab = TABS.some((item) => item.k === requestedTab) ? requestedTab : "basic";
   // Der Reiter steht in der Adresse (?tab=…, wie in Mails und Benachrichtigungen
   // verlinkt) und wird als eigener Verlaufseintrag gesetzt, damit „Zurück“ zum
@@ -284,18 +270,7 @@ export default function ProfilePage() {
           <ProfileNav tab={tab} onSelect={setTab} />
 
           <form onSubmit={submit} className="mt-6 lg:mt-0 space-y-5 min-w-0">
-            {tab === "basic" && (
-              <BasicTab
-                form={form}
-                set={set}
-                user={user}
-                refresh={refresh}
-                siteSettings={siteSettings}
-                googleLinked={googleLinked}
-                googleOnly={googleOnly}
-                unlinkGoogle={unlinkGoogle}
-              />
-            )}
+            {tab === "basic" && <BasicTab form={form} set={set} />}
             {tab === "gaming" && <GamingTab form={form} set={set} setGameId={setGameId} gameIdGroups={gameIdGroups} />}
             {tab === "socials" && <SocialsTab form={form} set={set} />}
             {tab === "achievements" && (
@@ -310,7 +285,7 @@ export default function ProfilePage() {
             {tab === "teams" && <TeamsPanel />}
             {tab === "friends" && <FriendsPanel />}
             {tab === "inbox" && <MessagesPanel />}
-            {tab === "sessions" && <SessionsPanel />}
+            {tab === "security" && <SecurityTab user={user} refresh={refresh} siteSettings={siteSettings} />}
             {tab === "privacy" && (
               <PrivacyTab
                 form={form}
