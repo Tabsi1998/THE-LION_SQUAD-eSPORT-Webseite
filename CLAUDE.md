@@ -172,6 +172,11 @@ Seit dem 15. September gilt:
   `frontend/e2e/header-user-menu.spec.js`; der Abmelde-Test in
   `e2e/public.spec.js` öffnet zuerst das Menü (`nav-user`, am Handy
   `nav-logout-mobile`).
+- Mitgliederbereich (#283, PR #285): `pages/user/MemberAreaPage.jsx` lädt
+  `/api/events?upcoming=true&compact=true`; `lib/memberArea.js` behält
+  Mitglieder- und interne Events, die noch anstehen (Karte und Kachel
+  „Interne Events“). Browser-Test `frontend/e2e/member-area.spec.js`.
+  Der Umbau der Seite (#284) wartet auf das OK des Betreibers.
 - Privatsphäre und Benachrichtigungen (#257, PR #275) speichern von selbst:
   `profile/useAutosave.js` (0,7 s Entprellung, ein PATCH je Lauf, Änderungen
   während des Speicherns bleiben stehen), Schalter in `profile/SwitchRow.jsx`
@@ -406,7 +411,7 @@ braucht.
 (Profil II). `main` steht auf `72cef4c`.
 
 ### Offene PRs
-- #285 (#282 Benutzermenü im Kopf). Nach dem Merge: keine.
+- #285 (#282 Benutzermenü im Kopf, #283 interne Events). Nach dem Merge: keine.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -424,12 +429,12 @@ braucht.
 - #238: der Text aus der Bildkachel liegt vor („Bild konnte nicht geladen
   werden … Unexpected HTTP Code“); die Fehlersuche läuft in App 0.4.1-beta.
 
-### Meilensteine und offene Issues (28 offen)
+### Meilensteine und offene Issues (27 offen)
 | Meilenstein | Issues |
 | --- | --- |
 | Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg, #265 Betrieb II |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
-| Web: Mitgliederbereich und Kopfzeile | #283 Interne Events aus der Event-Liste, #284 Mitgliederbereich aufräumen (Vorschlag, wartet auf OK); #282 ist mit #285 umgesetzt |
+| Web: Mitgliederbereich und Kopfzeile | #284 Mitgliederbereich aufräumen (Vorschlag, wartet auf OK); #282 und #283 sind mit #285 umgesetzt |
 | App 0.4.1-beta | #238 Chat-Bild „Unexpected HTTP Code“ (Fehlertext liegt vor) |
 | App 0.5.0-beta | #249 Was ist neu, #250 Update aus der App, #251 In-App-Banner, #277 Nickname-Feld weg |
 | App 0.6.0-beta | #218 Erfolge |
@@ -443,8 +448,8 @@ braucht.
 ### Reihenfolge danach (vom Betreiber freigegeben)
 1. Profil I und Profil II sind fertig und seit 16.09. am Server (#267, #275,
    #276, #278–#281).
-2. Web: Mitgliederbereich und Kopfzeile – #282 (#285, umgesetzt), #283 interne
-   Events, #284 nach dem OK des Betreibers. Danach Server-Update.
+2. Web: Mitgliederbereich und Kopfzeile – #282 und #283 (#285, umgesetzt), #284
+   nach dem OK des Betreibers. Danach Server-Update.
 3. App 0.4.1-beta: #238 Chat-Bild → Build 62.
 4. Betrieb II #265.
 5. App 0.5.0-beta (#249–#251, #277) → Build 63.

@@ -45,7 +45,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen (#228) | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise (#229) | #193, #195 |
 | 18 | **Auszeichnungen: Banner und Trophäen** | offen (#230) | — |
-| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | umgesetzt: Profil I (#253, #257, #258) und Profil II (#254, #255, #256, #259); Nachtrag Kopfzeile und Mitgliederbereich (#282 umgesetzt, #283, #284 offen) | #267, #275, #276, #278, #279, #280, #281, #285 |
+| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | umgesetzt: Profil I (#253, #257, #258) und Profil II (#254, #255, #256, #259); Nachtrag Kopfzeile und Mitgliederbereich (#282, #283 umgesetzt, #284 wartet auf das OK) | #267, #275, #276, #278, #279, #280, #281, #285 |
 | 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
 | 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
 | 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | #232 und #233 Teil 1 umgesetzt, Rest als #265 offen | #263, #266 |
@@ -434,7 +434,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233 umgesetzt; #223, #231, #265 offen |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
 | Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar (#279, umgesetzt), #256 Dashboard (#280, umgesetzt), #259 Freunde (#281, umgesetzt; #222 ist darin aufgegangen) – Meilenstein abgeschlossen |
-| Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter, #284 Mitgliederbereich aufräumen (Vorschlag im Issue, wartet auf das OK) |
+| Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (Vorschlag im Issue, wartet auf das OK) |
 | Web: Dynamik | Block 20: #224, #225, #226 |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | Block 17 und 18: #229, #230 |
@@ -658,6 +658,20 @@ Am Handy hat das Klappmenü dieselben Einträge; das Dashboard bekommt „Profil
 schließen es), damit die Tests in jsdom laufen. Der Browser-Test für das Abmelden öffnet
 seit dem zuerst das Menü. Nebenbei: die Profilseite stürzte ab, wenn `/api/games` keine
 Liste liefert – der neue Browser-Test hat es gezeigt, jetzt wird die Antwort geprüft.
+
+### Was 19.9 gefunden hat (#283, PR #285)
+
+**Die Karte war nie angeschlossen.** „Interne Events“ im Mitgliederbereich war ein fester
+Platzhalter; die Seite rief keine Events ab, obwohl die Halloween Gaming Night als
+Mitglieder-Event ausgeschrieben war. „Interne News“ daneben filterte längst echte Daten.
+
+**Kein neuer Endpunkt.** `GET /api/events?upcoming=true` liefert schon, was der Angemeldete
+sehen darf (Sichtbarkeit public/community/members/internal, Entwürfe und Vergangenes weg).
+Die Seite behält davon Mitglieder- und interne Events und zeigt die nächsten drei mit
+Termin, Ort und Link; eine Kachel zählt sie. Die Auswahl steckt in `lib/memberArea.js`.
+
+**Was bleibt (#284):** Kacheln und Karten zeigen dieselben Themen doppelt, und drei Karten
+sind meist leer. Der Vorschlag steht im Issue und wartet auf das OK des Betreibers.
 
 ## Block 16 — Turnier-Leitfaden im Adminbereich
 
