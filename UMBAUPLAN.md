@@ -509,9 +509,11 @@ Fehlergruppen, Scheduler – alle fünf Minuten, sieben Tage Verlauf. Die Bewert
 von der Messung, damit die Schwellen testbar sind. Die In-Memory-Datenbank der Tests kennt
 kein `ping`; die Prüfung weicht dort auf ein Lesen aus.
 
-**Alarme über den vorhandenen Webhook, gedrosselt.** Rote Prüfungen und neue 5xx-Gruppen
-gehen über denselben Discord-Webhook wie News und Turniere, höchstens eine Meldung je
-Schlüssel und Stunde. Die Fehlergruppen-Meldung läuft als Hintergrund-Aufgabe, damit der
+**Alarme über einen eigenen Webhook, gedrosselt.** Der erste Entwurf schickte Alarme über den
+Community-Webhook – dort gehören nur News, Turniere und Erfolge hin (Einwand des Betreibers).
+Jetzt gibt es in den Discord-Einstellungen einen zweiten, privaten Betriebs-Webhook; fehlt er,
+gibt es keine Alarme, und auf den Community-Kanal fällt der Betrieb nie zurück. Rote Prüfungen
+und neue 5xx-Gruppen gehen dorthin, höchstens eine Meldung je Schlüssel und Stunde. Die Fehlergruppen-Meldung läuft als Hintergrund-Aufgabe, damit der
 Anfrage-Pfad nicht auf Discord wartet. Push an Admins bleibt aus – der Webhook reicht.
 
 **p75 mit Interpolation.** Bei wenigen Messwerten liefert der nächste Rang (wie bei Tempo)

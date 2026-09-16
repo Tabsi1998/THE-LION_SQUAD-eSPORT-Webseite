@@ -39,7 +39,7 @@ async def discord_recorder(monkeypatch):
         calls.append({"title": title, "description": description, **kwargs})
         return {"ok": True, "status_code": 204}
 
-    monkeypatch.setattr(discord_service, "send_discord", fake_send)
+    monkeypatch.setattr(discord_service, "send_ops_discord", fake_send)
     return calls
 
 
@@ -177,3 +177,46 @@ async def test_a_new_5xx_group_alerts_once_and_4xx_never(flow, discord_recorder)
 
     assert await ops_alerts.alert_error_group(flow.db, {**group, "fingerprint": "def456", "status_code": 404}) is False
     assert len(discord_recorder) == 1
+
+
+@pytest.mark.asyncio
+async def test_alerts_use_only_the_ops_webhook_never_the_community_channel(flow, monkeypatch):
+    import discord_service
+
+    posted = []
+
+    async def fake_post(webhook_url, **kwargs):
+        posted.append({"webhook_url": webhook_url, "username": kwargs.get("username")})
+        return {"ok": True, "status_code": 204, "error": None}
+
+    monkeypatch.setattr(discord_service, "_post_embed", fake_post)
+
+    admin = await flow.add_user(role="club_admin", name="clubadmin")
+    flow.act_as(admin)
+    saved = await flow.put("/api/settings/discord", json={"webhook_url": "https://discord.com/api/webhooks/1/community", "enabled": True})
+    assert saved.status_code == 200, saved.text
+
+    # Nur der Community-Webhook ist da: kein Alarm, und schon gar nicht dorthin.
+    outcome = await discord_service.send_ops_discord("Betrieb: Test", "rot")
+    assert outcome == {"ok": False, "reason": "ops_webhook_missing", "error": "Discord ops webhook not configured"}
+    assert posted == []
+    skipped = await flow.db.email_logs.find_one({"target": "ops"}, {"_id": 0})
+    assert skipped and skipped["status"] == "skipped"
+
+    saved = await flow.put("/api/settings/discord", json={"ops_webhook_url": "https://discord.com/api/webhooks/2/ops"})
+    assert saved.status_code == 200, saved.text
+    shown = (await flow.get("/api/settings/discord")).json()
+    assert shown["ops_configured"] is True and "ops_webhook_url" not in shown
+    assert shown["ops_webhook_url_masked"].startswith("https://discord.com/api/webhooks/")
+
+    outcome = await discord_service.send_ops_discord("Betrieb: Test", "rot")
+    assert outcome["ok"] is True
+    assert posted == [{"webhook_url": "https://discord.com/api/webhooks/2/ops", "username": "LION Betrieb"}]
+
+    # Der Community-Weg bleibt beim Community-Webhook.
+    await discord_service.send_discord("News", "öffentlich")
+    assert posted[-1]["webhook_url"] == "https://discord.com/api/webhooks/1/community"
+
+    test_message = await flow.post("/api/settings/discord/test?target=ops")
+    assert test_message.status_code == 200 and test_message.json()["ok"] is True
+    assert posted[-1]["webhook_url"] == "https://discord.com/api/webhooks/2/ops"

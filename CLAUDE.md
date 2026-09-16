@@ -120,8 +120,9 @@ Seit dem 15. September gilt:
   (Datenbank, Speicher, Upload-Volume, Mail-Queue, Änderungsstrom,
   Bildvarianten, Fehlergruppen, Scheduler), Bewertung in `rate_*`, Lauf
   alle 5 min über den Scheduler-Job `ops_checks`, Sammlung
-  `ops_check_runs` (TTL 7 Tage). `services/ops_alerts.py` – Discord-Webhook
-  für rote Prüfungen und neue 5xx-Gruppen (Hook in
+  `ops_check_runs` (TTL 7 Tage). `services/ops_alerts.py` – eigener
+  Betriebs-Webhook (`settings.discord.ops_webhook_url`, `send_ops_discord`;
+  nie der Community-Webhook) für rote Prüfungen und neue 5xx-Gruppen (Hook in
   `ops_monitor._upsert_error`), eine Meldung je Schlüssel und Stunde
   (`ops_alert_state`). `services/ops_vitals.py` + `routes/ops_routes.py`:
   `POST /api/ops/vitals` (anonym, 30 Sendungen je Adresse und Minute,

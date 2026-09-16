@@ -1,7 +1,7 @@
 """Admin settings: email, SMTP, branding, socials, legal texts, banners, Discord and auth."""
 
 import os
-from fastapi import APIRouter, HTTPException, Depends, Response
+from fastapi import Query, APIRouter, HTTPException, Depends, Response
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Literal
 from datetime import datetime, timezone
@@ -216,6 +216,9 @@ async def _newsletter_source(kind: str, source_id: str) -> dict:
 class DiscordSettings(BaseModel):
     webhook_url: Optional[str] = None
     clear_webhook: Optional[bool] = None
+    # Eigener Kanal für den Betrieb (#265): Alarme gehen nie in den Community-Kanal.
+    ops_webhook_url: Optional[str] = None
+    clear_ops_webhook: Optional[bool] = None
     username: Optional[str] = None
     avatar_url: Optional[str] = None
     enabled: bool = True
@@ -238,7 +241,7 @@ class AuthSettings(BaseModel):
     google_client_id: Optional[str] = None
 
 
-SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "webhook_url", "twitch_client_secret"}
+SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "webhook_url", "ops_webhook_url", "twitch_client_secret"}
 
 
 def _hide_branding_secrets(settings: dict) -> dict:
@@ -1101,6 +1104,10 @@ async def get_discord(me: dict = Depends(require_club_admin())):
     if s.get("webhook_url"):
         s["webhook_url_masked"] = "https://discord.com/api/webhooks/…"
         s.pop("webhook_url", None)
+    s["ops_configured"] = bool(s.get("ops_webhook_url"))
+    if s.get("ops_webhook_url"):
+        s["ops_webhook_url_masked"] = "https://discord.com/api/webhooks/…"
+        s.pop("ops_webhook_url", None)
     last = await db.email_logs.find_one(
         {"channel": "discord"},
         {"_id": 0, "status": 1, "error": 1, "event_key": 1, "created_at": 1},
@@ -1118,17 +1125,21 @@ async def get_discord(me: dict = Depends(require_club_admin())):
 async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_admin())):
     db = get_db()
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
-    clear_webhook = bool(updates.pop("clear_webhook", False))
-    unset = {"webhook_url": ""} if clear_webhook else {}
-    if "webhook_url" in updates:
-        updates["webhook_url"] = updates["webhook_url"].strip()
-    if "webhook_url" in updates and not updates["webhook_url"]:
-        updates.pop("webhook_url")
-    if "webhook_url" in updates:
-        from discord_service import is_valid_discord_webhook_url
-        if not is_valid_discord_webhook_url(updates["webhook_url"]):
-            raise HTTPException(400, "Ungültige Discord Webhook URL. Erlaubt sind https://discord.com/api/webhooks/... URLs.")
-        updates["webhook_url"] = encrypt_secret(updates["webhook_url"])
+    from discord_service import is_valid_discord_webhook_url
+    unset = {}
+    if updates.pop("clear_webhook", False):
+        unset["webhook_url"] = ""
+    if updates.pop("clear_ops_webhook", False):
+        unset["ops_webhook_url"] = ""
+    for field in ("webhook_url", "ops_webhook_url"):
+        if field in updates:
+            updates[field] = str(updates[field]).strip()
+            if not updates[field]:
+                updates.pop(field)
+                continue
+            if not is_valid_discord_webhook_url(updates[field]):
+                raise HTTPException(400, "Ungültige Discord Webhook URL. Erlaubt sind https://discord.com/api/webhooks/... URLs.")
+            updates[field] = encrypt_secret(updates[field])
     for key in ("username", "avatar_url"):
         if key in updates and isinstance(updates[key], str):
             updates[key] = updates[key].strip()
@@ -1220,8 +1231,14 @@ async def amp_test(me: dict = Depends(require_club_admin())):
 
 
 @settings_router.post("/discord/test")
-async def discord_test(me: dict = Depends(require_club_admin())):
-    from discord_service import send_discord
+async def discord_test(target: str = Query(default="community", pattern="^(community|ops)$"), me: dict = Depends(require_club_admin())):
+    from discord_service import send_discord, send_ops_discord
+    if target == "ops":
+        return await send_ops_discord(
+            "Betrieb · Testnachricht",
+            "Diese Nachricht bestätigt, dass der Betriebs-Webhook funktioniert. Hierher kommen rote Auto-Checks und neue Serverfehler - sonst nichts.",
+            event_key="test",
+        )
     res = await send_discord(
         "THE LION SQUAD · Testnachricht",
         "Diese Nachricht bestätigt, dass dein Discord-Webhook korrekt funktioniert. 🦁",

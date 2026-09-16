@@ -2,9 +2,10 @@
 gehen per Discord-Webhook raus - gedrosselt auf eine Meldung je Schlüssel
 und Stunde, damit ein Dauerfehler nicht den Kanal flutet.
 
-Der Webhook ist derselbe wie für News und Turniere (Admin → Einstellungen →
-Discord). Ist er nicht eingerichtet, passiert nichts; ``send_discord``
-schreibt das ins Log.
+Der Betrieb hat seinen eigenen Webhook (Admin → Einstellungen → Discord →
+Betriebs-Webhook) - der Community-Kanal mit News, Turnieren und Erfolgen
+bekommt nie einen Alarm. Ist der Betriebs-Webhook nicht eingerichtet,
+passiert nichts; ``send_ops_discord`` schreibt das ins Log.
 """
 from __future__ import annotations
 
@@ -45,9 +46,9 @@ async def claim_alert(db, key: str, now: datetime | None = None) -> bool:
 
 
 async def _send(title: str, description: str, fields: list[dict], event_key: str) -> bool:
-    from discord_service import send_discord
+    from discord_service import send_ops_discord
 
-    outcome = await send_discord(title, description, color=RED, url="/admin/ops", fields=fields, event_key=event_key)
+    outcome = await send_ops_discord(title, description, color=RED, url="/admin/ops", fields=fields, event_key=event_key)
     return bool(outcome.get("ok"))
 
 
