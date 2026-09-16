@@ -45,7 +45,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen (#228) | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise (#229) | #193, #195 |
 | 18 | **Auszeichnungen: Banner und Trophäen** | offen (#230) | — |
-| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | in Arbeit: Profil I (#253, #257, #258) und #254 umgesetzt; #255, #256, #259 (Profil II) offen | #267, #275, #276, #278 |
+| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | in Arbeit: Profil I (#253, #257, #258), #254 und #255 umgesetzt; #256, #259 (Profil II) offen | #267, #275, #276, #278, #279 |
 | 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
 | 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
 | 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | #232 und #233 Teil 1 umgesetzt, Rest als #265 offen | #263, #266 |
@@ -432,7 +432,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233 umgesetzt; #223, #231, #265 offen |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
-| Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar, #256 Dashboard, #259 Freunde (#222 ist darin aufgegangen) |
+| Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar (#279, umgesetzt), #256 Dashboard, #259 Freunde (#222 ist darin aufgegangen) |
 | Web: Dynamik | Block 20: #224, #225, #226 |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | Block 17 und 18: #229, #230 |
@@ -592,6 +592,26 @@ den keine App liest, zeigt direkt auf `/messages/<absender>`.
 **Der Browser-Test läuft ohne Backend.** Wie die Chat-Tests stellt er den Server mit
 `page.route` nach: 120 Nachrichten, davon zuerst 50; Hochscrollen holt 50 und dann 20, und die
 Seitenhöhe des Dokuments bleibt gleich – der Beweis, dass nur der Verlauf scrollt.
+
+### Was 19.5 gefunden hat (#255, PR #279)
+
+**Dreimal dieselbe Zeile, nirgends hin.** Das Dashboard zeigte Titel und Uhrzeit, nicht
+anklickbar; die Glocke hatte zwar Links, aber keine Bündelung. Jetzt teilen Glocke, Dashboard
+und die neue Seite `/notifications` eine Zeile (`NotificationRow`) und einen Feed
+(`useNotificationFeed`): Titel, eine Zeile Vorschau, Klick führt ans Ziel und markiert das
+Bündel als gelesen.
+
+**Bündeln nach Schlüssel, nicht nach Titel.** Nachrichten desselben Absenders bündeln über
+`meta.thread_user_id`, Team-, Turnier- und Match-Chats über ihre IDs; innerhalb einer Stunde ab
+der neuesten. Der Titel wird daraus gebaut („3 neue Nachrichten von X“, „4 neue Teamnachrichten
+[GRD]“); unbekannte Titel bekommen einen Zähler. Reine Funktionen in `lib/notifications.js`,
+einzeln getestet.
+
+**Zwei Backend-Pfade führten ins Leere.** Gewinne verlinkt das Backend mit `/me/prizes`, die
+Seite heißt `/my/prizes`; Turnier-Chats mit `/tournaments/<slug>/chat`, das es im Web nicht gibt
+(der Chat steht auf der Turnierseite). Beides fängt die Zielzuordnung im Web ab; die Pfade im
+Backend bleiben, weil die App nach Art und Metadaten navigiert und den Pfad nur als Rückfall
+liest.
 
 ## Block 16 — Turnier-Leitfaden im Adminbereich
 
