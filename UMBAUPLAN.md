@@ -45,7 +45,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen (#228) | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise (#229) | #193, #195 |
 | 18 | **Auszeichnungen: Banner und Trophäen** | offen (#230) | — |
-| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | in Arbeit: Profil I (#253, #257, #258), #254, #255 und #256 umgesetzt; #259 (Profil II) offen | #267, #275, #276, #278, #279, #280 |
+| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | umgesetzt: Profil I (#253, #257, #258) und Profil II (#254, #255, #256, #259) | #267, #275, #276, #278, #279, #280, #281 |
 | 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
 | 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
 | 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | #232 und #233 Teil 1 umgesetzt, Rest als #265 offen | #263, #266 |
@@ -432,7 +432,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233 umgesetzt; #223, #231, #265 offen |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
-| Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar (#279, umgesetzt), #256 Dashboard (#280, umgesetzt), #259 Freunde (#222 ist darin aufgegangen) |
+| Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar (#279, umgesetzt), #256 Dashboard (#280, umgesetzt), #259 Freunde (#281, umgesetzt; #222 ist darin aufgegangen) – Meilenstein abgeschlossen |
 | Web: Dynamik | Block 20: #224, #225, #226 |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | Block 17 und 18: #229, #230 |
@@ -626,6 +626,19 @@ entfallen, weil dieselben Übersichten in der Antwort stecken.
 Teamverwaltung, Achievements, Turniere, Fast Lap – alles über Menü oder Profil erreichbar. Geblieben
 sind Mitgliedervorteile, Strafen und Daten; „Mitglied werden“ ist ein Text-Link im Kopf, Gewinne
 sind eine offene Aktion. Matches und Turnierleitung erscheinen nur, wenn es welche gibt.
+
+### Was 19.7 gefunden hat (#259, PR #281)
+
+**Die Suche gab es schon, nur nicht hier.** `/api/messages/users?q=` findet jeden aktiven Spieler
+nach Name oder @nutzername; der Reiter Freunde nutzt sie jetzt und rechnet den Stand zu mir
+(befreundet, gesendet, offen, blockiert) aus der eigenen Freundesliste – ohne neuen Endpunkt.
+
+**Keine Anwesenheit im Backend.** „Online“ oder „zuletzt gesehen“ ließe sich nicht anzeigen, weil
+kein Feld dafür gepflegt wird; die Zeile zeigt Avatar, Name, Profil-Link, Schreiben und Entfernen.
+
+**Zähler ohne den Reiter zu öffnen.** Das Profil lädt die Freundesliste einmal und bei jeder
+Änderung über den Änderungsstrom und hängt „Freunde (n)“ und einen Punkt für offene Anfragen an
+den Reiter. Damit ist Block 19 (Web-Profil) komplett: Profil I und Profil II sind abgeschlossen.
 
 ## Block 16 — Turnier-Leitfaden im Adminbereich
 

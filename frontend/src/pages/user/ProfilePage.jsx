@@ -70,6 +70,21 @@ export default function ProfilePage() {
   const [games, setGames] = useState([]);
   const initialProfileFormRef = useRef(null);
   const initialProfileUserIdRef = useRef("");
+  // Zähler im Reiter „Freunde“ und Punkt bei offenen Anfragen (#259).
+  const [friendCounts, setFriendCounts] = useState({ friends: 0, incoming: 0 });
+  const loadFriendCounts = useCallback(async () => {
+    try {
+      const { data } = await api.get("/friends");
+      setFriendCounts({
+        friends: Array.isArray(data?.friends) ? data.friends.length : 0,
+        incoming: Array.isArray(data?.incoming) ? data.incoming.length : 0,
+      });
+    } catch {
+      setFriendCounts({ friends: 0, incoming: 0 });
+    }
+  }, []);
+  useEffect(() => { loadFriendCounts(); }, [loadFriendCounts]);
+  useApiInvalidation(loadFriendCounts, ["friends"]);
   const autosave = useAutosave({
     form,
     setForm,
@@ -273,7 +288,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="mt-8 lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10 lg:items-start">
-          <ProfileNav tab={tab} onSelect={setTab} />
+          <ProfileNav tab={tab} onSelect={setTab} badges={{ friends: { count: friendCounts.friends, alert: friendCounts.incoming > 0 } }} />
 
           <form onSubmit={submit} className="mt-6 lg:mt-0 space-y-5 min-w-0">
             {tab === "basic" && <BasicTab form={form} set={set} />}
@@ -289,7 +304,7 @@ export default function ProfilePage() {
               />
             )}
             {tab === "teams" && <TeamsPanel />}
-            {tab === "friends" && <FriendsPanel />}
+            {tab === "friends" && <FriendsPanel onChanged={loadFriendCounts} />}
             {tab === "security" && <SecurityTab user={user} refresh={refresh} siteSettings={siteSettings} />}
             {tab === "privacy" && (
               <PrivacyTab
