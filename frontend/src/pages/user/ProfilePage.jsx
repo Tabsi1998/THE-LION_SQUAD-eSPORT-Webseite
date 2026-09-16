@@ -119,7 +119,7 @@ export default function ProfilePage() {
   }, ["achievements", "users"]);
 
   useEffect(() => {
-    api.get("/games").then(({ data }) => setGames(data || [])).catch(() => setGames([]));
+    api.get("/games").then(({ data }) => setGames(Array.isArray(data) ? data : [])).catch(() => setGames([]));
   }, []);
 
   useEffect(() => {

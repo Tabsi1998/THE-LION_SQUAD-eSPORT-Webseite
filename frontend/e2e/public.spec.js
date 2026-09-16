@@ -198,7 +198,13 @@ test("login shows inline validation and blocks simultaneous requests", async ({ 
   expect(submissions).toBe(1);
 });
 
-test("logout keeps the visible session when server revocation fails", async ({ page }) => {
+test("logout keeps the visible session when server revocation fails", async ({ page, isMobile }) => {
+  // Abmelden liegt seit #282 im Benutzermenü, am Handy im aufgeklappten Menü.
+  const logoutButton = async () => {
+    const id = isMobile ? "nav-logout-mobile" : "nav-logout";
+    if (!(await page.getByTestId(id).isVisible())) await page.getByTestId(isMobile ? "nav-mobile-toggle" : "nav-user").click();
+    return page.getByTestId(id);
+  };
   await mockPublicChrome(page);
   const user = { id: "user-1", username: "testplayer", display_name: "Test Player", role: "player" };
   let loggedIn = true;
@@ -219,11 +225,10 @@ test("logout keeps the visible session when server revocation fails", async ({ p
 
   await page.goto("/403");
   await acceptCookies(page);
-  await expect(page.getByTestId("nav-logout")).toBeVisible();
-  await page.getByTestId("nav-logout").click();
+  await (await logoutButton()).click();
   const errorToast = page.getByText("Logout derzeit nicht möglich");
   await expect(errorToast).toBeVisible();
-  await expect(page.getByTestId("nav-logout")).toBeVisible();
+  await expect(await logoutButton()).toBeVisible();
 
   // Der Toast liegt oben rechts über der Navigation. Für den zweiten Klick
   // fährt Playwright mit dem Zeiger dorthin, und Sonner hält das Ausblenden
@@ -232,8 +237,9 @@ test("logout keeps the visible session when server revocation fails", async ({ p
   await page.mouse.move(0, 0);
   await expect(errorToast).toBeHidden({ timeout: 15_000 });
 
-  await page.getByTestId("nav-logout").click();
-  await expect(page.getByTestId("nav-logout")).toHaveCount(0);
+  await (await logoutButton()).click();
+  await expect(page.getByTestId("nav-user")).toHaveCount(0);
+  await expect(page.getByTestId("nav-login")).toHaveCount(1);
   expect(attempts).toBe(2);
 });
 
